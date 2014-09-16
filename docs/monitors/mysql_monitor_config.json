@@ -1,0 +1,71 @@
+{
+  // The write logs api key for your account.  You can retrieve/create one at
+  // https://www.scalyr.com/keys
+  api_key: "<api key here>",
+
+  // Any attributes you wish to add to all data uploaded from this server.
+  // For example, you could add a region description as described below.
+  server_attributes: {
+     // region: "us-east"
+  }
+
+  agent_data_path: "<scalyr data path>",
+  agent_log_path: "<scalyr log path>",
+
+  // The paths for the logs you wish to copy from this server.  The agent
+  // log is automatically uploaded.
+  logs: [
+     // Example:
+     // {
+     //   path: "/var/log/tomcat6/access.log"
+     // }
+    {
+      // mysql log - Debian / Redhat Linux
+      path: "/var/log/mysql.log"
+    },
+    {
+      // mysql error log - Debian / Redhat Linux
+      path: "/var/log/mysql/error.log"
+    },    
+    // {
+    //   // mysql log - Redhat / RHEL / CentOS / Fedora Linux
+    //   path: "/var/log/mysql.log"
+    // },
+    
+  ],
+
+  // Any Scalyr monitors you wish to run on this server.
+  monitors: [ 
+    {
+        module: "scalyr_agent.builtin_monitors.mysql_monitor",
+   
+        // Either "database_socket" or "database_hostport" is REQUIRED to indicate the type of connection being used.
+        
+        
+        // database_socket:  "<path to socket file>"
+        //      When using "socket" connection type, this value specifies the location 
+        //      of the mysql socket file.  If you specify "default", the  
+        //      default for the system (if available) is used.  For systems with multiple 
+        //      mysql instances should specify the location to be safe.
+        // database_socket:  "/var/run/mysqld/mysqld.sock",
+
+        // database_hostport:  "<hostname>:<port>"
+        //      When using the "host:port" connection type, this value specifies the host
+        //      and port to connect to.  By default, this is "localhost:3306" and shouldn't  
+        //      need to change when monitoring the local machine.  Allowed values are
+        //      "default", "<host>" to specify only the hostname, or the full pair
+        //      "<host>:<port>"        
+        // database_host:  "localhost:3306",
+   
+        // database_username:  "<username>"
+        //      This value is REQUIRED and is the mysql username that has sufficient 
+        //      privileges to run the required queries -- typically admin leve.
+        database_username: "root",
+   
+        // database_password:  "<password>"
+        //      This value is REQUIRED and is the password associated with the username
+        //      specified above.
+        database_password: "password"
+    }
+  ]
+}

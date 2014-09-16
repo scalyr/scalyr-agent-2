@@ -1,0 +1,139 @@
+MySQL Dashboard:
+
+{
+  duration: "4h",
+  
+  graphs: [
+    {
+      label: "Read requests",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='mysql.derived.read_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Write requests",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='mysql.derived.write_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Connect attempts that abort",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='mysql.derived.aborted_connections_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Client connections that abort",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='mysql.derived.aborted_clients_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Number of slow queries",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.slow_query_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Query cache efficiency",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.query_cache_efficiency'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Number of joins with out indexes",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.joins_without_indexes'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Table cache hit rate",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.table_cache_hit_rate'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Table locks acquired immediately",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.immediate_table_lock_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Allowed files open",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.open_file_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Total connections in use",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.connections_used_percentage'",
+          label: "percentage"
+        }
+      ]
+    },
+    {
+      label: "Connection threads cached",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.thread_cache_hit_rate'",
+          label: "percentage"
+        }
+      ]
+    },       
+    {
+      label: "Temporary tables spooled to disk",
+      plots: [
+        {
+          facet: "value"
+          filter: "metric='mysql.derived.tmp_disk_table_percentage'",
+          label: "percentage"
+        }
+      ]
+    },       
+  ]
+}
+

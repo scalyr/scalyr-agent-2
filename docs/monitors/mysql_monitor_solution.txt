@@ -1,0 +1,138 @@
+Install MySQL Monitor
+
+This Solution describes how to setup and make use of the MySQL Monitor included with the Scalyr agent.  The preconfigured dashboard incorporates a number of derived statistics that can help analyze some common MySQL performance stats.
+
+Prerequisites:
+
+1.  MySQL is installed and running.  To verify:
+    - At a terminal prompt, enter the command "ps aux | grep mysql".  
+    - If you are running Ubuntu, you should see something resembling:
+        mysql     1104  0.0  6.7 689840 50692    Ssl  Jun28   4:36 /usr/sbin/mysqld
+    - If it is not running, consult the specifics for your OS / Distribution on how to start MySQL
+
+2.  MySQL user with Admin privileges. Both the username and password.
+
+3.  Decide how you want the monitor to connect to your MySQL database.  The two options are "socket" and "host:port".
+    - If you choose "socket", the MySQL Monitor will attempt to connect to the default location for your OS.  If you are wanting to connect to the non-default location or you did a custom install of MySQL, you will need to locate the appropriate socket file.
+    - If you choose "host:port", the MySQL Monitor will attempt to connect to the default values.  If you changed these values, you will need to know them.  Typically the values are "localhost" and 3306.  The "port" can be found as the "port" value in your mysql.cnf file.
+
+Steps:
+
+1.  In your Scalyr Agent configuration file, you will need to add one of the following stanzas to the monitor section to enable the MySQL Monitor:
+
+    - If you are using "socket" with the default location:
+    
+        {
+            module: "scalyr_agent.builtin_monitors.mysql_monitor",
+            database_socket: "default",
+            database_username: "<username>",
+            database_password: "<password>"
+        },
+        
+    - If you are using "socket" with a custom location:
+    
+        {
+            module: "scalyr_agent.builtin_monitors.mysql_monitor",
+            database_socket: "<path to your socket file>",
+            database_username: "<username>",
+            database_password: "<password>"
+        }
+        
+    - If you are using "host:port" with the default values:
+    
+        {
+            module: "scalyr_agent.builtin_monitors.mysql_monitor",
+            database_hostport: "default",
+            database_username: "<username>",
+            database_password: "<password>"
+        },
+        
+    - If you are using "socket" with a custom location:
+    
+        {
+            module: "scalyr_agent.builtin_monitors.mysql_monitor",
+            database_hostport: "<hostname>:<port number>",
+            database_username: "<username>",
+            database_password: "<password>"
+        }
+
+2.  Restart your Scalyr Agent, allow some data to collect, and click "Dashboards" in the navigation bar, and select the "MySQL" dashboard.
+
+3.  The MySQL dashboard will present you with a series of graphs of derived data from your MySQL database.
+
+Dashboard Graphs
+
+There are a number of pre-configured graphs that are part of the MySQL dashboard.  The graphs fall into three basic categories: resource usage, application behavior, and a mix of each.  The graphs that fall into each category are as follows:
+
+    - Resource usage:
+        - Table locks acquired immediately
+        - Allowed files open
+        - Total connections in use
+        - Connection threads cached
+        - Temporary tables spooled to disk
+        
+    - Application behavior:
+        - Read requests
+        - Write requests
+        - Connect attempts that abort
+        - Client connections that abort
+        - Number of slow queries
+        - Number of joins without indexes
+    
+    - A mix of both:
+        - Query cache efficiency
+        - Table cache hit rate
+
+Each graph corresponds to a "derived" metric outlined in the "MySQL Monitor" documentation <#### insert link here>.  Below is a description of each graph and the metric it corresponds to:
+
+    - Number of slow queries
+        - metric: mysql.derived.slow_query_percentage
+        - This graph shows what percentage of the queries being run are deemed to be "slow".  Often this can affect application performance as well as overall database load.  The value shown is a percentage of the total queries run.  If the percentage is high, it might be worth looking at how the application queries and data is structured.
+
+    - Total connections in use
+        - metric: mysql.derived.connections_used_percentage
+        - Within the MySQL configuration file, the maximum number of client connections allowed is specified.  This value shows the percentage of those connections that are in use.  If the value is quite small, you can conserve resources by decreasing the number.  If the percentage used is quite high, it is worth looking at updating the configuration to allow more connections or if the application(s) hitting the database can be tuned to use fewer.
+
+    - Connection attempts that abort
+        - metric: mysql.derived.aborted_connections_percentage
+        - This value shows the total percentage of inbound client connections that fail/abort the initial connection attempt for some reason.  Reasons can typically include invalid username/password or invalid privileges.
+
+    - Client connections that abort
+        - metric: mysql.derived.aborted_clients_percentage
+        - When a client does not disconnect cleanly (either times out or doesn't call "close" on the connection), it registers as an aborted client connection.  If this value is high, there may be network connectivity issues or potentially something behaving abnormally in the application.
+
+    - Read requests
+        - metric: mysql.derived.read_percentage
+        - The graph simply shows the percentage of client requests that are reads.  If it looks like the expected ratio of reads to writes is out of skew, looking into application behavior is a good bet.
+
+    - Write requests
+        - metric: mysql.derived.write_percentage
+        - The graph shows the percentage of client requests that are writes.  This value is basically 100% minus the percentage that are reads.  
+        
+    - Query cache efficiency
+        - metric: mysql.derived.query_cache_efficiency
+        - MySQL can be configured to allow memory resources to be used to cache queries.  If the percentage is low and performance is being impacted, consider configuring more resources.
+
+    - Number of joins without indexes
+        - metric: mysql.derived.joins_without_indexes
+        - A numeric value showing the number of joins performed where there is no index used.  If the application is performing poorly, looking at the database schema and making adjustments could help overall performance.
+
+    - Table cache hit rate
+        - metric: mysql.derived.table_cache_hit_rate
+        - What percentage of the time is a table already open when a client request comes in.  If the value is too low, there can be performance impacts.
+
+    - Allowed files open
+        - metric: mysql.derived.open_file_percentage
+        - In the MySQL config, the open_files_limit determines the number of files MySQL can actually open.  Allowed files open shows how many open files there are against the total allowed.  If this value gets too high, it might be worth considering upping the configured maximums.
+
+    - Table locks acquired immediately
+        - metric: mysql.derived.immediate_table_lock_percentage
+        - Certain operations require that a table be locked before they can be performed.  If the percentage of tables that can't be locked immediately is low, this could have a performance impact.  
+
+    - Table cache hit rate
+        - metric: mysql.derived.thread_cache_hit_rate
+        - This metric reflects the percentage of time that a new thread needs to be created when an incoming client connection occurs.  If the value is low, looking at upping the value of thread_cache_size within you MySQL config.
+
+    - Temporary tables spooled to disk
+        - metric: mysql.derived.tmp_disk_table_percentage
+        - During the execution of queries, the server may need to create temporary tables.  Whether or not these temp tables are stored within RAM or spooled to disk depends on the configuration for the temp table size.  If the hit rate for this value is too low, it is worth looking into upping the limit.
