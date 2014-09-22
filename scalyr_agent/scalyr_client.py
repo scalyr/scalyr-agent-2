@@ -172,7 +172,7 @@ class ScalyrClientSession(object):
                 log.warn('No ssl library available so cannot verify server certificate when communicating with Scalyr. '
                          'This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. '
                          'To solve this, install the Python ssl library. '
-                         'For more details, see https://www.scalyr.com/help/scalyr-agent-2-needs-ssl',
+                         'For more details, see https://www.scalyr.com/help/scalyr-agent#ssl',
                          limit_once_per_x_secs=86400, limit_key='nosslwarning', error_code='client/nossl')
             elif self.__ca_file is None:
                 log.warn('Server certificate validation has been disabled while communicating with Scalyr. '
