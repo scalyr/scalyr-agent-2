@@ -213,7 +213,7 @@ Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine
 
-View data from this agent at: https://agent.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 
 
 Agent configuration:
@@ -274,7 +274,7 @@ Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine
 
-View data from this agent at: https://agent.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 
 
 Agent configuration:
@@ -338,7 +338,7 @@ Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine
 
-View data from this agent at: https://agent.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
+View data from this agent at: https://www.scalyr.com/events?filter=$serverHost%3D%27test_machine%27
 
 
 Agent configuration:

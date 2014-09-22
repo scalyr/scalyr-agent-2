@@ -248,8 +248,14 @@ def report_status(output, status, current_time):
     print >>output, 'Agent log:        %s' % status.log_path
     print >>output, 'ServerHost:       %s' % status.server_host
     print >>output, ''
+    server = status.scalyr_server
+    # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,
+    # you should go to https://www.scalyr.com.  So, we do a little clean up before sticking it in
+    # the url.  Same goes for https://log.scalyr.com  -- it is really is just https://www.scalyr.com
+    server = server.replace('https://agent.', 'https://www.')
+    server = server.replace('https://log.', 'https://www.')
     print >>output, 'View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27' % (
-        status.scalyr_server, status.server_host)
+        server, status.server_host)
     print >>output, ''
     print >>output, ''
 
