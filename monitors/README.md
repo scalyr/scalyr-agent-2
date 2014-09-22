@@ -4,6 +4,9 @@ Third-party monitor plugins
 The `contrib` and `local` directories can be used to hold monitor plugins developed by third parties (non-Scalyr
 engineers).
 
+To learn how to develop plugins, please see the
+[instructions for creating a monitor plugin](../docs/CREATING_MONITORS.md).
+
 The `contrib` directory should be used by developers who wish to contribute their plugins to the main Scalyr repository
 so that other Scalyr customers can use them.
 

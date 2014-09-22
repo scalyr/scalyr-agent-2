@@ -1,7 +1,6 @@
-Third-party monitor plugins
-===========================
+Third-party monitor contributed plugins
+=======================================
 
-This directory will hold monitor plugins created by third-parties (not by Scalyr engineers).  This will allow
-Scalyr users to leverage the cool plugins built by other power Scalyr users.
-
-We will be providing documentation on how to develop your own monitors and then add them to this directory.
+This directory will hold monitor plugins created by third parties (not by Scalyr engineers) who wish to contribute them
+to the main Scalyr repository.  This will allow Scalyr customers to leverage the cool plugins built by other power Scalyr
+users.
