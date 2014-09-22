@@ -37,7 +37,11 @@ any periodic monitoring task you have.
 
 We encourage users to create their own plugins to cover features they desire.  In the near future, we will be
 publishing documentation that describes how to implement your own monitor.  And, if you feel your monitor would
-be useful to other Scalyr customers, we encourage you to submit it to monitor collection in the `contrib` directory.
+be useful to other Scalyr customers, we encourage you to submit it to monitor collection in the `monitors/contrib`
+directory.
+
+To learn how to develop plugins, please see the
+[instructions for creating a monitor plugin](docs/CREATING_MONITORS.md).
 
 ## Building packages
 
