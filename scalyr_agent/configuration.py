@@ -20,7 +20,6 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import inspect
 import os
 import re
 import socket
@@ -32,15 +31,7 @@ from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.util import JsonReadFileException
 
-
-# This is suppose to be a system-independent way of adding the necessary parent directory
-# to the python path so that everything executes properly.  We do not rely on __file__ because
-# some folks report problems with that when running on some versions of Windows.
-# Get the file for this script and make it absolute.
-__file_path__ = inspect.stack()[0][1]
-if not os.path.isabs(__file_path__):
-    __file_path__ = os.path.abspath(__file_path__)
-__file_path__ = os.path.realpath(__file_path__)
+from __scalyr__ import get_install_root
 
 
 class Configuration(object):
@@ -192,7 +183,7 @@ class Configuration(object):
 
             if self.__monitor_factory is not None:
                 for entry in all_monitors:
-                    self.__monitors.append(self.__monitor_factory(entry, self.monitor_module_path))
+                    self.__monitors.append(self.__monitor_factory(entry, self.additional_monitor_module_paths))
 
             # Get all of the paths for the logs currently being copied.
             all_paths = {}
@@ -268,9 +259,9 @@ class Configuration(object):
         return self.__get_config().get_string('agent_log_path')
 
     @property
-    def monitor_module_path(self):
-        """Returns the configuration value for 'monitor_module_path'."""
-        return self.__get_config().get_string('monitor_module_path')
+    def additional_monitor_module_paths(self):
+        """Returns the configuration value for 'additional_monitor_module_paths'."""
+        return self.__get_config().get_string('additional_monitor_module_paths')
 
     @property
     def api_key(self):
@@ -446,15 +437,6 @@ class Configuration(object):
             return '/var/lib/scalyr-agent-2'
 
     @staticmethod
-    def default_monitor_module_path():
-        """Returns the default monitor module path for the agent."""
-        # TODO:  Support more platforms.
-        if Configuration.__determine_platform_type() == 'tarball':
-            return Configuration.__resolve_to_install_location('local', 'monitors')
-        else:
-            return '/usr/share/scalyr-agent-2/local/monitors'
-
-    @staticmethod
     def default_config_file_path():
         """Returns the default configuration file path for the agent."""
         # TODO:  Support more platforms.
@@ -470,15 +452,6 @@ class Configuration(object):
         return Configuration.__resolve_to_install_location('certs', 'ca_certs.crt')
 
     @staticmethod
-    def __get_install_root():
-        """Returns the absolute path to the install root.  This is the grandparent of the directory containing
-        this file."""
-        # The install location is the grandparent of the directory that contains this file.
-        # It typically looks like /usr/share/scalyr-agent-2/py.scalyr_agent/configuration.py where
-        # scalyr-agent-2 is the install root.
-        return os.path.dirname(os.path.dirname(os.path.dirname(__file_path__)))
-
-    @staticmethod
     def __determine_platform_type():
         """Returns a string identifying the installation method that was used to install the agent, as well
         as the platform.
@@ -489,7 +462,7 @@ class Configuration(object):
         # is identified by 'packageless' being a file in root of the install location for the source.
         # (Typically, the path looks like /usr/share/scalyr-agent-2/py/scalyr_agent/configuration.py,
         # where scalyr-agent-2 is the install location).
-        tarball_install = os.path.exists(os.path.join(Configuration.__get_install_root(), 'packageless'))
+        tarball_install = os.path.exists(os.path.join(get_install_root(), 'packageless'))
 
         if tarball_install:
             return 'tarball'
@@ -504,7 +477,7 @@ class Configuration(object):
         @param paths: The file components of the desired path. There can be multiple, starting with the outer directory
             first and finishing with the last file.
         """
-        result = Configuration.__get_install_root()
+        result = get_install_root()
         for path in paths:
             result = os.path.join(result, path)
         return result
@@ -596,8 +569,7 @@ class Configuration(object):
                                              description)
         self.__verify_or_set_optional_string(config, 'agent_data_path', Configuration.default_agent_data_path(),
                                              description)
-        self.__verify_or_set_optional_string(config, 'monitor_module_path', Configuration.default_monitor_module_path(),
-                                             description)
+        self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description)
         self.__verify_or_set_optional_string(config, 'scalyr_server', 'https://agent.scalyr.com', description)
         self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description)
         self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description)

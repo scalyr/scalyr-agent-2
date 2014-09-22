@@ -211,10 +211,10 @@ You may place your module in `/usr/share/scalyr-agent-2/local/monitors`.  This p
 search path when locating plugins.
 
 Alternatively, you may make your own directory to hold your custom plugins, and then include the path to your directory
-in the `monitor_module_path` in your configuration file.  This is a string that specifies additional paths to search for
-modules.  It defaults to `/usr/share/scalyr-agent-2/py/scalyr_agent`.     It can contain multiple paths, separated by
-the system specific path separator (colon for Unix, semi-colon for Windows).  Note, the `PYTHONPATH` and the
-Scalyr Agent 2 package are always searched.
+in the `additional_monitor_module_paths` in your configuration file.  This is a string that specifies additional paths 
+to search for modules beyond the default locations.  It defaults to empty string.     It can contain multiple paths, 
+separated by the system specific path separator (colon for Unix, semi-colon for Windows).  Note, the `PYTHONPATH`,
+the Scalyr Agent 2 package, the local monitor path, and the contrib monitor path are always searched.
 
 Be sure to set the permissions on your files such that they can be read by the user running the Scalyr Agent 2 process.
 

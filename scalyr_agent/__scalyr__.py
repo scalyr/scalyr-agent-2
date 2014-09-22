@@ -61,11 +61,43 @@ __file_path__ = determine_file_path()
 def add_scalyr_package_to_path():
     """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
     """
-    # We rely on the fact that the agent_main.py file should be in a directory structure that looks like:
-    # py/scalyr_agent/agent_main.py  .  We wish to add 'py' to the path, so the parent of the parent.
-    sys.path.append(os.path.dirname(os.path.dirname(__file_path__)))
+    sys.path.append(os.path.dirname(get_package_root()))
     # Also add in the third party directory
     sys.path.append(os.path.join(os.path.dirname(__file_path__), 'third_party'))
+
+
+def get_package_root():
+    """Returns the absolute path to the scalyr_agent Python package, including the scalyr_agent directory name.
+
+    @return: The path to the scalyr_agent directory (which contains the Python package).
+    @rtype: str
+    """
+    # We rely on the fact that the __scalyr__.py file should be in a directory structure that looks like:
+    # py/scalyr_agent/__scalyr__.py  .  We wish to return the parent of this current file.
+    return os.path.dirname(__file_path__)
+
+
+def get_install_root():
+    """Returns the absolute path to the root of the install location to scalyr-agent-2.  This
+    works for the different types of installation such as RPM and Debian, as well as when this
+    is running from the source tree.
+
+    For example, it will return '/usr/share/scalyr-agent-2', for Linux installs and
+    the top of the repository when running from the source tree.
+
+    @return:  The path to the scalyr-agent-2 directory.
+    @rtype: str
+    """
+    # There are cases to consider.  Either this source was installed as part of an RPM or Debian package,
+    # or we are running directly from the source tree.  The paths to this package will look like:
+    # /usr/share/scalyr-agent-2/py/scalyr_agent/__scalyr__.py      for RPM/Debian
+    # ~/scalyr-agent-2/scalyr_agent/__scalyr__.py      for RPM/Debian.
+    # So, we just look at the grandparent to determine which of the two cases we are in.
+    grandparent = os.path.dirname(os.path.dirname(__file_path__))
+    if os.path.basename(grandparent) == 'py':
+        return os.path.dirname(grandparent)
+    else:
+        return grandparent
 
 
 def __determine_version():

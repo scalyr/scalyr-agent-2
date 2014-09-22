@@ -24,6 +24,7 @@ import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
+from __scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -131,7 +132,14 @@ class MonitorsManager(object):
         # Augment the PYTHONPATH if requested to locate the module.
         original_path = list(sys.path)
 
-        if additional_python_paths is not None:
+        # Also add in scalyr_agent/../monitors/local and scalyr_agent/../monitors/contrib to the Python path to search
+        # for monitors.  (They are always in the parent directory of the scalyr_agent package.
+        path_to_package_parent = os.path.dirname(get_package_root())
+        sys.path.append(os.path.join(path_to_package_parent, 'monitors', 'local'))
+        sys.path.append(os.path.join(path_to_package_parent, 'monitors', 'contrib'))
+
+        # Add in the additional paths.
+        if additional_python_paths is not None and len(additional_python_paths) > 0:
             for x in additional_python_paths.split(os.pathsep):
                 sys.path.append(x)
 

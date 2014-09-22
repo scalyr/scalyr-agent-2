@@ -43,7 +43,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.api_key, "hi there")
         self.assertEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
         self.assertEquals(config.agent_data_path, '/var/lib/scalyr-agent-2')
-        self.assertEquals(config.monitor_module_path, '/usr/share/scalyr-agent-2/local/monitors')
+        self.assertEquals(config.additional_monitor_module_paths, '')
         self.assertEquals(config.config_directory, self.__config_fragments_dir)
         self.assertEquals(config.implicit_metric_monitor, True)
         self.assertEquals(config.implicit_agent_log_collection, True)
@@ -109,7 +109,7 @@ class TestConfiguration(unittest.TestCase):
             api_key: "hi there",
             agent_log_path: "silly1",
             agent_data_path: "silly2",
-            monitor_module_path: "silly3",
+            additional_monitor_module_paths: "silly3",
             config_directory: "silly4",
             implicit_metric_monitor: false,
             implicit_agent_log_collection: false,
@@ -138,7 +138,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.api_key, "hi there")
         self.assertEquals(config.agent_log_path, 'silly1')
         self.assertEquals(config.agent_data_path, 'silly2')
-        self.assertEquals(config.monitor_module_path, 'silly3')
+        self.assertEquals(config.additional_monitor_module_paths, 'silly3')
         self.assertEquals(config.config_directory, os.path.join(self.__config_dir, 'silly4'))
         self.assertEquals(config.implicit_metric_monitor, False)
         self.assertEquals(config.implicit_agent_log_collection, False)

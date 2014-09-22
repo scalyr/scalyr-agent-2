@@ -250,7 +250,6 @@ def build_base_files():
 
     make_directory('certs')
     make_directory('bin')
-    make_directory('local/monitors')
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
     shutil.copy(make_path(agent_source_root, 'VERSION'), 'VERSION')
@@ -259,6 +258,10 @@ def build_base_files():
     os.chdir('py')
 
     shutil.copytree(make_path(agent_source_root, 'scalyr_agent'), 'scalyr_agent')
+    shutil.copytree(make_path(agent_source_root, 'monitors'), 'monitors')
+    os.chdir('monitors')
+    recursively_delete_files_by_name('README.md')
+    os.chdir('..')
     shutil.copy(make_path(agent_source_root, 'VERSION'), os.path.join('scalyr_agent', 'VERSION'))
 
     # Exclude certain files.
