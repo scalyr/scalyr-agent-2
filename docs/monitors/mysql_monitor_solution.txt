@@ -136,3 +136,33 @@ Each graph corresponds to a "derived" metric outlined in the "MySQL Monitor" doc
     - Temporary tables spooled to disk
         - metric: mysql.derived.tmp_disk_table_percentage
         - During the execution of queries, the server may need to create temporary tables.  Whether or not these temp tables are stored within RAM or spooled to disk depends on the configuration for the temp table size.  If the hit rate for this value is too low, it is worth looking into upping the limit.
+
+
+
+
+
+Alerts
+
+You can setup alerts on any of the metrics mentioned above.  Some useful alerts to understand the behavior of your database usage would be:
+
+- mysql.derived.read_percentage (or mysql.derived.write_percentage)
+    This will allow you to understand the nature of the transactions on your database.  In general, one knows the expected behavior of an application in rough terms of reads to writes on the DB.  So, if you are expecting roughly 25% writes, 75% reads, setting an alert on writes hitting 40% or more might be useful to note a difference in application behavior.
+    
+- mysql.derived.slow_query_percentage
+    Too many slow queries can affect the overall load and performance of the database.  Most queries should be performant, so if you are seeing a relatively high percentage of such it might be worth using the various MySQL tools to investigate the slow queries.  Or maybe, if slow queries occur at only certain times, being alerted to the incident would allow coordination with other parts of the system.
+    
+Say you wanted to create an alert when the average "mysql.derived.read_percentage" dropped below 60% or when the "mysql.derived.slow_query_percentage" jumped to 20%, for each you would need to do the following:
+
+    1) Go to the MySQL dashboard
+    2) Click on the appropriate graph
+    3) This will bring up the graph edit box at the top, select Save Search -> As Alert
+    4) In the Alert edit dialog that pops up:
+        - For "mysql.derived.read_percentage":
+            - Select "less" from the dropdown
+            - Enter the value "60"
+            - Click add
+        - For "mysql.derived.slow_query_percentage":
+            - Select "greater" from the dropdown
+            - Enter the value "20"
+            - Click add
+        - In between each of the above, you will need to repeat steps 2 and 3

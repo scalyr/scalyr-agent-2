@@ -27,7 +27,7 @@ the instance type of the Amazon EC2 server on which the agent is running.
 By default, the plugin will listen for connecions on both of the standard Graphite TCP ports (2003 for
 the "plain text" protocol, and 2004 for "pickle" protocol). For security, it will only accept connections
 from localhost (i.e. from processes running on the same server). Set the configuration option ``only_accept_local``
-to false to allow connections from other servers. You can also specify custom ports; see the next section.
+to false to allow connections from other servers. You can also specify custom ports; see Configuration Reference.
 
 
 ## Viewing Data

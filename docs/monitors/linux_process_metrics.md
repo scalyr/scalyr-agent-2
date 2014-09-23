@@ -33,14 +33,14 @@ your configuration.
 ## Viewing Data
 
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
-click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux System Metrics}}. (The dashboard will not be
+click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux Process Metrics}}. (The dashboard will not be
 listed until the agent begins sending data.)
 
 You'll have to edit the dashboard file for each ``id`` value you've used. From the dashboard page, click the
 {{menuRef:Edit Dashboard}} link. Look for the following bit of code, near the top of the file:
 
-      // On the next line, list each "id" that you've used in a linux_process_metrics clause in the Scalyr Agent
-      // configuration file (agent.json).
+      // On the next line, list each "id" that you've used in a linux_process_metrics
+      // clause in the Scalyr Agent configuration file (agent.json).
       values: [ "agent" ]
 
 Edit the ``values`` list according to the list of ids you've used. For instance, if you've used "tomcat"
@@ -75,4 +75,4 @@ Each event recorded by this plugin will have the following fields:
 |||# ``metric``               ||| The name of a metric being measured, e.g. "app.cpu"
 |||# ``value``                ||| The metric value
 
-Some metrics have will have additional fields, as documented below.
+Some metrics have additional fields, as documented below.
