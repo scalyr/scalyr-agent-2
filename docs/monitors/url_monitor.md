@@ -69,7 +69,7 @@ Each event recorded by this plugin will have the following fields:
 |||# ``monitor``              ||| Always ``url_monitor``
 |||# ``metric``               ||| Always ``response``
 |||# ``instance``             ||| The ``id`` value from the monitor configuration, e.g. ``instance-type``
-|||# ``url``                  ||| The URL that was retrieved, e.g. ``http://169.254.169.254/latest/meta-data/instance-type``
+|||# ``url``                  ||| The URL that was retrieved, e.g. ``http:/^^^/169.254.169.254/latest/meta-data/instance-type``
 |||# ``status``               ||| The HTTP response code, e.g. 200 or 404
 |||# ``length``               ||| The length of the HTTP response
 |||# ``value``                ||| The body of the HTTP response
