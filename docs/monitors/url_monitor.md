@@ -5,18 +5,18 @@
 
 # HTTP Monitor
 
-This agent module periodically fetches specified HTTP or HTTPS URL, and records the response. The URL
+This agent plugin periodically fetches specified HTTP or HTTPS URL, and records the response. The URL
 is retrieved from the agent process, so any host and port reachable from the machine on which the agent
 is running can be monitored.
 
-@class=bg-warning docInfoPanel: An *agent module* is a component of the Scalyr Agent. To use a module,
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Modules](/help/scalyr-agent#modules).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 
 ## Sample Configuration
 
-Here is a simple configuration fragment showing use of the url_monitor module. This sample will record
+Here is a simple configuration fragment showing use of the url_monitor plugin. This sample will record
 the instance type of the Amazon EC2 server on which the agent is running.
 
     monitors: [
@@ -27,14 +27,14 @@ the instance type of the Amazon EC2 server on which the agent is running.
       }
     ]
 
-To monitor more than one URL, use several copies of the url_monitor module in your configuration.
+To monitor more than one URL, use several copies of the url_monitor plugin in your configuration.
 
 
 ## Viewing Data
 
-After adding this module to the agent configuration file, wait one minute for data to begin recording. Then go to
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then go to
 the Search page and search for [$monitor = 'url_monitor'](/events?filter=$monitor%20%3D%20%27url_monitor%27).
-This will show all data collected by this module, across all servers. You can use the {{menuRef:Refine search by}}
+This will show all data collected by this plugin, across all servers. You can use the {{menuRef:Refine search by}}
 dropdown to narrow your search to specific servers and monitors.
 
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
@@ -63,12 +63,12 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 
 ## Log Reference
 
-Each event recorded by this module will have the following fields:
+Each event recorded by this plugin will have the following fields:
 
 |||# Field                    ||| Meaning
 |||# ``monitor``              ||| Always ``url_monitor``
 |||# ``metric``               ||| Always ``response``
-|||# ``instance``             ||| The ``id`` value from the module configuration, e.g. ``instance-type``
+|||# ``instance``             ||| The ``id`` value from the monitor configuration, e.g. ``instance-type``
 |||# ``url``                  ||| The URL that was retrieved, e.g. ``http://169.254.169.254/latest/meta-data/instance-type``
 |||# ``status``               ||| The HTTP response code, e.g. 200 or 404
 |||# ``length``               ||| The length of the HTTP response

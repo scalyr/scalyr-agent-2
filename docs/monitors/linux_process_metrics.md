@@ -5,17 +5,17 @@
 
 # Linux Process Metrics
 
-This agent module records CPU consumption, memory usage, and other metrics for a specified process. You can
-use this module to record resource usage for a web server, database, or other application.
+This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process.
+You can use this plugin to record resource usage for a web server, database, or other application.
 
-@class=bg-warning docInfoPanel: An *agent module* is a component of the Scalyr Agent. To use a module,
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Modules](/help/scalyr-agent#modules).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 
 ## Sample Configuration
 
-Here is a simple configuration fragment showing use of the linux_process_metrics module. This sample will record
+Here is a simple configuration fragment showing use of the linux_process_metrics plugin. This sample will record
 resource usage for any process whose command line contains a match for the regular expression ``java.*tomcat6``:
 
     monitors: [
@@ -26,13 +26,13 @@ resource usage for any process whose command line contains a match for the regul
       }
     ]
 
-To record information for more than one process, use several copies of the linux_process_metrics module in
+To record information for more than one process, use several copies of the linux_process_metrics plugin in
 your configuration.
 
 
 ## Viewing Data
 
-After adding this module to the agent configuration file, wait one minute for data to begin recording. Then 
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux System Metrics}}. (The dashboard will not be
 listed until the agent begins sending data.)
 
@@ -43,7 +43,7 @@ You'll have to edit the dashboard file for each ``id`` value you've used. From t
       // configuration file (agent.json).
       values: [ "agent" ]
 
-Edit the ``values`` list according to the list of ids you've used. For instance, if you've added a "tomcat" module
+Edit the ``values`` list according to the list of ids you've used. For instance, if you've used "tomcat"
 (as in the example above), the list would look like this:
 
       values: [ "agent", "tomcat" ]
@@ -67,11 +67,11 @@ you'd like to view.
 
 ## Log Reference
 
-Each event recorded by this module will have the following fields:
+Each event recorded by this plugin will have the following fields:
 
 |||# Field                    ||| Meaning
 |||# ``monitor``              ||| Always ``linux_process_metrics``
-|||# ``instance``             ||| The ``id`` value from the module configuration, e.g. ``tomcat``
+|||# ``instance``             ||| The ``id`` value from the monitor configuration, e.g. ``tomcat``
 |||# ``metric``               ||| The name of a metric being measured, e.g. "app.cpu"
 |||# ``value``                ||| The metric value
 

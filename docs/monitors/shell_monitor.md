@@ -5,18 +5,18 @@
 
 # Shell Monitor
 
-This agent module periodically executes a specified shell command, and records the output.
+This agent monitor plugin periodically executes a specified shell command, and records the output.
 It can be used to monitor any information that can be retrieved via a shell command. Shell commands
 are run from the Scalyr Agent, and execute as the same user as the agent.
 
-@class=bg-warning docInfoPanel: An *agent module* is a component of the Scalyr Agent. To use a module,
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Modules](/help/scalyr-agent#modules).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 
 ## Sample Configuration
 
-Here is a simple configuration fragment showing use of the shell_monitor module. This sample will record
+Here is a simple configuration fragment showing use of the shell_monitor plugin. This sample will record
 the version of the Linux kernel in use on the machine where the agent is running.
 
     monitors: [
@@ -27,14 +27,14 @@ the version of the Linux kernel in use on the machine where the agent is running
       }
     ]
 
-To record output from more than one command, use several copies of the shell_monitor module in your configuration.
+To record output from more than one command, use several copies of the shell_monitor plugin in your configuration.
 
 
 ## Viewing Data
 
-After adding this module to the agent configuration file, wait one minute for data to begin recording. Then go to
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then go to
 the Search page and search for [$monitor = 'shell_monitor'](/events?filter=$monitor%20%3D%20%27shell_monitor%27).
-This will show all data collected by this module, across all servers. You can use the {{menuRef:Refine search by}}
+This will show all data collected by this plugin, across all servers. You can use the {{menuRef:Refine search by}}
 dropdown to narrow your search to specific servers and monitors.
 
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
@@ -62,11 +62,11 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 
 ## Log Reference
 
-Each event recorded by this module will have the following fields:
+Each event recorded by this plugin will have the following fields:
 
 |||# Field                    ||| Meaning
 |||# ``monitor``              ||| Always ``shell_monitor``
 |||# ``metric``               ||| Always ``output``
-|||# ``instance``             ||| The ``id`` value from the module configuration, e.g. ``kernel-version``
-|||# ``command``              ||| The shell command for this module instance, e.g. ``uname -r``
+|||# ``instance``             ||| The ``id`` value from the monitor configuration, e.g. ``kernel-version``
+|||# ``command``              ||| The shell command for this plugin instance, e.g. ``uname -r``
 |||# ``value``                ||| The output of the shell command, e.g. ``3.4.73-64.112.amzn1.x86_64``

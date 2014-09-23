@@ -5,17 +5,17 @@
 
 # Graphite Monitor
 
-This agent module acts as a Graphite server, allowing you to import data from Graphite-compatible tools
+This agent monitor plugin acts as a Graphite server, allowing you to import data from Graphite-compatible tools
 into Scalyr.
 
-@class=bg-warning docInfoPanel: An *agent module* is a component of the Scalyr Agent. To use a module,
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
-For more information, see [Agent Modules](/help/scalyr-agent#modules).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 
 ## Sample Configuration
 
-Here is a simple configuration fragment showing use of the url_monitor module. This sample will record
+Here is a simple configuration fragment showing use of the url_monitor plugin. This sample will record
 the instance type of the Amazon EC2 server on which the agent is running.
 
     monitors: [
@@ -24,7 +24,7 @@ the instance type of the Amazon EC2 server on which the agent is running.
       }
     ]
 
-By default, the module will listen for connecions on both of the standard Graphite TCP ports (2003 for
+By default, the plugin will listen for connecions on both of the standard Graphite TCP ports (2003 for
 the "plain text" protocol, and 2004 for "pickle" protocol). For security, it will only accept connections
 from localhost (i.e. from processes running on the same server). Set the configuration option ``only_accept_local``
 to false to allow connections from other servers. You can also specify custom ports; see the next section.
@@ -32,7 +32,7 @@ to false to allow connections from other servers. You can also specify custom po
 
 ## Viewing Data
 
-After adding this module to the agent configuration file, wait one minute for the agent to open the Graphite
+After adding this plugin to the agent configuration file, wait one minute for the agent to open the Graphite
 ports. Then configure your Graphite-compatible tools to send data to these ports.
 
 Once you are sending Graphite data to the agent, go to the Search page and search for
@@ -49,21 +49,21 @@ You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/
 
 |||# Option                   ||| Usage
 |||# ``module``               ||| Always ``scalyr_agent.builtin_monitors.graphite_monitor ``
-|||# ``only_accept_local``    ||| Optional (defaults to true). If true, then the module only accepts connections \
+|||# ``only_accept_local``    ||| Optional (defaults to true). If true, then the plugin only accepts connections \
                                   from localhost. If false, all network connections are accepted.
-|||# ``accept_plaintext``     ||| Optional (defaults to true). If true, then the module accepts connections in \
+|||# ``accept_plaintext``     ||| Optional (defaults to true). If true, then the plugin accepts connections in \
                                   Graphite's "plain text" procotol.
-|||# ``accept_pickle``        ||| Optional (defaults to true). If true, then the module accepts connections in \
+|||# ``accept_pickle``        ||| Optional (defaults to true). If true, then the plugin accepts connections in \
                                   Graphite's "pickle" procotol.
-|||# ``plaintext_port``       ||| Optional (defaults to 2003). The port number on which the module listens for \
+|||# ``plaintext_port``       ||| Optional (defaults to 2003). The port number on which the plugin listens for \
                                   plain text connections. Unused if ``accept_plaintext`` is false.
-|||# ``pickle_port``          ||| Optional (defaults to 2004). The port number on which the module listens for \
+|||# ``pickle_port``          ||| Optional (defaults to 2004). The port number on which the plugin listens for \
                                   pickle connections. Unused if ``accept_pickle `` is false.
 
 
 ## Log Reference
 
-Each event recorded by this module will have the following fields:
+Each event recorded by this plugin will have the following fields:
 
 |||# Field                    ||| Meaning
 |||# ``monitor``              ||| Always ``graphite_monitor``
