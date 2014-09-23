@@ -1,31 +1,35 @@
 scalyr-agent-2
 ==============
 
-The source code for Scalyr Agent 2, the daemon process Scalyr customers run on their servers to collect metrics and log
-files and transmit them to Scalyr.  Using this information, the Scalyr monitoring and alerting service enables users
-to search through their logs using powerful queries, construct graphs of interesting metrics, and create alerts to
-warn when there are problems.
+This repository holds the source code for the Scalyr Agent, a daemon that collects logs and metrics from
+customer machines and transmits them to Scalyr.
 
-For more information on Scalyr Agent 2, please visit https://www.scalyr.com/help/scalyr-agent-2
+For more information on the Scalyr Agent, please visit https://www.scalyr.com/help/scalyr-agent.
 
-To learn more about Scalyr, please visit https://www.scalyr.com
+To learn more about Scalyr, visit https://www.scalyr.com.
+
 
 Features
 ========
 
-Scalyr Agent 2 provides several key features:
+The Scalyr Agent is designed to be lightweight, easy to install, and safe to run on production systems.
+Key features:
 
-  * Written in Python, supporting Python version 2.4 and up
+  * Pure Python implementation, supporting Python versions 2.4 and up
+  * Lightweight (typically 15 MB RAM, 2% CPU or less)
+  * Easy-to-use troubleshooting features
   * Modular configuration files
-  * Easy to use troubleshooting features
   * Extensibility using monitor plugins
+
 
 Developing
 ==========
 
-Using this repository, users can both contribute to the development of Scalyr Agent 2 and create forked
-versions of the agent for their own use.  Users can even create their own RPM and Debian packages using
-the provided scripts.
+From this repository, you can create your own RPM and Debian packages containing customized versions of
+the Scalyr Agent. For instance, you can bundle additional monitoring plugins to collect specialized data
+from your servers.
+
+We also welcome submissions from the community.
 
 ## Monitor plugins
 
