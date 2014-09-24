@@ -173,6 +173,7 @@ The method for reporting metrics is `emit_value` and has the following arguments
      you typically will not need to supply it yourself.
 
 
+
 ## Testing the Monitor Plugin
 You must use the `run_monitor.py` tool to run your Monitor Plugin by itself for testing and debugging purposes.  It
 creates and initializes the plugin instance in the same way Scalyr Agent 2 will, and sends all output (both metric and
@@ -191,6 +192,14 @@ The output will look something like this:
     2014-07-29 20:22:06.789Z [random_coin_monitor()] gauss 1.07020127799 count=1
     2014-07-29 20:22:11.790Z [random_coin_monitor()] uniform 0.730115799546 count=2
     2014-07-29 20:22:11.790Z [random_coin_monitor()] gauss 0.340942612923 count=2
+
+
+First Header  | Second Header
+------------- | -------------
+Content Cell  | Content Cell There iasdf asdfa sdf asdf sdf sfd asdfasdf asfd asdf asdf asfd sdf sdf sdfsadf Thie quick brown fox jumped over the silly dog one more time come on.
+Content Cell  | Content Cell
+
+
 
 You can use Control-C to stop the process.
 
