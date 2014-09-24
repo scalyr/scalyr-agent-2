@@ -1,7 +1,7 @@
-Scalyr Agent 2
-==============
+Scalyr Agent
+============
 
-The Scalyr Agent 2 package.
+The Scalyr Agent package.
 
-The module that implements Scalyr Agent 2, the daemon process Scalyr customers run on their servers to collect
-metrics and log files and transmit them to Scalyr.
+The module that implements the Scalyr Agent, a daemon that collects logs and metrics from
+customer machines and transmits them to Scalyr.

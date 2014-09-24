@@ -17,7 +17,7 @@ To develop a Monitor Plugin, we strongly recommend you use `pip` and `virtualenv
 environment on a machine that does not already have Scalyr Agent 2 installed. If you would prefer to either
 use `git` to clone the Scalyr Agent 2 source code or develop against the Scalyr Agent 2 package already installed on
 your machine, please see the
-[Alternate Setup Instructions](#alertnate-setup) at the bottom of this page.
+[Alternate Setup Instructions](/help/creating-a-monitor-plugin#alternate-setup) at the bottom of this page.
 
 If you do not have `pip` and `virtualenv` installed on your machine, please see the
 [`pip` install instructions](http://pip.readthedocs.org/en/latest/installing.html)
