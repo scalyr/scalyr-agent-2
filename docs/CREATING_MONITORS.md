@@ -193,15 +193,6 @@ The output will look something like this:
     2014-07-29 20:22:11.790Z [random_coin_monitor()] uniform 0.730115799546 count=2
     2014-07-29 20:22:11.790Z [random_coin_monitor()] gauss 0.340942612923 count=2
 
-
-| First Header  | Second Header|
-|------------- | ------------- |
-|Content Cell  | Content Cell There iasdf asdfa sdf asdf sdf sfd asdfasdf asfd asdf asdf asfd sdf
- sdf sdfsadf Thie quick brown fox jumped over the silly dog one more time come on. |
-|Content Cell  | Content Cell |
-
-
-
 You can use Control-C to stop the process.
 
 If you wish to change the Monitor configuration passed to your instance, you may supply a string containing a JSON 
