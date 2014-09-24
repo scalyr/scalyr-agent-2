@@ -1,17 +1,18 @@
-# Copyright 2014 Scalyr Inc.
+# Copyright 2014 Scalyr Inc and the tcollector authors.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.  This program is distributed in the hope that it
+# will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+# of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+# General Public License for more details.  You should have received a copy
+# of the GNU Lesser General Public License along with this program.  If not,
+# see <http://www.gnu.org/licenses/>.
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ------------------------------------------------------------------------
+# Note, this file draws heavily on the mysql collector distributed as part of
+# the tcollector project (https://github.com/OpenTSDB/tcollector).  As such,
+# this file is being distributed under GPLv3.
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
@@ -36,7 +37,6 @@ if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] 
 import pymysql
 
 
-# TODO: Possibly move the following functions to some sort of common utility class.
 def file_exists(path):
     if path is None:
         return False
@@ -144,7 +144,6 @@ class MysqlDB(object):
             metric_name = metric.lower()
             # To reduce the amount of metrics we write, we only include the variables that
             # we actually need.
-            # TODO:  Maybe make this configurable.
             if metric_name == 'max_connections' or metric_name == 'open_files_limit':
                 result.append( { "field": "vars.%s" % metric_name, "value": value } )
         return result
@@ -267,11 +266,6 @@ class MysqlDB(object):
                     },                    
                 ]
             },
-            # INSERT BUFFER AND ADAPTIVE HASH INDEX
-            # TODO(tsuna): According to the code in ibuf0ibuf.c, this line and
-            # the following one can appear multiple times.  I've never seen this.
-            # If that happens, we need to aggregate the values here instead of
-            # printing them directly.            
             { 
                 "regex": "Ibuf: size (\d+), free list len (\d+), seg size (\d+),",
                 "fields": [
@@ -584,8 +578,6 @@ class MysqlMonitor(ScalyrMonitor):
     def _initialize(self):
         """Performs monitor-specific initialization.
         """
-        # TODO:  Is it better to have this, or just require that classes override __init__ and do their
-        # initialization that way.  If we do that, then they must know the argument list for __init__.
 
         # Useful instance variables:
         #   _sample_interval_secs:  The number of seconds between calls to gather_sample.
