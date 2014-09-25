@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.1 "Aggravated Aardvark" - Sept 11, 2014
+## 2.0.1 "Aggravated Aardvark" - Sept 15, 2014
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sept 11, 2014 15:12 -0600
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sept 15, 2014 15:45 -0700
 --->
 
 New core features:
@@ -20,3 +20,4 @@ Bugs fixed since beta and alpha testing:
 
 * Slow memory "leak".
 * graphite_module not accepting connections from localhost when only_accept_local is false.
+* Ignore old pidfile if the process is no longer running.  Added pid collison detection as well.
