@@ -76,3 +76,22 @@ Each event recorded by this plugin will have the following fields:
 |||# ``value``                ||| The metric value
 
 Some metrics have additional fields, as documented below.
+
+The metrics recorded by the plugin are listed below.  Note, each metric has an additional field ``app`` set to the
+``id`` value from the monitor configuration.
+
+|||# Metric                              ||| Description 
+|||# ``app.cpu type=user``                ||| The number of 1/100ths seconds of user cpu time.
+|||# ``app.cpu type=system``              ||| The number of 1/100ths seconds of system cpu time.
+|||# ``app.uptime``                       ||| The number of milliseconds of uptime.
+|||# ``app.threads``                      ||| The number of threads being used by the process.
+|||# ``app.nice``                         ||| The nice value for the process.
+|||# ``app.mem.bytes type=vmsize``        ||| The number of bytes of virtual memory in use.
+|||# ``app.mem.bytes type=resident``      ||| The number of bytes of resident memory in use.
+|||# ``app.mem.bytes type=peak_vmsize``   ||| The maximum number of bytes used for virtual memory for process.
+|||# ``app.mem.bytes type=peak_resident`` ||| The maximum number of bytes of resident memory ever used by process.
+|||# ``app.disk.bytes type=read``         ||| The number of bytes read from disk.
+|||# ``app.disk.requests type=read``      ||| The number of disk requests.
+|||# ``app.disk.bytes type=write``        ||| The number of bytes written to disk.
+|||# ``app.disk.requests type=write``     ||| The number of disk requests.
+      
