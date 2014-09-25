@@ -225,7 +225,6 @@ class UnixDaemonController:
         @rtype: bool
         """
         pid = self.__read_pidfile()
-        # TODO: Add in check for the pid file exists but the process is not running.
         return pid is not None
 
     def fail_if_already_running(self):
@@ -270,15 +269,11 @@ class UnixDaemonController:
         @param quiet:  If True, the only error information will be printed to stdout and stderr.
         """
         # Get the pid from the pidfile
-        try:
-            pf = file(self.pidfile, 'r')
-            pid = int(pf.read().strip())
-            pf.close()
-        except IOError:
-            pid = None
+        pid = self.__read_pidfile()
 
         if not pid:
-            message = "The agent does not appear to be running.  pidfile %s does not exist.\n"
+            message = ("The agent does not appear to be running.  pidfile %s does not exist or listed process"
+                       " is not running.\n")
             sys.stderr.write(message % self.pidfile)
             return 0  # not an error in a restart
 
