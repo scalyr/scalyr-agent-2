@@ -72,26 +72,26 @@ Each event recorded by this plugin will have the following fields:
 |||# Field                    ||| Meaning
 |||# ``monitor``              ||| Always ``linux_process_metrics``
 |||# ``instance``             ||| The ``id`` value from the monitor configuration, e.g. ``tomcat``
+|||# ``app``                  ||| Same as ``instance``; provided for compatibility with the original Scalyr Agent.
 |||# ``metric``               ||| The name of a metric being measured, e.g. "app.cpu"
 |||# ``value``                ||| The metric value
 
-Some metrics have additional fields, as documented below.
+Some metrics have additional fields, as documented in the table below.
 
-The metrics recorded by the plugin are listed below.  Note, each metric has an additional field ``app`` set to the
-``id`` value from the monitor configuration.
+This table lists all metrics recorded by the Linux Process Metrics plugin.
 
-|||# Metric                              ||| Description 
-|||# ``app.cpu type=user``                ||| The number of 1/100ths seconds of user cpu time.
-|||# ``app.cpu type=system``              ||| The number of 1/100ths seconds of system cpu time.
-|||# ``app.uptime``                       ||| The number of milliseconds of uptime.
+|||# Metric                               ||| Description 
+|||# ``app.cpu type=user``                ||| User-mode CPU usage, in 1/100ths of a second.
+|||# ``app.cpu type=system``              ||| System-mode CPU usage, in 1/100ths of a second,
+|||# ``app.uptime``                       ||| Process uptime, in milliseconds,
 |||# ``app.threads``                      ||| The number of threads being used by the process.
 |||# ``app.nice``                         ||| The nice value for the process.
-|||# ``app.mem.bytes type=vmsize``        ||| The number of bytes of virtual memory in use.
-|||# ``app.mem.bytes type=resident``      ||| The number of bytes of resident memory in use.
-|||# ``app.mem.bytes type=peak_vmsize``   ||| The maximum number of bytes used for virtual memory for process.
-|||# ``app.mem.bytes type=peak_resident`` ||| The maximum number of bytes of resident memory ever used by process.
-|||# ``app.disk.bytes type=read``         ||| The number of bytes read from disk.
-|||# ``app.disk.requests type=read``      ||| The number of disk requests.
-|||# ``app.disk.bytes type=write``        ||| The number of bytes written to disk.
-|||# ``app.disk.requests type=write``     ||| The number of disk requests.
+|||# ``app.mem.bytes type=vmsize``        ||| Virtual memory usage, in bytes.
+|||# ``app.mem.bytes type=resident``      ||| Resident memory usage, in bytes.
+|||# ``app.mem.bytes type=peak_vmsize``   ||| Peak virtual memory usage, in bytes.
+|||# ``app.mem.bytes type=peak_resident`` ||| Peak resident memory usage, in bytes.
+|||# ``app.disk.bytes type=read``         ||| Total bytes read from disk.
+|||# ``app.disk.requests type=read``      ||| Total disk read requests.
+|||# ``app.disk.bytes type=write``        ||| Total bytes written to disk.
+|||# ``app.disk.requests type=write``     ||| Total disk write requests.
       

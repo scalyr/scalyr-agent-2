@@ -83,8 +83,6 @@ Each event recorded by this plugin will have the following fields:
 |||# ``metric``               ||| The name of a metric being measured, e.g. "mysql.vars"
 |||# ``value``                ||| The metric value
 
-Some metrics may have additional fields, as documented below.
-
 
 ### Data Categories
   
@@ -95,7 +93,7 @@ depending on which version of MySQL you are using and how you have configured My
 #### mysql.global
 
 These values are the output of the "SHOW GLOBAL STATUS" query. These are discussed in the MySQL documentation chapter
-"Server Status Variables".  To reduce the amount of metrics recorded, not all command counts are reported.
+"Server Status Variables".  To reduce the number of metrics recorded, not all command counts are reported.
 
 
 |||# Metric name                      ||| Description

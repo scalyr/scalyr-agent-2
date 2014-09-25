@@ -34,14 +34,13 @@ Each event recorded by this plugin will have the following fields:
 |||# ``metric``               ||| The name of a metric being measured, e.g. "proc.stat.cpu"
 |||# ``value``                ||| The metric value
 
-Some metrics have additional fields, as documented below.
+Some metrics have additional fields, as documented in the table below.
 
-Here is a list of the metrics most commonly used in dashboards and alerts recorded by this plugin.
-For a complete list, please see refer to list in the comments at the top of the
-[source file](https://github.com/scalyr/scalyr-agent-2/blob/master/scalyr_agent/builtin_monitors/linux_system_metrics.py).
+This table lists the most commonly-used metrics. For a complete list, refer to the comments at the top
+of the [plugin source](https://github.com/scalyr/scalyr-agent-2/blob/master/scalyr_agent/builtin_monitors/linux_system_metrics.py).
 
 |||# Metric                             ||| Fields    ||| Description
-||| ``proc.stat.cpu``                   ||| ``type``  ||| CPU counters in units of jiffers, where ``type`` can be one \
+||| ``proc.stat.cpu``                   ||| ``type``  ||| CPU counters in units of jiffies, where ``type`` can be one \
                                                           of ``user``, ``nice``, ``system``,  ``iowait``, ``irq``, \
                                                           ``softirq``, ``steal``, ``guest``.  As a rate, they should \
                                                            add up to  ``100*numcpus`` on the host.                             

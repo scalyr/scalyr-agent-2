@@ -33,7 +33,7 @@ from scalyr_agent import StoppableThread
 # We use the original tcollector documentation here has much as possible.
 #
 # From procstats:
-#   proc.stat.cpu type=*:        CPU counters in units of jiffers, where type can be one of user, nice, system, iowait,
+#   proc.stat.cpu type=*:        CPU counters in units of jiffies, where type can be one of user, nice, system, iowait,
 #                                irq, softirq, steal, guest.  As a rate, they should add up to 100*numcpus on the host.
 #   proc.stat.intr:              The number of interrupts since boot.
 #   proc.stat.ctxt               The number of context switches since boot.
