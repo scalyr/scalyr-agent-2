@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.1 "Aggravated Aardvark" - Sept 15, 2014
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sept 15, 2014 15:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sept 15, 2014 16:15 -0700
 --->
 
 New core features:
