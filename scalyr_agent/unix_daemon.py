@@ -101,8 +101,20 @@ class UnixDaemonController:
 
         # write pidfile
         atexit.register(self.delpid)
-        pid = str(os.getpid())
-        file(self.pidfile, 'w+').write("%s\n" % pid)
+        pid = os.getpid()
+
+        fp = None
+        try:
+            fp = file(self.pidfile, 'w+')
+            # If we are on an OS that supports reading the commandline arguments from /proc, then use that
+            # to write more unique information about the running process to help avoid pid collison.
+            if self.__can_read_command_line(pid):
+                fp.write('%d %s\n' % (pid, self.__read_command_line(pid)))
+            else:
+                fp.write('%d\n' % pid)
+        finally:
+            if fp is not None:
+                fp.close()
 
     def delpid(self):
         """Deletes the pid file"""
@@ -111,17 +123,73 @@ class UnixDaemonController:
     def __read_pidfile(self):
         """Reads the pid file and returns the process id contained in it.
 
+        This also verifies as best as it can that the process returned is running and is really an agent
+        process.
+
         @return The id of the agent process or None if there is none or it cannot be read.
         @rtype: int or None
         """
         try:
             pf = file(self.pidfile, 'r')
-            pid = int(pf.read().strip())
+            contents = pf.read().strip().split()
             pf.close()
         except IOError:
-            pid = None
+            return None
 
-        return pid
+        pid = int(contents[0])
+        try:
+            os.kill(pid, 0)
+        except OSError, e:
+            # ESRCH indicates the process is not running, in which case we ignore the pidfile.
+            if e.errno == errno.ESRCH:
+                return None
+            # EPERM indicates the current user does not have permission to signal the process.. so it exists
+            # but may not be the agent process.  We will just try our /proc/pid/commandline trick below if we can.
+            elif e.errno != errno.EPERM:
+                raise e
+
+        # If we got here, the process is running, and we have to see if we can determine if it is really the
+        # original agent process.  For Linux systems with /proc, we see if the commandlines match up.
+        # For all other Posix systems, (Mac OS X, etc) we bail for now.
+        if not self.__can_read_command_line(pid):
+            return pid
+
+        # Handle the case that we have an old pid file that didn't have the commandline right into it.
+        if len(contents) == 1:
+            return pid
+
+        command_line = self.__read_command_line(pid)
+        if contents[1] == command_line:
+            return pid
+        else:
+            return None
+
+    def __can_read_command_line(self, pid):
+        """Returns True if the commandline arguments for the specified process can be read.
+
+        @param pid: The id of the process
+        @type pid: int
+        @return: True if it can be read.
+        @rtype: bool
+        """
+        return os.path.isfile('/proc/%d/cmdline' % pid)
+
+    def __read_command_line(self, pid):
+        """Reads the commandline arguments for the specified pid and returns the contents.
+
+        @param pid: The id of the process.
+        @type pid: int
+
+        @return: The commandline arguments with no spaces.
+        @rtype: str
+        """
+        pf = None
+        try:
+            pf = file('/proc/%d/cmdline' % pid, 'r')
+            return pf.read().strip()
+        finally:
+            if pf is not None:
+                pf.close()
 
     def run_as_user(self, user_id, script_file):
         """Restarts this process with the same arguments as the specified user.
