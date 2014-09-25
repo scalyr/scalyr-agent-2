@@ -95,37 +95,32 @@ depending on which version of MySQL you are using and how you have configured My
 #### mysql.global
 
 These values are the output of the "SHOW GLOBAL STATUS" query. These are discussed in the MySQL documentation chapter
-"Server Status Variables".
+"Server Status Variables".  To reduce the amount of metrics recorded, not all command counts are reported.
 
-- mysql.global.aborted_clients
-    The number of connections abourted because the client died or didn't close the connection properly.  The value is relative to the uptime of the server.
 
-- mysql.global.aborted_connects
-    The number of failed connection attempts.  The value is relative to the uptime of the server.
-
-- mysql.global.bytes_received
-    How much data has been sent to the database from all clients.  The value is relative to the uptime of the server.
-
-- mysql.global.bytes_sent
-    How much data has been sent from the database to all clients.  The value is relative to the uptime of the server.
-
-- mysql.global.com_* 
-    How many of each type of command have been issues against the server.  Please see the "Server Status Variables" chapter of the MySQL documentation for the complete list.
-
-- mysql.global.connections
-    Total number of connection attempts (successful and failed).  The value is relative to the uptime of the server.
-    
-- mysql.global.key_blocks_unused
-    The total number of keyblocks unused at the time of the monitor check.  A high number indicates that the key cache might be large.
-      
-- mysql.global.key_blocks_used
-    Maximum number of key blocks used at any one point.  Indicates a high water mark of the number used.  The value is relative to the uptime of the server.
-
-- mysql.global.max_used_connections
-    High water mark for the total number of connections used at any one time since the server was started.
-
-- mysql.global.slow_queries
-    The total number of queries over the uptime of the server that exceeded the "long_query_time" configuration.
+|||# Metric name                      ||| Description
+|||``mysql.global.aborted_clients``   ||| The number of connections aborted because the client died or didn't close \
+                                          the connection properly.  The value is relative to the uptime of the server.
+||| ``mysql.global.aborted_connects`` ||| The number of failed connection attempts.  The value is relative to the \
+                                          uptime of the server.
+||| ``mysql.global.bytes_received``   ||| How much data has been sent to the database from all clients.  The value is \
+                                          relative to the uptime of the server.
+||| ``mysql.global.bytes_sent``       ||| How much data has been sent from the database to all clients.  The value \
+                                          is relative to the uptime of the server.
+||| ``mysql.global.com_insert``       ||| The number of ``insert`` commands run against the server
+||| ``mysql.global.com_delete``       ||| The number of ``delete`` commands run against the server
+||| ``mysql.global.com_replace``      ||| The number of ``replace`` commands run against the server
+||| ``mysql.global.com_select``       ||| The number of ``select`` commands run against the server
+||| ``mysql.global.connections``      ||| Total number of connection attempts (successful and failed).  The value is \
+                                          relative to the uptime of the server.
+||| ``mysql.global.key_blocks_unused``||| The total number of keyblocks unused at the time of the monitor check.  A \
+                                          high number indicates that the key cache might be large.
+||| ``mysql.global.key_blocks_used``  ||| Maximum number of key blocks used at any one point.  Indicates a high water \
+                                          mark of the number used.  The value is relative to the uptime of the server.
+||| ``mysql.global.max_used_connections``||| High water mark for the total number of connections used at any one time \
+                                             since the server was started.
+||| ``mysql.global.slow_queries``     ||| The total number of queries over the uptime of the server that exceeded the \
+                                          "long_query_time" configuration.
 
 
 #### mysql.innodb
@@ -133,53 +128,57 @@ These values are the output of the "SHOW GLOBAL STATUS" query. These are discuss
 If MySQL is configured to use the InnoDB storage engine, information about InnoDB usage will be emitted. These are discussed
 in the MySQL documentation chapter "SHOW ENGINE INNODB STATUS and the InnoDB Monitors".
 
-- mysql.innodb.oswait_array.reservation_count 
-    A measure of how actively innodb uses it's internal sync array.  Specifically, how frequently slots are allocated.
-
-- mysql.innodb.oswait_array.signal_count 
-    As above, part of the measure of activity of the internal sync array, in this case how frequently threads are signaled using the sync array.
-    
-- mysql.innodb.locks.spin_waits 
-- mysql.innodb.locks.rounds 
-- mysql.innodb.locks.os_waits
-    Three values that indicate how efficiently InnoDB locking is working.  'spin_waits' is the number of times a thread tried to get a mutex that wasn't available.  'rounds' is the number of times the threads looped through the spin-wait cycle.  'os_waits' is the number of times a thread gave up spin-waiting and went to sleep.  These values are cumulative relative to the uptime of the server.
-
-- mysql.innodb.history_list_length 
-    The number of unpurged transactions in the internal undo buffer.  It typically increases while transactions with updates are run and will decrease once the internal purge runs.
-
-- mysql.innodb.ibuf.size 
-- mysql.innodb.ibuf.free_list_len 
-- mysql.innodb.ibuf.seg_size 
-    Details about the insert buffer and status of the hash.  "size" is the insert buffer size.  "free_list_len" is the length of it's free list.  "seg_size" is the size of the segment.
-
-- mysql.innodb.ibuf.inserts
-- mysql.innodb.ibuf.merged_recs
-- mysql.innodb.ibuf.merges
-    A measure of the activity within the insert buffer.  "inserts" is the total number of inserts in the insert buffer.  "merged_recs" is the total number of records merged.  "merges" is the total number of merges required to make the merges.  These values are cumulative relative to the uptime of the server.
-    
-- mysql.innodb.queries_queued
-    The number of queries waiting to be processed.  The value is based on the time the monitor sample is run.
-
-- mysql.innodb.opened_read_views 
-    The number of views into the db, this is "started transactions" which have no current statement actively operating.
+|||#Metric name                                    ||| Description
+|||``mysql.innodb.oswait_array.reservation_count`` ||| A measure of how actively innodb uses it's internal sync array. \
+                                                       Specifically, how frequently slots are allocated.
+|||``mysql.innodb.oswait_array.signal_count``      ||| As above, part of the measure of activity of the internal sync \
+                                                       array, in this case how frequently threads are signaled using \
+                                                       the sync array.
+|||``mysql.innodb.locks.spin_waits``               ||| The number of times since server start that a thread tried to a \
+                                                       mutex that wasn't available.
+|||``mysql.innodb.locks.rounds``                   ||| The number of times since server start that a thread looped \
+                                                       through the spin-wait cycle.
+|||``mysql.innodb.locks.os_waits``                 ||| The number of times since server start that a thread gave up \
+                                                       spin-waiting and went to sleep.
+|||``mysql.innodb.history_list_length``            ||| The number of unpurged transactions in the internal undo buffer.\
+                                                       It typically increases while transactions with updates are run \
+                                                       and will decrease once the internal purge runs.
+|||``mysql.innodb.innodb.ibuf.size``               ||| The size of the insert buffer.
+|||``mysql.innodb.innodb.ibuf.free_list_len``      ||| The size free list for the insert buffer.
+|||``mysql.innodb.innodb.ibuf.seg_size``           ||| The segment size of the insert buffer.
+|||``mysql.innodb.innodb.ibuf.inserts``            ||| The total number of inserts since server start into the insert \
+                                                       buffer.
+|||``mysql.innodb.innodb.ibuf.merged_recs``        ||| The total number of records merged in the insert buffer since \
+                                                       server start.
+|||``mysql.innodb.innodb.ibuf.merges``             ||| The total number of merges for the insert buffer since \
+                                                       server start.   
+|||``mysql.innodb.queries_queued``                 ||| The number of queries waiting to be processed.  The value is \
+                                                       based on the time the monitor sample is run.
+|||``mysql.innodb.opened_read_views``              ||| The number of views into the db, this is "started transactions" \
+                                                       which have no current statement actively operating.
 
 
 #### mysql.process
 
 The result of "SHOW PROCESSLIST". These show the types of commands being run and the number of threads performing each
-command. For instance, if there one thread is performing a query and two are sleeping, the recorded metrics might look
-like this:
+command. 
 
-    mysql.process.query 1
-    mysql.process.sleep 2
+|||#Metric name                                    ||| Description
+|||``mysql.process.query``                         ||| The number of threads performing a query.
+|||``mysql.process.sleep``                         ||| The number of threads sleeping.
+||| ...                                            ||| ...
+|||``mysql.process.xxx``                           ||| The number of threads in state ``xxx``
 
 
 #### mysql.vars
 
 These values reflect the current configuration of the MySQL server. They are discussed MySQL documentation chapter titled "Using System Variables".
-Each variable is recorded using a metric name of the form "mysql.vars.<variable name>".
+Currently, the monitor only records two specific variables.
 
-
+|||#Metric name                  ||| Description
+|||``mysql.max_connections``     ||| The maximum number of allowed open connections to server.
+|||``mysql.open_files_limit``    ||| The maximum number of allowed open files.
+ 
 #### mysql.slave
 
 If your MySQL instance is configured as a slave, the values from "SHOW SLAVE STATUS" are listed in this category. See the MySQL documentation
@@ -190,42 +189,70 @@ chapter "Checking Replication Status".
 
 These are values computed by the MySQL monitor plugin based on raw data collected from MySQL. Most values reflect performance since
 the MySQL server was last started.
-    
-- mysql.derived.slow_query_percentage
-    Measure of what percentage of queries are taking a long time to execute.  The value of what defines a "long time" is controlled by the variable "long_query_time" within the MySQL config file (the default as of MySQL 5.0 is 10 seconds).  The higher the percentage, the more your server is being kept busy fulfilling requests and the possible higher load on your server. 
 
-- mysql.derived.connections_used_percentage
-    Measure, as a percentage, of how many of simultaneous connections were used out of the number of connections configured within the MySQL configuration file.  If connections run out, client requests will be blocked.  A high percentage could indicate an application not making efficient use of connections (for instance, not caching an existing connection) or it could indicate more clients connecting than anticipated.
-    
-- mysql.derived.aborted_connections_percentage
-    A percentage of client connection attempts that fail to connect.  Typical reasons include a client doesn't have permission to connect to the database (or invalid password), a corrupt connection packet from the client, or the client is slow in sending it's connect message.  This could indicate something wrong with the clients or possibly even attempts to break into the server.
-
-- mysql.derived.aborted_clients_percentage
-    A measure of the number of clients that disconnect improperly (the don't close the connection).  This could indicate a poorly written client, inactivity on the part of clients, or possibly a problematic connection to the database.
-
-- mysql.derived.read_percentage
-    Measure of what percentage of database activity is reads.  Depending on your configuration, a high read percentage could be expected or might be a problem.  If you have setup read slaves and write masters and the masters show heavy reads, that could indicate a problem.
-
-- mysql.derived.write_percentage
-    Measure of what percentage of database activity is writes.  Writes are generally quite costly and could impact read performance.
-
-- mysql.derived.query_cache_efficiency
-    Measue of what percentage of queries are cached.  A higher percentage means that the query will be more responsive.  A low percentage could indicate that queries aren't used that often or the query cache size is not sufficient to keep the queries that do get made in memory.
-
-- mysql.derived.joins_without_indexes
-    A count of the number of joins performing table scans that do not use indices as well as the joins that check for key usage after each row.  If this value is greater than 0, it could indicate missing or improper indexes on your tables.
-    
-- mysql.derived.table_cache_hit_rate
-    How efficient is the table cache being used?  If the hit rate is low, then increasing the size of the table cache could be beneficial.  Note, that the larger the table cache, however, the more file descriptors are used by the system.
-    
-- mysql.derived.open_file_percentage
-    Of the allowed number of open files, what percentage of them are open.  The higher the percentage, the more file descriptors MySQL is using and the likelihood of operations being delayed (or failing) if too many files are open.  A solution may be as simple as uping the "open_file_limit" in the MySQL config.
-
-- mysql.derived.immediate_table_lock_percentage
-    What percentage of requests to lock a table are granted immediately versus having to wait?  For instance, is another operation locking the table.  If this value is low and there are performance issues, it might be worth considering looking at the table structure or possibly replication.
-
-- mysql.derived.thread_cache_hit_rate
-    For each connection, a thread is needed.  If this value is low, it indicates that either you have unexpected traffic loads or need to allocate more resources to the thread cache.
-    
-- mysql.derived.tmp_disk_table_percentage
-    When MySQL needs to create a temp table (for instance due to a join), how many of the tables created need to be written to disk?  A high percentage could indicate that either your database operations are creating temporary tables that are large or you need to increase the space allocated for in memory temp tables.
+|||#Metric name                                     ||| Description
+|||``mysql.derived.slow_query_percentage``          ||| Measure of what percentage of queries are taking a long time \
+                                                        to execute. The value of what defines a "long time" is \
+                                                        controlled by the variable "long_query_time" within the MySQL \
+                                                        config file (the default as of MySQL 5.0 is 10 seconds). \
+                                                        The higher the percentage, the more your server is being kept \
+                                                        busy fulfilling requests and the possible higher load on your \
+                                                        server. 
+|||``mysql.derived.connections_used_percentage``    ||| Measure, as a percentage, of how many of simultaneous \
+                                                        connections were used out of the number of connections \
+                                                        configured within the MySQL configuration file.  If connections\
+                                                        run out, client requests will be blocked.  A high percentage \
+                                                        could indicate an application not making efficient use of \
+                                                        connections (for instance, not caching an existing connection)\
+                                                        or it could indicate more clients connecting than anticipated.
+|||``mysql.derived.aborted_connections_percentage`` ||| A percentage of client connection attempts that fail to \
+                                                        connect.  Typical reasons include a client doesn't have \
+                                                        permission to connect to the database (or invalid password),\
+                                                        a corrupt connection packet from the client, or the client \
+                                                        is slow in sending it's connect message.  This could \
+                                                        indicate something wrong with the clients or possibly even \
+                                                        attempts to break into the server.
+|||``mysql.derived.aborted_clients_percentage``     ||| A measure of the number of clients that disconnect improperly\ 
+                                                        (the don't close the connection).  This could indicate a \
+                                                        poorly written client, inactivity on the part of clients, or \
+                                                        possibly a problematic connection to the database.
+|||``mysql.derived.read_percentage``                ||| Measure of what percentage of database activity is reads. \
+                                                        Depending on your configuration, a high read percentage could \
+                                                        be expected or might be a problem.  If you have setup read \
+                                                        slaves and write masters and the masters show heavy reads, that\
+                                                        could indicate a problem.
+|||``mysql.derived.write_percentage``               ||| Measure of what percentage of database activity is writes. \ 
+                                                        Writes are generally quite costly and could impact read \
+                                                        performance.
+|||``mysql.derived.query_cache_efficiency``         ||| Measure of what percentage of queries are cached.  A higher \
+                                                        percentage means that the query will be more responsive.  \
+                                                        A low percentage could indicate that queries aren't used \
+                                                        that often or the query cache size is not sufficient to keep \
+                                                        the queries that do get made in memory.
+|||``mysql.derived.joins_without_indexes``          ||| A count of the number of joins performing table scans that do \
+                                                        not use indices as well as the joins that check for key usage \
+                                                        after each row.  If this value is greater than 0, it could \
+                                                        indicate missing or improper indexes on your tables.
+|||``mysql.derived.table_cache_hit_rate``           ||| How efficient is the table cache being used?  If the hit rate \
+                                                        is low, then increasing the size of the table cache could be \
+                                                        beneficial.  Note, that the larger the table cache, however, \
+                                                        the more file descriptors are used by the system.
+|||``mysql.derived.open_file_percentage``           ||| Of the allowed number of open files, what percentage of them \
+                                                        are open.  The higher the percentage, the more file descriptors\
+                                                        MySQL is using and the likelihood of operations being delayed \
+                                                        (or failing) if too many files are open.  A solution may be as \
+                                                        simple as uping the "open_file_limit" in the MySQL config.
+|||``mysql.derived.immediate_table_lock_percentage``||| What percentage of requests to lock a table are granted \
+                                                        immediately versus having to wait?  For instance, is another \
+                                                        operation locking the table.  If this value is low and there \
+                                                        are performance issues, it might be worth considering looking \
+                                                        at the table structure or possibly replication.
+|||``mysql.derived.thread_cache_hit_rate``          ||| For each connection, a thread is needed.  If this value is low,\
+                                                        it indicates that either you have unexpected traffic loads or \
+                                                        need to allocate more resources to the thread cache.   
+|||``mysql.derived.tmp_disk_table_percentage``      ||| When MySQL needs to create a temp table (for instance due to \
+                                                        a join), how many of the tables created need to be written to \
+                                                        disk?  A high percentage could indicate that either your \
+                                                        database operations are creating temporary tables that are \
+                                                        large or you need to increase the space allocated for in \
+                                                        memory temp tables.
