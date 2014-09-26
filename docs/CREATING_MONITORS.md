@@ -293,7 +293,7 @@ cloning the public `scalyr-agent-2` repository and adding your own plugin source
 First, clone the `scalyr-agent-2` repository:
 
     cd ~/
-    git clone https://github.com/scalyr/scalyr-agent-2.git release
+    git clone https://github.com/scalyr/scalyr-agent-2.git --branch release
     
 Next, add the source tree to your `PYTHONPATH`.  The instructions to do this will be platform and shell dependent,
 but for Linux running bash, you just need to execute:
