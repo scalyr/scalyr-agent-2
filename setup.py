@@ -36,7 +36,7 @@ from os import path
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
-here = determine_file_path()
+here = path.dirname(determine_file_path())
 
 # Get the long description from the relevant file
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
@@ -58,7 +58,7 @@ setup(
     author_email='contact@scalyr.com',
 
     # Choose your license
-    license='MIT',
+    license='Apache',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -66,7 +66,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
         'Intended Audience :: System Administrators',
@@ -74,7 +74,7 @@ setup(
         'Topic :: System :: Monitoring',
 
         # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: Apache Software License',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
