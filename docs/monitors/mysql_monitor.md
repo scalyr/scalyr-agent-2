@@ -42,6 +42,9 @@ see Configuration Reference.
 
 ## Viewing Data
 
+@class=bg-warning docInfoPanel: The MySQL dashboard is still under development, and will be released shortly. If you'd
+like early access, contact us at support@scalyr.com.
+
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:MySQL}}. (The dashboard may not be listed until
 the agent begins sending MySQL data.)
