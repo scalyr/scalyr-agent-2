@@ -804,11 +804,12 @@ def parse_change_log():
             # For all other cases, someone else is going to have to look at this line, so add it back to the list.
             lines.append(my_line)
 
-            # If the next line looks like it belongs to previous nesting level, then we must have exited out of
+            # If the next line looks like it belongs any previous nesting levels, then we must have exited out of
             # our current nesting level, so just return what we have gathered for this sublist.
-            if section_delims[level]['up'].match(my_line) is not None:
-                return result
-            elif (section_delims[level]['down'] is not None and
+            for i in range(level + 1):
+                if section_delims[i]['up'].match(my_line) is not None:
+                    return result
+            if (section_delims[level]['down'] is not None and
                   section_delims[level]['down'].match(my_line) is not None):
                 # Otherwise, it looks like the next line belongs to a sublist.  Recursively call ourselves, going
                 # down a level in nesting.
