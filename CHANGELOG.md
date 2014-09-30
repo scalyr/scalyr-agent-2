@@ -15,7 +15,11 @@ New features:
 
 Bug fixes:
 
-* TBD
+* Fix bug prevented having release notes for multiple releases in CHANGELOG.md
+
+Documentation fixes:
+
+* Update MySQL monitor documentation to note deprecated metrics.
 
 ## 2.0.1 "Aggravated Aardvark" - Sept 15, 2014
 
