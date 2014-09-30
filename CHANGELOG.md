@@ -1,6 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.2 "Bashful Bovine" - Oct 15, 2014
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 15, 2014 16:15 -0700
+--->
+
+This release is under active development.  The release date is TBD and will be updated.
+
+New features:
+
+* Support for the MySQL monitor plugin
+
+Bug fixes:
+
+* TBD
+
 ## 2.0.1 "Aggravated Aardvark" - Sept 15, 2014
 
 <!---
