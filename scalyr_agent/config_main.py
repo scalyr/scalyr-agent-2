@@ -37,12 +37,6 @@ from distutils import spawn
 from pwd import getpwnam
 from optparse import OptionParser
 
-from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
-
-# By importing the platform modules, they register themselves if they apply to the current platform.
-# noinspection PyUnresolvedReferences
-import scalyr_agent.platform_posix
-
 from __scalyr__ import scalyr_init, determine_file_path
 
 scalyr_init()
@@ -50,7 +44,11 @@ scalyr_init()
 __file_path__ = determine_file_path()
 
 from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
 
+# By importing the platform modules, they register themselves if they apply to the current platform.
+# noinspection PyUnresolvedReferences
+import scalyr_agent.platform_posix
 
 def set_api_key(config, config_file_path, new_api_key):
     """Replaces the current api key in the file at 'config_file_path' with the value of 'new_api_key'.
