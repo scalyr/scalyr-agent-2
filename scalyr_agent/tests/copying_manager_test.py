@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from scalyr_agent.platform_controller import DefaultPaths
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -109,10 +110,13 @@ class CopyingParamsTest(unittest.TestCase):
 
     def __create_test_configuration_instance(self):
 
+        default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
+                                     '/var/lib/scalyr-agent-2')
+
         def log_factory(config):
             return CopyingParamsTest.LogObject(config)
 
         def monitor_factory(config, _):
             return CopyingParamsTest.MonitorObject(config)
 
-        return Configuration(self.__config_file, log_factory, monitor_factory)
+        return Configuration(self.__config_file, default_paths, log_factory, monitor_factory)

@@ -21,6 +21,10 @@ Documentation fixes:
 
 * Update MySQL monitor documentation to note deprecated metrics.
 
+Internal:
+
+* Refactored code to extract platform-specific logic in preparation for Windows work.
+
 ## 2.0.1 "Aggravated Aardvark" - Sept 15, 2014
 
 <!---

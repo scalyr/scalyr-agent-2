@@ -46,7 +46,7 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, log_factory, monitor_factory):
+    def __init__(self, file_path, default_paths, log_factory, monitor_factory):
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -63,6 +63,10 @@ class Configuration(object):
         # The list of monitor objects created by the monitor_factory passed into the parse method, one for
         # each monitor entry that was found in the configuration file or implicit monitors.
         self.__monitors = []
+
+        # The DefaultPaths object that specifies the default paths for things like the data and log directory
+        # based on platform.
+        self.__default_paths = default_paths
 
         # FIX THESE:
         # Add documentation, verify, etc.
@@ -414,60 +418,10 @@ class Configuration(object):
                 other.__config.put('debug_level', original_debug_level)
 
     @staticmethod
-    def is_tarball_install():
-        """Returns True if this agent was installed using the tarball method.
-        """
-        return Configuration.__determine_platform_type() == 'tarball'
-
-    @staticmethod
-    def default_agent_log_path():
-        """Returns the default log path for the agent."""
-        # TODO:  Support more platforms.
-        if Configuration.__determine_platform_type() == 'tarball':
-            return Configuration.__resolve_to_install_location('log')
-        else:
-            return '/var/log/scalyr-agent-2'
-
-    @staticmethod
-    def default_agent_data_path():
-        # TODO:  Support more platforms.
-        if Configuration.__determine_platform_type() == 'tarball':
-            return Configuration.__resolve_to_install_location('data')
-        else:
-            return '/var/lib/scalyr-agent-2'
-
-    @staticmethod
-    def default_config_file_path():
-        """Returns the default configuration file path for the agent."""
-        # TODO:  Support more platforms.
-        if Configuration.__determine_platform_type() == 'tarball':
-            return Configuration.__resolve_to_install_location('config', 'agent.json')
-        else:
-            return '/etc/scalyr-agent-2/agent.json'
-
-    @staticmethod
     def default_ca_cert_path():
         """Returns the default configuration file path for the agent."""
         # TODO:  Support more platforms.
         return Configuration.__resolve_to_install_location('certs', 'ca_certs.crt')
-
-    @staticmethod
-    def __determine_platform_type():
-        """Returns a string identifying the installation method that was used to install the agent, as well
-        as the platform.
-
-        TODO:  This method doesn't return all platforms yet, just 'tarball' or 'linux'.
-        """
-        # See if the source was installed using the tarball method, which
-        # is identified by 'packageless' being a file in root of the install location for the source.
-        # (Typically, the path looks like /usr/share/scalyr-agent-2/py/scalyr_agent/configuration.py,
-        # where scalyr-agent-2 is the install location).
-        tarball_install = os.path.exists(os.path.join(get_install_root(), 'packageless'))
-
-        if tarball_install:
-            return 'tarball'
-        else:
-            return 'linux'
 
     @staticmethod
     def __resolve_to_install_location(*paths):
@@ -565,9 +519,9 @@ class Configuration(object):
                                    file_path, 'api_key', 'emptyApiKey')
 
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description)
-        self.__verify_or_set_optional_string(config, 'agent_log_path', Configuration.default_agent_log_path(),
+        self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
                                              description)
-        self.__verify_or_set_optional_string(config, 'agent_data_path', Configuration.default_agent_data_path(),
+        self.__verify_or_set_optional_string(config, 'agent_data_path',  self.__default_paths.agent_data_path,
                                              description)
         self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description)
         self.__verify_or_set_optional_string(config, 'scalyr_server', 'https://agent.scalyr.com', description)
