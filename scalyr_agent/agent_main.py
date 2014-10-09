@@ -64,12 +64,16 @@ from optparse import OptionParser
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.unix_daemon import UnixDaemonController
 from scalyr_agent.util import RunState
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
+from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
+
+# By importing the platform modules, they register themselves if they apply to the current platform.
+# noinspection PyUnresolvedReferences
+import scalyr_agent.platform_posix
 
 import getpass
 
@@ -79,7 +83,12 @@ STATUS_FILE = 'last_status'
 class ScalyrAgent(object):
     """Encapsulates the entire Scalyr Agent 2 application.
     """
-    def __init__(self):
+    def __init__(self, platform_controller):
+        """Initialize the object.
+
+        @param platform_controller:  The controller for this platform.
+        @type platform_controller: PlatformController
+        """
         # NOTE:  This abstraction is not thread safe, but it does not need to be.  Even the calls to
         # create the status file are always issued on the main thread since that's how signals are handled.
 
@@ -87,7 +96,11 @@ class ScalyrAgent(object):
         # version of the config, if that latest version had parsing errors.
         self.__config = None
         # The platform-specific controller that does things like fork daemon processes, sleeps, etc.
-        self.__controller = None
+        self.__controller = platform_controller
+        # The DefaultPaths object for defining the default paths for various things like the log directory based on
+        # the platform.
+        self.__default_paths = platform_controller.default_paths
+
         self.__config_file_path = None
         # If the current contents of the configuration file has errors in it, then this will be set to the config
         # object produced by reading it.
@@ -141,30 +154,18 @@ class ScalyrAgent(object):
 
         # Read the configuration file.  Fail if we can't read it, unless the command is stop or status.
         if config_file_path is None:
-            config_file_path = Configuration.default_config_file_path()
+            config_file_path = self.__default_paths.config_file_path
 
         self.__config_file_path = config_file_path
         self.__config = self.__read_config(config_file_path, command != 'stop' and command != 'status')
 
-        # Try to determine the pid file for the running agent, unless we could not parse the config, in which
-        # case we guess where it should be.  We try this guess to handle executing 'stop' or 'status' when we
-        # have a bad configurtion -- we want to help the user out and try to get the status or stop.
-        if self.__config is not None:
-            pid_file = os.path.join(self.__config.agent_log_path, 'agent.pid')
-        elif command_options.pid_file is None:
-            pid_file = os.path.join(Configuration.default_agent_log_path(), 'agent.pid')
+        if self.__config is None:
             print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
-            print >> sys.stderr, 'Assuming pid file is \'%s\'.  Use --pid-file to override.' % pid_file
-        else:
-            print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
-            pid_file = os.path.abspath(command_options.pid_file)
-            print >> sys.stderr, 'Using pid file \'%s\'.' % pid_file
+
+        self.__controller.consume_config(self.__config)
 
         # noinspection PyBroadException
         try:
-            # TODO: When we have Windows support, we will need to change this to add in a new possible controller.
-            self.__controller = UnixDaemonController(pid_file)
-
             # Execute the command.
             if command == 'start':
                 return self.__start(quiet, no_fork, no_change_user)
@@ -176,7 +177,7 @@ class ScalyrAgent(object):
                 if self.__config is not None:
                     agent_data_path = self.__config.agent_data_path
                 else:
-                    agent_data_path = Configuration.default_agent_data_path()
+                    agent_data_path = self.__default_paths.agent_data_path
                     print >> sys.stderr, 'Assuming agent data path is \'%s\'' % agent_data_path
                 return self.__detailed_status(agent_data_path)
             elif command == 'restart':
@@ -206,7 +207,8 @@ class ScalyrAgent(object):
         @rtype: Configuration
         """
         try:
-            config_file = Configuration(config_file_path, CopyingManager.build_log, MonitorsManager.build_monitor)
+            config_file = Configuration(config_file_path, self.__default_paths, CopyingManager.build_log,
+                                        MonitorsManager.build_monitor)
             config_file.parse()
             return config_file
         except UnsupportedSystem, e:
@@ -258,10 +260,10 @@ class ScalyrAgent(object):
                 print >> sys.stderr, 'No change user is selected by agent is not being run by correct user.'
                 print >> sys.stderr, 'Terminating agent, please restart agent using correct user.'
         else:
-            self.__controller.run_as_user(desired_user, os.path.realpath(__file__))
+            self.__controller.run_as_user(desired_user, os.path.realpath(__file__), sys.argv[1:])
 
         # Make sure we do not try to start it up again.
-        self.__controller.fail_if_already_running()
+        self.__fail_if_already_running()
 
         try:
             self.__verify_can_write_to_logs_and_data(self.__config)
@@ -295,22 +297,16 @@ class ScalyrAgent(object):
             return 1
         client.close()
 
-        if not quiet:
-            print "Configuration and server connection verified, starting agent in background."
-
-        # Define some functions for the controller to execute to run the agent and what to do when the process
-        # should be terminated.
-        def run_wrapper():
-            self.__start_time = time.time()
-            self.__run()
-
-        def handle_terminate_wrapper():
-            self.__handle_terminate()
-
         if not no_fork:
-            self.__controller.start_daemon(run_wrapper, handle_terminate_wrapper)
+            # Do one last check to just cut down on the window of race conditions.
+            self.__fail_if_already_running()
+
+            if not quiet:
+                print "Configuration and server connection verified, starting agent in background."
+            self.__controller.start_agent_service(self.__run, quiet)
         else:
-            run_wrapper()
+            self.__run(self.__controller)
+
         return 0
 
     def __handle_terminate(self):
@@ -353,7 +349,7 @@ class ScalyrAgent(object):
             f.close()
 
         # Signal to the running process.  This should cause that process to write to the status file
-        result = self.__controller.request_status()
+        result = self.__controller.request_agent_status()
         if result is not None:
             if result == errno.ESRCH:
                 print >> sys.stderr, 'The agent does not appear to be running.'
@@ -377,7 +373,7 @@ class ScalyrAgent(object):
                 if self.__config is not None:
                     agent_log = os.path.join(self.__config.agent_log_path, 'agent.log')
                 else:
-                    agent_log = os.path.join(Configuration.default_agent_log_path(), 'agent.log')
+                    agent_log = os.path.join(self.__default_paths.agent_log_path, 'agent.log')
                 print >> sys.stderr, ('Failed to get status within 5 seconds.  Giving up.  The agent process is '
                                       'possibly stuck.  See %s for more details.' % agent_log)
                 return 1
@@ -405,7 +401,7 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
-        status = self.__controller.stop_daemon(quiet)
+        status = self.__controller.stop_agent_service(quiet)
         return status
 
     def __status(self):
@@ -414,7 +410,7 @@ class ScalyrAgent(object):
         @return: The exit status code.  It will return zero only if it is running.
         @rtype: int
         """
-        if self.__controller.is_running():
+        if self.__controller.is_agent_running():
             print 'The agent is running. For details, use "scalyr-agent-2 status -v".'
             return 0
         else:
@@ -437,7 +433,7 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
-        if self.__controller.is_running():
+        if self.__controller.is_agent_running():
             if not quiet:
                 print 'Agent is running, restarting now.'
             if self.__stop(quiet) != 0:
@@ -468,7 +464,7 @@ class ScalyrAgent(object):
             could not be started.
         @rtype: int
         """
-        if self.__controller.is_running():
+        if self.__controller.is_agent_running():
             if not quiet:
                 print 'Agent is running, stopping it now.'
             if self.__stop(quiet) != 0:
@@ -477,14 +473,24 @@ class ScalyrAgent(object):
 
         return self.__start(quiet, no_fork, no_change_user)
 
-    def __run(self):
+    def __run(self, controller):
         """Runs the Scalyr Agent 2.
 
         This method will not return until a TERM signal is received or a fatal error occurs.
 
+        @param controller The controller that started this agent service.
+        @type controller: PlatformController
+
         @return: the exit status code
         @rtype: int
         """
+        self.__start_time = time.time()
+        controller.register_for_termination(self.__handle_terminate)
+
+        # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
+        # a file because a user has run the 'detailed_status' command.
+        self.__controller.register_for_status_requests(self.__report_status_to_file)
+
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
         base_overall_stats = OverallStats()
@@ -505,10 +511,6 @@ class ScalyrAgent(object):
                                                    agent_log_file_path='agent.log')
 
                 self.__update_debug_log_level(self.__config.debug_level)
-
-                # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
-                # a file because a user has run the 'detailed_status' command.
-                self.__controller.register_for_status_requests(self.__report_status_to_file)
 
                 # We record where the log file currently is so that we can (in the worse case) start copying it
                 # from this position.  That way we capture the first 'Starting scalyr agent' call.
@@ -544,7 +546,7 @@ class ScalyrAgent(object):
                         last_bw_stats_report_time = current_time
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Checking for any changes to config file')
-                    new_config = Configuration(self.__config_file_path, CopyingManager.build_log,
+                    new_config = Configuration(self.__config_file_path, self.__default_paths, CopyingManager.build_log,
                                                MonitorsManager.build_monitor)
                     try:
                         new_config.parse()
@@ -596,6 +598,15 @@ class ScalyrAgent(object):
         finally:
             if worker_thread is not None:
                 worker_thread.stop()
+
+    def __fail_if_already_running(self):
+        """If the agent is already running, prints an appropriate error message and exits the process.
+        """
+        try:
+            self.__controller.is_agent_running(fail_if_running=True)
+        except AgentAlreadyRunning, e:
+            print >> sys.stderr, "%s" % e.message
+            sys.exit(4)
 
     def __update_debug_log_level(self, debug_level):
         """Updates the debug log level of the agent.
@@ -894,12 +905,12 @@ class WorkerThread(object):
         self.__scalyr_client.close()
 
 if __name__ == '__main__':
+    my_controller = PlatformController.new_platform()
+
     parser = OptionParser(usage='Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)',
                           version='scalyr-agent v' + SCALYR_VERSION)
     parser.add_option("-c", "--config-file", dest="config_filename",
                       help="Read configuration from FILE", metavar="FILE")
-    parser.add_option("-p", "--pid-file", dest="pid_file",
-                      help="The path storing the running agent's process id.  Only used if config cannot be parsed.")
     parser.add_option("-q", "--quiet", action="store_true", dest="quiet", default=False,
                       help="Only print error messages when running the start, stop, and condrestart commands")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False,
@@ -910,8 +921,11 @@ if __name__ == '__main__':
                       help="Forces agent to not change which user is executing agent.  Requires the right user is "
                            "already being used.  This is used internally to prevent infinite loops in changing to"
                            "the correct user.  Users should not need to set this option.")
+    my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()
+
+    my_controller.consume_options(options)
     if len(args) < 1:
         print >> sys.stderr, 'You must specify a command, such as "start", "stop", or "status".'
         parser.print_help(sys.stderr)
@@ -927,4 +941,4 @@ if __name__ == '__main__':
 
     if options.config_filename is not None and not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
-    sys.exit(ScalyrAgent().main(options.config_filename, args[0], options))
+    sys.exit(ScalyrAgent(my_controller).main(options.config_filename, args[0], options))

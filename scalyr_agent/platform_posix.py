@@ -26,11 +26,16 @@ import atexit
 import resource
 import signal
 
+from platform_controller import PlatformController, DefaultPaths, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from platform_controller import AgentAlreadyRunning
+
+from __scalyr__ import get_install_root
+
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
 
 
-class UnixDaemonController:
+class PosixPlatformController(PlatformController):
     """A controller instance for Unix-like platforms.
 
     The controller manages such platform dependent tasks as:
@@ -39,20 +44,106 @@ class UnixDaemonController:
         such as by using a PID file.
       - Stopping the agent process.
       - Sending signals to the running agent process.
-
-    TODO:  This is meant to be a central place to put the platform-specific code.  However, it has not been
-    full baked yet since we have not yet implemented the Windows version.  When we do implement the Windows version,
-    we expect to change this abstraction, create a common base class, and then implement the Windows version as well.
     """
 
-    def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
-        self.stdin = stdin
-        self.stdout = stdout
-        self.stderr = stderr
-        self.pidfile = pidfile
+    def __init__(self, install_type, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+        """Initializes the POSIX platform instance.
+
+        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
+            or DEV_INSTALL.
+
+        @type install_type: int
+        """
+        self.__stdin = stdin
+        self.__stdout = stdout
+        self.__stderr = stderr
+        # The file name storing the pid.
+        self.__pidfile = None
+        # The pidfile specified on the commandline using the flags, if any.  This gives the user a chance to
+        # specify the pidfile if the configuration cannot be read.
+        self.__pidfile_from_options = None
+
+        # The method to invoke when termination is requested.
+        self.__termination_handler = None
+        # The method to invoke when status is requested by another process.
+        self.__status_handler = None
+        PlatformController.__init__(self, install_type)
+
+    def can_handle_current_platform(self):
+        """Returns true if this platform object can handle the server this process is running on.
+
+        @return:  True if this platform instance can handle the current server.
+        @rtype: bool
+        """
+        # TODO:  For now, we only support POSIX.  Once we get Windows support in, will need to change this to
+        # not return True when we should be using Windows.
+        return True
+
+    def add_options(self, options_parser):
+        """Invoked by the main method to allow the platform to add in platform-specific options to the
+        OptionParser used to parse the commandline options.
+
+        @param options_parser:
+        @type options_parser: optparse.OptionParser
+        """
+        options_parser.add_option(
+            "-p", "--pid-file", dest="pid_file",
+            help="The path storing the running agent's process id.  Only used if config cannot be parsed.")
+
+    def consume_options(self, options):
+        """Invoked by the main method to allow the platform to consume any command line options previously requested
+        in the 'add_options' call.
+
+        @param options: The object containing the options as returned by the OptionParser.
+        """
+        self.__pidfile_from_options = options.pid_file
+
+    def consume_config(self, config):
+        """Invoked after 'consume_options' is called to set the Configuration object to be used.
+
+        @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @type config: configuration.Configuration
+        """
+        # Now that we have the config and have consumed any options that we could have been specified, we need to
+        # determine where we read the pidfile from.  Typically, this should be based on the configuration file, but
+        # in the case where we cannot read it, we have to guess or use the commandline option.
+        if config is not None:
+            self.__pidfile = os.path.join(config.agent_log_path, 'agent.pid')
+        elif self.__pidfile_from_options is None:
+            self.__pidfile = os.path.join(self.default_paths.agent_log_path, 'agent.pid')
+            print >> sys.stderr, 'Assuming pid file is \'%s\'.  Use --pid-file to override.' % self.__pidfile
+        else:
+            self.__pidfile = os.path.abspath(self.__pidfile_from_options)
+            print >> sys.stderr, 'Using pid file \'%s\'.' % self.__pidfile
+
+    @property
+    def default_paths(self):
+        """Returns the default paths to use for various configuration options for this platform.
+
+        @return: The default paths
+        @rtype: DefaultPaths
+        """
+        if self._install_type == PACKAGE_INSTALL:
+            return DefaultPaths('/var/log/scalyr-agent-2',
+                                '/etc/scalyr-agent-2/agent.json',
+                                '/var/lib/scalyr-agent-2')
+        elif self._install_type == TARBALL_INSTALL:
+            install_location = get_install_root()
+            return DefaultPaths(os.path.join(install_location, 'log'),
+                                os.path.join(install_location, 'config', 'agent.json'),
+                                os.path.join(install_location, 'data'))
+        else:
+            assert(self._install_type == DEV_INSTALL)
+            # For developers only.  We default to a directory ~/scalyr-agent-dev for storing
+            # all log/data information, and then require a log, config, and data subdirectory in each of those.
+            base_dir = os.path.join(os.path.expanduser('~'), 'scalyr-agent-dev')
+            return DefaultPaths(os.path.join(base_dir, 'log'),
+                                os.path.join(base_dir, 'config', 'agent.json'),
+                                os.path.join(base_dir, 'data'))
 
     def __daemonize(self):
-        """Fork off a background thread for execution.  When this method returns, it will be on the new process.
+        """Fork off a background thread for execution.  If this method returns True, it is the new process, otherwise
+        it is the original process.
 
         This will also populate the PID file with the new process id.
 
@@ -68,7 +159,7 @@ class UnixDaemonController:
             pid = os.fork()
             if pid > 0:
                 # exit first parent
-                sys.exit(0)
+                return False
         except OSError, e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
@@ -92,20 +183,20 @@ class UnixDaemonController:
         # redirect standard file descriptors
         sys.stdout.flush()
         sys.stderr.flush()
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'a+')
-        se = file(self.stderr, 'a+', 0)
+        si = file(self.__stdin, 'r')
+        so = file(self.__stdout, 'a+')
+        se = file(self.__stderr, 'a+', 0)
         os.dup2(si.fileno(), sys.stdin.fileno())
         os.dup2(so.fileno(), sys.stdout.fileno())
         os.dup2(se.fileno(), sys.stderr.fileno())
 
         # write pidfile
-        atexit.register(self.delpid)
+        atexit.register(self.__delpid)
         pid = os.getpid()
 
         fp = None
         try:
-            fp = file(self.pidfile, 'w+')
+            fp = file(self.__pidfile, 'w+')
             # If we are on an OS that supports reading the commandline arguments from /proc, then use that
             # to write more unique information about the running process to help avoid pid collison.
             if self.__can_read_command_line(pid):
@@ -116,9 +207,11 @@ class UnixDaemonController:
             if fp is not None:
                 fp.close()
 
-    def delpid(self):
+        return True
+
+    def __delpid(self):
         """Deletes the pid file"""
-        os.remove(self.pidfile)
+        os.remove(self.__pidfile)
 
     def __read_pidfile(self):
         """Reads the pid file and returns the process id contained in it.
@@ -130,7 +223,7 @@ class UnixDaemonController:
         @rtype: int or None
         """
         try:
-            pf = file(self.pidfile, 'r')
+            pf = file(self.__pidfile, 'r')
             contents = pf.read().strip().split()
             pf.close()
         except IOError:
@@ -191,7 +284,7 @@ class UnixDaemonController:
             if pf is not None:
                 pf.close()
 
-    def run_as_user(self, user_id, script_file):
+    def run_as_user(self, user_id, script_file, script_arguments):
         """Restarts this process with the same arguments as the specified user.
 
         This will re-run the entire Python script so that it is executing as the specified user.
@@ -200,9 +293,12 @@ class UnixDaemonController:
 
         @param user_id: The user id to run as, typically 0 for root.
         @param script_file: The path to the Python script file that was executed.
+        @param script_arguments: The arguments passed in on the command line that need to be used for the new
+            command line.
 
         @type user_id: int
         @type script_file: str
+        @type script_arguments: list<str>
         """
         user_name = pwd.getpwuid(user_id).pw_name
         if os.geteuid() != user_id:
@@ -214,56 +310,70 @@ class UnixDaemonController:
             # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
             # us from re-executing the script again to change the user, to
             # head of any potential bugs that could cause infinite loops.
-            arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + sys.argv[1:]
+            arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
 
             print >>sys.stderr, ('Running as %s' % user_name)
             os.execvp("sudo", arguments)
 
-    def is_running(self):
-        """
+    def is_agent_running(self, fail_if_running=False):
+        """Returns true if the agent service is running, as determined by the pidfile.
+
+        This will optionally raise an Exception with an appropriate error message if the agent is not running.
+
+        @param fail_if_running:  True if the method should raise an Exception with a message about where the pidfile
+            was read from.
+        @type fail_if_running: bool
+
         @return: True if the agent process is already running.
         @rtype: bool
         """
         pid = self.__read_pidfile()
-        return pid is not None
+        if not fail_if_running:
+            return pid is not None
 
-    def fail_if_already_running(self):
-        """Exit the process with a non-zero status if the agent is already running.
-        """
-        pid = self.__read_pidfile()
-        if pid:
-            message = "The agent appears to be running pid=%d.  pidfile %s does exists.\n"
-            sys.stderr.write(message % (pid, self.pidfile))
-            sys.exit(1)
+        if pid is not None:
+            raise AgentAlreadyRunning('The agent appears to be running pid=%d.  pidfile %s does exist.' % (
+                pid, self.__pidfile))
 
-    def start_daemon(self, run_method, handle_terminate_method):
+    def start_agent_service(self, agent_run_method, quiet):
         """Start the daemon process by forking a new process.
 
-        @param run_method:  The method to invoke once the fork is complete and this is a daemon process.
-        @param handle_terminate_method:  The method to invoke if the daemon process is requested to be terminated
-            (such as by receiving a TERM signal)
+        This method will invoke the agent_run_method that was passed in when initializing this object.
         """
-        # Check for a pidfile to see if the daemon already runs
-        self.fail_if_already_running()
-
         # noinspection PyUnusedLocal
         def handle_terminate(signal_num, frame):
-            handle_terminate_method()
+            if self.__termination_handler is not None:
+                self.__termination_handler()
 
-        original = signal.signal(signal.SIGTERM, handle_terminate)
+        # noinspection PyUnusedLocal
+        def handle_interrupt(signal_num, frame):
+            if self.__status_handler is not None:
+                self.__status_handler()
 
-        # Start the daemon
-        self.__daemonize()
-        result = run_method()
+        # Start the daemon by forking off a new process.  When it returns, we are either the original process
+        # or the new forked one.  If it are the original process, then we just return.
+        if not self.__daemonize():
+            return
 
-        signal.signal(signal.SIGTERM, original)
+        # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
+        # get a INT, then we write a status file.. this is what a process will send us when the command
+        # scalyr-agent-2 status -v is invoked.
+        original_term = signal.signal(signal.SIGTERM, handle_terminate)
+        original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
 
-        if result is not None:
-            sys.exit(result)
-        else:
-            sys.exit(99)
+        try:
+            result = agent_run_method(self)
 
-    def stop_daemon(self, quiet):
+            if result is not None:
+                sys.exit(result)
+            else:
+                sys.exit(99)
+
+        finally:
+            signal.signal(signal.SIGTERM, original_term)
+            signal.signal(signal.SIGINT, original_interrupt)
+
+    def stop_agent_service(self, quiet):
         """Stop the daemon
 
         @param quiet:  If True, the only error information will be printed to stdout and stderr.
@@ -274,7 +384,7 @@ class UnixDaemonController:
         if not pid:
             message = ("The agent does not appear to be running.  pidfile %s does not exist or listed process"
                        " is not running.\n")
-            sys.stderr.write(message % self.pidfile)
+            sys.stderr.write(message % self.__pidfile)
             return 0  # not an error in a restart
 
         if not quiet:
@@ -286,7 +396,7 @@ class UnixDaemonController:
             term_attempts = 50
             while term_attempts > 0:
                 os.kill(pid, signal.SIGTERM)
-                UnixDaemonController.__sleep(0.1)
+                PosixPlatformController.__sleep(0.1)
                 term_attempts -= 1
 
             if not quiet:
@@ -294,13 +404,13 @@ class UnixDaemonController:
 
             while 1:
                 os.kill(pid, signal.SIGKILL)
-                UnixDaemonController.__sleep(0.1)
+                PosixPlatformController.__sleep(0.1)
 
         except OSError, err:
             err = str(err)
             if err.find("No such process") > 0:
-                if os.path.exists(self.pidfile):
-                    os.remove(self.pidfile)
+                if os.path.exists(self.__pidfile):
+                    os.remove(self.__pidfile)
             else:
                 print 'Unable to terminate agent.'
                 print str(err)
@@ -312,6 +422,50 @@ class UnixDaemonController:
             print 'Agent has stopped.'
 
         return 0
+
+    def request_agent_status(self):
+        """Invoked by a process that is not the agent to request the current agent dump the current detail
+        status to the status file.
+
+        This is used to implement the 'scalyr-agent-2 status -v' feature.
+
+        @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
+            have permission to request the status.  errno.ESRCH indicates the agent is not running.
+        """
+
+        pid = self.__read_pidfile()
+        if pid is None:
+            return errno.ESRCH
+
+        try:
+            os.kill(pid, signal.SIGINT)
+        except OSError, e:
+            if e.errno == errno.ESRCH or e.errno == errno.EPERM:
+                return e.errno
+            raise e
+        return None
+
+    def register_for_termination(self, handler):
+        """Register a method to be invoked if the agent service is requested to terminated.
+
+        This should only be invoked by the agent service once it has begun to run.
+
+        @param handler: The method to invoke when termination is requested.
+        @type handler:  func
+        """
+        self.__termination_handler = handler
+
+    def register_for_status_requests(self, handler):
+        """Register a method to be invoked if this process is requested to report its status.
+
+        This is used to implement the 'scalyr-agent-2 status -v' feature.
+
+        This should only be invoked by the agent service once it has begun to run.
+
+        @param handler:  The method to invoke when status is requested.
+        @type handler: func
+        """
+        self.__status_handler = handler
 
     @staticmethod
     def __sleep(seconds):
@@ -347,41 +501,6 @@ class UnixDaemonController:
         # Remove the alarm if it is still pending.
         signal.alarm(0)
 
-    def request_status(self):
-        """Invoked by a process that is not the agent to request the current agent dump the current detail
-        status to the status file.
-
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
-
-        @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
-            have permission to request the status.  errno.ESRCH indicates the agent is not running.
-        """
-
-        pid = self.__read_pidfile()
-        if pid is None:
-            return errno.ESRCH
-
-        try:
-            os.kill(pid, signal.SIGINT)
-        except OSError, e:
-            if e.errno == errno.ESRCH or e.errno == errno.EPERM:
-                return e.errno
-            raise e
-        return None
-
-    def register_for_status_requests(self, handler):
-        """Register a method to be invoked if this process is requested to report its status.
-
-        This is used to implement the 'scalyr-agent-2 status -v' feature.
-
-        @param handler:  The method to invoke when status is requested.
-        @type handler: func
-        """
-        # noinspection PyUnusedLocal
-        def wrapped_handler(signal_num, frame):
-            handler()
-        signal.signal(signal.SIGINT, wrapped_handler)
-
     def get_usage_info(self):
         """Returns CPU and memory usage information.
 
@@ -395,3 +514,5 @@ class UnixDaemonController:
         rss_size = usage_info[2]
 
         return user_cpu, system_cpu, rss_size
+
+PlatformController.register_platform(PosixPlatformController)
