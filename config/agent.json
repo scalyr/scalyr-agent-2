@@ -11,7 +11,7 @@
   server_attributes: {
      // serverHost: "specify this field to override the server's hostname",
      // tier: "production"
-  },
+  }
 
   // Log files to upload to Scalyr. You can use '*' wildcards here.
   logs: [
