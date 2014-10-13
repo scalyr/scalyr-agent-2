@@ -50,6 +50,7 @@ from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
 # noinspection PyUnresolvedReferences
 import scalyr_agent.platform_posix
 
+
 def set_api_key(config, config_file_path, new_api_key):
     """Replaces the current api key in the file at 'config_file_path' with the value of 'new_api_key'.
 
@@ -198,21 +199,21 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
     try:
         try:
             platform_controller = PlatformController.new_platform()
-            default_paths = platform_controller.default_paths
+            my_default_paths = platform_controller.default_paths
 
             # Ensure that this is a tarball install
-            if not platform_controller.install_type != TARBALL_INSTALL:
+            if platform_controller.install_type != TARBALL_INSTALL:
                 raise UpgradeFailure('The current agent was not installed using a tarball, so you may not use the '
                                      'upgrade tarball command.')
 
             # Ensure that the user has not changed the defaults for the config, data, and log directory.
-            if default_paths.config_file_path != config.file_path:
+            if my_default_paths.config_file_path != config.file_path:
                 raise UpgradeFailure('The agent is not using the default configuration file so you may not use the '
                                      'upgrade tarball command.')
-            if default_paths.agent_data_path != config.agent_data_path:
+            if my_default_paths.agent_data_path != config.agent_data_path:
                 raise UpgradeFailure('The agent is not using the default data directory so you may not use the upgrade '
                                      'tarball command.')
-            if default_paths.agent_log_path != config.agent_log_path:
+            if my_default_paths.agent_log_path != config.agent_log_path:
                 raise UpgradeFailure('The agent is not using the default log directory so you may not use the upgrade '
                                      'tarball command.')
 
