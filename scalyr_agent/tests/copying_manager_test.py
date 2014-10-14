@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_controller import DefaultPaths
 
 __author__ = 'czerwin@scalyr.com'
@@ -119,4 +120,7 @@ class CopyingParamsTest(unittest.TestCase):
         def monitor_factory(config, _):
             return CopyingParamsTest.MonitorObject(config)
 
-        return Configuration(self.__config_file, default_paths, log_factory, monitor_factory)
+        monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
+                    JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
+                               pid='$$', id='agent')]
+        return Configuration(self.__config_file, default_paths, monitors, log_factory, monitor_factory)

@@ -46,7 +46,7 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, default_paths, log_factory, monitor_factory):
+    def __init__(self, file_path, default_paths, default_monitors, log_factory, monitor_factory):
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -67,6 +67,11 @@ class Configuration(object):
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
+
+        # A list of dict/JsonObjects specifying the monitors to run by default.  This comes from the PlatformController
+        # to automatically include platform-specific monitors.  On Linux machines, this would include the
+        # linux_system_metrics and linux_process_metrics for the agent process.
+        self.__default_monitors = default_monitors
 
         # FIX THESE:
         # Add documentation, verify, etc.
@@ -121,20 +126,12 @@ class Configuration(object):
                 self.__verify_log_entry_and_set_defaults(config, description='implicit rule')
                 agent_log = config
 
-            # Add in implicit entry to run the metric monitor collector.
-            metric_monitor = None
-            if self.implicit_metric_monitor:
-                config = JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics')
-                self.__verify_monitor_entry_and_set_defaults(config, "implicit rules", -1)
-                metric_monitor = config
-
-            # Add in an implicit instance of the apps_metric monitor for the agent.
-            agent_apps_metric_monitor = None
-            if self.implicit_agent_process_metrics_monitor:
-                config = JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
-                                    pid='$$', id='agent')
-                self.__verify_monitor_entry_and_set_defaults(config, "implicit rules", -1)
-                agent_apps_metric_monitor = config
+            # Add in any platform-specific monitors.
+            platform_monitors = []
+            for monitor in self.__default_monitors:
+                config = JsonObject(content=monitor)
+                self.__verify_monitor_entry_and_set_defaults(config, 'default monitors for platform', -1)
+                platform_monitors.append(config)
 
             all_logs = list(self.__config.get_json_array('logs'))
             if agent_log is not None:
@@ -148,10 +145,8 @@ class Configuration(object):
             # Tracks which modules already had an id present in the module config.
             had_id = {}
             all_monitors = list(self.__config.get_json_array('monitors'))
-            if metric_monitor is not None:
-                all_monitors.append(metric_monitor)
-            if agent_apps_metric_monitor is not None:
-                all_monitors.append(agent_apps_metric_monitor)
+            for monitor in platform_monitors:
+                all_monitors.append(monitor)
 
             for entry in all_monitors:
                 module_name = entry['module'].split('.')[-1]
