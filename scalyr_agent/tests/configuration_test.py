@@ -416,9 +416,7 @@ class TestConfiguration(unittest.TestCase):
 
     def test_parser_specification(self):
         self.__write_file(""" {
-            implicit_metric_monitor: false,
             implicit_agent_log_collection: false,
-            implicit_agent_process_metrics_monitor: false,
             api_key: "hi there",
             logs: [ { path: "/tmp/foo.txt",
                       parser: "foo-parser"} ]
@@ -426,7 +424,7 @@ class TestConfiguration(unittest.TestCase):
         """)
         config = self.__create_test_configuration_instance()
         config.parse()
-        self.assertEquals(len(config.logs), 1)
+        self.assertEquals(len(config.logs), 3)
         self.assertEquals(config.logs[0].config['attributes']['parser'], 'foo-parser')
 
     def test_monitors(self):
@@ -591,4 +589,8 @@ class TestConfiguration(unittest.TestCase):
 
         default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                      '/var/lib/scalyr-agent-2')
-        return Configuration(self.__config_file, default_paths, log_factory, monitor_factory)
+
+        monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
+                    JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
+                               pid='$$', id='agent')]
+        return Configuration(self.__config_file, default_paths, monitors, log_factory, monitor_factory)

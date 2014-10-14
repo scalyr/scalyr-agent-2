@@ -46,9 +46,8 @@ __file_path__ = determine_file_path()
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
 
-# By importing the platform modules, they register themselves if they apply to the current platform.
-# noinspection PyUnresolvedReferences
-import scalyr_agent.platform_posix
+from scalyr_agent.platforms import register_supported_platforms
+register_supported_platforms()
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -476,7 +475,8 @@ if __name__ == '__main__':
         print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
         sys.exit(1)
 
-    default_paths = PlatformController.new_platform().default_paths
+    controller = PlatformController.new_platform()
+    default_paths = controller.default_paths
 
     if options.config_filename is None:
         options.config_filename = default_paths.config_file_path
@@ -485,7 +485,7 @@ if __name__ == '__main__':
         options.config_filename = os.path.abspath(options.config_filename)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, None, None)
+        config_file = Configuration(options.config_filename, default_paths, controller.default_monitors, None, None)
         config_file.parse()
     except Exception, e:
         print >> sys.stderr, 'Error reading configuration file: %s' % str(e)

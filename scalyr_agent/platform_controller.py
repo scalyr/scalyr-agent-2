@@ -143,6 +143,21 @@ class PlatformController:
         """
         return None
 
+    @property
+    def default_monitors(self):
+        """Returns the default monitors to use for this platform.
+
+        This is guaranteed to be invoked after consume_config is called to allow implementations to make what they
+        return be dependent on configuration options.
+
+        This method should return a list of dicts containing monitor configuration options just as you would specify
+        them in the configuration file.  The list may be empty.
+
+        @return: The default monitors
+        @rtype: list<dict>
+        """
+        return []
+
     def run_as_user(self, user_id, script_file, script_arguments):
         """Restarts this process with the same arguments as the specified user.
 

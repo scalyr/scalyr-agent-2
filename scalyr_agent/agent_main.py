@@ -71,9 +71,8 @@ from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
 
-# By importing the platform modules, they register themselves if they apply to the current platform.
-# noinspection PyUnresolvedReferences
-import scalyr_agent.platform_posix
+from scalyr_agent.platforms import register_supported_platforms
+register_supported_platforms()
 
 import getpass
 
@@ -100,6 +99,8 @@ class ScalyrAgent(object):
         # The DefaultPaths object for defining the default paths for various things like the log directory based on
         # the platform.
         self.__default_paths = platform_controller.default_paths
+        # The default monitors for this platform.
+        self.__default_monitors = platform_controller.default_monitors
 
         self.__config_file_path = None
         # If the current contents of the configuration file has errors in it, then this will be set to the config
@@ -207,8 +208,8 @@ class ScalyrAgent(object):
         @rtype: Configuration
         """
         try:
-            config_file = Configuration(config_file_path, self.__default_paths, CopyingManager.build_log,
-                                        MonitorsManager.build_monitor)
+            config_file = Configuration(config_file_path, self.__default_paths, self.__default_monitors,
+                                        CopyingManager.build_log, MonitorsManager.build_monitor)
             config_file.parse()
             return config_file
         except UnsupportedSystem, e:
@@ -546,8 +547,8 @@ class ScalyrAgent(object):
                         last_bw_stats_report_time = current_time
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Checking for any changes to config file')
-                    new_config = Configuration(self.__config_file_path, self.__default_paths, CopyingManager.build_log,
-                                               MonitorsManager.build_monitor)
+                    new_config = Configuration(self.__config_file_path, self.__default_paths, self.__default_monitors,
+                                               CopyingManager.build_log, MonitorsManager.build_monitor)
                     try:
                         new_config.parse()
                         self.__verify_can_write_to_logs_and_data(new_config)

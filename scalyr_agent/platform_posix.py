@@ -26,8 +26,8 @@ import atexit
 import resource
 import signal
 
-from platform_controller import PlatformController, DefaultPaths, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
-from platform_controller import AgentAlreadyRunning
+from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
+from scalyr_agent.platform_controller import TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
 from __scalyr__ import get_install_root
 
@@ -123,6 +123,8 @@ class PosixPlatformController(PlatformController):
         @return: The default paths
         @rtype: DefaultPaths
         """
+        # TODO: Change this to something that is not Linux-specific.  Maybe we should always just default
+        # to the home directory location.
         if self._install_type == PACKAGE_INSTALL:
             return DefaultPaths('/var/log/scalyr-agent-2',
                                 '/etc/scalyr-agent-2/agent.json',
@@ -514,5 +516,3 @@ class PosixPlatformController(PlatformController):
         rss_size = usage_info[2]
 
         return user_cpu, system_cpu, rss_size
-
-PlatformController.register_platform(PosixPlatformController)
