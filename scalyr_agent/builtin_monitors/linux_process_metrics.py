@@ -34,6 +34,63 @@ import os
 import re
 import time
 
+from scalyr_agent import define_config_option, define_metric
+
+__monitor__ = __name__
+
+define_config_option(__monitor__, 'commandline',
+                     'The regular expression used to determine the process from which the monitor instance is '
+                     'collecting metrics.  This expression is matched against the commandline.',
+                     default=None, convert_to=str)
+define_config_option(__monitor__, 'pid',
+                     'The pid of the process from which the monitor instance is collecting metrics.  This is ignored '
+                     'if the commandline option is specified.',
+                     default=None, convert_to=str)
+define_config_option(__monitor__, 'id',
+                     'The string to use to identify this monitor instance in the log.  This string will be included '
+                     'on all metrics reported for the matched process.', required_option=True, convert_to=str)
+
+define_metric(__monitor__, 'app.cpu',
+              'User-mode CPU usage, in 1/100ths of a second.',
+              extra_fields={'type': 'user'}, unit='secs:0.01', cumulative=True)
+
+define_metric(__monitor__, 'app.cpu',
+              'System-mode CPU usage, in 1/100ths of a second.', extra_fields={'type': 'system'}, unit='secs:0.01',
+              cumulative=True)
+
+define_metric(__monitor__, 'app.uptime',
+              'Process uptime, in milliseconds.', unit='milliseconds', cumulative=True)
+
+define_metric(__monitor__, 'app.threads',
+              'The number of threads being used by the process.')
+
+define_metric(__monitor__, 'app.nice',
+              'The nice value for the process.')
+
+define_metric(__monitor__, 'app.mem.bytes',
+              'Virtual memory usage, in bytes.', extra_fields={'type': 'vmsize'}, unit='bytes')
+
+define_metric(__monitor__, 'app.mem.bytes',
+              'Resident memory usage, in bytes.', extra_fields={'type': 'resident'}, unit='bytes')
+
+define_metric(__monitor__, 'app.mem.bytes',
+              'Peak virtual memory usage, in bytes.', extra_fields={'type': 'peak_vmsize'}, unit='bytes')
+
+define_metric(__monitor__, 'app.mem.bytes',
+              'Peak resident memory usage, in bytes.', extra_fields={'type': 'peak_resident'}, unit='bytes')
+
+define_metric(__monitor__, 'app.disk.bytes',
+              'Total bytes read from disk.', extra_fields={'type': 'read'}, unit='bytes', cumulative=True)
+
+define_metric(__monitor__, 'app.disk.requests',
+              'Total disk read requests.', extra_fields={'type': 'read'}, unit='bytes', cumulative=True)
+
+define_metric(__monitor__, 'app.disk.bytes',
+              'Total bytes written to disk.', extra_fields={'type': 'write'}, unit='bytes', cumulative=True)
+
+define_metric(__monitor__, 'app.disk.requests',
+              'Total disk write requests.', extra_fields={'type': 'write'}, unit='bytes', cumulative=True)
+
 
 class BaseReader:
     """The base class for all readers.  Each derived reader class is responsible for

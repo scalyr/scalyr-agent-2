@@ -17,8 +17,7 @@
 # This class should be used by developers creating their own monitor plugins.
 #
 # To see how to write your own Scalyr monitor plugin, please see:
-# http://www.scalyr.com/FILL_THIS_IN  (TODO: Fill in after alpha once we have
-# a permanent URL for the documentation.)
+# https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
@@ -78,11 +77,11 @@ class ScalyrMonitor(StoppableThread):
         @param logger: The logger to use for output.
         @param sample_interval_secs: The interval in seconds to wait between gathering samples.
         """
-        # The MonitorConfig object created from the config for this monitor instance.
-        self._config = MonitorConfig(monitor_config)
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config['module']
+        # The MonitorConfig object created from the config for this monitor instance.
+        self._config = MonitorConfig(monitor_config, monitor_module=self.monitor_name)
         log_path = self.monitor_name.split('.')[-1] + '.log'
         self.disabled = False
         # TODO: For now, just leverage the logic in the loggers for naming this monitor.  However,
@@ -250,6 +249,50 @@ class ScalyrMonitor(StoppableThread):
         return self._run_state.sleep_but_awaken_if_stopped(time_to_sleep)
 
 
+def define_config_option(monitor_module, option_name, option_description, required_option=False,
+                         max_value=None, min_value=None, convert_to=None, default=None):
+    """Defines a configuration option for the specified monitor.
+
+    Once this is invoked, any validation rules supplied here are applied to all MonitorConfig objects created
+    with the same monitor name.
+
+    Note, this overwrites any previously defined rules for this configuration option.
+
+    @param monitor_module:  The module the monitor is defined in.  This must be the same name that will be supplied
+        for any MonitorConfig instances for this monitor.
+    @param option_name: The name of the option field.
+    @param required_option: If True, then this is option considered to be required and when the configuration
+        is parsed for the monitor, a BadMonitorConfiguration exception if the field is not present.
+    @param convert_to: If not None, then will convert the value for the option to the specified type. Only int,
+        bool, float, long, str, and unicode are supported. If the type conversion cannot be done, a
+        BadMonitorConfiguration exception is raised during configuration parsing. The only true conversions allowed are
+        those from str, unicode value to other types such as int, bool, long, float. Trivial conversions are allowed
+        from int, long to float, but not the other way around. Additionally, any primitive type can be converted to
+        str, unicode.
+    @param default: The value to assign to the option if the option is not present in the configuration. This is
+        ignored if 'required_option' is True.
+    @param max_value: If not None, the maximum allowed value for option. Raises a BadMonitorConfiguration if the
+        value is greater during configuration parsing.
+    @param min_value: If not None, the minimum allowed value for option. Raises a BadMonitorConfiguration if the
+        value is less than during configuration parsing.
+    """
+    if monitor_module not in __option_map__:
+        __option_map__[monitor_module] = {}
+
+    option = MonitorConfigOption()
+    option.option_name = option_name
+    option.description = option_description
+    option.required_option = required_option
+    option.max_value = max_value
+    option.min_value = min_value
+    option.convert_to = convert_to
+    option.default = default
+
+    __option_map__[monitor_module][option_name] = option
+
+    return None
+
+
 class MonitorConfig(object):
     """Encapsulates configuration parameters for a single monitor instance and includes helper utilities to
     validate configuration values.
@@ -259,15 +302,24 @@ class MonitorConfig(object):
 
     This abstraction does not support any mutator operations.  The configuration is read-only.
     """
-    def __init__(self, content=None):
+    def __init__(self, content=None, monitor_module=None):
         """Initializes MonitorConfig.
 
         @param content: A dict containing the key/values pairs to use.
+        @param monitor_module: The module containing the monitor.  This must be the same as what was previously
+            used for 'define_config_option' for any options registered for this monitor.
         """
         self.__map = {}
         if content is not None:
             for x in content:
                 self.__map[x] = content[x]
+
+        if monitor_module in __option_map__:
+            for x in __option_map__[monitor_module].itervalues():
+                if x.required_option or x.default is not None or x.option_name in self.__map:
+                    self.__map[x.option_name] = self.get(x.option_name, required_field=x.required_option,
+                                                         max_value=x.max_value, min_value=x.min_value,
+                                                         convert_to=x.convert_to, default=x.default)
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""
@@ -409,6 +461,86 @@ class MonitorConfig(object):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+
+# Maps from monitor module name to a map of option name to MonitorConfigOptions.
+# dict(module_name, dict(option name, MonitorConfigOptions))
+__option_map__ = {}
+
+# Maps from monitor module name to a map of metric name to MetricInfo.
+# dict(module_name, dict(metric name, MetricInfo))
+__metric_info_map__ = {}
+
+
+def define_metric(monitor_module, metric_name, description, extra_fields=None, unit=None, cumulative=False):
+    """
+    @param monitor_module:  The module name for the monitor this metric is defined in.
+    @param metric_name: The name of the metric.
+    @param description: The description of the metric.
+    @param extra_fields: A dict describing the extra fields that are recorded with this metric.  It maps from the
+        extra field name to the values that the description apply to.
+    @param unit: A string describing the units of the value.  For now, this should be 'sec' or 'bytes'.  You may also
+        include a colon after the unit with a scale factor.  For example, 'sec:.01' indicates the value represents
+        1/100ths of a second.  You may also specify 'milliseconds', which is mapped to 'sec:.001'
+    @param cumulative: True if the metric records the sum all metric since the monitored process began.  For example,
+        it could be the sum of all request sizes received by a server.  In this case, calculating the difference between
+        two values for the metric is the same as calculating the rate of non-accumulated metric.
+
+    @type monitor_module: str
+    @type metric_name: str
+    @type description: str
+    @type extra_fields: dict
+    @type unit: str
+    @type cumulative: bool
+    """
+    if monitor_module not in __metric_info_map__:
+        __metric_info_map__[monitor_module] = {}
+
+    info = MetricInfo()
+    __metric_info_map__[monitor_module][metric_name] = info
+    info.metric_name = metric_name
+    info.description = description
+    info.extra_fields = extra_fields
+    info.unit = unit
+    info.cumulative = cumulative
+
+
+class MonitorConfigOption(object):
+    """Simple object to hold the fields for a single configuration option.
+    """
+    def __init__(self):
+        # The name of the option.
+        self.option_name = None
+        # The description of the option.
+        self.description = None
+        # True if the option is required.
+        self.required_option = False
+        # The maximum value allowed value for the option if any.
+        self.max_value = None
+        # The minimum value allowed value for the option if any.
+        self.min_value = None
+        # The primitive type to convert the value to.
+        self.convert_to = None
+        # The default value, if any.
+        self.default = None
+
+
+class MetricInfo(object):
+    """Simple object to hold fields describing a monitor's metric."""
+    def __init__(self):
+        # The name of the metric.
+        self.metric_name = None
+        # The description for the metric.
+        self.description = None
+        # A dict containing a map of the extra fields included in the metric along with the format for the values.
+        self.extra_fields = None
+        # A string describing the units of the value.  For now, this should be 'sec' or 'bytes'.  You may also include
+        # a colon after the unit with a scale factor.  For example, 'sec:.01' indicates the value represents 1/100ths
+        # of a second.  You may also specify 'milliseconds', which is mapped to 'sec:.001'.
+        self.unit = None
+        # True if the metric records the sum all metric since the monitored process began.  For example, it could be
+        # the sum of all the latencies for all requested received by the server.
+        self.cumulative = False
 
 
 class BadMonitorConfiguration(Exception):
