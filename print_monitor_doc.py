@@ -316,5 +316,5 @@ if __name__ == '__main__':
         print >> sys.stderr, ('Warning, this tool is still experimental.  The format of the output may change in the'
                               'future.  Use with caution.')
 
-    print_monitor_documentation(args[0], options.column_size, options.module_paths)
+    print_monitor_documentation(args[0], int(options.column_size), options.module_paths)
     sys.exit(0)
