@@ -30,7 +30,7 @@ except ImportError:
     import pickle
 
 from scalyr_agent import StoppableThread
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.monitor_utils import ServerProcessor, LineRequestParser, Int32RequestParser
 
 __monitor__ = __name__
@@ -74,6 +74,11 @@ define_config_option(__monitor__, 'max_request_size',
 define_config_option(__monitor__, 'buffer_size',
                      'Optional (defaults to 100KB).  The maximum buffer size in bytes for buffering incoming requests '
                      'per connection', default=100*1024, min_value=10*1024, convert_to=int)
+
+define_log_field(__monitor__, 'monitor', 'Always ``graphite_monitor``.')
+define_log_field(__monitor__, 'metric', 'The Graphite metric name.')
+define_log_field(__monitor__, 'value', 'The Graphite metric value.')
+define_log_field(__monitor__, 'orig_time', 'The Graphite timestamp.')
 
 
 class GraphiteMonitor(ScalyrMonitor):

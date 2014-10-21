@@ -19,7 +19,7 @@ import re
 import urllib2
 import cookielib
 
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 
 __monitor__ = __name__
 
@@ -46,6 +46,16 @@ define_config_option(__monitor__, 'max_characters',
                      'Optional (defaults to 200). At most this many characters of output are recorded. You may specify '
                      'a value up to 10000, but the Scalyr server currently truncates all fields to 3500 characters.',
                      default=200, convert_to=int, min_value=0, max_value=10000)
+
+define_log_field(__monitor__, 'monitor', 'Always ``url_monitor``.')
+define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration, e.g. ``instance-type``.')
+define_log_field(__monitor__, 'url', 'The URL that was retrieved, e.g. '
+                                     '``http:/^^^/169.254.169.254/latest/meta-data/instance-type``.')
+define_log_field(__monitor__, 'metric', 'Always ``response``.')
+define_log_field(__monitor__, 'status', 'The HTTP response code, e.g. 200 or 404.')
+define_log_field(__monitor__, 'length', 'The length of the HTTP response.')
+define_log_field(__monitor__, 'value', 'The body of the HTTP response.')
+
 
 # Pattern that matches the first line of a string
 first_line_pattern = re.compile('[^\r\n]+')

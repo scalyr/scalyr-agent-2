@@ -34,7 +34,7 @@ import os
 import re
 import time
 
-from scalyr_agent import define_config_option, define_metric
+from scalyr_agent import define_config_option, define_metric, define_log_field
 
 __monitor__ = __name__
 
@@ -94,6 +94,12 @@ define_metric(__monitor__, 'app.disk.bytes',
 
 define_metric(__monitor__, 'app.disk.requests',
               'Total disk write requests.', extra_fields={'type': 'write'}, unit='bytes', cumulative=True)
+
+define_log_field(__monitor__, 'monitor', 'Always ``linux_process_metrics``.')
+define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration, e.g. ``tomcat``.')
+define_log_field(__monitor__, 'app', 'Same as ``instance``; provided for compatibility with the original Scalyr Agent.')
+define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "app.cpu".')
+define_log_field(__monitor__, 'value', 'The metric value.')
 
 
 class BaseReader:

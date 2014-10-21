@@ -21,7 +21,7 @@ import os
 import re
 import scalyr_agent.third_party.tcollector.tcollector as tcollector
 from Queue import Empty
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration, define_metric
+from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration, define_metric, define_log_field
 from scalyr_agent.third_party.tcollector.tcollector import ReaderThread
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent import StoppableThread
@@ -223,6 +223,10 @@ define_metric(__monitor__, 'proc.meminfo.cached',
 define_metric(__monitor__, 'proc.meminfo.buffered',
               'The total number of 1 KB pages of RAM being used in system buffers.', unit='bytes:1024',
               category='memory')
+
+define_log_field(__monitor__, 'monitor', 'Always ``linux_system_metrics``.')
+define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "proc.stat.cpu".')
+define_log_field(__monitor__, 'value', 'The metric value.')
 
 
 class TcollectorOptions(object):

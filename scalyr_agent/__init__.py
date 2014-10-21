@@ -42,6 +42,7 @@ from scalyr_agent.scalyr_monitor import MonitorConfig
 from scalyr_agent.scalyr_monitor import UnsupportedSystem
 from scalyr_agent.scalyr_monitor import define_metric
 from scalyr_agent.scalyr_monitor import define_config_option
+from scalyr_agent.scalyr_monitor import define_log_field
 
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.util import RunState
@@ -56,4 +57,5 @@ import monitor_utils
 
 __all__ = ['ScalyrMonitor', 'MonitorConfig', 'BadMonitorConfiguration', 'UnsupportedSystem', 'getLogger', 'AgentLogger',
            'StoppableThread', 'RunState', 'DEBUG_LEVEL_0', 'DEBUG_LEVEL_1', 'DEBUG_LEVEL_2', 'DEBUG_LEVEL_3',
-           'DEBUG_LEVEL_4', 'DEBUG_LEVEL_5', 'json_lib', 'monitor_utils', 'define_metric', 'define_config_option']
+           'DEBUG_LEVEL_4', 'DEBUG_LEVEL_5', 'json_lib', 'monitor_utils', 'define_metric', 'define_config_option',
+           'define_log_field']

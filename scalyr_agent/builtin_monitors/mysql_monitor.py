@@ -22,7 +22,7 @@ import os
 import stat
 import errno
 
-from scalyr_agent import ScalyrMonitor, UnsupportedSystem, define_config_option, define_metric
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem, define_config_option, define_metric, define_log_field
 
 # We must require 2.6 or greater right now because PyMySQL requires it.  We are considering
 # forking PyMySQL and adding in support if there is enough customer demand.
@@ -151,6 +151,11 @@ define_metric(__monitor__, 'mysql.process.sleep',
               'The number of threads sleeping.', category='threads')
 define_metric(__monitor__, 'mysql.process.xxx',
               'The number of threads in state ``xxx``', category='threads')
+
+define_log_field(__monitor__, 'monitor', 'Always ``mysql_monitor``.')
+define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration.')
+define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "mysql.vars".')
+define_log_field(__monitor__, 'value', 'The metric value.')
 
 
 def file_exists(path):

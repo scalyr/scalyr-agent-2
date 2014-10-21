@@ -18,7 +18,7 @@
 import re
 import os
 
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 
 __monitor__ = __name__
 
@@ -41,6 +41,13 @@ define_config_option(__monitor__, 'max_characters',
                      'Optional (defaults to 200). At most this many characters of output are recorded. You may specify '
                      'a value up to 10000, but the Scalyr server currently truncates all fields to 3500 characters.',
                      default=200, convert_to=int, min_value=0, max_value=10000)
+
+define_log_field(__monitor__, 'monitor', 'Always ``shell_monitor``.')
+define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration, e.g. ``kernel-version``.')
+define_log_field(__monitor__, 'command', 'The shell command for this plugin instance, e.g. ``uname -r``.')
+define_log_field(__monitor__, 'metric', 'Always ``output``.')
+define_log_field(__monitor__, 'value', 'The output of the shell command, e.g. ``3.4.73-64.112.amzn1.x86_64``.')
+
 
 # Pattern that matches the first line of a string
 __first_line_pattern__ = re.compile('[^\r\n]+')
