@@ -341,7 +341,8 @@ def define_config_option(monitor_module, option_name, option_description, requir
     return None
 
 
-def define_metric(monitor_module, metric_name, description, extra_fields=None, unit=None, cumulative=False):
+def define_metric(monitor_module, metric_name, description, extra_fields=None, unit=None, cumulative=False,
+                  category=None):
     """Defines description information for a metric with the specified name and extra fields.
 
     This will overwrite previous metric information recorded for the same ``metric_name`` and ``extra_fields``.
@@ -360,6 +361,8 @@ def define_metric(monitor_module, metric_name, description, extra_fields=None, u
     @param cumulative: True if the metric records the sum all metric since the monitored process began.  For example,
         it could be the sum of all request sizes received by a server.  In this case, calculating the difference between
         two values for the metric is the same as calculating the rate of non-accumulated metric.
+    @param category: The category of the metric.  Each category will get its own table when printing the documentation.
+        This should be used when there are many metrics and they need to be broken down into smaller groups.
 
     @type monitor_module: str
     @type metric_name: str
@@ -367,6 +370,7 @@ def define_metric(monitor_module, metric_name, description, extra_fields=None, u
     @type extra_fields: dict
     @type unit: str
     @type cumulative: bool
+    @type category: str
     """
 
     info = MetricDescription()
@@ -375,6 +379,7 @@ def define_metric(monitor_module, metric_name, description, extra_fields=None, u
     info.extra_fields = extra_fields
     info.unit = unit
     info.cumulative = cumulative
+    info.category = category
     MonitorInformation.set_monitor_info(monitor_module, metric=info)
 
 
@@ -519,6 +524,9 @@ class MetricDescription(object):
         # True if the metric records the sum all metric since the monitored process began.  For example, it could be
         # the sum of all the latencies for all requested received by the server.
         self.cumulative = False
+        # The category for this metric.  This needs only to be supplied if the metric list is long for a particular
+        # monitor.
+        self.category = None
 
 
 class MonitorConfig(object):
