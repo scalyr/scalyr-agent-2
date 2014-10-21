@@ -417,6 +417,8 @@ class MonitorInformation(object):
         self.__metrics = {}
         # Maps from log field name to the LogFieldDescription object that describes it.
         self.__log_fields = {}
+        # A counter used to determine insert sort order.
+        self.__counter = 0
 
     @property
     def monitor_module(self):
@@ -443,10 +445,7 @@ class MonitorInformation(object):
         @return: A list of the options
         @rtype: list of ConfigOption
         """
-        result = []
-        for x in self.__options.itervalues():
-            result.append(x)
-        return result
+        return sorted(self.__options.itervalues(), key=self.__get_insert_sort_position)
 
     @property
     def metrics(self):
@@ -455,10 +454,7 @@ class MonitorInformation(object):
         @return: A list of metric descriptions
         @rtype: list of MetricDescription
         """
-        result = []
-        for x in self.__metrics.itervalues():
-            result.append(x)
-        return result
+        return sorted(self.__metrics.itervalues(), key=self.__get_insert_sort_position)
 
     @property
     def log_fields(self):
@@ -467,10 +463,21 @@ class MonitorInformation(object):
         @return: A list of the log fields.
         @rtype: list of LogFieldDescription
         """
-        result = []
-        for x in self.__log_fields.itervalues():
-            result.append(x)
-        return result
+        return sorted(self.__log_fields.itervalues(), key=self.__get_insert_sort_position)
+
+    def __get_insert_sort_position(self, item):
+        """Returns the key to use for sorting the item by its insert position.
+
+        This relies on the 'sort_pos' attribute added to all ConfigOption, MetricDescription, and
+        LogFieldDescription objects when added to a monitor's information.
+
+        @param item: The object
+        @type item: object
+
+        @return: The insert position of the item
+        @rtype: int
+        """
+        return getattr(item, 'sort_pos')
 
     __monitor_info__ = {}
 
@@ -497,8 +504,13 @@ class MonitorInformation(object):
         if description is not None:
             info.__description = description
 
+        # Increment the counter we use to recorder insert order.
+        info.__counter += 1
+
         if option is not None:
             info.__options[option.option_name] = option
+            # Stash a position attribute to capture what the insert order was for the options.
+            setattr(option, 'sort_pos', info.__counter)
 
         if metric is not None:
             if metric.extra_fields is None:
@@ -507,9 +519,13 @@ class MonitorInformation(object):
                 # If there are extra fields, we use that as part of the key name to store the metric under to
                 # avoid collisions with the same metric but different extra fields registered.
                 info.__metrics['%s%s' % (metric.metric_name, str(metric.extra_fields))] = metric
+            # Stash a position attribute to capture what the insert order was for the metrics.
+            setattr(metric, 'sort_pos', info.__counter)
 
         if log_field is not None:
             info.__log_fields[log_field.field] = log_field
+            # Stash a position attribute to capture what the insert order was for the log fields.
+            setattr(log_field, 'sort_pos', info.__counter)
 
     @staticmethod
     def get_monitor_info(monitor_module):
