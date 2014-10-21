@@ -57,9 +57,33 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     print_options(info.config_options, column_size)
     print ''
 
-    print 'Metrics:'
-    print_metrics(info.metrics, column_size)
+    print 'Log reference:'
+    print_log_fields(info.log_fields, column_size)
     print ''
+
+    print 'Metrics:'
+    # Have to break the metrics up into their categories if they have them.
+    all_metrics = info.metrics
+
+    # Determine the unique categories.
+    categories = []
+    for metric in all_metrics:
+        if metric.category is None:
+            continue
+        # This is a bit inefficient, but that's ok here.
+        if categories.count(metric.category) == 0:
+            categories.append(metric.category)
+
+    # Print each grouping.
+    metrics_with_no_categories = filter_metric_by_category(all_metrics, None)
+    if len(metrics_with_no_categories) > 0:
+        print_metrics(metrics_with_no_categories, column_size)
+    print ''
+    
+    for category in categories:
+        print '%s metrics' % category
+        print_metrics(filter_metric_by_category(all_metrics, category), column_size)
+        print ''
 
 
 def print_options(option_list, column_size):
@@ -75,6 +99,37 @@ def print_options(option_list, column_size):
     rows = [['# Option', 'Usage']]
     for x in option_list:
         rows.append(['# ``%s``' % x.option_name, x.description])
+
+    # We let the second column take up as much room as it needs, so find out how large the first column is
+    # by finding the longest string in it.
+    longest_first_column = ''
+    for x in rows:
+        if len(x[0]) > len(longest_first_column):
+            longest_first_column = x[0]
+
+    # The length has to include the '|||' characters we prefix the line with.
+    first_column_length = 3 + len(longest_first_column)
+
+    sys.stdout.flush()
+    for row in rows:
+        sys.stdout.write('|||%s%s||| ' % (row[0], space_filler(first_column_length - len(row[0]) - 3)))
+        write_wrapped_line(row[1], column_size - first_column_length - 4, ' ' * (first_column_length + 4))
+    sys.stdout.flush()
+
+
+def print_log_fields(log_fields_list, column_size):
+    """Prints the log reference table for the log fields.
+
+    @param log_fields_list: The list of log fields.
+    @param column_size: The maximum line size to use.
+
+    @type log_fields_list: list of scalyr_agent.scalyr_monitor.LogFieldDescription
+    @type column_size: int
+    """
+    # First, prepare a list of lists representing the table contents.  Each row has two elements.
+    rows = [['# Field', 'Meaning']]
+    for x in log_fields_list:
+        rows.append(['# ``%s``' % x.field, x.description])
 
     # We let the second column take up as much room as it needs, so find out how large the first column is
     # by finding the longest string in it.
@@ -220,6 +275,25 @@ def space_filler(num_spaces):
     """
     return ' ' * num_spaces
 
+
+def filter_metric_by_category(metrics, category):
+    """Returns the metric list filtered by metrics that have the specified category.
+
+    @param metrics: The list of the metrics.
+    @param category: The category name, or None if should match for all metrics that have None as category.
+    @type metrics: list of MetricDescription
+    @type category: str or None
+    @return: The filtered list.
+    @rtype: list of MetricDescription
+    """
+    result = []
+    for metric in metrics:
+        if metric.category is None:
+            if category is None:
+                result.append(metric)
+        elif metric.category == category:
+            result.append(metric)
+    return result
 
 if __name__ == '__main__':
     parser = OptionParser(usage='Usage: python print_monitor_doc.py [options] monitor_module')
