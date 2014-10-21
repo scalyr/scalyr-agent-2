@@ -79,7 +79,7 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     if len(metrics_with_no_categories) > 0:
         print_metrics(metrics_with_no_categories, column_size)
     print ''
-    
+
     for category in categories:
         print '%s metrics' % category
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
