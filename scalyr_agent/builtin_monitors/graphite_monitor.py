@@ -30,40 +30,73 @@ except ImportError:
     import pickle
 
 from scalyr_agent import StoppableThread
-from scalyr_agent import ScalyrMonitor
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.monitor_utils import ServerProcessor, LineRequestParser, Int32RequestParser
+
+__monitor__ = __name__
+
+# Configuration parameters are:
+# only_accept_local: (defaults to True)
+# accept_plaintext: (defaults to True)
+# accept_pickle: (defaults to True)
+# plaintext_port: (defaults to 2003)
+# pickle_port: (defaults to 2004)
+# max_connection_idle_time: (defaults to 300)
+# max_request_size: (defaults to 100K)
+# buffer_size: (defaults to 100K)
+define_config_option(__monitor__, 'module',
+                     'Always ``scalyr_agent.builtin_monitors.graphite_monitor``',
+                     convert_to=str, required_option=True)
+define_config_option(__monitor__, 'only_accept_local',
+                     'Optional (defaults to true). If true, then the plugin only accepts connections from localhost. '
+                     'If false, all network connections are accepted.',
+                     default=True, convert_to=bool)
+define_config_option(__monitor__, 'accept_plaintext',
+                     'Optional (defaults to true). If true, then the plugin accepts connections in Graphite\'s "plain '
+                     'text" procotol.', default=True, convert_to=bool)
+define_config_option(__monitor__, 'accept_pickle',
+                     'Optional (defaults to true). If true, then the plugin accepts connections in Graphite\'s '
+                     '"pickle" procotol.', default=True, convert_to=bool)
+define_config_option(__monitor__, 'plaintext_port',
+                     'Optional (defaults to 2003). The port number on which the plugin listens for plain text '
+                     'connections. Unused if ``accept_plaintext`` is false.',
+                     default=2003, min_value=1, max_value=65535, convert_to=int)
+define_config_option(__monitor__, 'pickle_port',
+                     'Optional (defaults to 2004). The port number on which the plugin listens for pickle connections. '
+                     'Unused if ``accept_pickle `` is false.',
+                     default=2004, min_value=1, max_value=65535, convert_to=int)
+define_config_option(__monitor__, 'max_connection_idle_time',
+                     'Optional (defaults to 300).  The maximum number of seconds allowed between requests before the '
+                     'Graphite server will close the connection.', default=300.0, min_value=1, convert_to=float)
+define_config_option(__monitor__, 'max_request_size',
+                     'Optional (defaults to 100K).  The maximum size of a single request in bytes.', default=100*1024,
+                     min_value=1000, convert_to=int)
+define_config_option(__monitor__, 'buffer_size',
+                     'Optional (defaults to 100KB).  The maximum buffer size in bytes for buffering incoming requests '
+                     'per connection', default=100*1024, min_value=10*1024, convert_to=int)
+
+define_log_field(__monitor__, 'monitor', 'Always ``graphite_monitor``.')
+define_log_field(__monitor__, 'metric', 'The Graphite metric name.')
+define_log_field(__monitor__, 'value', 'The Graphite metric value.')
+define_log_field(__monitor__, 'orig_time', 'The Graphite timestamp.')
 
 
 class GraphiteMonitor(ScalyrMonitor):
     """A Scalyr agent monitor acts as a Graphite server, accepting metrics over a network connection and then sends
     them to Scalyr.
     """
+
     def _initialize(self):
         """Performs monitor-specific initialization.
         """
-        # Configuration parameters are:
-        # only_accept_local: (defaults to True)
-        # accept_plaintext: (defaults to True)
-        # accept_pickle: (defaults to True)
-        # plaintext_port: (defaults to 2003)
-        # pickle_port: (defaults to 2004)
-        # max_connection_idle_time: (defaults to 300)
-        # max_request_size: (defaults to 100K)
-        # buffer_size: (defaults to 100K)
-
-        self.__only_accept_local = self._config.get('only_accept_local', default=True, convert_to=bool)
-        self.__accept_plaintext = self._config.get('accept_plaintext', default=True, convert_to=bool)
-        self.__accept_pickle = self._config.get('accept_pickle', default=True, convert_to=bool)
-        self.__plaintext_port = self._config.get('plaintext_port', default=2003, min_value=1, max_value=65535,
-                                                 convert_to=int)
-        self.__pickle_port = self._config.get('pickle_port', default=2004, min_value=1, max_value=65535,
-                                              convert_to=int)
-        self.__max_connection_idle_time = self._config.get('max_connection_idle_time', default=300.0,
-                                                           min_value=1, convert_to=float)
-        self.__max_request_size = self._config.get('max_request_size', default=100*1024,
-                                                   min_value=1000, convert_to=int)
-        self.__buffer_size = self._config.get('buffer_size', default=100*1024,
-                                              min_value=10*1024, convert_to=int)
+        self.__only_accept_local = self._config.get('only_accept_local')
+        self.__accept_plaintext = self._config.get('accept_plaintext')
+        self.__accept_pickle = self._config.get('accept_pickle')
+        self.__plaintext_port = self._config.get('plaintext_port')
+        self.__pickle_port = self._config.get('pickle_port')
+        self.__max_connection_idle_time = self._config.get('max_connection_idle_time')
+        self.__max_request_size = self._config.get('max_request_size')
+        self.__buffer_size = self._config.get('buffer_size')
         # We may need an extra thread for this monitor if we are accepting traffic on both the text and pickle
         # ports since our server abstractions require a thread per port.
         self.__extra_thread = None

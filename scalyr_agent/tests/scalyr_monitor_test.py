@@ -20,7 +20,7 @@ __author__ = 'czerwin@scalyr.com'
 import unittest
 
 
-from scalyr_agent.scalyr_monitor import MonitorConfig, BadMonitorConfiguration
+from scalyr_agent.scalyr_monitor import MonitorConfig, BadMonitorConfiguration, define_config_option
 
 
 class MonitorConfigTest(unittest.TestCase):
@@ -119,6 +119,27 @@ class MonitorConfigTest(unittest.TestCase):
 
         self.assertEquals(config.get('foo', default=20), 10)
         self.assertEquals(config.get('fee', default=20), 20)
+
+    def test_define_config_option(self):
+        define_config_option('foo', 'a', 'Description', required_option=True, convert_to=int)
+        self.assertRaises(BadMonitorConfiguration, MonitorConfig, {'b': 1}, monitor_module='foo')
+
+        config = MonitorConfig({'a': '5'}, monitor_module='foo')
+        self.assertEquals(config.get('a'), 5)
+
+        define_config_option('foo', 'b', 'Description', min_value=5, max_value=10, default=7, convert_to=int)
+
+        config = MonitorConfig({'a': 5}, monitor_module='foo')
+        self.assertEquals(config.get('b'), 7)
+
+        self.assertRaises(BadMonitorConfiguration, MonitorConfig, {'a': 5, 'b': 1}, monitor_module='foo')
+        self.assertRaises(BadMonitorConfiguration, MonitorConfig, {'a': 5, 'b': 11}, monitor_module='foo')
+
+        # Test case where no value in config for option with no default value should result in no value in
+        # MonitorConfig object
+        define_config_option('foo', 'c', 'Description', min_value=5, max_value=10, convert_to=int)
+        config = MonitorConfig({'a': 5}, monitor_module='foo')
+        self.assertTrue('c' not in config)
 
     def get(self, original_value, convert_to=None, required_field=False, max_value=None,
             min_value=None):

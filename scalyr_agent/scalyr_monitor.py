@@ -17,10 +17,12 @@
 # This class should be used by developers creating their own monitor plugins.
 #
 # To see how to write your own Scalyr monitor plugin, please see:
-# http://www.scalyr.com/FILL_THIS_IN  (TODO: Fill in after alpha once we have
-# a permanent URL for the documentation.)
+# https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import inspect
+import os
+import sys
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -78,11 +80,11 @@ class ScalyrMonitor(StoppableThread):
         @param logger: The logger to use for output.
         @param sample_interval_secs: The interval in seconds to wait between gathering samples.
         """
-        # The MonitorConfig object created from the config for this monitor instance.
-        self._config = MonitorConfig(monitor_config)
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config['module']
+        # The MonitorConfig object created from the config for this monitor instance.
+        self._config = MonitorConfig(monitor_config, monitor_module=self.monitor_name)
         log_path = self.monitor_name.split('.')[-1] + '.log'
         self.disabled = False
         # TODO: For now, just leverage the logic in the loggers for naming this monitor.  However,
@@ -250,6 +252,347 @@ class ScalyrMonitor(StoppableThread):
         return self._run_state.sleep_but_awaken_if_stopped(time_to_sleep)
 
 
+def load_monitor_class(module_name, additional_python_paths):
+    """Loads the ScalyrMonitor class from the specified module and return it.
+
+    This examines the module, locates the first class derived from ScalyrMonitor (there should only be one),
+    and returns it.
+
+    @param module_name: The name of the module
+    @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
+        instantiating the module in case it needs to read other packages.
+
+    @type module_name: str
+    @type additional_python_paths: str
+
+    @return: A tuple containing the class for the monitor and the MonitorInformation object for it.
+    @rtype: (class, MonitorInformation)
+    """
+
+    original_path = list(sys.path)
+
+    # Add in the additional paths.
+    if additional_python_paths is not None and len(additional_python_paths) > 0:
+        for x in additional_python_paths.split(os.pathsep):
+            sys.path.append(x)
+
+    MonitorInformation.set_monitor_info(module_name)
+    # Load monitor.
+    try:
+        module = __import__(module_name)
+        # If this a package name (contains periods) then we have to walk down
+        # the subparts to get the actual module we wanted.
+        for n in module_name.split(".")[1:]:
+            module = getattr(module, n)
+
+        # Now find any class that derives from ScalyrMonitor
+        for attr in module.__dict__:
+            value = getattr(module, attr)
+            if not inspect.isclass(value):
+                continue
+            if 'ScalyrMonitor' in str(value.__bases__):
+                MonitorInformation.set_monitor_info(module_name, description=value.__doc__)
+                return value, MonitorInformation.get_monitor_info(module_name)
+
+        return None, None
+    finally:
+        # Be sure to reset the PYTHONPATH
+        sys.path = original_path
+
+
+def define_config_option(monitor_module, option_name, option_description, required_option=False,
+                         max_value=None, min_value=None, convert_to=None, default=None):
+    """Defines a configuration option for the specified monitor.
+
+    Once this is invoked, any validation rules supplied here are applied to all MonitorConfig objects created
+    with the same monitor name.
+
+    Note, this overwrites any previously defined rules for this configuration option.
+
+    @param monitor_module:  The module the monitor is defined in.  This must be the same name that will be supplied
+        for any MonitorConfig instances for this monitor.
+    @param option_name: The name of the option field.
+    @param required_option: If True, then this is option considered to be required and when the configuration
+        is parsed for the monitor, a BadMonitorConfiguration exception if the field is not present.
+    @param convert_to: If not None, then will convert the value for the option to the specified type. Only int,
+        bool, float, long, str, and unicode are supported. If the type conversion cannot be done, a
+        BadMonitorConfiguration exception is raised during configuration parsing. The only true conversions allowed are
+        those from str, unicode value to other types such as int, bool, long, float. Trivial conversions are allowed
+        from int, long to float, but not the other way around. Additionally, any primitive type can be converted to
+        str, unicode.
+    @param default: The value to assign to the option if the option is not present in the configuration. This is
+        ignored if 'required_option' is True.
+    @param max_value: If not None, the maximum allowed value for option. Raises a BadMonitorConfiguration if the
+        value is greater during configuration parsing.
+    @param min_value: If not None, the minimum allowed value for option. Raises a BadMonitorConfiguration if the
+        value is less than during configuration parsing.
+    """
+    option = ConfigOption()
+    option.option_name = option_name
+    option.description = option_description
+    option.required_option = required_option
+    option.max_value = max_value
+    option.min_value = min_value
+    option.convert_to = convert_to
+    option.default = default
+
+    MonitorInformation.set_monitor_info(monitor_module, option=option)
+
+    return None
+
+
+def define_metric(monitor_module, metric_name, description, extra_fields=None, unit=None, cumulative=False,
+                  category=None):
+    """Defines description information for a metric with the specified name and extra fields.
+
+    This will overwrite previous metric information recorded for the same ``metric_name`` and ``extra_fields``.
+
+    Currently, this information is only used when creating documentation pages for the monitor.  Not all of the fields
+    are used but will be used in the future.
+
+    @param monitor_module:  The module name for the monitor this metric is defined in.
+    @param metric_name: The name of the metric.
+    @param description: The description of the metric.
+    @param extra_fields: A dict describing the extra fields that are recorded with this metric.  It maps from the
+        extra field name to the values that the description apply to.
+    @param unit: A string describing the units of the value.  For now, this should be 'sec' or 'bytes'.  You may also
+        include a colon after the unit with a scale factor.  For example, 'sec:.01' indicates the value represents
+        1/100ths of a second.  You may also specify 'milliseconds', which is mapped to 'sec:.001'
+    @param cumulative: True if the metric records the sum all metric since the monitored process began.  For example,
+        it could be the sum of all request sizes received by a server.  In this case, calculating the difference between
+        two values for the metric is the same as calculating the rate of non-accumulated metric.
+    @param category: The category of the metric.  Each category will get its own table when printing the documentation.
+        This should be used when there are many metrics and they need to be broken down into smaller groups.
+
+    @type monitor_module: str
+    @type metric_name: str
+    @type description: str
+    @type extra_fields: dict
+    @type unit: str
+    @type cumulative: bool
+    @type category: str
+    """
+
+    info = MetricDescription()
+    info.metric_name = metric_name
+    info.description = description
+    info.extra_fields = extra_fields
+    info.unit = unit
+    info.cumulative = cumulative
+    info.category = category
+    MonitorInformation.set_monitor_info(monitor_module, metric=info)
+
+
+def define_log_field(monitor_module, field_name, field_description):
+    """Defines a field that can be parsed from the log lines generated by the specified monitor.
+
+    Note, this overwrites any previously defined rules for this log field.
+
+    @param monitor_module:  The module the monitor is defined in.  This must be the same name that will be supplied
+        for any MonitorConfig instances for this monitor.
+    @param field_name: The name of the log field.
+    @param field_description: The description for the log field.
+
+    """
+    log_field = LogFieldDescription()
+    log_field.field = field_name
+    log_field.description = field_description
+
+    MonitorInformation.set_monitor_info(monitor_module, log_field=log_field)
+
+    return None
+
+
+class MonitorInformation(object):
+    """Encapsulates all the descriptive information that can be gather for a particular monitor.
+
+    This is generally used to create documentation pages for the monitor.
+    """
+    def __init__(self, monitor_module):
+        self.__monitor_module = monitor_module
+        self.__description = None
+        # Maps from option name to the ConfigOption object that describes it.
+        self.__options = {}
+        # Maps from metric name with extra fields to the MetricDescription object that describes it.
+        self.__metrics = {}
+        # Maps from log field name to the LogFieldDescription object that describes it.
+        self.__log_fields = {}
+        # A counter used to determine insert sort order.
+        self.__counter = 0
+
+    @property
+    def monitor_module(self):
+        """Returns the module the monitor is defined in.
+
+        @return: The module the monitor is defined in.
+        @rtype: str
+        """
+        return self.__monitor_module
+
+    @property
+    def description(self):
+        """Returns a description for the monitor using markdown.
+
+        @return: The description
+        @rtype: str
+        """
+        return self.__description
+
+    @property
+    def config_options(self):
+        """Returns the configuration options for this monitor.
+
+        @return: A list of the options
+        @rtype: list of ConfigOption
+        """
+        return sorted(self.__options.itervalues(), key=self.__get_insert_sort_position)
+
+    @property
+    def metrics(self):
+        """Returns descriptions for the metrics recorded by this monitor.
+
+        @return: A list of metric descriptions
+        @rtype: list of MetricDescription
+        """
+        return sorted(self.__metrics.itervalues(), key=self.__get_insert_sort_position)
+
+    @property
+    def log_fields(self):
+        """Returns the log fields that are parsed from the log lines generated by this monitor.
+
+        @return: A list of the log fields.
+        @rtype: list of LogFieldDescription
+        """
+        return sorted(self.__log_fields.itervalues(), key=self.__get_insert_sort_position)
+
+    def __get_insert_sort_position(self, item):
+        """Returns the key to use for sorting the item by its insert position.
+
+        This relies on the 'sort_pos' attribute added to all ConfigOption, MetricDescription, and
+        LogFieldDescription objects when added to a monitor's information.
+
+        @param item: The object
+        @type item: object
+
+        @return: The insert position of the item
+        @rtype: int
+        """
+        return getattr(item, 'sort_pos')
+
+    __monitor_info__ = {}
+
+    @staticmethod
+    def set_monitor_info(monitor_module, description=None, option=None, metric=None, log_field=None):
+        """Sets information for the specified monitor.
+
+        @param monitor_module: The module the monitor is defined in.
+        @param description: If not None, sets the description for the monitor, using markdown.
+        @param option: If not None, adds the specified configuration option to the monitor's information.
+        @param metric: If not None, adds the specified metric description to the monitor's information.
+        @param log_field: If not None, adds the specified log field description to the monitor's information.
+
+        @type monitor_module: str
+        @type description: str
+        @type option: ConfigOption
+        @type metric: MetricDescription
+        @type log_field: LogFieldDescription
+        """
+        if monitor_module not in MonitorInformation.__monitor_info__:
+            MonitorInformation.__monitor_info__[monitor_module] = MonitorInformation(monitor_module)
+
+        info = MonitorInformation.__monitor_info__[monitor_module]
+        if description is not None:
+            info.__description = description
+
+        # Increment the counter we use to recorder insert order.
+        info.__counter += 1
+
+        if option is not None:
+            info.__options[option.option_name] = option
+            # Stash a position attribute to capture what the insert order was for the options.
+            setattr(option, 'sort_pos', info.__counter)
+
+        if metric is not None:
+            if metric.extra_fields is None:
+                info.__metrics[metric.metric_name] = metric
+            else:
+                # If there are extra fields, we use that as part of the key name to store the metric under to
+                # avoid collisions with the same metric but different extra fields registered.
+                info.__metrics['%s%s' % (metric.metric_name, str(metric.extra_fields))] = metric
+            # Stash a position attribute to capture what the insert order was for the metrics.
+            setattr(metric, 'sort_pos', info.__counter)
+
+        if log_field is not None:
+            info.__log_fields[log_field.field] = log_field
+            # Stash a position attribute to capture what the insert order was for the log fields.
+            setattr(log_field, 'sort_pos', info.__counter)
+
+    @staticmethod
+    def get_monitor_info(monitor_module):
+        """Returns the MonitorInformation object for the monitor defined in ``monitor_module``.
+
+        @param monitor_module: The module the monitor is defined in.
+        @type monitor_module: str
+
+        @return: The information for the specified monitor, or none if it has not been loaded.
+        @rtype: MonitorInformation
+        """
+        if monitor_module in MonitorInformation.__monitor_info__:
+            return MonitorInformation.__monitor_info__[monitor_module]
+        else:
+            return None
+
+
+class ConfigOption(object):
+    """Simple object to hold the fields for a single configuration option.
+    """
+    def __init__(self):
+        # The name of the option.
+        self.option_name = None
+        # The description of the option.
+        self.description = None
+        # True if the option is required.
+        self.required_option = False
+        # The maximum value allowed value for the option if any.
+        self.max_value = None
+        # The minimum value allowed value for the option if any.
+        self.min_value = None
+        # The primitive type to convert the value to.
+        self.convert_to = None
+        # The default value, if any.
+        self.default = None
+
+
+class MetricDescription(object):
+    """Simple object to hold fields describing a monitor's metric."""
+    def __init__(self):
+        # The name of the metric.
+        self.metric_name = None
+        # The description for the metric.
+        self.description = None
+        # A dict containing a map of the extra fields included in the metric along with the format for the values.
+        self.extra_fields = None
+        # A string describing the units of the value.  For now, this should be 'sec' or 'bytes'.  You may also include
+        # a colon after the unit with a scale factor.  For example, 'sec:.01' indicates the value represents 1/100ths
+        # of a second.  You may also specify 'milliseconds', which is mapped to 'sec:.001'.
+        self.unit = None
+        # True if the metric records the sum all metric since the monitored process began.  For example, it could be
+        # the sum of all the latencies for all requested received by the server.
+        self.cumulative = False
+        # The category for this metric.  This needs only to be supplied if the metric list is long for a particular
+        # monitor.
+        self.category = None
+
+
+class LogFieldDescription(object):
+    """Simple object to hold fields describing the entries that are parsed from a log line produced by the monitor."""
+    def __init__(self):
+        # The name of the field in the log line.
+        self.field = None
+        # The meaning of the field.
+        self.description = None
+
+
 class MonitorConfig(object):
     """Encapsulates configuration parameters for a single monitor instance and includes helper utilities to
     validate configuration values.
@@ -259,15 +602,25 @@ class MonitorConfig(object):
 
     This abstraction does not support any mutator operations.  The configuration is read-only.
     """
-    def __init__(self, content=None):
+    def __init__(self, content=None, monitor_module=None):
         """Initializes MonitorConfig.
 
         @param content: A dict containing the key/values pairs to use.
+        @param monitor_module: The module containing the monitor.  This must be the same as what was previously
+            used for 'define_config_option' for any options registered for this monitor.
         """
         self.__map = {}
         if content is not None:
             for x in content:
                 self.__map[x] = content[x]
+
+        info = MonitorInformation.get_monitor_info(monitor_module)
+        if info is not None:
+            for x in info.config_options:
+                if x.required_option or x.default is not None or x.option_name in self.__map:
+                    self.__map[x.option_name] = self.get(x.option_name, required_field=x.required_option,
+                                                         max_value=x.max_value, min_value=x.min_value,
+                                                         convert_to=x.convert_to, default=x.default)
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""

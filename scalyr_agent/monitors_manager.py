@@ -17,13 +17,13 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import inspect
 import os
-import sys
 import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
+from scalyr_agent.scalyr_monitor import load_monitor_class
+
 from __scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -111,6 +111,36 @@ class MonitorsManager(object):
             log.exception('Failed to stop the monitors due to an exception')
 
     @staticmethod
+    def load_monitor(monitor_module, additional_python_paths):
+        """Loads the module for the specified monitor.
+
+        @param monitor_module: The module for the monitor.
+        @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
+            instantiating the module in case it needs to packages in other directories.
+
+        @type monitor_module: str
+        @type additional_python_paths: str
+
+        @return:  The class for the ScalyrMonitor in the module.
+        @rtype: class
+        """
+        # Augment the PYTHONPATH if requested to locate the module.
+        paths_to_pass = []
+
+        # Also add in scalyr_agent/../monitors/local and scalyr_agent/../monitors/contrib to the Python path to search
+        # for monitors.  (They are always in the parent directory of the scalyr_agent package.
+        path_to_package_parent = os.path.dirname(get_package_root())
+        paths_to_pass.append(os.path.join(path_to_package_parent, 'monitors', 'local'))
+        paths_to_pass.append(os.path.join(path_to_package_parent, 'monitors', 'contrib'))
+
+        # Add in the additional paths.
+        if additional_python_paths is not None and len(additional_python_paths) > 0:
+            for x in additional_python_paths.split(os.pathsep):
+                paths_to_pass.append(x)
+
+        return load_monitor_class(monitor_module, os.pathsep.join(paths_to_pass))[0]
+
+    @staticmethod
     def build_monitor(monitor_config, additional_python_paths):
         """Builds an instance of a ScalyrMonitor for the specified monitor configuration.
 
@@ -129,55 +159,8 @@ class MonitorsManager(object):
         module_name = monitor_config['module']
         monitor_id = monitor_config['id']
 
-        # Augment the PYTHONPATH if requested to locate the module.
-        original_path = list(sys.path)
-
-        # Also add in scalyr_agent/../monitors/local and scalyr_agent/../monitors/contrib to the Python path to search
-        # for monitors.  (They are always in the parent directory of the scalyr_agent package.
-        path_to_package_parent = os.path.dirname(get_package_root())
-        sys.path.append(os.path.join(path_to_package_parent, 'monitors', 'local'))
-        sys.path.append(os.path.join(path_to_package_parent, 'monitors', 'contrib'))
-
-        # Add in the additional paths.
-        if additional_python_paths is not None and len(additional_python_paths) > 0:
-            for x in additional_python_paths.split(os.pathsep):
-                sys.path.append(x)
-
         # Load monitor.
-        try:
-            monitor_class = MonitorsManager.__load_class_from_module(module_name)
-        finally:
-            # Be sure to reset the PYTHONPATH
-            sys.path = original_path
+        monitor_class = MonitorsManager.load_monitor(module_name, additional_python_paths)
 
         # Instantiate and initialize it.
         return monitor_class(monitor_config, scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)))
-
-    @staticmethod
-    def __load_class_from_module(module_name):
-        """Loads the ScalyrMonitor class from the specified module and return it.
-
-        This examines the module, locates the first class derived from ScalyrMonitor (there should only be one),
-        and returns it.
-
-        @param module_name: The name of the module
-        @type module_name: str
-
-        @return: The class for the monitor.
-        @rtype: class
-        """
-        module = __import__(module_name)
-        # If this a package name (contains periods) then we have to walk down
-        # the subparts to get the actual module we wanted.
-        for n in module_name.split(".")[1:]:
-            module = getattr(module, n)
-
-        # Now find any class that derives from ScalyrMonitor
-        for attr in module.__dict__:
-            value = getattr(module, attr)
-            if not inspect.isclass(value):
-                continue
-            if 'ScalyrMonitor' in str(value.__bases__):
-                return value
-
-        return None
