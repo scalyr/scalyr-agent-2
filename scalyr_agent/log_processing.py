@@ -676,11 +676,15 @@ class LogFileIterator(object):
             # invalidated.  If so, we need to adjust the position to the next legal one according to the
             # buffer map.
             self.__position = self.__buffer_contents_index[0].position_start
+            log.warn('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
+                     'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-invalidated-%s' % self.__path))
         elif len(self.__pending_files) > 0:
             # We only get here if we were not able to read anything into the buffer.  This must mean
             # all of our file content after the current position is gone.  so, just adjust the position to
             # point to the end as we know it.
             self.__position = self.__pending_files[-1].position_end
+            log.warn('File content appears to have disappeared.  This may not be an indicator of a real error. '
+                     'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-disappeared-%s' % self.__path))
 
         # Just a sanity check.
         if len(self.__buffer_contents_index) > 0:
@@ -712,7 +716,16 @@ class LogFileIterator(object):
         offset_in_file = read_position_relative_to_mark - file_state.position_start
         self.__file_system.seek(file_state.file_handle, offset_in_file)
         chunk = self.__file_system.read(file_state.file_handle, num_bytes)
-        if chunk is None or len(chunk) != num_bytes:
+        if chunk is None:
+            file_state.valid = False
+            return None
+
+        if len(chunk) != num_bytes:
+            # We did not read the right number of bytes for some reason.  This shouldn't really happen, but
+            # we just pretend like we didn't read anything to prevent corrupting logs.
+            log.warn('Did not read expected number of bytes. Expected=%ld vs Read=%ld in file %s', num_bytes,
+                     len(chunk), self.__path, limit_once_per_x_secs=60,
+                     limit_key=('byte_mismatch-%s' % self.__path))
             file_state.valid = False
             return None
 
@@ -1663,7 +1676,7 @@ class FileSystem(object):
 
         @return: The file object
         """
-        return open(file_path, 'r')
+        return open(file_path, 'rb')
 
     def readlines(self, file_object, max_bytes=None):
         """Reads lines from the file_object, up to max_bytes bytes.
