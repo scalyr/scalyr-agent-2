@@ -19,6 +19,7 @@ New features:
 Bug fixes:
 
 * Fix bug prevented having release notes for multiple releases in CHANGELOG.md
+* Fix bug with CR/LF on Windows preventing log uploads
 
 Documentation fixes:
 
