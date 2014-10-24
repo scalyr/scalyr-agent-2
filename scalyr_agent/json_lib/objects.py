@@ -562,6 +562,18 @@ class JsonArray(object):
                 "The index=%i is out of bounds of array size=%i" % (index, len(self.__items)))
         return self.__items[index]
 
+    def __setitem__(self, index, value):
+        """Sets the value at the specified index.
+
+        @param index: The index to lookup
+        @param value: The value
+
+        @raise IndexError: If there is no entry at that index."""
+        if index >= len(self.__items) or index < 0:
+            raise IndexError(
+                "The index=%i is out of bounds of array size=%i" % (index, len(self.__items)))
+        self.__items[index] = value
+
     def add(self, value):
         """Inserts a new element at the end of the array.
 

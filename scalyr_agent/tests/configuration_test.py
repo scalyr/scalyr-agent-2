@@ -557,6 +557,48 @@ class TestConfiguration(unittest.TestCase):
 
         self.assertTrue(error_seen)
 
+    def test_substitution(self):
+        self.__write_file(""" {
+            import_vars: [ "TEST_VAR" ],
+            api_key: "hi$TEST_VAR",
+          }
+        """)
+
+        os.environ['TEST_VAR'] = 'bye'
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hibye')
+
+    def test_json_array_substitution(self):
+        self.__write_file(""" {
+            import_vars: [ "TEST_VAR", "DIR_VAR" ],
+            api_key: "hi$TEST_VAR",
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
+          }
+        """)
+
+        os.environ['TEST_VAR'] = 'bye'
+        os.environ['DIR_VAR'] = 'ok'
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hibye')
+        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
+
+    def test_empty_substitution(self):
+        self.__write_file(""" {
+            import_vars: [ "UNDEFINED_VAR" ],
+            api_key: "hi$UNDEFINED_VAR",
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hi')
+
     def __write_file(self, contents):
         fp = open(self.__config_file, 'w')
         fp.write(contents)

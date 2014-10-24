@@ -256,6 +256,13 @@ class JsonArrayTests(unittest.TestCase):
         self.assertEquals(len(z), 1)
         self.assertTrue(x[0] == z[0])
 
+    def test_set_item(self):
+        x = JsonArray('bye', 3)
+        x[0] = 'hi'
+        self.assertEquals(x[0], 'hi')
+
+        self.assertRaises(IndexError, x.__setitem__, 5, 'foo')
+
     def test_equals(self):
         x = JsonArray(1, 2)
         y = JsonArray(1, 2)
