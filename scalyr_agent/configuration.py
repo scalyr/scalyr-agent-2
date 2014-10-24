@@ -73,6 +73,10 @@ class Configuration(object):
         # linux_system_metrics and linux_process_metrics for the agent process.
         self.__default_monitors = default_monitors
 
+        # Used to implement variable substitution in configuration file values.  This maps the variable name
+        # to the value to use in its place.
+        self.__substitutions = {}
+
         # FIX THESE:
         # Add documentation, verify, etc.
         self.__log_factory = log_factory
@@ -92,6 +96,10 @@ class Configuration(object):
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException, e:
                 raise BadConfiguration(str(e), None, 'fileParseError')
+
+            # Import any requested variables from the shell and use them for substitutions.
+            self.__import_shell_variables()
+            self.__perform_substitutions()
 
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
@@ -892,6 +900,86 @@ class Configuration(object):
         if self.__last_error is not None:
             raise BadConfiguration(self.__last_error, 'fake', 'fake')
         return self.__config
+
+    def __import_shell_variables(self):
+        """Imports the shell variables requested in 'import_vars' and adds them to self.__substitutions.
+        """
+        if 'import_vars' in self.__config:
+            for var_name in self.__config.get_json_array('import_vars'):
+                if var_name in os.environ:
+                    self.__substitutions[var_name] = os.environ[var_name]
+                else:
+                    self.__substitutions[var_name] = ''
+
+    def __perform_substitutions(self):
+        """Rewrites self.__config to reflect any substitutions in self.__substitutions."""
+
+        def perform_generic_substitution(value):
+            """Takes a given JSON value and performs the appropriate substitution.
+
+            This method will return a non-None value if the value has to be replaced with the returned value.
+            Otherwise, this will attempt to perform in-place substitutions.
+
+            For str, unicode, it substitutes the variables and returns the result.  For
+            container objects, it does the recursive substitution.
+
+            @param value: The JSON value
+            @type value: Any valid element of a JsonObject
+            @return: The value that should replace the original, if any.  If no replacement is necessary, returns None
+            """
+            result = None
+            value_type = type(value)
+
+            if (value_type is str or value_type is unicode) and '$' in value:
+                result = perform_str_substitution(value)
+            elif isinstance(value, JsonObject):
+                perform_object_substitution(value)
+            elif isinstance(value, JsonArray):
+                perform_array_substitution(value)
+            return result
+
+        def perform_object_substitution(object_value):
+            """Performs the in-place substitution for a JsonObject.
+
+            @param object_value: The object to perform substitutions on.
+            @type object_value: JsonObject
+            """
+            # We collect the new values and apply them later to avoid messing up the iteration.
+            new_values = {}
+            for (key, value) in object_value.iteritems():
+                replace_value = perform_generic_substitution(value)
+                if replace_value is not None:
+                    new_values[key] = replace_value
+
+            for (key, value) in new_values.iteritems():
+                object_value[key] = value
+
+        def perform_str_substitution(str_value):
+            """Performs substitutions on the given string.
+
+            @param str_value: The input string.
+            @type str_value: str or unicode
+            @return: The resulting value after substitution.
+            @rtype: str or unicode
+            """
+            result = str_value
+            for (var_name, value) in self.__substitutions.iteritems():
+                result = result.replace('$%s' % var_name, value)
+            return result
+
+        def perform_array_substitution(array_value):
+            """Perform substitutions on the JsonArray.
+
+            @param array_value: The array
+            @type array_value: JsonArray
+            """
+            for i in range(len(array_value)):
+                replace_value = perform_generic_substitution(array_value[i])
+                if replace_value is not None:
+                    array_value[i] = replace_value
+
+        # Actually do the work.
+        perform_object_substitution(self.__config)
 
 
 class BadConfiguration(Exception):
