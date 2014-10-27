@@ -1,0 +1,96 @@
+Install Apache Monitor
+
+This Solution describes how to setup and make use of the Apache Monitor included with the Scalyr agent.  The preconfigured dashboard incorporates some statistics that help monitor the health of your server.
+
+Prerequisites:
+
+1.  Apache is installed and running.  To verify:
+    - At a terminal prompt, enter the command "ps aux | grep apache".  
+    - You should see something resembling:
+
+        root      26326  0.0  0.3  71304 2608 ?   Ss   08:57   0:00 /usr/sbin/apache2 -k start
+        www-data  26328  0.0  0.5 360468 4264 ?   Sl   08:57   0:00 /usr/sbin/apache2 -k start
+        www-data  26329  0.0  0.5 360468 4264 ?   Sl   08:57   0:00 /usr/sbin/apache2 -k start
+        
+    - If it is not running, consult the specifics for your OS / Distribution on how to start Apache
+
+2.  Root access to edit the Apache configuration
+
+Steps:
+
+1.  Verify that the status module is available and configured for your version of Apache.  Links to the specifics for a couple of platforms are in the Apache Monitor documentation.  For example, on Ubuntu, you would do the following:
+    
+    - Look to see if the "status" module is enabled.  Issue the command "ls /etc/apache2/mods-enabled" and look for the files "status.conf" and "status.load".
+    - If the modules are not present, issue the command "sudo /usr/sbin/a2enmod status" to enable the module.
+
+2.  In your Apache configuration, under the "VirtualHost" directive, add the following:
+
+    <Location /server-status>
+       SetHandler server-status
+       Order allow,deny
+       Deny from all
+       Allow from 127.0.0.1
+    </Location>
+        
+3.  Restart Apache.
+
+4.  Verify you can get to the status page, using curl, you would type the following:
+
+        curl --interface "127.0.0.1" http://localhost/server-status?auto
+        
+5.  The output should resemble:
+
+    Total Accesses: 2
+    Total kBytes: 4
+    CPULoad: .0982659
+    Uptime: 519
+    ReqPerSec: .00385356
+    BytesPerSec: 7.8921
+    BytesPerReq: 2048
+    BusyWorkers: 1
+    IdleWorkers: 49
+    ConnsTotal: 0
+    ConnsAsyncWriting: 0
+    ConnsAsyncKeepAlive: 0
+    ConnsAsyncClosing: 0
+    Scoreboard: _________________________________W________________..............
+    ............................................................................
+    ..........
+
+6.  In your Scalyr Agent configuration file, you will need to add one of the following stanza to the monitor section to enable the Apache Monitor:
+
+        {
+            module: "scalyr_agent.builtin_monitors.apache_monitor"
+        }
+        
+7.  Restart your Scalyr Agent, allow some data to collect, and click "Dashboards" in the navigation bar, and select the "Apache" dashboard.
+
+8.  The Apache dashboard will present you with a series of graphs.
+
+Dashboard Graphs
+
+There are a number of pre-configured graphs that are part of the MySQL dashboard.  The graphs are as follows:
+
+    - Active Connections
+        - metric: apache.connections.active
+        - The graph shows a running count of the active connections over time.  Spikes in connections could signify an event triggering an unusual amount of activity.
+        
+    - Connections Writing
+        - metric: apache.connections.writing
+        - The graph shows the number of connections currently writing data to the connected clients.
+        
+    - Connections Idle
+        - metric: apache.connections.idle
+        - The graph shows the number of connections currently idle / sending keep alives.
+        
+    - Connections Closing
+        - metric: apache.connections.closing
+        - The graph shows the number of connections currently idle / sending keep alives.
+        
+    - Active Workers
+        - metric: apache.workers.active
+        - The graph shows the number of workers currently active.  Depending on which version of apache is installed - prefork, worker, event - the number of workers could be significantly higher than the number of actual processes.  See a description of each to understand the differences.  Too many active workers could indicate a need to tune the system.
+        
+    - Idle Workers
+        - metric: apache.workers.idle
+        - The graph shows a running total of the number of workers currently idle.  If there are consistently too many idle workers, it might be worth tuning your configuration to use fewer resources.
