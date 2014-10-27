@@ -13,8 +13,7 @@ New features:
 
 * Support for the MySQL monitor plugin
 * New ``print_monitor_doc.py`` tool for printing documentation for a monitor.  This tool is experimental.
-* New functions for defining and adding documentation for Scalyr Plugin Monitor configuration options, log entries,
-  and metrics.
+* New functions for defining and adding documentation for Scalyr Plugin Monitor configuration options, log entries, and metrics.
 
 Bug fixes:
 
