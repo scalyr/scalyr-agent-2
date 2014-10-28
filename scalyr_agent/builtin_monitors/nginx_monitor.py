@@ -265,4 +265,4 @@ instance."""
 
             for key in samplesToEmit:
                 if key in data:
-                    self._logger.emit_value(samplesToEmit[key], data[key])
+                    self._logger.emit_value(samplesToEmit[key], int(data[key]))

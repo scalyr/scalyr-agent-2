@@ -93,13 +93,19 @@ dashboard entries independently (if desired) for each instance.
 
 ## Configuring Apache
 
-In order to enable the status module, you must update the VirtualHost configuration section of your Apache server.
-Please see the [reference documentation for the status module](http://httpd.apache.org/docs/2.2/mod/mod_status.html)
-for detailed instructions.  The specific entry to add is as follows:
+In order to enable the status module, you must update the ``VirtualHost`` configuration section of your Apache server.
+The file that contains your ``VirtualHost`` configuration is dependent on your version of Apache as well as your
+site's individual set up.  Please see the
+[reference documentation for the status module](http://httpd.apache.org/docs/2.2/mod/mod_status.html)
+for general instructions.  For example, for Linux systems, the ``/etc/apache2/sites-available`` directory typically
+contains the file with the ``VirtualHost`` configuration.
+
+To enable the status module, add the following to the ``VirtualHost`` configuration section (between ``<VirtualHost>``
+ and ``</VirtualHost>``):
 
     <Location /server-status>
        SetHandler server-status
-       Order allow,deny
+       Order deny,allow
        Deny from all
        Allow from 127.0.0.1
     </Location>
@@ -274,4 +280,4 @@ to a particular instance of Apache and will make it easier to filter on metrics 
 
             for key in samplesToEmit:
                 if key in data:
-                    self._logger.emit_value(samplesToEmit[key], data[key])
+                    self._logger.emit_value(samplesToEmit[key], int(data[key]))
