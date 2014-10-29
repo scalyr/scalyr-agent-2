@@ -258,7 +258,7 @@ instance."""
         else:
             samplesToEmit = {
                 'active_connections': 'nginx.connections.active',
-                'reading': 'nginx.connections.active',
+                'reading': 'nginx.connections.reading',
                 'writing': 'nginx.connections.writing',
                 'waiting': 'nginx.connections.waiting',
             }
