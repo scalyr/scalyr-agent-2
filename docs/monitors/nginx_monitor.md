@@ -12,15 +12,27 @@ dashboard entries independently (if desired) for each instance.
 
 ## Configuring Nginx
 
-To use Scalyr's Nginx monitor, you will first need to configure your Nginx server to enable the status module,
-which servers a status page containing information the monitor will extract.
+To use Scalyr's Nginx monitor, you will need to configure your Nginx server to enable the status module,
+which server a status page containing information the monitor will extract.  For more details about this module,
+please refer to the
+[Nginx status module documentation page](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
 
-To enable the status module, you must update the server configuration section of your Nginx server.  Details on the
-status module can be found [here](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html).  You should also
-review the [reference documentation to restrict access](http://nginx.com/resources/admin-guide/restricting-access/)
-to a particular URL since it is important for the status module's URL not to be public.
+You will first need to verify that your Nginx server supports the status module.  You can do this by executing
+the following command:
 
-The configuration you will want to add to your Nginx config is:
+    nginx -V 2>&1 | grep -o with-http_stub_status_module
+
+If the command outputs ``with-http_stub_status_module``, then your server supports the status module and you
+may proceed to the next step.  If it does not, then your Nginx instance was not compiled with the
+``--with-http_stub_status_module`` flag.  You will need to either recompile Nginx or upgrade a full version of Nginx
+that has been compiled with that flag.
+
+To enable the status module, you must update the ``server`` configuration section of your Nginx server.  This
+configuration can either be found in the ``nginx.conf`` file or in a file in your ``sites-available`` directory.
+The full path for these will depend on your system, but for most Linux systems, they are ``/etc/nginx/nginx.conf``
+and ``/etc/nginx/sites-available``.
+
+Add the following configuration to the ``server`` configuration section (somewhere in the ``server { ... }`` stanza):
 
     location /nginx_status {
       stub_status on;      # enable the status module
@@ -40,10 +52,10 @@ recommended that you consult the Nginx documentation.
 One thing to consider in the above stanzas, each access to the ``/nginx_status`` URL will be logged in the Nginx access
 log.  If you wish to change this, add the line ``access_log off;`` to the above configuration.
 
-The specific location to place this block depends upon the server operating system.  To configure it for the default
-site on Ubuntu (and Debian variants), look for the file ``/etc/nginx/sites-enabled/default``.
+Once you make the configuration change, you will need to restart Nginx.  On most Linux systems, you may do this
+with:
 
-Once you make the configuration change, you will need to restart Nginx.
+    sudo service nginx restart
 
 ## Configuring the Nginx Monitor
 

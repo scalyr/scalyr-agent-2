@@ -12,13 +12,44 @@ dashboard entries independently (if desired) for each instance.
 
 ## Configuring Apache
 
-In order to enable the status module, you must update the VirtualHost configuration section of your Apache server.
-Please see the [reference documentation for the status module](http://httpd.apache.org/docs/2.2/mod/mod_status.html)
-for detailed instructions.  The specific entry to add is as follows:
+This plugin monitor uses the Apache server status module to gather its metrics.  Therefore, your Apache server must be
+configured to enable the module and serve requests to it.  In this section, we will give you some instructions on
+how to do this.  You may also consult 
+[Apache's instructions on how to use the status module](http://httpd.apache.org/docs/2.2/mod/mod_status.html) for
+further information.
+
+First, you must verify that the module is enabled for your Apache server.  How you verify this will vary based on the
+operating system the server is running on and the version of Apache being used.  For example, for Linux systems, you
+can check to see if the module is enabled by invoking this command:
+
+    ls /etc/apache2/mods-enabled
+
+If you see ``status.conf`` and ``status.load`` present, the module is enabled.  If it is not enabled, you
+can enabled it for Linux systems by executing the following command:
+
+    sudo /usr/sbin/a2enmod status
+
+Note, that you must restart your Apache server for any changes to the modules to take affect.
+
+The process for enabling the module will vary from platform to
+platform.  Additionally, if Apache was compiled manually, the module may or may not be available.  Consult the
+documentation for your particular platform.  As some examples, here are links to the documentation for
+[CentOS 5/RHEL 5](https://www.centos.org/docs/5/html/5.1/Deployment_Guide/s1-apache-addmods.html), 
+[Ubuntu 14.04](https://help.ubuntu.com/14.04/serverguide/httpd.html),
+[Windows](http://httpd.apache.org/docs/2.0/platform/windows.html#cust).
+
+After the module is enabled, the next step is to configure a URL from which the server status will be served.
+In general, this means updating the ``VirtualHost`` configuration section of your Apache server.  How you determine
+which file contains this configuration will depend on your system and your site's individual set up.  For
+example, for Linux systems, the ``/etc/apache2/sites-available`` directory typically contains the file with the
+necessary configuration.
+
+To enable the status module, add the following to the ``VirtualHost`` configuration section (between ``<VirtualHost>``
+ and ``</VirtualHost>``):
 
     <Location /server-status>
        SetHandler server-status
-       Order allow,deny
+       Order deny,allow
        Deny from all
        Allow from 127.0.0.1
     </Location>
@@ -29,26 +60,10 @@ important for security purposes.  ``Order allow,deny`` tells Apache how to check
 ``Deny from all`` is a blanket statement to disallow access by everyone.  ``Allow from 127.0.0.1`` tells Apache to
 allow access to the page from localhost.
 
-Another important step is to make sure that the status module is enabled.  This will vary based on the operating system
-the server is running.  Here is the documentation for a few popular sytems:
-[CentOS 5](https://www.centos.org/docs/5/html/5.1/Deployment_Guide/s1-apache-addmods.html)
-[Ubuntu 14.04](https://help.ubuntu.com/14.04/serverguide/httpd.html)
+Once you make the configuration change, you will need to restart Apache.  For Linux systems, you may do this by
+executing:
 
-For example, on Ubuntu (and other Debian-based variants),  you can check to see if the module is enabled by invoking
-the command:
-
-    ls /etc/apache2/mods-enabled
-
-If you see ``status.conf`` and ``status.load`` present, the module is enabled.  If you need to enable it, issuing the
-following command should take care of that (for apache2):
-
-    sudo /usr/sbin/a2enmod status
-
-The process for enabling the module and specific locations for the configuration changes will vary from platform to
-platform.  Additionally, if Apache was compiled manually, the module may or may not be available.  Consult the
-particulars of your platform.
-
-Once you make the configuration change, you will need to restart Apache.
+    sudo service apache2 restart
 
 ## Configuring the Scalyr Apache Monitor
 
