@@ -9,19 +9,19 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 31, 2014 12:30 -0700
 
 New features:
 
-* Support for the MySQL, Apache, and Nginx monitor plugins
+* Added the MySQL, Apache, and Nginx monitor plugins.
 * New functions for defining and adding documentation for Scalyr Plugin Monitor configuration options, log entries, and metrics.
-* Added support variable substitution in configuration files.
+* Added support for variable substitution in configuration files.
 * New ``print_monitor_doc.py`` tool for printing documentation for a monitor.  This tool is experimental.
 
 Bug fixes:
 
-* Fix bug prevented having release notes for multiple releases in CHANGELOG.md
-* Fix bug with CR/LF on Windows preventing log uploads
+* Fixed bug that prevented having release notes for multiple releases in CHANGELOG.md
+* Fixed bug with CR/LF on Windows preventing log uploads
 
 Documentation fixes:
 
-* Update MySQL monitor documentation to note deprecated metrics.
+* Updated MySQL monitor documentation to note deprecated metrics.
 
 Internal:
 
