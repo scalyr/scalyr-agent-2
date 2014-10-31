@@ -1,19 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.2 "Bashful Bovine" - Oct 15, 2014
+## 2.0.2 "Bashful Bovine" - Oct 31, 2014
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 15, 2014 16:15 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 31, 2014 12:30 -0700
 --->
-
-This release is under active development.  The release date is TBD and will be updated.
 
 New features:
 
-* Support for the MySQL monitor plugin
-* New ``print_monitor_doc.py`` tool for printing documentation for a monitor.  This tool is experimental.
+* Support for the MySQL, Apache, and Nginx monitor plugins
 * New functions for defining and adding documentation for Scalyr Plugin Monitor configuration options, log entries, and metrics.
+* Added support variable substitution in configuration files.
+* New ``print_monitor_doc.py`` tool for printing documentation for a monitor.  This tool is experimental.
 
 Bug fixes:
 
