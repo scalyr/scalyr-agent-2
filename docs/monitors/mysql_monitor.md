@@ -42,12 +42,11 @@ see Configuration Reference.
 
 ## Viewing Data
 
-@class=bg-warning docInfoPanel: The MySQL dashboard is still under development, and will be released shortly. If you'd
-like early access, contact us at support@scalyr.com.
-
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:MySQL}}. (The dashboard may not be listed until
-the agent begins sending MySQL data.)
+the agent begins sending MySQL data.) You will see an overview of MySQL performance statistics across all
+servers where you are running the MySQL plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a
+specific server.
 
 The dashboard shows only some of the data collected by the MySQL monitor plugin. To explore the full range
 of data collected, go to the Search page and search for [$monitor = 'mysql_monitor'](/events?filter=$monitor%20%3D%20%27mysql_monitor%27).

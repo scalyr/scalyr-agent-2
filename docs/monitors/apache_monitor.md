@@ -5,47 +5,42 @@
 
 # Apache Monitor
 
-The Apache monitor allows you to collect data about the usage and performance of your Apache server.
+This agent monitor plugin records performance and usage data from an Apache server.
 
-Each monitor can be configured to monitor a specific Apache instance, thus allowing you to configure alerts and the
-dashboard entries independently (if desired) for each instance.
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+
 
 ## Configuring Apache
 
-This plugin monitor uses the Apache server status module to gather its metrics.  Therefore, your Apache server must be
-configured to enable the module and serve requests to it.  In this section, we will give you some instructions on
-how to do this.  You may also consult 
-[Apache's instructions on how to use the status module](http://httpd.apache.org/docs/2.2/mod/mod_status.html) for
-further information.
+To use this monitor, you will need to configure your Apache server to enable the status module. For details,
+see the [Apache documentation](http://httpd.apache.org/docs/2.2/mod/mod_status.html).
 
-First, you must verify that the module is enabled for your Apache server.  How you verify this will vary based on the
-operating system the server is running on and the version of Apache being used.  For example, for Linux systems, you
-can check to see if the module is enabled by invoking this command:
+First, verify that the module is enabled in your Apache server. On most Linux installations, you can use the
+following command:
 
     ls /etc/apache2/mods-enabled
 
-If you see ``status.conf`` and ``status.load`` present, the module is enabled.  If it is not enabled, you
-can enabled it for Linux systems by executing the following command:
+If you see ``status.conf`` and ``status.load`` present, the module is enabled. Otherwise, use the following
+command (again, for most Linux installations):
 
     sudo /usr/sbin/a2enmod status
 
-Note, that you must restart your Apache server for any changes to the modules to take affect.
+On some platforms, you may need to use different commands to enable the status module. Also, if Apache was
+compiled manually, the module may not be available. Consult the documentation for your particular platform.
+Here are some links:
 
-The process for enabling the module will vary from platform to
-platform.  Additionally, if Apache was compiled manually, the module may or may not be available.  Consult the
-documentation for your particular platform.  As some examples, here are links to the documentation for
-[CentOS 5/RHEL 5](https://www.centos.org/docs/5/html/5.1/Deployment_Guide/s1-apache-addmods.html), 
-[Ubuntu 14.04](https://help.ubuntu.com/14.04/serverguide/httpd.html),
-[Windows](http://httpd.apache.org/docs/2.0/platform/windows.html#cust).
+- [CentOS 5/RHEL 5](https://www.centos.org/docs/5/html/5.1/Deployment_Guide/s1-apache-addmods.html)
+- [Ubuntu 14.04](https://help.ubuntu.com/14.04/serverguide/httpd.html)
+- [Windows](http://httpd.apache.org/docs/2.0/platform/windows.html#cust)
 
-After the module is enabled, the next step is to configure a URL from which the server status will be served.
-In general, this means updating the ``VirtualHost`` configuration section of your Apache server.  How you determine
-which file contains this configuration will depend on your system and your site's individual set up.  For
-example, for Linux systems, the ``/etc/apache2/sites-available`` directory typically contains the file with the
-necessary configuration.
 
-To enable the status module, add the following to the ``VirtualHost`` configuration section (between ``<VirtualHost>``
- and ``</VirtualHost>``):
+Next, you must enable the status module, usually by updating the ``VirtualHost`` configuration section of your
+Apache server. On Linux, this is typically found in the ``/etc/apache2/sites-available`` directory, in the file
+that corresponds to your site.
+
+Add the following to the ``VirtualHost`` section (between ``<VirtualHost>`` and ``</VirtualHost>``):
 
     <Location /server-status>
        SetHandler server-status
@@ -54,74 +49,79 @@ To enable the status module, add the following to the ``VirtualHost`` configurat
        Allow from 127.0.0.1
     </Location>
 
-This block does a couple of very important things.  First, it specifies that the status page will be exposed on the
-local server at ``http://<address>/server-status``.  The next three statements work together and are probably the most
-important for security purposes.  ``Order allow,deny`` tells Apache how to check things to grant access.
-``Deny from all`` is a blanket statement to disallow access by everyone.  ``Allow from 127.0.0.1`` tells Apache to
-allow access to the page from localhost.
+This specifies that the status page should be served at ``http://<address>/server-status``, and can't be accessed
+from other servers.
 
-Once you make the configuration change, you will need to restart Apache.  For Linux systems, you may do this by
-executing:
+Once you make the configuration change, you will need to restart Apache.  On most Linux systems, use the following
+command:
 
     sudo service apache2 restart
 
-## Configuring the Scalyr Apache Monitor
+To verify that the status module is working properly, you can view it manually. Execute this command on the server
+(substituting the appropriate port number as needed):
 
-The Apache monitor is included with the Scalyr agent.  In order to configure it, you will need to add its monitor
-configuration to the Scalyr agent config file.
+    curl http://localhost:80/server-status
 
-A basic Apache monitor configuration entry might resemble:
+If you have any difficulty enabling the status module, drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
 
-    monitors: [
-      {
-          module: "scalyr_agent.builtin_monitors.apache_monitor",
-      }
-    ]
 
-If you were running an instances of Apache on a non-standard port (say 8080), your config might resemble:
+## Sample Configuration
+
+Here is a typical configuration fragment:
 
     monitors: [
       {
           module: "scalyr_agent.builtin_monitors.apache_monitor",
-          status_url: "http://localhost:8080/server-status"
-          id: "customers"
+          status_url: "http://localhost:80/server-status"
       }
     ]
 
-Note the "id" field in the configurations.  This is an optional field that allows you to specify an identifier specific
-to a particular instance of Apache and will make it easier to filter on metrics specific to that instance.
+If your Apache server is running on a nonstandard port, replace ``80`` with the appropriate port number. For additional
+options, see Configuration Reference.
 
+
+## Configuration Reference
+
+|||# Option                   ||| Usage
+|||# ``module``               ||| Always ``scalyr_agent.builtin_monitors.apache_monitor ``
+|||# ``id``                   ||| Optional. Included in each log message generated by this monitor, as a field named ``instance``. \
+                                  Allows you to distinguish between values recorded by different monitors. This is especially \
+                                  useful if you are running multiple Apache instances on a single server; you can monitor each \
+                                  instance with a separate apache_monitor record in the Scalyr Agent configuration.
+|||# ``status_url``           ||| Specifies the URL -- in particular, the port number -- at which the Apache status module is served.
+|||# ``source_address``       ||| Optional (defaults to '127.0.0.1'). The source IP address to use when fetching the server status.
+
+
+accessLog:
 ## Uploading the Apache access log
 
 If you have not already done so, you should also configure the Scalyr Agent to upload the access log
-generated by Apache.  The default dashboard generated for Apache relies on this log to generate statistics
-such as request rates and response bandwidths.
+generated by Apache. Scalyr's Apache dashboard uses this log to generate many statistics.
 
-For most Linux systems, the Apache access log is saved in ``/var/log/apache2/access.log``.  To upload this log
-to Scalyr, you must modify the "logs" section of ``/etc/scalyr-agent-2/agent.json`` to add an entry for this
-log file:
+For most Linux systems, the access log is saved in ``/var/log/apache2/access.log``. To upload, edit the
+``logs`` section of ``/etc/scalyr-agent-2/agent.json``. Add the following entry:
 
     logs: [
-       {
-         path: "/var/log/apache2/access.log",
-         attributes: {parser: "accessLog"}
-       },
-     ]
+       ...
 
-## Configuration reference
+    ***   {***
+    ***     path: "/var/log/apache2/access.log",***
+    ***     attributes: {parser: "accessLog", serverType: "apache"}***
+    ***   }***
+    ]
 
-The table below describes the options that can be used to configure the Apache monitor.
+Edit the ``path`` field as appropriate for your system setup.
 
-|||# Option            ||| Usage
-|||# ``module``        ||| Always ``scalyr_agent.builtin_monitors.apache_monitor``
-|||# ``status_url``    ||| Optional (defaults to 'http://localhost/server-status/?auto').  The URL the monitor will \
-                           fetchto retrieve the Apache status information.
-|||# ``source_address``||| Optional (defaults to '127.0.0.1'). The IP address to be used as the source address when \
-                           fetching the status URL.  Many servers require this to be 127.0.0.1 because they only \
-                           server the status page to requests from localhost.
-|||# ``id``            ||| Optional (defaults to empty string).  Included in each log message generated by this \
-                           monitor, as a field named ``instance``. Allows you to distinguish between different Apache \
-                           instances running on the same server.
+
+## Viewing Data
+
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
+click the {{menuRef:Dashboards}} menu and select {{menuRef:Apache}}. (The dashboard may not be listed until
+the agent begins sending Apache data.) You will see an overview of Apache data across all servers where you are
+running the Apache plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.
+
+See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
+
 
 ## Log reference
 
@@ -133,14 +133,15 @@ Each event recorded by this plugin will have the following fields:
 |||# ``value``   ||| The value of the metric.
 |||# ``instance``||| The ``id`` value from the monitor configuration.
 
+
 ## Metric reference
 
 The table below describes the metrics recorded by the Apache monitor.
 
 |||# Metric                         ||| Description
-|||# ``apache.connections.active``  ||| The number of connections currently opened to the server.
-|||# ``apache.connections.writing`` ||| The number of connections currently writing to the clients.
-|||# ``apache.connections.idle``    ||| The number of connections currently idle/sending keep alives.
+|||# ``apache.connections.active``  ||| The number of connections currently open on the server.
+|||# ``apache.connections.writing`` ||| The number of connections currently writing response data.
+|||# ``apache.connections.idle``    ||| The number of connections currently idle / sending keepalives.
 |||# ``apache.connections.closing`` ||| The number of connections currently closing.
 |||# ``apache.workers.active``      ||| How many workers are currently active.
 |||# ``apache.workers.idle``        ||| How many of the workers are currently idle.
