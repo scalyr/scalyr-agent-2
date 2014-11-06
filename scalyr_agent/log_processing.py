@@ -676,8 +676,10 @@ class LogFileIterator(object):
             # invalidated.  If so, we need to adjust the position to the next legal one according to the
             # buffer map.
             self.__position = self.__buffer_contents_index[0].position_start
-            log.warn('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
-                     'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-invalidated-%s' % self.__path))
+            # TODO:  This warning was firing in normal cases.  Have to re-examine under what conditions this triggers.
+            # It might be that if the file is empty, or if it consume all bytes, then we trigger this.
+            # log.warn('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
+            #         'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-invalidated-%s' % self.__path))
         elif len(self.__pending_files) > 0:
             # We only get here if we were not able to read anything into the buffer.  This must mean
             # all of our file content after the current position is gone.  so, just adjust the position to

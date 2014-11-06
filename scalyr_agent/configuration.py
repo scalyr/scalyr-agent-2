@@ -43,6 +43,10 @@ class Configuration(object):
     values for fields not set.  You can also use the equivalent method to determine if two instances of this
     object have the same configuration content.
 
+    You may also use environment variable substitution in any string value in the configuration file.  You just
+    need to define the ``import_vars`` configuration field to be a list of variable names to import from the
+    shell and then use the $VAR_NAME in any string field.
+
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
