@@ -54,3 +54,8 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# IPython
+**/ipython_log.py
+
+# PyEnv
+**/.python_version
