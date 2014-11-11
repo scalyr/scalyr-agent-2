@@ -29,11 +29,10 @@ __monitor__ = __name__
 
 
 import os
-#from subprocess import Popen, PIPE
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-from scalyr_agent import define_config_option, define_metric, define_log_field
-
 import sys
+import re
+import datetime
+
 try:
     import psutil
 except ImportError:
@@ -41,8 +40,10 @@ except ImportError:
     sys.stderr.write(msg)
     sys.exit(1)
 
-import time
 
+
+from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
+from scalyr_agent import define_config_option, define_metric, define_log_field
 
 
 #
@@ -121,28 +122,53 @@ METRICS = [
     # A Process's Memory Consumption
     dict(
         metric_name='winproc.mem.bytes',
-        description='Virtual memory usage, in bytes.',
-        extra_fields={'type': 'vmsize'},
+        description='The current working set size, in bytes.',
+        extra_fields={'type': 'working_set'},
         unit='bytes'
     ),
     dict(
         metric_name='winproc.mem.bytes',
-        description='Resident memory usage, in bytes.',
-        extra_fields={'type': 'resident'},
+        description='The peak working set size, in bytes.',
+        extra_fields={'type': 'peak_working_set'},
         unit='bytes'
     ),
     dict(
         metric_name='winproc.mem.bytes',
-        description='Peak virtual memory usage, in bytes.',
-        extra_fields={'type': 'peak_vmsize'},
+        description='The paged pool usage, in bytes.',
+        extra_fields={'type': 'paged_pool'},
         unit='bytes'
     ),
     dict(
         metric_name='winproc.mem.bytes',
-        description='Peak resident memory usage, in bytes.',
-        extra_fields={'type': 'peak_resident'},
+        description='The peak paged-pool usage, in bytes.',
+        extra_fields={'type': 'peak_paged_pool'},
         unit='bytes'
     ),
+    dict(
+        metric_name='winproc.mem.bytes',
+        description='The nonpaged pool usage, in bytes.',
+        extra_fields={'type': 'nonpaged_pool'},
+        unit='bytes'
+    ),
+    dict(
+        metric_name='winproc.mem.bytes',
+        description='The peak nonpaged pool usage, in bytes.',
+        extra_fields={'type': 'peak_nonpaged_pool'},
+        unit='bytes'
+    ),
+    dict(
+        metric_name='winproc.mem.bytes',
+        description='The pagefile usage, in bytes.',
+        extra_fields={'type': 'pagefile'},
+        unit='bytes'
+    ),
+    dict(
+        metric_name='winproc.mem.bytes',
+        description='The peak pagefile usage, in bytes.',
+        extra_fields={'type': 'peak_pagefile'},
+        unit='bytes'
+    ),
+
 
     # A Process's Disk Activity
     dict(
@@ -202,6 +228,13 @@ define_log_field(__monitor__, 'app', 'Same as ``instance``; provided for compati
 define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "app.cpu".')
 define_log_field(__monitor__, 'value', 'The metric value.')
 
+
+def uptime(create_time):
+    """Calculate the difference between now() and the given create_time.
+
+    TODO: Add the documentation
+    """
+    return datetime.datetime.now() - datetime.datetime.fromtimestamp(create_time)
 
 
 class ProcessMonitor(ScalyrMonitor):
@@ -283,32 +316,82 @@ class ProcessMonitor(ScalyrMonitor):
         if self.__pid is None:
             self.__set_process(self.__select_process())
 
-        #for gather in self.__gathers:
-        #    gather.run_single_cycle()
+        # !!!: HOLY LORD THIS IS UGLY... I just want to see some stuff work; this can't stay like this.
         try:
-            #self._logger.emit_value('metric_name', 'metric+value', 'extra')
-
             # CPU Times
-            cputimes = self.__process.cpu_times()
             metrics_iterator = (m for m in METRICS)
+
             metric = metrics_iterator.next()
+            cputimes = self.__process.cpu_times()
             metric_value = cputimes.user
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric_value = cputimes.system
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            # Uptime
+            metric = metrics_iterator.next()
+            metric_value = str(uptime(self.__process.create_time()))
             self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
 
             # Threads
             metric = metrics_iterator.next()
-            metric_value = time.ctime(self.__process.create_time())
+            metric_value = self.__process.num_threads()
             self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
 
             # Memory
-            mem_info = self.__process.memory_info()
             metric = metrics_iterator.next()
-            metric_value = mem_info.res
+            mi = self.__process.memory_info_ex()
+            metric_value = mi.wset
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = mi.peak_wset
             self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
 
             metric = metrics_iterator.next()
-            metric_value = mem_info.vms
+            metric_value = mi.paged_pool
             self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = mi.peak_paged_pool
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            metric = metrics_iterator.next()
+            metric_value = mi.nonpaged_pool
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = mi.peak_nonpaged_pool
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            metric = metrics_iterator.next()
+            metric_value = mi.pagefile
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = mi.peak_pagefile
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            # Disk Activity
+            disk_io = self.__process.io_counters()
+            metric = metrics_iterator.next()
+            metric_value = disk_io.read_count
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = disk_io.write_count
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            metric = metrics_iterator.next()
+            metric_value = disk_io.read_bytes
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+            metric = metrics_iterator.next()
+            metric_value = disk_io.write_bytes
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            # TODO: Since this is just a brute force display of some functionality (we'll clean it up soon); we do
+            # a quick sanity check that we correctly pulled and emitted the correct metrics.
+            try:
+                metrics_iterator.next()
+            except StopIteration:
+                pass
+            else:
+                raise Exception("Misaligned metrics")
 
         except psutil.NoSuchProcess:
             self.__set_process(None)
@@ -327,7 +410,7 @@ class ProcessMonitor(ScalyrMonitor):
             pattern = re.compile(self.__commandline_matcher)
             for p in psutil.get_process_list():
                 if pattern.search(' '.join(p.cmdline())):
-                    return pid
+                    return p.pid
             return None
         else:
             # See if the specified target pid is running.  If so, then return it.
