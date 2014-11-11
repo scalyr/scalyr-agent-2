@@ -98,7 +98,8 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
 
     return 0
 
-if __name__ == '__main__':
+def create_parser():
+    "Build the commandline option parser"
     parser = OptionParser(usage='Usage: python -m scalyr_agent.scalyr_monitor [options] monitor_module')
     parser.add_option("-p", "--monitor-python-path", dest="monitor_python_path",
                       help="Add PATH to the paths searched to find the python module for the monitor.", metavar="PATH",
@@ -109,7 +110,11 @@ if __name__ == '__main__':
     parser.add_option("-s", "--monitor-sample-interval", dest="monitor_sample_interval",
                       help="The number of seconds between calls to the monitor's gather_sample method.",
                       metavar="INTERVAL", default=5)
+    return parser
 
+
+if __name__ == '__main__':
+    parser = create_parser()
     (options, args) = parser.parse_args()
     if len(args) != 1:
         print >> sys.stderr, 'You must provide the module that contains the Scalyr Monitor plugin you wish to run.'
