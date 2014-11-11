@@ -33,7 +33,15 @@ import os
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
+import sys
+try:
+    import psutil
+except ImportError:
+    msg = "This monitor requires the psutil module.\n\tpip install psutil\n"
+    sys.stderr.write(msg)
+    sys.exit(1)
 
+import time
 
 
 
@@ -196,8 +204,6 @@ define_log_field(__monitor__, 'value', 'The metric value.')
 
 
 
-
-
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
 
@@ -251,18 +257,16 @@ class ProcessMonitor(ScalyrMonitor):
         @param pid: The process id or None if there is no process to monitor.
         @type pid: int or None
         """
-        if self.__pid is not None:
-            for gather in self.__gathers:
-                gather.close()
+        #if self.__pid is not None:
+        #    for gather in self.__gathers:
+        #        gather.close()
 
         self.__pid = pid
         self.__gathers = []
 
-        if pid is not None:
-            pass
-            #self.__gathers.append(StatReader(self.__pid, self.__id, self._logger))
-            #self.__gathers.append(StatusReader(self.__pid, self.__id, self._logger))
-            #self.__gathers.append(IoReader(self.__pid, self.__id, self._logger))
+        if pid is not None and psutil.pid_exists(pid):
+            self.__process = psutil.Process(pid)
+
         # TODO: Re-enable these if we can find a way to get them to truly report
         # per-app statistics.
         #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
@@ -281,7 +285,33 @@ class ProcessMonitor(ScalyrMonitor):
 
         #for gather in self.__gathers:
         #    gather.run_single_cycle()
-        self._logger.emit_value('dimension', 'metric value')
+        try:
+            #self._logger.emit_value('metric_name', 'metric+value', 'extra')
+
+            # CPU Times
+            cputimes = self.__process.cpu_times()
+            metrics_iterator = (m for m in METRICS)
+            metric = metrics_iterator.next()
+            metric_value = cputimes.user
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            # Threads
+            metric = metrics_iterator.next()
+            metric_value = time.ctime(self.__process.create_time())
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            # Memory
+            mem_info = self.__process.memory_info()
+            metric = metrics_iterator.next()
+            metric_value = mem_info.res
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+            metric = metrics_iterator.next()
+            metric_value = mem_info.vms
+            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
+
+        except psutil.NoSuchProcess:
+            self.__set_process(None)
 
     def __select_process(self):
         """Returns the process id of a running process that fulfills the match criteria.
@@ -292,36 +322,21 @@ class ProcessMonitor(ScalyrMonitor):
         @return: The process id of the matching process, or None
         @rtype: int or None
         """
-        sub_proc = None
         if self.__commandline_matcher is not None:
-            try:
-                pass
-                # Spawn a process to run ps and match on the command line.  We only output two
-                # fields from ps.. the pid and command.
-                #sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
-                #                 shell=False, stdout=PIPE)
-                #
-                #sub_proc.stdout.readline()
-                #for line in sub_proc.stdout:
-                #    line = line.strip()
-                #    if line.find(' ') > 0:
-                #        pid = int(line[:line.find(' ')])
-                #        line = line[(line.find(' ') + 1):]
-                #        if re.search(self.__commandline_matcher, line) is not None:
-                #            return pid
-                #return None
-            finally:
-                # Be sure to wait on the spawn process.
-                if sub_proc is not None:
-                    sub_proc.wait()
+            # XXX: This only finds the first match!
+            pattern = re.compile(self.__commandline_matcher)
+            for p in psutil.get_process_list():
+                if pattern.search(' '.join(p.cmdline())):
+                    return pid
+            return None
         else:
             # See if the specified target pid is running.  If so, then return it.
             try:
                 # Special case '$$' to mean this process.
                 if self.__target_pid == '$$':
                     pid = os.getpid()
-                #else:
-                    #pid = int(self.__target_pid)
+                else:
+                    pid = int(self.__target_pid)
                 #os.kill(pid, 0)
                 return pid
             except OSError:
