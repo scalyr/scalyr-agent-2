@@ -646,8 +646,10 @@ class LogFileIterator(object):
         self.__refresh_pending_files(current_time)
 
         # Now we go through the files and get as many bytes as we can.
+        should_have_bytes = False
         for pending_file in self.__pending_files:
             if read_position < pending_file.position_end:
+                should_have_bytes = True
                 read_position = max(pending_file.position_start, read_position)
                 bytes_left_in_file = pending_file.last_known_size - (read_position - pending_file.position_start)
                 content = self.__read_file_chunk(
@@ -680,10 +682,10 @@ class LogFileIterator(object):
             # It might be that if the file is empty, or if it consume all bytes, then we trigger this.
             # log.warn('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
             #         'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-invalidated-%s' % self.__path))
-        elif len(self.__pending_files) > 0:
-            # We only get here if we were not able to read anything into the buffer.  This must mean
-            # all of our file content after the current position is gone.  so, just adjust the position to
-            # point to the end as we know it.
+        elif should_have_bytes:
+            # We only get here if we were not able to read anything into the buffer but there were files that should
+            # have had bytes available for reading.  This must mean  all of our file content after the current position
+            # is gone.  so, just adjust the position to point to the end as we know it.
             self.__position = self.__pending_files[-1].position_end
             log.warn('File content appears to have disappeared.  This may not be an indicator of a real error. '
                      'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-disappeared-%s' % self.__path))

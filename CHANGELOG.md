@@ -13,6 +13,10 @@ New features:
 
 * The ``run_monitor.py`` takes a new option ``-d`` to set the debug level.
 
+Bug fixes:
+
+* Fix false warning message about file contents disappearing.
+
 ## 2.0.2 "Bashful Bovine" - Oct 31, 2014
 
 <!---
