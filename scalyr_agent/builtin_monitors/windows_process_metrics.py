@@ -1,30 +1,71 @@
-# Copyright 2014 Scalyr Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ------------------------------------------------------------------------
-#
-# A ScalyrMonitor that collects metrics on a running Windows process.  The
-# collected metrics include CPU and memory usage.
-#
-# Note, this can be run in standalone mode by:
-#     $ python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.windows_process_metrics -c "{pid:1234}"
-#
-#   where 1234 is the process id of the target process.
-# See documentation for other ways to match processes.
-#
-# author:  Scott Sullivan <guy.hoozdis@gmail.com>
+#!/usr/bin/env python
+"""Scalyr Agent Plugin Module - Windows Process Metrics
 
-__author__ = 'guy.hoozdis@gmail.com'
+This module extends the ScalyrMonitor base class to implement it's functionality, a process
+metrics collector for the Windows (Server 2003 and newer) platforms, as a monitor plugin into
+the Scalyr plugin framework.
+
+The two most important object in this monitor are:
+
+ 1. The METRICS list; which defines the metrics that this module will collect
+ 2. The ProcessMonitor class which drives the collection of each defined metric and emits 
+    its associated value at a specified sampling rate.
+
+
+>>> import re, operator, collections
+>>> metric_template = "{metric.metric_name} - {metric.description} {metric.units}".format
+>>> criteria = dict(
+...     category = 'cpu',
+...     metric_name = 'winproc.disk.*',
+...     match = any
+... )
+>>> predicates = [(operator.itemgetter(k), re.compile(v))
+...                 for k,v in criteria.items() 
+...                 if k is not 'match']
+>>> Telemetry = collections.namedtuple('Telemetry', 'match metric attribute fetcher matcher')
+>>> for metric in METRICS:
+...     matches = []
+...     for fetcher, matcher in predicates:
+...         attribute = fetcher(metric)
+...         match = matcher.search(attribute)
+...         matches.append(Telemetry(match, metric, attribute, fetcher, matcher))
+...     else:
+...         if any(itertools.ifilter(operator.attrgetter('match'), matches)):
+...             print metric_template(metric)
+
+
+>>> from scalyr_agent import run_monitor
+>>> monitors_path = path.join(path.dirname(scalyr_agent.__file__), 'builtin_monitors')
+>>> cmdline = ['-p', monitors_path, -c, '{commandline:cmd}', 'windows_process_metrics' ]
+>>> parser = run_monitor.create_parser()
+>>> options, args = parser.parse_args(cmdline)
+>>> run_monitor.run_standalone_monitor(args[0], options.monitor_module, options.monitors_path, 
+...     options.monitor_config options.monitor_sample_interval)
+"""
+
+
+__license__ = """
+Copyright 2014 Scalyr Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+------------------------------------------------------------------------
+"""
+
+__author__ = 'Scott Sullivan <guy.hoozdis@gmail.com>'
+__version__ = "0.0.1"
+
+
+
 __monitor__ = __name__
 
 
@@ -33,17 +74,50 @@ import sys
 import re
 import datetime
 
+import itertools
+from operator import methodcaller, attrgetter
+from collections import namedtuple
+
+
+
+
 try:
     import psutil
 except ImportError:
     msg = "This monitor requires the psutil module.\n\tpip install psutil\n"
     sys.stderr.write(msg)
     sys.exit(1)
+else:
+    from psutil import Error, AccessDenied, NoSuchProcess, TimeoutExpired
+    from psutil import process_iter, Process
 
 
 
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-from scalyr_agent import define_config_option, define_metric, define_log_field
+try:
+    import scalyr_agent
+except ImportError:
+    msg = "This monitor requires the scalyr_agent module.\n\t"
+    sys.stderr.write(msg)
+    sys.exit(1)
+else:
+    from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
+    from scalyr_agent import define_config_option, define_metric, define_log_field
+    from scalyr_agent import scalyr_logging
+
+
+applog = scalyr_logging.getLogger("{}.{}".format(__name__, 'main')) # pylint: disable=invalid-name
+scalyr_logging.set_log_destination(use_stdout=True)
+scalyr_logging.set_log_level(scalyr_logging.logging.DEBUG)
+
+
+
+MSG = "** Log Level Active **"
+applog.critical(MSG)
+applog.warn(MSG)
+applog.info(MSG)
+applog.debug(MSG)
+applog.info('Module loading...')
+
 
 
 #
@@ -52,7 +126,7 @@ from scalyr_agent import define_config_option, define_metric, define_log_field
 CONFIG_OPTIONS = [
     dict(
         option_name='module',
-        option_description='Always ``scalyr_agent.builtin_monitors.linux_process_metrics``',
+        option_description='Always ``scalyr_agent.builtin_monitors.windows_process_metrics``',
         convert_to=str,
         required_option=True
     ),
@@ -81,141 +155,302 @@ CONFIG_OPTIONS = [
 ]
 
 _ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] # pylint: disable=star-args
+## End Monitor Configuration
+# #########################################################################################
 
 
 
-#
-# Process's Metrics / Dimensions - defines the capibilities of this monitor
-#
-METRICS = [
 
-    # A Process's CPU time
-    dict(
-        metric_name='winproc.cpu',
-        description='User-mode CPU usage, in 1/100ths of a second.',
-        extra_fields={'type': 'user'},
-        unit='secs:0.01',
-        cumulative=True
-    ),
-    dict(
-        metric_name='winproc.cpu',
-        description='System-mode CPU usage, in 1/100ths of a second.',
-        extra_fields={'type': 'system'},
-        unit='secs:0.01',
-        cumulative=True
-    ),
+# #########################################################################################
+# #########################################################################################
+# ## Process's Metrics / Dimensions -
+# ##
+# ##    Metrics define the capibilities of this monitor.  These some utility functions
+# ##    along with the list(s) of metrics themselves.
+# ##
+def _gather_metric(method, attribute=None):
+    """Curry arbitrary process metric extraction
 
-    # A Process's uptime/lifetime
-    dict(
-        metric_name='winproc.uptime',
-        description='Process uptime, in milliseconds.',
-        unit='milliseconds',
-        cumulative=True
-    ),
+    @param method: a callable member of the process object interface
+    @param attribute: an optional data member, of the data structure returned by ``method``
 
-    # A Processes's Threads
-    dict(
-        metric_name='winproc.threads',
-        description='The number of threads being used by the process.'
-    ),
+    @type method callable
+    @type attribute str
+    """
 
-    # A Process's Memory Consumption
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The current working set size, in bytes.',
-        extra_fields={'type': 'working_set'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The peak working set size, in bytes.',
-        extra_fields={'type': 'peak_working_set'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The paged pool usage, in bytes.',
-        extra_fields={'type': 'paged_pool'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The peak paged-pool usage, in bytes.',
-        extra_fields={'type': 'peak_paged_pool'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The nonpaged pool usage, in bytes.',
-        extra_fields={'type': 'nonpaged_pool'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The peak nonpaged pool usage, in bytes.',
-        extra_fields={'type': 'peak_nonpaged_pool'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The pagefile usage, in bytes.',
-        extra_fields={'type': 'pagefile'},
-        unit='bytes'
-    ),
-    dict(
-        metric_name='winproc.mem.bytes',
-        description='The peak pagefile usage, in bytes.',
-        extra_fields={'type': 'peak_pagefile'},
-        unit='bytes'
-    ),
+    doc = "Extract the {} attribute from the given process object".format
+    if attribute:
+        doc = "Extract the {}().{} attribute from the given process object".format
+
+    def gather_metric(process):
+        """Dynamically Generated """
+        assert type(process) is psutil.Process, "Only the 'psutil.Process' interface is supported currently"
+        metric = methodcaller(method)   # pylint: disable=redefined-outer-name
+        return attribute and attrgetter(attribute)(metric(process)) or metric(process)
+
+    gather_metric.__doc__ = doc(method, attribute)
+    return gather_metric
 
 
-    # A Process's Disk Activity
-    dict(
-        metric_name='winproc.disk.operations',
-        description='Total disk read requests.',
-        extra_fields={'type': 'read'},
-        unit='bytes',
-        cumulative=True
+def uptime(start_time):
+    """Calculate the difference between now() and the given create_time.
+
+    @param start_time: milliseconds passed since 'event' (not since epoc)
+    @type float
+    """
+    return datetime.datetime.now() - datetime.datetime.fromtimestamp(start_time)
+
+
+METRIC = namedtuple('METRIC', 'config dispatch')
+METRIC_CONFIG = dict    # pylint: disable=invalid-name
+GATHER_METRIC = _gather_metric
+
+
+# pylint: disable=bad-whitespace
+# =================================================================================
+# ============================    Process CPU    ==================================
+# =================================================================================
+_PROCESS_CPU_METRICS = [
+    METRIC( ## ------------------ User-mode CPU ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.cpu',
+            description     = 'User-mode CPU usage, in 1/100ths of a second.',
+            category        = 'cpu',
+            unit            = 'secs:0.01',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'user'
+            },
+        ),
+        GATHER_METRIC('cpu_times', 'user')
     ),
-    dict(
-        metric_name='app.disk.operations',
-        description='Total disk write requests.',
-        extra_fields={'type': 'write'},
-        unit='bytes',
-        cumulative=True
+    METRIC( ## ------------------ Kernel-mode CPU ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.cpu',
+            description     = 'System-mode CPU usage, in 1/100ths of a second.',
+            category        = 'cpu',
+            unit            = 'secs:0.01',
+            cumulative      =   True,
+            extra_fields    = {
+                'type': 'system'
+            },
+        ),
+        GATHER_METRIC('cpu_times', 'system')
     ),
-    dict(
-        metric_name='app.disk.operations',
-        description='Total disk write requests.',
-        extra_fields={'type': 'other'},
-        unit='bytes',
-        cumulative=True
-    ),
-    dict(
-        metric_name='winproc.disk.bytes',
-        description='Total bytes read from disk.',
-        extra_fields={'type': 'read'},
-        unit='bytes',
-        cumulative=True
-    ),
-    dict(
-        metric_name='winproc.disk.bytes',
-        description='Total bytes written to disk.',
-        extra_fields={'type': 'write'},
-        unit='bytes',
-        cumulative=True
-    ),
-    dict(
-        metric_name='winproc.disk.bytes',
-        description='Total other bytes.',
-        extra_fields={'type': 'other'},
-        unit='bytes',
-        cumulative=True
-    ),
+
+    # TODO: Additional attributes for this section
+    #  * context switches
+    #  * ...
 ]
 
-_ = [define_metric(__monitor__, **metric) for metric in METRICS] # pylint: disable=star-args
+
+# =================================================================================
+# ========================    Process Attributes    ===============================
+# =================================================================================
+_PROCESS_ATTRIBUTE_METRICS = [
+    METRIC( ## ------------------  Process Uptime   ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.uptime',
+            description     = 'Process uptime, in milliseconds.',
+            category        = 'attributes',
+            unit            = 'milliseconds',
+            cumulative      = True,
+        ),
+        GATHER_METRIC('create_time')
+    ),
+    METRIC( ## ------------------  Process Threads   ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.threads',
+            description     = 'The number of threads being used by the process.',
+            category        = 'attributes'
+        ),
+        GATHER_METRIC('num_threads')
+    ),
+
+    # TODO: Additional attributes for this section
+    #  * number of handles
+    #  * number of child processes
+    #  * process priority
+    #  * process cmdline
+    #  * procress working directory
+    #  * process env vars
+    #  * parent PID
+    #  * cpu affinity
+]
+
+# =================================================================================
+# ========================    Process Memory    ===================================
+# =================================================================================
+_PROCESS_MEMORY_METRICS = [
+    METRIC( ## ------------------ Working Set ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The current working set size, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'working_set'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'wset')
+    ),
+    METRIC( ## ------------------ Peak Working Set ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The peak working set size, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'peak_working_set'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'peak_wset')
+    ),
+    METRIC( ## ------------------ Paged Pool ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The paged pool usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'paged_pool'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'paged_pool')
+    ),
+    METRIC( ## ------------------ Peak Paged Pool ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The peak paged-pool usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'peak_paged_pool'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'peak_paged_pool')
+    ),
+
+    METRIC( ## ------------------ NonPaged Pool ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The nonpaged pool usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'nonpaged_pool'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'nonpaged_pool')
+    ),
+    METRIC( ## ------------------ Peak NonPaged Pool ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The peak nonpaged pool usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'peak_nonpaged_pool'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'peak_nonpaged_pool')
+    ),
+    METRIC( ## ------------------ Pagefile ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The current pagefile usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'pagefile'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'pagefile')
+    ),
+    METRIC( ## ------------------ Peak Pagefile ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The peak pagefile usage, in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'peak_pagefile'
+            },
+        ),
+        GATHER_METRIC('memory_info_ex', 'peak_pagefile')
+    ),
+
+
+    # TODO: Additional attributes for this section
+    #  * ...
+]
+
+
+
+# =================================================================================
+# =============================    DISK IO    =====================================
+# =================================================================================
+_PROCESS_DISK_IO_METRICS = [
+    METRIC( ## ------------------ Disk Read Operations ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.disk.operations',
+            description     = 'Total disk read requests.',
+            category        = "disk",
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+            },
+        ),
+        GATHER_METRIC('io_counters', 'read_count')
+    ),
+    METRIC( ## ------------------ Disk Write Operations ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.disk.operations',
+            description     = 'Total disk read requests.',
+            category        = "disk",
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+            },
+        ),
+        GATHER_METRIC('io_counters', 'read_count')
+    ),
+    METRIC( ## ------------------ Disk Read Bytes ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.disk.operations',
+            description     = 'Total bytes processed during disk read operations.',
+            category        = "disk",
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+            },
+        ),
+        GATHER_METRIC('io_counters', 'read_bytes')
+    ),
+    METRIC( ## ------------------ Disk Read Bytes ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.disk.operations',
+            description     = 'Total disk read requests.',
+            category        = "disk",
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+            },
+        ),
+        GATHER_METRIC('io_counters', 'read_count')
+    )
+    # TODO: Additional attributes for this section
+    #  * ...
+]
+# pylint: enable=bad-whitespace
+
+METRICS = _PROCESS_CPU_METRICS + _PROCESS_ATTRIBUTE_METRICS + _PROCESS_MEMORY_METRICS + _PROCESS_DISK_IO_METRICS
+_ = [define_metric(__monitor__, **metric.config) for metric in METRICS]     # pylint: disable=star-args
+
 
 
 
@@ -229,219 +464,111 @@ define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.
 define_log_field(__monitor__, 'value', 'The metric value.')
 
 
-def uptime(create_time):
-    """Calculate the difference between now() and the given create_time.
 
-    TODO: Add the documentation
+
+
+
+
+#
+#
+#
+def commandline_matcher(regex, flags=re.IGNORECASE):
     """
-    return datetime.datetime.now() - datetime.datetime.fromtimestamp(create_time)
+    @param regex: a regular expression to compile and use to search process commandlines for matches
+    @param flags: modify the regular expression with standard flags (see ``re`` module)
+
+    @type regex str
+    @type flags int
+    """
+    pattern = re.compile(regex, flags)
+
+    def _cmdline(process):
+        """Compose the process's commandline parameters as a string"""
+        return ' '.join(process.cmdline())
+
+    def _match_generator(processes):
+        """
+        @param processes: an iterable list of process object interfaces
+        @type interface
+        """
+        return (process for process in processes if pattern.search(_cmdline(process)))
+
+    return _match_generator
+
+
+
 
 
 class ProcessMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records metrics about a running process.
+    """Windows Process Metrics"""
 
-    To configure this monitor, you need to provide an id for the instance to identify which process the metrics
-    belong to in the logs and a regular expression to match against the list of running processes to determine which
-    process should be monitored.
+    def __init__(self, monitor_config, logger, **kw):
+        sample_interval_secs = kw.get('sample_interval_secs', 30)
+        super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
+        self.__process = None
 
-    Example:
-      monitors: [{
-         module: "builtin_monitors.windows_process_metrics".
-         id: "tomcat",
-         commandline: "java.*tomcat",
-      }]
-
-    Instead of 'commandline', you may also define the 'pid' field which should be set to the id of the process to
-    monitor.  However, since ids can change over time, it's better to use the commandline matcher.  The 'pid' field
-    is mainly used by the Windows process monitor run to monitor the agent itself.
-
-    This monitor records the following metrics:
-    TODO: Generate the list of metrics collected
-
-    In additional to the fields listed above, each metric will also have a field 'winproc' set to the monitor id to
-    specify which process the metric belongs to.
-
-    You can run multiple instances of this monitor per agent to monitor different processes.
-    """
-    def _initialize(self):
-        """Performs monitor-specific initialization."""
-        # The id of the process being monitored, if one has been matched.
-        self.__pid = None
-        # The list of BaseReaders instantiated to gather metrics for the process.
-        self.__gathers = []
-
-        self.__id = self._config.get('id', required_field=True, convert_to=str)
-        self.__commandline_matcher = self._config.get('commandline', default=None, convert_to=str)
-        self.__target_pid = self._config.get('pid', default=None, convert_to=str)
-
-        if self.__commandline_matcher is None and self.__target_pid is None:
-            raise BadMonitorConfiguration('At least one of the following fields must be provide: commandline or pid',
-                                          'commandline')
-
-        # Make sure to set our configuration so that the proper parser is used.
-        self.log_config = {
-            'parser': 'agent-metrics',
-            'path': 'windows_process_metrics.log',
+        applog.info('%s instantiated', self.__class__)
+        self.__debug = {
+           'counter': itertools.count()
         }
 
-    def __set_process(self, pid):
-        """Sets the id of the process for which this monitor instance should record metrics.
+    def _select_target_process(self):
+        applog.debug('Selecting target process from config %s', str(self._config))
 
-        @param pid: The process id or None if there is no process to monitor.
-        @type pid: int or None
-        """
-        #if self.__pid is not None:
-        #    for gather in self.__gathers:
-        #        gather.close()
+        process = None
+        if 'commandline' in self._config:
+            applog.info('Using commandlline string matching to select target process')
+            matcher = commandline_matcher(self._config['commandline'])
+            matching_process_iterator = matcher(process_iter())
+            process = matching_process_iterator.next()
+        elif 'pid' in self._config:
+            applog.info('Using pid to select target process')
+            if '$$' == self._config.get('pid'):
+                pid = os.getpid()
+            else:
+                pid = self._config.get('pid')
+            process = psutil.Process(int(pid))
 
-        self.__pid = pid
-        self.__gathers = []
-
-        if pid is not None and psutil.pid_exists(pid):
-            self.__process = psutil.Process(pid)
-
-        # TODO: Re-enable these if we can find a way to get them to truly report
-        # per-app statistics.
-        #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
-        #        self.gathers.append(SockStatReader(self.pid, self.id, self._logger))
+        applog.info('Target process selected for monitoring: %s', process)
+        self.__process = process
 
     def gather_sample(self):
-        """Collect the per-process metrics for the monitored process.
+        counter = self.__debug['counter']
+        sample_id = counter.next()
+        applog.debug('Sampling metrics (Iteration %03d)', sample_id)
 
-        If the process is no longer running, then attempts to match a new one.
-        """
-        if self.__pid is not None and not self.__is_running():
-            self.__set_process(None)
-
-        if self.__pid is None:
-            self.__set_process(self.__select_process())
-
-        # !!!: HOLY LORD THIS IS UGLY... I just want to see some stuff work; this can't stay like this.
         try:
-            # CPU Times
-            metrics_iterator = (m for m in METRICS)
+            self._select_target_process()
 
-            metric = metrics_iterator.next()
-            cputimes = self.__process.cpu_times()
-            metric_value = cputimes.user
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric_value = cputimes.system
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            # Uptime
-            metric = metrics_iterator.next()
-            metric_value = str(uptime(self.__process.create_time()))
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            # Threads
-            metric = metrics_iterator.next()
-            metric_value = self.__process.num_threads()
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            # Memory
-            metric = metrics_iterator.next()
-            mi = self.__process.memory_info_ex()
-            metric_value = mi.wset
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = mi.peak_wset
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            metric = metrics_iterator.next()
-            metric_value = mi.paged_pool
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = mi.peak_paged_pool
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            metric = metrics_iterator.next()
-            metric_value = mi.nonpaged_pool
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = mi.peak_nonpaged_pool
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            metric = metrics_iterator.next()
-            metric_value = mi.pagefile
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = mi.peak_pagefile
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            # Disk Activity
-            disk_io = self.__process.io_counters()
-            metric = metrics_iterator.next()
-            metric_value = disk_io.read_count
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = disk_io.write_count
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            metric = metrics_iterator.next()
-            metric_value = disk_io.read_bytes
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-            metric = metrics_iterator.next()
-            metric_value = disk_io.write_bytes
-            self._logger.emit_value(metric['metric_name'], metric_value, metric.get('extra_fields', None))
-
-            # TODO: Since this is just a brute force display of some functionality (we'll clean it up soon); we do
-            # a quick sanity check that we correctly pulled and emitted the correct metrics.
-            try:
-                metrics_iterator.next()
-            except StopIteration:
-                pass
-            else:
-                raise Exception("Misaligned metrics")
-
-        except psutil.NoSuchProcess:
-            self.__set_process(None)
-
-    def __select_process(self):
-        """Returns the process id of a running process that fulfills the match criteria.
-
-        This will either use the commandline matcher or the target pid to find the process.
-        If no process is matched, None is returned.
-
-        @return: The process id of the matching process, or None
-        @rtype: int or None
-        """
-        if self.__commandline_matcher is not None:
-            # XXX: This only finds the first match!
-            pattern = re.compile(self.__commandline_matcher)
-            for p in psutil.get_process_list():
-                if pattern.search(' '.join(p.cmdline())):
-                    return p.pid
-            return None
-        else:
-            # See if the specified target pid is running.  If so, then return it.
-            try:
-                # Special case '$$' to mean this process.
-                if self.__target_pid == '$$':
-                    pid = os.getpid()
-                else:
-                    pid = int(self.__target_pid)
-                #os.kill(pid, 0)
-                return pid
-            except OSError:
-                # If we get this, it means we tried to signal a process we do not have permission to signal.
-                # If this is the case, we won't have permission to read its stats files either, so we ignore it.
-                return None
-
-    def __is_running(self):
-        """Returns true if the current process is still running.
-
-        @return:  True if the monitored process is still running.
-        @rtype: bool
-        """
-        try:
-            os.kill(self.__pid, 0)
-            return True
-        except OSError, e:
-            # Errno #3 corresponds to the process not running.  We could get
-            # other errors like this process does not have permission to send
-            # a signal to self.pid.  But, if that error is returned to us, we
-            # know the process is running at least, so we ignore the error.
-            return e.errno != 3
+            applog.info("Enumerating and emitting metrics")
+            for idx, metric in enumerate(METRICS):
+                metric_name = metric.config['metric_name']
+                metric_value = metric.dispatch(self.__process)
+                applog.debug('Sampled %s at %s', metric_name, metric_value)
+                self._logger.emit_value(
+                    metric_name,
+                    metric_value,
+                    **metric.config['extra_fields']
+                )
+            applog.debug('Sampling complete (Iteration %s)', sample_id)
+        except NoSuchProcess:
+            self.__process = None
 
 
-__all__ = ['ProcessMonitor']
+def create_application_logger(name, level=scalyr_logging.DEBUG_LEVEL_0, parent=None, **config):
+    logger = parent and parent.getChild(name) or scalyr_logging.getLogger(name)
+    logger.set_log_level(level)
+
+    slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
+    scalyr_agent.set_log_destination(use_stdout=True)
+
+
+
+import argparse
+def create_commandline_parser(**parser_config):
+    parser = argparse.ArgumentParser(**parser_config)
+    parser.add_argument('-c', '--config', 
+        dest='monitor_config', default='{pid:$$}', type=str, 
+        help='A json object, as a string, that defines the process to monitor and sample metrics',
+    )
+    # todo: Left-off here....
