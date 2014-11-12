@@ -82,13 +82,14 @@ from collections import namedtuple
 
 
 
-
+SCALYR_BUILD_DOCS = os.environ.get('SCALYR_BUILD_DOCS', False)
 try:
     import psutil
 except ImportError:
-    msg = "This monitor requires the psutil module.\n\tpip install psutil\n"
-    sys.stderr.write(msg)
-    sys.exit(1)
+    if not SCALYR_BUILD_DOCS:
+        msg = "This monitor requires the psutil module.\n\tpip install psutil\n"
+        sys.stderr.write(msg)
+        sys.exit(1)
 else:
     from psutil import Error, AccessDenied, NoSuchProcess, TimeoutExpired
     from psutil import process_iter, Process
@@ -98,27 +99,14 @@ else:
 try:
     import scalyr_agent
 except ImportError:
-    msg = "This monitor requires the scalyr_agent module.\n\t"
-    sys.stderr.write(msg)
-    sys.exit(1)
+    if not SCALYR_BUILD_DOCS:
+        msg = "This monitor requires the scalyr_agent module.\n\t"
+        sys.stderr.write(msg)
+        sys.exit(1)
 else:
     from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
     from scalyr_agent import define_config_option, define_metric, define_log_field
     from scalyr_agent import scalyr_logging
-
-
-applog = scalyr_logging.getLogger("{}.{}".format(__name__, 'main')) # pylint: disable=invalid-name
-scalyr_logging.set_log_destination(use_stdout=True)
-scalyr_logging.set_log_level(scalyr_logging.logging.DEBUG)
-
-
-
-MSG = "** Log Level Active **"
-applog.critical(MSG)
-applog.warn(MSG)
-applog.info(MSG)
-applog.debug(MSG)
-applog.info('Module loading...')
 
 
 
@@ -190,7 +178,7 @@ def _gather_metric(method, attribute=None):
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
         return attribute and attrgetter(attribute)(metric(process)) or metric(process)
 
-    gather_metric.__doc__ = doc(method, attribute)
+    #gather_metric.__doc__ = doc(method, attribute)
     return gather_metric
 
 
@@ -557,12 +545,21 @@ class ProcessMonitor(ScalyrMonitor):
             self.__process = None
 
 
-def create_application_logger(name, level=scalyr_logging.DEBUG_LEVEL_0, parent=None, **config):
+def create_application_logger(name=None, level=scalyr_logging.DEBUG_LEVEL_0, parent=None, **config):
+    """Configure a logging interface for the monitor plugin module to use.
+    
+    The monitor, separate from emitting it's metrics, needs to communicate it's health, activities,
+    and journalling unexpected or repeated errors.
+
+    """
+    if not name:
+        name = "{}.application".format(__name__)
     logger = parent and parent.getChild(name) or scalyr_logging.getLogger(name)
     logger.set_log_level(level)
 
-    slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
-    scalyr_agent.set_log_destination(use_stdout=True)
+    #slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
+    scalyr_logging.set_log_destination(use_stdout=True)
+    return logger
 
 
 
@@ -574,3 +571,20 @@ def create_commandline_parser(**parser_config):
         help='A json object, as a string, that defines the process to monitor and sample metrics',
     )
     # todo: Left-off here....
+
+if __name__ == "__main__":
+    parser = create_parser()
+    options, command = parser.parse_args()
+    
+
+    logger = create_application_logger()
+
+    MSG = "** Log Level Active **"
+    applog.critical(MSG)
+    applog.warn(MSG)
+    applog.info(MSG)
+    applog.debug(MSG)
+    applog.info('Module loading...')
+
+
+
