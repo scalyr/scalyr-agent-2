@@ -41,10 +41,12 @@ The two most important object in this monitor are:
 >>> options, args = parser.parse_args(cmdline)
 >>> run_monitor.run_standalone_monitor(args[0], options.monitor_module, options.monitors_path, 
 ...     options.monitor_config options.monitor_sample_interval)
-"""
+0
+>>> 
 
-
-__license__ = """
+Author: Scott Sullivan <guy.hoozdis+scalyr@gmail.com>
+License: Apache 2.0
+------------------------------------------------------------------------
 Copyright 2014 Scalyr Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
