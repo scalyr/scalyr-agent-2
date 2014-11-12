@@ -114,8 +114,8 @@ def create_parser():
 
 
 if __name__ == '__main__':
-    parser = create_parser()
-    (options, args) = parser.parse_args()
+    parser = create_parser()                # pylint: disable=invalid-name
+    (options, args) = parser.parse_args()   # pylint: disable=invalid-name
     if len(args) != 1:
         print >> sys.stderr, 'You must provide the module that contains the Scalyr Monitor plugin you wish to run.'
         parser.print_help(sys.stderr)
