@@ -56,19 +56,27 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
+log = scalyr_logging.getLogger('scalyr_agent.run_monitor')
 
-def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, monitor_sample_interval):
+
+def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, monitor_sample_interval,
+                           monitor_debug_level):
     """Runs a single plugin monitor instance.
 
     @param monitor_module: The name of the python module implementing the monitor.
     @param monitor_python_path: The python path to search to find the module.
     @param monitor_config: The monitor configuration object.
     @param monitor_sample_interval: The default to use for the sample interval.
+    @param monitor_debug_level: The debug level to use for logging.
     """
     scalyr_logging.set_log_destination(use_stdout=True)
+    scalyr_logging.set_log_level(monitor_debug_level)
+
+    log.log(scalyr_logging.DEBUG_LEVEL_1, 'Attempting to run module %s', monitor_module)
 
     try:
         parsed_config = json_lib.parse(monitor_config)
+        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Parsed configuration successfully')
     except json_lib.JsonParseException, e:
         print >>sys.stderr, 'Failed to parse the monitor configuration as valid JSON: %s', str(e)
         return 1
@@ -87,8 +95,10 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
 
     try:
         monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path)
+        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Constructed monitor')
         monitor.set_sample_interval(float(monitor_sample_interval))
         monitor.open_metric_log()
+        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting monitor')
         monitor.start()
 
         while monitor.is_alive():
@@ -106,6 +116,11 @@ if __name__ == '__main__':
     parser.add_option("-c", "--monitor-config", dest="monitor_config",
                       help="The JSON object to use for the monitor configuration, excluding the 'module' field",
                       default="{}")
+    parser.add_option("-d", "--debug-level", dest="debug_level",
+                      help="The Scalyr debug level to use for emitting debug output.  This will be sent to stdout. "
+                           "This should be a number between 0 and 5, corresponding to DEBUG_LEVEL_0 .. DEBUG_LEVEL_5 "
+                           "defined in scalyr_logging",
+                      default=0)
     parser.add_option("-s", "--monitor-sample-interval", dest="monitor_sample_interval",
                       help="The number of seconds between calls to the monitor's gather_sample method.",
                       metavar="INTERVAL", default=5)
@@ -116,5 +131,17 @@ if __name__ == '__main__':
         parser.print_help(sys.stderr)
         sys.exit(1)
 
+    try:
+        my_debug_level = int(options.debug_level)
+        if my_debug_level < 0 or my_debug_level > 5:
+            raise ValueError('Out of range')
+    except ValueError:
+        print >>sys.stderr, ('Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 ' %
+                             str(options.debug_level))
+        sys.exit(1)
+
+    debug_levels = [scalyr_logging.DEBUG_LEVEL_0, scalyr_logging.DEBUG_LEVEL_1, scalyr_logging.DEBUG_LEVEL_2,
+                    scalyr_logging.DEBUG_LEVEL_3, scalyr_logging.DEBUG_LEVEL_4, scalyr_logging.DEBUG_LEVEL_5]
+
     sys.exit(run_standalone_monitor(args[0], options.monitor_python_path, options.monitor_config,
-                                    options.monitor_sample_interval))
+                                    options.monitor_sample_interval, debug_levels[my_debug_level]))
