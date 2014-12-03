@@ -1121,9 +1121,15 @@ class BadMetricOrFieldName(Exception):
                            'and underscores.' % metric_or_field_name)
 
 
+# A sentinel value used to indicate an argument was not specified.  We do not use None to indicate
+# NOT_GIVEN since the argument's value may be None.
+__NOT_GIVEN__ = {}
+
+
 class UnsupportedValueType(Exception):
     """Exception raised when an MetricValueLogger is asked to emit a metric with an unsupported type."""
-    def __init__(self, metric_name=None, metric_value=None, field_name=None, field_value=None):
+    def __init__(self, metric_name=__NOT_GIVEN__, metric_value=__NOT_GIVEN__, field_name=__NOT_GIVEN__,
+                 field_value=__NOT_GIVEN__):
         """Constructs an exception.
 
         There are several different modes of operation for this exception.  If only metric_name or field_name
@@ -1136,17 +1142,17 @@ class UnsupportedValueType(Exception):
         self.field_name = field_name
         self.field_value = field_value
 
-        if metric_name is not None and metric_value is None:
+        if metric_name is not __NOT_GIVEN__ and metric_value is __NOT_GIVEN__:
             message = ('An unsupported type for a metric name was given.  It must be either str or unicode, but was'
                        '"%s".  This was for metric "%s"' % (str(type(metric_name)), str(metric_name)))
-        elif field_name is not None and field_value is None:
+        elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
             message = ('An unsupported type for a field name was given.  It must be either str or unicode, but was'
                        '"%s".  This was for field "%s"' % (str(type(field_name)), str(field_name)))
-        elif metric_name is not None and metric_value is not None:
+        elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
             message = ('Unsupported metric value type of "%s" with value "%s" for metric="%s".'
                        'Only int, long, float, and str are supported.' % (str(type(metric_value)), str(metric_value),
                                                                           metric_name))
-        elif field_name is not None and field_value is not None:
+        elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = ('Unsupported field value type of "%s" with value "%s" for field="%s".'
                        'Only int, long, float, and str are supported.' % (str(type(field_value)), str(field_value),
                                                                           field_name))
