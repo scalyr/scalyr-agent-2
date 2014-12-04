@@ -174,7 +174,9 @@ def _gather_metric(method, attribute=None):
 
     def gather_metric(process):
         """Dynamically Generated """
-        assert type(process) is psutil.Process, "Only the 'psutil.Process' interface is supported currently"
+        errmsg = "Only the 'psutil.Process' interface is supported currently; not {}".format
+        proc_type = type(process)
+        assert proc_type is psutil.Process, errmsg(proc_type)
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
         return attribute and attrgetter(attribute)(metric(process)) or metric(process)
 
@@ -532,13 +534,18 @@ class ProcessMonitor(ScalyrMonitor):
 
             applog.info("Enumerating and emitting metrics")
             for idx, metric in enumerate(METRICS):
+
+                if not self.__process:
+                    break
+
                 metric_name = metric.config['metric_name']
                 metric_value = metric.dispatch(self.__process)
                 applog.debug('Sampled %s at %s', metric_name, metric_value)
                 self._logger.emit_value(
                     metric_name,
                     metric_value,
-                    **metric.config['extra_fields']
+                    #**metric.config['extra_fields']
+                    extra_fields=metric.config['extra_fields']
                 )
             applog.debug('Sampling complete (Iteration %s)', sample_id)
         except NoSuchProcess:
@@ -555,7 +562,7 @@ def create_application_logger(name=None, level=scalyr_logging.DEBUG_LEVEL_0, par
     if not name:
         name = "{}.application".format(__name__)
     logger = parent and parent.getChild(name) or scalyr_logging.getLogger(name)
-    logger.set_log_level(level)
+    #logger.set_log_level(level)
 
     #slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
     scalyr_logging.set_log_destination(use_stdout=True)
@@ -572,12 +579,13 @@ def create_commandline_parser(**parser_config):
     )
     # todo: Left-off here....
 
+applog = create_application_logger()
+
 if __name__ == "__main__":
     parser = create_parser()
     options, command = parser.parse_args()
     
 
-    logger = create_application_logger()
 
     MSG = "** Log Level Active **"
     applog.critical(MSG)
