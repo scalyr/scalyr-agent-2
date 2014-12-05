@@ -480,32 +480,6 @@ _DISK_IO_METRICS = [
     # TODO: Additional attributes for this section
     #  * ...
 ]
-
-section_template = """
-# =================================================================================
-# ========================    {section_title}     ===============================
-# =================================================================================
-_{section_title}_METRICS = [
-
-    METRIC( ## ------------------    {metric_title}    ----------------------------
-        METRIC_CONFIG(
-            metric_name     = '{module}.{group}',
-            description     = '{description}',
-            category        = '{category}',
-            unit            = '{unit}',
-            cumulative      = {cumulative},
-            extra_fields    = {
-                'type': '{extra_fields[type]]}'
-                }
-        ),
-        GATHER_METRIC('{dispatch[method]}', '{dispatch[attribute]}')
-    ),
-
-    # TODO: Additional attributes for this section
-    #  * ...
-]
-"""
-
 # pylint: enable=bad-whitespace
 
 METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS
