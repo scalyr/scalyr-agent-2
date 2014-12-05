@@ -67,9 +67,8 @@ else:
 
 
 
-
 import psutil
-from psutil import process_iter, Process
+
 
 
 #
@@ -252,32 +251,235 @@ _UPTIME_METRICS = [
     #  * ...
 ]
 
+# =================================================================================
+# ========================    Virtual Memory    ===============================
+# =================================================================================
+_VIRTUAL_MEMORY_METRICS = [
 
-"""
-define_metric(__monitor__, 'proc.stat.intr:',
-              'The number of interrupts since boot.', cumulative=True, category='general')
-define_metric(__monitor__, 'proc.stat.ctxt',
-              'The number of context switches since boot.', cumulative=True, category='general')
-define_metric(__monitor__, 'proc.stat.processes',
-              'The number of processes created since boot.', cumulative=True, category='general')
-define_metric(__monitor__, 'proc.stat.procs_blocked',
-              'The number of processes currently blocked on I/O.', cumulative=True, category='general')
-define_metric(__monitor__, 'proc.loadavg.1m',
-              'The load average over 1 minute.', category='general')
-define_metric(__monitor__, 'proc.loadavg.5m',
-              'The load average over 5 minutes.', category='general')
-define_metric(__monitor__, 'proc.loadavg.15m',
-              'The load average over 15 minutes.', category='general')
-define_metric(__monitor__, 'proc.loadavg.runnable',
-              'The number of runnable threads/processes.', category='general')
-define_metric(__monitor__, 'proc.loadavg.total_threads',
-              'The total number of threads/processes.', category='general')
-define_metric(__monitor__, 'proc.kernel.entropy_avail',
-              'The number of bits of entropy that can be read without blocking from /dev/random', unit='bits',
-              category='general')
-define_metric(__monitor__, 'proc.uptime.total',
-              'The total number of seconds since boot.', cumulative=True, category='general')
-"""
+    METRIC( ## ------------------    Total Virtual Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.virtual',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'total',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'total')
+    ),
+    METRIC( ## ------------------    Used Virtual Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.virtual',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'used',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'used')
+    ),
+    METRIC( ## ------------------    Free Virtual Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.virtual',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'free',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'free')
+    ),
+
+
+    # TODO: Additional attributes for this section
+    #  * ...
+]
+
+# =================================================================================
+# ========================    Physical Memory    ===============================
+# =================================================================================
+_PHYSICAL_MEMORY_METRICS = [
+
+    METRIC( ## ------------------    Total Physical Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.physical',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'total',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'total')
+    ),
+    METRIC( ## ------------------    Used Physical Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.physical',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'used',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'used')
+    ),
+    METRIC( ## ------------------    Free Physical Memory    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'memory.physical',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            #cumulative      = {cumulative},
+            extra_fields    = {
+                'type': 'free',
+                }
+        ),
+        GATHER_METRIC('virtual_memory', 'free')
+    ),
+
+
+    # TODO: Additional attributes for this section
+    #  * ...
+]
+
+
+# =================================================================================
+# ========================    Network IO Counters   ===============================
+# =================================================================================
+_NETWORK_IO_METRICS = [
+
+    METRIC( ## ------------------   Bytes Sent  ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'network.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'sent',
+                }
+        ),
+        GATHER_METRIC('network_io_counters', 'bytes_sent')
+    ),
+    METRIC( ## ------------------   Bytes Recv  ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'network.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'recv',
+                }
+        ),
+        GATHER_METRIC('network_io_counters', 'bytes_recv')
+    ),
+    METRIC( ## ------------------   Packets Sent  ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'network.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'packets',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'sent',
+                }
+        ),
+        GATHER_METRIC('network_io_counters', 'packets_sent')
+    ),
+    METRIC( ## ------------------   Packets Recv  ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'network.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'packets',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'recv',
+                }
+        ),
+        GATHER_METRIC('network_io_counters', 'packets_recv')
+    ),
+
+
+    # TODO: Additional attributes for this section
+    #  * dropped packets in/out
+    #  * error packets in/out
+    #  * various interfaces
+]
+
+
+# =================================================================================
+# ========================     Disk IO Counters     ===============================
+# =================================================================================
+_DISK_IO_METRICS = [
+
+    METRIC( ## ------------------   Disk Bytes Read    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'disk.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+                }
+        ),
+        GATHER_METRIC('disk_io_counters', 'read_bytes')
+    ),
+    METRIC( ## ------------------  Disk Bytes Written  ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'disk.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'bytes',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'write'
+                }
+        ),
+        GATHER_METRIC('disk_io_counters', 'write_bytes')
+    ),
+    METRIC( ## ------------------   Disk Read Count    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'disk.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'count',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'read'
+                }
+        ),
+        GATHER_METRIC('disk_io_counters', 'read_count')
+    ),
+    METRIC( ## ------------------   Disk Write Count    ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'disk.io',
+            description     = '{description}',
+            category        = 'general',
+            unit            = 'count',
+            cumulative      = True,
+            extra_fields    = {
+                'type': 'write'
+                }
+        ),
+        GATHER_METRIC('disk_io_counters', 'write_count')
+    ),
+
+
+    # TODO: Additional attributes for this section
+    #  * ...
+]
 
 section_template = """
 # =================================================================================
@@ -306,8 +508,7 @@ _{section_title}_METRICS = [
 
 # pylint: enable=bad-whitespace
 
-#METRICS = _PROCESS_CPU_METRICS + _PROCESS_ATTRIBUTE_METRICS + _PROCESS_MEMORY_METRICS + _PROCESS_DISK_IO_METRICS
-METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS
+METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS
 _ = [define_metric(__monitor__, **metric.config) for metric in METRICS]     # pylint: disable=star-args
 
 
@@ -328,18 +529,14 @@ define_log_field(__monitor__, 'value', 'The metric value.')
 import itertools
 
 class SystemMonitor(ScalyrMonitor):
-    """Windows Process Metrics"""
+    """Windows System Metrics"""
 
     def __init__(self, config, logger, **kwargs):
-    #def __init__(self, *args, **kwargs):
-    #    config = kwargs.get('monitor_config', '{}')
-    #    logger = kwargs.get('metrics_logger', None)
         sampling_rate = kwargs.get('sampling_rate', 30)
         super(SystemMonitor, self).__init__(config, logger, sampling_rate)
         self.__debug = {
             'counter': itertools.count()
         }
-        self.__process = None
 
 
     def gather_sample(self):
