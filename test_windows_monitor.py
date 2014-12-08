@@ -12,10 +12,10 @@ test_cmdline = [
 cmdline = sys.argv[1:] or test_cmdline
 parser = run_monitor.create_parser()
 options, args = parser.parse_args(cmdline)
-print '-' * 78
-print options
-print args
-print '-' * 78
+#print '-' * 78
+#print options
+#print args
+#print '-' * 78
 
 rc = -1
 sys.exit( 

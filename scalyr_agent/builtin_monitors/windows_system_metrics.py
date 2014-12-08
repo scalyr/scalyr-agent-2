@@ -38,6 +38,7 @@ __monitor__ = __name__
 
 
 import sys
+import itertools
 
 try:
     import scalyr_agent
@@ -68,7 +69,6 @@ else:
 
 
 import psutil
-
 
 
 #
@@ -135,8 +135,6 @@ def _gather_metric(method, attribute=None):
 
     def gather_metric():
         """Dynamically Generated """
-
-        #assert type(process) is psutil.Process, "Only the 'psutil.Process' interface is supported currently; not {}".format(type(process))
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
         return attribute and attrgetter(attribute)(metric(psutil)) or metric(psutil)
 
@@ -179,6 +177,10 @@ except ImportError:
 METRIC_CONFIG = dict    # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
+
+def partion_disk_usage():
+    partitions = [p.mountpoint for p in psutil.disk_partitions()]
+    return psutil.disk_usage(partion)
 
 # pylint: disable=bad-whitespace
 # =================================================================================
@@ -359,52 +361,56 @@ _NETWORK_IO_METRICS = [
 
     METRIC( ## ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io',
+            metric_name     = 'network.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             cumulative      = True,
             extra_fields    = {
-                'type': 'sent',
+                'direction': 'sent',
+                'iface': ''
                 }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_sent')
     ),
     METRIC( ## ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io',
+            metric_name     = 'network.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             cumulative      = True,
             extra_fields    = {
-                'type': 'recv',
+                'direction': 'recv',
+                'iface': ''
                 }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_recv')
     ),
     METRIC( ## ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io',
+            metric_name     = 'network.io.packets',
             description     = '{description}',
             category        = 'general',
             unit            = 'packets',
             cumulative      = True,
             extra_fields    = {
-                'type': 'sent',
+                'direction': 'sent',
+                'iface': ''
                 }
         ),
         GATHER_METRIC('network_io_counters', 'packets_sent')
     ),
     METRIC( ## ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io',
+            metric_name     = 'network.io.packets',
             description     = '{description}',
             category        = 'general',
             unit            = 'packets',
             cumulative      = True,
             extra_fields    = {
-                'type': 'recv',
+                'direction': 'recv',
+                'iface': ''
                 }
         ),
         GATHER_METRIC('network_io_counters', 'packets_recv')
@@ -480,6 +486,21 @@ _DISK_IO_METRICS = [
     # TODO: Additional attributes for this section
     #  * ...
 ]
+
+# TODO: Add Disk Usage per partion
+
+#_DISK_USAGE_METRIC = [
+#    METRIC(
+#        METRIC_CONFIG(
+#            metric_name     = 'disk.usage',
+#            description     = '{description}',
+#            category        = 'general',
+#            unit            = 'bytes',
+#            cumulative      = True,
+#        )
+#    ),
+#    GATHER_METRIC('partion_disk_usage', 'c://')
+#]
 # pylint: enable=bad-whitespace
 
 METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS
@@ -500,7 +521,6 @@ define_log_field(__monitor__, 'value', 'The metric value.')
 
 
 
-import itertools
 
 class SystemMonitor(ScalyrMonitor):
     """Windows System Metrics"""
@@ -523,16 +543,8 @@ class SystemMonitor(ScalyrMonitor):
                 "Enumerating and emitting {} metrics".format(len(METRICS))
             )
             for idx, metric in enumerate(METRICS):
-                #print '-' * 70
-                #print idx, metric
-
                 metric_name = metric.config['metric_name']
                 metric_value = metric.dispatch()
-
-                #print metric_name
-                #print metric_value
-                #print '-' * 70
-
                 logmsg = "Sampled %s at %s %d-%d".format
                 applog.debug(logmsg(metric_name, metric_value, sample_id, idx))
                 self._logger.emit_value(
