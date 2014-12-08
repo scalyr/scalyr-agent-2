@@ -180,6 +180,7 @@ def _gather_metric(method, attribute=None):
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
         return attribute and attrgetter(attribute)(metric(process)) or metric(process)
 
+    # XXX: For some reason this was causing trouble for the documentation build process
     #gather_metric.__doc__ = doc(method, attribute)
     return gather_metric
 
@@ -247,6 +248,7 @@ _PROCESS_ATTRIBUTE_METRICS = [
             category        = 'attributes',
             unit            = 'milliseconds',
             cumulative      = True,
+            extra_fields    = {}
         ),
         GATHER_METRIC('create_time')
     ),
@@ -254,7 +256,8 @@ _PROCESS_ATTRIBUTE_METRICS = [
         METRIC_CONFIG(
             metric_name     = 'winproc.threads',
             description     = 'The number of threads being used by the process.',
-            category        = 'attributes'
+            category        = 'attributes',
+            extra_fields    = {}
         ),
         GATHER_METRIC('num_threads')
     ),
@@ -495,44 +498,35 @@ class ProcessMonitor(ScalyrMonitor):
     """Windows Process Metrics"""
 
     def __init__(self, monitor_config, logger, **kw):
+        """TODO: Function documentation
+        """
+
         sample_interval_secs = kw.get('sample_interval_secs', 30)
         super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
         self.__process = None
 
-        applog.info('%s instantiated', self.__class__)
-        self.__debug = {
-           'counter': itertools.count()
-        }
-
     def _select_target_process(self):
-        applog.debug('Selecting target process from config %s', str(self._config))
-
+        """TODO: Function documentation
+        """
         process = None
         if 'commandline' in self._config:
-            applog.info('Using commandlline string matching to select target process')
             matcher = commandline_matcher(self._config['commandline'])
             matching_process_iterator = matcher(process_iter())
             process = matching_process_iterator.next()
         elif 'pid' in self._config:
-            applog.info('Using pid to select target process')
             if '$$' == self._config.get('pid'):
                 pid = os.getpid()
             else:
                 pid = self._config.get('pid')
             process = psutil.Process(int(pid))
 
-        applog.info('Target process selected for monitoring: %s', process)
         self.__process = process
 
     def gather_sample(self):
-        counter = self.__debug['counter']
-        sample_id = counter.next()
-        applog.debug('Sampling metrics (Iteration %03d)', sample_id)
-
+        """TODO: Function documentation
+        """
         try:
             self._select_target_process()
-
-            applog.info("Enumerating and emitting metrics")
             for idx, metric in enumerate(METRICS):
 
                 if not self.__process:
@@ -540,59 +534,10 @@ class ProcessMonitor(ScalyrMonitor):
 
                 metric_name = metric.config['metric_name']
                 metric_value = metric.dispatch(self.__process)
-                applog.debug('Sampled %s at %s', metric_name, metric_value)
                 self._logger.emit_value(
                     metric_name,
                     metric_value,
-                    #**metric.config['extra_fields']
                     extra_fields=metric.config['extra_fields']
                 )
-            applog.debug('Sampling complete (Iteration %s)', sample_id)
         except NoSuchProcess:
             self.__process = None
-
-
-def create_application_logger(name=None, level=scalyr_logging.DEBUG_LEVEL_0, parent=None, **config):
-    """Configure a logging interface for the monitor plugin module to use.
-    
-    The monitor, separate from emitting it's metrics, needs to communicate it's health, activities,
-    and journalling unexpected or repeated errors.
-
-    """
-    if not name:
-        name = "{}.application".format(__name__)
-    logger = parent and parent.getChild(name) or scalyr_logging.getLogger(name)
-    #logger.set_log_level(level)
-
-    #slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
-    scalyr_logging.set_log_destination(use_stdout=True)
-    return logger
-
-
-
-import argparse
-def create_commandline_parser(**parser_config):
-    parser = argparse.ArgumentParser(**parser_config)
-    parser.add_argument('-c', '--config', 
-        dest='monitor_config', default='{pid:$$}', type=str, 
-        help='A json object, as a string, that defines the process to monitor and sample metrics',
-    )
-    # todo: Left-off here....
-
-applog = create_application_logger()
-
-if __name__ == "__main__":
-    parser = create_parser()
-    options, command = parser.parse_args()
-    
-
-
-    MSG = "** Log Level Active **"
-    applog.critical(MSG)
-    applog.warn(MSG)
-    applog.info(MSG)
-    applog.debug(MSG)
-    applog.info('Module loading...')
-
-
-
