@@ -12,7 +12,7 @@ plugin development cycle.
     $ python -m scalyr_agent.run_monitor -p /path/to/scalyr_agent/builtin_monitors
 
 # Credits & License
-Author: Supermassive Blackhole '<OnTheEdge@TheEventHorizon.com>'
+Author: Scott Sullivan '<guy.hoozdis@gmail.com>'
 License: Apache 2.0
 
 ------------------------------------------------------------------------
@@ -32,7 +32,7 @@ limitations under the License.
 ------------------------------------------------------------------------
 """
 
-__author__ = "Supermassive Blackhole '<OnTheEdge@TheEventHorizon.com>'"
+__author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
 
@@ -107,7 +107,7 @@ CONFIG_OPTIONS = [
 ]
 
 _ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] # pylint: disable=star-args
-## End Monitor Configuration
+# # End Monitor Configuration
 # #########################################################################################
 
 
@@ -115,7 +115,7 @@ _ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] #
 
 # #########################################################################################
 # #########################################################################################
-# ## Process's Metrics / Dimensions -
+# ## System Metrics / Dimensions -
 # ##
 # ##    Metrics define the capibilities of this monitor.  These some utility functions
 # ##    along with the list(s) of metrics themselves.
@@ -136,9 +136,29 @@ def _gather_metric(method, attribute=None):
     def gather_metric():
         """Dynamically Generated """
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
-        return attribute and attrgetter(attribute)(metric(psutil)) or metric(psutil)
+        value = metric(psutil)
+        if attribute:
+            value = attrgetter(attribute)(value)
+        yield value
 
     gather_metric.__doc__ = doc(method, attribute)
+    return gather_metric
+
+
+def partion_disk_usage():
+    mountpoints = [p.mountpoint for p in psutil.disk_partitions()]
+    def gather_metric():
+        for mountpoint in mountpoints:
+            diskusage = None
+            try:
+                diskusage = psutil.disk_usage(mountpoint)
+            except OSError:
+                # Certain partitions, like a CD/DVD drive, are expected to fail
+                pass
+            else:
+                yield "{}={}%".format(mountpoint, diskusage.percent)
+
+    gather_metric.__doc__ = "TODO"
     return gather_metric
 
 
@@ -177,10 +197,6 @@ except ImportError:
 METRIC_CONFIG = dict    # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
-
-def partion_disk_usage():
-    partitions = [p.mountpoint for p in psutil.disk_partitions()]
-    return psutil.disk_usage(partion)
 
 # pylint: disable=bad-whitespace
 # =================================================================================
@@ -267,7 +283,7 @@ _VIRTUAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'total',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'total')
     ),
@@ -280,7 +296,7 @@ _VIRTUAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'used',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'used')
     ),
@@ -293,7 +309,7 @@ _VIRTUAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'free',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'free')
     ),
@@ -317,7 +333,7 @@ _PHYSICAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'total',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'total')
     ),
@@ -330,7 +346,7 @@ _PHYSICAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'used',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'used')
     ),
@@ -343,7 +359,7 @@ _PHYSICAL_MEMORY_METRICS = [
             #cumulative      = {cumulative},
             extra_fields    = {
                 'type': 'free',
-                }
+            }
         ),
         GATHER_METRIC('virtual_memory', 'free')
     ),
@@ -369,7 +385,7 @@ _NETWORK_IO_METRICS = [
             extra_fields    = {
                 'direction': 'sent',
                 'iface': ''
-                }
+            }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_sent')
     ),
@@ -383,7 +399,7 @@ _NETWORK_IO_METRICS = [
             extra_fields    = {
                 'direction': 'recv',
                 'iface': ''
-                }
+            }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_recv')
     ),
@@ -397,7 +413,7 @@ _NETWORK_IO_METRICS = [
             extra_fields    = {
                 'direction': 'sent',
                 'iface': ''
-                }
+            }
         ),
         GATHER_METRIC('network_io_counters', 'packets_sent')
     ),
@@ -411,7 +427,7 @@ _NETWORK_IO_METRICS = [
             extra_fields    = {
                 'direction': 'recv',
                 'iface': ''
-                }
+            }
         ),
         GATHER_METRIC('network_io_counters', 'packets_recv')
     ),
@@ -438,7 +454,7 @@ _DISK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'type': 'read'
-                }
+            }
         ),
         GATHER_METRIC('disk_io_counters', 'read_bytes')
     ),
@@ -451,7 +467,7 @@ _DISK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'type': 'write'
-                }
+            }
         ),
         GATHER_METRIC('disk_io_counters', 'write_bytes')
     ),
@@ -464,7 +480,7 @@ _DISK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'type': 'read'
-                }
+            }
         ),
         GATHER_METRIC('disk_io_counters', 'read_count')
     ),
@@ -477,7 +493,7 @@ _DISK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'type': 'write'
-                }
+            }
         ),
         GATHER_METRIC('disk_io_counters', 'write_count')
     ),
@@ -489,21 +505,22 @@ _DISK_IO_METRICS = [
 
 # TODO: Add Disk Usage per partion
 
-#_DISK_USAGE_METRIC = [
-#    METRIC(
-#        METRIC_CONFIG(
-#            metric_name     = 'disk.usage',
-#            description     = '{description}',
-#            category        = 'general',
-#            unit            = 'bytes',
-#            cumulative      = True,
-#        )
-#    ),
-#    GATHER_METRIC('partion_disk_usage', 'c://')
-#]
+_DISK_USAGE_METRICS = [
+    METRIC(
+        METRIC_CONFIG(
+            metric_name     = 'disk.usage',
+            description     = 'Disk usage percentage for each partition',
+            category        = 'general',
+            unit            = 'percent',
+            cumulative      = True,
+            extra_fields    = {}
+        ),
+        partion_disk_usage()
+    ),
+]
 # pylint: enable=bad-whitespace
 
-METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS
+METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS + _DISK_USAGE_METRICS
 _ = [define_metric(__monitor__, **metric.config) for metric in METRICS]     # pylint: disable=star-args
 
 
@@ -526,69 +543,28 @@ class SystemMonitor(ScalyrMonitor):
     """Windows System Metrics"""
 
     def __init__(self, config, logger, **kwargs):
+        """TODO: Fucntion documentation
+        """
         sampling_rate = kwargs.get('sampling_rate', 30)
         super(SystemMonitor, self).__init__(config, logger, sampling_rate)
-        self.__debug = {
-            'counter': itertools.count()
-        }
 
 
     def gather_sample(self):
-        counter = self.__debug['counter']
-        sample_id = counter.next()
-        applog.debug('Sampling metrics (Iteration %03d)', sample_id)
-
+        """TODO: Fucntion documentation
+        """
         try:
-            applog.info(
-                "Enumerating and emitting {} metrics".format(len(METRICS))
-            )
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config['metric_name']
-                metric_value = metric.dispatch()
                 logmsg = "Sampled %s at %s %d-%d".format
-                applog.debug(logmsg(metric_name, metric_value, sample_id, idx))
-                self._logger.emit_value(
-                    metric_name,
-                    metric_value,
-                    extra_fields=metric.config['extra_fields']
-                )
-            applog.debug('Sampling complete (Iteration %s)', sample_id)
+                for metric_value in metric.dispatch():
+                    self._logger.emit_value(
+                        metric_name,
+                        metric_value,
+                        extra_fields=metric.config['extra_fields']
+                    )
         except:
             self.__process = None
             exc_type, exc_value, traceback = sys.exc_info()
             print exc_type, exc_value
             import traceback
             traceback.print_exc()
-
-
-def create_application_logger(name=None, level=scalyr_logging.DEBUG_LEVEL_0, parent=None, **config):
-    """Configure a logging interface for the monitor plugin module to use.
-
-    The monitor, separate from emitting it's metrics, needs to communicate it's health, activities,
-    and journalling unexpected or repeated errors.
-
-    """
-    if not name:
-        name = "{}.application".format(__name__)
-    logger = parent and parent.getChild(name) or scalyr_logging.getLogger(name)
-    scalyr_logging.set_log_level(level)
-
-    #slc = collections.defaultdict(lambda k: '<Uninitialized>', use_stdout=True, use_disk=False, )
-    scalyr_logging.set_log_destination(use_stdout=True)
-    return logger
-
-
-
-
-applog = create_application_logger()  # pylint: disable=invalid-name
-
-if __name__ == "__main__":
-    parser = create_commandline_parser()        # pylint: disable=invalid-name
-    options, command = parser.parse_args()      # pylint: disable=invalid-name
-
-    MSG = "** Log Level Active **"
-    applog.critical(MSG)
-    applog.warn(MSG)
-    applog.info(MSG)
-    applog.debug(MSG)
-    applog.info('Module loading...')
