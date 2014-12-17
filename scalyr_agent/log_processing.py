@@ -1615,6 +1615,9 @@ class LogMatcher(object):
                 if 'logfile' not in log_attributes and 'filename' not in log_attributes:
                     log_attributes['logfile'] = matched_file
 
+                # Add in a unique threadId to tie all records for this logfile together.
+                log_attributes['threadId'] = LogMatcher.generate_unique_thread_id()
+
                 # Create the processor to handle this log.
                 new_processor = LogFileProcessor(matched_file, log_attributes, checkpoint=checkpoint_state)
                 for rule in self.__log_entry_config['redaction_rules']:
@@ -1655,6 +1658,23 @@ class LogMatcher(object):
             if not processor.is_closed():
                 new_list.append(processor)
         self.__processors = new_list
+
+    # Variables used to implement the static method ``generate_unique_thread_id``.
+    __thread_id_lock = threading.Lock()
+    __thread_id_counter = 0
+
+    @staticmethod
+    def generate_unique_thread_id():
+        """Generates and returns a unique thread id that has not been issued before by this agent.
+
+        @rtype: str
+        """
+        LogMatcher.__thread_id_lock.acquire()
+        LogMatcher.__thread_id_counter += 1
+        new_id = LogMatcher.__thread_id_counter
+        LogMatcher.__thread_id_lock.release()
+
+        return 'log_%d' % new_id
 
 
 class FileSystem(object):

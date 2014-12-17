@@ -22,7 +22,7 @@ import shutil
 import tempfile
 import unittest
 
-from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
+from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor, LogMatcher
 from scalyr_agent.log_processing import FileSystem
 
 
@@ -772,6 +772,16 @@ class TestLogFileProcessor(unittest.TestCase):
 
         def total_events(self):
             return len(self.events)
+
+
+class TestLogMatcher(unittest.TestCase):
+    def test_unique_id(self):
+        first_thread_id = LogMatcher.generate_unique_thread_id()
+        self.assertTrue(first_thread_id.startswith('log_'))
+        sequence = int(first_thread_id[4:])
+        self.assertTrue(sequence > 0)
+        self.assertEquals(first_thread_id, 'log_%d' % sequence)
+        self.assertEquals(LogMatcher.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
 
 if __name__ == '__main__':
     unittest.main()

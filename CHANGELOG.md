@@ -16,6 +16,7 @@ New features:
 Bug fixes:
 
 * Fix false warning message about file contents disappearing.
+* Assign a unique thread id for each log file being copied to mimic old agent's behavior.
 
 ## 2.0.2 "Bashful Bovine" - Oct 31, 2014
 
