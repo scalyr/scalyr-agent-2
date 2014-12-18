@@ -31,13 +31,16 @@ class AddEventsRequestTest(unittest.TestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
+        self.assertEquals(request.total_events, 0)
+
         self.assertTrue(request.add_event({'name': 'eventOne'}, timestamp=1L))
         self.assertTrue(request.add_event({'name': 'eventTwo'}, timestamp=2L))
 
         self.assertEquals(
             request.get_payload(),
             """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"},{"name":"eventTwo","ts":"2"}]"""
-            """, client_time: 1 }""")
+            """, threads: [], client_time: 1 }""")
+        self.assertEquals(request.total_events, 2)
         request.close()
 
     def test_multiple_calls_to_get_payload(self):
@@ -50,15 +53,48 @@ class AddEventsRequestTest(unittest.TestCase):
         self.assertEquals(request.get_payload(), request.get_payload())
         request.close()
 
+    def test_add_thread(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(1)
+
+        self.assertEquals(request.total_events, 0)
+
+        self.assertTrue(request.add_event({'name': 'eventOne'}, timestamp=1L))
+        self.assertTrue(request.add_thread('t1', 'n1'))
+        self.assertTrue(request.add_event({'name': 'eventTwo'}, timestamp=2L))
+        self.assertTrue(request.add_thread('t2', 'n2'))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"},{"name":"eventTwo","ts":"2"}]"""
+            """, threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""")
+
+        self.assertEquals(request.total_events, 2)
+        request.close()
+
     def test_maximum_bytes_exceeded(self):
-        request = AddEventsRequest(self.__body, max_size=90)
+        request = AddEventsRequest(self.__body, max_size=103)
         request.set_client_time(1)
 
         self.assertTrue(request.add_event({'name': 'eventOne'}, timestamp=1L))
         self.assertFalse(request.add_event({'name': 'eventTwo'}, timestamp=2L))
 
-        self.assertEquals(request.get_payload(),
-                          """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"}], client_time: 1 }""")
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"}], threads: [], client_time: 1 }""")
+        request.close()
+
+    def test_maximum_bytes_exceeded_from_threads(self):
+        request = AddEventsRequest(self.__body, max_size=100)
+        request.set_client_time(1)
+
+        self.assertTrue(request.add_thread("t1", "name1"))
+        self.assertFalse(request.add_thread("t2", "name2"))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [], threads: [{"id":"t1","name":"name1"}], client_time: 1 }""")
+
         request.close()
 
     def test_set_position(self):
@@ -73,7 +109,26 @@ class AddEventsRequestTest(unittest.TestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{"name":"eventThree","ts":"3"}], client_time: 1 }""")
+            """{"token":"fakeToken", events: [{"name":"eventThree","ts":"3"}], threads: [], client_time: 1 }""")
+
+        request.close()
+
+    def test_set_position_with_thread(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(1)
+        position = request.position()
+        request.add_thread('log1', 'Hi there')
+        self.assertTrue(request.add_event({'name': 'eventOne'}, timestamp=1L))
+        self.assertTrue(request.add_event({'name': 'eventTwo'}, timestamp=2L))
+
+        request.set_position(position)
+        self.assertTrue(request.add_thread('log2', 'Log two'))
+        self.assertTrue(request.add_event({'name': 'eventThree'}, timestamp=3L))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{"name":"eventThree","ts":"3"}], """
+            """threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""")
 
         request.close()
 
@@ -87,11 +142,11 @@ class AddEventsRequestTest(unittest.TestCase):
         self.assertEquals(
             request.get_payload(),
             """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"},{"name":"eventTwo","ts":"2"}]"""
-            """, client_time: 100 }""")
+            """, threads: [], client_time: 100 }""")
 
         request.set_client_time(2)
         self.assertEquals(
             request.get_payload(),
             """{"token":"fakeToken", events: [{"name":"eventOne","ts":"1"},{"name":"eventTwo","ts":"2"}]"""
-            """, client_time: 2 }""")
+            """, threads: [], client_time: 2 }""")
         request.close()
