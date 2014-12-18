@@ -483,7 +483,7 @@ class Configuration(object):
         if not os.access(directory_path, os.R_OK):
             return result
 
-        for f in os.listdir(directory_path):
+        for f in sorted(os.listdir(directory_path)):
             if f.endswith('.json'):
                 full_path = os.path.join(directory_path, f)
                 if os.path.isfile(full_path):
