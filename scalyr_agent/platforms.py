@@ -17,14 +17,16 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-from scalyr_agent.platform_linux import LinuxPlatformController
-from scalyr_agent.platform_posix import PosixPlatformController
+#from scalyr_agent.platform_linux import LinuxPlatformController
+#from scalyr_agent.platform_posix import PosixPlatformController
+from scalyr_agent.platform_windows import WindowsPlatformController
 from scalyr_agent.platform_controller import PlatformController
 
 
 def register_supported_platforms():
     """Register the PlatformControllers for all platforms supported by this server.
     """
-    PlatformController.register_platform(LinuxPlatformController)
+    #PlatformController.register_platform(LinuxPlatformController)
     # TODO: Do not register the POSIX platform for Windows when Windows is supported.
-    PlatformController.register_platform(PosixPlatformController)
+    #PlatformController.register_platform(PosixPlatformController)
+    PlatformController.register_platform(WindowsPlatformController)
