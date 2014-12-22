@@ -252,7 +252,7 @@ class ScalyrAgent(object):
         @rtype: int
         """
         # First, see if we have to change the user that is executing this script to match the owner of the config.
-        running_user = os.geteuid()
+        #running_user = os.geteuid()
         desired_user = os.stat(self.__config.file_path).st_uid
         # We set no_change_user is a safety flag to avoid recursion.. if we believe we started a new process that
         # is running as the right user, do not do it again if that is not the case.
