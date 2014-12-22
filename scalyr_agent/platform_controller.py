@@ -198,7 +198,9 @@ class PlatformController:
         This method must return once the agent service has been started.
 
         @param agent_run_method: The method to invoke to actually run the agent service.  This method takes one
-            argument, the reference to this controller.
+            argument, the reference to this controller.  Note, if your platform implementation cannot use this
+            function pointer (because the service is running in a separate address space and cannot be passed this
+            pointer), then instead of invoking this method, you may invoke ScalyrAgent.agent_run_method instead.
         @param quiet: True if only error messages should be printed to stdout, stderr.
 
         @type agent_run_method: func(PlatformController)

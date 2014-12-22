@@ -462,13 +462,16 @@ class AddEventsRequest(object):
         string_buffer.write(', events: [')
 
         # The string that must be append after all of the events to terminate the JSON.  We will
-        # later replace TIMESTAMP with the real timestamp.
-        self.__post_fix = '], client_time: TIMESTAMP }'
+        # later replace TIMESTAMP with the real timestamp and replace THREADS with the serialized threads array.
+        self.__post_fix = '], threads: THREADS, client_time: TIMESTAMP }'
 
         # The time that will be sent as the 'client_time' parameter for the addEvents request.
         # This may be later updated using the set_client_time method in the case where the same AddEventsRequest
         # is being reused to send the events again.
         self.__client_time = time.time()
+
+        # Holds a list of dicts, one for each thread added so far.
+        self.__threads = []
 
         self.__buffer = string_buffer
         self.__max_size = max_size
@@ -478,6 +481,37 @@ class AddEventsRequest(object):
 
         # If we have finished serializing the body, it is stored here until the close() method is invoked.
         self.__body = None
+
+    def add_thread(self, thread_id, thread_name):
+        """Registers the specified thread for this AddEvents request.
+
+        Any thread id mentioned in any event in this request should first be registered here.
+
+        @param thread_id: An id for the thread.  This can then be used as the value for a ``thread`` field
+            in the ``event`` object passed to ``add_event``.  Should be unique for this session.
+        @param thread_name: A human-readable name for the thread
+
+        @type thread_id: str
+        @type thread_name: str
+
+        @return: True if there was the allowed bytes to send were not exceeded by adding this thread to the
+            request.
+        @rtype: bool
+        """
+        # Have to account for the extra space this will use when serialized.  For now, we do a little heavy weight
+        # thing and just size how big the post fix size is compared to the old size.
+        original_size = len(self.__get_post_fix(self.__client_time))
+
+        self.__threads.append({"id": thread_id, "name": thread_name})
+
+        added_size = len(self.__get_post_fix(self.__client_time)) - original_size
+
+        if self.__current_size + added_size > self.__max_size:
+            self.__threads.pop()
+            return False
+
+        self.__current_size += added_size
+        return True
 
     def add_event(self, event, timestamp=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
@@ -573,7 +607,8 @@ class AddEventsRequest(object):
 
         @return: The post fix string, including the client time parameter.
         """
-        return self.__post_fix.replace('TIMESTAMP', str(int(client_time)))
+        tmp = self.__post_fix.replace('TIMESTAMP', str(int(client_time)))
+        return tmp.replace('THREADS', json_lib.serialize(self.__threads))
 
     def __get_timestamp(self):
         """
@@ -588,11 +623,17 @@ class AddEventsRequest(object):
         __last_time_stamp__ = base_timestamp
         return base_timestamp
 
+    @property
+    def total_events(self):
+        """Returns the total number of events that will be sent in this batch."""
+        return self.__events_added
+
     def position(self):
         """Returns a position such that if it is passed to 'set_position', all events added since this method was
         invoked are removed."""
 
-        return AddEventsRequest.Position(self.__current_size, self.__events_added, self.__buffer.tell())
+        return AddEventsRequest.Position(self.__current_size, self.__events_added, self.__buffer.tell(),
+                                         len(self.__threads))
 
     def set_position(self, position):
         """Reverts this object to only contain the events contained by the object when position was invoked to
@@ -603,14 +644,17 @@ class AddEventsRequest(object):
         self.__current_size = position.current_size
         self.__events_added = position.events_added
         self.__buffer.truncate(position.buffer_size)
+        assert position.thread_count <= len(self.__threads)
+        self.__threads = self.__threads[0:position.thread_count]
 
     class Position(object):
         """Represents a position in the added events.
         """
-        def __init__(self, current_size, events_added, buffer_size):
+        def __init__(self, current_size, events_added, buffer_size, thread_count):
             self.current_size = current_size
             self.events_added = events_added
             self.buffer_size = buffer_size
+            self.thread_count = thread_count
 
 # The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically
 # increasing so we track it in a global var.

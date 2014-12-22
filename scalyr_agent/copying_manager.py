@@ -561,9 +561,15 @@ class CopyingManager(StoppableThread):
 
         @return: The result of sending the request.  It is a tuple of the status message, the number of
             bytes sent, and the actual response itself.
-        @rtype: (str, int, dict)
+        @rtype: (str, int, str)
         """
+        # TODO: Re-enable not actually sending an event if it is empty.  However, if we turn this on, it
+        # currently causes too much error output and the client connection closes too frequently.  We need to
+        # actually send some sort of application level keep alive.
+        #if add_events_task.add_events_request.total_events > 0:
         return self.__scalyr_client.send(add_events_task.add_events_request)
+        #else:
+        #    return "success", 0, "{ status: \"success\", message: \"RPC not sent to server because it was empty\"}"
 
     def __scan_for_new_logs_if_necessary(self, current_time=None, checkpoints=None, logs_initial_positions=None,
                                          copy_at_index_zero=False):

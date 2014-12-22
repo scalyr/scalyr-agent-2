@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.3 "Capricious Cat" - Nov 30, 2014
+## 2.0.3 "Capricious Cat" - Dec 18, 2014
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 30, 2014 12:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 18, 2014 14:45 -0800
 --->
-
-This release is under active development, so the release date and feature set is TBD.
 
 New features:
 
@@ -16,6 +14,7 @@ New features:
 Bug fixes:
 
 * Fix false warning message about file contents disappearing.
+* Assign a unique thread id for each log file being copied to mimic old agent's behavior.
 
 ## 2.0.2 "Bashful Bovine" - Oct 31, 2014
 

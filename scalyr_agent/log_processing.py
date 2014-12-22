@@ -984,6 +984,15 @@ class LogFileProcessor(object):
             log_attributes = {}
 
         self.__path = file_path
+        # To mimic the behavior of the old agent which would use the ``thread_id`` feature of the Scalyr API to
+        # group all events from the same log file together, we associate a thread_id (and thread_name) for each
+        # LogFileProcessors.  We really should fix this at some point because thread_ids do not persist across sessions
+        # which will mean all the vents from a single logical log file will not be put together (when an agent restart
+        # happens).  However, this is how the old agent worked and the UI relies on it, so we just keep the old system
+        # going for now.
+        self.__thread_name = 'Lines for file %s' % file_path
+        self.__thread_id = LogFileProcessor.generate_unique_thread_id()
+
         self.__log_file_iterator = LogFileIterator(file_path, file_system=file_system, checkpoint=checkpoint)
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
@@ -1131,39 +1140,42 @@ class LogFileProcessor(object):
 
             buffer_filled = False
 
-            while True:
-                position = self.__log_file_iterator.tell()
+            # Try to add the thread id and thread name for this processor.  If it succeeds, then add events.
+            if add_events_request.add_thread(self.__thread_id, self.__thread_name):
+                # Keep looping, add more events until there are no more or there is no more room.
+                while True:
+                    position = self.__log_file_iterator.tell()
 
-                line = self.__log_file_iterator.readline(current_time=current_time)
+                    line = self.__log_file_iterator.readline(current_time=current_time)
 
-                # This means we hit the end of the file, or at least there is not a new line yet available.
-                if len(line) == 0:
-                    break
-
-                # We have a line, process it and see what comes out.
-                bytes_read += len(line)
-                lines_read += 1L
-
-                sample_result = self.__sampler.process_line(line)
-                if sample_result is None:
-                    lines_dropped_by_sampling += 1L
-                    bytes_dropped_by_sampling += len(line)
-                    continue
-
-                (line, redacted) = self.__redacter.process_line(line)
-
-                if len(line) > 0:
-                    # Try to add the line to the request, but it will let us know if it exceeds the limit it can
-                    # send.
-                    if not add_events_request.add_event(self.__create_events_object(line, sample_result)):
-                        self.__log_file_iterator.seek(position)
-                        buffer_filled = True
+                    # This means we hit the end of the file, or at least there is not a new line yet available.
+                    if len(line) == 0:
                         break
 
-                if redacted:
-                    total_redactions += 1L
-                bytes_copied += len(line)
-                lines_copied += 1
+                    # We have a line, process it and see what comes out.
+                    bytes_read += len(line)
+                    lines_read += 1L
+
+                    sample_result = self.__sampler.process_line(line)
+                    if sample_result is None:
+                        lines_dropped_by_sampling += 1L
+                        bytes_dropped_by_sampling += len(line)
+                        continue
+
+                    (line, redacted) = self.__redacter.process_line(line)
+
+                    if len(line) > 0:
+                        # Try to add the line to the request, but it will let us know if it exceeds the limit it can
+                        # send.
+                        if not add_events_request.add_event(self.__create_events_object(line, sample_result)):
+                            self.__log_file_iterator.seek(position)
+                            buffer_filled = True
+                            break
+
+                    if redacted:
+                        total_redactions += 1L
+                    bytes_copied += len(line)
+                    lines_copied += 1
 
             final_position = self.__log_file_iterator.tell()
 
@@ -1301,6 +1313,7 @@ class LogFileProcessor(object):
         if sampling_rate != 1.0:
             attrs['sample_rate'] = sampling_rate
         return {
+            'thread': self.__thread_id,
             'attrs': attrs,
         }
 
@@ -1334,6 +1347,23 @@ class LogFileProcessor(object):
         """
         return LogFileIterator.create_checkpoint(initial_position)
 
+    # Variables used to implement the static method ``generate_unique_thread_id``.
+    __thread_id_lock = threading.Lock()
+    __thread_id_counter = 0
+
+    @staticmethod
+    def generate_unique_thread_id():
+        """Generates and returns a unique thread id that has not been issued before by this agent.
+
+        This is used to assign a unique thread id to all events coming from a single LogFileProcessor instance.
+        @rtype: str
+        """
+        LogFileProcessor.__thread_id_lock.acquire()
+        LogFileProcessor.__thread_id_counter += 1
+        new_id = LogFileProcessor.__thread_id_counter
+        LogFileProcessor.__thread_id_lock.release()
+
+        return 'log_%d' % new_id
 
 class LogLineSampler(object):
     """Encapsulates all of the configured sampling rules to perform on lines from a single log file.

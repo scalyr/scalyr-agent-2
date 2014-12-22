@@ -130,6 +130,35 @@ class ScalyrAgent(object):
         # A reference to the remote shell debug server.
         self.__debug_server = None
 
+    @staticmethod
+    def agent_run_method(controller, config_file_path):
+        """Begins executing the agent service on the current thread.
+
+        This will not return until the service is requested to terminate.
+
+        This method can be used as an entry point by PlatformControllers that cannot invoke the ``agent_run_method``
+        argument passed in the ``start_agent_service`` method.  It immediately because execution of the service.
+
+        @param controller: The controller to use to run the service.
+        @param config_file_path: The path to the configuration file to use.
+
+        @type controller: PlatformController
+        @type config_file_path: str
+
+        @return: The return code when the agent exits.
+        @rtype: int
+        """
+        class Options(object):
+            pass
+
+        my_options = Options()
+        my_options.quiet = True
+        my_options.verbose = False
+        my_options.no_fork = True
+        my_options.no_change_user = True
+
+        return ScalyrAgent(controller).main(config_file_path, 'inner_run', my_options)
+
     def main(self, config_file_path, command, command_options):
         """Run the Scalyr Agent.
 
@@ -170,6 +199,8 @@ class ScalyrAgent(object):
             # Execute the command.
             if command == 'start':
                 return self.__start(quiet, no_fork, no_change_user)
+            elif command == 'inner_run':
+                return self.__run(self.__controller)
             elif command == 'stop':
                 return self.__stop(quiet)
             elif command == 'status' and not verbose:

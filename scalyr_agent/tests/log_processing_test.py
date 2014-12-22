@@ -595,6 +595,8 @@ class TestLogFileProcessor(unittest.TestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
+        self.assertEquals(len(events.threads), 1)
+
         status = log_processor.generate_status()
         self.assertEquals(23L, status.total_bytes_pending)
         self.assertEquals(0L, status.total_bytes_copied)
@@ -736,6 +738,14 @@ class TestLogFileProcessor(unittest.TestCase):
         self.assertEquals('scalyr-1', events.events[0]['attrs']['host'])
         self.assertEquals('scalyr-1', events.events[1]['attrs']['host'])
 
+    def test_unique_id(self):
+        first_thread_id = LogFileProcessor.generate_unique_thread_id()
+        self.assertTrue(first_thread_id.startswith('log_'))
+        sequence = int(first_thread_id[4:])
+        self.assertTrue(sequence > 0)
+        self.assertEquals(first_thread_id, 'log_%d' % sequence)
+        self.assertEquals(LogFileProcessor.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'w')
@@ -752,6 +762,7 @@ class TestLogFileProcessor(unittest.TestCase):
         def __init__(self, limit=10):
             self.events = []
             self.__limit = limit
+            self.threads = {}
 
         def add_event(self, event):
             if len(self.events) < self.__limit:
@@ -765,6 +776,10 @@ class TestLogFileProcessor(unittest.TestCase):
 
         def set_position(self, position):
             self.events = self.events[0:position]
+
+        def add_thread(self, thread_id, thread_name):
+            self.threads[thread_id] = thread_name
+            return True
 
         def get_message(self, index):
             """Returns the message field from an events object."""
