@@ -36,6 +36,8 @@ from os import path
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
+import py2exe
+
 here = path.dirname(determine_file_path())
 
 # Get the long description from the relevant file
@@ -119,4 +121,5 @@ setup(
     #        'sample=sample:main',
     #    ],
     #},
+    console=['scalyr-agent-2.py'],
 )
