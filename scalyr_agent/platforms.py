@@ -19,7 +19,8 @@ __author__ = 'czerwin@scalyr.com'
 
 #from scalyr_agent.platform_linux import LinuxPlatformController
 #from scalyr_agent.platform_posix import PosixPlatformController
-from scalyr_agent.platform_windows import WindowsPlatformController
+#from scalyr_agent.platform_windows import WindowsPlatformController
+from scalyr_agent.ScalyrAgentService import WindowsPlatformController
 from scalyr_agent.platform_controller import PlatformController
 
 
