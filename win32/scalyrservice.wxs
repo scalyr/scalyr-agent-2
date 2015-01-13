@@ -1,6 +1,6 @@
 <?xml version='1.0'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-    <Product Id='*' Name='Scalyr Agent 2' Version='2.0.4' 
+    <Product Id='*' Name='Scalyr Agent 2' Version='2.0.3' 
         Language='1033' UpgradeCode='3240D803-FD4A-4A29-8493-783A1F920C67' Manufacturer='Scalyr' >
 
         <Package Description='Scalyr Agent Service' Manufacturer='Scalyr' InstallerVersion='200'
