@@ -1,0 +1,141 @@
+<?xml version='1.0'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product Id='*' Name='Scalyr Agent 2' Version='2.0.4' 
+        Language='1033' UpgradeCode='3240D803-FD4A-4A29-8493-783A1F920C67' Manufacturer='Scalyr' >
+
+        <Package Description='Scalyr Agent Service' Manufacturer='Scalyr' InstallerVersion='200'
+            Comments='Scalyr Agent Service for Windows Platforms' Compressed='yes' />
+        <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+        <!-- Define directory structure -->
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='ProgramFilesFolder' >
+                <Directory Id='APPLICATIONROOTDIRECTORY' Name='Scalyr' >
+                    <Directory Id='APPLICATIONCERTS' Name='certs' />
+                    <Directory Id='DEFAULTAPPLOGS' Name='log' />
+                    <Directory Id='DEFAULTAPPLIBS' Name='lib' />
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='Scalyr' />
+            </Directory>
+        </Directory>
+
+        <!-- Define files within directory structure -->
+        <DirectoryRef Id='APPLICATIONCERTS'>
+            <Component Id='ca_certs.crt' Guid='*'>
+                <File Id='ca_certs.crt' Source='certs\ca_certs.crt' KeyPath='yes' Checksum='yes' />
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
+            <Component Id='ScalyrAgent2' Guid='8A883043-D54B-4392-9D25-9F3B51A40671' >
+
+                <!-- Scalyr Data -->
+                <File Id='VERSION' Name='VERSION' DiskId='1' Source='VERSION' />
+                <File Id='LICENSE' Name='LICENSE.txt' DiskId='1' Source='LICENSE.txt' />
+                <File Id='config.tmpl' Name='config.tmpl' Source='config\agent.json' />
+                <!-- TODO: Remove the next line... for debugging only -->
+                <!-- <File Id='agent.json' Name='agent.json' Source='config\agent.json' /> -->
+
+                <!-- Scalyr Executables -->
+                <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='dist\scalyr-agent-2.exe' />
+                <File Id='ScalyrAgentService' Name='ScalyrAgentService.exe' DiskId='1' Source='dist\ScalyrAgentService.exe' />
+                <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='win32\ScalyrShell.cmd' />
+
+                <!-- Supporting Binary Modules -->
+                <File Id='API_MS_Win_Core_DelayLoad' Name='API-MS-Win-Core-DelayLoad-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-DelayLoad-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_ErrorHandling' Name='API-MS-Win-Core-ErrorHandling-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-ErrorHandling-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_File' Name='API-MS-Win-Core-File-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-File-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_Handle' Name='API-MS-Win-Core-Handle-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-Handle-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_Heap' Name='API-MS-Win-Core-Heap-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-Heap-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_IO' Name='API-MS-Win-Core-IO-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-IO-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_LibraryLoader' Name='API-MS-Win-Core-LibraryLoader-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-LibraryLoader-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_LocalRegistry' Name='API-MS-Win-Core-LocalRegistry-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-LocalRegistry-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_Misc' Name='API-MS-Win-Core-Misc-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-Misc-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_ProcessThreads' Name='API-MS-Win-Core-ProcessThreads-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-ProcessThreads-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_Profile' Name='API-MS-Win-Core-Profile-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-Profile-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_String' Name='API-MS-Win-Core-String-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-String-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_Synch' Name='API-MS-Win-Core-Synch-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-Synch-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_SysInfo' Name='API-MS-Win-Core-SysInfo-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-SysInfo-L1-1-0.dll' />
+                <File Id='API_MS_Win_Core_ThreadPool' Name='API-MS-Win-Core-ThreadPool-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Core-ThreadPool-L1-1-0.dll' />
+                <File Id='API_MS_Win_Security_Base' Name='API-MS-Win-Security-Base-L1-1-0.dll'
+                    DiskId='1' Source='dist\API-MS-Win-Security-Base-L1-1-0.dll' />
+
+                <!-- -->
+                <File Id='CFGMGR32' Name='CFGMGR32.dll' DiskId='1' Source='dist\CFGMGR32.dll' />
+                <File Id='DEVOBJ' Name='DEVOBJ.dll' DiskId='1' Source='dist\DEVOBJ.dll' />
+                <File Id='IPHLPAPI' Name='IPHLPAPI.dll' DiskId='1' Source='dist\IPHLPAPI.dll' />
+                <File Id='KERNELBASE' Name='KERNELBASE.dll' DiskId='1' Source='dist\KERNELBASE.dll' />
+                <File Id='MPR' Name='MPR.dll' DiskId='1' Source='dist\MPR.dll' />
+                <File Id='NSI' Name='NSI.dll' DiskId='1' Source='dist\NSI.dll' />
+                <File Id='POWRPROF' Name='POWRPROF.dll' DiskId='1' Source='dist\POWRPROF.dll' />
+                <File Id='PSAPI' Name='PSAPI.dll' DiskId='1' Source='dist\PSAPI.dll' />
+                <File Id='python27' Name='python27.dll' DiskId='1' Source='dist\python27.dll' />
+                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId='1' Source='dist\pywintypes27.dll' />
+                <File Id='SETUPAPI' Name='SETUPAPI.dll' DiskId='1' Source='dist\SETUPAPI.dll' />
+                <File Id='WINNSI' Name='WINNSI.dll' DiskId='1' Source='dist\WINNSI.dll' />
+                <File Id='WTSAPI32' Name='WTSAPI32.dll' DiskId='1' Source='dist\WTSAPI32.dll' />
+
+                <!-- Compiled Python modules -->
+                <File Id='bz2' Name='bz2.pyd' DiskId='1' Source='dist\bz2.pyd' />
+                <File Id='perfmon' Name='perfmon.pyd' DiskId='1' Source='dist\perfmon.pyd' />
+                <File Id='pyexpat' Name='pyexpat.pyd' DiskId='1' Source='dist\pyexpat.pyd' />
+                <File Id='select' Name='select.pyd' DiskId='1' Source='dist\select.pyd' />
+                <File Id='servicemanager' Name='servicemanager.pyd' DiskId='1' Source='dist\servicemanager.pyd' />
+                <File Id='unicodedata' Name='unicodedata.pyd' DiskId='1' Source='dist\unicodedata.pyd' />
+                <File Id='win32api' Name='win32api.pyd' DiskId='1' Source='dist\win32api.pyd' />
+                <File Id='win32event' Name='win32event.pyd' DiskId='1' Source='dist\win32event.pyd' />
+                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId='1' Source='dist\win32evtlog.pyd' />
+                <File Id='win32pipe' Name='win32pipe.pyd' DiskId='1' Source='dist\win32pipe.pyd' />
+                <File Id='win32service' Name='win32service.pyd' DiskId='1' Source='dist\win32service.pyd' />
+                <File Id='win32wnet' Name='win32wnet.pyd' DiskId='1' Source='dist\win32wnet.pyd' />
+                <File Id='_ctypes' Name='_ctypes.pyd' DiskId='1' Source='dist\_ctypes.pyd' />
+                <File Id='_hashlib' Name='_hashlib.pyd' DiskId='1' Source='dist\_hashlib.pyd' />
+                <File Id='_psutil_windows' Name='_psutil_windows.pyd' DiskId='1' Source='dist\_psutil_windows.pyd' />
+                <File Id='_socket' Name='_socket.pyd' DiskId='1' Source='dist\_socket.pyd' />
+                <File Id='_ssl' Name='_ssl.pyd' DiskId='1' Source='dist\_ssl.pyd' />
+                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId='1' Source='dist\_win32sysloader.pyd' />
+
+                <!-- Uncompiled Python modules -->
+                <File Id='library' Name='library.zip' DiskId='1' Source='dist\library.zip' />
+            </Component>
+        </DirectoryRef>
+
+        <!-- -->
+        <DirectoryRef Id='ApplicationProgramsFolder'>
+            <Component Id='ApplicationShortcut' Guid='*'>
+                <Shortcut Id='ApplicationStartMenuShortcut' Name='Scalyr Agent 2' Description='Scalyr Agent 2 Command Shell'
+                    Target='[#ScalyrShell]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall' />
+                <RegistryValue Root='HKCU' Key='Software\Scalyr\ScalyrAgent2'
+                    Name='installed' Type='integer' Value='1' KeyPath='yes' />
+            </Component>
+        </DirectoryRef>
+
+
+        <!-- -->
+        <Feature Id='ScalyrApplication' Title='Scalyr Application' Level='1'>
+            <ComponentRef Id='ScalyrAgent2' />
+            <ComponentRef Id='ApplicationShortcut' />
+            <ComponentRef Id='ca_certs.crt' />
+        </Feature>
+    </Product>
+</Wix>
