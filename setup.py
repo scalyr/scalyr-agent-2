@@ -37,7 +37,7 @@ from os import path
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
 import sys
-if "win32" == sys.platform
+if "win32" == sys.platform:
     import py2exe
 
 here = path.dirname(determine_file_path())
