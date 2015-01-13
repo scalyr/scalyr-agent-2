@@ -36,7 +36,9 @@ from os import path
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
-import py2exe
+import sys
+if "win32" == sys.platform
+    import py2exe
 
 here = path.dirname(determine_file_path())
 
@@ -57,11 +59,6 @@ service_config = Target(
     cmdline_style = 'pywin32',
 )
 
-service_config2 = Target(
-    description = 'A second service for testing',
-    modules = ['scalyr_agent.SullyService'],
-    cmdline_style = 'pywin32',
-)
 
 setup(
     name='scalyr-agent-2',
@@ -140,6 +137,6 @@ setup(
     #        'sample=sample:main',
     #    ],
     #},
-    console=['scalyr-agent-2.py'],
+    console=[path.join('scalyr_agent', 'scalyr-agent-2.py')],
     service=[service_config],
 )
