@@ -9,6 +9,7 @@ from scalyr_agent.platform_windows import ScalyrAgentService
 
 from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
 
+
 if __name__ == '__main__':
     my_controller = PlatformController.new_platform()
     parser = create_commandline_parser()
@@ -27,6 +28,9 @@ if __name__ == '__main__':
         sys.exit(1)
     elif  args[0].lower() in ('install', 'remove', 'debug'):
         sys.exit(win32serviceutil.HandleCommandLine(ScalyrAgentService))
+    elif args[0].lower() in ('update'):
+        #sys.exit(update_product())
+        raise NotImplementedError, "Functionality not yet implemented"
     elif args[0] not in ('start', 'stop', 'status', 'restart', 'condrestart', 'version'):
         print >> sys.stderr, 'Unknown command given: "%s"' % args[0]
         parser.print_help(sys.stderr)
