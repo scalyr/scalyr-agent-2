@@ -16,7 +16,7 @@ SET BuildDir=build\install
 SET BuildLog=%BuildDir%\build.log
 SET PATH=%WIX%\bin;%PATH%
 SET /P VERSION=<VERSION
-
+SET /P UPGRADECODE=<win32\UPGRADECODE
 
 :Clean
 ECHO [*] Cleaning intermediate and installer output file(s)
@@ -64,7 +64,7 @@ IF NOT EXIST %BuildDir% MKDIR %BuildDir%
 
 :BuildInstall
 ECHO [*] Compile installation package contents
-candle -nologo -out %BuildDir%\%ProductName%.wixobj win32\%ProductName%.wxs >%BuildLog%
+candle -nologo -out %BuildDir%\%ProductName%.wixobj -dVERSION=%VERSION% -dUPGRADECODE=%UPGRADECODE% win32\%ProductName%.wxs >%BuildLog%
 IF %ERRORLEVEL% GTR 0 (
     ECHO [-] Failed to compile package
     TYPE %BuildLog%

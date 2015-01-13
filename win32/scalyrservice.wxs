@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-    <Product Id='*' Name='Scalyr Agent 2' Version='2.0.3' 
-        Language='1033' UpgradeCode='3240D803-FD4A-4A29-8493-783A1F920C67' Manufacturer='Scalyr' >
+    <Product Id='*' Name='Scalyr Agent 2' Version='$(var.VERSION)'
+        Language='1033' UpgradeCode='$(var.UPGRADECODE)' Manufacturer='Scalyr' >
 
         <Package Description='Scalyr Agent Service' Manufacturer='Scalyr' InstallerVersion='200'
             Comments='Scalyr Agent Service for Windows Platforms' Compressed='yes' />
@@ -37,8 +37,6 @@
                 <File Id='VERSION' Name='VERSION' DiskId='1' Source='VERSION' />
                 <File Id='LICENSE' Name='LICENSE.txt' DiskId='1' Source='LICENSE.txt' />
                 <File Id='config.tmpl' Name='config.tmpl' Source='config\agent.json' />
-                <!-- TODO: Remove the next line... for debugging only -->
-                <!-- <File Id='agent.json' Name='agent.json' Source='config\agent.json' /> -->
 
                 <!-- Scalyr Executables -->
                 <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='dist\scalyr-agent-2.exe' />
@@ -119,11 +117,16 @@
             </Component>
         </DirectoryRef>
 
-        <!-- -->
+
+        <!-- Application Menu Shortcuts -->
         <DirectoryRef Id='ApplicationProgramsFolder'>
             <Component Id='ApplicationShortcut' Guid='*'>
                 <Shortcut Id='ApplicationStartMenuShortcut' Name='Scalyr Agent 2' Description='Scalyr Agent 2 Command Shell'
                     Target='[#ScalyrShell]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
+                    Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
+                <Shortcut Id='ApplicationLogs' Name='logs' Description='Default application logs folder'
+                    Target='[WindowsFolder]explorer.exe' Arguments='[ApplicationProgramsFolder]log' />
                 <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall' />
                 <RegistryValue Root='HKCU' Key='Software\Scalyr\ScalyrAgent2'
                     Name='installed' Type='integer' Value='1' KeyPath='yes' />
