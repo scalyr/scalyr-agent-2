@@ -34,10 +34,15 @@ import tempfile
 import traceback
 
 from distutils import spawn
-from pwd import getpwnam
+if 'win32' != sys.platform:
+    from pwd import getpwnam
 from optparse import OptionParser
 
-from __scalyr__ import scalyr_init, determine_file_path
+try:
+    from __scalyr__ import scalyr_init, determine_file_path
+except ImportError:
+    from scalyr_agent.__scalyr__ import scalyr_init, determine_file_path
+
 
 scalyr_init()
 

@@ -30,6 +30,7 @@
             </Component>
         </DirectoryRef>
 
+        <!-- Scalyr Application Files -->
         <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
             <Component Id='ScalyrAgent2' Guid='8A883043-D54B-4392-9D25-9F3B51A40671' >
 
@@ -41,6 +42,7 @@
                 <!-- Scalyr Executables -->
                 <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='dist\scalyr-agent-2.exe' />
                 <File Id='ScalyrAgentService' Name='ScalyrAgentService.exe' DiskId='1' Source='dist\ScalyrAgentService.exe' />
+                <File Id='scalyr_agent_2_config' Name='scalyr-agent-2-config.exe' DiskId='1' Source='dist\config_main.exe' />
                 <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='win32\ScalyrShell.cmd' />
 
                 <!-- Supporting Binary Modules -->

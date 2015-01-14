@@ -137,6 +137,9 @@ setup(
     #        'sample=sample:main',
     #    ],
     #},
-    console=[path.join('scalyr_agent', 'scalyr-agent-2.py')],
+    console=[
+        path.join('scalyr_agent', 'scalyr-agent-2.py'),
+        path.join('scalyr_agent', 'config_main.py'),
+    ],
     service=[service_config],
 )
