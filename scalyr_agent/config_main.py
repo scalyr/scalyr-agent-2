@@ -34,10 +34,11 @@ import tempfile
 import traceback
 
 from distutils import spawn
-if 'win32' != sys.platform:
-    from pwd import getpwnam
 from optparse import OptionParser
 
+# TODO: The following two imports have been modified to facilitate Windows platforms
+if 'win32' != sys.platform:
+    from pwd import getpwnam
 try:
     from __scalyr__ import scalyr_init, determine_file_path
 except ImportError:
@@ -356,6 +357,10 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     # For now, we do not do anything.
     return 0
 
+def upgrade_windows_install(config_file):
+    print "upgrade windows install"
+
+    return 0
 
 # TODO:  This code is shared with build_package.py.  We should move this into a common
 # utility location both commands can import it from.
@@ -470,6 +475,13 @@ if __name__ == '__main__':
                       help="When performing a tarball upgrade, move the old install to a temporary directory "
                            "instead of deleting it.")
 
+    # TODO: This option is only available on Windows platforms
+    if 'win32' == sys.platform:
+        parser.add_option("", "--upgrade-windows", dest="upgrade_windows",
+            help='Upgrade the agent if a new version is available')
+
+
+
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print >> sys.stderr, 'Could not parse commandline arguments.'
@@ -519,4 +531,21 @@ if __name__ == '__main__':
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
+    if options.upgrade_windows:
+        # TODO: Improve the method for determining the installed agent_version
+        # This works on Windows platforms in a shell where the Scalyr Environment has been initialized.
+        agent_version = os.environ.get('ScalyrVersion')
+
+        # Determine if a newer version is available
+        client = ScalyrClientSession(
+                config_file.scalyr_server, 
+                config_file.api_key, 
+                agent_version)
+        response = client.get_latest_agent_version()
+        if response['update_required']:
+            print "A newer version is available"
+            sys.exit(upgrade_windows_install(config_file, response['url']))
+        else:
+            print "The latest version is already installed"
+        
     sys.exit(0)

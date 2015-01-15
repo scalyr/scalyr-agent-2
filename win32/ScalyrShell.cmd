@@ -51,9 +51,9 @@ IF %ERRORLEVEL% EQU 0 (GOTO StartShell) ELSE (
 :: 
 :: ----------------------------------------------------------------------
 :StartShell
-SET /P VERSION=<VERSION
+SET /P ScalyrVersion=<VERSION
 CLS
-ECHO Scalyr Agent 2 Shell [v%VERSION%]
+ECHO Scalyr Agent 2 Shell [v%ScalyrVersion%]
 ECHO ==================================
 ECHO.
 ECHO Examples:
