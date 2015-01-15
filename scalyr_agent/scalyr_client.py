@@ -408,7 +408,7 @@ class ScalyrClientSession(object):
         # TODO: Default response is hard-coded for now
         response = {
             'update_required': False,
-            'url': 'http://update.scalyr.com:8000/ScalyrService_2.0.5.msi'
+            'url': 'http://10.0.0.109:8000/ScalyrService_2.0.5.msi'
         }
 
         # TODO: A more robust version comparison should be done

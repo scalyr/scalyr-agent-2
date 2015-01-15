@@ -39,10 +39,14 @@ from optparse import OptionParser
 # TODO: The following two imports have been modified to facilitate Windows platforms
 if 'win32' != sys.platform:
     from pwd import getpwnam
+
 try:
     from __scalyr__ import scalyr_init, determine_file_path
 except ImportError:
     from scalyr_agent.__scalyr__ import scalyr_init, determine_file_path
+
+import urllib
+from scalyr_agent.scalyr_client import ScalyrClientSession
 
 
 scalyr_init()
@@ -357,9 +361,11 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     # For now, we do not do anything.
     return 0
 
-def upgrade_windows_install(config_file):
+def upgrade_windows_install(config_file, url):
     print "upgrade windows install"
-
+    print url
+    urllib.urlretrieve(url, 'update.msi')
+    run_command('msiexec.exe /i update.msi')
     return 0
 
 # TODO:  This code is shared with build_package.py.  We should move this into a common
@@ -477,7 +483,7 @@ if __name__ == '__main__':
 
     # TODO: This option is only available on Windows platforms
     if 'win32' == sys.platform:
-        parser.add_option("", "--upgrade-windows", dest="upgrade_windows",
+        parser.add_option("", "--upgrade-windows", dest="upgrade_windows", action="store_true", default=False,
             help='Upgrade the agent if a new version is available')
 
 
@@ -543,8 +549,11 @@ if __name__ == '__main__':
                 agent_version)
         response = client.get_latest_agent_version()
         if response['update_required']:
+            url = response['url']
             print "A newer version is available"
-            sys.exit(upgrade_windows_install(config_file, response['url']))
+            print url
+            print '======================================================='
+            sys.exit(upgrade_windows_install(config_file, url))
         else:
             print "The latest version is already installed"
         
