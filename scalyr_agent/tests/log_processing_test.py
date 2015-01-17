@@ -746,6 +746,31 @@ class TestLogFileProcessor(unittest.TestCase):
         self.assertEquals(first_thread_id, 'log_%d' % sequence)
         self.assertEquals(LogFileProcessor.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
 
+    def test_thread_id_fails_to_be_added(self):
+        log_processor = self.log_processor
+        self.append_file(self.__path, 'First line\nSecond line\n')
+
+        # Make sure if adding the thread id in fails, then unread the lines and reset everything to normal.
+        # We can see if it is normal by making sure the lines are read in the next successful call.
+        events = TestLogFileProcessor.TestAddEventsRequest(thread_limit=0)
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals(0, events.total_events())
+        self.assertEquals(len(events.threads), 0)
+
+        # Now have a succuessful call and make sure we get the lines.
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals(2, events.total_events())
+        self.assertEquals(events.get_message(0), 'First line\n')
+        self.assertEquals(events.get_message(1), 'Second line\n')
+        self.assertEquals(len(events.threads), 1)
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'w')
@@ -759,9 +784,10 @@ class TestLogFileProcessor(unittest.TestCase):
         file_handle.close()
 
     class TestAddEventsRequest(object):
-        def __init__(self, limit=10):
+        def __init__(self, limit=10, thread_limit=10):
             self.events = []
             self.__limit = limit
+            self.__thread_limit = thread_limit
             self.threads = {}
 
         def add_event(self, event):
@@ -772,12 +798,15 @@ class TestLogFileProcessor(unittest.TestCase):
                 return False
 
         def position(self):
-            return len(self.events)
+            return [len(self.events), dict(self.threads)]
 
         def set_position(self, position):
-            self.events = self.events[0:position]
+            self.events = self.events[0:position[0]]
+            self.threads = position[1]
 
         def add_thread(self, thread_id, thread_name):
+            if self.__thread_limit == len(self.threads):
+                return False
             self.threads[thread_id] = thread_name
             return True
 

@@ -1139,43 +1139,54 @@ class LogFileProcessor(object):
             bytes_dropped_by_sampling = 0L
 
             buffer_filled = False
+            added_thread_id = False
 
-            # Try to add the thread id and thread name for this processor.  If it succeeds, then add events.
-            if add_events_request.add_thread(self.__thread_id, self.__thread_name):
-                # Keep looping, add more events until there are no more or there is no more room.
-                while True:
-                    position = self.__log_file_iterator.tell()
+            # Keep looping, add more events until there are no more or there is no more room.
+            while True:
+                position = self.__log_file_iterator.tell()
 
-                    line = self.__log_file_iterator.readline(current_time=current_time)
+                line = self.__log_file_iterator.readline(current_time=current_time)
 
-                    # This means we hit the end of the file, or at least there is not a new line yet available.
-                    if len(line) == 0:
+                # This means we hit the end of the file, or at least there is not a new line yet available.
+                if len(line) == 0:
+                    break
+
+                # We have a line, process it and see what comes out.
+                bytes_read += len(line)
+                lines_read += 1L
+
+                sample_result = self.__sampler.process_line(line)
+                if sample_result is None:
+                    lines_dropped_by_sampling += 1L
+                    bytes_dropped_by_sampling += len(line)
+                    continue
+
+                (line, redacted) = self.__redacter.process_line(line)
+
+                if len(line) > 0:
+                    # Try to add the line to the request, but it will let us know if it exceeds the limit it can
+                    # send.
+                    if not add_events_request.add_event(self.__create_events_object(line, sample_result)):
+                        self.__log_file_iterator.seek(position)
+                        buffer_filled = True
                         break
 
-                    # We have a line, process it and see what comes out.
-                    bytes_read += len(line)
-                    lines_read += 1L
-
-                    sample_result = self.__sampler.process_line(line)
-                    if sample_result is None:
-                        lines_dropped_by_sampling += 1L
-                        bytes_dropped_by_sampling += len(line)
-                        continue
-
-                    (line, redacted) = self.__redacter.process_line(line)
-
-                    if len(line) > 0:
-                        # Try to add the line to the request, but it will let us know if it exceeds the limit it can
-                        # send.
-                        if not add_events_request.add_event(self.__create_events_object(line, sample_result)):
+                    # Try to add the thread id if we have not done so far.  This should only be added once per file.
+                    if not added_thread_id:
+                        if not add_events_request.add_thread(self.__thread_id, self.__thread_name):
+                            # If we got here, it means we did not have enough room to add both the thread id
+                            # and the event into the events request.  So, we have to remove the event we just
+                            # added to the add_events_request by setting the position to the original.
+                            add_events_request.set_position(original_events_position)
                             self.__log_file_iterator.seek(position)
                             buffer_filled = True
                             break
+                        added_thread_id = True
 
-                    if redacted:
-                        total_redactions += 1L
-                    bytes_copied += len(line)
-                    lines_copied += 1
+                if redacted:
+                    total_redactions += 1L
+                bytes_copied += len(line)
+                lines_copied += 1
 
             final_position = self.__log_file_iterator.tell()
 
