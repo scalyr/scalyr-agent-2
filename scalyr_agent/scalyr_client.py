@@ -461,26 +461,31 @@ class AddEventsRequest(object):
         # Append the start of our events field.
         string_buffer.write(', events: [')
 
-        # The string that must be append after all of the events to terminate the JSON.  We will
-        # later replace TIMESTAMP with the real timestamp and replace THREADS with the serialized threads array.
-        self.__post_fix = '], threads: THREADS, client_time: TIMESTAMP }'
+        # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
+        # the request.  That includes both the threads JSON array and the client timestamp.
+        self.__post_fix_buffer = PostFixBuffer('], threads: THREADS, client_time: TIMESTAMP }')
 
         # The time that will be sent as the 'client_time' parameter for the addEvents request.
         # This may be later updated using the set_client_time method in the case where the same AddEventsRequest
         # is being reused to send the events again.
-        self.__client_time = time.time()
-
-        # Holds a list of dicts, one for each thread added so far.
-        self.__threads = []
+        self.__post_fix_buffer.set_client_timestamp(time.time())
 
         self.__buffer = string_buffer
         self.__max_size = max_size
-        self.__current_size = self.__buffer.tell() + len(self.__get_post_fix(self.__client_time))
 
         self.__events_added = 0
 
         # If we have finished serializing the body, it is stored here until the close() method is invoked.
         self.__body = None
+
+    @property
+    def __current_size(self):
+        """
+        @return: The number of bytes that will be used to send the current request.  This include both the bytes
+            from the events and the post fix.
+        @rtype: int
+        """
+        return self.__buffer.tell() + self.__post_fix_buffer.length
 
     def add_thread(self, thread_id, thread_name):
         """Registers the specified thread for this AddEvents request.
@@ -498,20 +503,11 @@ class AddEventsRequest(object):
             request.
         @rtype: bool
         """
-        # Have to account for the extra space this will use when serialized.  For now, we do a little heavy weight
-        # thing and just size how big the post fix size is compared to the old size.
-        original_size = len(self.__get_post_fix(self.__client_time))
-
-        self.__threads.append({"id": thread_id, "name": thread_name})
-
-        added_size = len(self.__get_post_fix(self.__client_time)) - original_size
-
-        if self.__current_size + added_size > self.__max_size:
-            self.__threads.pop()
-            return False
-
-        self.__current_size += added_size
-        return True
+        # Have to account for the extra space this will use when serialized.  See how much space we can allow for
+        # the post fix right now.
+        available_size_for_post_fix = self.__max_size - self.__buffer.tell()
+        return self.__post_fix_buffer.add_thread_entry(thread_id, thread_name,
+                                                       fail_if_buffer_exceeds=available_size_for_post_fix)
 
     def add_event(self, event, timestamp=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
@@ -537,14 +533,12 @@ class AddEventsRequest(object):
 
         event['ts'] = str(timestamp)
         json_lib.serialize(event, output=self.__buffer, use_fast_encoding=True)
-        size = self.__buffer.tell() - start_pos
 
         # Check if we exceeded the size, if so chop off what we just added.
-        if self.__current_size + size > self.__max_size:
+        if self.__current_size > self.__max_size:
             self.__buffer.truncate(start_pos)
             return False
 
-        self.__current_size += size
         self.__events_added += 1
         return True
 
@@ -561,23 +555,26 @@ class AddEventsRequest(object):
         @param current_time: The current time to include in the request.
         @type current_time: float
         """
+        # Get the current size of the postfix buffer since we may need it down below.  We need the length before
+        # the new timestamp was added.
+        original_postfix_length = self.__post_fix_buffer.length
+
+        self.__post_fix_buffer.set_client_timestamp(current_time)
+
         if self.__body is not None:
             # We have already cached the serialized JSON, so we need to update it to remain consistent.
-            old_post_fix = self.__get_post_fix(self.__client_time)
-            new_post_fix = self.__get_post_fix(current_time)
 
             # Create a buffer for the copying.  We write in the entire JSON and then just back up the length of
-            # the old postfix to then add in the new one.
+            # the old postfix and then add in the new one.
             rebuild_buffer = StringIO()
             rebuild_buffer.write(self.__body)
             self.__body = None
-            rebuild_buffer.seek(-1 * len(old_post_fix), os.SEEK_END)
+            rebuild_buffer.seek(-1 * original_postfix_length, os.SEEK_END)
             rebuild_buffer.truncate()
-            rebuild_buffer.write(new_post_fix)
+
+            rebuild_buffer.write(self.__post_fix_buffer.content())
             self.__body = rebuild_buffer.getvalue()
             rebuild_buffer.close()
-
-        self.__client_time = current_time
 
     def get_payload(self):
         """Returns the serialized JSON to use as the body for the add_request.
@@ -587,7 +584,7 @@ class AddEventsRequest(object):
         the client clock.
         """
         if self.__body is None:
-            self.__buffer.write(self.__get_post_fix(self.__client_time))
+            self.__buffer.write(self.__post_fix_buffer.content())
             self.__body = self.__buffer.getvalue()
             self.__buffer.close()
             self.__buffer = None
@@ -598,17 +595,6 @@ class AddEventsRequest(object):
         after this call.
         """
         self.__body = None
-
-    def __get_post_fix(self, client_time):
-        """Returns the string that should be appended after the events JSON array to complete the
-        JSON for the body.
-
-        @param client_time: The time in seconds past epoch to include in this request for the client time.
-
-        @return: The post fix string, including the client time parameter.
-        """
-        tmp = self.__post_fix.replace('TIMESTAMP', str(int(client_time)))
-        return tmp.replace('THREADS', json_lib.serialize(self.__threads))
 
     def __get_timestamp(self):
         """
@@ -632,8 +618,7 @@ class AddEventsRequest(object):
         """Returns a position such that if it is passed to 'set_position', all events added since this method was
         invoked are removed."""
 
-        return AddEventsRequest.Position(self.__current_size, self.__events_added, self.__buffer.tell(),
-                                         len(self.__threads))
+        return AddEventsRequest.Position(self.__events_added, self.__buffer.tell(), self.__post_fix_buffer.position)
 
     def set_position(self, position):
         """Reverts this object to only contain the events contained by the object when position was invoked to
@@ -641,20 +626,207 @@ class AddEventsRequest(object):
 
         @param position: The position token representing the previous state.
         """
-        self.__current_size = position.current_size
         self.__events_added = position.events_added
         self.__buffer.truncate(position.buffer_size)
-        assert position.thread_count <= len(self.__threads)
-        self.__threads = self.__threads[0:position.thread_count]
+        self.__post_fix_buffer.set_position(position.postfix_buffer_position)
 
     class Position(object):
         """Represents a position in the added events.
         """
-        def __init__(self, current_size, events_added, buffer_size, thread_count):
-            self.current_size = current_size
+        def __init__(self, events_added, buffer_size, postfix_buffer_position):
             self.events_added = events_added
             self.buffer_size = buffer_size
-            self.thread_count = thread_count
+            self.postfix_buffer_position = postfix_buffer_position
+
+
+# This is used down below by PostFixBuffer.
+def _calculate_per_thread_extra_bytes():
+    """Calculates how many extra bytes are added to the serialized form of the threads JSON array
+    when adding a new thread, excluding the bytes for serializing the thread id and name themselves.
+
+    This is used below by the PostFixBuffer abstraction to help calculate the number of bytes the serialized form
+    of the PostFixBuffer will take, without having to actually serialize it.  It was found that doing the heavy
+    weight process of serializing it over and over again to just get the size was eating too much CPU.
+
+    @return: An array of two int entries.  The first entry is how many extra bytes are added when adding the
+        first thread to the threads JSON array and the second is how many extra bytes are added for all subsequent
+        threads.  (The number differences by at least one due to the need for a comma to be inserted).
+    @rtype: [int]
+    """
+    # An array of the number of bytes used to serialize the array when there are N threads in it (where N is the
+    # index into size_by_entries).
+    sizes_by_entries = []
+
+    # Calculate sizes_by_entries by actually serialzing each case.
+    threads = []
+    test_string = 'A'
+    for i in range(3):
+        sizes_by_entries.append(len(json_lib.serialize(threads)))
+        # Add in another thread for the next round through the loop.
+        threads.append({'id': test_string, 'name': test_string})
+
+    # Now go back and calculate the deltas between the different cases.  We have to remember to subtract
+    # out the length due to the id and name strings.
+    test_string_len = len(json_lib.serialize(test_string))
+    result = []
+    for i in range(1, 3):
+        result.append(sizes_by_entries[i] - sizes_by_entries[i - 1] - 2 * test_string_len)
+
+    return result
+
+
+class PostFixBuffer(object):
+    """Buffer for the items that must be written after the events JSON array, which typically means
+    the client timestamp and the threads JSON array.
+
+    This abstraction has optimizations in place to more efficiency keep track of the number of bytes the
+    that will be used by the serialized form.
+
+    Additionally, the buffer can be reset to a previous position.
+    """
+    def __init__(self, format_string):
+        """Initializes the buffer.
+
+        @param format_string: The format for the buffer.  The output of this buffer will be this format string
+            with the keywords THREADS and TIMESTAMP replaced with the json serialized form of the threads
+            JSON array and the timestamp.
+        @type format_string: str
+        """
+        # Make sure the keywords are used in the format string.
+        assert('THREADS' in format_string)
+        assert('TIMESTAMP' in format_string)
+
+        # The entries added to include in the threads JSON array in the request.
+        self.__threads = []
+        # The timestamp to include in the output.
+        self.__client_timestamp = 0
+        self.__format = format_string
+        self.__current_size = len(self.content())
+
+    # Static variable holding the number of extra bytes to add in when calculating the new size due to adding in
+    # a new thread entry (beyond just the bytes due to the serialized thread id and thread name themselves).
+    # This will have two entries.  See above for a better description.
+    __per_thread_extra_bytes = _calculate_per_thread_extra_bytes()
+
+    @property
+    def length(self):
+        """The number of bytes the serialized buffer will take.
+
+        @return: The number of bytes
+        @rtype: int
+        """
+        return self.__current_size
+
+    def content(self, cache_size=True):
+        """Serialize all the information for the post fix and return it.
+
+        @param cache_size: Used for testing purposes.  Can be used to turn off a slop factor that will automatically
+            fix differences between the calculated size and the actual size.  We turn this off for testing to make
+            sure we catch these errors.
+        @type cache_size: bool
+
+        @return: The post fix to include at the end of the AddEventsRequest.
+        @rtype: str
+        """
+        result = self.__format.replace('TIMESTAMP', str(self.__client_timestamp))
+        result = result.replace('THREADS', json_lib.serialize(self.__threads))
+
+        # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
+        # assert here to make sure it's always equal (it should be) but we don't want errors to cause issues for
+        # customers.  Due to the way AddRequest uses this abstraction, we really really need to make sure
+        # the length() returns the correct result after content() was invoked, so we add in this measure to be safe.
+        if cache_size:
+            self.__current_size = len(result)
+        return result
+
+    def set_client_timestamp(self, timestamp, fail_if_buffer_exceeds=None):
+        """Updates the client timestamp that will be included in the post fix.
+
+        @param timestamp: The timestamp.
+        @param fail_if_buffer_exceeds: The maximum number of bytes that can be used by the post fix when serialized.
+            If this is not None, and the size will exceed this amount when the timestamp is changed, then the
+            timestamp is not changed and False is returned.
+
+        @type timestamp: int|float
+        @type fail_if_buffer_exceeds: None|int
+
+        @return: True if the thread was added (can only return False if fail_if_buffer_exceeds is not None)
+        @rtype: bool
+        """
+        new_timestamp = int(timestamp)
+        size_difference = len(str(new_timestamp)) - len(str(self.__client_timestamp))
+
+        if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
+            return False
+
+        self.__current_size += size_difference
+        self.__client_timestamp = new_timestamp
+        return True
+
+    def add_thread_entry(self, thread_id, thread_name, fail_if_buffer_exceeds=None):
+        """Adds in a new thread entry that will be included in the post fix.
+
+
+        @param thread_id: The id of the thread.
+        @param thread_name: The name of the thread.
+        @param fail_if_buffer_exceeds: The maximum number of bytes that can be used by the post fix when serialized.
+            If this is not None, and the size will exceed this amount when the thread entry is added, then the
+            thread is not added and False is returned.
+
+        @type thread_id: str
+        @type thread_name: str
+        @type fail_if_buffer_exceeds: None|int
+
+        @return: True if the thread was added (can only return False if fail_if_buffer_exceeds is not None)
+        @rtype: bool
+        """
+        # Calculate the size difference.  It is at least the size of taken by the serialized strings.
+        size_difference = len(json_lib.serialize(thread_name)) + len(json_lib.serialize(thread_id))
+
+        # Use the __per_thread_extra_bytes to calculate the additional bytes that will be consumed by serializing
+        # the JSON object containing the thread id and name.  The number of extra bytes depends on whether or not
+        # there is already an entry in the JSON array, so take that into consideration.
+        num_threads = len(self.__threads)
+        if num_threads < 1:
+            size_difference += PostFixBuffer.__per_thread_extra_bytes[0]
+        else:
+            size_difference += PostFixBuffer.__per_thread_extra_bytes[1]
+
+        if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
+            return False
+
+        self.__current_size += size_difference
+        self.__threads.append({'id': thread_id, 'name': thread_name})
+        return True
+
+    @property
+    def position(self):
+        """Returns the current `position` for this buffer.
+
+        This can be used to reset the buffer to a state before new thread entries were added or timestamps were set.
+
+        @return: The position object.
+        """
+        # We store the information just as three entries in an array because we are lazy.
+        return [self.__current_size, self.__client_timestamp, len(self.__threads)]
+
+    def set_position(self, position):
+        """Resets the buffer to a previous state.
+
+        The contents of the thread JSON array and the client timestamp will be reset to whatever it was when
+        `position` was invoked.
+
+        @param position: The position to reset the buffer state to.
+        """
+        # The position value should by an array with three entries: the size, the client timestamp, and the number
+        # of threads.  Since threads are always added one after another, it is sufficient just to truncate back to that
+        # previous length.
+        self.__current_size = position[0]
+        self.__client_timestamp = position[1]
+        assert(len(self.__threads) >= position[2])
+        if position[2] < len(self.__threads):
+            self.__threads = self.__threads[0:position[2]]
+
 
 # The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically
 # increasing so we track it in a global var.

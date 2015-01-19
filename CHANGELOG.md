@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.4 "Dubious Dog" - Jan 22, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 22, 2015 14:45 -0800
+--->
+
+This release is still be developed and the actual contents and release date are TBD.
+
+Bug fixes:
+
+* Fix excessive CPU usage bug when monitoring thousands of logs that are not growing.
+
 ## 2.0.3 "Capricious Cat" - Dec 18, 2014
 
 <!---
