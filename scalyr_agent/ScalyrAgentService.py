@@ -41,22 +41,16 @@ except ImportError:
     )
     from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
 except:
-    log('unhandled exception 1.3.1')
-
     etype, emsg, estack = sys.exc_info()
     log("%s - %s" % (etype, emsg.message))
 
-    log('unhandled exception 1.3.2')
 
 try:
     from __scalyr__ import get_install_root
     from scalyr_agent.json_lib import JsonObject
     from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
 except ImportError:
-    log('scalyr import 2.2')
     log('import error during scalyr imports')
-except:
-    log(str(sys.exc_info()))
 
 
 import win32serviceutil
@@ -326,13 +320,10 @@ class WindowsPlatformController(PlatformController):
 
 
 if __name__ == "__main__":
-    log('main')
     try:
         rc = win32serviceutil.HandleCommandLine(ScalyrAgentService)
     except:
-        #exc_info = sys.exc_info()
         log('ERROR: got an exeption in main')
     else:
         log('SUCCESS: no exception in main')
-    log('exiting main')
     sys.exit(rc)
