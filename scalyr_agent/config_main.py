@@ -374,10 +374,9 @@ def upgrade_windows_install(config_file, url, preserve_msi=False):
         default_paths = platform_controller.default_paths
 
         # Ensure agent was installed via MSI
-        # TODO: Implement MSI_INSTALL
-        #if MSI_INSTALL != platform_controller.install_type:
-        #    raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the '
-        #            'upgrade windows command.')
+        if MSI_INSTALL != platform_controller.install_type:
+            raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the '
+                    'upgrade windows command.')
 
         # Ensure that the user has not changed the defaults for the config, data, and log directory.
         if default_paths.config_file_path != config_file.file_path:
