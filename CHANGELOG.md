@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.4 "Dubious Dog" - Jan 22, 2015
+## 2.0.4 "Dubious Dog" - Jan 20, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 22, 2015 14:45 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 20, 2015 13:00 -0800
 --->
-
-This release is still be developed and the actual contents and release date are TBD.
 
 Bug fixes:
 
