@@ -128,7 +128,7 @@
                 <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
                     Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
                 <Shortcut Id='ApplicationLogs' Name='logs' Description='Default application logs folder'
-                    Target='[WindowsFolder]explorer.exe' Arguments='[ApplicationProgramsFolder]log' />
+                    Target='[WindowsFolder]explorer.exe' Arguments='[DEFAULTAPPLOGS]' />
                 <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall' />
                 <RegistryValue Root='HKCU' Key='Software\Scalyr\ScalyrAgent2'
                     Name='installed' Type='integer' Value='1' KeyPath='yes' />
