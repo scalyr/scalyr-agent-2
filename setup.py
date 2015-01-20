@@ -36,11 +36,29 @@ from os import path
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
+import sys
+if "win32" == sys.platform:
+    import py2exe
+
 here = path.dirname(determine_file_path())
 
 # Get the long description from the relevant file
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
+
+class Target:
+    def __init__(self, **kw):
+        self.version = SCALYR_VERSION
+        self.description = 'TODO'
+        self.copyright = 'TODO'
+        self.__dict__.update(kw)
+
+service_config = Target(
+    description = 'Scalyr Agetn 2 Service',
+    modules = ['scalyr_agent.ScalyrAgentService'],
+    cmdline_style = 'pywin32',
+)
+
 
 setup(
     name='scalyr-agent-2',
@@ -119,4 +137,9 @@ setup(
     #        'sample=sample:main',
     #    ],
     #},
+    console=[
+        path.join('scalyr_agent', 'scalyr-agent-2.py'),
+        path.join('scalyr_agent', 'config_main.py'),
+    ],
+    service=[service_config],
 )

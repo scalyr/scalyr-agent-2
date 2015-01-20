@@ -283,7 +283,7 @@ class ScalyrAgent(object):
         @rtype: int
         """
         # First, see if we have to change the user that is executing this script to match the owner of the config.
-        running_user = os.geteuid()
+        #running_user = os.geteuid()
         desired_user = os.stat(self.__config.file_path).st_uid
         # We set no_change_user is a safety flag to avoid recursion.. if we believe we started a new process that
         # is running as the right user, do not do it again if that is not the case.
@@ -936,9 +936,7 @@ class WorkerThread(object):
         log.debug('Shutting client')
         self.__scalyr_client.close()
 
-if __name__ == '__main__':
-    my_controller = PlatformController.new_platform()
-
+def create_commandline_parser():
     parser = OptionParser(usage='Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)',
                           version='scalyr-agent v' + SCALYR_VERSION)
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -953,6 +951,13 @@ if __name__ == '__main__':
                       help="Forces agent to not change which user is executing agent.  Requires the right user is "
                            "already being used.  This is used internally to prevent infinite loops in changing to"
                            "the correct user.  Users should not need to set this option.")
+    return parser
+
+
+
+if __name__ == '__main__':
+    my_controller = PlatformController.new_platform()
+    parser = create_commandline_parser()
     my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()

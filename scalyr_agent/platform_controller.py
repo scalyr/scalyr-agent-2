@@ -19,6 +19,7 @@ __author__ = 'czerwin@scalyr.com'
 
 
 import os
+import sys
 
 from __scalyr__ import get_install_root
 
@@ -27,6 +28,7 @@ from __scalyr__ import get_install_root
 PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
 TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
 DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
+MSI_INSTALL = 4        # Indicates source code was installed via a Windows MSI package
 
 
 class PlatformController:
@@ -71,6 +73,8 @@ class PlatformController:
             install_type = TARBALL_INSTALL
         elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
             install_type = DEV_INSTALL
+        elif hasattr(sys, 'frozen'):
+            install_type = MSI_INSTALL
         else:
             install_type = PACKAGE_INSTALL
 
