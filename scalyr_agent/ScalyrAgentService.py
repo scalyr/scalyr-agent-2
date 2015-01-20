@@ -234,6 +234,7 @@ class WindowsPlatformController(PlatformController):
 
         @raise AgentAlreadyRunning: If the agent is running and fail_if_running is True.
         """
+        print 'Calling is_agent_running(fail_if_running={})'.format(fail_if_running)
         status = QueryServiceStatusEx(ScalyrAgentService._svc_name_)
         state = status['CurrentState']
 
