@@ -19,6 +19,7 @@ __author__ = 'czerwin@scalyr.com'
 
 
 import os
+import sys
 
 from __scalyr__ import get_install_root
 
@@ -72,6 +73,8 @@ class PlatformController:
             install_type = TARBALL_INSTALL
         elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
             install_type = DEV_INSTALL
+        elif hasattr(sys, 'frozen'):
+            install_type = MSI_INSTALL
         else:
             install_type = PACKAGE_INSTALL
 
