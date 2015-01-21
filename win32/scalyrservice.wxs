@@ -45,28 +45,28 @@
                 <File Id='scalyr_agent_2_config' Name='scalyr-agent-2-config.exe' DiskId='1' Source='dist\config_main.exe' />
                 <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='win32\ScalyrShell.cmd' />
 
-                <File Id='MPR' Name='MPR.dll' DiskId=1 Source='dist/MPR.dll'/>
-                <File Id='_ctypes' Name='_ctypes.pyd' DiskId=1 Source='dist/_ctypes.pyd'/>
-                <File Id='_hashlib' Name='_hashlib.pyd' DiskId=1 Source='dist/_hashlib.pyd'/>
-                <File Id='_socket' Name='_socket.pyd' DiskId=1 Source='dist/_socket.pyd'/>
-                <File Id='_ssl' Name='_ssl.pyd' DiskId=1 Source='dist/_ssl.pyd'/>
-                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId=1 Source='dist/_win32sysloader.pyd'/>
-                <File Id='bz2' Name='bz2.pyd' DiskId=1 Source='dist/bz2.pyd'/>
-                <File Id='config_main' Name='config_main.exe' DiskId=1 Source='dist/config_main.exe'/>
-                <File Id='perfmon' Name='perfmon.pyd' DiskId=1 Source='dist/perfmon.pyd'/>
-                <File Id='pyexpat' Name='pyexpat.pyd' DiskId=1 Source='dist/pyexpat.pyd'/>
-                <File Id='python27' Name='python27.dll' DiskId=1 Source='dist/python27.dll'/>
-                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId=1 Source='dist/pywintypes27.dll'/>
-                <File Id='select' Name='select.pyd' DiskId=1 Source='dist/select.pyd'/>
-                <File Id='servicemanager' Name='servicemanager.pyd' DiskId=1 Source='dist/servicemanager.pyd'/>
-                <File Id='unicodedata' Name='unicodedata.pyd' DiskId=1 Source='dist/unicodedata.pyd'/>
-                <File Id='w9xpopen' Name='w9xpopen.exe' DiskId=1 Source='dist/w9xpopen.exe'/>
-                <File Id='win32api' Name='win32api.pyd' DiskId=1 Source='dist/win32api.pyd'/>
-                <File Id='win32event' Name='win32event.pyd' DiskId=1 Source='dist/win32event.pyd'/>
-                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId=1 Source='dist/win32evtlog.pyd'/>
-                <File Id='win32pipe' Name='win32pipe.pyd' DiskId=1 Source='dist/win32pipe.pyd'/>
-                <File Id='win32service' Name='win32service.pyd' DiskId=1 Source='dist/win32service.pyd'/>
-                <File Id='win32wnet' Name='win32wnet.pyd' DiskId=1 Source='dist/win32wnet.pyd'/>
+                <File Id='MPR' Name='MPR.dll' DiskId='1' Source='dist/MPR.dll'/>
+                <File Id='_ctypes' Name='_ctypes.pyd' DiskId='1' Source='dist/_ctypes.pyd'/>
+                <File Id='_hashlib' Name='_hashlib.pyd' DiskId='1' Source='dist/_hashlib.pyd'/>
+                <File Id='_socket' Name='_socket.pyd' DiskId='1' Source='dist/_socket.pyd'/>
+                <File Id='_ssl' Name='_ssl.pyd' DiskId='1' Source='dist/_ssl.pyd'/>
+                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId='1' Source='dist/_win32sysloader.pyd'/>
+                <File Id='bz2' Name='bz2.pyd' DiskId='1' Source='dist/bz2.pyd'/>
+                <File Id='config_main' Name='config_main.exe' DiskId='1' Source='dist/config_main.exe'/>
+                <File Id='perfmon' Name='perfmon.pyd' DiskId='1' Source='dist/perfmon.pyd'/>
+                <File Id='pyexpat' Name='pyexpat.pyd' DiskId='1' Source='dist/pyexpat.pyd'/>
+                <File Id='python27' Name='python27.dll' DiskId='1' Source='dist/python27.dll'/>
+                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId='1' Source='dist/pywintypes27.dll'/>
+                <File Id='select' Name='select.pyd' DiskId='1' Source='dist/select.pyd'/>
+                <File Id='servicemanager' Name='servicemanager.pyd' DiskId='1' Source='dist/servicemanager.pyd'/>
+                <File Id='unicodedata' Name='unicodedata.pyd' DiskId='1' Source='dist/unicodedata.pyd'/>
+                <File Id='w9xpopen' Name='w9xpopen.exe' DiskId='1' Source='dist/w9xpopen.exe'/>
+                <File Id='win32api' Name='win32api.pyd' DiskId='1' Source='dist/win32api.pyd'/>
+                <File Id='win32event' Name='win32event.pyd' DiskId='1' Source='dist/win32event.pyd'/>
+                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId='1' Source='dist/win32evtlog.pyd'/>
+                <File Id='win32pipe' Name='win32pipe.pyd' DiskId='1' Source='dist/win32pipe.pyd'/>
+                <File Id='win32service' Name='win32service.pyd' DiskId='1' Source='dist/win32service.pyd'/>
+                <File Id='win32wnet' Name='win32wnet.pyd' DiskId='1' Source='dist/win32wnet.pyd'/>
 
 
                 <!-- Uncompiled Python modules -->
