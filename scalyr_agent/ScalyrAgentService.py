@@ -17,15 +17,21 @@
 
 __author__ = 'guy.hoozdis@gmail.com'
 
+# TODO(windows): Rename this file to platform_windows.py.  We will need to change the setup.py to use a different
+# name for the module vs. the service that is built.
+
 # TODO:
 #  * Control flow (agent_run_method returns => stop service)
 import servicemanager
 
+# TODO(windows): Get rid of this logging method, or name it to something better.
 def log(msg):
     servicemanager.LogInfoMsg(msg)
 
 import sys
 
+# TODO(windows): Remove this try around the import.  We should be able to fix it so that we do not need this
+# I think it really comes from when you are doing development and you are manually adding the service in.
 try:
     from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
 except ImportError:
@@ -45,9 +51,11 @@ except:
     log("%s - %s" % (etype, emsg.message))
 
 
+# TODO(windows): Remove this try.
 try:
     from __scalyr__ import get_install_root
     from scalyr_agent.json_lib import JsonObject
+    # TODO(windows): Remove including the monitors directly here.
     from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
 except ImportError:
     log('import error during scalyr imports')
@@ -61,6 +69,7 @@ import win32api
 import psutil
 
 
+# TODO(windows): Rename and document this method.
 def QueryServiceStatusEx(servicename):
     hscm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
     try:
@@ -75,12 +84,14 @@ def QueryServiceStatusEx(servicename):
 
 
 class ScalyrAgentService(win32serviceutil.ServiceFramework):
+    # TODO(windows): Do these really need to be separate vars.  If so, then document them.
     _svc_name_ = "ScalyrAgentService"
     _svc_display_name_ = "Scalyr Agent Service"
     _svc_description_ = "Hosts Scalyr metric collectors"
 
     # Custom/user defined control messages
     SERVICE_CONTROL_DETAILED_REPORT = win32service.SERVICE_USER_DEFINED_CONTROL - 1 
+
 
     def __init__(self, *args):
         win32serviceutil.ServiceFramework.__init__(self, *args)
@@ -113,6 +124,7 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.SvcStop()
 
     def start(self):
+        # TODO(windows): Get rid of need to for the parser.  Fix this method.
         from scalyr_agent.agent_main import ScalyrAgent, create_commandline_parser
 
         self.controller = PlatformController.new_platform()
@@ -160,6 +172,7 @@ class WindowsPlatformController(PlatformController):
         @return: The default paths
         @rtype: DefaultPaths
         """
+        # TODO(windows): Fix this method.
         # NOTE: For this module, it is assumed that the 'install_type' is always PACKAGE_INSTALL
         # TODO: These are not ideal paths, just something to get us started.
         from os import path, environ
@@ -217,6 +230,8 @@ class WindowsPlatformController(PlatformController):
         @type script_file: str
         @type script_arguments: list<str>
         """
+        # TODO(windows): Probably need to throw an error here since we do not support changing the user at this
+        # time on windows.
         # TODO: Selects user based on owner of the config file.  Do we want to do the same thing on this platform?
         pass
 
@@ -234,7 +249,6 @@ class WindowsPlatformController(PlatformController):
 
         @raise AgentAlreadyRunning: If the agent is running and fail_if_running is True.
         """
-        print 'Calling is_agent_running(fail_if_running={})'.format(fail_if_running)
         status = QueryServiceStatusEx(ScalyrAgentService._svc_name_)
         state = status['CurrentState']
 
@@ -281,6 +295,7 @@ class WindowsPlatformController(PlatformController):
         CPU seconds spent in user land, the second is the number of CPU seconds spent in system land,
         and the third is the current resident size of the process in bytes."""
         # TODO: Implement the data structure (cpu, sys, phy_ram)
+        # TODO(windows): Fix the RAM value.
         cpu_usage = psutil.cpu_times()
         user_cpu = cpu_usage.user
         system_cpu = cpu_usage.system
@@ -317,6 +332,7 @@ class WindowsPlatformController(PlatformController):
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
         """
+        # TODO(czerwin): Return an appropriate error message.
         win32serviceutil.ControlService(ScalyrAgentService._svc_name_, ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
 
 
