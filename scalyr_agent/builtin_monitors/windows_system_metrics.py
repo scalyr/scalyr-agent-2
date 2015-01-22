@@ -39,9 +39,8 @@ __monitor__ = __name__
 
 import sys
 
-from scalyr_agent import ScalyrMonitor
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem
 from scalyr_agent import define_config_option, define_metric, define_log_field
-
 
 try:
     import psutil
@@ -528,9 +527,13 @@ class SystemMonitor(ScalyrMonitor):
     def __init__(self, config, logger, **kwargs):
         """TODO: Fucntion documentation
         """
+        if psutil is None:
+            raise UnsupportedSystem('windows_system_metrics',
+                                    'You must install the python module "psutils" to use this module.  Typically, this'
+                                    'can be done with the following command:'
+                                    '  pip install psutils')
         sampling_rate = kwargs.get('sampling_rate', 30)
         super(SystemMonitor, self).__init__(config, logger, sampling_rate)
-
 
     def gather_sample(self):
         """TODO: Fucntion documentation
