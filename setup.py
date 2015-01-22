@@ -142,8 +142,14 @@ setup(
     #    ],
     #},
     console=[
-        path.join('scalyr_agent', 'scalyr-agent-2.py'),
-        path.join('scalyr_agent', 'config_main.py'),
+        {
+            'script': path.join('source_root', 'scalyr_agent', 'agent_main.py'),
+            'dest_name': 'scalyr-agent-2'
+        },
+        {
+            'script': path.join('source_root', 'scalyr_agent', 'config_main.py'),
+            'dest_name': 'scalyr-agent-config'
+        }
     ],
     service=[service_config],
 )

@@ -157,7 +157,7 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, 'setup.py'), 'setup.py')
 
     shutil.copy(make_path(agent_source_root, 'DESCRIPTION.rst'), 'DESCRIPTION.rst')
-    
+
     run_command('python.exe setup.py py2exe', exit_on_fail=True, command_name='py2exe')
     return ''
 
