@@ -38,37 +38,15 @@ __monitor__ = __name__
 
 
 import sys
-import itertools
+
+from scalyr_agent import ScalyrMonitor
+from scalyr_agent import define_config_option, define_metric, define_log_field
+
 
 try:
-    import scalyr_agent
+    import psutil
 except ImportError:
-    # pylint: disable=bad-continuation
-    msg = ["This monitor requires the scalyr_agent module to be installed or on the PYTHONPATH",
-            "If you are not a developer, but are seeing this message - you probably want to be using",
-            "one of the install scripts to deploy the ScalyrAgent to your system.  If you have intentionally",
-            "not used the installer(s), then the next best way to deploy the ScalyrAgent into your system is",
-            "to:"
-            "\tNOTICE: The setup module (standard python distribution framework stuff) provides help for those",
-            "\t\tthat are interested in modifyting the default installation parameters - the various install schemes",
-            "are notable and useful particularly if you are having permission issues installing to the system-wide",
-            "directories on your machine",
-            "",
-            "python setup.py install",
-            "\t... or...",
-            "pip install -e /path/to/scalyr-agent-2/",
-    ]
-    # pylint: enable=bad-continuation
-    sys.stderr.write(msg)
-    sys.exit(1)
-else:
-    from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-    from scalyr_agent import define_config_option, define_metric, define_log_field
-    from scalyr_agent import scalyr_logging
-
-
-
-import psutil
+    psutil = None
 
 
 #
@@ -146,17 +124,22 @@ def _gather_metric(method, attribute=None):
 
 
 def partion_disk_usage():
-    mountpoints = [p.mountpoint for p in psutil.disk_partitions()]
+    mountpoints_initialized = [0]
+    mountpoints = []
+
     def gather_metric():
+        if mountpoints_initialized[0] == 0:
+            for p in psutil.disk_partitions():
+                mountpoints.append(p.mountpoint)
+            mountpoints_initialized[0] = 1
+
         for mountpoint in mountpoints:
-            diskusage = None
             try:
                 diskusage = psutil.disk_usage(mountpoint)
+                yield "{}={}%".format(mountpoint, diskusage.percent)
             except OSError:
                 # Certain partitions, like a CD/DVD drive, are expected to fail
                 pass
-            else:
-                yield "{}={}%".format(mountpoint, diskusage.percent)
 
     gather_metric.__doc__ = "TODO"
     return gather_metric
