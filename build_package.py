@@ -124,8 +124,8 @@ def build_win32_installer_package(variant, version):
     # directory because we need it there when we execute setup.py.  For the same reason, we put a copy of VERSION.
     shutil.copy(convert_path('scalyr_agent/__scalyr__.py'), '__scalyr__.py')
     shutil.copy(make_path(agent_source_root, 'VERSION'), 'VERSION')
+    shutil.copy(make_path(agent_source_root, 'VERSION'), convert_path('scalyr_agent/VERSION'))
 
-    shutil.copy(make_path(agent_source_root, 'DESCRIPTION.rst'), 'DESCRIPTION.rst')
     shutil.copytree(make_path(agent_source_root, 'monitors'), 'monitors')
 
     os.chdir('monitors')
@@ -156,6 +156,8 @@ def build_win32_installer_package(variant, version):
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
     shutil.copy(make_path(agent_source_root, 'setup.py'), 'setup.py')
 
+    shutil.copy(make_path(agent_source_root, 'DESCRIPTION.rst'), 'DESCRIPTION.rst')
+    
     run_command('python.exe setup.py py2exe', exit_on_fail=True, command_name='py2exe')
     return ''
 
