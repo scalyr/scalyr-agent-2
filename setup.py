@@ -34,9 +34,13 @@ from setuptools import setup, find_packages  # Always prefer setuptools over dis
 from codecs import open  # To use a consistent encoding
 from os import path
 
+import sys
+
+if path.isdir('source_root'):
+    sys.path.append('source_root')
+
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
 
-import sys
 if "win32" == sys.platform:
     import py2exe
 
