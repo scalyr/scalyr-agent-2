@@ -17,56 +17,42 @@
 
 __author__ = 'guy.hoozdis@gmail.com'
 
-# TODO(windows): Rename this file to platform_windows.py.  We will need to change the setup.py to use a different
-# name for the module vs. the service that is built.
+import sys
+
+if sys.platform != 'win32':
+    raise Exception('Attempting to load platform_windows module on a non-Windows machine')
 
 # TODO:
 #  * Control flow (agent_run_method returns => stop service)
 import servicemanager
-
-# TODO(windows): Get rid of this logging method, or name it to something better.
-def log(msg):
-    servicemanager.LogInfoMsg(msg)
-
-import sys
-
-# TODO(windows): Remove this try around the import.  We should be able to fix it so that we do not need this
-# I think it really comes from when you are doing development and you are manually adding the service in.
-try:
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
-except ImportError:
-    # The module lookup path list might fail when this module is being hosted by
-    # PythonService.exe, so append the lookup path and try again.
-    from os import path
-    sys.path.append(
-        path.dirname(
-            path.dirname(
-                path.abspath(__file__)
-            )
-        )
-    )
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
-except:
-    etype, emsg, estack = sys.exc_info()
-    log("%s - %s" % (etype, emsg.message))
-
-
-# TODO(windows): Remove this try.
-try:
-    from __scalyr__ import get_install_root
-    from scalyr_agent.json_lib import JsonObject
-    # TODO(windows): Remove including the monitors directly here.
-    from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
-except ImportError:
-    log('import error during scalyr imports')
-
-
 import win32serviceutil
 import win32service
 import win32event
 import win32api
 
 import psutil
+
+# TODO(windows): Get rid of this logging method, or name it to something better.
+def log(msg):
+    servicemanager.LogInfoMsg(msg)
+
+from scalyr_agent.json_lib import JsonObject
+
+# TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
+try:
+    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
+except:
+    etype, emsg, estack = sys.exc_info()
+    log("%s - %s" % (etype, emsg.message))
+
+
+
+# TODO(windows): Remove including the monitors directly here.
+from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
+
+
+
+
 
 
 # TODO(windows): Rename and document this method.
@@ -144,7 +130,8 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.controller.invoke_status_handler()
         else:
             win32serviceutil.ServiceFramework.SvcOther(self, control)
-    
+
+
 class WindowsPlatformController(PlatformController):
     """A controller instance for Microsoft's Windows platforms
     """

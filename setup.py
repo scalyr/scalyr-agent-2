@@ -58,9 +58,10 @@ class Target:
         self.__dict__.update(kw)
 
 service_config = Target(
-    description = 'Scalyr Agetn 2 Service',
-    modules = ['scalyr_agent.ScalyrAgentService'],
-    cmdline_style = 'pywin32',
+    description='Scalyr Agent 2 Service',
+    modules=['scalyr_agent.platform_windows'],
+    dest_base='ScalyrAgentService',
+    cmdline_style='pywin32'
 )
 
 
@@ -152,4 +153,13 @@ setup(
         }
     ],
     service=[service_config],
+
+    options={
+        'py2exe': {
+            # TODO(windows): Auto-generate this list based on contents of the monitors directory.
+            'includes': 'scalyr_agent.builtin_monitors.windows_system_metrics,'
+                        'scalyr_agent.builtin_monitors.windows_process_metrics',
+            'dll_excludes': ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
+        }
+    }
 )
