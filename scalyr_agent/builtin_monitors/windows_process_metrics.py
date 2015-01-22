@@ -72,7 +72,6 @@ __monitor__ = __name__
 
 
 import os
-import sys
 import re
 import datetime
 
@@ -80,34 +79,13 @@ import itertools
 from operator import methodcaller, attrgetter
 from collections import namedtuple
 
-
-
-SCALYR_BUILD_DOCS = os.environ.get('SCALYR_BUILD_DOCS', False)
 try:
     import psutil
 except ImportError:
-    if not SCALYR_BUILD_DOCS:
-        msg = "This monitor requires the psutil module.\n\tpip install psutil\n"
-        sys.stderr.write(msg)
-        sys.exit(1)
-else:
-    from psutil import Error, AccessDenied, NoSuchProcess, TimeoutExpired
-    from psutil import process_iter, Process
+    psutil = None
 
-
-
-try:
-    import scalyr_agent
-except ImportError:
-    if not SCALYR_BUILD_DOCS:
-        msg = "This monitor requires the scalyr_agent module.\n\t"
-        sys.stderr.write(msg)
-        sys.exit(1)
-else:
-    from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-    from scalyr_agent import define_config_option, define_metric, define_log_field
-    from scalyr_agent import scalyr_logging
-
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem
+from scalyr_agent import define_config_option, define_metric, define_log_field
 
 
 #
@@ -500,6 +478,11 @@ class ProcessMonitor(ScalyrMonitor):
     def __init__(self, monitor_config, logger, **kw):
         """TODO: Function documentation
         """
+        if psutil is None:
+            raise UnsupportedSystem('windows_process_metrics',
+                                    'You must install the python module "psutils" to use this module.  Typically, this'
+                                    'can be done with the following command:'
+                                    '  pip install psutils')
 
         sample_interval_secs = kw.get('sample_interval_secs', 30)
         super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
@@ -511,7 +494,7 @@ class ProcessMonitor(ScalyrMonitor):
         process = None
         if 'commandline' in self._config:
             matcher = commandline_matcher(self._config['commandline'])
-            matching_process_iterator = matcher(process_iter())
+            matching_process_iterator = matcher(psutil.process_iter())
             process = matching_process_iterator.next()
         elif 'pid' in self._config:
             if '$$' == self._config.get('pid'):
@@ -539,5 +522,5 @@ class ProcessMonitor(ScalyrMonitor):
                     metric_value,
                     extra_fields=metric.config['extra_fields']
                 )
-        except NoSuchProcess:
+        except psutil.NoSuchProcess:
             self.__process = None
