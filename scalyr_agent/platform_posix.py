@@ -26,7 +26,7 @@ import atexit
 import resource
 import signal
 
-from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
+from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning, CannotExecuteAsUser
 from scalyr_agent.platform_controller import TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
 from __scalyr__ import get_install_root
@@ -286,36 +286,76 @@ class PosixPlatformController(PlatformController):
             if pf is not None:
                 pf.close()
 
-    def run_as_user(self, user_id, script_file, script_arguments):
+    def get_file_owner(self, file_path):
+        """Returns the user name of the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @type file_path: str
+
+        @return: The user name of the owner.
+        @rtype: str
+        """
+        return pwd.getpwuid(os.stat(file_path).st_uid).pw_name
+
+    def get_current_user(self):
+        """Returns the effective user name running this process.
+
+        The effective user may not be the same as the initiator of the process if the process has escalated its
+        privileges.
+
+        @return: The name of the effective user running this process.
+        @rtype: str
+        """
+        return pwd.getpwuid(os.geteuid()).pw_name
+
+    def is_privileged_user(self):
+        """Returns true if the user running this process is privileged (can read / write any file).
+
+        @return: True if the user running this process is privileged.
+        @rtype: bool
+        """
+        # We only return true if we are running as root.
+        return os.geteuid() == 0
+
+    def privileged_name(self):
+        """Returns the name of the privileged account for this platform.
+
+        This is used to report error messages.
+
+        @return: The name of the privileged account.
+        @rtype: str
+        """
+        return 'root'
+
+    def run_as_user(self, user_name, script_file, script_arguments):
         """Restarts this process with the same arguments as the specified user.
 
         This will re-run the entire Python script so that it is executing as the specified user.
         It will also add in the '--no-change-user' option which can be used by the script being executed with the
         next proces that it was the result of restart so that it probably shouldn't do that again.
 
-        @param user_id: The user id to run as, typically 0 for root.
+        @param user_name: The user to run as, typically 'root'.
         @param script_file: The path to the Python script file that was executed.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
 
-        @type user_id: int
+        @type user_name: str
         @type script_file: str
         @type script_arguments: list<str>
-        """
-        user_name = pwd.getpwuid(user_id).pw_name
-        if os.geteuid() != user_id:
-            if os.geteuid() != 0:
-                print >>sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
-                                     'not own the config file and cannot change to that user because '
-                                     'not root.' % user_name)
-                sys.exit(1)
-            # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
-            # us from re-executing the script again to change the user, to
-            # head of any potential bugs that could cause infinite loops.
-            arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
 
-            print >>sys.stderr, ('Running as %s' % user_name)
-            os.execvp("sudo", arguments)
+        @raise CannotExecuteAsUser: Indicates that the user currently running this process does not have
+            sufficient privilege to change to 'user_name'.
+        @raise ChangeUserNotSupported: Indicates that the platform has not implemented this functionality.
+        """
+        if os.geteuid() != 0:
+            raise CannotExecuteAsUser
+        # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
+        # us from re-executing the script again to change the user, to
+        # head of any potential bugs that could cause infinite loops.
+        arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
+
+        print >>sys.stderr, ('Running as %s' % user_name)
+        os.execvp("sudo", arguments)
 
     def is_agent_running(self, fail_if_running=False):
         """Returns true if the agent service is running, as determined by the pidfile.

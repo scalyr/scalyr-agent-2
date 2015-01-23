@@ -29,6 +29,8 @@ import win32serviceutil
 import win32service
 import win32event
 import win32api
+import win32security
+import ctypes
 
 try:
     import psutil
@@ -44,16 +46,11 @@ from scalyr_agent.json_lib import JsonObject
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
+    from scalyr_agent.platform_controller import PlatformController, DefaultPaths
+    from scalyr_agent.platform_controller import AgentAlreadyRunning, ChangeUserNotSupported
 except:
     etype, emsg, estack = sys.exc_info()
     log("%s - %s" % (etype, emsg.message))
-
-
-
-# TODO(windows): Remove including the monitors directly here.
-from scalyr_agent.builtin_monitors import windows_process_metrics, windows_system_metrics, test_monitor
-
 
 
 
@@ -205,26 +202,70 @@ class WindowsPlatformController(PlatformController):
         ]
         return monitors
 
-    def run_as_user(self, user_id, script_file, script_arguments):
+    def get_file_owner(self, file_path):
+        """Returns the user name of the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @type file_path: str
+
+        @return: The user name of the owner.
+        @rtype: str
+        """
+        sd = win32security.GetFileSecurity (file_path, win32security.OWNER_SECURITY_INFORMATION)
+        owner_sid = sd.GetSecurityDescriptorOwner()
+        name, domain, account_type = win32security.LookupAccountSid(None, owner_sid)
+        return u'%s\\%s' % (name, domain)
+
+    def get_current_user(self):
+        """Returns the effective user name running this process.
+
+        The effective user may not be the same as the initiator of the process if the process has escalated its
+        privileges.
+
+        @return: The name of the effective user running this process.
+        @rtype: str
+        """
+        return win32api.GetUserNameEx(win32api.NameSamCompatible)
+
+    def is_privileged_user(self):
+        """Returns true if the user running this process is privileged (can read / write any file).
+
+        @return: True if the user running this process is privileged.
+        @rtype: bool
+        """
+        return ctypes.windll.shell32.IsUserAnAdmin() == 1
+
+    def privileged_name(self):
+        """Returns the name of the privileged account for this platform.
+
+        This is used to report error messages.
+
+        @return: The name of the privileged account.
+        @rtype: str
+        """
+        return 'Administrator'
+
+    def run_as_user(self, user_name, script_file, script_arguments):
         """Restarts this process with the same arguments as the specified user.
 
         This will re-run the entire Python script so that it is executing as the specified user.
         It will also add in the '--no-change-user' option which can be used by the script being executed with the
         next proces that it was the result of restart so that it probably shouldn't do that again.
 
-        @param user_id: The user id to run as, typically 0 for root.
+        @param user_name: The user to run as, typically 'root' or 'Administrator'.
         @param script_file: The path to the Python script file that was executed.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
 
-        @type user_id: int
+        @type user_name: str
         @type script_file: str
         @type script_arguments: list<str>
+
+        @raise CannotExecuteAsUser: Indicates that the user currently running this process does not have
+            sufficient privilege to change to 'user_name'.
+        @raise ChangeUserNotSupported: Indicates that the platform has not implemented this functionality.
         """
-        # TODO(windows): Probably need to throw an error here since we do not support changing the user at this
-        # time on windows.
-        # TODO: Selects user based on owner of the config file.  Do we want to do the same thing on this platform?
-        pass
+        raise ChangeUserNotSupported
 
     def is_agent_running(self, fail_if_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.

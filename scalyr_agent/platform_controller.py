@@ -162,21 +162,64 @@ class PlatformController:
         """
         return []
 
-    def run_as_user(self, user_id, script_file, script_arguments):
+    def get_file_owner(self, file_path):
+        """Returns the user name of the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @type file_path: str
+
+        @return: The user name of the owner.
+        @rtype: str
+        """
+        pass
+
+    def get_current_user(self):
+        """Returns the effective user name running this process.
+
+        The effective user may not be the same as the initiator of the process if the process has escalated its
+        privileges.
+
+        @return: The name of the effective user running this process.
+        @rtype: str
+        """
+        pass
+
+    def is_privileged_user(self):
+        """Returns true if the user running this process is privileged (can read / write any file).
+
+        @return: True if the user running this process is privileged.
+        @rtype: bool
+        """
+        pass
+
+    def privileged_name(self):
+        """Returns the name of the privileged account for this platform.
+
+        This is used to report error messages.
+
+        @return: The name of the privileged account.
+        @rtype: str
+        """
+
+    def run_as_user(self, user_name, script_file, script_arguments):
         """Restarts this process with the same arguments as the specified user.
 
         This will re-run the entire Python script so that it is executing as the specified user.
         It will also add in the '--no-change-user' option which can be used by the script being executed with the
         next proces that it was the result of restart so that it probably shouldn't do that again.
 
-        @param user_id: The user id to run as, typically 0 for root.
+        @param user_name: The user to run as, typically 'root' or 'Administrator'.
         @param script_file: The path to the Python script file that was executed.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
 
-        @type user_id: int
+        @type user_name: str
         @type script_file: str
         @type script_arguments: list<str>
+
+        @raise CannotExecuteAsUser: Indicates that the user currently running this process does not have
+            sufficient privilege to change to 'user_name'.
+        @raise ChangeUserNotSupported: Indicates that the platform has not implemented this functionality.
         """
         pass
 
@@ -277,5 +320,18 @@ class DefaultPaths(object):
 
 class AgentAlreadyRunning(Exception):
     """Raised to signal the agent is already running.
+    """
+    pass
+
+
+class CannotExecuteAsUser(Exception):
+    """Raised to signal that the platform cannot change to the requested user.
+
+    This usually means the current user is not privileged (root)."""
+    pass
+
+
+class ChangeUserNotSupported(Exception):
+    """Raised to signal that this platform has not implemented the operation of changing its executing user.
     """
     pass

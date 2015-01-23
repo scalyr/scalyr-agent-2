@@ -70,6 +70,7 @@ from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
+from scalyr_agent.platform_controller import CannotExecuteAsUser, ChangeUserNotSupported
 
 from scalyr_agent.platforms import register_supported_platforms
 register_supported_platforms()
@@ -283,16 +284,32 @@ class ScalyrAgent(object):
         @rtype: int
         """
         # First, see if we have to change the user that is executing this script to match the owner of the config.
-        #running_user = os.geteuid()
-        desired_user = os.stat(self.__config.file_path).st_uid
+        running_user = self.__controller.get_current_user()
+        desired_user = self.__controller.get_file_owner(self.__config.file_path)
         # We set no_change_user is a safety flag to avoid recursion.. if we believe we started a new process that
         # is running as the right user, do not do it again if that is not the case.
         if no_change_user:
             if running_user != desired_user:
                 print >> sys.stderr, 'No change user is selected by agent is not being run by correct user.'
                 print >> sys.stderr, 'Terminating agent, please restart agent using correct user.'
-        else:
-            self.__controller.run_as_user(desired_user, os.path.realpath(__file__), sys.argv[1:])
+        elif running_user != desired_user:
+            # When the Windows agent is running via py2exe, __file__ is not defined.  Have to handle that case.
+            if '__file__' in globals():
+                script_path = os.path.realpath(__file__)
+            else:
+                script_path = None
+            try:
+                self.__controller.run_as_user(desired_user, script_path, sys.argv[1:])
+            except CannotExecuteAsUser:
+                print >> sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
+                                      'not own the config file (%s does) and cannot change to that user because it is '
+                                      'not %s' % (running_user, desired_user, self.__controller.privileged_name()))
+                return 1
+            except ChangeUserNotSupported:
+                print >> sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
+                                      'not own the config file (%s does) and cannot change to that user because it is '
+                                      'not supported by this agent implementation' % (running_user, desired_user))
+                return 1
 
         # Make sure we do not try to start it up again.
         self.__fail_if_already_running()
@@ -936,6 +953,7 @@ class WorkerThread(object):
         log.debug('Shutting client')
         self.__scalyr_client.close()
 
+
 def create_commandline_parser():
     parser = OptionParser(usage='Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)',
                           version='scalyr-agent v' + SCALYR_VERSION)
@@ -952,7 +970,6 @@ def create_commandline_parser():
                            "already being used.  This is used internally to prevent infinite loops in changing to"
                            "the correct user.  Users should not need to set this option.")
     return parser
-
 
 
 if __name__ == '__main__':
