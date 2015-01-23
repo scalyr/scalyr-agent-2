@@ -529,9 +529,9 @@ class SystemMonitor(ScalyrMonitor):
         """
         if psutil is None:
             raise UnsupportedSystem('windows_system_metrics',
-                                    'You must install the python module "psutils" to use this module.  Typically, this'
+                                    'You must install the python module "psutil" to use this module.  Typically, this'
                                     'can be done with the following command:'
-                                    '  pip install psutils')
+                                    '  pip install psutil')
         sampling_rate = kwargs.get('sampling_rate', 30)
         super(SystemMonitor, self).__init__(config, logger, sampling_rate)
 

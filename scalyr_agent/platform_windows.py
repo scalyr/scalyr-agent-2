@@ -30,7 +30,11 @@ import win32service
 import win32event
 import win32api
 
-import psutil
+try:
+    import psutil
+except ImportError:
+    raise Exception('You must install the python module "psutil" to run on Windows.  Typically, this can be done with'
+                    'the following command:  pip install psutil')
 
 # TODO(windows): Get rid of this logging method, or name it to something better.
 def log(msg):

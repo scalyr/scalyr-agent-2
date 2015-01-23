@@ -480,9 +480,9 @@ class ProcessMonitor(ScalyrMonitor):
         """
         if psutil is None:
             raise UnsupportedSystem('windows_process_metrics',
-                                    'You must install the python module "psutils" to use this module.  Typically, this'
+                                    'You must install the python module "psutil" to use this module.  Typically, this'
                                     'can be done with the following command:'
-                                    '  pip install psutils')
+                                    '  pip install psutil')
 
         sample_interval_secs = kw.get('sample_interval_secs', 30)
         super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
