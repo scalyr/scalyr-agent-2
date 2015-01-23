@@ -214,7 +214,7 @@ class WindowsPlatformController(PlatformController):
         sd = win32security.GetFileSecurity (file_path, win32security.OWNER_SECURITY_INFORMATION)
         owner_sid = sd.GetSecurityDescriptorOwner()
         name, domain, account_type = win32security.LookupAccountSid(None, owner_sid)
-        return u'%s\\%s' % (name, domain)
+        return u'%s\\%s' % (domain, name)
 
     def get_current_user(self):
         """Returns the effective user name running this process.
