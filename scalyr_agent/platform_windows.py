@@ -31,6 +31,7 @@ import win32event
 import win32api
 import win32security
 import ctypes
+import path
 
 try:
     import psutil
@@ -43,6 +44,7 @@ def log(msg):
     servicemanager.LogInfoMsg(msg)
 
 from scalyr_agent.json_lib import JsonObject
+from __scalyr__ import get_install_root
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
@@ -136,6 +138,19 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
 class WindowsPlatformController(PlatformController):
     """A controller instance for Microsoft's Windows platforms
     """
+    def __init__(self, install_type):
+        """Initializes the Windows platform instance.
+
+        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
+            or DEV_INSTALL.
+
+        @type install_type: int
+        """
+        # The method to invoke when termination is requested.
+        self.__termination_handler = None
+        # The method to invoke when status is requested by another process.
+        self.__status_handler = None
+        PlatformController.__init__(self, install_type)
 
     def invoke_termination_handler(self):
         if self.__termination_handler:
@@ -162,19 +177,12 @@ class WindowsPlatformController(PlatformController):
         """
         # TODO(windows): Fix this method.
         # NOTE: For this module, it is assumed that the 'install_type' is always PACKAGE_INSTALL
-        # TODO: These are not ideal paths, just something to get us started.
-        from os import path, environ
-        #root = environ.get('ScalyrRoot', path.abspath(path.dirname(__file__)))
-        pf = environ.get('ProgramFiles(x86)')
-        root = path.join(pf, 'Scalyr')
+
+        root = get_install_root()
         logdir = path.join(root, 'log')
         libdir = path.join(root, 'lib')
-        config = path.join(root, 'agent.json')
+        config = path.join(root, 'config', 'agent.json')
 
-        #return DefaultPaths(
-        #        r'\Temp\scalyr\log',
-        #        r'\Temp\scalyr\agent.json',
-        #        r'\Temp\scalyr\lib')
         return DefaultPaths(logdir, config, libdir)
 
     @property

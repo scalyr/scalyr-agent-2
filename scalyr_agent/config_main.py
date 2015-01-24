@@ -40,21 +40,14 @@ from optparse import OptionParser
 if 'win32' != sys.platform:
     from pwd import getpwnam
 
-try:
-    from __scalyr__ import scalyr_init, determine_file_path
-except ImportError:
-    from scalyr_agent.__scalyr__ import scalyr_init, determine_file_path
-
 import urllib
-from scalyr_agent.scalyr_client import ScalyrClientSession
 
-
+from __scalyr__ import scalyr_init, get_install_root
 scalyr_init()
 
-__file_path__ = determine_file_path()
-
+from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
+from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL, MSI_INSTALL
 
 from scalyr_agent.platforms import register_supported_platforms
 register_supported_platforms()
@@ -240,11 +233,8 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                 raise UpgradeFailure('The supplied tarball file name does not match the expected format.')
             tarball_directory = file_name[0:-7]
 
-            # We will be installing in the same directory where scalyr-agent-2 is currently installed.  That directory
-            # should be 4 levels back from this file.
-            # The path to this file looks like: scalyr-agent-2/py/scalyr_agent/config_main.py
-
-            install_directory = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file_path__))))
+            # We will be installing in the same directory where scalyr-agent-2 is currently installed.
+            install_directory = os.path.dirname(get_install_root())
 
             if not os.path.isdir(os.path.join(install_directory, 'scalyr-agent-2')):
                 raise UpgradeFailure('Could not determine the install directory.  Either the main directory is no '

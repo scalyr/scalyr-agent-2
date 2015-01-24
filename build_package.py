@@ -40,12 +40,12 @@ from cStringIO import StringIO
 from optparse import OptionParser
 from time import gmtime, strftime
 
-from scalyr_agent.__scalyr__ import determine_file_path, SCALYR_VERSION, scalyr_init
+from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_init
 
 scalyr_init()
 
 # The root of the Scalyr repository should just be the parent of this file.
-__source_root__ = os.path.dirname(determine_file_path())
+__source_root__ = get_install_root()
 
 
 def build_package(package_type, variant):

@@ -39,15 +39,13 @@ import sys
 if path.isdir('source_root'):
     sys.path.append('source_root')
 
-from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
+from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
 
 if "win32" == sys.platform:
     import py2exe
 
-here = path.dirname(determine_file_path())
-
 # Get the long description from the relevant file
-with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
+with open(path.join(path.dirname(get_install_root()), 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 class Target:
