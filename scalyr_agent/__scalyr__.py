@@ -149,7 +149,7 @@ def __determine_version():
     # This file can be either in the package root or the install root (if you examine the cases
     # from above).  So, just check both locations.
     in_install = os.path.join(get_install_root(), 'VERSION')
-    in_package = os.path.join(get_install_root(), 'VERSION')
+    in_package = os.path.join(get_package_root(), 'VERSION')
 
     if os.path.isfile(in_package):
         version_path = in_package

@@ -31,7 +31,7 @@ import win32event
 import win32api
 import win32security
 import ctypes
-import path
+import os
 
 try:
     import psutil
@@ -179,9 +179,9 @@ class WindowsPlatformController(PlatformController):
         # NOTE: For this module, it is assumed that the 'install_type' is always PACKAGE_INSTALL
 
         root = get_install_root()
-        logdir = path.join(root, 'log')
-        libdir = path.join(root, 'lib')
-        config = path.join(root, 'config', 'agent.json')
+        logdir = os.path.join(root, 'log')
+        libdir = os.path.join(root, 'lib')
+        config = os.path.join(root, 'config', 'agent.json')
 
         return DefaultPaths(logdir, config, libdir)
 
