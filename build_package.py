@@ -144,13 +144,10 @@ def build_win32_installer_package(variant, version):
     os.chdir('data_files')
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
-    shutil.copy(make_path(agent_source_root, 'VERSION'), convert_path('VERSION'))
+    shutil.copy(make_path(agent_source_root, 'VERSION'), 'VERSION')
 
     # Copy the config file.
     cat_files([make_path(agent_source_root, 'config/agent.json')], 'agent_config.tmpl', convert_newlines=True)
-
-    # Copy the cert files.
-    cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'ca_certs.crt', convert_newlines=True)
 
     os.chdir('..')
     # We need to place a 'setup.py' here so that when we executed py2exe it finds it.
@@ -159,6 +156,18 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, 'DESCRIPTION.rst'), 'DESCRIPTION.rst')
 
     run_command('python.exe setup.py py2exe', exit_on_fail=True, command_name='py2exe')
+
+    make_directory('Scalyr/certs')
+    make_directory('Scalyr/logs')
+    make_directory('Scalyr/data')
+    make_directory('Scalyr/config/agent.d')
+    os.rename('dist', convert_path('Scalyr/bin'))
+
+    # Copy the cert files.
+    cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'Scalyr/certs/ca_certs.crt',
+              convert_newlines=True)
+
+    shutil.move('Scalyr', agent_source_root)
     return ''
 
 
