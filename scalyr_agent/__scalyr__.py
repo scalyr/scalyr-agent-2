@@ -128,7 +128,7 @@ def get_install_root():
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
     parent_of_package_install = os.path.dirname(get_package_root())
     if __is_py2exe__:  # win32 install
-        return os.path.dirname(parent_of_package_install)
+        return parent_of_package_install
     elif parent_of_package_install != 'py':   # Running from Source
         return parent_of_package_install
     else:  # Installed using tarball or rpm/debian package
