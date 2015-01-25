@@ -49,7 +49,6 @@ from __scalyr__ import get_install_root, scalyr_init
 scalyr_init()
 
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.agent_main import ScalyrAgent
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
@@ -81,8 +80,8 @@ _CONFIG_KEY = 'ConfigPath'
 
 
 def _set_config_path_registry_entry(value):
-    _winreg.CreateKey(_winreg.HKEY_CURRENT_USER, _REG_PATH)
-    registry_key = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
+    _winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH)
+    registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0,
                                    _winreg.KEY_WRITE)
     _winreg.SetValueEx(registry_key, _CONFIG_KEY, 0, _winreg.REG_SZ, value)
     _winreg.CloseKey(registry_key)
@@ -90,7 +89,7 @@ def _set_config_path_registry_entry(value):
 
 
 def _get_config_path_registry_entry():
-    registry_key = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
+    registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0,
                                    _winreg.KEY_READ)
     value, regtype = _winreg.QueryValueEx(registry_key, _CONFIG_KEY)
     _winreg.CloseKey(registry_key)
@@ -140,14 +139,11 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     def start(self):
         # TODO(windows): Get rid of need to for the parser.  Fix this method.
         # Remove the parser.
+        from scalyr_agent.agent_main import ScalyrAgent
         self.controller = PlatformController.new_platform()
-        self.log("Calling agent_run_method()")
-        self.log("The path is %s" % _get_config_path_registry_entry())
         ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry())
-        self.log("Exiting agent_run_method()")
 
     def SvcOther(self, control):
-        self.log('SvcOther (control=%d)' % control)
         if ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT == control:
             self.controller.invoke_status_handler()
         else:
