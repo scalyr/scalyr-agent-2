@@ -49,9 +49,6 @@ from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL, MSI_INSTALL
 
-from scalyr_agent.platforms import register_supported_platforms
-register_supported_platforms()
-
 
 def set_api_key(config, config_file_path, new_api_key):
     """Replaces the current api key in the file at 'config_file_path' with the value of 'new_api_key'.

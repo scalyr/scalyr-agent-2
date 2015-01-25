@@ -72,9 +72,6 @@ from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
 from scalyr_agent.platform_controller import CannotExecuteAsUser, ChangeUserNotSupported
 
-from scalyr_agent.platforms import register_supported_platforms
-register_supported_platforms()
-
 import getpass
 
 STATUS_FILE = 'last_status'

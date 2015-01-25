@@ -43,17 +43,24 @@ class PlatformController:
 
     # A list of PlatformController classes that have been registered for use.
     __platform_classes__ = []
+    __platforms_registered__ = False
 
     @staticmethod
-    def register_platform(platform_class):
-        """Register a new platform class that could be instantiated during the 'new_platform' method.
-
-        The class must derive from PlatformController.
-
-        @param platform_class:  The derived PlatformController class
-        @type platform_class: class
+    def __register_supported_platforms():
+        """Adds all available platforms to the '__platforms_registered__' array.
+         a new platform class that could be instantiated during the 'new_platform' method.
         """
-        PlatformController.__platform_classes__.append(platform_class)
+        if sys.platform == 'win32':
+            from scalyr_agent.platform_windows import WindowsPlatformController
+            PlatformController.__platform_classes__.append(WindowsPlatformController)
+        else:
+            from scalyr_agent.platform_linux import LinuxPlatformController
+            PlatformController.__platform_classes__.append(LinuxPlatformController)
+
+            from scalyr_agent.platform_posix import PosixPlatformController
+            PlatformController.__platform_classes__.append(PosixPlatformController)
+
+        PlatformController.__platforms_registered__ = True
 
     @staticmethod
     def new_platform():
@@ -66,6 +73,10 @@ class PlatformController:
         @return: The PlatformController instance to use
         @rtype: PlatformController
         """
+        # If we haven't initialized the platforms array, then do so.
+        if not PlatformController.__platforms_registered__:
+            PlatformController.__register_supported_platforms()
+
         # Determine which type of install this is.  We do this based on
         # whether or not certain files exist in the root of the source tree.
         install_root = get_install_root()
