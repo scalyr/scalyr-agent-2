@@ -193,7 +193,7 @@ class ScalyrAgent(object):
         if self.__config is None:
             print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
 
-        self.__controller.consume_config(self.__config)
+        self.__controller.consume_config(self.__config, config_file_path)
 
         # noinspection PyBroadException
         try:

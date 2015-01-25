@@ -127,14 +127,17 @@ class PlatformController:
         """
         pass
 
-    def consume_config(self, config):
+    def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
 
         This will be invoked before the scalyr-agent-2 command performs any real work and while stdout and stderr
         are still be displayed to the screen.
 
         @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
         @type config: configuration.Configuration
+        @type path_to_config: str
         """
         pass
 

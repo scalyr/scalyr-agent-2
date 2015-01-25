@@ -98,11 +98,14 @@ class PosixPlatformController(PlatformController):
         """
         self.__pidfile_from_options = options.pid_file
 
-    def consume_config(self, config):
+    def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
 
         @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
         @type config: configuration.Configuration
+        @type path_to_config: str
         """
         # Now that we have the config and have consumed any options that we could have been specified, we need to
         # determine where we read the pidfile from.  Typically, this should be based on the configuration file, but

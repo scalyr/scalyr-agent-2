@@ -30,6 +30,8 @@ import win32service
 import win32event
 import win32api
 import win32security
+import _winreg
+
 import ctypes
 import os
 
@@ -43,8 +45,11 @@ except ImportError:
 def log(msg):
     servicemanager.LogInfoMsg(msg)
 
+from __scalyr__ import get_install_root, scalyr_init
+scalyr_init()
+
 from scalyr_agent.json_lib import JsonObject
-from __scalyr__ import get_install_root
+from scalyr_agent.agent_main import ScalyrAgent
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
@@ -71,6 +76,26 @@ def QueryServiceStatusEx(servicename):
         win32service.CloseServiceHandle(hscm)
     return status
 
+_REG_PATH = r"SOFTWARE\Scalyr\Settings"
+_CONFIG_KEY = 'ConfigPath'
+
+
+def _set_config_path_registry_entry(value):
+    _winreg.CreateKey(_winreg.HKEY_CURRENT_USER, _REG_PATH)
+    registry_key = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
+                                   _winreg.KEY_WRITE)
+    _winreg.SetValueEx(registry_key, _CONFIG_KEY, 0, _winreg.REG_SZ, value)
+    _winreg.CloseKey(registry_key)
+    return True
+
+
+def _get_config_path_registry_entry():
+    registry_key = _winreg.OpenKey(_winreg.HKEY_CURRENT_USER, _REG_PATH, 0,
+                                   _winreg.KEY_READ)
+    value, regtype = _winreg.QueryValueEx(registry_key, _CONFIG_KEY)
+    _winreg.CloseKey(registry_key)
+    return value
+
 
 class ScalyrAgentService(win32serviceutil.ServiceFramework):
     # TODO(windows): Do these really need to be separate vars.  If so, then document them.
@@ -81,8 +106,8 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     # Custom/user defined control messages
     SERVICE_CONTROL_DETAILED_REPORT = win32service.SERVICE_USER_DEFINED_CONTROL - 1 
 
-
     def __init__(self, *args):
+        self.controller = None
         win32serviceutil.ServiceFramework.__init__(self, *args)
         self._stop_event = win32event.CreateEvent(None, 0, 0, None)
 
@@ -114,17 +139,11 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
 
     def start(self):
         # TODO(windows): Get rid of need to for the parser.  Fix this method.
-        from scalyr_agent.agent_main import ScalyrAgent, create_commandline_parser
-
+        # Remove the parser.
         self.controller = PlatformController.new_platform()
-        parser = create_commandline_parser()
-        self.controller.add_options(parser)
-        options, args = parser.parse_args(['start'])
-        self.controller.consume_options(options)
-
         self.log("Calling agent_run_method()")
-        agent = ScalyrAgent(self.controller)
-        agent.agent_run_method(self.controller, options.config_filename)
+        self.log("The path is %s" % _get_config_path_registry_entry())
+        ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry())
         self.log("Exiting agent_run_method()")
 
     def SvcOther(self, control):
@@ -150,6 +169,9 @@ class WindowsPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
+        # The file path to the configuration.  We need to stash this so it is available when start is invoked.
+        self.__config_file_path = None
+
         PlatformController.__init__(self, install_type)
 
     def invoke_termination_handler(self):
@@ -184,6 +206,20 @@ class WindowsPlatformController(PlatformController):
         config = os.path.join(root, 'config', 'agent.json')
 
         return DefaultPaths(logdir, config, libdir)
+
+    def consume_config(self, config, path_to_config):
+        """Invoked after 'consume_options' is called to set the Configuration object to be used.
+
+        This will be invoked before the scalyr-agent-2 command performs any real work and while stdout and stderr
+        are still be displayed to the screen.
+
+        @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
+        @type config: configuration.Configuration
+        @type path_to_config: str
+        """
+        self.__config_file_path = os.path.abspath(path_to_config)
 
     @property
     def default_monitors(self):
@@ -314,6 +350,7 @@ class WindowsPlatformController(PlatformController):
         """
         # TODO: Add Error handling.  Insufficient privileges will raise an exception
         # that is currently unhandled.
+        _set_config_path_registry_entry(self.__config_file_path)
         win32serviceutil.StartService(ScalyrAgentService._svc_name_)
 
     def stop_agent_service(self, quiet):
