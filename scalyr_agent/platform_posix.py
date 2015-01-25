@@ -27,9 +27,8 @@ import resource
 import signal
 
 from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning, CannotExecuteAsUser
-from scalyr_agent.platform_controller import TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
-from __scalyr__ import get_install_root
+from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -46,13 +45,8 @@ class PosixPlatformController(PlatformController):
       - Sending signals to the running agent process.
     """
 
-    def __init__(self, install_type, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         """Initializes the POSIX platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-
-        @type install_type: int
         """
         self.__stdin = stdin
         self.__stdout = stdout
@@ -67,7 +61,7 @@ class PosixPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
-        PlatformController.__init__(self, install_type)
+        PlatformController.__init__(self)
 
     def can_handle_current_platform(self):
         """Returns true if this platform object can handle the server this process is running on.

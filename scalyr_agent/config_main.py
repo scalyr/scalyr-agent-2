@@ -42,12 +42,12 @@ if 'win32' != sys.platform:
 
 import urllib
 
-from __scalyr__ import scalyr_init, get_install_root
+from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL
 scalyr_init()
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL, MSI_INSTALL
+from scalyr_agent.platform_controller import PlatformController
 
 
 def set_api_key(config, config_file_path, new_api_key):

@@ -18,28 +18,16 @@
 __author__ = 'czerwin@scalyr.com'
 
 
-import os
 import sys
 
-from __scalyr__ import get_install_root
-
-# The constants for install_type used below in the initializer for a
-# platform instance.
-PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
-TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
-DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
-MSI_INSTALL = 4        # Indicates source code was installed via a Windows MSI package
+from __scalyr__ import INSTALL_TYPE
 
 
 class PlatformController:
-    def __init__(self, install_type):
+    def __init__(self):
         """Initializes a platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-        @type install_type: int
         """
-        self._install_type = install_type
+        self._install_type = INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
     __platform_classes__ = []
@@ -77,20 +65,8 @@ class PlatformController:
         if not PlatformController.__platforms_registered__:
             PlatformController.__register_supported_platforms()
 
-        # Determine which type of install this is.  We do this based on
-        # whether or not certain files exist in the root of the source tree.
-        install_root = get_install_root()
-        if os.path.exists(os.path.join(install_root, 'packageless')):
-            install_type = TARBALL_INSTALL
-        elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
-            install_type = DEV_INSTALL
-        elif hasattr(sys, 'frozen'):
-            install_type = MSI_INSTALL
-        else:
-            install_type = PACKAGE_INSTALL
-
         for platform_class in PlatformController.__platform_classes__:
-            result = platform_class(install_type)
+            result = platform_class()
             if result.can_handle_current_platform():
                 return result
         return None

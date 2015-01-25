@@ -166,3 +166,34 @@ def __determine_version():
 
 
 SCALYR_VERSION = __determine_version()
+
+
+# The constants for INSTALL_TYPE, a variable declared down below.
+PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
+TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
+DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
+MSI_INSTALL = 4        # Indicates source code was installed via a Windows MSI package
+
+
+def __determine_install_type():
+    """Returns the type of install that was used for the source currently running.
+
+    @return: The install type, drawn from the constants above.
+    @rtype: int
+    """
+    # Determine which type of install this is.  We do this based on
+    # whether or not certain files exist in the root of the source tree.
+    install_root = get_install_root()
+    if os.path.exists(os.path.join(install_root, 'packageless')):
+        install_type = TARBALL_INSTALL
+    elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
+        install_type = DEV_INSTALL
+    elif hasattr(sys, 'frozen'):
+        install_type = MSI_INSTALL
+    else:
+        install_type = PACKAGE_INSTALL
+    return install_type
+
+
+# Holds which type of installation we are currently running from.
+INSTALL_TYPE = __determine_install_type()

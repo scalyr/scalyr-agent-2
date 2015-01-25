@@ -140,7 +140,7 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
         # TODO(windows): Get rid of need to for the parser.  Fix this method.
         # Remove the parser.
         from scalyr_agent.agent_main import ScalyrAgent
-        self.controller = PlatformController.new_platform()
+        self.controller = WindowsPlatformController()
         ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry())
 
     def SvcOther(self, control):
@@ -153,13 +153,8 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
 class WindowsPlatformController(PlatformController):
     """A controller instance for Microsoft's Windows platforms
     """
-    def __init__(self, install_type):
+    def __init__(self):
         """Initializes the Windows platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-
-        @type install_type: int
         """
         # The method to invoke when termination is requested.
         self.__termination_handler = None
@@ -168,7 +163,7 @@ class WindowsPlatformController(PlatformController):
         # The file path to the configuration.  We need to stash this so it is available when start is invoked.
         self.__config_file_path = None
 
-        PlatformController.__init__(self, install_type)
+        PlatformController.__init__(self)
 
     def invoke_termination_handler(self):
         if self.__termination_handler:
