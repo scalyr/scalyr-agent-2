@@ -954,7 +954,8 @@ class WorkerThread(object):
         self.__scalyr_client.close()
 
 
-def create_commandline_parser():
+if __name__ == '__main__':
+    my_controller = PlatformController.new_platform()
     parser = OptionParser(usage='Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)',
                           version='scalyr-agent v' + SCALYR_VERSION)
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -969,12 +970,6 @@ def create_commandline_parser():
                       help="Forces agent to not change which user is executing agent.  Requires the right user is "
                            "already being used.  This is used internally to prevent infinite loops in changing to"
                            "the correct user.  Users should not need to set this option.")
-    return parser
-
-
-if __name__ == '__main__':
-    my_controller = PlatformController.new_platform()
-    parser = create_commandline_parser()
     my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()
