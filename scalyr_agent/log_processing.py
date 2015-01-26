@@ -21,6 +21,7 @@
 #         logs.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import sys
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -408,6 +409,26 @@ class LogFileIterator(object):
             current_time = time.time()
         self.__refresh_pending_files(current_time)
 
+    def prepare_for_inactivity(self):
+        """Can be called before times when this iterator instance will not be used for some period of
+        time.
+
+        This is necessary to do on some platforms, such as Windows, where open file handles should be closed
+        while no real work is going on.
+
+        No calls are necessary to bring it out of this mode.  The next invocation of any method on this
+        instance will result in the instance no longer being considered inactive.
+        """
+        # This is a pain, but Windows does not allow for anyone to delete a file or its parent directory while
+        # someone has a file handle open to it.  So, to be nice, we should close ours.  However, it does limit
+        # our ability to detect and more easily handle log rotates.  (Ok, it is not completely true that Windows does
+        # not allow for file deletes while someone has a file handle open, but you have to use the native win32 api
+        # to be able to open files that work in such a way.. and it still does not allow for the parent dirs to be
+        # deleted.)
+        if sys.platform == 'win32':
+            for pending in self.__pending_files:
+                self.__close_file(pending)
+
     def close(self):
         """Closes all files open for this iterator.  This should be called before it is discarded."""
         for pending in self.__pending_files:
@@ -547,21 +568,29 @@ class LogFileIterator(object):
 
         # First, try to see if the file at the log file path still exists, and if so, what's size and inode is.
         try:
+            # Get the latest size and inode of the file at __path.
             stat_result = self.__file_system.stat(self.__path)
-            inode = stat_result.st_ino
+            latest_inode = stat_result.st_ino
+            latest_size = stat_result.st_size
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
-                if (current_log_file.last_known_size > stat_result.st_size or
-                        self.__file_system.trust_inodes and current_log_file.inode != inode):
+                if (current_log_file.last_known_size > latest_size or
+                        self.__file_system.trust_inodes and current_log_file.inode != latest_inode):
                     # Ok, the log file has rotated.  We need to add in a new entry to represent this.
                     # But, we also take this opportunity to see if the current entry we had for the log file has
                     # grown in length since the last time we checked it, which is possible.  This is the last time
                     # we have to check it since theorectically, the file would have been fully rotated before a new
                     # log file was created to take its place.
-                    current_log_file.last_known_size = max(
-                        current_log_file.last_known_size,
-                        self.__file_system.get_file_size(current_log_file.file_handle))
+                    if current_log_file.file_handle is not None:
+                        current_log_file.last_known_size = max(
+                            current_log_file.last_known_size,
+                            self.__file_system.get_file_size(current_log_file.file_handle))
+                    elif not self.__file_system.trust_inodes:
+                        # If we do not have the file handle open (probably because we are on a win32 system) and
+                        # we do not trust inodes, then there is no way to get back to the original contents, so we
+                        # just mark this file portion as now invalid.
+                        current_log_file.valid = False
                     current_log_file.is_log_file = False
                     current_log_file.position_end = current_log_file.position_start + current_log_file.last_known_size
                     # Note, we do not yet detect if current_log_file is actually pointing to the same inode as the
@@ -573,23 +602,24 @@ class LogFileIterator(object):
                     # do it.  That is a future feature.
 
                     # Add in an entry for the file content at log_path.
-                    self.__add_entry_for_log_path(inode)
+                    self.__add_entry_for_log_path(latest_inode)
                 else:
                     # It has not been rotated.  So we just update the size of the current entry.
-                    current_log_file.last_known_size = stat_result.st_size
-                    current_log_file.position_end = current_log_file.position_start + stat_result.st_size
+                    current_log_file.last_known_size = latest_size
+                    current_log_file.position_end = current_log_file.position_start + latest_size
             else:
                 # There is no entry representing the file at log_path, but it does exist, so we need to add it in.
-                self.__add_entry_for_log_path(inode)
+                self.__add_entry_for_log_path(latest_inode)
         except OSError, e:
             if e.errno == errno.ENOENT:
                 # The file doesn't exist.  See if we think we have a file handle that is for the log path, and if
                 # so, update it to reflect it no longer is.
                 if current_log_file is not None:
                     current_log_file.is_log_file = False
-                    current_log_file.last_known_size = max(current_log_file.last_known_size,
-                                                           self.__file_system.get_file_size(
-                                                               current_log_file.file_handle))
+                    if current_log_file.file_handle is not None:
+                        current_log_file.last_known_size = max(current_log_file.last_known_size,
+                                                               self.__file_system.get_file_size(
+                                                                   current_log_file.file_handle))
                     current_log_file.position_end = current_log_file.position_start + current_log_file.last_known_size
                 if self.__log_deletion_time is None:
                     self.__log_deletion_time = current_time
@@ -717,6 +747,15 @@ class LogFileIterator(object):
         if not file_state.valid:
             return None
 
+        # The file_handle could have been closed if we are on a win32 system and prepare_for_inactivity was closed.
+        # If so, we need to re-open it for reading.
+        if file_state.file_handle is None:
+            (file_state.file_handle) = self.__open_file_by_path(self.__path, starting_inode=file_state.inode)
+
+        if file_state.file_handle is None:
+            file_state.valid = False
+            return None
+
         offset_in_file = read_position_relative_to_mark - file_state.position_start
         self.__file_system.seek(file_state.file_handle, offset_in_file)
         chunk = self.__file_system.read(file_state.file_handle, num_bytes)
@@ -766,7 +805,7 @@ class LogFileIterator(object):
                 # inode hasn't changed, then we return it and the file handle.. otherwise, we try again.  We
                 # only try three times at most.
                 while attempts_left > 0:
-                    if starting_inode is None:
+                    if starting_inode is None and self.__file_system.trust_inodes:
                         starting_inode = self.__file_system.stat(file_path).st_ino
                     pending_file = self.__file_system.open(file_path)
                     second_stat = self.__file_system.stat(file_path)
@@ -785,7 +824,15 @@ class LogFileIterator(object):
                     log.warn('Permission denied while attempting to read file \'%s\'', file_path,
                              limit_once_per_x_secs=60, limit_key=('invalid-perm' + file_path))
                 else:
-                    log.warn('Error seen while attempting to read file \'%s\' with errno=%d', file_path, errno)
+                    log.warn('Error seen while attempting to read file \'%s\' with errno=%d', file_path, error.errno,
+                             limit_once_per_x_secs=60, limit_key=('unknown-io' + file_path))
+                return None, None, None
+            except OSError, e:
+                if e.errno == errno.ENOENT:
+                    log.warn('File unexpectantly missing when trying open it')
+                else:
+                    log.warn('OSError seen while attempting to read file \'%s\' with errno=%d', file_path, e.errno,
+                             limit_once_per_x_secs=60, limit_key=('unknown-os' + file_path))
                 return None, None, None
         finally:
             if pending_file is not None:
@@ -1196,6 +1243,10 @@ class LogFileProcessor(object):
             self.__total_bytes_being_processed = bytes_copied
             self.__total_bytes_pending = self.__log_file_iterator.available
             self.__lock.release()
+
+            # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
+            # do some clean up work until the next time we need it.
+            self.__log_file_iterator.prepare_for_inactivity()
 
             # Define the callback to return.
             def completion_callback(result):
@@ -1713,7 +1764,7 @@ class FileSystem(object):
     """
 
     def __init__(self):
-        self.trust_inodes = True
+        self.trust_inodes = sys.platform != 'win32'
 
     def open(self, file_path):
         """Returns a file object to read the file at file_path.

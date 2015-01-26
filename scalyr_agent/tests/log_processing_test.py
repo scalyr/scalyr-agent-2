@@ -441,9 +441,11 @@ class TestLogFileIterator(unittest.TestCase):
         file_handle.close()
 
     def delete_file(self, path):
+        self.log_file.prepare_for_inactivity()
         os.remove(path)
 
     def move_file(self, original_path, new_path):
+        self.log_file.prepare_for_inactivity()
         os.rename(original_path, new_path)
 
     def truncate_file(self, path):
