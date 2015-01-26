@@ -113,8 +113,8 @@ class TestConfiguration(unittest.TestCase):
     def test_overriding_basic_settings(self):
         self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
-            agent_log_path: "silly1",
-            agent_data_path: "silly2",
+            agent_log_path: "/var/silly1",
+            agent_data_path: "/var/silly2",
             additional_monitor_module_paths: "silly3",
             config_directory: "silly4",
             implicit_metric_monitor: false,
@@ -142,8 +142,8 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(config.agent_log_path, 'silly1')
-        self.assertEquals(config.agent_data_path, 'silly2')
+        self.assertPathEquals(config.agent_log_path, '/var/silly1')
+        self.assertPathEquals(config.agent_data_path, '/var/silly2')
         self.assertEquals(config.additional_monitor_module_paths, 'silly3')
         self.assertEquals(config.config_directory, os.path.join(self.__config_dir, 'silly4'))
         self.assertEquals(config.implicit_metric_monitor, False)
@@ -168,7 +168,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.request_too_large_adjustment, 0.75)
         self.assertEquals(config.debug_level, 1)
         self.assertEquals(config.request_deadline, 30.0)
-        self.assertEquals(config.ca_cert_path, '/var/lib/foo.pem')
+        self.assertPathEquals(config.ca_cert_path, '/var/lib/foo.pem')
         self.assertFalse(config.verify_server_certificate)
 
     def test_missing_api_key(self):
@@ -449,7 +449,7 @@ class TestConfiguration(unittest.TestCase):
 
         self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
         self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
-        self.assertPathEquals(config.logs[1].config.get_json_object('attributes').get_string('parser'), 'agent-metrics')
+        self.assertEquals(config.logs[1].config.get_json_object('attributes').get_string('parser'), 'agent-metrics')
         self.assertPathEquals(config.logs[2].config.get_string('path'),
                               '/var/log/scalyr-agent-2/linux_system_metrics.log')
 
@@ -592,7 +592,7 @@ class TestConfiguration(unittest.TestCase):
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
 
     def test_empty_substitution(self):
         self.__write_file_with_separator_conversion(""" {
@@ -613,11 +613,16 @@ class TestConfiguration(unittest.TestCase):
         @param contents: The contents to convert in a valid Json atom (JsonObject, JsonArray, or primitive)
         @return: The passed in object.
         """
-        if contents is dict or contents is JsonObject:
+        contents_type = type(contents)
+        if contents_type is dict or contents_type is JsonObject:
             for key in contents:
-                if key.endswith('path'):
+                value = contents[key]
+                value_type = type(value)
+                if key.endswith('path') and (value_type is str or value_type is unicode):
                     contents[key] = self.convert_path(contents[key])
-        elif contents is list or contents is JsonArray:
+                elif value_type in (dict, JsonObject, list, JsonArray):
+                    self.__convert_separators(value)
+        elif contents_type is list or contents_type is JsonArray:
             for i in range(len(contents)):
                 self.__convert_separators(contents[i])
         return contents
@@ -706,6 +711,8 @@ class TestConfiguration(unittest.TestCase):
             if len(path_part) > 0:
                 result = os.path.join(result, path_part)
 
+        if os.path.sep == '\\':
+            result = 'C:\\%s' % result
         return result
 
     def convert_path(self, path):
