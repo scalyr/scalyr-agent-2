@@ -430,13 +430,13 @@ class TestLogFileIterator(unittest.TestCase):
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'w')
+        file_handle = open(path, 'wb')
         file_handle.write(contents)
         file_handle.close()
 
     def append_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'a')
+        file_handle = open(path, 'ab')
         file_handle.write(contents)
         file_handle.close()
 
@@ -773,13 +773,13 @@ class TestLogFileProcessor(unittest.TestCase):
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'w')
+        file_handle = open(path, 'wb')
         file_handle.write(contents)
         file_handle.close()
 
     def append_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'a')
+        file_handle = open(path, 'ab')
         file_handle.write(contents)
         file_handle.close()
 
