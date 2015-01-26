@@ -532,8 +532,9 @@ class LogFileIterator(object):
         @param file_entry: The entry for the file to close.
         @type file_entry: FileState
         """
-        self.__file_system.close(file_entry.file_handle)
-        file_entry.file_handle = None
+        if file_entry is not None:
+            self.__file_system.close(file_entry.file_handle)
+            file_entry.file_handle = None
 
     def __add_entry_for_log_path(self, inode):
         self.__log_deletion_time = None
@@ -750,7 +751,7 @@ class LogFileIterator(object):
         # The file_handle could have been closed if we are on a win32 system and prepare_for_inactivity was closed.
         # If so, we need to re-open it for reading.
         if file_state.file_handle is None:
-            (file_state.file_handle) = self.__open_file_by_path(self.__path, starting_inode=file_state.inode)
+            (file_state.file_handle, x, y) = self.__open_file_by_path(self.__path, starting_inode=file_state.inode)
 
         if file_state.file_handle is None:
             file_state.valid = False
