@@ -23,6 +23,7 @@
 #     should only be emitted at most once per X seconds).
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import inspect
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -138,13 +139,18 @@ def set_log_level(level):
 # _srcfile is used when walking the stack to check when we've got the first
 # caller stack frame.  This is copied from the logging/__init__.py
 #
-if hasattr(sys, 'frozen'):  # support for py2exe
-    _srcfile = "scalyr_agent%sscaly_logging%s" % (os.sep, __file__[-4:])
-elif __file__[-4:].lower() in ['.pyc', '.pyo']:
-    _srcfile = __file__[:-4] + '.py'
-else:
-    _srcfile = __file__
-_srcfile = os.path.normcase(_srcfile)
+def __determine_file():
+    # To determine file holding this code, we do not rely on __file__ because it is not portable to all
+    # versions of python, especially when on win32 when code is running using py2exe.  Instead, we do this
+    # trick which is suppose to be more portable.
+    base = os.getcwd()
+    file_path = inspect.stack()[1][1]
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(base, file_path)
+    file_path = os.path.dirname(os.path.realpath(file_path))
+    return file_path
+
+_srcfile = os.path.normcase(__determine_file())
 
 
 # next bit filched from 1.5.2's inspect.py

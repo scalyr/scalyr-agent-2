@@ -1376,6 +1376,7 @@ class LogFileProcessor(object):
 
         return 'log_%d' % new_id
 
+
 class LogLineSampler(object):
     """Encapsulates all of the configured sampling rules to perform on lines from a single log file.
 
