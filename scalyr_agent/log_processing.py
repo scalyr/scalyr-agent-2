@@ -532,7 +532,7 @@ class LogFileIterator(object):
         @param file_entry: The entry for the file to close.
         @type file_entry: FileState
         """
-        if file_entry is not None:
+        if file_entry.file_handle is not None:
             self.__file_system.close(file_entry.file_handle)
             file_entry.file_handle = None
 
