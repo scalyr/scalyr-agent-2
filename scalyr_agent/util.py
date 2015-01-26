@@ -127,7 +127,13 @@ def format_time(time_value):
     if time_value is None:
         return 'Never'
     else:
-        return '%s UTC' % (time.asctime(time.gmtime(time_value)))
+        result = '%s UTC' % (time.asctime(time.gmtime(time_value)))
+        # Windows uses a leading 0 on the day of month field, which makes it different behavior from Linux
+        # which uses a space in place of the leading 0.  For tests, we need this to behave the same, so we spend
+        # the small effort here to make it work.  At least, that leading 0 is always in the same place.
+        if result[8] == '0':
+            result = '%s %s' % (result[:8], result[9:])
+        return result
 
 
 class JsonReadFileException(Exception):
