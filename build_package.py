@@ -35,6 +35,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import uuid
 
 from cStringIO import StringIO
 from optparse import OptionParser
@@ -91,6 +92,12 @@ def build_package(package_type, variant):
         #shutil.rmtree(tmp_dir)
 
 
+# A GUID representing Scalyr products, used to generate a per-version guid for each version of the Windows
+# Scalyr Agent.  DO NOT MODIFY THIS VALUE, or already installed software on clients machines will not be able
+# to be upgraded.
+_scalyr_guid_ = '0b52b8a0-22c7-4d50-92c1-8ea3b258984e'
+
+
 def build_win32_installer_package(variant, version):
     """Builds an MSI that will install the agent on a win32 machine in the current working directory.
 
@@ -103,6 +110,12 @@ def build_win32_installer_package(variant, version):
 
     @return: The file name of the built package.
     """
+    if os.getenv('WIX') is None:
+        print >>sys.stderr, 'Error, the WIX toolset does not appear to be installed.'
+        print >>sys.stderr, 'Please install it to build the Windows Scalyr Agent installer.'
+        print >>sys.stderr, 'See http://wixtoolset.org.'
+        sys.exit(1)
+
     # What do I need?
     # - Make the cert file
     # - Make the json file
@@ -167,7 +180,21 @@ def build_win32_installer_package(variant, version):
     cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'Scalyr/certs/ca_certs.crt',
               convert_newlines=True)
 
-    shutil.move('Scalyr', agent_source_root)
+    # Generate the file used by WIX's candle program.
+    shutil.copy(make_path(agent_source_root, 'win32/scalyr_agent.wxs'), 'scalyr_agent.wxs')
+
+    # Get ready to run wix.  Add in WIX to the PATH variable.
+    os.environ['PATH'] = '%s;%s' % (os.getenv('PATH'), os.getenv('WIX'))
+
+    if variant is None:
+        variant = 'main'
+
+    # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
+    upgrade_code = uuid.uuid3(_scalyr_guid_, '%s:%s' % (variant, version))
+
+    run_command('candle -nologo -out ScalyrAgent.wixobj -dVERSION=%s -dUPGRADECODE=%s scalyr_agent.wxs' % (
+        version, upgrade_code), exit_on_fail=True, command_name='candle')
+
     return ''
 
 
