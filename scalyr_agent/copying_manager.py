@@ -464,6 +464,8 @@ class CopyingManager(StoppableThread):
             fp.write(json_lib.serialize(state))
             fp.close()
             fp = None
+            if sys.platform == 'win32':
+                os.unlink(file_path)
             os.rename(tmp_path, file_path)
         except (IOError, OSError):
             if fp is not None:
