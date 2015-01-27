@@ -3,8 +3,8 @@
     <Product Id='*' Name='Scalyr Agent 2' Version='$(var.VERSION)'
         Language='1033' UpgradeCode='$(var.UPGRADECODE)' Manufacturer='Scalyr' >
 
-        <Package Description='Scalyr Agent Service' Manufacturer='Scalyr' InstallerVersion='200'
-            Comments='Scalyr Agent Service for Windows Platforms' Compressed='yes' />
+        <Package Description='Scalyr Agent' Manufacturer='Scalyr' InstallerVersion='200'
+            Comments='Scalyr Agent for Windows Platforms' Compressed='yes' />
         <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -16,6 +16,10 @@
                     <Directory Id='APPLICATIONCERTS' Name='certs' />
                     <Directory Id='DEFAULTAPPLOGS' Name='log' />
                     <Directory Id='DEFAULTAPPLIBS' Name='lib' />
+                    <Directory Id='APPLICATIONBINDIR' Name='bin' />
+                    <Directory Id='DEFAULTAPPCONFIG' Name='config'>
+                        <Directory Id='DEFAULTAPPCONFIGD' Name='agent.d' />
+                    </Directory>
                 </Directory>
             </Directory>
             <Directory Id='ProgramMenuFolder'>
@@ -26,51 +30,50 @@
         <!-- Define files within directory structure -->
         <DirectoryRef Id='APPLICATIONCERTS'>
             <Component Id='ca_certs.crt' Guid='*'>
-                <File Id='ca_certs.crt' Source='certs\ca_certs.crt' KeyPath='yes' Checksum='yes' />
+                <File Id='ca_certs.crt' Source='Scalyr\certs\ca_certs.crt' KeyPath='yes' Checksum='yes' />
             </Component>
         </DirectoryRef>
 
         <!-- Scalyr Application Files -->
-        <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
+        <DirectoryRef Id='APPLICATIONBINDIR'>
             <Component Id='ScalyrAgent2' Guid='8A883043-D54B-4392-9D25-9F3B51A40671' >
 
                 <!-- Scalyr Data -->
-                <File Id='VERSION' Name='VERSION' DiskId='1' Source='VERSION' />
-                <File Id='LICENSE' Name='LICENSE.txt' DiskId='1' Source='LICENSE.txt' />
-                <File Id='config.tmpl' Name='config.tmpl' Source='config\agent.json' />
+                <File Id='VERSION' Name='VERSION' DiskId='1' Source='data_files\VERSION' />
+                <File Id='LICENSE' Name='LICENSE.txt' DiskId='1' Source='data_files\LICENSE.txt' />
+                <File Id='config.tmpl' Name='agent_config.tmpl' Source='data_files\agent_config.tmpl' />
 
                 <!-- Scalyr Executables -->
-                <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='dist\scalyr-agent-2.exe' />
-                <File Id='ScalyrAgentService' Name='ScalyrAgentService.exe' DiskId='1' Source='dist\ScalyrAgentService.exe' />
-                <File Id='scalyr_agent_2_config' Name='scalyr-agent-2-config.exe' DiskId='1' Source='dist\config_main.exe' />
-                <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='win32\ScalyrShell.cmd' />
+                <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='Scalyr\bin\scalyr-agent-2.exe' />
+                <File Id='ScalyrAgentService' Name='ScalyrAgentService.exe' DiskId='1' Source='Scalyr\bin\ScalyrAgentService.exe' />
+                <File Id='scalyr_agent_2_config' Name='scalyr-agent-2-config.exe' DiskId='1' Source='Scalyr\bin\scalyr-agent-2-config.exe' />
+                <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='Scalyr\bin\ScalyrShell.cmd' />
 
-                <File Id='MPR' Name='MPR.dll' DiskId='1' Source='dist/MPR.dll'/>
-                <File Id='_ctypes' Name='_ctypes.pyd' DiskId='1' Source='dist/_ctypes.pyd'/>
-                <File Id='_hashlib' Name='_hashlib.pyd' DiskId='1' Source='dist/_hashlib.pyd'/>
-                <File Id='_socket' Name='_socket.pyd' DiskId='1' Source='dist/_socket.pyd'/>
-                <File Id='_ssl' Name='_ssl.pyd' DiskId='1' Source='dist/_ssl.pyd'/>
-                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId='1' Source='dist/_win32sysloader.pyd'/>
-                <File Id='bz2' Name='bz2.pyd' DiskId='1' Source='dist/bz2.pyd'/>
-                <File Id='config_main' Name='config_main.exe' DiskId='1' Source='dist/config_main.exe'/>
-                <File Id='perfmon' Name='perfmon.pyd' DiskId='1' Source='dist/perfmon.pyd'/>
-                <File Id='pyexpat' Name='pyexpat.pyd' DiskId='1' Source='dist/pyexpat.pyd'/>
-                <File Id='python27' Name='python27.dll' DiskId='1' Source='dist/python27.dll'/>
-                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId='1' Source='dist/pywintypes27.dll'/>
-                <File Id='select' Name='select.pyd' DiskId='1' Source='dist/select.pyd'/>
-                <File Id='servicemanager' Name='servicemanager.pyd' DiskId='1' Source='dist/servicemanager.pyd'/>
-                <File Id='unicodedata' Name='unicodedata.pyd' DiskId='1' Source='dist/unicodedata.pyd'/>
-                <File Id='w9xpopen' Name='w9xpopen.exe' DiskId='1' Source='dist/w9xpopen.exe'/>
-                <File Id='win32api' Name='win32api.pyd' DiskId='1' Source='dist/win32api.pyd'/>
-                <File Id='win32event' Name='win32event.pyd' DiskId='1' Source='dist/win32event.pyd'/>
-                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId='1' Source='dist/win32evtlog.pyd'/>
-                <File Id='win32pipe' Name='win32pipe.pyd' DiskId='1' Source='dist/win32pipe.pyd'/>
-                <File Id='win32service' Name='win32service.pyd' DiskId='1' Source='dist/win32service.pyd'/>
-                <File Id='win32wnet' Name='win32wnet.pyd' DiskId='1' Source='dist/win32wnet.pyd'/>
+                <File Id='MPR' Name='MPR.dll' DiskId='1' Source='Scalyr\bin\MPR.dll'/>
+                <File Id='_ctypes' Name='_ctypes.pyd' DiskId='1' Source='Scalyr\bin\_ctypes.pyd'/>
+                <File Id='_hashlib' Name='_hashlib.pyd' DiskId='1' Source='Scalyr\bin\_hashlib.pyd'/>
+                <File Id='_socket' Name='_socket.pyd' DiskId='1' Source='Scalyr\bin\_socket.pyd'/>
+                <File Id='_ssl' Name='_ssl.pyd' DiskId='1' Source='Scalyr\bin\_ssl.pyd'/>
+                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId='1' Source='Scalyr\bin\_win32sysloader.pyd'/>
+                <File Id='bz2' Name='bz2.pyd' DiskId='1' Source='Scalyr\bin\bz2.pyd'/>
+                <File Id='perfmon' Name='perfmon.pyd' DiskId='1' Source='Scalyr\bin\perfmon.pyd'/>
+                <File Id='pyexpat' Name='pyexpat.pyd' DiskId='1' Source='Scalyr\bin\pyexpat.pyd'/>
+                <File Id='python27' Name='python27.dll' DiskId='1' Source='Scalyr\bin\python27.dll'/>
+                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId='1' Source='Scalyr\bin\pywintypes27.dll'/>
+                <File Id='select' Name='select.pyd' DiskId='1' Source='Scalyr\bin\select.pyd'/>
+                <File Id='servicemanager' Name='servicemanager.pyd' DiskId='1' Source='Scalyr\bin\servicemanager.pyd'/>
+                <File Id='unicodedata' Name='unicodedata.pyd' DiskId='1' Source='Scalyr\bin\unicodedata.pyd'/>
+                <File Id='w9xpopen' Name='w9xpopen.exe' DiskId='1' Source='Scalyr\bin\w9xpopen.exe'/>
+                <File Id='win32api' Name='win32api.pyd' DiskId='1' Source='Scalyr\bin\win32api.pyd'/>
+                <File Id='win32event' Name='win32event.pyd' DiskId='1' Source='Scalyr\bin\win32event.pyd'/>
+                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId='1' Source='Scalyr\bin\win32evtlog.pyd'/>
+                <File Id='win32pipe' Name='win32pipe.pyd' DiskId='1' Source='Scalyr\bin\win32pipe.pyd'/>
+                <File Id='win32service' Name='win32service.pyd' DiskId='1' Source='Scalyr\bin\win32service.pyd'/>
+                <File Id='win32wnet' Name='win32wnet.pyd' DiskId='1' Source='Scalyr\bin\win32wnet.pyd'/>
 
 
                 <!-- Uncompiled Python modules -->
-                <File Id='library' Name='library.zip' DiskId='1' Source='dist\library.zip' />
+                <File Id='library' Name='library.zip' DiskId='1' Source='Scalyr\bin\library.zip' />
             </Component>
         </DirectoryRef>
 

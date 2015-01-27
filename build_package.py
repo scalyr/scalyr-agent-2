@@ -158,6 +158,7 @@ def build_win32_installer_package(variant, version):
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
     shutil.copy(make_path(agent_source_root, 'VERSION'), 'VERSION')
+    shutil.copy(make_path(agent_source_root, 'LICENSE.txt'), 'LICENSE.txt')
 
     # Copy the config file.
     cat_files([make_path(agent_source_root, 'config/agent.json')], 'agent_config.tmpl', convert_newlines=True)
@@ -175,6 +176,7 @@ def build_win32_installer_package(variant, version):
     make_directory('Scalyr/data')
     make_directory('Scalyr/config/agent.d')
     os.rename('dist', convert_path('Scalyr/bin'))
+    shutil.copy(make_path(agent_source_root, 'win32/ScalyrShell.cmd'), 'Scalyr/bin/ScalyrShell.cmd')
 
     # Copy the cert files.
     cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'Scalyr/certs/ca_certs.crt',
@@ -195,8 +197,9 @@ def build_win32_installer_package(variant, version):
     run_command('candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" scalyr_agent.wxs' % (
         version, upgrade_code), exit_on_fail=True, command_name='candle')
 
-    run_command('light -nolog -out ScalyrAgentInstaller-%s.msi ScalyrAgent.wixobj' % version)
-    return ''
+    installer_name = 'ScalyrAgentInstaller-%s.msi' % version
+    run_command('light -nolog -out %s ScalyrAgent.wixobj' % installer_name)
+    return installer_name
 
 
 def build_rpm_or_deb_package(is_rpm, variant, version):
