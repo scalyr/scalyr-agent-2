@@ -305,6 +305,17 @@ class PosixPlatformController(PlatformController):
         """
         return pwd.getpwuid(os.geteuid()).pw_name
 
+    def set_file_owner(self, file_path, owner):
+        """Sets the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
+            `get_current_user`.
+        @type file_path: str
+        @type owner: str
+        """
+        os.chown(file_path, pwd.getpwnam(owner).pw_uid, -1)
+
     def is_privileged_user(self):
         """Returns true if the user running this process is privileged (can read / write any file).
 

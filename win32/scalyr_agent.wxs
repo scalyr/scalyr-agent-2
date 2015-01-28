@@ -112,8 +112,15 @@
             <!-- EXPAND_FROM_BIN -->
         </Feature>
 
+        <!-- This is a little bit of a hack.  We run the config tool to initialize the config, which means it -->
+        <!-- makes a copy of the config temlate, puts it in the right location and sets the owner to the current -->
+        <!-- user.  We use the quiet execute commandline tool so a console window does not pop up -->
+        <Property Id="QtExecCmdLine" Value='"C:\Program Files (x86)\Scalyr\bin\scalyr-agent-2-config.exe" --init-config'/>
+        <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="immediate" Return="check"/>
+
         <InstallExecuteSequence>
           <WriteEnvironmentStrings />
+          <Custom Action="InitializeConfig" After="InstallFinalize"/>
         </InstallExecuteSequence>
     </Product>
 </Wix>

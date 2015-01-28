@@ -512,21 +512,19 @@ if __name__ == '__main__':
                       help="When performing a tarball upgrade, move the old install to a temporary directory "
                            "instead of deleting it.")
 
-    # TODO: This option is only available on Windows platforms
+    # TODO: These options are only available on Windows platforms
     if 'win32' == sys.platform:
         parser.add_option("", "--upgrade-windows", dest="upgrade_windows", action="store_true", default=False,
-            help='Upgrade the agent if a new version is available')
-
-
+                          help='Upgrade the agent if a new version is available')
+        # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
+        # beyond just Windows.
+        parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
+                          help='Create an initial copy of the configuration file in the appropriate location.')
 
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print >> sys.stderr, 'Could not parse commandline arguments.'
         parser.print_help(sys.stderr)
-        sys.exit(1)
-
-    if options.executing_user and getpass.getuser() != 'root':
-        print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
         sys.exit(1)
 
     controller = PlatformController.new_platform()
@@ -537,6 +535,33 @@ if __name__ == '__main__':
 
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
+
+    if options.init_config:
+        # Create a copy of the configuration file and set the owner to be the current user.
+        config_path = options.config_filename
+        template_dir = os.path.join(os.path.dirname(config_path), 'templates')
+        template = os.path.join(template_dir, 'agent_config.tmpl')
+
+        if os.path.exists(config_path):
+            print >> sys.stderr, 'Cannot initialize configuration file at %s because file already exists.' % config_path
+            sys.exit(1)
+        if not os.path.isdir(template_dir):
+            print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist at'
+                                  '%s' % template_dir)
+            sys.exit(1)
+        if not os.path.isfile(template):
+            print >> sys.stderr, ('Cannot initialize configuration file because template file does not exist at'
+                                  '%s' % template)
+            sys.exit(1)
+
+        # Copy the file.
+        shutil.copy(template, config_path)
+        controller.set_file_owner(template, controller.get_current_user())
+        print 'Successfully initialized the configuration file.'
+
+    if options.executing_user and getpass.getuser() != 'root':
+        print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
+        sys.exit(1)
 
     try:
         config_file = Configuration(options.config_filename, default_paths, controller.default_monitors, None, None)

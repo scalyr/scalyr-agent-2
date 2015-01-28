@@ -246,10 +246,30 @@ class WindowsPlatformController(PlatformController):
         @return: The user name of the owner.
         @rtype: str
         """
-        sd = win32security.GetFileSecurity (file_path, win32security.OWNER_SECURITY_INFORMATION)
+        sd = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
         owner_sid = sd.GetSecurityDescriptorOwner()
         name, domain, account_type = win32security.LookupAccountSid(None, owner_sid)
         return u'%s\\%s' % (domain, name)
+
+    def set_file_owner(self, file_path, owner):
+        """Sets the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
+            `get_current_user`.
+        @type file_path: str
+        @type owner: str
+        """
+        # Lookup the user info by their name.  We need their sid, which will be in the 0th element of user_info.
+        domain_user = owner.split('\\')
+        user_info = win32security.LookupAccountName(domain_user[0], domain_user[1])
+
+        # Get the current acl so we can just replace the owner information.
+        owner_acl = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
+
+        owner_acl.SetSecurityDescriptorOwner(user_info[0], True)
+        
+        win32security.SetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION, owner_acl)
 
     def get_current_user(self):
         """Returns the effective user name running this process.

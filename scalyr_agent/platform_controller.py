@@ -163,6 +163,17 @@ class PlatformController:
         """
         pass
 
+    def set_file_owner(self, file_path, owner):
+        """Sets the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
+            `get_current_user`.
+        @type file_path: str
+        @type owner: str
+        """
+        pass
+
     def get_current_user(self):
         """Returns the effective user name running this process.
 
