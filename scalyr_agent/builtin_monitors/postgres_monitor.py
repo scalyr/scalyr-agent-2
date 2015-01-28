@@ -232,10 +232,10 @@ class PostgreSQLDb(object):
         version = "unknown"
         try:
             self._cursor.execute("select version();")
-            r = cur.fetchone()
+            r = self._cursor.fetchone()
             # assumes version is in the form of 'PostgreSQL x.y.z on ...'
             s = string.split(r[0])
-            version = s[1]
+            print(version)
         except:
             ex = sys.exc_info()[0]
             self._logger.error("Exception getting database version: %s" % ex)
