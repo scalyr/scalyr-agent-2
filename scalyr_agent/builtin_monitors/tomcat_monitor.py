@@ -202,8 +202,68 @@ def _convert_to_milliseconds(value):
     
 
 class TomcatMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that monitors tomcat servers.
     """
+# Tomcat Monitor
+
+The Tomcat monitor allows you to collect data about the usage and performance of your Tomcat server.
+
+Each monitor can be configured to monitor a specific Tomcat server, thus allowing you to configure alerts and the
+dashboard entries independently (if desired) for each instance.
+
+## Configuring TomcatMonitor
+
+In order to use this monitor, you will need to configure a couple of things in your Tomcat 
+instance:
+
+- Installation of the management utilities
+- Adding a user role with monitoring privileges
+
+Installation of the Management Utilities
+
+If you are (or have) installed Tomcat from sources, please consult the documentation for your
+version of Tomcat at http://tomcat.apache.org.  For Redhat (and related variants), the 
+administrator webapps are contained in a package  named tomcat<version>-admin-webapps.
+For Debian (and related variants) the administrator webapps are contained in the package
+named tomcat<version>-admin.
+
+To check to see, say for Tomcat version 7, if you already have the admin webapps already 
+installed, you can issue the command 'dpkg -l | grep tomcat7' or look for the file 
+manager.xml in the directory /etc/tomcat7/Catalina/localhost.
+
+Adding a User Role with Monitoring Privileges
+
+Users are configured in a file named tomcat-users.xml.  This file, for Ubuntu, is located
+(for version 7 of Tomcat) in /etc/tomcat7.  Tomcat provides a number of roles with differing
+types of access.  For purposes of getting server status, that role is "manager-status".  The
+details of the Manager can be found in the Tomcat documentation here:  http://tomcat.apache.org/tomcat-7.0-doc/manager-howto.html
+
+To add user "statusmon" with password "getstatus", you would open up the tomcat-users.xml file
+and edit the tomcat-users section to resemble:
+
+<tomcat-users>
+  ...
+  <role rolename="manager-status"/>
+  <user username="statusmon" password="getstatus" roles="manager-status"/>
+</tomcat-users>
+
+## Configuring Scalyr Agent
+
+In order to use the Tomcat monitor, you need to enter a configuration in the agent.json
+file.  A typical fragment resembles:
+
+  monitors: [
+    {
+      module:              "scalyr_agent.builtin_monitors.tomcat_monitor",
+      id:                  "tomcat",
+      monitor_url:         "http://localhost:8080/manager/status",
+      monitor_username:    "statusmon",
+      monitor_password:    "getstatus" 
+    }
+  ]
+  
+Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
+specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
+instance."""
     def _initialize(self):
         """Performs monitor-specific initialization.
         """
