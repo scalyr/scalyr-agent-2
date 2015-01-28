@@ -79,9 +79,6 @@ define_metric(__monitor__, 'tomcat.runtime.processing_time_max',
 define_metric(__monitor__, 'tomcat.runtime.processing_time',
               'The value represents the largest amount of time spent processing the current request.'
               , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.processing_time',
-              'The value represents the largest amount of time spent processing the current request.'
-              , cumulative=False, category='general')
 define_metric(__monitor__, 'tomcat.runtime.request_count',
               'The value represents the total number of requests made.  '
               , cumulative=True, category='general')
@@ -96,7 +93,7 @@ define_metric(__monitor__, 'tomcat.runtime.bytes_sent',
               , cumulative=True, category='general')
 
 memory_pools = {
-    'cms_old_gen': 'The memory pool for objects that have exised for some time in the survivor space / are long lived..',
+    'cms_old_gen': 'The memory pool for objects that have exised for some time in the survivor space / are long lived.',
     'eden_space':  'The memory space from which objects are initially allocated.',
     'survivor_space': 'The memory pool for objects that have survived garbage collection of the Eden Space.',
     'cms_perm_gen': 'Memory used for storing loaded classes.',
@@ -104,9 +101,6 @@ memory_pools = {
 }
 
 for i in memory_pools.keys():
-    define_metric(__monitor__, 'tomcat.memory_pool.%s.type',
-              '%s. The type of memory pool %s represents.' % (i, memory_pools[i])
-              , cumulative=False, category='memory')
     define_metric(__monitor__, 'tomcat.memory_pool.%s.initial',
               '%s.  The iniital amount of memory allocated to the memory pool.' % i
               , cumulative=False, category='memory')
@@ -378,8 +372,8 @@ class TomcatMonitor(ScalyrMonitor):
             
             if stats != None:
                 for key in stats.keys():
-                    self._logger.emit_value("tomcat.runtime.%s" % key, get_value_as_str(stats[key]))
+                    self._logger.emit_value("tomcat.runtime.%s" % key, stats[key])
             if heap != None:
                 for key in heap.keys():
-                    self._logger.emit_value("tomcat.memory_pool.%s" % key, get_value_as_str(heap[key]))
+                    self._logger.emit_value("tomcat.memory_pool.%s" % key, heap[key])
         
