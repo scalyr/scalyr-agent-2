@@ -1,0 +1,46 @@
+{
+  duration: "4h",
+  
+  graphs: [
+    {
+      label: "Active Connections",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.connections'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Deadlocks",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.deadlocks'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Disk Blocks Read",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.disk_blocks_read'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Disk Blocks in Buffer Cache",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.disk_blocks_hit'",
+          label: "number"
+        }
+      ]
+    },    
+  ],
+}

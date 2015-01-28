@@ -77,15 +77,11 @@ define_metric(__monitor__, 'postgres.database.transactions_rolledback',
               'The number of database transactions that have been rolled back.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.blocks_read',
+define_metric(__monitor__, 'postgres.database.disk_blocks_read',
               'The number of disk blocks read into the database.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.blocks_hit',
-              'The number of disk blocks read that were found in the buffer cache.  '
-              'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.blocks_hit',
+define_metric(__monitor__, 'postgres.database.disk_blocks_hit',
               'The number of disk blocks read that were found in the buffer cache.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
@@ -125,10 +121,6 @@ define_metric(__monitor__, 'postgres.database.deadlocks',
               'The number of deadlocks detected in the database.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.deadlocks',
-              'The number of deadlocks detected in the database.  '
-              'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
 define_metric(__monitor__, 'postgres.database.blocks_read_time',
               'The amount of time data file blocks are read by clients in the database (in milliseconds).  '
               'The value is relative to postgres.database.stats_reset.'
@@ -140,27 +132,6 @@ define_metric(__monitor__, 'postgres.database.blocks_write_time',
 define_metric(__monitor__, 'postgres.database.stats_reset',
               'The time at which database statistics were last reset.'
               , cumulative=False, category='general')
-
-define_metric(__monitor__, 'postgres.database.conflict_tablespace',
-              'The number of queries that have been canceled due to dropped tablespaces.  '
-              'The value is relative to postgres.database.stats_reset.',
-              cumulative=True, category='conflicts')
-define_metric(__monitor__, 'postgres.database.conflict_lock',
-              'The number of queries that have been canceled due to lock timeouts.  '
-              'The value is relative to postgres.database.stats_reset.',
-              cumulative=True, category='conflicts')
-define_metric(__monitor__, 'postgres.database.conflict_snapshot',
-              'The number of queries that have been canceled due to old snapshots.  '
-              'The value is relative to postgres.database.stats_reset.',
-              cumulative=True, category='conflicts')
-define_metric(__monitor__, 'postgres.database.conflict_bufferpin',
-              'The number of queries that have been canceled due to pinned buffers.  '
-              'The value is relative to postgres.database.stats_reset.',
-              cumulative=True, category='conflicts')
-define_metric(__monitor__, 'postgres.database.conflict_deadlock',
-              'The number of queries that have been canceled due to deadlocks.  '
-              'The value is relative to postgres.database.stats_reset.',
-              cumulative=True, category='conflicts')
 
 define_log_field(__monitor__, 'monitor', 'Always ``postgres_monitor``.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration.')
@@ -190,13 +161,6 @@ class PostgreSQLDb(object):
           'blk_read_time' : 'postgres.database.blocks_read_time',
           'blk_write_time' : 'postgres.database.blocks_write_time',
           'stats_reset' : 'postgres.database.stats_reset'
-        },
-        'pg_stat_database_conflicts': {
-          'confl_tablespace' : 'postgres.database.conflict_tablespace',
-          'confl_lock' : 'postgres.database.conflict_lock',
-          'confl_snapshot' : 'postgres.database.conflict_snapshot',
-          'confl_bufferpin' : 'postgres.database.conflict_bufferpin',
-          'confl_deadlock' : 'postgres.database.conflict_deadlock'
         }
     }
     
@@ -215,7 +179,7 @@ class PostgreSQLDb(object):
             raise Exception("Exception trying to connect:  %s" % ex)
         
     def _close(self):
-        """Closes the cursor and connection to this MySQL server."""
+        """Closes the cursor and connection to this PostgreSQL server."""
         if self._cursor:
             self._cursor.close()
         if self._db:
@@ -224,7 +188,7 @@ class PostgreSQLDb(object):
         self._db = None
             
     def _reconnect(self):
-        """Reconnects to this MySQL server."""
+        """Reconnects to this PostgreSQL server."""
         self._close()
         self._connect()
         
@@ -235,7 +199,7 @@ class PostgreSQLDb(object):
             r = self._cursor.fetchone()
             # assumes version is in the form of 'PostgreSQL x.y.z on ...'
             s = string.split(r[0])
-            print(version)
+            version = s[1]
         except:
             ex = sys.exc_info()[0]
             self._logger.error("Exception getting database version: %s" % ex)
@@ -387,20 +351,10 @@ class PostgresMonitor(ScalyrMonitor):
             td = dt - epoch
             return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 1e3
         
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is str:
-                return "%r" % value
-            else:
-                return "%r" % value
-                
         dbstats = self._db.retrieve_database_stats()
         if dbstats != None:
             for key in dbstats.keys():
                 if key != "postgres.database.stats_reset":
-                    self._logger.emit_value(key, get_value_as_str(dbstats[key]))
+                    self._logger.emit_value(key, dbstats[key])
                 else:
-                    self._logger.emit_value(key, get_value_as_str(timestamp_ms(dbstats[key])))
+                    self._logger.emit_value(key, timestamp_ms(dbstats[key]))

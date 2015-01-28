@@ -1,0 +1,98 @@
+PostgreSQL Monitor
+
+This agent monitor plugin records performance and usage data from a PostgreSQL server.
+
+
+Configuring PostgreSQL
+
+In order to use this monitor, you will need to configure a user account that will allow
+access to the PostgreSQL database.  PostgreSQL has differing methods for user authentication.
+This configuration is controlled within the PostgreSQL's pg_hba.conf file.  Typical entries
+might include:
+
+    # "local" is for Unix domain socket connections only
+    local   all             all                                     peer
+    local   all             all                                     md5
+    # IPv4 local connections:
+    host    all             all             127.0.0.1/32            md5
+
+For a description of the pg_hba.conf file, please refer to the PostgreSQL documentation for
+the version of PostgreSQL you are running.  For version 9.3, the documentation can be found
+here:  http://www.postgresql.org/docs/9.3/static/auth-pg-hba-conf.html
+
+In the above configuration, we are interested in the line:
+
+    host    all             all             127.0.0.1/32            md5
+    
+This line specifies that the server will allow users to connect from localhost using a 
+password.
+
+If you have an existing user that requires a password, please consult the documentation
+on the section about altering roles:  http://www.postgresql.org/docs/9.3/static/sql-alterrole.html
+If you desire creating a new user, consult:  http://www.postgresql.org/docs/9.3/static/sql-createrole.html
+
+Assuming you created a user "statusmon" with password "getstatus", you can make sure that
+things are configured correctly by using the psql command as follows:
+
+    $ psql -U statusmon -W postgres -h localhost
+    Password for user statusmon: <enter password>
+    psql (9.3.5)
+    SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
+    Type "help" for help.
+
+    postgres=# 
+      
+If the configuration is incorrect or you enter an invalid password, you will see something 
+similar to:
+
+    $ psql -U statusmon -W postgres -h localhost
+    psql: FATAL:  password authentication failed for user "statusmon"
+    FATAL:  password authentication failed for user "statusmon"
+    
+
+Configuring Scalyr Agent
+
+In order to use the PostgreSQL monitor, you need to enter a configuration in the agent.json
+file.  A typical fragment resembles:
+
+  monitors: [
+    {
+      module:              "scalyr_agent.builtin_monitors.postgres_monitor",
+      id:                  "postgres",
+      database_host:       "localhost",
+      database_name:       "mydb",
+      database_username:   "statusmon",
+      database_password:   "getstatus" 
+    }
+  ]
+  
+The valid configuration options for the module are:
+
+'database_host'       -- Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.
+'database_port'       -- Name of port on the host machine the agent will connect to PostgreSQL to retrieve monitoring data.
+'database_name'       -- Name of database the agent will connect to PostgreSQL to retrieve monitoring data.
+'database_username'   -- Username which the agent uses to connect to PostgreSQL to retrieve monitoring data.
+'database_password'   -- Password for connecting to PostgreSQL.
+
+
+Metrics
+
+The following metrics are exposed by the postgres_monitor:
+
+postgres.database.connections -- The number of current active connections.  The value is accurate to when the check was made.
+postgres.database.transactions_committed -- The number of database transactions that have been committed.
+postgres.database.transactions_rolledback -- The number of database transactions that have been rolled back.
+postgres.database.disk_blocks_read -- The number of disk blocks read into the database.
+postgres.database.disk_blocks_hit -- The number of disk blocks read that were found in the buffer cache.
+postgres.database.query_rows_returned -- The number of rows returned by all queries in the database.
+postgres.database.query_rows_fetched -- The number of rows fetched by all queries in the database.
+postgres.database.query_rows_inserted -- The number of rows inserted by all queries in the database.
+postgres.database.query_rows_updated -- The number of rows updated by all queries in the database.
+postgres.database.query_rows_deleted -- The number of rows deleted by all queries in the database.
+postgres.database.temp_files -- The number of temporary files created by queries to the database.
+postgres.database.temp_bytes -- The total amount of data written to temporary files by queries to the database.
+postgres.database.temp_bytes -- The total amount of data written to temporary files by queries to the database.
+postgres.database.deadlocks -- The number of deadlocks detected in the database.
+postgres.database.blocks_read_time -- The amount of time data file blocks are read by clients in the database (in milliseconds).
+postgres.database.blocks_write_time -- The amount of time data file blocks are written by clients in the database (in milliseconds).
+postgres.database.stats_reset -- The time at which database statistics were last reset.
