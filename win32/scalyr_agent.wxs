@@ -43,11 +43,11 @@
 
         <!-- Scalyr Application Files -->
         <DirectoryRef Id='APPLICATIONBINDIR'>
-            <Component Id='scalyr-agent-2' Guid='5f035924-953c-4d3c-b5c7-74df47a4b1a7' >
+            <Component Id='scalyr_agent_2' Guid='5f035924-953c-4d3c-b5c7-74df47a4b1a7' >
               <File Id='scalyr_agent_2_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2.exe' />
             </Component>
 
-            <Component Id='scalyr-agent-2-config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
+            <Component Id='scalyr_agent_2_config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
               <File Id='scalyr_agent_2_config_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2-config.exe' />
             </Component>
 
@@ -90,8 +90,8 @@
 
         <!-- -->
         <Feature Id='ScalyrApplication' Title='Scalyr Application' Level='1'>
-            <ComponentRef Id='scalyr-agent-2' />
-            <ComponentRef Id='scalyr-agent-2-config' />
+            <ComponentRef Id='scalyr_agent_2' />
+            <ComponentRef Id='scalyr_agent_2_config' />
             <ComponentRef Id='ScalyrAgentService' />
             <ComponentRef Id='ScalyrShell' />
             <ComponentRef Id='ApplicationShortcut' />

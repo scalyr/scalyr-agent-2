@@ -242,7 +242,7 @@ def create_wxs_file(template_path, dist_path, destination_path):
     dist_files = []
     for dist_file_path in glob.glob("%s/*" % dist_path):
         base_file = os.path.basename(dist_file_path)
-        file_id = base_file.replace('.', '_')
+        file_id = base_file.replace('.', '_').replace('-', '_')
         entry = {
             'BASE': base_file,
             'FILE_ID': file_id,
