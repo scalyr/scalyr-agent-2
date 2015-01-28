@@ -183,7 +183,8 @@ def build_win32_installer_package(variant, version):
               convert_newlines=True)
 
     # Generate the file used by WIX's candle program.
-    shutil.copy(make_path(agent_source_root, 'win32/scalyr_agent.wxs'), 'scalyr_agent.wxs')
+    create_wxs_file(make_path(agent_source_root, 'win32/scalyr_agent.wxs'), convert_path('Scalyr/bin'),
+                    'scalyr_agent.wxs')
 
     # Get ready to run wix.  Add in WIX to the PATH variable.
     os.environ['PATH'] = '%s;%s\\bin' % (os.getenv('PATH'), os.getenv('WIX'))
@@ -192,14 +193,145 @@ def build_win32_installer_package(variant, version):
         variant = 'main'
 
     # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
-    upgrade_code = uuid.uuid3(_scalyr_guid_, '%s:%s' % (variant, version))
+    product_code = uuid.uuid3(_scalyr_guid_, 'ProductID:%s:%s' % (variant, version))
+    # The upgrade code identifies all families of versions that can be upgraded from one to the other.  So, this
+    # should be a single number for all Scalyr produced ones.
+    upgrade_code = uuid.uuid3(_scalyr_guid_, 'UpgradeCode:%s' % variant)
 
-    run_command('candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" scalyr_agent.wxs' % (
-        version, upgrade_code), exit_on_fail=True, command_name='candle')
+    run_command('candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
+                '-dPRODUCTCODE="%s" scalyr_agent.wxs' % (version, upgrade_code, product_code), exit_on_fail=True,
+                command_name='candle')
 
     installer_name = 'ScalyrAgentInstaller-%s.msi' % version
-    run_command('light -nolog -out %s ScalyrAgent.wixobj' % installer_name)
+    run_command('light -nolog -out %s ScalyrAgent.wixobj' % installer_name, exit_on_fail=True, command_name='light')
     return installer_name
+
+
+def create_wxs_file(template_path, dist_path, destination_path):
+    """Performs a rewrite of the Wix file to replace template-like poritions with information about the
+    binaries/files in `dist_path`.
+
+    This is required so that our Windows installer includes all of the DLLs, Python compiled files, etc that py2exe
+    produced.  This list can change over time and is dependent on the build machine, so we cannot hard code this
+    list.  It must be determined dynamically.
+
+    The file is rewrite by expanding the 'templates' found between the '<!-- EXPAND_FROM_BIN' markers.  This will
+    make a copy of the included template, once for each file in the `dist_path`, replacing such variables as
+    $COMPONENT_ID, $COMPONENT_GUID, $FILE_ID, and $FILE_SOURCE with values calculated on the file's information.
+
+    You may also specify a list of files to exclude in `dist_path` from the template expansion.  This is used for
+    well-known files that are already in the Wix file.
+
+    Here is an example:
+      <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe -->
+        <Component Id='$COMPONENT_ID' Guid='$COMPONENT_GUID' >
+          <File Id='$FILE_ID' DiskId='1' KeyPath='yes' Checksum='yes'  Source='$FILE_SOURCE' />
+         </Component>
+      <!-- EXPAND_FROM_BIN -->
+
+    @param template_path: The file path storing the Wix file to copy/rewrite.
+    @param dist_path: The path to the directory containing the files that should be included in the template
+        expansion.
+    @param destination_path: The file path to write the result
+
+    @type template_path: str
+    @type dist_path: str
+    @type destination_path: str
+    """
+    # First, calculate all of the per-file information for each file in the distribution directory.
+    dist_files = []
+    for dist_file_path in glob.glob("%s/*" % dist_path):
+        base_file = os.path.basename(dist_file_path)
+        file_id = base_file.replace('.', '_')
+        entry = {
+            'BASE': base_file,
+            'FILE_ID': file_id,
+            'COMPONENT_GUID': str(uuid.uuid3(_scalyr_guid_, 'DistComp%s' % base_file)),
+            'COMPONENT_ID': '%s_comp' % file_id,
+            'FILE_SOURCE': dist_file_path
+        }
+
+        dist_files.append(entry)
+
+    # For the sake of easier coding, we read all of the lines of the input file into an array.
+    with open(template_path) as f:
+        template_lines = f.readlines()
+
+    # Now go through, looking for the markers, and when we find them, do the replacement.
+    result = []
+    while len(template_lines) > 0:
+        if '<!-- EXPAND_FROM_BIN' in template_lines[0]:
+            result.extend(expand_template(template_lines, dist_files))
+        else:
+            l = template_lines[0]
+            del template_lines[0]
+            result.append(l)
+
+    # Write the resulting lines out.
+    with open(destination_path, 'wb') as f:
+        for line in result:
+            f.write(line)
+
+
+def expand_template(input_lines, dist_files):
+    """Reads the template starting at the first entry in `input_lines` and generates a copy of it for each
+    item in `dist_files` that is not excluded.
+
+    Used by `create_wxs_file`.
+
+    This consumes the lines from the `input_lines` list.
+
+    @param input_lines: The list of input lines from the file, with the first beginning a template expansion
+        (should have the <!-- EXPAND_FROM_BIN pragma in it).
+    @param dist_files: The list of file entries from the distribution directory.  The template should be expanded
+        once for each entry (unless it was specifically excluded).
+
+    @type input_lines: [str]
+    @type dist_files:  [{}]
+
+    @return: The list of lines produced by the expansion.
+    @rtype: [str]
+    """
+    # First, see if there were any files that should be excluded.  This will be in the first line, prefaced by
+    # EXCLUDED and a comma separated list.
+    match = re.search('EXCLUDE:(\S*)', input_lines[0])
+    del input_lines[0]
+
+    if match is not None:
+        excluded_files = match.group(1).split(',')
+    else:
+        excluded_files = []
+
+    # Create a list of just the template.  We need to find where it ends in the input lines.
+    template_lines = []
+    found_end = False
+    while len(input_lines) > 0:
+        l = input_lines[0]
+        del input_lines[0]
+        if '<!-- EXPAND_FROM_BIN' in l:
+            found_end = True
+            break
+        else:
+            template_lines.append(l)
+
+    if not found_end:
+        raise Exception('Did not find termination for EXPAND_FROM_BIN')
+
+    result = []
+    # Do the expansion.
+    for dist_entry in dist_files:
+        if dist_entry['BASE'] in excluded_files:
+            continue
+
+        for template_line in template_lines:
+            line = template_line.replace('$FILE_ID', dist_entry['FILE_ID'])
+            line = line.replace('$COMPONENT_GUID', dist_entry['COMPONENT_GUID'])
+            line = line.replace('$COMPONENT_ID', dist_entry['COMPONENT_ID'])
+            line = line.replace('$FILE_SOURCE', dist_entry['FILE_SOURCE'])
+
+            result.append(line)
+
+    return result
 
 
 def build_rpm_or_deb_package(is_rpm, variant, version):
@@ -928,7 +1060,7 @@ def parse_change_log():
                 if section_delims[i]['up'].match(my_line) is not None:
                     return result
             if (section_delims[level]['down'] is not None and
-                  section_delims[level]['down'].match(my_line) is not None):
+                    section_delims[level]['down'].match(my_line) is not None):
                 # Otherwise, it looks like the next line belongs to a sublist.  Recursively call ourselves, going
                 # down a level in nesting.
                 result.append(read_section(lines, level + 1))

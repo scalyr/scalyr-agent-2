@@ -1,6 +1,6 @@
 <?xml version='1.0'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
-    <Product Id='*' Name='Scalyr Agent 2' Version='$(var.VERSION)'
+    <Product Id='$(var.PRODUCTCODE)' Name='Scalyr Agent 2' Version='$(var.VERSION)'
         Language='1033' UpgradeCode='$(var.UPGRADECODE)' Manufacturer='Scalyr' >
 
         <Package Description='Scalyr Agent' Manufacturer='Scalyr' InstallerVersion='200'
@@ -19,6 +19,7 @@
                     <Directory Id='APPLICATIONBINDIR' Name='bin' />
                     <Directory Id='DEFAULTAPPCONFIG' Name='config'>
                         <Directory Id='DEFAULTAPPCONFIGD' Name='agent.d' />
+                        <Directory Id='CONFIGTEMPLATES' Name='templates' />
                     </Directory>
                 </Directory>
             </Directory>
@@ -29,58 +30,51 @@
 
         <!-- Define files within directory structure -->
         <DirectoryRef Id='APPLICATIONCERTS'>
-            <Component Id='ca_certs.crt' Guid='*'>
+            <Component Id='ca_certs.crt' Guid='B2011AAE-03FB-46AC-91CC-A3E116DF054D'>
                 <File Id='ca_certs.crt' Source='Scalyr\certs\ca_certs.crt' KeyPath='yes' Checksum='yes' />
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='CONFIGTEMPLATES'>
+            <Component Id='config_tmpl' Guid='571081B1-6926-45D0-A7EE-8D55E7531E16'>
+                <File Id='config.tmpl' Name='agent_config.tmpl' KeyPath='yes' Checksum='yes' Source='data_files\agent_config.tmpl' />
             </Component>
         </DirectoryRef>
 
         <!-- Scalyr Application Files -->
         <DirectoryRef Id='APPLICATIONBINDIR'>
-            <Component Id='ScalyrAgent2' Guid='8A883043-D54B-4392-9D25-9F3B51A40671' >
-
-                <!-- Scalyr Data -->
-                <File Id='VERSION' Name='VERSION' DiskId='1' Source='data_files\VERSION' />
-                <File Id='LICENSE' Name='LICENSE.txt' DiskId='1' Source='data_files\LICENSE.txt' />
-                <File Id='config.tmpl' Name='agent_config.tmpl' Source='data_files\agent_config.tmpl' />
-
-                <!-- Scalyr Executables -->
-                <File Id='scalyr_agent_2' Name='scalyr-agent-2.exe' DiskId='1' Source='Scalyr\bin\scalyr-agent-2.exe' />
-                <File Id='ScalyrAgentService' Name='ScalyrAgentService.exe' DiskId='1' Source='Scalyr\bin\ScalyrAgentService.exe' />
-                <File Id='scalyr_agent_2_config' Name='scalyr-agent-2-config.exe' DiskId='1' Source='Scalyr\bin\scalyr-agent-2-config.exe' />
-                <File Id='ScalyrShell' Name='ScalyrShell.cmd' DiskId='1' Source='Scalyr\bin\ScalyrShell.cmd' />
-
-                <File Id='MPR' Name='MPR.dll' DiskId='1' Source='Scalyr\bin\MPR.dll'/>
-                <File Id='_ctypes' Name='_ctypes.pyd' DiskId='1' Source='Scalyr\bin\_ctypes.pyd'/>
-                <File Id='_hashlib' Name='_hashlib.pyd' DiskId='1' Source='Scalyr\bin\_hashlib.pyd'/>
-                <File Id='_socket' Name='_socket.pyd' DiskId='1' Source='Scalyr\bin\_socket.pyd'/>
-                <File Id='_ssl' Name='_ssl.pyd' DiskId='1' Source='Scalyr\bin\_ssl.pyd'/>
-                <File Id='_win32sysloader' Name='_win32sysloader.pyd' DiskId='1' Source='Scalyr\bin\_win32sysloader.pyd'/>
-                <File Id='bz2' Name='bz2.pyd' DiskId='1' Source='Scalyr\bin\bz2.pyd'/>
-                <File Id='perfmon' Name='perfmon.pyd' DiskId='1' Source='Scalyr\bin\perfmon.pyd'/>
-                <File Id='pyexpat' Name='pyexpat.pyd' DiskId='1' Source='Scalyr\bin\pyexpat.pyd'/>
-                <File Id='python27' Name='python27.dll' DiskId='1' Source='Scalyr\bin\python27.dll'/>
-                <File Id='pywintypes27' Name='pywintypes27.dll' DiskId='1' Source='Scalyr\bin\pywintypes27.dll'/>
-                <File Id='select' Name='select.pyd' DiskId='1' Source='Scalyr\bin\select.pyd'/>
-                <File Id='servicemanager' Name='servicemanager.pyd' DiskId='1' Source='Scalyr\bin\servicemanager.pyd'/>
-                <File Id='unicodedata' Name='unicodedata.pyd' DiskId='1' Source='Scalyr\bin\unicodedata.pyd'/>
-                <File Id='w9xpopen' Name='w9xpopen.exe' DiskId='1' Source='Scalyr\bin\w9xpopen.exe'/>
-                <File Id='win32api' Name='win32api.pyd' DiskId='1' Source='Scalyr\bin\win32api.pyd'/>
-                <File Id='win32event' Name='win32event.pyd' DiskId='1' Source='Scalyr\bin\win32event.pyd'/>
-                <File Id='win32evtlog' Name='win32evtlog.pyd' DiskId='1' Source='Scalyr\bin\win32evtlog.pyd'/>
-                <File Id='win32pipe' Name='win32pipe.pyd' DiskId='1' Source='Scalyr\bin\win32pipe.pyd'/>
-                <File Id='win32service' Name='win32service.pyd' DiskId='1' Source='Scalyr\bin\win32service.pyd'/>
-                <File Id='win32wnet' Name='win32wnet.pyd' DiskId='1' Source='Scalyr\bin\win32wnet.pyd'/>
-
-
-                <!-- Uncompiled Python modules -->
-                <File Id='library' Name='library.zip' DiskId='1' Source='Scalyr\bin\library.zip' />
+            <Component Id='scalyr-agent-2' Guid='5f035924-953c-4d3c-b5c7-74df47a4b1a7' >
+              <File Id='scalyr_agent_2_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2.exe' />
             </Component>
+
+            <Component Id='scalyr-agent-2-config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
+              <File Id='scalyr_agent_2_config_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2-config.exe' />
+            </Component>
+
+            <Component Id='ScalyrAgentService' Guid='cf5da252-7803-45c0-b33b-e1745925cd09' >
+              <File Id='ScalyrAgentService_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrAgentService.exe' />
+            </Component>
+
+            <Component Id='ScalyrShell' Guid='180482b7-d9de-4b95-bbf9-4f2c34acd5c5' >
+              <File Id='ScalyrShell_cmd' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrShell.cmd' />
+            </Component>
+
+            <!-- This next stanza is me cheating.  We have build_package.py expand it to all the files that were -->
+            <!-- put in the dist directory by py2exe that should be distributed.  There's probably a wix way to do -->
+            <!-- but it's too much of a pain to learn. -->
+
+            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <Component Id='$COMPONENT_ID' Guid='$COMPONENT_GUID' >
+              <File Id='$FILE_ID' DiskId='1' KeyPath='yes' Checksum='yes'  Source='$FILE_SOURCE' />
+            </Component>
+            <!-- EXPAND_FROM_BIN -->
+
         </DirectoryRef>
 
 
         <!-- Application Menu Shortcuts -->
         <DirectoryRef Id='ApplicationProgramsFolder'>
-            <Component Id='ApplicationShortcut' Guid='*'>
+            <Component Id='ApplicationShortcut' Guid='a55c9c08-ad2e-4c63-a434-26a226b45c57'>
                 <Shortcut Id='ApplicationStartMenuShortcut' Name='Scalyr Agent 2' Description='Scalyr Agent 2 Command Shell'
                     Target='[#ScalyrShell]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
                 <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
@@ -96,9 +90,16 @@
 
         <!-- -->
         <Feature Id='ScalyrApplication' Title='Scalyr Application' Level='1'>
-            <ComponentRef Id='ScalyrAgent2' />
+            <ComponentRef Id='scalyr-agent-2' />
+            <ComponentRef Id='scalyr-agent-2-config' />
+            <ComponentRef Id='ScalyrAgentService' />
+            <ComponentRef Id='ScalyrShell' />
             <ComponentRef Id='ApplicationShortcut' />
             <ComponentRef Id='ca_certs.crt' />
+            <ComponentRef Id='config_tmpl' />
+            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <ComponentRef Id='$COMPONENT_ID' />
+            <!-- EXPAND_FROM_BIN -->
         </Feature>
     </Product>
 </Wix>
