@@ -114,7 +114,6 @@ tomcat.runtime.threads_current_count -- The number of threads currently active.
 tomcat.runtime.threads_current_busy -- The number of threads currently busy.
 tomcat.runtime.processing_time_max -- The value represents the largest amount of time spent processing a single request.
 tomcat.runtime.processing_time -- The value represents the largest amount of time spent processing the current request.
-tomcat.runtime.processing_time -- The value represents the largest amount of time spent processing the current request.
 tomcat.runtime.request_count -- The value represents the total number of requests made.
 tomcat.runtime.error_count -- The value represents the total number requests that resulted in errors.
 tomcat.runtime.bytes_received -- The value represents the total number bytes received by the server.

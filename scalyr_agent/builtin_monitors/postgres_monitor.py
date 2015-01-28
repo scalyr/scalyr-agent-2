@@ -27,16 +27,11 @@ from datetime import datetime
 
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem, define_config_option, define_metric, define_log_field
 
-# We must require 2.6 or greater right now because PsycoPG2 requires it.
+# We must require 2.5 or greater right now because pg8000 requires it.
 if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 5):
     raise UnsupportedSystem('postgresql_monitor', 'Requires Python 2.5 or greater.')
 
-# We import psycopg2 from the third_party directory.  This
-# relies on PYTHONPATH being set up correctly, which is done
-# in both agent_main.py and config_main.py
-#
-# noinspection PyUnresolvedReferences,PyPackageRequirements
-import psycopg2
+import pg8000
 
 __monitor__ = __name__
 
@@ -166,11 +161,12 @@ class PostgreSQLDb(object):
     
     def _connect(self):
         try:
-            conn = psycopg2.connect(self._connection_string)
+            conn = pg8000.connect(user = self._user, host = self._host, port = self._port,
+                                  database = self._database, password = self._password)
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()                                                   
-        except psycopg2.Error, me:
+        except pg8000.Error, me:
             self._db = None
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
@@ -236,7 +232,7 @@ class PostgreSQLDb(object):
             fields = [desc[0] for desc in self._cursor.description];
             self._cursor.execute("select * from %s where datname = '%s';" % (table, self._database))
             data = self._cursor.fetchone()
-        except psycopg2.OperationalError, (errcode, msg):
+        except pg8000.OperationalError, (errcode, msg):
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self._reconnect()
@@ -262,7 +258,7 @@ class PostgreSQLDb(object):
     def __repr__(self):
         return self.__str__()
    
-    def __init__(self, host = None, port = None, database = None, username = None, password = None, logger = None):
+    def __init__(self, host, port, database, username, password, logger = None):
         """Constructor: 
     
         @param database: database we are connecting to
@@ -271,27 +267,12 @@ class PostgreSQLDb(object):
         @param username: username to connect with
         @param password: password to establish connection
         """
-        
-        database_connection_config = []
-        if host != None:
-            database_connection_config.append("host=%s" % host)
-        else:
-          host = "localhost"
-        if port != None:
-            database_connection_config.append("port=%s" % port)
-        else:
-          port = "5432"
-        if database != None:
-            database_connection_config.append("dbname=%s" % database)
-        if username != None:
-            database_connection_config.append("user=%s" % username)
-        if password != None:
-            database_connection_config.append("password=%s" % password)
-        
-        self._connection_string = string.join(database_connection_config, " ")
+
         self._host = host
         self._port = port
         self._database = database
+        self._user = username
+        self._password = password
         self._logger = logger
 
         self._connect()
@@ -356,8 +337,8 @@ instance."""
         
         # determine how we are going to connect
         database = None
-        host = None
-        port = None
+        host = "localhost"
+        port = 5432
         username = None
         password = None
         if "database_host" in self._config:
@@ -389,7 +370,7 @@ instance."""
         """
         
         def timestamp_ms(dt):
-            epoch = datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=psycopg2.tz.FixedOffsetTimezone(offset=-480, name=None))
+            epoch = datetime(1970, 1, 1, 0, 0, 0, 0)
             td = dt - epoch
             return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 1e3
         
