@@ -45,6 +45,8 @@
         <DirectoryRef Id='APPLICATIONBINDIR'>
             <Component Id='scalyr_agent_2' Guid='5f035924-953c-4d3c-b5c7-74df47a4b1a7' >
               <File Id='scalyr_agent_2_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2.exe' />
+              <Environment Action="set" Id="SetPathToInstallFolderToSystemPath" Name="PATH" System="yes"
+                  Value="[APPLICATIONBINDIR]" Permanent="no" Part="last"/>
             </Component>
 
             <Component Id='scalyr_agent_2_config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
@@ -53,6 +55,14 @@
 
             <Component Id='ScalyrAgentService' Guid='cf5da252-7803-45c0-b33b-e1745925cd09' >
               <File Id='ScalyrAgentService_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrAgentService.exe' />
+              <ServiceInstall Id="ServiceInstaller" Type="ownProcess" Vital="yes" Name="ScalyrAgentService"
+                              DisplayName="ScalyrAgentService"
+                              Description="The Scalyr Agent sends logs and metrics to Scalyr."
+                              Start="auto"
+                              Account="LocalSystem"
+                              ErrorControl="normal"
+                              Interactive="no" />
+              <ServiceControl Id="StartService" Stop="both" Remove="uninstall" Name="ScalyrAgentService" Wait="yes" />
             </Component>
 
             <Component Id='ScalyrShell' Guid='180482b7-d9de-4b95-bbf9-4f2c34acd5c5' >
@@ -76,7 +86,7 @@
         <DirectoryRef Id='ApplicationProgramsFolder'>
             <Component Id='ApplicationShortcut' Guid='a55c9c08-ad2e-4c63-a434-26a226b45c57'>
                 <Shortcut Id='ApplicationStartMenuShortcut' Name='Scalyr Agent 2' Description='Scalyr Agent 2 Command Shell'
-                    Target='[#ScalyrShell]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                    Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
                 <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
                     Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
                 <Shortcut Id='ApplicationLogs' Name='logs' Description='Default application logs folder'
@@ -101,5 +111,9 @@
             <ComponentRef Id='$COMPONENT_ID' />
             <!-- EXPAND_FROM_BIN -->
         </Feature>
+
+        <InstallExecuteSequence>
+          <WriteEnvironmentStrings />
+        </InstallExecuteSequence>
     </Product>
 </Wix>
