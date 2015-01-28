@@ -209,7 +209,6 @@ class PostgreSQLDb(object):
         except psycopg2.Error, me:
             self._db = None
             self._cursor = None
-            print(self._logger)
             self._logger.error("Database connect failed: %s" % me)
         except Exception, ex:
             self._logger.error("Exception trying to connect occured:  %s" % ex)
@@ -400,7 +399,6 @@ class PostgresMonitor(ScalyrMonitor):
                 
         dbstats = self._db.retrieve_database_stats()
         if dbstats != None:
-            print(dbstats)
             for key in dbstats.keys():
                 if key != "postgres.database.stats_reset":
                     self._logger.emit_value(key, get_value_as_str(dbstats[key]))
