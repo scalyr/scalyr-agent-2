@@ -268,7 +268,6 @@ class WindowsPlatformController(PlatformController):
         owner_acl = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
 
         owner_acl.SetSecurityDescriptorOwner(user_info[0], True)
-        
         win32security.SetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION, owner_acl)
 
     def get_current_user(self):

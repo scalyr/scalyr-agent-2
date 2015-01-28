@@ -556,7 +556,7 @@ if __name__ == '__main__':
 
         # Copy the file.
         shutil.copy(template, config_path)
-        controller.set_file_owner(template, controller.get_current_user())
+        controller.set_file_owner(config_path, controller.get_current_user())
         print 'Successfully initialized the configuration file.'
 
     if options.executing_user and getpass.getuser() != 'root':
