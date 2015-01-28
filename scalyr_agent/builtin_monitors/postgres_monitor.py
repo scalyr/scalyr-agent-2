@@ -300,8 +300,50 @@ class PostgreSQLDb(object):
 
 
 class PostgresMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that monitors postgresql databases.
     """
+# PostgreSQL Monitor
+
+The PostgreSQL monitor allows you to collect data about the usage and performance of your PostgreSQL server.
+
+Each monitor can be configured to monitor a specific PostgreSQL database, thus allowing you to configure alerts and the
+dashboard entries independently (if desired) for each instance.
+
+## Configuring PostgreSQL
+
+To use Scalyr's PostgreSQL monitor, you will first need to configure your PostgreSQL server to enable password
+authentication for a user as well as configure a user to connect to the database and gather the necessary data.
+
+To configure PostgreSQL for password authentication, you will need a line like the following in your pg_hba.conf
+file:
+
+    host    all             all             127.0.0.1/32            md5
+    
+To create a user and enable password authentication, please consult the PostgreSQL documentation.  For version
+9.3, that documentation can be found here:  http://www.postgresql.org/docs/9.3/static/sql-createrole.html
+
+### Configuring the PostgreSQL monitor
+
+The PostgreSQL monitor is included with the Scalyr agent.  In order to configure it, you will need to add its monitor
+configuration to the Scalyr agent config file.
+
+A basic PostgreSQL monitor configuration entry might resemble:
+
+  monitors: [
+    {
+      module:              "scalyr_agent.builtin_monitors.postgres_monitor",
+      id:                  "mydb",
+      database_host:       "localhost",
+      database_name:       "<database>",
+      database_username:   "<username>",
+      database_password:   "<password>"
+    }
+  ]
+  
+Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
+specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
+instance."""
+    
+    
     def _initialize(self):
         """Performs monitor-specific initialization.
         """
