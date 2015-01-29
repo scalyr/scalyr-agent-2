@@ -3,67 +3,56 @@ TITLE Scalyr Agent 2
 COLOR 02
 
 SETLOCAL
-SET ScalyrRoot=%ProgramFiles(x86)%\Scalyr
 SET PROMPT=Scalyr$G$S
-GOTO CheckService
 
+ENDLOCAL
 
-:InstallService
-:: ----------------------------------------------------------------------
-:: Install service on first run
-:: ----------------------------------------------------------------------
-NET SESSION >nul
-IF %ERRORLEVEL% NEQ 0 (
-    COLOR 04    
-    ECHO Please restart this shell with admin rights
-    ECHO --------------------------------------------------
-    ECHO From the applications menu; right-click and then
-    ECHO select "Run as administator" from the context menu
-    ECHO.
-    PAUSE
-    EXIT 1
-) ELSE (
-    CD "%ScalyrRoot%"
-    MKDIR log lib
-    COPY VERSION \Windows\system32\
-    IF NOT EXIST agent.json COPY config.tmpl agent.json
-    CLS
-    ScalyrAgentService.exe --startup=auto install
-    PAUSE
-)
-GOTO StartShell
-
-
-:: ----------------------------------------------------------------------
-:: Verify that ScalyrAgentService has been installed to the registry
-:: ----------------------------------------------------------------------
-:CheckService
-SC QUERY ScalyrAgentService >nul
-IF %ERRORLEVEL% EQU 1060 GOTO InstallService
-IF %ERRORLEVEL% EQU 0 (GOTO StartShell) ELSE (
-    COLOR 04
-    ECHO An error occured checking if the ScalyrAgentService is installed
-    PAUSE
-    EXIT 1
+:: ------------------------------
+:: To simplify short cut creation, we use this script to also execute the standard
+:: commands of start, status, stop based on the incoming argument.  If there is none,
+:: then we do run this as a shell down below.
+:: ------------------------------
+if "%~1"=="status" (
+  TITLE Scalyr Agent 2 Detailed Status
+  ECHO Executing: scalyr-agent-2 status -v
+  ECHO.
+  scalyr-agent-2 status -v
+) else if "%~1"=="start"  (
+  TITLE Starting Scalyr Agent 2
+  ECHO Executing: scalyr-agent-2 start
+  ECHO.
+  scalyr-agent-2 start
+) else if "%~1"=="stop"  (
+  TITLE Stopping Scalyr Agent 2
+  ECHO Executing: scalyr-agent-2 stop
+  ECHO.
+  scalyr-agent-2 stop
+) else (
+  GOTO StartShell
 )
 
+ECHO.
+ECHO.
+ECHO Command execution finished.  Closing window.
+PAUSE
+EXIT
+
+
 :: ----------------------------------------------------------------------
-:: 
+::
 :: ----------------------------------------------------------------------
 :StartShell
-SET /P ScalyrVersion=<VERSION
-CLS
-ECHO Scalyr Agent 2 Shell [v%ScalyrVersion%]
+ECHO Scalyr Agent 2 Shell
 ECHO ==================================
 ECHO.
 ECHO Examples:
-ECHO    scalyr-agent-2.exe 
+ECHO    scalyr-agent-2.exe
 ECHO    scalyr-agent-2.exe status
 ECHO    scalyr-agent-2.exe status -v
 ECHO    scalyr-agent-2.exe start
 ECHO    scalyr-agent-2.exe stop
 ECHO (type 'exit' to close shell)
-CMD /K CD "%ScalyrRoot%"
 
-ENDLOCAL
-EXIT 
+CMD /K CD "%Scalyr%"
+
+EXIT
