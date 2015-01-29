@@ -87,6 +87,8 @@
         <!-- Application Menu Shortcuts -->
         <DirectoryRef Id='ApplicationProgramsFolder'>
             <Component Id='ApplicationShortcut' Guid='a55c9c08-ad2e-4c63-a434-26a226b45c57'>
+                <Shortcut Id='EditConfig' Name='Edit agent configuration' Description='Default application logs folder'
+                        Target='[SystemFolder]notepad.exe' Arguments='[DEFAULTAPPCONFIG]\agent.json' />
 
                 <Shortcut Id='StartScalyrShortcut' Name='Start the Scalyr Agent'
                     Description='Executes the command to start the agent in a console window, displaying output.'
@@ -96,20 +98,18 @@
                     Description='Executes the command to stop the agent in a console window, displaying output'
                     Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
-                <Shortcut Id='ScalyrStatusShortcut' Name='See detailed status'
+                <Shortcut Id='ScalyrStatusShortcut' Name='View agent status'
                     Description='Executes the command to display the detailed status in a console window.'
                     Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
-                <Shortcut Id='Edit configuration' Name='logs' Description='Default application logs folder'
-                    Target='[WindowsFolder]notepad.exe' Arguments='[DEFAULTAPPCONFIG]\agent.json' />
 
-                <Shortcut Id='ApplicationLogs' Name='logs' Description='Default application logs folder'
+                <Shortcut Id='ApplicationLogs' Name='View logs folder' Description='Open default application logs folder'
                     Target='[WindowsFolder]explorer.exe' Arguments='[DEFAULTAPPLOGS]' />
 
                 <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
                     Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
 
-                <Shortcut Id='CmdShellShortcut' Name='Commandline'
+                <Shortcut Id='CmdShellShortcut' Name='Command prompt'
                     Description='Opens a console window to use for executing Scalyr Agent commands.'
                     Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
