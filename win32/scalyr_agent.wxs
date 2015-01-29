@@ -4,7 +4,9 @@
         Language='1033' UpgradeCode='$(var.UPGRADECODE)' Manufacturer='Scalyr' >
 
         <Package Description='Scalyr Agent' Manufacturer='Scalyr' InstallerVersion='200'
-            Comments='Scalyr Agent for Windows Platforms' Compressed='yes' />
+            Comments='Scalyr Agent for Windows Platforms' Compressed='yes'
+            InstallPrivileges='elevated' InstallScope='perMachine'
+            />
         <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
 
         <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
@@ -134,6 +136,8 @@
             <!-- EXPAND_FROM_BIN -->
         </Feature>
 
+        <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+        <Property Id="ALLUSERS" Value="2" />
         <!-- This is a little bit of a hack.  We run the config tool to initialize the config, which means it -->
         <!-- makes a copy of the config temlate, puts it in the right location and sets the owner to the current -->
         <!-- user.  We use the quiet execute commandline tool so a console window does not pop up -->
