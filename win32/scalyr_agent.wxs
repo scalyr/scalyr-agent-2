@@ -92,21 +92,21 @@
 
                 <Shortcut Id='StartScalyrShortcut' Name='Start the Scalyr Agent'
                     Description='Executes the command to start the agent in a console window, displaying output.'
-                    Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                    Target='[#ScalyrShell_cmd]' Arguments='start' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
                 <Shortcut Id='StopScalyrShortcut' Name='Stop the Scalyr Agent'
                     Description='Executes the command to stop the agent in a console window, displaying output'
-                    Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                    Target='[#ScalyrShell_cmd]' Arguments='stop' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
                 <Shortcut Id='ScalyrStatusShortcut' Name='View agent status'
                     Description='Executes the command to display the detailed status in a console window.'
-                    Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+                    Target='[#ScalyrShell_cmd]' Arguments='status' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
 
 
                 <Shortcut Id='ApplicationLogs' Name='View logs folder' Description='Open default application logs folder'
                     Target='[WindowsFolder]explorer.exe' Arguments='[DEFAULTAPPLOGS]' />
 
-                <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Removes Scalyr Agent 2'
+                <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Uninstalls the Scalyr Agent 2'
                     Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
 
                 <Shortcut Id='CmdShellShortcut' Name='Command prompt'
