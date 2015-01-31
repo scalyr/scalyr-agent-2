@@ -136,6 +136,13 @@
             <!-- EXPAND_FROM_BIN -->
         </Feature>
 
+        <UI>
+            <UIRef Id="WixUI_Minimal" />
+            <Publish Dialog="ExitDialog"
+                Control="Finish">
+            </Publish>
+        </UI>
+
         <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
         <Property Id="ALLUSERS" Value="2" />
         <!-- This is a little bit of a hack.  We run the config tool to initialize the config, which means it -->

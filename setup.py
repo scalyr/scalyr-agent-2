@@ -144,12 +144,10 @@ setup(
         {
             'script': path.join('source_root', 'scalyr_agent', 'agent_main.py'),
             'dest_base': 'scalyr-agent-2',
-            'uac_info': 'requireAdministrator'
         },
         {
             'script': path.join('source_root', 'scalyr_agent', 'config_main.py'),
             'dest_base': 'scalyr-agent-2-config',
-            'uac_info': 'requireAdministrator',
         }
     ],
     service=[service_config],
