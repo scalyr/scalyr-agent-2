@@ -281,43 +281,36 @@ class WindowsPlatformController(PlatformController):
         """
         return win32api.GetUserNameEx(win32api.NameSamCompatible)
 
-    def is_privileged_user(self):
-        """Returns true if the user running this process is privileged (can read / write any file).
+    def run_as_user(self, user_name, script_file, script_binary, script_arguments):
+        """Runs the specified script with the same arguments as the specified user.
 
-        @return: True if the user running this process is privileged.
-        @rtype: bool
-        """
-        return ctypes.windll.shell32.IsUserAnAdmin() == 1
-
-    def privileged_name(self):
-        """Returns the name of the privileged account for this platform.
-
-        This is used to report error messages.
-
-        @return: The name of the privileged account.
-        @rtype: str
-        """
-        return 'Administrator'
-
-    def run_as_user(self, user_name, script_file, script_arguments):
-        """Restarts this process with the same arguments as the specified user.
-
-        This will re-run the entire Python script so that it is executing as the specified user.
+        This will run the entire Python script so that it is executing as the specified user.
         It will also add in the '--no-change-user' option which can be used by the script being executed with the
-        next proces that it was the result of restart so that it probably shouldn't do that again.
+        next process that it was the result of restart so that it probably shouldn't do that again.
+
+        Note, in some system implementations, the current process is replaced by the new process, so this method
+        does not ever return to the caller.
 
         @param user_name: The user to run as, typically 'root' or 'Administrator'.
-        @param script_file: The path to the Python script file that was executed.
+        @param script_file: The path to the Python script file that was executed if it can be determined.  If it cannot
+            then this will be None and script_binary will be supplied.
+        @param script_binary:  The binary that is being executed.  This is only supplied if script_file is None.
+            On some systems, such as Windows running a script frozen by py2exe, the script is embedded in an actual
+            executable.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
 
+        @return The status code for the executed script, if it returns at all.
+
         @type user_name: str
-        @type script_file: str
+        @type script_file: str|None
+        @type script_binary: str|None
         @type script_arguments: list<str>
 
-        @raise CannotExecuteAsUser: Indicates that the user currently running this process does not have
-            sufficient privilege to change to 'user_name'.
-        @raise ChangeUserNotSupported: Indicates that the platform has not implemented this functionality.
+        @rtype int
+
+        @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
+            some reason to execute the script.
         """
         raise ChangeUserNotSupported
 

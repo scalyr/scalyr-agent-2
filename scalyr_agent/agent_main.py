@@ -70,7 +70,7 @@ from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
-from scalyr_agent.platform_controller import CannotExecuteAsUser, ChangeUserNotSupported
+from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 import getpass
 
@@ -296,16 +296,11 @@ class ScalyrAgent(object):
             else:
                 script_path = None
             try:
-                self.__controller.run_as_user(desired_user, script_path, sys.argv[1:])
+                self.__controller.run_as_user(desired_user, script_path, None, sys.argv[1:])
             except CannotExecuteAsUser:
                 print >> sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
                                       'not own the config file (%s does) and cannot change to that user because it is '
-                                      'not %s' % (running_user, desired_user, self.__controller.privileged_name()))
-                return 1
-            except ChangeUserNotSupported:
-                print >> sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
-                                      'not own the config file (%s does) and cannot change to that user because it is '
-                                      'not supported by this agent implementation' % (running_user, desired_user))
+                                      'not %s' % (running_user, desired_user, 'root'))
                 return 1
 
         # Make sure we do not try to start it up again.

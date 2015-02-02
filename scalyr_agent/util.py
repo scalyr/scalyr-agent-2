@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import sys
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -23,7 +24,8 @@ import random
 import threading
 import time
 
-from json_lib import parse, JsonParseException
+from scalyr_agent.json_lib import parse, JsonParseException
+from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
 try:
@@ -328,3 +330,84 @@ class RateLimiter(object):
             return True
 
         return False
+
+
+class ScriptEscalator(object):
+    """Utility that helps re-execute the current script using the user account that owns the
+    configuration file.
+
+    Most Scalyr scripts expect to run as the user that owns the configuration file.  If the current user is
+    not the owner, but they are privileged enough to execute a process as that owner, then we will do it.
+
+    This is platform dependent.  For example, Linux will re-execute the script if the current user is 'root',
+    where as Windows will prompt the user for the Administrator's password.
+    """
+
+    def __init__(self, controller, config_file_path, current_working_directory):
+        """
+        @param controller: The instance of the PlatformController being used to execute the script.
+        @param config_file_path: The full path to the configuration file.
+        @param current_working_directory: The current working directory for the script being executed.
+
+        @type controller: PlatformController
+        @type config_file_path: str
+        @type current_working_directory:  str
+        """
+        self.__controller = controller
+        self.__running_user = controller.get_current_user()
+        self.__desired_user = controller.get_file_owner(config_file_path)
+        self.__cwd = current_working_directory
+
+    def is_user_change_required(self):
+        """Returns True if the user running this process is not the same as the owner of the configuration file.
+
+        If this returns False, it is expected that `change_user_and_rerun_script` will be invoked.
+
+        @return: True if the user must be changed.
+        @rtype: bool
+        """
+        return self.__running_user != self.__desired_user
+
+    def change_user_and_rerun_script(self, description):
+        """Attempts to re-execute the current script as the owner of the configuration file.
+
+        Note, for some platforms, this will result in the current process being replaced completely with the
+        new process.  So, this method may never return from the point of the view of the caller.
+
+        @param description: A description of what the script is trying to accomplish.  This will be used in an
+            error message if an error occurs.  It will read "Failing, cannot [description] as the correct user".
+        @type description: str
+
+        @return: If the function returns, the status code of the executed process.
+        @rtype: int
+        """
+        try:
+            script_args = sys.argv[1:]
+            script_binary = None
+            script_file_path = None
+
+            # See if this is a py2exe executable.  If so, then we do not have a script file, but a binary executable
+            # that contains the script.
+            if hasattr(sys, 'frozen'):
+                script_binary = sys.executable
+            else:
+                # We use the __main__ symbolic module to determine which file was invoked by the python script.
+                # noinspection PyUnresolvedReferences
+                import __main__
+                script_file_path = __main__.__file__
+                if not os.path.isabs(script_file_path):
+                    script_file_path = os.path.normpath(os.path.join(self.__cwd, script_file_path))
+
+            return self.__controller.run_as_user(self.__desired_user, script_file_path, script_binary, script_args)
+        except CannotExecuteAsUser, e:
+            print >> sys.stderr, ('Failing, cannot %s as the correct user.  The command must be executed using the '
+                                  'same account that owns the configuration file.  The configuration file is owned by '
+                                  '%s whereas the current user is %s.  Changing user failed due to the following '
+                                  'error: "%s". Please try to re-execute the command as %s' % (description,
+                                                                                               self.__desired_user,
+                                                                                               self.__running_user,
+                                                                                               e.error_message,
+                                                                                               self.__desired_user))
+            return 1
+
+

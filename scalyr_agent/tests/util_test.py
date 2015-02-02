@@ -23,7 +23,7 @@ import unittest
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState
+from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator
 from scalyr_agent.json_lib import JsonObject
 
 
@@ -127,3 +127,53 @@ class TestRunState(unittest.TestCase):
         self.called = False
         run_state.register_on_stop_callback(on_stop)
         self.assertTrue(self.called)
+
+
+class TestScriptEscalator(unittest.TestCase):
+    def test_is_user_change_required(self):
+        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'steve')
+        self.assertTrue(test_instance.is_user_change_required())
+
+        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'czerwin')
+        self.assertFalse(test_instance.is_user_change_required())
+
+    def test_change_user_and_rerun_script(self):
+        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'steve')
+        self.assertEquals(test_instance.change_user_and_rerun_script('random'), 0)
+
+        self.assertEquals(controller.call_count, 1)
+        self.assertEquals(controller.last_call['user'], 'steve')
+        self.assertIsNotNone(controller.last_call['script_file'])
+
+    def create_test_instance(self, current_user, config_file, config_owner):
+        controller = TestScriptEscalator.ControllerMock(current_user, config_file, config_owner)
+        # noinspection PyTypeChecker
+        return ScriptEscalator(controller, config_file, os.getcwd()), controller
+
+    class ControllerMock(object):
+        def __init__(self, running_user, expected_config_file, config_owner):
+            self.__running_user = running_user
+            self.__expected_config_file = expected_config_file
+            self.__config_owner = config_owner
+            self.last_call = None
+            self.call_count = 0
+
+        def get_current_user(self):
+            return self.__running_user
+
+        def get_file_owner(self, config_file_path):
+            assert self.__expected_config_file == config_file_path
+            if self.__expected_config_file == config_file_path:
+                return self.__config_owner
+            else:
+                return None
+
+        def run_as_user(self, user, script_file_path, script_binary, script_args):
+            self.call_count += 1
+            self.last_call = {
+                'user': user,
+                'script_file': script_file_path,
+                'script_binary': script_binary,
+                'script_args': script_args
+            }
+            return 0
