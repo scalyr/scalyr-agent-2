@@ -203,8 +203,8 @@ def build_win32_installer_package(variant, version):
                 command_name='candle')
 
     installer_name = 'ScalyrAgentInstaller-%s.msi' % version
-    run_command('light -nologo -ext WixUtilExtension.dll -out %s ScalyrAgent.wixobj' % installer_name,
-                exit_on_fail=True, command_name='light')
+    run_command('light -nologo -ext WixUtilExtension.dll -ext WixUIExtension -out %s ScalyrAgent.wixobj' %
+                installer_name, exit_on_fail=True, command_name='light')
     return installer_name
 
 
