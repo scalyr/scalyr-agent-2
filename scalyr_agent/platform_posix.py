@@ -61,6 +61,7 @@ class PosixPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
+        self.__no_change_user = False
         PlatformController.__init__(self)
 
     def can_handle_current_platform(self):
@@ -83,6 +84,10 @@ class PosixPlatformController(PlatformController):
         options_parser.add_option(
             "-p", "--pid-file", dest="pid_file",
             help="The path storing the running agent's process id.  Only used if config cannot be parsed.")
+        options_parser.add_option("", "--no-change-user", action="store_true", dest="no_change_user", default=False,
+                                  help="Forces agent to not change which user is executing agent.  Requires the right "
+                                       "user is already being used.  This is used internally to prevent infinite loops "
+                                       "in changing to the correct user.  Users should not need to set this option.")
 
     def consume_options(self, options):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
@@ -91,6 +96,7 @@ class PosixPlatformController(PlatformController):
         @param options: The object containing the options as returned by the OptionParser.
         """
         self.__pidfile_from_options = options.pid_file
+        self.__no_change_user = options.no_change_user
 
     def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
@@ -351,6 +357,8 @@ class PosixPlatformController(PlatformController):
             raise CannotExecuteAsUser('Must be root to change users')
         if script_file is None:
             raise CannotExecuteAsUser('Must supply script file to execute')
+        if self.__no_change_user:
+            raise CannotExecuteAsUser('Multiple attempts of changing user detected -- a bug must be causing loop.')
 
         # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
         # us from re-executing the script again to change the user, to
