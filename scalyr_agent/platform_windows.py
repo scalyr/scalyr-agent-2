@@ -43,7 +43,7 @@ import win32pipe
 import winerror
 import pywintypes
 
-from win32com.shell import shell
+import win32com
 
 try:
     import psutil
@@ -175,7 +175,7 @@ class WindowsPlatformController(PlatformController):
         self.__config_file_path = None
 
         # The local domain Administrators name.
-        self.__local_administrators = u'%s\\Administrators' % win32api.GetDomainName()
+        self.__local_administrators = u'%s\\Administrators' % win32api.GetComputerName()
 
         self.__no_change_user = False
 
@@ -265,7 +265,10 @@ class WindowsPlatformController(PlatformController):
         sd = win32security.GetFileSecurity(file_path, win32security.OWNER_SECURITY_INFORMATION)
         owner_sid = sd.GetSecurityDescriptorOwner()
         name, domain, account_type = win32security.LookupAccountSid(None, owner_sid)
-        return u'%s\\%s' % (domain, name)
+        if name == 'Administrators':
+            return self.__local_administrators
+        else:
+            return u'%s\\%s' % (domain, name)
 
     def set_file_owner(self, file_path, owner):
         """Sets the owner of the specified file.
@@ -298,7 +301,7 @@ class WindowsPlatformController(PlatformController):
         # As a little hack, we pretend anyone that has administrative privilege is running as
         # the local user 'Administrators' (note the 's').  This will result in us setting the configuration file
         # to be owned by 'Administrators' which is the right thing to do.
-        if shell.IsUserAnAdmin():
+        if win32com.shell.shell.IsUserAnAdmin():
             return self.__local_administrators
         else:
             return win32api.GetUserNameEx(win32api.NameSamCompatible)
@@ -337,7 +340,7 @@ class WindowsPlatformController(PlatformController):
         if user_name != self.__local_administrators:
             raise CannotExecuteAsUser('The current Scalyr Agent implementation only supports running the agent as %s' %
                                       self.__local_administrators)
-        if script_binary is not None:
+        if script_binary is None:
             raise CannotExecuteAsUser('The current Scalyr Agent implementation only supports running binaries when '
                                       'executing as another user.')
 
@@ -484,7 +487,7 @@ class PipeRedirectorServer(object):
     def start(self):
         self.__pipe_handle = win32pipe.CreateNamedPipe(self.__pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
                                                        win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_WAIT,
-                                                       1, 65536, 65536, 300, None)
+                                                       1, 65536, 65536, 5000, None)
 
         win32pipe.ConnectNamedPipe(self.__pipe_handle, None)
         self.__old_stdout = sys.stdout
@@ -494,11 +497,13 @@ class PipeRedirectorServer(object):
         sys.stderr = PipeRedirectorServer.Redirector(1, self._write_stream)
 
     def _write_stream(self, stream_id, content):
-        code = len(content) * 2 + stream_id
+        encoded_content = unicode(content).encode('utf-8')
+        code = len(encoded_content) * 2 + stream_id
+
         self.__pipe_lock.acquire()
         try:
             if self.__pipe_lock is not None:
-                win32file.WriteFile(self.__pipe_handle, struct.pack('I', code) + content)
+                win32file.WriteFile(self.__pipe_handle, struct.pack('I', code) + encoded_content)
             elif stream_id == 0:
                 sys.stdout.write(content)
             else:
@@ -575,7 +580,7 @@ class PipeRedirectorClient(StoppableThread):
                 bytes_to_read = code >> 1
                 stream_id = code % 2
 
-                content = win32file.ReadFile(file_handle, bytes_to_read)[1]
+                content = win32file.ReadFile(file_handle, bytes_to_read)[1].decode('utf-8')
                 if stream_id == 0:
                     sys.stdout.write(content)
                 else:
@@ -604,8 +609,8 @@ def _run_as_administrators(executable, arguments):
     client = PipeRedirectorClient()
     arguments = arguments + ['--redirect-to-pipe', client.pipe_name]
 
-    child_process = shell.ShellExecuteEx(fMask=256 + 64, lpVerb='runas', lpFile=executable,
-                                         lpParameters=''.join(arguments))
+    child_process = win32com.shell.shell.ShellExecuteEx(fMask=256 + 64, lpVerb='runas', lpFile=executable,
+                                                        lpParameters=' '.join(arguments))
     client.start()
 
     proc_handle = child_process['hProcess']

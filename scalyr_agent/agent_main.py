@@ -291,7 +291,7 @@ class ScalyrAgent(object):
             self.__verify_can_write_to_logs_and_data(self.__config)
         except Exception, e:
             print >> sys.stderr, '%s' % e.message
-            print >> 'Terminating agent, please fix the error and restart the agent.'
+            print >> sys.stderr, 'Terminating agent, please fix the error and restart the agent.'
             return 1
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
