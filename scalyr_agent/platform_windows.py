@@ -209,7 +209,7 @@ class WindowsPlatformController(PlatformController):
 
         root = get_install_root()
         logdir = os.path.join(root, 'log')
-        libdir = os.path.join(root, 'lib')
+        libdir = os.path.join(root, 'data')
         config = os.path.join(root, 'config', 'agent.json')
 
         return DefaultPaths(logdir, config, libdir)

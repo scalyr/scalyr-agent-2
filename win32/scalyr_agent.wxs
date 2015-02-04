@@ -56,7 +56,7 @@
         </DirectoryRef>
 
         <DirectoryRef Id='DEFAULTAPPCONFIG'>
-            <Directory Id='DEFAULTAPPLOGS' Name='agent.d'>
+            <Directory Id='DEFAULTAPPAGENTD' Name='agent.d'>
                 <Component Id='config_d_dir' Guid='7f375f4b-cc38-4d4a-af26-e60154f05392' SharedDllRefCount='no'
                            KeyPath='no' NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
                     <CreateFolder/>
