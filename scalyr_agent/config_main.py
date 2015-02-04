@@ -520,7 +520,9 @@ if __name__ == '__main__':
         # beyond just Windows.
         parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
                           help='Create an initial copy of the configuration file in the appropriate location.')
-
+        parser.add_option("", "--no-error-if-config-exists", dest="init_config_ignore_exists", action="store_true",
+                          default=False,
+                          help='If using "--init-config", exit with success if the file already exists.')
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print >> sys.stderr, 'Could not parse commandline arguments.'
@@ -543,8 +545,13 @@ if __name__ == '__main__':
         template = os.path.join(template_dir, 'agent_config.tmpl')
 
         if os.path.exists(config_path):
-            print >> sys.stderr, 'Cannot initialize configuration file at %s because file already exists.' % config_path
-            sys.exit(1)
+            if not options.init_config_ignore_exists:
+                print >> sys.stderr, ('Cannot initialize configuration file at %s because file already exists.' %
+                                      config_path)
+                sys.exit(1)
+            else:
+                print >> sys.stderr, 'Configuration file already exists at %s, so doing nothing.' % config_path
+                sys.exit(0)
         if not os.path.isdir(template_dir):
             print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist at'
                                   '%s' % template_dir)
