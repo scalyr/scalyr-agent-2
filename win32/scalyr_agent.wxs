@@ -16,11 +16,8 @@
             <Directory Id='ProgramFilesFolder' >
                 <Directory Id='APPLICATIONROOTDIRECTORY' Name='Scalyr' >
                     <Directory Id='APPLICATIONCERTS' Name='certs' />
-                    <Directory Id='DEFAULTAPPLOGS' Name='log' />
-                    <Directory Id='DEFAULTAPPLIBS' Name='lib' />
                     <Directory Id='APPLICATIONBINDIR' Name='bin' />
                     <Directory Id='DEFAULTAPPCONFIG' Name='config'>
-                        <Directory Id='DEFAULTAPPCONFIGD' Name='agent.d' />
                         <Directory Id='CONFIGTEMPLATES' Name='templates' />
                     </Directory>
                 </Directory>
@@ -41,6 +38,30 @@
             <Component Id='config_tmpl' Guid='571081B1-6926-45D0-A7EE-8D55E7531E16'>
                 <File Id='config.tmpl' Name='agent_config.tmpl' KeyPath='yes' Checksum='yes' Source='data_files\agent_config.tmpl' />
             </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
+            <Directory Id='DEFAULTAPPLOGS' Name='log'>
+                <Component Id='log_dir' Guid='3af7df35-608a-4cd0-8356-6cb03def0a66' SharedDllRefCount='no' KeyPath='no'
+                           NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
+            <Directory Id='DEFAULTAPPDATA' Name='data'>
+                <Component Id='data_dir' Guid='728d4e24-29b2-4320-9c64-c902d9df0d10' SharedDllRefCount='no' KeyPath='no'
+                           NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
+        </DirectoryRef>
+
+        <DirectoryRef Id='DEFAULTAPPCONFIG'>
+            <Directory Id='DEFAULTAPPLOGS' Name='agent.d'>
+                <Component Id='config_d_dir' Guid='7f375f4b-cc38-4d4a-af26-e60154f05392' SharedDllRefCount='no'
+                           KeyPath='no' NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
         </DirectoryRef>
 
         <!-- Scalyr Application Files -->
@@ -131,6 +152,10 @@
             <ComponentRef Id='ApplicationShortcut' />
             <ComponentRef Id='ca_certs.crt' />
             <ComponentRef Id='config_tmpl' />
+            <ComponentRef Id='log_dir' />
+            <ComponentRef Id='data_dir' />
+            <ComponentRef Id='config_d_dir' />
+
             <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
             <ComponentRef Id='$COMPONENT_ID' />
             <!-- EXPAND_FROM_BIN -->
