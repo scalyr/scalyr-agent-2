@@ -43,7 +43,7 @@ import win32pipe
 import winerror
 import pywintypes
 
-import win32com
+import win32com.shell.shell
 
 try:
     import psutil
@@ -478,14 +478,14 @@ class WindowsPlatformController(PlatformController):
 
 class PipeRedirectorServer(object):
     def __init__(self, pipe_name):
-        self.__pipe_name = pipe_name
+        self.__full_pipe_name = r'\\.\pipe\%s' % pipe_name
         self.__pipe_handle = None
         self.__pipe_lock = threading.Lock()
         self.__old_stdout = None
         self.__old_stderr = None
 
     def start(self):
-        self.__pipe_handle = win32pipe.CreateNamedPipe(self.__pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
+        self.__pipe_handle = win32pipe.CreateNamedPipe(self.__full_pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
                                                        win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_WAIT,
                                                        1, 65536, 65536, 5000, None)
 
@@ -538,7 +538,8 @@ class PipeRedirectorClient(StoppableThread):
         StoppableThread.__init__(self)
         if pipe_name is None:
             pipe_name = 'scalyr_agent_redir_%d' % random.randint(0, 4096)
-        self.__pipe_name = r'\\.\pipe\%s' % pipe_name
+        self.__pipe_name = pipe_name
+        self.__full_pipe_name = r'\\.\pipe\%s' % pipe_name
 
     def run(self):
         file_exists = False
@@ -563,7 +564,7 @@ class PipeRedirectorClient(StoppableThread):
         file_handle = None
 
         try:
-            file_handle = win32file.CreateFile(self.__pipe_name, win32file.GENERIC_READ, 0, None,
+            file_handle = win32file.CreateFile(self.__full_pipe_name, win32file.GENERIC_READ, 0, None,
                                                win32file.OPEN_EXISTING, 0, None)
 
             while self._is_running():
