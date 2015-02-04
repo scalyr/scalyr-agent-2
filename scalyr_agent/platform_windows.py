@@ -547,12 +547,14 @@ class PipeRedirectorClient(StoppableThread):
 
         while self._is_running():
             try:
-                win32pipe.WaitNamedPipe(self.__pipe_name, 100)
+                win32pipe.WaitNamedPipe(self.__full_pipe_name, 100)
                 file_exists = True
                 break
             except pywintypes.error, e:
                 if e[0] == winerror.ERROR_FILE_NOT_FOUND:
                     self._sleep_for_busy_loop(overall_deadline)
+                else:
+                    raise e
 
         if not self._is_running():
             return
