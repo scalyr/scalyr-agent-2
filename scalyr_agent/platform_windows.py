@@ -14,10 +14,16 @@
 # ------------------------------------------------------------------------
 #
 # author: Scott Sullivan <guy.hoozdis@gmail.com>
+import atexit
 
 __author__ = 'guy.hoozdis@gmail.com'
 
 import sys
+import time
+import struct
+import threading
+import random
+import os
 
 if sys.platform != 'win32':
     raise Exception('Attempting to load platform_windows module on a non-Windows machine')
@@ -28,12 +34,16 @@ import servicemanager
 import win32serviceutil
 import win32service
 import win32event
+import win32file
 import win32api
 import win32security
+import win32process
 import _winreg
+import win32pipe
+import winerror
+import pywintypes
 
-import ctypes
-import os
+from win32com.shell import shell
 
 try:
     import psutil
@@ -49,10 +59,11 @@ from __scalyr__ import get_install_root, scalyr_init
 scalyr_init()
 
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.util import StoppableThread
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths
+    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, CannotExecuteAsUser
     from scalyr_agent.platform_controller import AgentAlreadyRunning, ChangeUserNotSupported
 except:
     etype, emsg, estack = sys.exc_info()
@@ -162,6 +173,11 @@ class WindowsPlatformController(PlatformController):
         self.__status_handler = None
         # The file path to the configuration.  We need to stash this so it is available when start is invoked.
         self.__config_file_path = None
+
+        # The local domain Administrators name.
+        self.__local_administrators = u'%s\\Administrators' % win32api.GetDomainName()
+
+        self.__no_change_user = False
 
         PlatformController.__init__(self)
 
@@ -279,7 +295,13 @@ class WindowsPlatformController(PlatformController):
         @return: The name of the effective user running this process.
         @rtype: str
         """
-        return win32api.GetUserNameEx(win32api.NameSamCompatible)
+        # As a little hack, we pretend anyone that has administrative privilege is running as
+        # the local user 'Administrators' (note the 's').  This will result in us setting the configuration file
+        # to be owned by 'Administrators' which is the right thing to do.
+        if shell.IsUserAnAdmin():
+            return self.__local_administrators
+        else:
+            return win32api.GetUserNameEx(win32api.NameSamCompatible)
 
     def run_as_user(self, user_name, script_file, script_binary, script_arguments):
         """Runs the specified script with the same arguments as the specified user.
@@ -312,7 +334,14 @@ class WindowsPlatformController(PlatformController):
         @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
             some reason to execute the script.
         """
-        raise ChangeUserNotSupported
+        if user_name != self.__local_administrators:
+            raise CannotExecuteAsUser('The current Scalyr Agent implementation only supports running the agent as %s' %
+                                      self.__local_administrators)
+        if script_binary is not None:
+            raise CannotExecuteAsUser('The current Scalyr Agent implementation only supports running binaries when '
+                                      'executing as another user.')
+
+        return _run_as_administrators(script_binary, script_arguments + ['--no-change-user'])
 
     def is_agent_running(self, fail_if_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
@@ -413,8 +442,177 @@ class WindowsPlatformController(PlatformController):
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
         """
         # TODO(czerwin): Return an appropriate error message.
-        win32serviceutil.ControlService(ScalyrAgentService._svc_name_, ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
+        win32serviceutil.ControlService(ScalyrAgentService._svc_name_,
+                                        ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
 
+    def add_options(self, options_parser):
+        """Invoked by the main method to allow the platform to add in platform-specific options to the
+        OptionParser used to parse the commandline options.
+
+        @param options_parser:
+        @type options_parser: optparse.OptionParser
+        """
+        options_parser.add_option("", "--redirect-to-pipe", dest="redirect_pipe",
+                                  help="Used to redirect stdin/stdout to a named pipe.  Used internally.")
+        options_parser.add_option("", "--no-change-user", action="store_true", dest="no_change_user", default=False,
+                                  help="Forces agent to not change which user is executing agent.  Requires the right "
+                                       "user is already being used.  This is used internally to prevent infinite loops "
+                                       "in changing to the correct user.  Users should not need to set this option.")
+
+    def consume_options(self, options):
+        """Invoked by the main method to allow the platform to consume any command line options previously requested
+        in the 'add_options' call.
+
+        @param options: The object containing the options as returned by the OptionParser.
+        """
+        self.__no_change_user = options.no_change_user
+
+        if options.redirect_pipe is not None:
+            redirection = PipeRedirectorServer(options.redirect_pipe)
+            redirection.start()
+            atexit.register(redirection.stop)
+
+
+class PipeRedirectorServer(object):
+    def __init__(self, pipe_name):
+        self.__pipe_name = pipe_name
+        self.__pipe_handle = None
+        self.__pipe_lock = threading.Lock()
+        self.__old_stdout = None
+        self.__old_stderr = None
+
+    def start(self):
+        self.__pipe_handle = win32pipe.CreateNamedPipe(self.__pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
+                                                       win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_WAIT,
+                                                       1, 65536, 65536, 300, None)
+
+        win32pipe.ConnectNamedPipe(self.__pipe_handle, None)
+        self.__old_stdout = sys.stdout
+        self.__old_stderr = sys.stderr
+
+        sys.stdout = PipeRedirectorServer.Redirector(0, self._write_stream)
+        sys.stderr = PipeRedirectorServer.Redirector(1, self._write_stream)
+
+    def _write_stream(self, stream_id, content):
+        code = len(content) * 2 + stream_id
+        self.__pipe_lock.acquire()
+        try:
+            if self.__pipe_lock is not None:
+                win32file.WriteFile(self.__pipe_handle, struct.pack('I', code) + content)
+            elif stream_id == 0:
+                sys.stdout.write(content)
+            else:
+                sys.stderr.write(content)
+        finally:
+            self.__pipe_lock.release()
+
+    def stop(self):
+        self.__pipe_lock.acquire()
+        try:
+            win32file.WriteFile(self.__pipe_handle, struct.pack('I', 0))
+            win32file.FlushFileBuffers(self.__pipe_handle)
+            win32pipe.DisconnectNamedPipe(self.__pipe_handle)
+            self.__pipe_handle = None
+        finally:
+            self.__pipe_lock.release()
+
+        sys.stdout = self.__old_stdout
+        sys.stderr = self.__old_stderr
+
+    class Redirector(object):
+        def __init__(self, stream_id, writer_func):
+            self.__writer_func = writer_func
+            self.__stream_id = stream_id
+
+        def write(self, output_buffer):
+            self.__writer_func(self.__stream_id, output_buffer)
+
+
+class PipeRedirectorClient(StoppableThread):
+    def __init__(self, pipe_name=None):
+        StoppableThread.__init__(self)
+        if pipe_name is None:
+            pipe_name = 'scalyr_agent_redir_%d' % random.randint(0, 4096)
+        self.__pipe_name = r'\\.\pipe\%s' % pipe_name
+
+    def run(self):
+        file_exists = False
+        overall_deadline = time.time() + 60.0
+
+        while self._is_running():
+            try:
+                win32pipe.WaitNamedPipe(self.__pipe_name, 100)
+                file_exists = True
+                break
+            except pywintypes.error, e:
+                if e[0] == winerror.ERROR_FILE_NOT_FOUND:
+                    self._sleep_for_busy_loop(overall_deadline)
+
+        if not self._is_running():
+            return
+
+        if not file_exists:
+            print >>sys.stderr, 'Unable to receive stdout/stdin from running process, giving up.'
+            return
+
+        file_handle = None
+
+        try:
+            file_handle = win32file.CreateFile(self.__pipe_name, win32file.GENERIC_READ, 0, None,
+                                               win32file.OPEN_EXISTING, 0, None)
+
+            while self._is_running():
+                # Busy wait for bytes to become available.
+                while self._is_running():
+                    (tmp_buffer, num_bytes_available, result) = win32pipe.PeekNamedPipe(file_handle, 1024)
+                    if num_bytes_available > 0:
+                        break
+                    self._sleep_for_busy_loop(overall_deadline)
+
+                code = struct.unpack('I', win32file.ReadFile(file_handle, 4)[1])[0]    # Read str length
+                if code == 0:
+                    break
+                bytes_to_read = code >> 1
+                stream_id = code % 2
+
+                content = win32file.ReadFile(file_handle, bytes_to_read)[1]
+                if stream_id == 0:
+                    sys.stdout.write(content)
+                else:
+                    sys.stderr.write(content)
+        finally:
+            if file_handle is not None:
+                win32file.CloseHandle(file_handle)
+
+    @property
+    def pipe_name(self):
+        return self.__pipe_name
+
+    def _is_running(self):
+        return self._run_state.is_running()
+
+    def _sleep_for_busy_loop(self, deadline):
+        timeout = deadline - time.time()
+        if timeout < 0:
+            raise Exception('The operation took too long, giving up.')
+        elif timeout > .01:
+            timeout = .01
+        self._run_state.sleep_but_awaken_if_stopped(timeout)
+
+
+def _run_as_administrators(executable, arguments):
+    client = PipeRedirectorClient()
+    arguments = arguments + ['--redirect-to-pipe', client.pipe_name]
+
+    child_process = shell.ShellExecuteEx(fMask=256 + 64, lpVerb='runas', lpFile=executable,
+                                         lpParameters=''.join(arguments))
+    client.start()
+
+    proc_handle = child_process['hProcess']
+    win32event.WaitForSingleObject(proc_handle, -1)
+
+    client.stop()
+    return win32process.GetExitCodeProcess(proc_handle)
 
 if __name__ == "__main__":
     try:
