@@ -70,6 +70,7 @@ from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning, CannotExecuteAsUser
+from scalyr_agent.platform_controller import AgentNotRunning
 
 STATUS_FILE = 'last_status'
 
@@ -365,6 +366,13 @@ class ScalyrAgent(object):
                 # platforms depending on permissions.  This is legacy behavior.
                 pass
 
+        try:
+            self.__controller.is_agent_running(fail_if_not_running=True)
+        except AgentNotRunning, e:
+            print 'The agent does not appear to be running.'
+            print "%s" % e.message
+            return 1
+
         # The status works by sending telling the running agent to dump the status into a well known file and
         # then we read it from there, echoing it to stdout.
         if not os.path.isdir(data_directory):
@@ -443,8 +451,15 @@ class ScalyrAgent(object):
         if self.__escalator.is_user_change_required():
             return self.__escalator.change_user_and_rerun_script('stop the scalyr agent')
 
-        status = self.__controller.stop_agent_service(quiet)
-        return status
+        try:
+            self.__controller.is_agent_running(fail_if_not_running=True)
+            status = self.__controller.stop_agent_service(quiet)
+            return status
+        except AgentNotRunning, e:
+            print >> sys.stderr, 'Failed to stop the agent because it does not appear to be running.'
+            print >> sys.stderr, "%s" % e.message
+            return 0  # For the sake of restart, we need to return non-error code here.
+
 
     def __status(self):
         """Execute the 'status' command to indicate if the agent is running or not.
@@ -649,6 +664,7 @@ class ScalyrAgent(object):
         try:
             self.__controller.is_agent_running(fail_if_running=True)
         except AgentAlreadyRunning, e:
+            print >> sys.stderr, 'Failed to start agent because it is already running.'
             print >> sys.stderr, "%s" % e.message
             sys.exit(4)
 

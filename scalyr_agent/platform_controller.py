@@ -218,21 +218,26 @@ class PlatformController:
         """
         pass
 
-    def is_agent_running(self, fail_if_running=False):
+    def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
 
-        This will optionally raise an Exception with an appropriate error message if the agent is not running.
+        This will optionally raise an Exception with an appropriate error message if the agent is running or not
+        runnning.
 
         @param fail_if_running:  True if the method should raise an Exception with a platform-specific error message
+            explaining how it determined the agent is running.
+        @param fail_if_not_running: True if the method should raise an Exception with a platform-specific error message
             explaining how it determined the agent is not running.
+
         @type fail_if_running: bool
+        @type fail_if_not_running: bool
 
         @return: True if the agent process is already running.
         @rtype: bool
 
-        @raise AgentAlreadyRunning: If the agent is running and fail_if_running is True.
+        @raise AgentAlreadyRunning
+        @raise AgentNotRunning
         """
-        pass
 
     def start_agent_service(self, agent_run_method, quiet):
         """Start the agent service using the platform-specific method.
@@ -315,6 +320,12 @@ class DefaultPaths(object):
 
 class AgentAlreadyRunning(Exception):
     """Raised to signal the agent is already running.
+    """
+    pass
+
+
+class AgentNotRunning(Exception):
+    """Raised to signal the agent is not running.
     """
     pass
 

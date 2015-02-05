@@ -26,7 +26,8 @@ import atexit
 import resource
 import signal
 
-from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning, CannotExecuteAsUser
+from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
+from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 
 from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
@@ -368,25 +369,35 @@ class PosixPlatformController(PlatformController):
         print >>sys.stderr, ('Running as %s' % user_name)
         return os.execvp("sudo", arguments)
 
-    def is_agent_running(self, fail_if_running=False):
+    def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by the pidfile.
 
         This will optionally raise an Exception with an appropriate error message if the agent is not running.
 
         @param fail_if_running:  True if the method should raise an Exception with a message about where the pidfile
             was read from.
+        @param fail_if_not_running: True if the method should raise an Exception with a message about where the pidfile
+            was read from.
+
         @type fail_if_running: bool
+        @type fail_if_not_running: bool
 
         @return: True if the agent process is already running.
         @rtype: bool
+
+        @raise AgentAlreadyRunning
+        @raise AgentNotRunning
         """
         pid = self.__read_pidfile()
-        if not fail_if_running:
-            return pid is not None
 
-        if pid is not None:
-            raise AgentAlreadyRunning('The agent appears to be running pid=%d.  pidfile %s does exist.' % (
-                pid, self.__pidfile))
+        if fail_if_running and pid is not None:
+            raise AgentAlreadyRunning('The pidfile %s exists and indicates it is running pid=%d' % (
+                self.__pidfile, pid))
+
+        if fail_if_not_running and pid is None:
+            raise AgentNotRunning('The pidfile %s does not exist or listed process is not running.' % self.__pidfile)
+
+        return pid is not None
 
     def start_agent_service(self, agent_run_method, quiet):
         """Start the daemon process by forking a new process.
@@ -435,8 +446,8 @@ class PosixPlatformController(PlatformController):
         pid = self.__read_pidfile()
 
         if not pid:
-            message = ("The agent does not appear to be running.  pidfile %s does not exist or listed process"
-                       " is not running.\n")
+            message = ("Failed to stop the agent because it does not appear to be running.  pidfile %s does not exist"
+                       " or listed process is not running.\n")
             sys.stderr.write(message % self.__pidfile)
             return 0  # not an error in a restart
 

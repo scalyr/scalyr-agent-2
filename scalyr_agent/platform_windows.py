@@ -15,6 +15,7 @@
 #
 # author: Scott Sullivan <guy.hoozdis@gmail.com>
 import atexit
+import errno
 
 __author__ = 'guy.hoozdis@gmail.com'
 
@@ -63,7 +64,7 @@ from scalyr_agent.util import StoppableThread
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, CannotExecuteAsUser
+    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, CannotExecuteAsUser, AgentNotRunning
     from scalyr_agent.platform_controller import AgentAlreadyRunning, ChangeUserNotSupported
 except:
     etype, emsg, estack = sys.exc_info()
@@ -358,26 +359,37 @@ class WindowsPlatformController(PlatformController):
 
         return _run_as_administrators(script_binary, script_arguments + ['--no-change-user'])
 
-    def is_agent_running(self, fail_if_running=False):
+    def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
 
-        This will optionally raise an Exception with an appropriate error message if the agent is not running.
+        This will optionally raise an Exception with an appropriate error message if the agent is running or not
+        runnning.
 
         @param fail_if_running:  True if the method should raise an Exception with a platform-specific error message
+            explaining how it determined the agent is running.
+        @param fail_if_not_running: True if the method should raise an Exception with a platform-specific error message
             explaining how it determined the agent is not running.
+
         @type fail_if_running: bool
+        @type fail_if_not_running: bool
 
         @return: True if the agent process is already running.
         @rtype: bool
 
-        @raise AgentAlreadyRunning: If the agent is running and fail_if_running is True.
+        @raise AgentAlreadyRunning
+        @raise AgentNotRunning
         """
+
         status = QueryServiceStatusEx(ScalyrAgentService._svc_name_)
         state = status['CurrentState']
 
-        if fail_if_running and state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING):
+        is_running = state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
+        if fail_if_running and is_running:
             pid = status['ProcessId']
-            raise AgentAlreadyRunning('The agent appears to be running pid=%d' % pid) 
+            raise AgentAlreadyRunning('The operating system reports the Scalyr Agent Service is running with '
+                                      'pid=%d' % pid)
+        if fail_if_not_running and not is_running:
+            raise AgentNotRunning('The operating system reports the Scalyr Agent Service is not running')
 
         return state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
 
@@ -408,9 +420,16 @@ class WindowsPlatformController(PlatformController):
         @param quiet: True if only error messages should be printed to stdout, stderr.
         @type quiet: bool
         """
-        # TODO: Add Error handling. Trying to stop a service that isn't running
-        # will raise an exception that is currently unhandled.
-        win32serviceutil.StopService(ScalyrAgentService._svc_name_)
+        try:
+            win32serviceutil.StopService(ScalyrAgentService._svc_name_)
+        except win32api.error, e:
+            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+                raise AgentNotRunning('The operating system indicates the Scalyr Agent Service is not running.')
+            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+                raise AgentNotRunning('The operating system indicates the Scalyr Agent Service is not installed.  '
+                                      'This indicates a failed installation.  Try reinstalling the agent.')
+            else:
+                raise e
 
     def get_usage_info(self):
         """Returns CPU and memory usage information.
@@ -457,8 +476,17 @@ class WindowsPlatformController(PlatformController):
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
         """
         # TODO(czerwin): Return an appropriate error message.
-        win32serviceutil.ControlService(ScalyrAgentService._svc_name_,
-                                        ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
+        try:
+            win32serviceutil.ControlService(ScalyrAgentService._svc_name_,
+                                            ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
+        except win32api.error, e:
+            if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
+                return errno.ESRCH
+            elif e[0] == winerror.ERROR_SERVICE_DOES_NOT_EXIST:
+                raise AgentNotRunning('The operating system indicates the Scalyr Agent Service is not installed.  '
+                                      'This indicates a failed installation.  Try reinstalling the agent.')
+            else:
+                raise e
 
     def add_options(self, options_parser):
         """Invoked by the main method to allow the platform to add in platform-specific options to the
