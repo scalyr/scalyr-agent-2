@@ -280,13 +280,13 @@ class ScalyrAgent(object):
         """
         # Before we begin, make sure the user has set an API key... a common step that can be forgotten.
         # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
-        if self.__config.api_key == 'REPLACE_THIS':
+        if self.__config.api_key == 'REPLACE_THIS' or self.__config.api_key == '':
             print >> sys.stderr, 'Error, you have not set a valid api key in the configuration file.'
             print >> sys.stderr, ('Edit the file %s and replace the value for "api_key" with a valid logs '
                                   'write key for your account.' % self.__config.file_path)
             print >> sys.stderr, 'You can see your write logs keys at https://www.scalyr.com/keys'
             return 1
-        
+
         # First, see if we have to change the user that is executing this script to match the owner of the config.
         if self.__escalator.is_user_change_required():
             return self.__escalator.change_user_and_rerun_script('start the scalyr agent')
