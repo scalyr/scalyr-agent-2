@@ -368,7 +368,7 @@ class ScriptEscalator(object):
         """
         return self.__running_user != self.__desired_user
 
-    def change_user_and_rerun_script(self, description):
+    def change_user_and_rerun_script(self, description, handle_error=True):
         """Attempts to re-execute the current script as the owner of the configuration file.
 
         Note, for some platforms, this will result in the current process being replaced completely with the
@@ -376,7 +376,12 @@ class ScriptEscalator(object):
 
         @param description: A description of what the script is trying to accomplish.  This will be used in an
             error message if an error occurs.  It will read "Failing, cannot [description] as the correct user".
+        @param handle_error:  If True, if the platform controller raises an `CannotExecuteAsUser` error, this
+            method will handle it and print an error message to stderr.  If this is False, the exception is
+            not caught and propagated to the caller.
+
         @type description: str
+        @type handle_error: bool
 
         @return: If the function returns, the status code of the executed process.
         @rtype: int
@@ -400,6 +405,8 @@ class ScriptEscalator(object):
 
             return self.__controller.run_as_user(self.__desired_user, script_file_path, script_binary, script_args)
         except CannotExecuteAsUser, e:
+            if not handle_error:
+                raise e
             print >> sys.stderr, ('Failing, cannot %s as the correct user.  The command must be executed using the '
                                   'same account that owns the configuration file.  The configuration file is owned by '
                                   '%s whereas the current user is %s.  Changing user failed due to the following '

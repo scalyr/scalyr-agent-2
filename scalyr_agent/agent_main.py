@@ -69,7 +69,7 @@ from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
-from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
+from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning, CannotExecuteAsUser
 
 STATUS_FILE = 'last_status'
 
@@ -356,6 +356,15 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        # First, see if we have to change the user that is executing this script to match the owner of the config.
+        if self.__escalator.is_user_change_required():
+            try:
+                return self.__escalator.change_user_and_rerun_script('retrieved detailed status', handle_error=False)
+            except CannotExecuteAsUser:
+                # For now, we just ignore the error and try to get the status anyway.  This might work on Linux
+                # platforms depending on permissions.  This is legacy behavior.
+                pass
+
         # The status works by sending telling the running agent to dump the status into a well known file and
         # then we read it from there, echoing it to stdout.
         if not os.path.isdir(data_directory):
