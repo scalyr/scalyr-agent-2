@@ -179,6 +179,9 @@ class WindowsPlatformController(PlatformController):
 
         self.__no_change_user = False
 
+        # Controls whether or not we warn the user via stdout that we are about to escalate to Administrator privileges.
+        self.__no_escalation_warning = False
+
         PlatformController.__init__(self)
 
     def invoke_termination_handler(self):
@@ -343,6 +346,15 @@ class WindowsPlatformController(PlatformController):
         if script_binary is None:
             raise CannotExecuteAsUser('The current Scalyr Agent implementation only supports running binaries when '
                                       'executing as another user.')
+        if self.__no_change_user:
+            raise CannotExecuteAsUser('Multiple attempts of escalating privileges detected -- a bug must be causing '
+                                      'loop.')
+
+        if not self.__no_escalation_warning:
+            print 'The process requires Administrator permissions to complete this action.'
+            print 'Attempting to escalate privileges, which will require user confirmation or the Administrator '
+            print 'password through a dialog box that is about to be shown.'
+            raw_input('Hit Enter to continue and view the dialog box.')
 
         return _run_as_administrators(script_binary, script_arguments + ['--no-change-user'])
 
@@ -462,6 +474,13 @@ class WindowsPlatformController(PlatformController):
                                        "user is already being used.  This is used internally to prevent infinite loops "
                                        "in changing to the correct user.  Users should not need to set this option.")
 
+        options_parser.add_option("-n", "--no-warn-escalation", action="store_true", dest="no_escalation_warning",
+                                  default=False,
+                                  help="This will disable the warning message (and requirement to push enter) that is "
+                                       "printed to standard out before the process attempts to use Administrator "
+                                       "permissions.  This does not disable the dialog box that pops up since the OS"
+                                       "requires that dialog box to be presented.")
+
     def consume_options(self, options):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
         in the 'add_options' call.
@@ -469,6 +488,7 @@ class WindowsPlatformController(PlatformController):
         @param options: The object containing the options as returned by the OptionParser.
         """
         self.__no_change_user = options.no_change_user
+        self.__no_escalation_warning = options.no_escalation_warning
 
         if options.redirect_pipe is not None:
             redirection = PipeRedirectorServer(options.redirect_pipe)
