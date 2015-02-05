@@ -156,7 +156,10 @@ def _gather_metric(method, attribute=None):
         proc_type = type(process)
         assert proc_type is psutil.Process, errmsg(proc_type)
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
-        return attribute and attrgetter(attribute)(metric(process)) or metric(process)
+        if attribute is not None:
+            return attrgetter(attribute)(metric(process))
+        else:
+            return metric(process)
 
     # XXX: For some reason this was causing trouble for the documentation build process
     #gather_metric.__doc__ = doc(method, attribute)
