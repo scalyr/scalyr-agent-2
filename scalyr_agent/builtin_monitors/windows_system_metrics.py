@@ -36,9 +36,6 @@ __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
 
-
-import sys
-
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
@@ -550,7 +547,4 @@ class SystemMonitor(ScalyrMonitor):
                     )
         except:
             self.__process = None
-            exc_type, exc_value, traceback = sys.exc_info()
-            print exc_type, exc_value
-            import traceback
-            traceback.print_exc()
+            self._logger.exception('Failed to gather sample due to exception')
