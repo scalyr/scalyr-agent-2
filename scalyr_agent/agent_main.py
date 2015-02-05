@@ -71,8 +71,6 @@ from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
 
-import getpass
-
 STATUS_FILE = 'last_status'
 
 
@@ -739,7 +737,7 @@ class ScalyrAgent(object):
         # Basic agent stats first.
         result = AgentStatus()
         result.launch_time = self.__start_time
-        result.user = getpass.getuser()
+        result.user = self.__controller.get_current_user()
         result.version = SCALYR_VERSION
         result.server_host = self.__config.server_attributes['serverHost']
         result.scalyr_server = self.__config.scalyr_server

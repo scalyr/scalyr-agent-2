@@ -23,7 +23,6 @@
 __author__ = 'czerwin@scalyr.com'
 
 import cStringIO
-import getpass
 import os
 import re
 import shutil
@@ -566,7 +565,7 @@ if __name__ == '__main__':
         controller.set_file_owner(config_path, controller.get_current_user())
         print 'Successfully initialized the configuration file.'
 
-    if options.executing_user and getpass.getuser() != 'root':
+    if options.executing_user and controller.get_current_user() != 'root':
         print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
         sys.exit(1)
 
