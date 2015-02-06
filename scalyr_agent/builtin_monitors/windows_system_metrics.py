@@ -86,6 +86,11 @@ _ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] #
 
 
 
+# A special value we return as the result of the disk_io_counters metric evaluation if we
+# get an exception indicating diskperf has not been run to turn on the counters.
+# We have to use this special value as a hack because there's too many layers in the way to
+# do it a more direct route.
+__NO_DISK_PERF__ = 'no_disk_perf_signal'
 
 # #########################################################################################
 # #########################################################################################
@@ -109,11 +114,22 @@ def _gather_metric(method, attribute=None):
 
     def gather_metric():
         """Dynamically Generated """
-        metric = methodcaller(method)   # pylint: disable=redefined-outer-name
-        value = metric(psutil)
-        if attribute:
-            value = attrgetter(attribute)(value)
-        yield value
+        try:
+            metric = methodcaller(method)   # pylint: disable=redefined-outer-name
+            value = metric(psutil)
+            if attribute:
+                value = attrgetter(attribute)(value)
+            yield value
+        except RuntimeError, e:
+            # Special case the expected exception we see if we call disk_io_counters without the
+            # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
+            # on the exception message, but sometimes you have to do what you have to do.  At least we
+            # package a specific version of psutils in with the windows executable, so we should know if
+            # the message changes.
+            if e.message == "couldn't find any physical disk" and method == 'disk_io_counters':
+                yield __NO_DISK_PERF__
+            else:
+                raise e
 
     gather_metric.__doc__ = doc(method, attribute)
     return gather_metric
@@ -426,7 +442,7 @@ _DISK_IO_METRICS = [
 
     METRIC( ## ------------------   Disk Bytes Read    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io',
+            metric_name     = 'disk.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -439,7 +455,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------  Disk Bytes Written  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io',
+            metric_name     = 'disk.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -452,7 +468,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Disk Read Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io',
+            metric_name     = 'disk.io.ops',
             description     = '{description}',
             category        = 'general',
             unit            = 'count',
@@ -465,7 +481,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Disk Write Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io',
+            metric_name     = 'disk.io.ops',
             description     = '{description}',
             category        = 'general',
             unit            = 'count',
@@ -540,10 +556,16 @@ class SystemMonitor(ScalyrMonitor):
                 metric_name = metric.config['metric_name']
                 logmsg = "Sampled %s at %s %d-%d".format
                 for metric_value in metric.dispatch():
-                    self._logger.emit_value(
-                        metric_name,
-                        metric_value,
-                        extra_fields=metric.config['extra_fields']
+                    # We might get this metric value if we were doing the io counters metrics and the user has
+                    # not turned on disk performance yet.
+                    if metric_value == __NO_DISK_PERF__:
+                        self._logger.warn('disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
+                                          'to enable IO counters', limit_once_per_x_secs=3600, limit_key='win_diskperf')
+                    else:
+                        self._logger.emit_value(
+                            metric_name,
+                            metric_value,
+                            extra_fields=metric.config['extra_fields']
                     )
         except:
             self.__process = None
