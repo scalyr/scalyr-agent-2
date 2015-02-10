@@ -27,18 +27,31 @@ import os
 if sys.platform != 'win32':
     raise Exception('Attempting to load platform_windows module on a non-Windows machine')
 
+# noinspection PyUnresolvedReferences
 import servicemanager
+# noinspection PyUnresolvedReferences
 import win32serviceutil
+# noinspection PyUnresolvedReferences
 import win32service
+# noinspection PyUnresolvedReferences
 import win32event
+# noinspection PyUnresolvedReferences
 import win32file
+# noinspection PyUnresolvedReferences
 import win32api
+# noinspection PyUnresolvedReferences
 import win32security
+# noinspection PyUnresolvedReferences
 import win32process
+# noinspection PyUnresolvedReferences
 import _winreg
+# noinspection PyUnresolvedReferences
 import win32pipe
+# noinspection PyUnresolvedReferences
 import winerror
+# noinspection PyUnresolvedReferences
 import pywintypes
+# noinspection PyUnresolvedReferences
 import win32com.shell.shell
 
 try:
