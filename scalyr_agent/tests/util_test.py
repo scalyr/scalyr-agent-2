@@ -365,12 +365,14 @@ class TestRedirectorClient(unittest.TestCase):
         # Even though we haven't called stop on the client thread, it should still end because the server sent
         # the signal to stop/close.
         self._client.join()
+        self._client = None
 
     def test_stopped_during_connection(self):
         self._client.stop(wait_on_join=False)
         # We have wake all threads so the client thread will notice its thread has been stopped.
         self._fake_clock.wake_all_threads()
         self._client.join()
+        self._client = None
 
     def test_stopped_during_reading(self):
         self._accept_client_connection()
@@ -379,18 +381,15 @@ class TestRedirectorClient(unittest.TestCase):
         # We have wake all threads so the client thread will notice its thread has been stopped.
         self._fake_clock.wake_all_threads()
         self._client.join()
+        self._client = None
 
     def _accept_client_connection(self):
         self._client_channel.simulate_server_connect()
-        # We have wake all threads so the client will notice its connection has been accepted.
-        self._fake_clock.wake_all_threads()
 
     def _send_to_client(self, stream_id, content):
         encoded_content = unicode(content).encode('utf-8')
         code = len(encoded_content) * 2 + stream_id
         self._client_channel.simulate_server_write(struct.pack('I', code) + encoded_content)
-        # We have to wake all threads so the client will notice the new bytes.
-        self._fake_clock.wake_all_threads()
 
 
 class TestRedirectionService(unittest.TestCase):
@@ -487,14 +486,16 @@ class FakeClientChannel(object):
         self._lock.acquire()
         self._allow_connection = True
         self._lock.release()
-        self._fake_clock.wake_all_threads()
+        self._simulate_busy_loop_advance()
 
     def simulate_server_write(self, content):
         self._lock.acquire()
         self._pending_content = '%s%s' % (self._pending_content, content)
         self._lock.release()
-        self._fake_clock.wake_all_threads()
+        self._simulate_busy_loop_advance()
 
+    def _simulate_busy_loop_advance(self):
+        self._fake_clock.advance_time(increment_by=0.4)
 
 class FakeSys(object):
     def __init__(self):
