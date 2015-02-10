@@ -60,7 +60,7 @@ from __scalyr__ import get_install_root, scalyr_init
 scalyr_init()
 
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.util import StoppableThread
+from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 
 # TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
 try:
@@ -524,136 +524,127 @@ class WindowsPlatformController(PlatformController):
             atexit.register(redirection.stop)
 
 
-class PipeRedirectorServer(object):
+class PipeRedirectorServer(RedirectorServer):
     def __init__(self, pipe_name):
         self.__full_pipe_name = r'\\.\pipe\%s' % pipe_name
-        self.__pipe_handle = None
-        self.__pipe_lock = threading.Lock()
-        self.__old_stdout = None
-        self.__old_stderr = None
+        RedirectorServer.__init__(self, PipeRedirectorServer.ServerChannel(self.__full_pipe_name))
 
-    def start(self):
-        self.__pipe_handle = win32pipe.CreateNamedPipe(self.__full_pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
-                                                       win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_WAIT,
-                                                       1, 65536, 65536, 5000, None)
-
-        win32pipe.ConnectNamedPipe(self.__pipe_handle, None)
-        self.__old_stdout = sys.stdout
-        self.__old_stderr = sys.stderr
-
-        sys.stdout = PipeRedirectorServer.Redirector(0, self._write_stream)
-        sys.stderr = PipeRedirectorServer.Redirector(1, self._write_stream)
-
-    def _write_stream(self, stream_id, content):
-        encoded_content = unicode(content).encode('utf-8')
-        code = len(encoded_content) * 2 + stream_id
-
-        self.__pipe_lock.acquire()
-        try:
-            if self.__pipe_lock is not None:
-                win32file.WriteFile(self.__pipe_handle, struct.pack('I', code) + encoded_content)
-            elif stream_id == 0:
-                sys.stdout.write(content)
-            else:
-                sys.stderr.write(content)
-        finally:
-            self.__pipe_lock.release()
-
-    def stop(self):
-        self.__pipe_lock.acquire()
-        try:
-            win32file.WriteFile(self.__pipe_handle, struct.pack('I', 0))
-            win32file.FlushFileBuffers(self.__pipe_handle)
-            win32pipe.DisconnectNamedPipe(self.__pipe_handle)
+    class ServerChannel(RedirectorServer.ServerChannel):
+        def __init__(self, name):
+            self.__full_pipe_name = name
             self.__pipe_handle = None
-        finally:
-            self.__pipe_lock.release()
 
-        sys.stdout = self.__old_stdout
-        sys.stderr = self.__old_stderr
+        def accept_client(self, timeout=None):
+            """Blocks until a client connects to the server.
 
-    class Redirector(object):
-        def __init__(self, stream_id, writer_func):
-            self.__writer_func = writer_func
-            self.__stream_id = stream_id
+            One the client has connected, then the `write` method can be used to write to it.
 
-        def write(self, output_buffer):
-            self.__writer_func(self.__stream_id, output_buffer)
+            @param timeout: The maximum number of seconds to wait for the client to connect before raising an
+                `RedirectorError` exception.
+            @type timeout: float|None
+
+            @return:  True if a client has been connected, otherwise False.
+            @rtype: bool
+            """
+            scaled_timeout = None
+            if timeout is not None:
+                scaled_timeout = int(timeout * 1000)
+            self.__pipe_handle = win32pipe.CreateNamedPipe(self.__full_pipe_name, win32pipe.PIPE_ACCESS_OUTBOUND,
+                                                           win32pipe.PIPE_TYPE_BYTE | win32pipe.PIPE_WAIT,
+                                                           1, 65536, 65536, scaled_timeout, None)
+
+            return win32pipe.ConnectNamedPipe(self.__pipe_handle, None) == 0
+
+        def write(self, content):
+            """Writes the bytes to the connected client.
+
+            @param content: The bytes
+            @type content: str
+            """
+            win32file.WriteFile(self.__pipe_handle, content)
+
+        def close(self):
+            """Closes the channel to the client.
+            """
+            try:
+                win32file.WriteFile(self.__pipe_handle, struct.pack('I', 0))
+                win32file.FlushFileBuffers(self.__pipe_handle)
+            finally:
+                win32pipe.DisconnectNamedPipe(self.__pipe_handle)
+                self.__pipe_handle = None
 
 
-class PipeRedirectorClient(StoppableThread):
+class PipeRedirectorClient(RedirectorClient):
     def __init__(self, pipe_name=None):
-        StoppableThread.__init__(self)
         if pipe_name is None:
             pipe_name = 'scalyr_agent_redir_%d' % random.randint(0, 4096)
         self.__pipe_name = pipe_name
         self.__full_pipe_name = r'\\.\pipe\%s' % pipe_name
-
-    def run(self):
-        file_exists = False
-        overall_deadline = time.time() + 60.0
-
-        while self._is_running():
-            try:
-                win32pipe.WaitNamedPipe(self.__full_pipe_name, 100)
-                file_exists = True
-                break
-            except pywintypes.error, e:
-                if e[0] == winerror.ERROR_FILE_NOT_FOUND:
-                    self._sleep_for_busy_loop(overall_deadline)
-                else:
-                    raise e
-
-        if not self._is_running():
-            return
-
-        if not file_exists:
-            print >>sys.stderr, 'Unable to receive stdout/stdin from running process, giving up.'
-            return
-
-        file_handle = None
-
-        try:
-            file_handle = win32file.CreateFile(self.__full_pipe_name, win32file.GENERIC_READ, 0, None,
-                                               win32file.OPEN_EXISTING, 0, None)
-
-            while self._is_running():
-                # Busy wait for bytes to become available.
-                while self._is_running():
-                    (tmp_buffer, num_bytes_available, result) = win32pipe.PeekNamedPipe(file_handle, 1024)
-                    if num_bytes_available > 0:
-                        break
-                    self._sleep_for_busy_loop(overall_deadline)
-
-                code = struct.unpack('I', win32file.ReadFile(file_handle, 4)[1])[0]    # Read str length
-                if code == 0:
-                    break
-                bytes_to_read = code >> 1
-                stream_id = code % 2
-
-                content = win32file.ReadFile(file_handle, bytes_to_read)[1].decode('utf-8')
-                if stream_id == 0:
-                    sys.stdout.write(content)
-                else:
-                    sys.stderr.write(content)
-        finally:
-            if file_handle is not None:
-                win32file.CloseHandle(file_handle)
+        RedirectorClient.__init__(self, PipeRedirectorClient.ClientChannel(self.__full_pipe_name))
 
     @property
     def pipe_name(self):
         return self.__pipe_name
 
-    def _is_running(self):
-        return self._run_state.is_running()
+    class ClientChannel(object):
+        def __init__(self, full_pipe_name):
+            self.__full_pipe_name = full_pipe_name
+            self.__pipe_handle = None
 
-    def _sleep_for_busy_loop(self, deadline):
-        timeout = deadline - time.time()
-        if timeout < 0:
-            raise Exception('The operation took too long, giving up.')
-        elif timeout > .01:
-            timeout = .01
-        self._run_state.sleep_but_awaken_if_stopped(timeout)
+        def connect(self):
+            """Attempts to connect to the server, but does not block.
+
+            @return: True if the channel is now connected.
+            @rtype: bool
+            """
+            try:
+                if win32pipe.WaitNamedPipe(self.__full_pipe_name, 10) != 0:
+                    self.__pipe_handle = win32file.CreateFile(self.__full_pipe_name, win32file.GENERIC_READ, 0, None,
+                                                              win32file.OPEN_EXISTING, 0, None)
+                    return True
+                else:
+                    return False
+            except pywintypes.error, e:
+                if e[0] == winerror.ERROR_FILE_NOT_FOUND:
+                    return False
+                else:
+                    raise e
+
+        def peek(self):
+            """Returns the number of bytes available for reading without blocking.
+
+            @return A two values, the first the number of bytes, and the second, an error code.  An error code
+            of zero indicates there was no error.
+
+            @rtype (int, int)
+            """
+            result = win32pipe.PeekNamedPipe(self.__pipe_handle, 1024)
+            if result:
+                return result[1], 0
+            else:
+                return 0, 1
+
+        def read(self, num_bytes_to_read):
+            """Reads the specified number of bytes from the server and returns them.  This will block until the
+            bytes are read.
+
+            @param num_bytes_to_read: The number of bytes to read
+            @type num_bytes_to_read: int
+            @return: The bytes
+            @rtype: str
+            """
+            (result, data) = win32file.ReadFile(self.__pipe_handle, num_bytes_to_read)
+            if result == 0:
+                return data
+            else:
+                raise RedirectorError('Saw result code of %d with data len=%d' % (result, len(data)))
+
+        def close(self):
+            """Closes the channel to the server.
+            """
+            if self.__pipe_handle is not None:
+                win32file.CloseHandle(self.__pipe_handle)
+                self.__pipe_handle = None
 
 
 def _run_as_administrators(executable, arguments):
@@ -671,6 +662,7 @@ def _run_as_administrators(executable, arguments):
     return win32process.GetExitCodeProcess(proc_handle)
 
 if __name__ == "__main__":
+    rc = -1
     try:
         rc = win32serviceutil.HandleCommandLine(ScalyrAgentService)
     except:

@@ -15,6 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 import sys
+import struct
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -154,12 +155,17 @@ class RunState(object):
     still be running.  The expectation is that multiple threads will use this to attempt to quickly finish when
     the run state changes to false.
     """
-    def __init__(self):
-        """Creates a new instance of RunState which always is marked as running."""
+    def __init__(self, fake_clock=None):
+        """Creates a new instance of RunState which always is marked as running.
+
+        @param fake_clock: If not None, the fake clock to use to control the time and sleeping for tests.
+        @type fake_clock: FakeClock|None
+        """
         self.__condition = threading.Condition()
         self.__is_running = True
         # A list of functions to invoke when this instance becomes stopped.
         self.__on_stop_callbacks = []
+        self.__fake_clock = fake_clock
 
     def is_running(self):
         """Returns True if the state is still set to running."""
@@ -176,15 +182,37 @@ class RunState(object):
 
         @return: True if the run state has been set to stopped.
         """
+        if self.__fake_clock is not None:
+            return self.__simulate_sleep_but_awaken_if_stopped(timeout)
+
         self.__condition.acquire()
-        if not self.__is_running:
-            return True
+        try:
+            if not self.__is_running:
+                return True
 
-        self._wait_on_condition(timeout)
-        result = not self.__is_running
+            self._wait_on_condition(timeout)
+            return not self.__is_running
+        finally:
+            self.__condition.release()
 
-        self.__condition.release()
-        return result
+    def __simulate_sleep_but_awaken_if_stopped(self, timeout):
+        """Simulates sleeping when a `FakeClock` is being used for testing.
+
+        This method will exit when any of the following occur:  the fake time is advanced by `timeout`
+        seconds or when this thread is stopped.
+
+        @param timeout: The number of seconds to sleep.
+        @type timeout: float
+
+        @return: True if the thread has been stopped.
+        @rtype: bool
+        """
+        deadline = self.__fake_clock.time() + timeout
+
+        while deadline > self.__fake_clock.time() and self.is_running():
+            self.__fake_clock.simulate_waiting()
+
+        return not self.is_running()
 
     def stop(self):
         """Sets the run state to stopped.
@@ -252,17 +280,152 @@ class FakeRunState(RunState):
         return self.__total_times_slept
 
 
+class FakeClock(object):
+    """Used to simulate time and control threads waking up for sleep for tests.
+    """
+    def __init__(self):
+        """Constructs a new instance.
+        """
+        # A lock/condition to protected _time.  It is notified whenever _time is changed.
+        self._time_condition = threading.Condition()
+        # The current time in seconds past epoch.
+        self._time = 0.0
+        # A lock/condition to protect _waiting_threads.  It is notified whenever _waiting_threads is changed.
+        self._waiting_condition = threading.Condition()
+        # The number of threads that are blocking in `simulate_waiting`.
+        self._waiting_threads = 0
+
+    def time(self):
+        """Returns the current time according to the fake clock.
+
+        @return: The current time in seconds past epoch.
+        @rtype: float
+        """
+        self._time_condition.acquire()
+        try:
+            return self._time
+        finally:
+            self._time_condition.release()
+
+    def advance_time(self, set_to=None, increment_by=None):
+        """Advances the current time and notifies all threads currently waiting on the time.
+
+        One of `set_to` or `increment_by` must be set.
+
+        @param set_to: The absolute time in seconds past epoch to set the time.
+        @param increment_by: The number of seconds to advance the current time by.
+
+        @type set_to: float|None
+        @type increment_by: float|None
+        """
+        self._time_condition.acquire()
+        if set_to is not None:
+            self._time = set_to
+        else:
+            self._time += increment_by
+        self._time_condition.notifyAll()
+        self._time_condition.release()
+
+    def simulate_waiting(self):
+        """Will block the current thread until either the current time is changed or `wall_all_threads` is invoked.
+
+        Since this can return even when the fake clock time has not changed, it is up to the calling thread to check
+        to see if time has advanced far enough for any condition they wish.  However, it is typically expected that
+        they will not only be waiting for a particular time but also on some other condition, such as whether or not
+        a condition is has been notified.
+        """
+        self._time_condition.acquire()
+        self._increment_waiting_count(1)
+
+        self._time_condition.wait()
+
+        self._increment_waiting_count(-1)
+        self._time_condition.release()
+
+    def block_until_n_waiting_threads(self, n):
+        """Blocks until there are n threads blocked in `simulate_waiting`.
+
+        This is useful for tests when you wish to ensure other threads have reached some sort of checkpoint before
+        advancing to the next stage of the test.
+
+        @param n: The number of threads that should be blocked in `simulate_waiting.
+        @type n: int
+        """
+        self._waiting_condition.acquire()
+        while self._waiting_threads < n:
+            self._waiting_condition.wait()
+        self._waiting_condition.release()
+
+    def wake_all_threads(self):
+        """Invoked to wake all threads currently blocked in `simulate_waiting`.
+        """
+        self.advance_time(increment_by=0.0)
+
+    def _increment_waiting_count(self, increment):
+        """Increments the count of how many threads are blocked in `simulate_waiting` and notifies any thread waiting
+        on that count.
+
+        @param increment: The number of threads to increment the count by.
+        @type increment: int
+        """
+        self._waiting_condition.acquire()
+        self._waiting_threads += increment
+        self._waiting_condition.notifyAll()
+        self._waiting_condition.release()
+
+
 class StoppableThread(threading.Thread):
     """A slight extension of a thread that uses a RunState instance to track if it should still be running.
 
-    This class must be extended to actually perform work.  It is expected that the derived run method
-    invokes '_run_state.is_stopped' to determine when the thread has been stopped.
-    """
-    def __init__(self, name=None, target=None):
-        threading.Thread.__init__(self, name=name, target=target)
+    This abstraction also allows the caller to receive any exception that is raised during execution
+    by calling `join`.
 
+    It is expected that the run method or target of this thread periodically calls `_run_state.is_stopped`
+    to determine if the thread has been stopped.
+    """
+    def __init__(self, name=None, target=None, fake_clock=None):
+        """Creates a new thread.
+
+        You must invoke `start` to actually have the thread begin running.
+
+        Note, if you set `target` to None, then the thread will invoked `run_and_propagate` instead of `run` to
+        execute the work for the thread.  You must override `run_and_propagate` instead of `run`.
+
+        @param name: The name to give the thread.
+        @param target: If not None, a function that will be invoked when the thread is invoked to perform
+            the work for the thread.  This function should accept a single argument, the `RunState` instance
+            that will signal when the thread should stop work.
+        @param fake_clock:  A fake clock to control the time and when threads wake up for tests.
+
+        @type name: str
+        @type target: None|func
+        @type fake_clock: FakeClock|None
+        """
+        threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        self.__target = target
+        self.__exception_info = None
         # Tracks whether or not the thread should still be running.
-        self._run_state = RunState()
+        self._run_state = RunState(fake_clock=fake_clock)
+
+    def __run_impl(self):
+        """Internal run implementation.
+        """
+        # noinspection PyBroadException
+        try:
+            if self.__target is not None:
+                self.__target(self._run_state)
+            else:
+                self.run_and_propagate()
+        except Exception:
+            self.__exception_info = sys.exc_info()
+            return None
+
+    def run_and_propagate(self):
+        """Derived classes should override this method instead of `run` to perform their work.
+
+        This allows for the base class to catch any raised exceptions and propagate them during the join call.
+        """
+        pass
 
     def stop(self, wait_on_join=True, join_timeout=5):
         """Stops the thread from running.
@@ -275,6 +438,22 @@ class StoppableThread(threading.Thread):
         self._run_state.stop()
         if wait_on_join:
             self.join(join_timeout)
+
+    def join(self, timeout=None):
+        """Blocks until the thread has finished.
+
+        If the thread also raised an uncaught exception, this method will raise that same exception.
+
+        Note, the only way to tell for sure that the thread finished is by invoking 'is_alive' after this
+        method returns.  If the thread is still alive, that means this method exited due to a timeout expiring.
+
+        @param timeout: The number of seconds to wait for the thread to finish or None if it should block
+            indefinitely.
+        @type timeout: float|None
+        """
+        threading.Thread.join(self, timeout)
+        if not self.is_alive() and self.__exception_info is not None:
+            raise self.__exception_info[0], self.__exception_info[1], self.__exception_info[2]
 
 
 class RateLimiter(object):
@@ -418,3 +597,354 @@ class ScriptEscalator(object):
             return 1
 
 
+class RedirectorServer(object):
+    """Utility class that accepts incoming client connections and redirects the output being written to
+    stdout and stderr to it.
+
+    This is used to implement the process escalation feature for Windows.  Essentially, due to the limited access
+    Python provides to escalating a process, we cannot access the running processes's stdout, stderr.  In order
+    to display it, we have the spawned process redirect all of its output to stdout and stderr to the original
+    process which prints it to its stdout and stderr.
+
+    This must be used in conjunction with `RedirectorClient`.
+    """
+    def __init__(self, channel, sys_impl=sys):
+        """Creates an instance.
+
+        @param channel: The server channel to listen for connections.  Derived classes must provide an actual
+            implementation of the ServerChannel abstraction in order to actually implement the cross-process
+            communication.
+        @param sys_impl: The sys module, holding references to 'stdin' and 'stdout'.  This is only overridden
+            for testing purposes.
+
+        @type channel: RedirectorServer.ServerChannel
+        """
+        self.__channel = channel
+        # We need a lock to protect multiple threads from writing to the channel at the same time.
+        self.__channel_lock = threading.Lock()
+        # References to the original stdout, stderr for when we need to restore those objects.
+        self.__old_stdout = None
+        self.__old_stderr = None
+        # Holds the references to stdout and stderr.
+        self.__sys = sys_impl
+
+    # Constants used to identify which output stream a given piece of content should be written.
+    STDOUT_STREAM_ID = 0
+    STDERR_STREAM_ID = 1
+
+    def start(self, timeout=5.0):
+        """Starts the redirection server.
+
+        Blocks until a connection from a single client is received and then initializes the system to redirect
+        all stdout and stderr output to it.
+
+        This will replace the current stdout and stderr streams with implementations that will write to the
+        client channel.
+
+        Note, this method should not be called multiple times.
+
+        @param timeout: The maximum number of seconds this method will block for an incoming client.
+        @type timeout: float
+
+        @raise RedirectorError: If no client connects within the timeout period.
+        """
+        if not self.__channel.accept_client(timeout=timeout):
+            raise RedirectorError('Client did not connect to server within %lf seconds' % timeout)
+
+        self.__old_stdout = self.__sys.stdout
+        self.__old_stderr = self.__sys.stderr
+
+        self.__sys.stdout = RedirectorServer.Redirector(RedirectorServer.STDOUT_STREAM_ID, self._write_stream)
+        self.__sys.stderr = RedirectorServer.Redirector(RedirectorServer.STDERR_STREAM_ID, self._write_stream)
+
+    def stop(self):
+        """Signals the client connection that all bytes have been sent and then resets stdout and stderr to
+        their original values.
+        """
+        self._write_stream(0, '')
+
+        self.__channel.close()
+        self.__channel = None
+        self.__sys.stdout = self.__old_stdout
+        self.__sys.stderr = self.__old_stderr
+
+    def _write_stream(self, stream_id, content):
+        """Writes the specified bytes to the client.
+
+        @param stream_id: Either `STDOUT_STREAM_ID` or `STDERR_STREAM_ID`.  Identifies which output the
+            bytes were written to.
+        @param content: The bytes that were written.
+
+        @type stream_id: int
+        @type content: str|unicode
+        """
+        # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
+        # serialize it that way.
+        encoded_content = unicode(content).encode('utf-8')
+        # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
+        # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
+        # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is
+        # stdout, or 1 if it is stderr.
+        code = len(encoded_content) * 2 + stream_id
+
+        self.__channel_lock.acquire()
+        try:
+            if self.__channel_lock is not None:
+                self.__channel.write(struct.pack('I', code) + encoded_content)
+            elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
+                self.__sys.stdout.write(content)
+            else:
+                self.__sys.stderr.write(content)
+        finally:
+            self.__channel_lock.release()
+
+    class ServerChannel(object):
+        """The base class for the channel that is used by the server to accept an incoming connection from the
+        client and then write bytes to it.
+
+        A single instance of this class can only be used to accept one connection from a client and write bytes to it.
+
+        Derived classes must be provided to actually implement the communication.
+        """
+        def accept_client(self, timeout=None):
+            """Blocks until a client connects to the server.
+
+            One the client has connected, then the `write` method can be used to write to it.
+
+            @param timeout: The maximum number of seconds to wait for the client to connect before raising an
+                `RedirectorError` exception.
+            @type timeout: float|None
+
+            @return:  True if a client has been connected, otherwise False.
+            @rtype: bool
+            """
+            pass
+
+        def write(self, content):
+            """Writes the bytes to the connected client.
+
+            @param content: The bytes
+            @type content: str
+            """
+            pass
+
+        def close(self):
+            """Closes the channel to the client.
+            """
+            pass
+
+    class Redirector(object):
+        """Simple class that is used to set references to `sys.stdout` and `sys.stderr`.
+
+        This provides the `write` method necessary for `stdout` and `stderr` such that all bytes written will
+        be sent to the client.
+        """
+        def __init__(self, stream_id, writer_func):
+            """Creates an instance.
+
+            @param stream_id: Which stream this object is representing, either `STDOUT_STREAM_ID` or `STDERR_STREAM_ID`.
+                This is used to identify to the client which stream the bytes should be printed to.
+            @param writer_func: A function that, when invoked, will write the bytes to the underlying client.
+                The function takes two arguments: the stream id and the output bytes.
+
+            @type stream_id: int
+            @type writer_func: func(int, str)
+            """
+            self.__writer_func = writer_func
+            self.__stream_id = stream_id
+
+        def write(self, output_buffer):
+            """Writes the output to the underlying client.
+
+            @param output_buffer: The bytes to send.
+            @type output_buffer: str
+            """
+            self.__writer_func(self.__stream_id, output_buffer)
+
+
+class RedirectorError(Exception):
+    """Raised when an exception occurs with the RedirectionClient or RedirectionServer.
+    """
+    pass
+
+
+class RedirectorClient(StoppableThread):
+    """Implements the client side of the Redirector service.
+
+    It connects to a process running the `RedirectorServer`, reads all incoming bytes sent by the server, and
+    writes them to stdin/stdout.
+
+    This functionality is implemented using a thread.  This thread must be started for the process to begin
+    receiving bytes from the `RedirectorServer`.
+    """
+    def __init__(self, channel, sys_impl=sys, fake_clock=None):
+        """Creates a new instance.
+
+        @param channel: The channel to use to connect to the server.
+        @param sys_impl: The sys module, which holds references to stdin and stdout.  This is only overwritten for
+            tests.
+        @param fake_clock: The `FakeClock` instance to use to control time and when threads are woken up.  This is only
+            set by tests.
+
+        @type channel: RedictorClient.ClientChannel
+        @type fake_clock: FakeClock|None
+        """
+        StoppableThread.__init__(self, fake_clock=fake_clock)
+        self.__channel = channel
+        self.__stdout = sys_impl.stdout
+        self.__stderr = sys_impl.stderr
+        self.__fake_clock = fake_clock
+
+    # The number of seconds to wait for the server to accept the client connection.
+    CLIENT_CONNECT_TIMEOUT = 60.0
+
+    def run_and_propagate(self):
+        """Invoked when the thread begins and performs the bulk of the work.
+        """
+        # The timeline by which we must connect to the server and receiving all bytes.
+        overall_deadline = self.__time() + RedirectorClient.CLIENT_CONNECT_TIMEOUT
+
+        # Whether or not the client was able to connect.
+        connected = False
+
+        try:
+            # Do a busy loop to waiting to connect to the server.
+            while self._is_running():
+                if self.__channel.connect():
+                    connected = True
+                    break
+
+                self._sleep_for_busy_loop(overall_deadline, 'connection to be made.')
+
+            # If we aren't running any more, then return.  This could happen if the creator of this instance
+            # called the `stop` method before we connected.
+            if not self._is_running():
+                return
+
+            if not connected:
+                raise RedirectorError('Could not connect to other endpoint before timeout.')
+
+            # Keep looping, accepting new bytes and writing them to the appropriate stream.
+            while self._is_running():
+                # Busy loop waiting for more bytes.
+                if not self.__wait_for_available_bytes(overall_deadline):
+                    break
+
+                # Read one integer which should contain both the number of bytes of content that are being sent
+                # and which stream it should be written to.  The stream id is in the lower bit, and the number of
+                # bytes is shifted over by one.
+                code = struct.unpack('I', self.__channel.read(4))[0]    # Read str length
+
+                # We use a length of 0 to indicate the server has gracefully closed and the client should consider all
+                # work done.
+                if code == 0:
+                    break
+
+                bytes_to_read = code >> 1
+                stream_id = code % 2
+
+                content = self.__channel.read(bytes_to_read).decode('utf-8')
+
+                if stream_id == RedirectorServer.STDOUT_STREAM_ID:
+                    self.__stdout.write(content)
+                else:
+                    self.__stderr.write(content)
+        finally:
+            if connected:
+                self.__channel.close()
+
+    def __wait_for_available_bytes(self, overall_deadline):
+        """Waits for new bytes to become available from the server.
+
+        Raises `RedirectorError` if no bytes are available before the overall deadline is reached.
+
+        @param overall_deadline: The walltime that new bytes must be received by, or this instance will raise
+            `RedirectorError`
+        @type overall_deadline: float
+        @return: True if new bytes are available, or False if the thread has been stopped.
+        @rtype: bool
+        """
+        while self._is_running():
+            (num_bytes_available, result) = self.__channel.peek()
+            if result != 0:
+                raise RedirectorError('Error while waiting for more bytes from redirect server error=%d' % result)
+            if num_bytes_available > 0:
+                return True
+            self._sleep_for_busy_loop(overall_deadline, 'more bytes to be read')
+        return False
+
+    def _is_running(self):
+        """Returns true if this thread is still running.
+        @return: True if this thread is still running.
+        @rtype: bool
+        """
+        return self._run_state.is_running()
+
+    # The amount of time we sleep while doing a busy wait loop waiting for the client to connect or for new byte
+    # to become available.
+    BUSY_LOOP_POLL_INTERVAL = .03
+
+    def _sleep_for_busy_loop(self, deadline, description):
+        """Sleeps for a small unit of time as part of a busy wait loop.
+
+        This method will return if either the small unit of time has exceeded, the overall deadline has been exceeded,
+        or if the `stop` method of this thread has been invoked.
+
+        @param deadline: The walltime that this operation should time out.  This method will sleep for the small of
+            BUSY_LOOP_POLL_INTERVAL or the difference between now and walltime.
+        @param description: A description of why we waiting to be used in error output.
+
+        @type deadline: float
+        @type description: str
+        """
+        timeout = deadline - self.__time()
+        if timeout < 0:
+            raise RedirectorError('Deadline exceeded while waiting for %s' % description)
+        elif timeout > RedirectorClient.BUSY_LOOP_POLL_INTERVAL:
+            timeout = RedirectorClient.BUSY_LOOP_POLL_INTERVAL
+        self._run_state.sleep_but_awaken_if_stopped(timeout)
+
+    def __time(self):
+        if self.__fake_clock is None:
+            return time.time()
+        else:
+            return self.__fake_clock.time()
+
+    class ClientChannel(object):
+        """The base class for client channels, which are used to connect to the server and read the sent bytes.
+
+        Derived classes must provide the actual communication implementation.
+        """
+        def connect(self):
+            """Attempts to connect to the server, but does not block.
+
+            @return: True if the channel is now connected.
+            @rtype: bool
+            """
+            pass
+
+        def peek(self):
+            """Returns the number of bytes available for reading without blocking.
+
+            @return A two values, the first the number of bytes, and the second, an error code.  An error code
+            of zero indicates there was no error.
+
+            @rtype (int, int)
+            """
+            pass
+
+        def read(self, num_bytes_to_read):
+            """Reads the specified number of bytes from the server and returns them.  This will block until the
+            bytes are read.
+
+            @param num_bytes_to_read: The number of bytes to read
+            @type num_bytes_to_read: int
+            @return: The bytes
+            @rtype: str
+            """
+            pass
+
+        def close(self):
+            """Closes the channel to the server.
+            """
+            pass
