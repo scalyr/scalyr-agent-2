@@ -20,17 +20,13 @@ import errno
 __author__ = 'guy.hoozdis@gmail.com'
 
 import sys
-import time
 import struct
-import threading
 import random
 import os
 
 if sys.platform != 'win32':
     raise Exception('Attempting to load platform_windows module on a non-Windows machine')
 
-# TODO:
-#  * Control flow (agent_run_method returns => stop service)
 import servicemanager
 import win32serviceutil
 import win32service
@@ -43,55 +39,45 @@ import _winreg
 import win32pipe
 import winerror
 import pywintypes
-
 import win32com.shell.shell
 
 try:
     import psutil
 except ImportError:
+    psutil = None
     raise Exception('You must install the python module "psutil" to run on Windows.  Typically, this can be done with'
                     'the following command:  pip install psutil')
-
-# TODO(windows): Get rid of this logging method, or name it to something better.
-def log(msg):
-    servicemanager.LogInfoMsg(msg)
 
 from __scalyr__ import get_install_root, scalyr_init
 scalyr_init()
 
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
-
-# TODO(windows): Remove this once we verify that adding the service during dev stag works correclty
-try:
-    from scalyr_agent.platform_controller import PlatformController, DefaultPaths, CannotExecuteAsUser, AgentNotRunning
-    from scalyr_agent.platform_controller import AgentAlreadyRunning, ChangeUserNotSupported
-except:
-    etype, emsg, estack = sys.exc_info()
-    log("%s - %s" % (etype, emsg.message))
+from scalyr_agent.util import RedirectorServer, RedirectorClient, RedirectorError
+from scalyr_agent.platform_controller import PlatformController, DefaultPaths, CannotExecuteAsUser, AgentNotRunning
+from scalyr_agent.platform_controller import AgentAlreadyRunning
 
 
-
-
-
-# TODO(windows): Rename and document this method.
-def QueryServiceStatusEx(servicename):
-    hscm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
-    try:
-        hs = win32serviceutil.SmartOpenService(hscm, servicename, win32service.SERVICE_QUERY_STATUS)
-        try:
-            status = win32service.QueryServiceStatusEx(hs)
-        finally:
-            win32service.CloseServiceHandle(hs)
-    finally:
-        win32service.CloseServiceHandle(hscm)
-    return status
-
+# The path where we store our entries in the registry.
 _REG_PATH = r"SOFTWARE\Scalyr\Settings"
+# The registry key where we store the path to the configuration file.
 _CONFIG_KEY = 'ConfigPath'
+# The agent service name to use when registering the service with Windows.
+_SCALYR_AGENT_SERVICE_ = "ScalyrAgentService"
+_SCALYR_AGENT_SERVICE_DISPLAY_NAME_ = "Scalyr Agent Service"
+_SERVICE_DESCRIPTION_ = "Collects logs and metrics and forwards them to Scalyr.com"
+# A custom control message that is used to signal the agent should generate a detailed status report.
+_SERVICE_CONTROL_DETAILED_REPORT_ = win32service.SERVICE_USER_DEFINED_CONTROL - 1
 
 
 def _set_config_path_registry_entry(value):
+    """Updates the Windows registry entry for the configuration file path.
+
+    We store this configuration file path this way so that if the service is restarted, it knows the last location
+    of the configuration file.
+
+    @param value: The file path
+    @type value: str
+    """
     _winreg.CreateKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH)
     registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0,
                                    _winreg.KEY_WRITE)
@@ -101,6 +87,11 @@ def _set_config_path_registry_entry(value):
 
 
 def _get_config_path_registry_entry():
+    """Returns the current value for the configuration file path from the Windows registry.
+
+    @return: The file path.
+    @rtype: str
+    """
     registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0,
                                    _winreg.KEY_READ)
     value, regtype = _winreg.QueryValueEx(registry_key, _CONFIG_KEY)
@@ -108,15 +99,10 @@ def _get_config_path_registry_entry():
     return value
 
 
+# noinspection PyPep8Naming
 class ScalyrAgentService(win32serviceutil.ServiceFramework):
-    # TODO(windows): Do these really need to be separate vars.  If so, then document them.
-    _svc_name_ = "ScalyrAgentService"
-    _svc_display_name_ = "Scalyr Agent Service"
-    _svc_description_ = "Hosts Scalyr metric collectors"
-
-    # Custom/user defined control messages
-    SERVICE_CONTROL_DETAILED_REPORT = win32service.SERVICE_USER_DEFINED_CONTROL - 1 
-
+    """Implements the Windows service interface and exports the Scalyr Agent as a service.
+    """
     def __init__(self, *args):
         self.controller = None
         win32serviceutil.ServiceFramework.__init__(self, *args)
@@ -141,22 +127,19 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.ReportServiceStatus(win32service.SERVICE_RUNNING)
             self.log('Starting service')
             self.start()
-            self.log('Waiting for stop event')
             win32event.WaitForSingleObject(self._stop_event, win32event.INFINITE)
-            self.log('Stop event triggered')
         except Exception, e:
             self.log('ERROR: {}'.format(e))
             self.SvcStop()
 
     def start(self):
-        # TODO(windows): Get rid of need to for the parser.  Fix this method.
-        # Remove the parser.
         from scalyr_agent.agent_main import ScalyrAgent
         self.controller = WindowsPlatformController()
         ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry())
 
     def SvcOther(self, control):
-        if ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT == control:
+        # See if the control signal is our custom one, otherwise dispatch it to the superclass.
+        if _SERVICE_CONTROL_DETAILED_REPORT_ == control:
             self.controller.invoke_status_handler()
         else:
             win32serviceutil.ServiceFramework.SvcOther(self, control)
@@ -208,7 +191,6 @@ class WindowsPlatformController(PlatformController):
         @return: The default paths
         @rtype: DefaultPaths
         """
-        # TODO(windows): Fix this method.
         # NOTE: For this module, it is assumed that the 'install_type' is always PACKAGE_INSTALL
 
         root = get_install_root()
@@ -357,7 +339,40 @@ class WindowsPlatformController(PlatformController):
             print 'password through a dialog box that is about to be shown.'
             raw_input('Hit Enter to continue and view the dialog box.')
 
-        return _run_as_administrators(script_binary, script_arguments + ['--no-change-user'])
+        return self._run_as_administrators(script_binary, script_arguments + ['--no-change-user'])
+
+    def _run_as_administrators(self, executable, arguments):
+        """Invokes the specified executable with the specified arguments, escalating the privileges of the process
+        to Administrators.
+
+        All output that process generates to stdout/stderr will be echoed to this process's stdout/stderr.
+
+        Note, this can only be used on executables that accept the `--redirect-to-pipe` option to allow for this
+        process to capture the output from the escalated process.
+
+        Note, Windows will ask for confirmation and/or an Administrator password before the process is escalated.
+
+        @param executable: The path to the Windows executable to run escalated.
+        @param arguments: An array of arguments to supply to the executable.
+
+        @type executable: str
+        @type arguments: []
+
+        @return: The exit code of the process.
+        @rtype: int
+        """
+        client = PipeRedirectorClient()
+        arguments = arguments + ['--redirect-to-pipe', client.pipe_name]
+
+        child_process = win32com.shell.shell.ShellExecuteEx(fMask=256 + 64, lpVerb='runas', lpFile=executable,
+                                                            lpParameters=' '.join(arguments))
+        client.start()
+
+        proc_handle = child_process['hProcess']
+        win32event.WaitForSingleObject(proc_handle, -1)
+
+        client.stop()
+        return win32process.GetExitCodeProcess(proc_handle)
 
     def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
@@ -380,18 +395,32 @@ class WindowsPlatformController(PlatformController):
         @raise AgentNotRunning
         """
 
-        status = QueryServiceStatusEx(ScalyrAgentService._svc_name_)
-        state = status['CurrentState']
+        hscm = None
+        hs = None
 
-        is_running = state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
-        if fail_if_running and is_running:
-            pid = status['ProcessId']
-            raise AgentAlreadyRunning('The operating system reports the Scalyr Agent Service is running with '
-                                      'pid=%d' % pid)
-        if fail_if_not_running and not is_running:
-            raise AgentNotRunning('The operating system reports the Scalyr Agent Service is not running')
+        try:
+            hscm = win32service.OpenSCManager(None, None, win32service.SC_MANAGER_CONNECT)
+            hs = win32serviceutil.SmartOpenService(hscm, _SCALYR_AGENT_SERVICE_,
+                                                   win32service.SERVICE_QUERY_STATUS)
+            status = win32service.QueryServiceStatusEx(hs)
 
-        return state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
+            state = status['CurrentState']
+
+            is_running = state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
+            if fail_if_running and is_running:
+                pid = status['ProcessId']
+                raise AgentAlreadyRunning('The operating system reports the Scalyr Agent Service is running with '
+                                          'pid=%d' % pid)
+            if fail_if_not_running and not is_running:
+                raise AgentNotRunning('The operating system reports the Scalyr Agent Service is not running')
+
+            return state in (win32service.SERVICE_RUNNING, win32service.SERVICE_START_PENDING)
+
+        finally:
+            if hs is not None:
+                win32service.CloseServiceHandle(hs)
+            if hscm is not None:
+                win32service.CloseServiceHandle(hscm)
 
     def start_agent_service(self, agent_run_method, quiet):
         """Start the agent service using the platform-specific method.
@@ -407,10 +436,8 @@ class WindowsPlatformController(PlatformController):
         @type agent_run_method: func(PlatformController)
         @type quiet: bool
         """
-        # TODO: Add Error handling.  Insufficient privileges will raise an exception
-        # that is currently unhandled.
         _set_config_path_registry_entry(self.__config_file_path)
-        win32serviceutil.StartService(ScalyrAgentService._svc_name_)
+        win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
 
     def stop_agent_service(self, quiet):
         """Stops the agent service using the platform-specific method.
@@ -421,7 +448,7 @@ class WindowsPlatformController(PlatformController):
         @type quiet: bool
         """
         try:
-            win32serviceutil.StopService(ScalyrAgentService._svc_name_)
+            win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
         except win32api.error, e:
             if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning('The operating system indicates the Scalyr Agent Service is not running.')
@@ -437,12 +464,13 @@ class WindowsPlatformController(PlatformController):
         It returns the results in a tuple, with the first element being the number of
         CPU seconds spent in user land, the second is the number of CPU seconds spent in system land,
         and the third is the current resident size of the process in bytes."""
-        # TODO: Implement the data structure (cpu, sys, phy_ram)
-        # TODO(windows): Fix the RAM value.
-        cpu_usage = psutil.cpu_times()
+        process_info = psutil.Process()
+
+        cpu_usage = process_info.cpu_times()
         user_cpu = cpu_usage.user
         system_cpu = cpu_usage.system
-        return (user_cpu, system_cpu, 0)
+
+        return user_cpu, system_cpu, process_info.memory_info().rss
 
     def register_for_termination(self, handler):
         """Register a method to be invoked if the agent service is requested to terminated.
@@ -475,10 +503,8 @@ class WindowsPlatformController(PlatformController):
         @return: If there is an error, an errno that describes the error.  errno.EPERM indicates the current does not
             have permission to request the status.  errno.ESRCH indicates the agent is not running.
         """
-        # TODO(czerwin): Return an appropriate error message.
         try:
-            win32serviceutil.ControlService(ScalyrAgentService._svc_name_,
-                                            ScalyrAgentService.SERVICE_CONTROL_DETAILED_REPORT)
+            win32serviceutil.ControlService(_SCALYR_AGENT_SERVICE_, _SERVICE_CONTROL_DETAILED_REPORT_)
         except win32api.error, e:
             if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 return errno.ESRCH
@@ -525,11 +551,21 @@ class WindowsPlatformController(PlatformController):
 
 
 class PipeRedirectorServer(RedirectorServer):
+    """Implements a server that will listen on a pipe named for a client connection and then send all bytes written to
+    its stdout/stderr to that client.
+
+    This is used to pipe the output of an esclated process to the one that invoked it.  Due to the interfaces exposed
+    to Python, the command that allows for you to run an escalated process does not allow you to directly capture
+    its stdout/stderr.. so we pass in a special option to the spawned process that allows us to transfer the
+    stdout/stderr over the named pipe.
+    """
     def __init__(self, pipe_name):
         self.__full_pipe_name = r'\\.\pipe\%s' % pipe_name
         RedirectorServer.__init__(self, PipeRedirectorServer.ServerChannel(self.__full_pipe_name))
 
     class ServerChannel(RedirectorServer.ServerChannel):
+        """Provides the channel implementation for receiving client connections over a named pipe.
+        """
         def __init__(self, name):
             self.__full_pipe_name = name
             self.__pipe_handle = None
@@ -575,7 +611,19 @@ class PipeRedirectorServer(RedirectorServer):
 
 
 class PipeRedirectorClient(RedirectorClient):
+    """Implements the client-side of the redirection service.
+
+    This class creates a thread that will connect to a `PipeRedirectorServer` and print all of the sent back
+    bytes to stdout or stderr.
+    """
     def __init__(self, pipe_name=None):
+        """Constructs a new client.
+
+        @param pipe_name: The file portion of the named pipe.  If None is provided, then this instance will generate
+            a random one that can be accessed through the `pipe_name` property.  This should be given to the server
+            so it knows which pipe name to use.
+        @type pipe_name: str
+        """
         if pipe_name is None:
             pipe_name = 'scalyr_agent_redir_%d' % random.randint(0, 4096)
         self.__pipe_name = pipe_name
@@ -587,6 +635,8 @@ class PipeRedirectorClient(RedirectorClient):
         return self.__pipe_name
 
     class ClientChannel(object):
+        """Implements the client channel that connects to a named pipe and can receive data from it.
+        """
         def __init__(self, full_pipe_name):
             self.__full_pipe_name = full_pipe_name
             self.__pipe_handle = None
@@ -646,27 +696,5 @@ class PipeRedirectorClient(RedirectorClient):
                 win32file.CloseHandle(self.__pipe_handle)
                 self.__pipe_handle = None
 
-
-def _run_as_administrators(executable, arguments):
-    client = PipeRedirectorClient()
-    arguments = arguments + ['--redirect-to-pipe', client.pipe_name]
-
-    child_process = win32com.shell.shell.ShellExecuteEx(fMask=256 + 64, lpVerb='runas', lpFile=executable,
-                                                        lpParameters=' '.join(arguments))
-    client.start()
-
-    proc_handle = child_process['hProcess']
-    win32event.WaitForSingleObject(proc_handle, -1)
-
-    client.stop()
-    return win32process.GetExitCodeProcess(proc_handle)
-
 if __name__ == "__main__":
-    rc = -1
-    try:
-        rc = win32serviceutil.HandleCommandLine(ScalyrAgentService)
-    except:
-        log('ERROR: got an exeption in main')
-    else:
-        log('SUCCESS: no exception in main')
-    sys.exit(rc)
+    sys.exit(win32serviceutil.HandleCommandLine(ScalyrAgentService))
