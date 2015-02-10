@@ -68,7 +68,6 @@ def build_package(package_type, variant):
 
     # Create a temporary directory to build the package in.
     tmp_dir = tempfile.mkdtemp(prefix='build-scalyr-agent-packages')
-    print 'Building it in %s' % tmp_dir
 
     try:
         # Change to that directory and delegate to another method for the specific type.
@@ -89,7 +88,7 @@ def build_package(package_type, variant):
     finally:
         # Be sure to delete the temporary directory.
         os.chdir(original_cwd)
-        #shutil.rmtree(tmp_dir)
+        shutil.rmtree(tmp_dir)
 
 
 # A GUID representing Scalyr products, used to generate a per-version guid for each version of the Windows

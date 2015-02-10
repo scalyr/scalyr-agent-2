@@ -247,7 +247,7 @@ class ScalyrAgent(object):
             if not fail_on_error:
                 return None
             print >> sys.stderr, 'Configuration file uses a monitor that is not supported on this system'
-            print >> sys.stderr, 'Monitor \'%s\' cannot be used due to: %s\n' % (e.monitor_name, e.message)
+            print >> sys.stderr, 'Monitor \'%s\' cannot be used due to: %s\n' % (e.monitor_name, str(e))
             print >> sys.stderr, 'If you require support for this monitor for your system, please e-mail'
             print >> sys.stderr, 'contact@scalyr.com.\n'
         except Exception, e:
@@ -298,7 +298,7 @@ class ScalyrAgent(object):
         try:
             self.__verify_can_write_to_logs_and_data(self.__config)
         except Exception, e:
-            print >> sys.stderr, '%s' % e.message
+            print >> sys.stderr, '%s' % str(e)
             print >> sys.stderr, 'Terminating agent, please fix the error and restart the agent.'
             return 1
 
@@ -370,7 +370,7 @@ class ScalyrAgent(object):
             self.__controller.is_agent_running(fail_if_not_running=True)
         except AgentNotRunning, e:
             print 'The agent does not appear to be running.'
-            print "%s" % e.message
+            print "%s" % str(e)
             return 1
 
         # The status works by sending telling the running agent to dump the status into a well known file and
@@ -457,7 +457,7 @@ class ScalyrAgent(object):
             return status
         except AgentNotRunning, e:
             print >> sys.stderr, 'Failed to stop the agent because it does not appear to be running.'
-            print >> sys.stderr, "%s" % e.message
+            print >> sys.stderr, "%s" % str(e)
             return 0  # For the sake of restart, we need to return non-error code here.
 
 
@@ -665,7 +665,7 @@ class ScalyrAgent(object):
             self.__controller.is_agent_running(fail_if_running=True)
         except AgentAlreadyRunning, e:
             print >> sys.stderr, 'Failed to start agent because it is already running.'
-            print >> sys.stderr, "%s" % e.message
+            print >> sys.stderr, "%s" % str(e)
             sys.exit(4)
 
     def __update_debug_log_level(self, debug_level):

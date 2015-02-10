@@ -41,7 +41,7 @@ if 'win32' != sys.platform:
 
 import urllib
 
-from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL
+from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL, SCALYR_VERSION
 scalyr_init()
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
@@ -537,7 +537,7 @@ if __name__ == '__main__':
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
-    if options.init_config:
+    if 'win32' == sys.platform and options.init_config:
         # Create a copy of the configuration file and set the owner to be the current user.
         config_path = options.config_filename
         template_dir = os.path.join(os.path.dirname(config_path), 'templates')
@@ -599,16 +599,9 @@ if __name__ == '__main__':
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
-    if options.upgrade_windows:
-        # TODO: Improve the method for determining the installed agent_version
-        # This works on Windows platforms in a shell where the Scalyr Environment has been initialized.
-        agent_version = os.environ.get('ScalyrVersion')
-
+    if 'win32' == sys.platform and options.upgrade_windows:
         # Determine if a newer version is available
-        client = ScalyrClientSession(
-                config_file.scalyr_server, 
-                config_file.api_key, 
-                agent_version)
+        client = ScalyrClientSession(config_file.scalyr_server, config_file.api_key, SCALYR_VERSION)
         response = client.get_latest_agent_version()
         if response['update_required']:
             url = response['url']
