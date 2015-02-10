@@ -116,6 +116,10 @@ def _get_config_path_registry_entry():
 class ScalyrAgentService(win32serviceutil.ServiceFramework):
     """Implements the Windows service interface and exports the Scalyr Agent as a service.
     """
+    # The following fields must be present for py2exe to detect this as a service implementation.
+    _svc_name_ = _SCALYR_AGENT_SERVICE_
+    _svc_display_name_ = _SCALYR_AGENT_SERVICE_DISPLAY_NAME_
+
     def __init__(self, *args):
         self.controller = None
         win32serviceutil.ServiceFramework.__init__(self, *args)
