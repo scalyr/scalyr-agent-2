@@ -859,9 +859,30 @@ class MetricRotatingLogHandler(logging.handlers.RotatingFileHandler, MetricLogHa
 
 class MetricStdoutLogHandler(logging.StreamHandler, MetricLogHandler):
     def __init__(self, file_path):
-        logging.StreamHandler.__init__(self, sys.stdout)
+        logging.StreamHandler.__init__(self, WrapStdout())
         MetricLogHandler.__init__(self, file_path)
         self.propagate = False
+
+
+class WrapStdout(object):
+    """A stream implementation that sends all operations to `sys.stdout`.
+
+    This is useful for creating a StreamHandler that will write to this object, but actually end up sending all
+    output to `sys.stdout`.  Even if the `sys.stdout` object changes while the handler is active, it will still
+    go to the most up-to-date `sys.stdout` value.  This is useful when we do change where `stdout` is going, such
+    as on the Windows redirect.
+    """
+    def flush(self):
+        if hasattr(sys.stdout, 'flush'):
+            sys.stdout.flush()
+
+    def write(self, content):
+        if hasattr(sys.stdout, 'write'):
+            sys.stdout.write(content)
+
+    def close(self):
+        if hasattr(sys.stdout, 'close'):
+            sys.stdout.close()
 
 
 class AgentLogManager(object):
