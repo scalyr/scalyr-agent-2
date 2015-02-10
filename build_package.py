@@ -197,6 +197,13 @@ def build_win32_installer_package(variant, version):
     # should be a single number for all Scalyr produced ones.
     upgrade_code = uuid.uuid3(_scalyr_guid_, 'UpgradeCode:%s' % variant)
 
+    # For prereleases, we use weird version numbers like 4.0.4.pre5.1 .  That does not work for Windows which
+    # requires X.X.X.X.  So, we convert if necessary.
+    if len(version.split('.')) == 5:
+        parts = version.split('.')
+        del parts[3]
+        version = '.'.join(parts)
+
     run_command('candle -nologo -out ScalyrAgent.wixobj -dVERSION="%s" -dUPGRADECODE="%s" '
                 '-dPRODUCTCODE="%s" scalyr_agent.wxs' % (version, upgrade_code, product_code), exit_on_fail=True,
                 command_name='candle')
