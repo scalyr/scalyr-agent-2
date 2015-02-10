@@ -661,7 +661,8 @@ class RedirectorServer(object):
         """Signals the client connection that all bytes have been sent and then resets stdout and stderr to
         their original values.
         """
-        self._write_stream(0, '')
+        # This will result in a -1 being written to the stream, indicating the server is closing down.
+        self._write_stream(-1, '')
 
         self.__channel.close()
         self.__channel = None
@@ -690,7 +691,7 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                self.__channel.write(struct.pack('I', code) + encoded_content)
+                self.__channel.write(struct.pack('i', code) + encoded_content)
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -833,11 +834,10 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                code = struct.unpack('I', self.__channel.read(4))[0]    # Read str length
+                code = struct.unpack('i', self.__channel.read(4))[0]    # Read str length
 
-                # We use a length of 0 to indicate the server has gracefully closed and the client should consider all
-                # work done.
-                if code == 0:
+                # The server sends -1 when it wishes to close the stream.
+                if code < 0:
                     break
 
                 bytes_to_read = code >> 1

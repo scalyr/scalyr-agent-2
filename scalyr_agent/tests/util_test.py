@@ -301,7 +301,7 @@ class TestRedirectorServer(unittest.TestCase):
         @rtype: (int,str)
         """
         prefix_code = content[0:4]
-        code = struct.unpack('I', prefix_code)[0]
+        code = struct.unpack('i', prefix_code)[0]
         stream_id = code % 2
         num_bytes = code >> 1
 
@@ -361,7 +361,7 @@ class TestRedirectorClient(unittest.TestCase):
 
     def test_close_from_server(self):
         self._accept_client_connection()
-        self._send_to_client(0, '')
+        self._send_to_client(-1, '')
         # Even though we haven't called stop on the client thread, it should still end because the server sent
         # the signal to stop/close.
         self._client.join()
@@ -389,7 +389,7 @@ class TestRedirectorClient(unittest.TestCase):
     def _send_to_client(self, stream_id, content):
         encoded_content = unicode(content).encode('utf-8')
         code = len(encoded_content) * 2 + stream_id
-        self._client_channel.simulate_server_write(struct.pack('I', code) + encoded_content)
+        self._client_channel.simulate_server_write(struct.pack('i', code) + encoded_content)
 
 
 class TestRedirectionService(unittest.TestCase):
