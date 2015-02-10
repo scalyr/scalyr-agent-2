@@ -465,7 +465,11 @@ class WindowsPlatformController(PlatformController):
         @type quiet: bool
         """
         try:
+            if not quiet:
+                print 'Sending control signal to stop agent service.'
             win32serviceutil.StopService(_SCALYR_AGENT_SERVICE_)
+            if not quiet:
+                print 'Agent service has stopped.'
         except win32api.error, e:
             if e[0] == winerror.ERROR_SERVICE_NOT_ACTIVE:
                 raise AgentNotRunning('The operating system indicates the Scalyr Agent Service is not running.')
