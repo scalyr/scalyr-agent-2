@@ -81,7 +81,7 @@
             <Component Id='ScalyrAgentService' Guid='cf5da252-7803-45c0-b33b-e1745925cd09' >
               <File Id='ScalyrAgentService_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrAgentService.exe' />
               <ServiceInstall Id="ServiceInstaller" Type="ownProcess" Vital="yes" Name="ScalyrAgentService"
-                              DisplayName="ScalyrAgentService"
+                              DisplayName="Scalyr Agent Service"
                               Description="The Scalyr Agent sends logs and metrics to Scalyr."
                               Start="auto"
                               Account="LocalSystem"
