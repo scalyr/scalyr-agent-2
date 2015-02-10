@@ -554,13 +554,13 @@ class SystemMonitor(ScalyrMonitor):
         try:
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config['metric_name']
-                logmsg = "Sampled %s at %s %d-%d".format
                 for metric_value in metric.dispatch():
                     # We might get this metric value if we were doing the io counters metrics and the user has
                     # not turned on disk performance yet.
                     if metric_value == __NO_DISK_PERF__:
                         self._logger.warn('disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
-                                          'to enable IO counters', limit_once_per_x_secs=3600, limit_key='win_diskperf')
+                                          'to enable IO counters', limit_once_per_x_secs=3600, limit_key='win_diskperf',
+                                          error_code='win32DiskPerDisabled')
                     else:
                         self._logger.emit_value(
                             metric_name,
