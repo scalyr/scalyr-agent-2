@@ -325,19 +325,6 @@ _VIRTUAL_MEMORY_METRICS = [
         ),
         GATHER_METRIC('swap_memory', 'free')
     ),
-    METRIC( ## ------------------    Free Virtual Memory    ----------------------------
-        METRIC_CONFIG(
-            metric_name     = 'winsys.memory.availabe',
-            description     = '{description}',
-            category        = 'general',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'swap',
-            }
-        ),
-        GATHER_METRIC('swap_memory', 'available')
-    ),
 
     # TODO: Additional attributes for this section
     #  * ...
