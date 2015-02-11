@@ -391,7 +391,7 @@ _PROCESS_MEMORY_METRICS = [
 _PROCESS_DISK_IO_METRICS = [
     METRIC( ## ------------------ Disk Read Operations ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winproc.disk.operations',
+            metric_name     = 'winproc.disk.ops',
             description     = 'Total disk read requests.',
             category        = "disk",
             unit            = 'requests',
@@ -404,7 +404,7 @@ _PROCESS_DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------ Disk Write Operations ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winproc.disk.operations',
+            metric_name     = 'winproc.disk.ops',
             description     = 'Total disk write requests.',
             category        = "disk",
             unit            = 'requests',
