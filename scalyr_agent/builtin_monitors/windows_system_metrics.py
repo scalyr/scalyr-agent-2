@@ -36,6 +36,8 @@ __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
 
+import time
+
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
@@ -99,14 +101,16 @@ __NO_DISK_PERF__ = 'no_disk_perf_signal'
 # ##    Metrics define the capibilities of this monitor.  These some utility functions
 # ##    along with the list(s) of metrics themselves.
 # ##
-def _gather_metric(method, attribute=None):
+def _gather_metric(method, attribute=None, transform=None):
     """Curry arbitrary process metric extraction
 
     @param method: a callable member of the process object interface
     @param attribute: an optional data member, of the data structure returned by ``method``
+    @param transform: An optional function that can be used to modify the value of the metric that `method` returned.
 
-    @type method callable
-    @type attribute str
+    @type method: callable
+    @type attribute: str
+    @type transform: func()
     """
     doc = "Extract the {} attribute from the given process object".format
     if attribute:
@@ -119,7 +123,9 @@ def _gather_metric(method, attribute=None):
             value = metric(psutil)
             if attribute:
                 value = attrgetter(attribute)(value)
-            yield value
+            if transform is not None:
+                value = transform(value)
+            yield value, None
         except RuntimeError, e:
             # Special case the expected exception we see if we call disk_io_counters without the
             # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
@@ -127,7 +133,7 @@ def _gather_metric(method, attribute=None):
             # package a specific version of psutils in with the windows executable, so we should know if
             # the message changes.
             if e.message == "couldn't find any physical disk" and method == 'disk_io_counters':
-                yield __NO_DISK_PERF__
+                yield __NO_DISK_PERF__, None
             else:
                 raise e
 
@@ -135,7 +141,7 @@ def _gather_metric(method, attribute=None):
     return gather_metric
 
 
-def partion_disk_usage():
+def partion_disk_usage(sub_metric):
     mountpoints_initialized = [0]
     mountpoints = []
 
@@ -148,7 +154,7 @@ def partion_disk_usage():
         for mountpoint in mountpoints:
             try:
                 diskusage = psutil.disk_usage(mountpoint)
-                yield "{}={}%".format(mountpoint, diskusage.percent)
+                yield getattr(diskusage, sub_metric), {'partition': mountpoint}
             except OSError:
                 # Certain partitions, like a CD/DVD drive, are expected to fail
                 pass
@@ -206,7 +212,7 @@ _SYSTEM_CPU_METRICS = [
             unit            = 'secs:1.00',
             cumulative      = True,
             extra_fields    = {
-                'type': 'User'
+                'type': 'user'
             },
         ),
         GATHER_METRIC('cpu_times', 'user')
@@ -243,6 +249,17 @@ _SYSTEM_CPU_METRICS = [
 ]
 
 
+def calculate_uptime(boot_time):
+    """Calculates the uptime for the system based on its boot time.
+
+    @param boot_time: The time when the system was started in seconds past epoch.
+    @type boot_time: float
+
+    @return: The number of seconds since the system was last started.
+    @rtype: float
+    """
+    return time.time() - boot_time
+
 # =================================================================================
 # ========================    UPTIME METRICS     ===============================
 # =================================================================================
@@ -251,13 +268,13 @@ _UPTIME_METRICS = [
     METRIC( ## ------------------  System Boot Time   ----------------------------
         METRIC_CONFIG(
             metric_name     = 'proc.uptime',
-            description     = 'System boot time in seconds since the epoch.',
+            description     = 'Seconds since the system boot time.',
             category        = 'general',
             unit            = 'sec',
             cumulative      = True,
             extra_fields    = {}
         ),
-        GATHER_METRIC('boot_time', None)
+        GATHER_METRIC('boot_time', None, transform=calculate_uptime)
     ),
 
     # TODO: Additional attributes for this section
@@ -369,7 +386,8 @@ _PHYSICAL_MEMORY_METRICS = [
 # ========================    Network IO Counters   ===============================
 # =================================================================================
 _NETWORK_IO_METRICS = [
-
+    # TODO: Add in per-interface metrics.  This can be gathered using psutils.  You just have to set pernic=True
+    # on the call to network_io_counters.  The current structure of this code makes it difficult though.
     METRIC( ## ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
             metric_name     = 'network.io.bytes',
@@ -379,7 +397,6 @@ _NETWORK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'direction': 'sent',
-                'iface': ''
             }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_sent')
@@ -393,7 +410,6 @@ _NETWORK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'direction': 'recv',
-                'iface': ''
             }
         ),
         GATHER_METRIC('network_io_counters', 'bytes_recv')
@@ -407,7 +423,6 @@ _NETWORK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'direction': 'sent',
-                'iface': ''
             }
         ),
         GATHER_METRIC('network_io_counters', 'packets_sent')
@@ -421,7 +436,6 @@ _NETWORK_IO_METRICS = [
             cumulative      = True,
             extra_fields    = {
                 'direction': 'recv',
-                'iface': ''
             }
         ),
         GATHER_METRIC('network_io_counters', 'packets_recv')
@@ -503,14 +517,36 @@ _DISK_IO_METRICS = [
 _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'disk.usage',
+            metric_name     = 'disk.usage.percent',
             description     = 'Disk usage percentage for each partition',
             category        = 'general',
             unit            = 'percent',
-            cumulative      = True,
-            extra_fields    = {}
+            cumulative      = False,
+            extra_fields    = { 'partition'}
         ),
-        partion_disk_usage()
+        partion_disk_usage('percent')
+    ),
+    METRIC(
+        METRIC_CONFIG(
+            metric_name     = 'disk.usage.used',
+            description     = 'Bytes used for each partition',
+            category        = 'general',
+            unit            = 'byte',
+            cumulative      = False,
+            extra_fields    = { 'partition'}
+        ),
+        partion_disk_usage('used')
+    ),
+    METRIC(
+        METRIC_CONFIG(
+            metric_name     = 'disk.usage.total',
+            description     = 'Total bytes on each partition included free and used bytes',
+            category        = 'general',
+            unit            = 'byte',
+            cumulative      = False,
+            extra_fields    = { 'partition'}
+        ),
+        partion_disk_usage('total')
     ),
 ]
 # pylint: enable=bad-whitespace
@@ -554,7 +590,7 @@ class SystemMonitor(ScalyrMonitor):
         try:
             for idx, metric in enumerate(METRICS):
                 metric_name = metric.config['metric_name']
-                for metric_value in metric.dispatch():
+                for (metric_value, extra_fields) in metric.dispatch():
                     # We might get this metric value if we were doing the io counters metrics and the user has
                     # not turned on disk performance yet.
                     if metric_value == __NO_DISK_PERF__:
@@ -562,10 +598,12 @@ class SystemMonitor(ScalyrMonitor):
                                           'to enable IO counters', limit_once_per_x_secs=3600, limit_key='win_diskperf',
                                           error_code='win32DiskPerDisabled')
                     else:
+                        if extra_fields is None:
+                            extra_fields = metric.config['extra_fields']
                         self._logger.emit_value(
                             metric_name,
                             metric_value,
-                            extra_fields=metric.config['extra_fields']
+                            extra_fields=extra_fields
                     )
         except:
             self.__process = None
