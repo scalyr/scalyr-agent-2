@@ -267,7 +267,7 @@ _UPTIME_METRICS = [
 
     METRIC( ## ------------------  System Boot Time   ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'proc.uptime',
+            metric_name     = 'winsys.uptime',
             description     = 'Seconds since the system boot time.',
             category        = 'general',
             unit            = 'sec',
@@ -288,39 +288,39 @@ _VIRTUAL_MEMORY_METRICS = [
 
     METRIC( ## ------------------    Total Virtual Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.virtual',
+            metric_name     = 'winsys.memory.total',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'total',
+                'type': 'virtual',
             }
         ),
         GATHER_METRIC('virtual_memory', 'total')
     ),
     METRIC( ## ------------------    Used Virtual Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.virtual',
+            metric_name     = 'winsys.memory.used',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'used',
+                'type': 'virtual',
             }
         ),
         GATHER_METRIC('virtual_memory', 'used')
     ),
     METRIC( ## ------------------    Free Virtual Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.virtual',
+            metric_name     = 'winsys.memory.free',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'free',
+                'type': 'virtual',
             }
         ),
         GATHER_METRIC('virtual_memory', 'free')
@@ -338,39 +338,39 @@ _PHYSICAL_MEMORY_METRICS = [
 
     METRIC( ## ------------------    Total Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.physical',
+            metric_name     = 'winsys.memory.total',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'total',
+                'type': 'physical',
             }
         ),
         GATHER_METRIC('virtual_memory', 'total')
     ),
     METRIC( ## ------------------    Used Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.physical',
+            metric_name     = 'winsys.memory.used',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'used',
+                'type': 'physical',
             }
         ),
         GATHER_METRIC('virtual_memory', 'used')
     ),
     METRIC( ## ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'memory.physical',
+            metric_name     = 'winsys.memory.free',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
             #cumulative      = {cumulative},
             extra_fields    = {
-                'type': 'free',
+                'type': 'physical',
             }
         ),
         GATHER_METRIC('virtual_memory', 'free')
@@ -390,7 +390,7 @@ _NETWORK_IO_METRICS = [
     # on the call to network_io_counters.  The current structure of this code makes it difficult though.
     METRIC( ## ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io.bytes',
+            metric_name     = 'winsys.network.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -403,7 +403,7 @@ _NETWORK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io.bytes',
+            metric_name     = 'winsys.network.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -416,7 +416,7 @@ _NETWORK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io.packets',
+            metric_name     = 'winsys.network.packets',
             description     = '{description}',
             category        = 'general',
             unit            = 'packets',
@@ -429,7 +429,7 @@ _NETWORK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'network.io.packets',
+            metric_name     = 'winsys.network.packets',
             description     = '{description}',
             category        = 'general',
             unit            = 'packets',
@@ -456,7 +456,7 @@ _DISK_IO_METRICS = [
 
     METRIC( ## ------------------   Disk Bytes Read    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io.bytes',
+            metric_name     = 'winsys.disk.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -469,7 +469,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------  Disk Bytes Written  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io.bytes',
+            metric_name     = 'winsys.disk.io.bytes',
             description     = '{description}',
             category        = 'general',
             unit            = 'bytes',
@@ -482,7 +482,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Disk Read Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io.ops',
+            metric_name     = 'winsys.disk.io.ops',
             description     = '{description}',
             category        = 'general',
             unit            = 'count',
@@ -495,7 +495,7 @@ _DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------   Disk Write Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'disk.io.ops',
+            metric_name     = 'winsys.disk.io.ops',
             description     = '{description}',
             category        = 'general',
             unit            = 'count',
@@ -517,7 +517,7 @@ _DISK_IO_METRICS = [
 _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'disk.usage.percent',
+            metric_name     = 'winsys.disk.usage.percent',
             description     = 'Disk usage percentage for each partition',
             category        = 'general',
             unit            = 'percent',
@@ -528,7 +528,7 @@ _DISK_USAGE_METRICS = [
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'disk.usage.used',
+            metric_name     = 'winsys.disk.usage.used',
             description     = 'Bytes used for each partition',
             category        = 'general',
             unit            = 'byte',
@@ -539,7 +539,7 @@ _DISK_USAGE_METRICS = [
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'disk.usage.total',
+            metric_name     = 'winsys.disk.usage.total',
             description     = 'Total bytes on each partition included free and used bytes',
             category        = 'general',
             unit            = 'byte',
