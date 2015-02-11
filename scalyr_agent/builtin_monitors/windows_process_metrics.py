@@ -74,6 +74,7 @@ __monitor__ = __name__
 import os
 import re
 import datetime
+import time
 
 import itertools
 from operator import methodcaller, attrgetter
@@ -136,14 +137,17 @@ _ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] #
 # ##    Metrics define the capibilities of this monitor.  These some utility functions
 # ##    along with the list(s) of metrics themselves.
 # ##
-def _gather_metric(method, attribute=None):
+def _gather_metric(method, attribute=None, transform=None):
     """Curry arbitrary process metric extraction
 
     @param method: a callable member of the process object interface
     @param attribute: an optional data member, of the data structure returned by ``method``
+    @param transform: an optional function that can be used to transform the value returned by ``method``.
+        The function should take a single argument and return the value to report as the metric value.
 
     @type method callable
     @type attribute str
+    @type transform: func()
     """
 
     doc = "Extract the {} attribute from the given process object".format
@@ -157,15 +161,21 @@ def _gather_metric(method, attribute=None):
         assert proc_type is psutil.Process, errmsg(proc_type)
         metric = methodcaller(method)   # pylint: disable=redefined-outer-name
         if attribute is not None:
-            return attrgetter(attribute)(metric(process))
+            value = attrgetter(attribute)(metric(process))
         else:
-            return metric(process)
+            value = metric(process)
+
+        if transform is not None:
+            value = transform(value)
+
+        return value
 
     # XXX: For some reason this was causing trouble for the documentation build process
     #gather_metric.__doc__ = doc(method, attribute)
     return gather_metric
 
 
+# TODO:  I believe this function can be deleted.
 def uptime(start_time):
     """Calculate the difference between now() and the given create_time.
 
@@ -173,6 +183,18 @@ def uptime(start_time):
     @type float
     """
     return datetime.datetime.now() - datetime.datetime.fromtimestamp(start_time)
+
+
+def uptime_from_start_time(start_time):
+    """Returns the uptime for the process given its ``start_time``.
+
+    @param start_time: The time the process started in seconds past epoch.
+    @type start_time: float
+
+    @return: The seconds since the process started.
+    @rtype: float
+    """
+    return time.time() - start_time
 
 
 METRIC = namedtuple('METRIC', 'config dispatch')
@@ -231,7 +253,7 @@ _PROCESS_ATTRIBUTE_METRICS = [
             cumulative      = True,
             extra_fields    = {}
         ),
-        GATHER_METRIC('create_time')
+        GATHER_METRIC('create_time', transform=uptime_from_start_time)
     ),
     METRIC( ## ------------------  Process Threads   ----------------------------
         METRIC_CONFIG(
@@ -372,7 +394,7 @@ _PROCESS_DISK_IO_METRICS = [
             metric_name     = 'winproc.disk.operations',
             description     = 'Total disk read requests.',
             category        = "disk",
-            unit            = 'bytes',
+            unit            = 'requests',
             cumulative      = True,
             extra_fields    = {
                 'type': 'read'
@@ -383,19 +405,19 @@ _PROCESS_DISK_IO_METRICS = [
     METRIC( ## ------------------ Disk Write Operations ----------------------------
         METRIC_CONFIG(
             metric_name     = 'winproc.disk.operations',
-            description     = 'Total disk read requests.',
+            description     = 'Total disk write requests.',
             category        = "disk",
-            unit            = 'bytes',
+            unit            = 'requests',
             cumulative      = True,
             extra_fields    = {
-                'type': 'read'
+                'type': 'write'
             },
         ),
-        GATHER_METRIC('io_counters', 'read_count')
+        GATHER_METRIC('io_counters', 'write_count')
     ),
     METRIC( ## ------------------ Disk Read Bytes ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winproc.disk.operations',
+            metric_name     = 'winproc.disk.bytes',
             description     = 'Total bytes processed during disk read operations.',
             category        = "disk",
             unit            = 'bytes',
@@ -408,16 +430,16 @@ _PROCESS_DISK_IO_METRICS = [
     ),
     METRIC( ## ------------------ Disk Read Bytes ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winproc.disk.operations',
-            description     = 'Total disk read requests.',
+            metric_name     = 'winproc.disk.bytes',
+            description     = 'Total bytes processed during disk write operations.',
             category        = "disk",
             unit            = 'bytes',
             cumulative      = True,
             extra_fields    = {
-                'type': 'read'
+                'type': 'write'
             },
         ),
-        GATHER_METRIC('io_counters', 'read_count')
+        GATHER_METRIC('io_counters', 'write_bytes')
     )
     # TODO: Additional attributes for this section
     #  * ...
