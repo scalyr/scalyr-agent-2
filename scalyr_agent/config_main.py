@@ -658,11 +658,13 @@ if __name__ == '__main__':
         print >> sys.stderr, 'Terminating, please fix the configuration file and restart agent.'
         sys.exit(1)
 
+    controller.consume_config(config_file, options.config_filename)
+
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
     if 'win32' == sys.platform and options.mark_conditional_restart:
         mark_conditional_restart(controller, config_file)
 
-    if 'win32' == sys.platform and options.conditional_start:
+    if 'win32' == sys.platform and options.conditional_restart:
         restart_if_conditional_marker_exists(controller, config_file)
 
     if options.set_key_from_stdin:
