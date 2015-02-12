@@ -522,6 +522,12 @@ if __name__ == '__main__':
         parser.add_option("", "--no-error-if-config-exists", dest="init_config_ignore_exists", action="store_true",
                           default=False,
                           help='If using "--init-config", exit with success if the file already exists.')
+        # This is a weird option we use to start the agent after the Windows install process finishes if there
+        # was an agent running before.  If there was an agent, then it would have written a special file
+        # called the conditional restart marker.  So, if it exists, then we should start the agent.
+        parser.add_option("", "--conditional-start", dest="conditional_start", action="store_true",
+                          default=False,
+                          help='Starts the agent if the conditional restart file marker exists.')
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print >> sys.stderr, 'Could not parse commandline arguments.'
@@ -550,7 +556,6 @@ if __name__ == '__main__':
                 sys.exit(1)
             else:
                 print >> sys.stderr, 'Configuration file already exists at %s, so doing nothing.' % config_path
-                sys.exit(0)
         if not os.path.isdir(template_dir):
             print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist at'
                                   '%s' % template_dir)
@@ -577,6 +582,18 @@ if __name__ == '__main__':
         print >> sys.stderr, traceback.format_exc()
         print >> sys.stderr, 'Terminating, please fix the configuration file and restart agent.'
         sys.exit(1)
+
+    # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
+    if 'win32' == sys.platform and options.conditional_start:
+        # If we get here, we know the controller is a WindowsPlatformController, so we can use its
+        # conditional_restart_marker_exists method.. though we need to give it the config first.
+        controller.consume_config(config_file, options.config_filename)
+        # noinspection PyUnresolvedReferences
+        if controller.conditional_restart_marker_exists():
+            # noinspection PyUnresolvedReferences
+            controller.delete_conditional_restart_marker()
+            # We rely on the WindowsPlatformController start_agent_service not needing a run method passed in to it.
+            controller.start_agent_service(None, True)
 
     if options.set_key_from_stdin:
         api_key = raw_input('Please enter key: ')
