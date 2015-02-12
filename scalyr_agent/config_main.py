@@ -556,19 +556,20 @@ if __name__ == '__main__':
                 sys.exit(1)
             else:
                 print >> sys.stderr, 'Configuration file already exists at %s, so doing nothing.' % config_path
-        if not os.path.isdir(template_dir):
-            print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist at'
-                                  '%s' % template_dir)
-            sys.exit(1)
-        if not os.path.isfile(template):
-            print >> sys.stderr, ('Cannot initialize configuration file because template file does not exist at'
-                                  '%s' % template)
-            sys.exit(1)
+        else:
+            if not os.path.isdir(template_dir):
+                print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist '
+                                      'at %s' % template_dir)
+                sys.exit(1)
+            if not os.path.isfile(template):
+                print >> sys.stderr, ('Cannot initialize configuration file because template file does not exist at'
+                                      '%s' % template)
+                sys.exit(1)
 
-        # Copy the file.
-        shutil.copy(template, config_path)
-        controller.set_file_owner(config_path, controller.get_current_user())
-        print 'Successfully initialized the configuration file.'
+            # Copy the file.
+            shutil.copy(template, config_path)
+            controller.set_file_owner(config_path, controller.get_current_user())
+            print 'Successfully initialized the configuration file.'
 
     if options.executing_user and controller.get_current_user() != 'root':
         print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
