@@ -9,7 +9,8 @@
             />
         <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
 
-        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+            AllowSameVersionUpgrades="Yes"/>
 
         <!-- Define directory structure -->
         <Directory Id='TARGETDIR' Name='SourceDir'>
