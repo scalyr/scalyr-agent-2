@@ -80,9 +80,6 @@ _SCALYR_AGENT_SERVICE_DISPLAY_NAME_ = "Scalyr Agent Service"
 _SERVICE_DESCRIPTION_ = "Collects logs and metrics and forwards them to Scalyr.com"
 # A custom control message that is used to signal the agent should generate a detailed status report.
 _SERVICE_CONTROL_DETAILED_REPORT_ = win32service.SERVICE_USER_DEFINED_CONTROL - 1
-# A custom control message that is used to signal the agent should leave a conditional restart marker if it is
-# running.
-_SERVICE_CONTROL_COND_RESTART_MARKER_ = win32service.SERVICE_USER_DEFINED_CONTROL - 2
 
 
 def _set_config_path_registry_entry(value):
@@ -161,8 +158,6 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
         # See if the control signal is our custom one, otherwise dispatch it to the superclass.
         if _SERVICE_CONTROL_DETAILED_REPORT_ == control:
             self.controller.invoke_status_handler()
-        elif _SERVICE_CONTROL_COND_RESTART_MARKER_ == control:
-            self.controller.write_conditional_restart_marker()
         else:
             win32serviceutil.ServiceFramework.SvcOther(self, control)
 
@@ -187,9 +182,6 @@ class WindowsPlatformController(PlatformController):
 
         # Controls whether or not we warn the user via stdout that we are about to escalate to Administrator privileges.
         self.__no_escalation_warning = False
-
-        # The path to the conditional restart marker file.  This is set when we consume the config.
-        self.__marker_path = None
 
         PlatformController.__init__(self)
 
@@ -238,7 +230,6 @@ class WindowsPlatformController(PlatformController):
         @type path_to_config: str
         """
         self.__config_file_path = os.path.abspath(path_to_config)
-        self.__marker_path = os.path.join(config.agent_data_path, 'cond_restart')
 
     @property
     def default_monitors(self):
@@ -580,36 +571,6 @@ class WindowsPlatformController(PlatformController):
             redirection = PipeRedirectorServer(options.redirect_pipe)
             redirection.start()
             atexit.register(redirection.stop)
-
-    def write_conditional_restart_marker(self):
-        """Write a file in the data directory that indicates that the agent was running and it should be
-        restarted as part of a conditional restart.
-
-        This is used in the wix install execution.  Before we uninstall an existing agent, we send it a signal
-        to say to write this marker if it is running.  Then, after we install the new agent, we only start it
-        if this marker file exists.
-
-        We are jumping through a lot of hoops, but this is the easiest way to get the conditional restart.
-        """
-        fp = open(self.__marker_path, 'w')
-        try:
-            fp.write('yes')
-        finally:
-            fp.close()
-
-    def delete_conditional_restart_marker(self):
-        """Deletes the conditional restart marker file.
-        """
-        if os.path.isfile(self.__marker_path):
-            os.unlink(self.__marker_path)
-
-    def conditional_restart_marker_exists(self):
-        """Returns true if the conditional restart marker file exists.
-
-        @return True if it exists.
-        @rtype bool
-        """
-        return os.path.isfile(self.__marker_path)
 
 
 class PipeRedirectorServer(RedirectorServer):
