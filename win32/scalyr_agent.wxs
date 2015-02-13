@@ -195,13 +195,22 @@
         <!-- Also, we use the CAQuietExec utility so a console window isn't popped up. -->
         <!-- Since the action is deferred, we have to do a dance where we set a property with the command first. -->
 
+        <CustomAction Id='CheckForCondRestart_set' Property='CheckForCondRestart' Execute='immediate'
+            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --mark-conditional-restart'/>
+        <CustomAction Id="CheckForCondRestart" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
+            Return="check" Impersonate="no"/>
+
+
         <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
-            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists'/>
+            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
         <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
             Return="check" Impersonate="no"/>
 
         <InstallExecuteSequence>
           <WriteEnvironmentStrings />
+          <Custom Action="CheckForCondRestart_set" After="CostFinalize">WIX_UPGRADE_DETECTED</Custom>
+          <Custom Action="CheckForCondRestart" After="InstallInitialize">WIX_UPGRADE_DETECTED</Custom>
+
           <Custom Action="InitializeConfig_set" After="CostFinalize">NOT Installed AND NOT REMOVE</Custom>
           <Custom Action="InitializeConfig" Before="InstallFinalize">NOT Installed AND NOT REMOVE</Custom>
         </InstallExecuteSequence>
