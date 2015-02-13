@@ -189,18 +189,27 @@
             Value="You have finished installing the Scalyr Agent.  You must first edit your configuration to add your account's API key.  Please see the following instructions: https://www.scalyr.com/help/install-agent" />
         <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
 
-        <!-- We this elaborate custom action to execute the config tool to initialize the configuration. -->
-        <!-- We must execute this using the SYSTEM/INSTALLER account rather than the impersonating as the -->
-        <!-- user running the installation.  Because of this, we have defer execution and set impersonate to no. -->
-        <!-- Also, we use the CAQuietExec utility so a console window isn't popped up. -->
-        <!-- Since the action is deferred, we have to do a dance where we set a property with the command first. -->
+        <!-- We use these custom actions to execute the 'mark for conditional restart' and initialize the -->
+        <!-- configuration.  We run the first one only during the uninstall portion of an upgrade.. and we execute -->
+        <!-- right before any files are removed so that we can use the scalyr-agent-2.exe binary.  We execute -->
+        <!-- that binary to have it check to see if the agent is currently running, and if so, set the marker. -->
+        <!-- During the install of the new app, we then run a command that both initializes the config if it is -->
+        <!-- there and checks to see of the conditional marker is set (and if so, start the agent).  We have to -->
+        <!-- wait until the end of the install cycle to execute that second command since the agent's binary files -->
+        <!-- need to be installed first.  We have to run both of these commands with the elevated installer -->
+        <!-- privileges instead of the user running the setup.  Because of this, we have defer execution and set -->
+        <!-- impersonate to no. Also, we use the CAQuietExec utility so a console window isn't popped up. -->
+        <!-- Since we use two CAQuietExec commands, we have to do a dance where we set a property for each command -->
+        <!-- containing the commandline. -->
 
+        <!-- Run this only during the uninstall portion of an upgrade.  Do not check the result code since the -->
+        <!-- conditional restart is not important enough to fail the install if something goes wrong. -->
         <CustomAction Id='CheckForCondRestart_set' Property='CheckForCondRestart' Execute='immediate'
             Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --mark-conditional-restart'/>
         <CustomAction Id="CheckForCondRestart" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
-            Return="check" Impersonate="no"/>
+            Return="ignore" Impersonate="no"/>
 
-
+        <!-- Run this during the install portion of an upgrade. -->
         <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
             Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
         <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
@@ -208,10 +217,10 @@
 
         <InstallExecuteSequence>
           <WriteEnvironmentStrings />
-          <Custom Action="CheckForCondRestart_set" After="CostFinalize">WIX_UPGRADE_DETECTED</Custom>
-          <Custom Action="CheckForCondRestart" After="InstallInitialize">WIX_UPGRADE_DETECTED</Custom>
+          <Custom Action="CheckForCondRestart_set" Before="InstallInitialize"></Custom>
+          <Custom Action="CheckForCondRestart" After="InstallInitialize">REMOVE AND UPGRADINGPRODUCTCODE AND Installed</Custom>
 
-          <Custom Action="InitializeConfig_set" After="CostFinalize">NOT Installed AND NOT REMOVE</Custom>
+          <Custom Action="InitializeConfig_set" After="CostFinalize"></Custom>
           <Custom Action="InitializeConfig" Before="InstallFinalize">NOT Installed AND NOT REMOVE</Custom>
         </InstallExecuteSequence>
     </Product>
