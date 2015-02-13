@@ -22,9 +22,9 @@ from sys import platform as _platform
 
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
-from scalyr_agent.platform_controller import DefaultPaths, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.platform_controller import DefaultPaths
 
-from __scalyr__ import get_install_root
+from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
 
 class LinuxPlatformController(PosixPlatformController):
@@ -32,15 +32,10 @@ class LinuxPlatformController(PosixPlatformController):
 
     This is based on the general Posix platform but also adds in Linux-specific monitors to run.
     """
-    def __init__(self, install_type, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         """Initializes the POSIX platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-
-        @type install_type: int
         """
-        PosixPlatformController.__init__(self, install_type, stdin=stdin, stdout=stdout, stderr=stderr)
+        PosixPlatformController.__init__(self, stdin=stdin, stdout=stdout, stderr=stderr)
         self.__run_system_metrics = True
         self.__run_agent_process_metrics = True
 
@@ -52,16 +47,19 @@ class LinuxPlatformController(PosixPlatformController):
         """
         return _platform.lower().startswith('linux')
 
-    def consume_config(self, config):
+    def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
 
         This will be invoked before the scalyr-agent-2 command performs any real work and while stdout and stderr
         are still be displayed to the screen.
 
         @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
         @type config: configuration.Configuration
+        @type path_to_config: str
         """
-        PosixPlatformController.consume_config(self, config)
+        PosixPlatformController.consume_config(self, config, path_to_config)
         self.__run_system_metrics = config.implicit_metric_monitor
         self.__run_agent_process_metrics = config.implicit_agent_process_metrics_monitor
 

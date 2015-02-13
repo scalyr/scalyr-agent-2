@@ -99,6 +99,8 @@ class ScalyrClientSession(object):
         self.__session_id = scalyr_util.create_unique_id()
         # The time of the last success.
         self.__last_success = None
+        # The version number of the installed agent
+        self.__agent_version = agent_version
 
         # The last time the connection was closed, if any.
         self.__last_connection_close = None
@@ -395,6 +397,28 @@ class ScalyrClientSession(object):
             ssl_str = 'nossllib'
 
         return '%s;%s;agent-%s;%s;' % (platform_value, python_version_str, agent_version, ssl_str)
+
+    def get_latest_agent_version(self):
+        """Query the Scalyr API to determine if a newer version is available
+        """
+        # TODO: Query Scalyr API for latest version.  For now assume it is 2.0.5
+        latest_version = '2.0.5'
+        current_version = self.__agent_version
+        
+        # TODO: Default response is hard-coded for now
+        response = {
+            'update_required': False,
+            'url': 'http://10.0.0.109:8000/ScalyrService_2.0.5.msi'
+        }
+
+        # TODO: A more robust version comparison should be done
+        # If latest_version > client_version modify the default response
+        for latest, current in zip(latest_version.split('.'), current_version.split('.')):
+            if int(latest) > int(current):
+                response['update_required'] = True
+                break
+
+        return response
 
 
 class AddEventsRequest(object):

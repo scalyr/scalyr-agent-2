@@ -34,13 +34,59 @@ from setuptools import setup, find_packages  # Always prefer setuptools over dis
 from codecs import open  # To use a consistent encoding
 from os import path
 
-from scalyr_agent.__scalyr__ import SCALYR_VERSION, determine_file_path
+import sys
 
-here = path.dirname(determine_file_path())
+if path.isdir('source_root'):
+    sys.path.append('source_root')
+
+from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
+
+if "win32" == sys.platform:
+    # ModuleFinder can't handle runtime changes to __path__, but win32com uses them
+    try:
+        # py2exe 0.6.4 introduced a replacement modulefinder.
+        # This means we have to add package paths there, not to the built-in
+        # one.  If this new modulefinder gets integrated into Python, then
+        # we might be able to revert this some day.
+        # if this doesn't work, try import modulefinder
+        try:
+            import py2exe.mf as modulefinder
+        except ImportError:
+            import modulefinder
+        import win32com, sys
+        for p in win32com.__path__[1:]:
+            modulefinder.AddPackagePath("win32com", p)
+
+        for extra in ["win32com.shell"]: #,"win32com.mapi"
+            __import__(extra)
+            m = sys.modules[extra]
+            for p in m.__path__[1:]:
+                modulefinder.AddPackagePath(extra, p)
+    except ImportError:
+        # no build path setup, no worries.
+        pass
+
+    import py2exe
 
 # Get the long description from the relevant file
-with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
+with open(path.join(path.dirname(get_install_root()), 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
+
+
+class Target:
+    def __init__(self, **kw):
+        self.version = SCALYR_VERSION
+        self.description = 'TODO'
+        self.copyright = 'TODO'
+        self.__dict__.update(kw)
+
+service_config = Target(
+    description='Scalyr Agent 2 Service',
+    modules=['scalyr_agent.platform_windows'],
+    dest_base='ScalyrAgentService',
+    cmdline_style='pywin32'
+)
+
 
 setup(
     name='scalyr-agent-2',
@@ -109,7 +155,7 @@ setup(
     # need to place data files outside of your packages.
     # see http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    #data_files=[('my_data', ['data/data_file'])],
+    data_files=[('', [path.join('source_root', 'VERSION')])],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
@@ -119,4 +165,24 @@ setup(
     #        'sample=sample:main',
     #    ],
     #},
+    console=[
+        {
+            'script': path.join('source_root', 'scalyr_agent', 'agent_main.py'),
+            'dest_base': 'scalyr-agent-2',
+        },
+        {
+            'script': path.join('source_root', 'scalyr_agent', 'config_main.py'),
+            'dest_base': 'scalyr-agent-2-config',
+        }
+    ],
+    service=[service_config],
+
+    options={
+        'py2exe': {
+            # TODO(windows): Auto-generate this list based on contents of the monitors directory.
+            'includes': 'scalyr_agent.builtin_monitors.windows_system_metrics,'
+                        'scalyr_agent.builtin_monitors.windows_process_metrics',
+            'dll_excludes': ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
+        }
+    }
 )

@@ -23,7 +23,6 @@
 __author__ = 'czerwin@scalyr.com'
 
 import cStringIO
-import getpass
 import os
 import re
 import shutil
@@ -34,20 +33,20 @@ import tempfile
 import traceback
 
 from distutils import spawn
-from pwd import getpwnam
 from optparse import OptionParser
 
-from __scalyr__ import scalyr_init, determine_file_path
+# TODO: The following two imports have been modified to facilitate Windows platforms
+if 'win32' != sys.platform:
+    from pwd import getpwnam
 
+import urllib
+
+from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL, SCALYR_VERSION
 scalyr_init()
 
-__file_path__ = determine_file_path()
-
+from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.platform_controller import PlatformController, TARBALL_INSTALL
-
-from scalyr_agent.platforms import register_supported_platforms
-register_supported_platforms()
+from scalyr_agent.platform_controller import PlatformController
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -230,11 +229,8 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                 raise UpgradeFailure('The supplied tarball file name does not match the expected format.')
             tarball_directory = file_name[0:-7]
 
-            # We will be installing in the same directory where scalyr-agent-2 is currently installed.  That directory
-            # should be 4 levels back from this file.
-            # The path to this file looks like: scalyr-agent-2/py/scalyr_agent/config_main.py
-
-            install_directory = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file_path__))))
+            # We will be installing in the same directory where scalyr-agent-2 is currently installed.
+            install_directory = os.path.dirname(get_install_root())
 
             if not os.path.isdir(os.path.join(install_directory, 'scalyr-agent-2')):
                 raise UpgradeFailure('Could not determine the install directory.  Either the main directory is no '
@@ -351,6 +347,56 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     # For now, we do not do anything.
     return 0
 
+def upgrade_windows_install(config_file, url, preserve_msi=False):
+    """Performs an upgrade for an existing Scalyr Agent 2 that was previously installed using a Windows MSI install file.
+
+    @param config_file: The configuration for this agent.
+    @param url: The url where the Windows MSI install file can be downloaded.
+
+    @return: The exit status code.
+    """
+    try:
+        platform_controller = PlatformController.new_platform()
+        default_paths = platform_controller.default_paths
+
+        # Ensure agent was installed via MSI
+        if MSI_INSTALL != platform_controller.install_type:
+            raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the '
+                    'upgrade windows command.')
+
+        # Ensure that the user has not changed the defaults for the config, data, and log directory.
+        if default_paths.config_file_path != config_file.file_path:
+            raise UpgradeFailure('The agent is not using the default configuration file so you may not use the '
+                                 'upgrade tarball command.')
+        if default_paths.agent_data_path != config_file.agent_data_path:
+            raise UpgradeFailure('The agent is not using the default data directory so you may not use the upgrade '
+                                 'tarball command.')
+        if default_paths.agent_log_path != config_file.agent_log_path:
+            raise UpgradeFailure('The agent is not using the default log directory so you may not use the upgrade '
+                                 'tarball command.')
+
+        msifile = os.path.join(default_paths.agent_data_path, 'update.msi')
+        
+        try:
+            urllib.urlretrieve(url, msifile)
+        except IOError, error:
+            raise UpgradeFailure(error.strerror[1])
+        finally:
+            if not os.path.isfile(msifile):
+                raise UpgradeFailure('Failed to download installation package')
+
+        run_command('ScalyrAgentService.exe stop')
+        run_command('ScalyrAgentService.exe remove')
+        return_code = subprocess.call(['msiexec.exe', '/i', "{}".format(msifile)])
+        print 'Installation complete.  Restart this shell to reload the environment'
+
+    except UpgradeFailure, error:
+        print >>sys.stderr
+        print >>sys.stderr, 'The upgrade failed due to the following reason: %s' % error.message
+        return 1
+
+    return 0
+
 
 # TODO:  This code is shared with build_package.py.  We should move this into a common
 # utility location both commands can import it from.
@@ -438,6 +484,75 @@ class UpgradeFailure(Exception):
     """
     pass
 
+
+def conditional_marker_path(config):
+    """Constructs the path to the conditional restart marker file and returns it.
+
+    @param config:
+    @type config: Configuration
+
+    @return: The pat to the conditional restart marker file.
+    @rtype: str
+    """
+    return os.path.join(config.agent_data_path, 'cond_restart')
+
+
+def mark_conditional_restart(platform_controller, config):
+    """If the agent is currently running, creates the conditional restart marker file.
+
+    If it is not running, makes sure that file is deleted if it currently exists.
+
+    @param platform_controller: The controller.
+    @param config: The configuration file.
+
+    @type platform_controller: PlatformController
+    @type config: Configuration
+
+    @return True if the agent was running and a file was created.
+    @rtype bool
+    """
+    path = conditional_marker_path(config)
+
+    if os.path.isfile(path):
+        os.unlink(path)
+
+    if platform_controller.is_agent_running():
+        fp = open(path, 'w')
+        try:
+            fp.write('yes')
+            return True
+        finally:
+            fp.close()
+    else:
+        return False
+
+
+def restart_if_conditional_marker_exists(platform_controller, config):
+    """Starts the agent if the conditional restart marker file exists.
+
+    This also deletes that marker file so that the next call to this function will not start the
+    agent unless another marker file was created.
+
+    @param platform_controller: The controller.  This must be the WindowsPlatformController.
+    @param config: The configuration file.
+
+    @type platform_controller: PlatformController
+    @type config: Configuration
+
+    @return: True if the agent was started.
+    @rtype: bool
+    """
+    path = conditional_marker_path(config)
+
+    if os.path.isfile(path):
+        os.unlink(path)
+        # We rely on the WindowsPlatformController start_agent_service not needing a run method passed in to it.
+        platform_controller.start_agent_service(None, True)
+        return True
+    else:
+        return False
+
+
 if __name__ == '__main__':
     parser = OptionParser(usage='Usage: scalyr-agent-2-config [options]')
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -465,14 +580,32 @@ if __name__ == '__main__':
                       help="When performing a tarball upgrade, move the old install to a temporary directory "
                            "instead of deleting it.")
 
+    # TODO: These options are only available on Windows platforms
+    if 'win32' == sys.platform:
+        parser.add_option("", "--upgrade-windows", dest="upgrade_windows", action="store_true", default=False,
+                          help='Upgrade the agent if a new version is available')
+        # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
+        # beyond just Windows.
+        parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
+                          help='Create an initial copy of the configuration file in the appropriate location.')
+        parser.add_option("", "--no-error-if-config-exists", dest="init_config_ignore_exists", action="store_true",
+                          default=False,
+                          help='If using "--init-config", exit with success if the file already exists.')
+        # These are a weird options we use to start the agent after the Windows install process finishes if there
+        # was an agent running before.  If there was an agent, the write a special file
+        # called the conditional restart marker.  So, if it exists, then we should start the agent.
+        parser.add_option("", "--mark-conditional-restart", dest="mark_conditional_restart", action="store_true",
+                          default=False,
+                          help='Creates the marker file to restart the agent next time --conditional-restart is '
+                               'specified if the agent is currently running.')
+        parser.add_option("", "--conditional-restart", dest="conditional_restart", action="store_true",
+                          default=False,
+                          help='Starts the agent if the conditional restart file marker exists.')
+
     (options, args) = parser.parse_args()
     if len(args) > 1:
         print >> sys.stderr, 'Could not parse commandline arguments.'
         parser.print_help(sys.stderr)
-        sys.exit(1)
-
-    if options.executing_user and getpass.getuser() != 'root':
-        print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
         sys.exit(1)
 
     controller = PlatformController.new_platform()
@@ -484,6 +617,38 @@ if __name__ == '__main__':
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
+    if 'win32' == sys.platform and options.init_config:
+        # Create a copy of the configuration file and set the owner to be the current user.
+        config_path = options.config_filename
+        template_dir = os.path.join(os.path.dirname(config_path), 'templates')
+        template = os.path.join(template_dir, 'agent_config.tmpl')
+
+        if os.path.exists(config_path):
+            if not options.init_config_ignore_exists:
+                print >> sys.stderr, ('Cannot initialize configuration file at %s because file already exists.' %
+                                      config_path)
+                sys.exit(1)
+            else:
+                print >> sys.stderr, 'Configuration file already exists at %s, so doing nothing.' % config_path
+        else:
+            if not os.path.isdir(template_dir):
+                print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist '
+                                      'at %s' % template_dir)
+                sys.exit(1)
+            if not os.path.isfile(template):
+                print >> sys.stderr, ('Cannot initialize configuration file because template file does not exist at'
+                                      '%s' % template)
+                sys.exit(1)
+
+            # Copy the file.
+            shutil.copy(template, config_path)
+            controller.set_file_owner(config_path, controller.get_current_user())
+            print 'Successfully initialized the configuration file.'
+
+    if options.executing_user and controller.get_current_user() != 'root':
+        print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
+        sys.exit(1)
+
     try:
         config_file = Configuration(options.config_filename, default_paths, controller.default_monitors, None, None)
         config_file.parse()
@@ -492,6 +657,15 @@ if __name__ == '__main__':
         print >> sys.stderr, traceback.format_exc()
         print >> sys.stderr, 'Terminating, please fix the configuration file and restart agent.'
         sys.exit(1)
+
+    controller.consume_config(config_file, options.config_filename)
+
+    # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
+    if 'win32' == sys.platform and options.mark_conditional_restart:
+        mark_conditional_restart(controller, config_file)
+
+    if 'win32' == sys.platform and options.conditional_restart:
+        restart_if_conditional_marker_exists(controller, config_file)
 
     if options.set_key_from_stdin:
         api_key = raw_input('Please enter key: ')
@@ -514,4 +688,17 @@ if __name__ == '__main__':
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
+    if 'win32' == sys.platform and options.upgrade_windows:
+        # Determine if a newer version is available
+        client = ScalyrClientSession(config_file.scalyr_server, config_file.api_key, SCALYR_VERSION)
+        response = client.get_latest_agent_version()
+        if response['update_required']:
+            url = response['url']
+            print "A newer version is available"
+            print url
+            print '======================================================='
+            sys.exit(upgrade_windows_install(config_file, url))
+        else:
+            print "The latest version is already installed"
+        
     sys.exit(0)

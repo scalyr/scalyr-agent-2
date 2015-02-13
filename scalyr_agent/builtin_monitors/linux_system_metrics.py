@@ -412,5 +412,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         """
         # We determine the collectors directory by looking at the parent directory of where this file resides
         # and then going down third_party/tcollector/collectors.
+        # TODO: Fix this so it works on the Windows agent.  We need to depend on the tcollectors.. but since this
+        # is a Linux specific module, we don't do anything for it.
         return os.path.join(os.path.dirname(os.path.realpath(__file__)), os.path.pardir, 'third_party', 'tcollector',
                             'collectors')

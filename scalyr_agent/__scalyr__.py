@@ -21,6 +21,50 @@ import inspect
 import os
 import sys
 
+# One of the main things this file does is correctly give the full path to two key directories regardless of install
+# type:
+#   package_root:  The directory containing the Scalyr source (contains files like 'agent_main.py', etc)
+#   install_root:  The top-level directory where Scalyr is currently installed (contains files like 'CHANGELOG.md')
+#
+# There are several different ways we can be running, and this files has to give the correct values for each of them.
+# For example, we could just be running out of the source tree as checked into github.  Or we can be running
+# out of an RPM.  Or as part of a single Windows executable created by Py2exe.  We handle of these cases.
+#
+# Example layouts for different install types:
+#
+# Running from source:
+#     ~/scalyr-agent-2/VERSION
+#     ~/scalyr-agent-2/scalyr-agent/__scalyr__.py
+#     ~/scalyr-agent-2/scalyr-agent/third_party
+#
+#   Here the install root is ~/scalyr-agent-2 and the package root is ~/scalyr-agent-2/scalyr-agent
+#
+# Install using tarball:
+#     ~/scalyr-agent-2/py/scalyr_agent/VERSION
+#     ~/scalyr-agent-2/py/scalyr_agent/__scalyr__py
+#     ~/scalyr-agent-2/py/scalyr_agent/third_party
+#
+#   Here the install root is ~/scalyr-agent-2 and the package root is ~/scalyr-agent-2/py/scalyr-agent
+#
+# Install using rpm/deb package:
+#     /usr/share/scalyr-agent-2/py/scalyr_agent/VERSION
+#     /usr/share/scalyr-agent-2/py/scalyr_agent/__scalyr__py
+#     /usr/share/scalyr-agent-2/py/scalyr_agent/third_party
+#
+#   Here the install root is /usr/share/scalyr-agent-2 and the package root is /usr/share/scalyr-agent-2/py/scalyr-agent
+#
+# Install using win32 exe:
+#     C:\Program Files (x86)\Scalyr\program_files\VERSION
+#     C:\Program Files (x86)\Scalyr\program_files\__scalyr__.py
+#     (There is no third party directory... its contents gets added directly to program_files
+#
+#   Here the install root is C:\Program Files (x86)\Scalyr\ and the package root is
+#   C:\Program Files (x86)\Scalyr\program_files\
+
+# Indicates if this code was compiled into a single Windows executable via Py2exe.  If that's the case,
+# then we cannot rely on __file__ and the source is kind of through into the same directory.
+__is_py2exe__ = hasattr(sys, 'frozen')
+
 
 def scalyr_init():
     """Initializes the environment to execute a Scalyr script.
@@ -30,40 +74,35 @@ def scalyr_init():
 
     It performs such tasks as ensures PYTHONPATH include the Scalyr package.
     """
-    add_scalyr_package_to_path()
+    # If this is a win32 executable, then all the packages have already been bundled in the exec and there is no
+    # need to change the PYTHONPATH
+    if not __is_py2exe__:
+        __add_scalyr_package_to_path()
 
 
-def determine_file_path(base=None):
-    """Returns the absolute file path for module that invoked this function.
+def __determine_package_root():
+    """Returns the absolute file path to the package root.
 
-    This is similar to __file__ but determines it in a way that's suppose to be more portable.
+    This must be invoked before the current working directory is changed by the code, so therefore should be
+    invoked during the module load.
 
-    @param base: The current working directory that was being used when the module that's invoking this function was
-        being invoked. If you invoke this method when the module loads, you may omit this parameter.
-
-    @return: The absolute file path for the module that invoked this function.
+    @return: The absolute file path for the package root.
     """
-    # We do not rely on __file__ because
-    # some folks report problems with that when running on some versions of Windows.
-    # Get the file for this script and make it absolute.
-    if base is None:
+    # We rely on the fact this file (__scalyr__.py) should be in the directory that is the package root.
+    # We could just return the parent of __file__, however, this apparently is not portable on all version of
+    # Windows.  Moreover, when running as a win32 exe, __file__ is not set.
+    if not __is_py2exe__:
         base = os.getcwd()
-    file_path = inspect.stack()[1][1]
-    if not os.path.isabs(file_path):
-        file_path = os.path.join(base, file_path)
-    file_path = os.path.realpath(file_path)
+        file_path = inspect.stack()[1][1]
+        if not os.path.isabs(file_path):
+            file_path = os.path.join(base, file_path)
+        file_path = os.path.dirname(os.path.realpath(file_path))
+    else:
+        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 
-__file_path__ = determine_file_path()
-
-
-def add_scalyr_package_to_path():
-    """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
-    """
-    sys.path.append(os.path.dirname(get_package_root()))
-    # Also add in the third party directory
-    sys.path.append(os.path.join(os.path.dirname(__file_path__), 'third_party'))
+__package_root__ = __determine_package_root()
 
 
 def get_package_root():
@@ -72,9 +111,7 @@ def get_package_root():
     @return: The path to the scalyr_agent directory (which contains the Python package).
     @rtype: str
     """
-    # We rely on the fact that the __scalyr__.py file should be in a directory structure that looks like:
-    # py/scalyr_agent/__scalyr__.py  .  We wish to return the parent of this current file.
-    return os.path.dirname(__file_path__)
+    return __package_root__
 
 
 def get_install_root():
@@ -88,34 +125,36 @@ def get_install_root():
     @return:  The path to the scalyr-agent-2 directory.
     @rtype: str
     """
-    # There are cases to consider.  Either this source was installed as part of an RPM or Debian package,
-    # or we are running directly from the source tree.  The paths to this package will look like:
-    # /usr/share/scalyr-agent-2/py/scalyr_agent/__scalyr__.py      for RPM/Debian
-    # ~/scalyr-agent-2/scalyr_agent/__scalyr__.py      for RPM/Debian.
-    # So, we just look at the grandparent to determine which of the two cases we are in.
-    grandparent = os.path.dirname(os.path.dirname(__file_path__))
-    if os.path.basename(grandparent) == 'py':
-        return os.path.dirname(grandparent)
-    else:
-        return grandparent
+    # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
+    parent_of_package_install = os.path.dirname(get_package_root())
+    if __is_py2exe__:  # win32 install
+        return parent_of_package_install
+    elif os.path.basename(parent_of_package_install) != 'py':   # Running from Source
+        return parent_of_package_install
+    else:  # Installed using tarball or rpm/debian package
+        return os.path.dirname(parent_of_package_install)
+
+
+def __add_scalyr_package_to_path():
+    """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
+    """
+    sys.path.append(os.path.dirname(get_package_root()))
+    # Also add in the third party directory
+    sys.path.append(os.path.join(get_package_root(), 'third_party'))
 
 
 def __determine_version():
     """Returns the agent version number, read from the VERSION file.
-
-    This file is either in this directory or the parent of this directory.
     """
-    # There are two cases to handle.  We are either in development mode (just executing
-    # the commands directly in the source tree), or this is an installed package.
-    # For development mode, the VERSION file is in the parent of this directory.
-    # For installed mode, the VERSION file will be in this directory.
-    source_dir_path = os.path.dirname(__file_path__)
-    parent = os.path.dirname(source_dir_path)
+    # This file can be either in the package root or the install root (if you examine the cases
+    # from above).  So, just check both locations.
+    in_install = os.path.join(get_install_root(), 'VERSION')
+    in_package = os.path.join(get_package_root(), 'VERSION')
 
-    if os.path.isfile(os.path.join(source_dir_path, 'VERSION')):
-        version_path = os.path.join(source_dir_path, 'VERSION')
-    elif os.path.isfile(os.path.join(parent, 'VERSION')):
-        version_path = os.path.join(parent, 'VERSION')
+    if os.path.isfile(in_package):
+        version_path = in_package
+    elif os.path.isfile(in_install):
+        version_path = in_install
     else:
         raise Exception('Could not locate VERSION file!')
 
@@ -127,3 +166,34 @@ def __determine_version():
 
 
 SCALYR_VERSION = __determine_version()
+
+
+# The constants for INSTALL_TYPE, a variable declared down below.
+PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
+TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
+DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
+MSI_INSTALL = 4        # Indicates source code was installed via a Windows MSI package
+
+
+def __determine_install_type():
+    """Returns the type of install that was used for the source currently running.
+
+    @return: The install type, drawn from the constants above.
+    @rtype: int
+    """
+    # Determine which type of install this is.  We do this based on
+    # whether or not certain files exist in the root of the source tree.
+    install_root = get_install_root()
+    if os.path.exists(os.path.join(install_root, 'packageless')):
+        install_type = TARBALL_INSTALL
+    elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
+        install_type = DEV_INSTALL
+    elif hasattr(sys, 'frozen'):
+        install_type = MSI_INSTALL
+    else:
+        install_type = PACKAGE_INSTALL
+    return install_type
+
+
+# Holds which type of installation we are currently running from.
+INSTALL_TYPE = __determine_install_type()

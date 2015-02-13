@@ -27,9 +27,9 @@ import resource
 import signal
 
 from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
-from scalyr_agent.platform_controller import TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 
-from __scalyr__ import get_install_root
+from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -46,13 +46,8 @@ class PosixPlatformController(PlatformController):
       - Sending signals to the running agent process.
     """
 
-    def __init__(self, install_type, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         """Initializes the POSIX platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-
-        @type install_type: int
         """
         self.__stdin = stdin
         self.__stdout = stdout
@@ -67,7 +62,8 @@ class PosixPlatformController(PlatformController):
         self.__termination_handler = None
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
-        PlatformController.__init__(self, install_type)
+        self.__no_change_user = False
+        PlatformController.__init__(self)
 
     def can_handle_current_platform(self):
         """Returns true if this platform object can handle the server this process is running on.
@@ -89,6 +85,10 @@ class PosixPlatformController(PlatformController):
         options_parser.add_option(
             "-p", "--pid-file", dest="pid_file",
             help="The path storing the running agent's process id.  Only used if config cannot be parsed.")
+        options_parser.add_option("", "--no-change-user", action="store_true", dest="no_change_user", default=False,
+                                  help="Forces agent to not change which user is executing agent.  Requires the right "
+                                       "user is already being used.  This is used internally to prevent infinite loops "
+                                       "in changing to the correct user.  Users should not need to set this option.")
 
     def consume_options(self, options):
         """Invoked by the main method to allow the platform to consume any command line options previously requested
@@ -97,12 +97,16 @@ class PosixPlatformController(PlatformController):
         @param options: The object containing the options as returned by the OptionParser.
         """
         self.__pidfile_from_options = options.pid_file
+        self.__no_change_user = options.no_change_user
 
-    def consume_config(self, config):
+    def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
 
         @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
         @type config: configuration.Configuration
+        @type path_to_config: str
         """
         # Now that we have the config and have consumed any options that we could have been specified, we need to
         # determine where we read the pidfile from.  Typically, this should be based on the configuration file, but
@@ -286,56 +290,114 @@ class PosixPlatformController(PlatformController):
             if pf is not None:
                 pf.close()
 
-    def run_as_user(self, user_id, script_file, script_arguments):
-        """Restarts this process with the same arguments as the specified user.
+    def get_file_owner(self, file_path):
+        """Returns the user name of the owner of the specified file.
 
-        This will re-run the entire Python script so that it is executing as the specified user.
+        @param file_path: The path of the file.
+        @type file_path: str
+
+        @return: The user name of the owner.
+        @rtype: str
+        """
+        return pwd.getpwuid(os.stat(file_path).st_uid).pw_name
+
+    def get_current_user(self):
+        """Returns the effective user name running this process.
+
+        The effective user may not be the same as the initiator of the process if the process has escalated its
+        privileges.
+
+        @return: The name of the effective user running this process.
+        @rtype: str
+        """
+        return pwd.getpwuid(os.geteuid()).pw_name
+
+    def set_file_owner(self, file_path, owner):
+        """Sets the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
+            `get_current_user`.
+        @type file_path: str
+        @type owner: str
+        """
+        os.chown(file_path, pwd.getpwnam(owner).pw_uid, -1)
+
+    def run_as_user(self, user_name, script_file, script_binary, script_arguments):
+        """Runs the specified script with the same arguments as the specified user.
+
+        This will run the entire Python script so that it is executing as the specified user.
         It will also add in the '--no-change-user' option which can be used by the script being executed with the
-        next proces that it was the result of restart so that it probably shouldn't do that again.
+        next process that it was the result of restart so that it probably shouldn't do that again.
 
-        @param user_id: The user id to run as, typically 0 for root.
-        @param script_file: The path to the Python script file that was executed.
+        Note, in some system implementations, the current process is replaced by the new process, so this method
+        does not ever return to the caller.
+
+        @param user_name: The user to run as, typically 'root' or 'Administrator'.
+        @param script_file: The path to the Python script file that was executed if it can be determined.  If it cannot
+            then this will be None and script_binary will be supplied.
+        @param script_binary:  The binary that is being executed.  This is only supplied if script_file is None.
+            On some systems, such as Windows running a script frozen by py2exe, the script is embedded in an actual
+            executable.
         @param script_arguments: The arguments passed in on the command line that need to be used for the new
             command line.
 
-        @type user_id: int
-        @type script_file: str
+        @return The status code for the executed script, if it returns at all.
+
+        @type user_name: str
+        @type script_file: str|None
+        @type script_binary: str|None
         @type script_arguments: list<str>
+
+        @rtype int
+
+        @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
+            some reason to execute the script.
         """
-        user_name = pwd.getpwuid(user_id).pw_name
-        if os.geteuid() != user_id:
-            if os.geteuid() != 0:
-                print >>sys.stderr, ('Failing, cannot start scalyr_agent as correct user.  The current user (%s) does '
-                                     'not own the config file and cannot change to that user because '
-                                     'not root.' % user_name)
-                sys.exit(1)
-            # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
-            # us from re-executing the script again to change the user, to
-            # head of any potential bugs that could cause infinite loops.
-            arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
+        if os.geteuid() != 0:
+            raise CannotExecuteAsUser('Must be root to change users')
+        if script_file is None:
+            raise CannotExecuteAsUser('Must supply script file to execute')
+        if self.__no_change_user:
+            raise CannotExecuteAsUser('Multiple attempts of changing user detected -- a bug must be causing loop.')
 
-            print >>sys.stderr, ('Running as %s' % user_name)
-            os.execvp("sudo", arguments)
+        # Use sudo to re-execute this script with the correct user.  We also pass in --no-change-user to prevent
+        # us from re-executing the script again to change the user, to
+        # head of any potential bugs that could cause infinite loops.
+        arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
 
-    def is_agent_running(self, fail_if_running=False):
+        print >>sys.stderr, ('Running as %s' % user_name)
+        return os.execvp("sudo", arguments)
+
+    def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by the pidfile.
 
         This will optionally raise an Exception with an appropriate error message if the agent is not running.
 
         @param fail_if_running:  True if the method should raise an Exception with a message about where the pidfile
             was read from.
+        @param fail_if_not_running: True if the method should raise an Exception with a message about where the pidfile
+            was read from.
+
         @type fail_if_running: bool
+        @type fail_if_not_running: bool
 
         @return: True if the agent process is already running.
         @rtype: bool
+
+        @raise AgentAlreadyRunning
+        @raise AgentNotRunning
         """
         pid = self.__read_pidfile()
-        if not fail_if_running:
-            return pid is not None
 
-        if pid is not None:
-            raise AgentAlreadyRunning('The agent appears to be running pid=%d.  pidfile %s does exist.' % (
-                pid, self.__pidfile))
+        if fail_if_running and pid is not None:
+            raise AgentAlreadyRunning('The pidfile %s exists and indicates it is running pid=%d' % (
+                self.__pidfile, pid))
+
+        if fail_if_not_running and pid is None:
+            raise AgentNotRunning('The pidfile %s does not exist or listed process is not running.' % self.__pidfile)
+
+        return pid is not None
 
     def start_agent_service(self, agent_run_method, quiet):
         """Start the daemon process by forking a new process.
@@ -384,8 +446,8 @@ class PosixPlatformController(PlatformController):
         pid = self.__read_pidfile()
 
         if not pid:
-            message = ("The agent does not appear to be running.  pidfile %s does not exist or listed process"
-                       " is not running.\n")
+            message = ("Failed to stop the agent because it does not appear to be running.  pidfile %s does not exist"
+                       " or listed process is not running.\n")
             sys.stderr.write(message % self.__pidfile)
             return 0  # not an error in a restart
 
