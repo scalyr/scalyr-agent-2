@@ -1,6 +1,6 @@
 # Copyright 2015 Scalyr Inc.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the "License")
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
@@ -127,6 +127,7 @@ define_metric(__monitor__, 'postgres.database.blocks_write_time',
 define_metric(__monitor__, 'postgres.database.stats_reset',
               'The time at which database statistics were last reset.'
               , cumulative=False, category='general')
+define_metric(__monitor__, 'postgres.database.size', 'The number of bytes the database is taking up on disk.' , cumulative=False, category='general')
 
 define_log_field(__monitor__, 'monitor', 'Always ``postgres_monitor``.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration.')
@@ -251,6 +252,17 @@ class PostgreSQLDb(object):
             if tmp != None:
                 result.update(tmp)
         return result
+        
+    def retrieve_database_size(self):
+        try:
+            self._cursor.execute("select pg_database_size('%s');" % self._database)
+            size = self._cursor.fetchone()[0]
+        except pg8000.OperationalError, (errcode, msg):
+            if errcode != 2006:  # "PostgreSQL server has gone away"
+                raise Exception("Database error -- " + errcode)
+            self._reconnect
+            return None
+        return size          
           
     def __str__(self):
         return "DB(%r:%r, %r)" % (self._host, self._port, self._version)
@@ -371,9 +383,13 @@ instance."""
         
         def timestamp_ms(dt):
             epoch = datetime(1970, 1, 1, 0, 0, 0, 0)
+            dt = dt.replace(tzinfo=None)
             td = dt - epoch
-            return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 10**6) / 1e3
+            return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 1000000) / 1000
         
+        dbsize = self._db.retrieve_database_size()
+        if dbsize != None:
+            self._logger.emit_value('postgres.database.size', dbsize)
         dbstats = self._db.retrieve_database_stats()
         if dbstats != None:
             for key in dbstats.keys():

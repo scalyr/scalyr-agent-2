@@ -13,6 +13,16 @@
       ]
     },
     {
+      label: "Size of the database on disk.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.size'",
+          label: "number"
+        }
+      ]
+    },    
+    {
       label: "Deadlocks",
       plots: [
         {
@@ -41,6 +51,96 @@
           label: "number"
         }
       ]
+    },
+    {
+      label: "Number of temporary files created.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.temp_files'",
+          label: "number"
+        }
+      ]
     },    
+    {
+      label: "Amount of data written to temp files.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.temp_bytes'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of transactions committed.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.transactions_committed'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of transactions rolled back.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.transactions_rolledback'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows returned.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows_returned'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows touched (looked at/read/fetched).",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows_fetched'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows inserted.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows_inserted'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Number of rows updated.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows_updated'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows deleted.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows_deleted'",
+          label: "number"
+        }
+      ]
+    },
   ],
 }
