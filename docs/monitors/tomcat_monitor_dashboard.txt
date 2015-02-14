@@ -7,7 +7,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='tomcat.runtime.memory_free'",
+          filter: "metric='tomcat.runtime.memory_bytes' type='free'",
           label: "number"
         }
       ]
@@ -17,7 +17,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='tomcat.runtime.threads_current_count'",
+          filter: "metric='tomcat.runtime.threads' type='active'",
           label: "number"
         }
       ]
@@ -27,7 +27,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='tomcat.runtime.threads_current_busy'",
+          filter: "metric='tomcat.runtime.threads' type='busy'",
           label: "number"
         }
       ]

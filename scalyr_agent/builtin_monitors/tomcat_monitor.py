@@ -55,24 +55,24 @@ define_config_option(__monitor__, 'source_address',
                      'page to requests from localhost.' % httpSourceAddress, default=httpSourceAddress)                    
 
 # Metric definitions.
-define_metric(__monitor__, 'tomcat.runtime.memory_free',
+define_metric(__monitor__, 'tomcat.runtime.memory_bytes',
               'The amount of memory free.'
-              , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.memory_total',
+              , extra_fields={'type': 'free'}, cumulative=False, category='general')
+define_metric(__monitor__, 'tomcat.runtime.memory_bytes',
               'The total amount of memory available.'
-              , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.memory_max',
+              , extra_fields={'type': 'total'}, cumulative=False, category='general')
+define_metric(__monitor__, 'tomcat.runtime.memory_bytes',
               'The maximum amount of memory free.'
-              , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.threads_max',
+              , extra_fields={'type': 'max'}, cumulative=False, category='general')
+define_metric(__monitor__, 'tomcat.runtime.threads',
               'The maximum number of threads available/configured.'
-              , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.threads_current_count',
+              , extra_fields={'type': 'max'}, cumulative=False, category='general')
+define_metric(__monitor__, 'tomcat.runtime.threads',
               'The number of threads currently active.'
-              , cumulative=False, category='general')
-define_metric(__monitor__, 'tomcat.runtime.threads_current_busy',
+              , extra_fields={'type': 'active'}, cumulative=False, category='general')
+define_metric(__monitor__, 'tomcat.runtime.threads',
               'The number of threads currently busy.'
-              , cumulative=False, category='general')
+              , extra_fields={'type': 'busy'}, cumulative=False, category='general')
 define_metric(__monitor__, 'tomcat.runtime.processing_time_max',
               'The value represents the largest amount of time spent processing a single request.'
               , cumulative=False, category='general')
@@ -85,12 +85,12 @@ define_metric(__monitor__, 'tomcat.runtime.request_count',
 define_metric(__monitor__, 'tomcat.runtime.error_count',
               'The value represents the total number requests that resulted in errors.  '
               , cumulative=True, category='general')
-define_metric(__monitor__, 'tomcat.runtime.bytes_received',
+define_metric(__monitor__, 'tomcat.runtime.network_bytes',
               'The value represents the total number bytes received by the server.  '
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'tomcat.runtime.bytes_sent',
+              , extra_fields={'type': 'received'}, cumulative=True, category='general')
+define_metric(__monitor__, 'tomcat.runtime.network_bytes',
               'The value represents the total number sent by the server.  '
-              , cumulative=True, category='general')
+              , extra_fields={'type': 'sent'}, cumulative=True, category='general')
 
 memory_pools = {
     'cms_old_gen': 'The memory pool for objects that have exised for some time in the survivor space / are long lived.',
@@ -101,18 +101,18 @@ memory_pools = {
 }
 
 for i in memory_pools.keys():
-    define_metric(__monitor__, 'tomcat.memory_pool.%s.initial',
-              '%s.  The iniital amount of memory allocated to the memory pool.' % i
-              , cumulative=False, category='memory')
-    define_metric(__monitor__, 'tomcat.memory_pool.%s.total',
-              '%s.  The total amount of memory allocated to the memory pool.' % i
-              , cumulative=False, category='memory')
-    define_metric(__monitor__, 'tomcat.memory_pool.%s.maximum',
-              '%s.  The maximum amount of memory allocated to the memory pool.' % i
-              , cumulative=False, category='memory')
-    define_metric(__monitor__, 'tomcat.memory_pool.%s.used',
-              '%s.  The total amount of memory used within the memory pool.' % i
-              , cumulative=False, category='memory')
+    define_metric(__monitor__, 'tomcat.memory_pools.initial',
+              '%s.  The iniital amount of memory allocated to the memory pool.' % memory_pools[i]
+              , extra_fields={'pool': i}, cumulative=False, category='memory')
+    define_metric(__monitor__, 'tomcat.memory_pools.allocated',
+              '%s.  The total amount of memory allocated to the memory pool.' % memory_pools[i]
+              , extra_fields={'pool': i}, cumulative=False, category='memory')
+    define_metric(__monitor__, 'tomcat.memory_pools.max',
+              '%s.  The maximum amount of memory allocated to the memory pool.' % memory_pools[i]
+              , extra_fields={'pool': i}, cumulative=False, category='memory')
+    define_metric(__monitor__, 'tomcat.memory_pools.used',
+              '%s.  The total amount of memory used within the memory pool.' % memory_pools[i]
+              , extra_fields={'pool': i}, cumulative=False, category='memory')
 
 define_log_field(__monitor__, 'monitor', 'Always ``tomcat_monitor``.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration.')
@@ -357,18 +357,18 @@ instance."""
                         "Max processing time: ([\w\W]*) Processing time: ([\w\W]*)[\w\W]*"
                         "Request count: ([\d]*) Error count: ([\d]*) Bytes received: ([\w\W]*) Bytes sent: ([\w\W]*)<\/p><table[\w\W]*", status[start + 12:])
           if m != None:
-              result["memory_free"] = _convert_to_megabytes(m.group(1))
-              result["memory_total"] = _convert_to_megabytes(m.group(2))
-              result["memory_max"] = _convert_to_megabytes(m.group(3))
-              result["threads_max"] = int(m.group(4))
-              result["threads_current_count"] = int(m.group(5))
-              result["threads_current_busy"] = int(m.group(6)  )    
-              result["processing_time_max"] = _convert_to_milliseconds(m.group(7))
-              result["processing_time"] = _convert_to_milliseconds(m.group(8))      
-              result["request_count"] = int(m.group(9))
-              result["error_count"] = int(m.group(10))
-              result["bytes_received"] = _convert_to_megabytes(m.group(11))
-              result["bytes_sent"] = _convert_to_megabytes(m.group(12))
+              result["memory_free"] = [ 'memory_bytes', _convert_to_megabytes(m.group(1)), 'type', 'free' ]
+              result["memory_total"] = [ 'memory_bytes', _convert_to_megabytes(m.group(2)), 'type', 'total' ]
+              result["memory_max"] = [ 'memory_bytes', _convert_to_megabytes(m.group(3)), 'type', 'max' ]
+              result["threads_max"] = [ 'threads', int(m.group(4)), 'type', 'max' ]
+              result["threads_current_count"] = [ 'threads', int(m.group(5)), 'type', 'max' ]
+              result["threads_current_busy"] = [ 'threads', int(m.group(6)), 'type', 'max' ]   
+              result["processing_time_max"] = [ 'processing_time_max', _convert_to_milliseconds(m.group(7)) ]
+              result["processing_time"] = [ 'processing_time', _convert_to_milliseconds(m.group(8)) ]
+              result["request_count"] = [ 'request_count', int(m.group(9)) ]
+              result["error_count"] = [ 'error_count', int(m.group(10)) ]
+              result["bytes_received"] = [ 'network_bytes', _convert_to_megabytes(m.group(11)), 'type', 'received' ]
+              result["bytes_sent"] = [ 'network_bytes', _convert_to_megabytes(m.group(12)), 'type', 'sent' ]
         return result
 
     def _parse_heap_status(self, status):
@@ -385,30 +385,30 @@ instance."""
                           status[start + 12:])
             if m != None:
                 # result["cms_old_gen.type"] = m.group(1)
-                result["cms_old_gen.initial"] = _convert_to_megabytes(m.group(2))
-                result["cms_old_gen.total"] = _convert_to_megabytes(m.group(3))
-                result["cms_old_gen.maximum"] = _convert_to_megabytes(m.group(4))
-                result["cms_old_gen.used"] = _convert_to_megabytes(m.group(5))
+                result["cms_old_gen.initial"] = [ 'initial', _convert_to_megabytes(m.group(2)), 'pool', 'cms_old_gen' ]
+                result["cms_old_gen.total"] = [ 'allocated', _convert_to_megabytes(m.group(3)), 'pool', 'cms_old_gen' ]
+                result["cms_old_gen.maximum"] = [ 'max', _convert_to_megabytes(m.group(4)), 'pool', 'cms_old_gen' ]
+                result["cms_old_gen.used"] = [ 'used', _convert_to_megabytes(m.group(5)), 'pool', 'cms_old_gen' ]
                 # result["eden_space.type"] = m.group(6)
-                result["eden_space.initial"] = _convert_to_megabytes(m.group(7))
-                result["eden_space.total"] = _convert_to_megabytes(m.group(8))
-                result["eden_space.maximum"] = _convert_to_megabytes(m.group(9))
-                result["eden_space.used"] = _convert_to_megabytes(m.group(10))
+                result["eden_space.initial"] = [ 'initial', _convert_to_megabytes(m.group(7)), 'pool', 'eden_space' ]
+                result["eden_space.total"] = [ 'allocated', _convert_to_megabytes(m.group(8)), 'pool', 'eden_space' ]
+                result["eden_space.maximum"] = [ 'max', _convert_to_megabytes(m.group(9)), 'pool', 'eden_space' ]
+                result["eden_space.used"] = [ 'used', _convert_to_megabytes(m.group(10)), 'pool', 'eden_space' ]
                 # result["survivor_space.type"] = m.group(11)
-                result["survivor_space.initial"] = _convert_to_megabytes(m.group(12))
-                result["survivor_space.total"] = _convert_to_megabytes(m.group(13))
-                result["survivor_space.maximum"] = _convert_to_megabytes(m.group(14))
-                result["survivor_space.used"] = _convert_to_megabytes(m.group(15))
+                result["survivor_space.initial"] = [ 'initial', _convert_to_megabytes(m.group(12)), 'pool', 'survivor_space' ]
+                result["survivor_space.total"] = [ 'allocated', _convert_to_megabytes(m.group(13)), 'pool', 'survivor_space' ]
+                result["survivor_space.maximum"] = [ 'max', _convert_to_megabytes(m.group(14)), 'pool', 'survivor_space' ]
+                result["survivor_space.used"] = [ 'used', _convert_to_megabytes(m.group(15)), 'pool', 'survivor_space' ]
                 # result["cms_perm_gen.type"] = m.group(16)
-                result["cms_perm_gen.initial"] = _convert_to_megabytes(m.group(17))
-                result["cms_perm_gen.total"] = _convert_to_megabytes(m.group(18))
-                result["cms_perm_gen.maximum"] = _convert_to_megabytes(m.group(19))
-                result["cms_perm_gen.used"] = _convert_to_megabytes(m.group(20))
+                result["cms_perm_gen.initial"] = [ 'initial', _convert_to_megabytes(m.group(17)), 'pool', 'cms_perm_gen' ]
+                result["cms_perm_gen.total"] = [ 'allocated', _convert_to_megabytes(m.group(18)), 'pool', 'cms_perm_gen' ]
+                result["cms_perm_gen.maximum"] = [ 'max', _convert_to_megabytes(m.group(19)), 'pool', 'cms_perm_gen' ]
+                result["cms_perm_gen.used"] = [ 'used', _convert_to_megabytes(m.group(20)), 'pool', 'cms_perm_gen' ]
                 # result["code_cache.type"] = m.group(21)
-                result["code_cache.initial"] = _convert_to_megabytes(m.group(22))
-                result["code_cache.total"] = _convert_to_megabytes(m.group(23))
-                result["code_cache.maximum"] = _convert_to_megabytes(m.group(24))
-                result["code_cache.used"] = _convert_to_megabytes(m.group(25))
+                result["code_cache.initial"] = [ 'initial', _convert_to_megabytes(m.group(22)), 'pool', 'code_cache' ]
+                result["code_cache.total"] = [ 'allocated', _convert_to_megabytes(m.group(23)), 'pool', 'code_cache' ]
+                result["code_cache.maximum"] = [ 'max', _convert_to_megabytes(m.group(24)), 'pool', 'code_cache' ]
+                result["code_cache.used"] = [ 'used', _convert_to_megabytes(m.group(25)), 'pool', 'code_cache' ]
         return result
 
     def gather_sample(self):
@@ -432,8 +432,12 @@ instance."""
             
             if stats != None:
                 for key in stats.keys():
-                    self._logger.emit_value("tomcat.runtime.%s" % key, stats[key])
+                    extra = None
+                    if len(stats[key]) == 4:
+                        extra = { stats[key][2] : stats[key][3] }
+                    self._logger.emit_value("tomcat.runtime.%s" % stats[key][0], stats[key][1], extra)              
             if heap != None:
                 for key in heap.keys():
-                    self._logger.emit_value("tomcat.memory_pool.%s" % key, heap[key])
+                    extra = { heap[key][2] : heap[key][3] }
+                    self._logger.emit_value("tomcat.memory_pools.%s" % heap[key][0], heap[key][1], extra)
         

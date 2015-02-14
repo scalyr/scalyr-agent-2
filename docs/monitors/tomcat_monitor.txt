@@ -106,39 +106,29 @@ Metrics
 Below are the metrics exposed by the Tomcat monitor.  It should be noted that all byte 
 values are in megabytes and all time values are in milliseconds.
 
-tomcat.runtime.memory_free -- The amount of memory free.
-tomcat.runtime.memory_total -- The total amount of memory available.
-tomcat.runtime.memory_max -- The maximum amount of memory free.
-tomcat.runtime.threads_max -- The maximum number of threads available/configured.
-tomcat.runtime.threads_current_count -- The number of threads currently active.
-tomcat.runtime.threads_current_busy -- The number of threads currently busy.
+tomcat.runtime.memory_bytes type='free' -- The amount of memory free.
+tomcat.runtime.memory_bytes type='total' -- The total amount of memory available.
+tomcat.runtime.memory_bytes type='max' -- The maximum amount of memory free.
+tomcat.runtime.threads type='max' -- The maximum number of threads available/configured.
+tomcat.runtime.threads type='active' -- The number of threads currently active.
+tomcat.runtime.threads type='busy' -- The number of threads currently busy.
 tomcat.runtime.processing_time_max -- The value represents the largest amount of time spent processing a single request.
 tomcat.runtime.processing_time -- The value represents the largest amount of time spent processing the current request.
 tomcat.runtime.request_count -- The value represents the total number of requests made.
 tomcat.runtime.error_count -- The value represents the total number requests that resulted in errors.
-tomcat.runtime.bytes_received -- The value represents the total number bytes received by the server.
-tomcat.runtime.bytes_sent -- The value represents the total number sent by the server.
+tomcat.runtime.network_bytes type='received' -- The value represents the total number bytes received by the server.
+tomcat.runtime.network_bytes type='sent' -- The value represents the total number sent by the server.
 
 In versions 7 and 8, Tomcat exposes information about different memory pools.  The following statistics are
-exposed for those those memory pools:
+exposed for those those memory pools.  The pools are:
 
-tomcat.memory_pool.cms_old_gen.initial -- The memory pool for objects that have exised for some time in the survivor space / are long lived.  The iniital amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_old_gen.total   -- The memory pool for objects that have exised for some time in the survivor space / are long lived.  The total amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_old_gen.maximum -- The memory pool for objects that have exised for some time in the survivor space / are long lived.  The maximum amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_old_gen.used    -- The memory pool for objects that have exised for some time in the survivor space / are long lived.  The total amount of memory used within the memory pool.
-tomcat.memory_pool.eden_space.initial -- The memory space from which objects are initially allocated.  The iniital amount of memory allocated to the memory pool.
-tomcat.memory_pool.eden_space.total   -- The memory space from which objects are initially allocated.  The total amount of memory allocated to the memory pool.
-tomcat.memory_pool.eden_space.maximum -- The memory space from which objects are initially allocated.  The maximum amount of memory allocated to the memory pool.
-tomcat.memory_pool.eden_space.used    -- The memory space from which objects are initially allocated.  The total amount of memory used within the memory pool.
-tomcat.memory_pool.survivor_space.initial -- The memory pool for objects that have survived garbage collection of the Eden Space.  The iniital amount of memory allocated to the memory pool.
-tomcat.memory_pool.survivor_space.total   -- The memory pool for objects that have survived garbage collection of the Eden Space.  The total amount of memory allocated to the memory pool.
-tomcat.memory_pool.survivor_space.maximum -- The memory pool for objects that have survived garbage collection of the Eden Space.  The maximum amount of memory allocated to the memory pool.
-tomcat.memory_pool.survivor_space.used    -- The memory pool for objects that have survived garbage collection of the Eden Space.  The total amount of memory used within the memory pool.
-tomcat.memory_pool.cms_perm_gen.initial -- Memory used for storing loaded classes.  The iniital amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_perm_gen.total   -- Memory used for storing loaded classes.  The total amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_perm_gen.maximum -- Memory used for storing loaded classes.  The maximum amount of memory allocated to the memory pool.
-tomcat.memory_pool.cms_perm_gen.used    -- Memory used for storing loaded classes.  The total amount of memory used within the memory pool.
-tomcat.memory_pool.code_cache.initial -- Memory used for caching the compilation and storage of native code.  The iniital amount of memory allocated to the memory pool.
-tomcat.memory_pool.code_cache.total   -- Memory used for caching the compilation and storage of native code.  The total amount of memory allocated to the memory pool.
-tomcat.memory_pool.code_cache.maximum -- Memory used for caching the compilation and storage of native code.  The maximum amount of memory allocated to the memory pool.
-tomcat.memory_pool.code_cache.used    -- Memory used for caching the compilation and storage of native code.  The total amount of memory used within the memory pool.
+cms_old_gen -- The memory pool for objects that have exised for some time in the survivor space / are long lived.
+eden_space -- The memory space from which objects are initially allocated.
+survivor_space -- 
+cms_perm_gen -- The memory pool for objects that have survived garbage collection of the Eden Space.
+code_cache -- Memory used for caching the compilation and storage of native code.
+
+tomcat.memory_pools.initial pool='...' -- The iniital amount of memory allocated to the memory pool.
+tomcat.memory_pools.allocated pool='...' -- The total amount of memory allocated to the memory pool.
+tomcat.memory_pools.max pool='...' -- The maximum amount of memory allocated to the memory pool.
+tomcat.memory_pools.used pool='...' -- The total amount of memory used within the memory pool.
