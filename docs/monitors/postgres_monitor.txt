@@ -80,19 +80,18 @@ Metrics
 The following metrics are exposed by the postgres_monitor:
 
 postgres.database.connections -- The number of current active connections.  The value is accurate to when the check was made.
-postgres.database.transactions_committed -- The number of database transactions that have been committed.
-postgres.database.transactions_rolledback -- The number of database transactions that have been rolled back.
-postgres.database.disk_blocks_read -- The number of disk blocks read into the database.
-postgres.database.disk_blocks_hit -- The number of disk blocks read that were found in the buffer cache.
-postgres.database.query_rows_returned -- The number of rows returned by all queries in the database.
-postgres.database.query_rows_fetched -- The number of rows fetched by all queries in the database.
-postgres.database.query_rows_inserted -- The number of rows inserted by all queries in the database.
-postgres.database.query_rows_updated -- The number of rows updated by all queries in the database.
-postgres.database.query_rows_deleted -- The number of rows deleted by all queries in the database.
+postgres.database.transactions result=committed -- The number of database transactions that have been committed.
+postgres.database.transactions result=rolledback -- The number of database transactions that have been rolled back.
+postgres.database.disk_blocks type=read -- The number of disk blocks read into the database.
+postgres.database.disk_blocks type=hit -- The number of disk blocks read that were found in the buffer cache.
+postgres.database.query_rows op=returned -- The number of rows returned by all queries in the database.
+postgres.database.query_rows op=fetched -- The number of rows fetched by all queries in the database.
+postgres.database.query_rows op=inserted -- The number of rows inserted by all queries in the database.
+postgres.database.query_rows op=updated -- The number of rows updated by all queries in the database.
+postgres.database.query_rows op=deleted -- The number of rows deleted by all queries in the database.
 postgres.database.temp_files -- The number of temporary files created by queries to the database.
 postgres.database.temp_bytes -- The total amount of data written to temporary files by queries to the database.
-postgres.database.temp_bytes -- The total amount of data written to temporary files by queries to the database.
 postgres.database.deadlocks -- The number of deadlocks detected in the database.
-postgres.database.blocks_read_time -- The amount of time data file blocks are read by clients in the database (in milliseconds).
-postgres.database.blocks_write_time -- The amount of time data file blocks are written by clients in the database (in milliseconds).
+postgres.database.blocks_op_time op=read -- The amount of time data file blocks are read by clients in the database (in milliseconds).
+postgres.database.blocks_op_time op=write-- The amount of time data file blocks are written by clients in the database (in milliseconds).
 postgres.database.stats_reset -- The time at which database statistics were last reset.

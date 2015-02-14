@@ -37,7 +37,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.disk_blocks_read'",
+          filter: "metric='postgres.database.disk_blocks' type='read'",
           label: "number"
         }
       ]
@@ -47,7 +47,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.disk_blocks_hit'",
+          filter: "metric='postgres.database.disk_blocks' type='hit'",
           label: "number"
         }
       ]
@@ -77,7 +77,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.transactions_committed'",
+          filter: "metric='postgres.database.transactions' result='committed'",
           label: "number"
         }
       ]
@@ -87,7 +87,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.transactions_rolledback'",
+          filter: "metric='postgres.database.transactions' result='rolledback'",
           label: "number"
         }
       ]
@@ -97,7 +97,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.query_rows_returned'",
+          filter: "metric='postgres.database.query_rows' op='returned'",
           label: "number"
         }
       ]
@@ -107,7 +107,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.query_rows_fetched'",
+          filter: "metric='postgres.database.query_rows' op='fetched'",
           label: "number"
         }
       ]
@@ -117,7 +117,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.query_rows_inserted'",
+          filter: "metric='postgres.database.query_rows' op='inserted'",
           label: "number"
         }
       ]
@@ -127,7 +127,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.query_rows_updated'",
+          filter: "metric='postgres.database.query_rows' op='updated'",
           label: "number"
         }
       ]
@@ -137,7 +137,7 @@
       plots: [
         {
           facet: "value",
-          filter: "metric='postgres.database.query_rows_deleted'",
+          filter: "metric='postgres.database.query_rows' op='deleted'",
           label: "number"
         }
       ]

@@ -64,48 +64,44 @@ define_config_option(__monitor__, 'database_password',
 define_metric(__monitor__, 'postgres.database.connections',
               'The number of current active connections.  The value is accurate to when the check was made.'
               , cumulative=False, category='connections')
-define_metric(__monitor__, 'postgres.database.transactions_committed',
+define_metric(__monitor__, 'postgres.database.transactions',
               'The number of database transactions that have been committed.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.transactions_rolledback',
+              , extra_fields={'result': 'committed'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.transactions',
               'The number of database transactions that have been rolled back.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.disk_blocks_read',
+              , extra_fields={'result': 'rolledback'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.disk_blocks',
               'The number of disk blocks read into the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.disk_blocks_hit',
+              , extra_fields={'type': 'read'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.disk_blocks',
               'The number of disk blocks read that were found in the buffer cache.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.query_rows_returned',
+              , extra_fields={'type': 'hit'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.query_rows',
               'The number of rows returned by all queries in the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.query_rows_fetched',
+              , extra_fields={'op': 'returned'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.query_rows',
               'The number of rows fetched by all queries in the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.query_rows_inserted',
+              , extra_fields={'op': 'fetched'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.query_rows',
               'The number of rows inserted by all queries in the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.query_rows_updated',
+              , extra_fields={'op': 'inserted'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.query_rows',
               'The number of rows updated by all queries in the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.query_rows_deleted',
+              , extra_fields={'op': 'updated'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.query_rows',
               'The number of rows deleted by all queries in the database.  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
+              , extra_fields={'op': 'deleted'}, cumulative=True, category='general')
 define_metric(__monitor__, 'postgres.database.temp_files',
               'The number of temporary files created by queries to the database.  '
-              'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.temp_bytes',
-              'The total amount of data written to temporary files by queries to the database.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
 define_metric(__monitor__, 'postgres.database.temp_bytes',
@@ -116,14 +112,14 @@ define_metric(__monitor__, 'postgres.database.deadlocks',
               'The number of deadlocks detected in the database.  '
               'The value is relative to postgres.database.stats_reset.'
               , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.blocks_read_time',
+define_metric(__monitor__, 'postgres.database.blocks_op_time',
               'The amount of time data file blocks are read by clients in the database (in milliseconds).  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
-define_metric(__monitor__, 'postgres.database.blocks_write_time',
+              , extra_fields={'op': 'read'}, cumulative=True, category='general')
+define_metric(__monitor__, 'postgres.database.blocks_op_time',
               'The amount of time data file blocks are written by clients in the database (in milliseconds).  '
               'The value is relative to postgres.database.stats_reset.'
-              , cumulative=True, category='general')
+              , extra_fields={'op': 'write'}, cumulative=True, category='general')
 define_metric(__monitor__, 'postgres.database.stats_reset',
               'The time at which database statistics were last reset.'
               , cumulative=False, category='general')
@@ -141,22 +137,22 @@ class PostgreSQLDb(object):
     
     _database_stats =  {
         'pg_stat_database': {
-          'numbackends' : 'postgres.database.connections',
-          'xact_commit' : 'postgres.database.transactions_committed',
-          'xact_rollback' : 'postgres.database.transactions_rolledback',
-          'blks_read' : 'postgres.database.disk_blocks_read',
-          'blks_hit' : 'postgres.database.disk_blocks_hit',
-          'tup_returned' : 'postgres.database.query_rows_returned',
-          'tup_fetched' : 'postgres.database.query_rows_fetched',
-          'tup_inserted' : 'postgres.database.query_rows_inserted',
-          'tup_updated' : 'postgres.database.query_rows_updated',
-          'tup_deleted' : 'postgres.database.query_rows_deleted',
-          'temp_files' : 'postgres.database.temp_files',
-          'temp_bytes' : 'postgres.database.temp_bytes',
-          'deadlocks' : 'postgres.database.deadlocks',
-          'blk_read_time' : 'postgres.database.blocks_read_time',
-          'blk_write_time' : 'postgres.database.blocks_write_time',
-          'stats_reset' : 'postgres.database.stats_reset'
+          'numbackends' : ['postgres.database.connections'],
+          'xact_commit' : ['postgres.database.transactions', 'result', 'committed'],
+          'xact_rollback' : ['postgres.database.transactions', 'result', 'rolledback'],
+          'blks_read' : ['postgres.database.disk_blocks', 'type', 'read'],
+          'blks_hit' : ['postgres.database.disk_blocks', 'type', 'hit'],
+          'tup_returned' : ['postgres.database.query_rows', 'op', 'returned'],
+          'tup_fetched' : ['postgres.database.query_rows', 'op', 'fetched'],
+          'tup_inserted' : ['postgres.database.query_rows', 'op', 'inserted'],
+          'tup_updated' : ['postgres.database.query_rows', 'op', 'updated'],
+          'tup_deleted' : ['postgres.database.query_rows', 'op', 'deleted'],
+          'temp_files' : ['postgres.database.temp_files'],
+          'temp_bytes' : ['postgres.database.temp_bytes'],
+          'deadlocks' : ['postgres.database.deadlocks'],
+          'blk_read_time' : ['postgres.database.blocks_op_time', 'op', 'read'],
+          'blk_write_time' : ['postgres.database.blocks_op_time', 'op', 'write'],
+          'stats_reset' : ['postgres.database.stats_reset']
         }
     }
     
@@ -243,7 +239,11 @@ class PostgreSQLDb(object):
         data = self._fields_and_data_to_dict(fields, data)
   
         # extract the ones we want
-        return dict([(self._database_stats[table][i], data[i]) for i in self._database_stats[table].keys() if i in data])
+        dict = {}
+        for i in self._database_stats[table].keys():
+            if i in data:
+                dict[i] = data[i];
+        return dict
         
     def retrieve_database_stats(self):
         result = {}
@@ -392,8 +392,14 @@ instance."""
             self._logger.emit_value('postgres.database.size', dbsize)
         dbstats = self._db.retrieve_database_stats()
         if dbstats != None:
-            for key in dbstats.keys():
-                if key != "postgres.database.stats_reset":
-                    self._logger.emit_value(key, dbstats[key])
-                else:
-                    self._logger.emit_value(key, timestamp_ms(dbstats[key]))
+            for table in self._db._database_stats.keys():
+                for key in self._db._database_stats[table].keys():
+                    if key in dbstats.keys():
+                        if key != "stats_reset":
+                            extra = None
+                            if len(self._db._database_stats[table][key]) == 3:
+                                extra = { }
+                                extra[self._db._database_stats[table][key][1]] = self._db._database_stats[table][key][2]
+                            self._logger.emit_value(self._db._database_stats[table][key][0], dbstats[key], extra)
+                        else:
+                            self._logger.emit_value(self._db._database_stats[table][key][0], timestamp_ms(dbstats[key]))
