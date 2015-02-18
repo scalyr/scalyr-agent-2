@@ -561,7 +561,7 @@ _DISK_USAGE_METRICS = [
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.usage.total',
+            metric_name     = 'winsys.disk.usage.free',
             description     = 'Total free bytes for each partition',
             category        = 'general',
             unit            = 'byte',
