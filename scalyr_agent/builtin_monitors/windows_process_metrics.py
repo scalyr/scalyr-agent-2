@@ -377,8 +377,30 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC('memory_info_ex', 'peak_pagefile')
     ),
-
-
+    METRIC( ## ------------------ Resident size ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The current resident size in bytes.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'rss'
+            },
+        ),
+        GATHER_METRIC('memory_info', 'rss')
+    ),
+    METRIC( ## ------------------ Virtual memory size ----------------------------
+        METRIC_CONFIG(
+            metric_name     = 'winproc.mem.bytes',
+            description     = 'The current virtual memory size in bytes.  This appear to exclude shared pages.',
+            category        = 'memory',
+            unit            = 'bytes',
+            extra_fields    = {
+                'type': 'vms'
+            },
+        ),
+        GATHER_METRIC('memory_info', 'vms')
+    ),
     # TODO: Additional attributes for this section
     #  * ...
 ]
