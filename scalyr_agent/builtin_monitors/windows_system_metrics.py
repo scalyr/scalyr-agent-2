@@ -559,7 +559,17 @@ _DISK_USAGE_METRICS = [
         ),
         partion_disk_usage('total')
     ),
-]
+    METRIC(
+        METRIC_CONFIG(
+            metric_name     = 'winsys.disk.usage.total',
+            description     = 'Total free bytes for each partition',
+            category        = 'general',
+            unit            = 'byte',
+            cumulative      = False,
+            extra_fields    = { 'partition'}
+        ),
+        partion_disk_usage('free')
+    ),]
 # pylint: enable=bad-whitespace
 
 METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS + _DISK_USAGE_METRICS
