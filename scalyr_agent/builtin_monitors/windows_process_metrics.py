@@ -539,6 +539,9 @@ class ProcessMonitor(ScalyrMonitor):
         super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
         self.__process = None
 
+    def _initialize(self):
+        self.__id = self._config.get('id', required_field=True, convert_to=str)
+
     def _select_target_process(self):
         """TODO: Function documentation
         """
@@ -568,10 +571,15 @@ class ProcessMonitor(ScalyrMonitor):
 
                 metric_name = metric.config['metric_name']
                 metric_value = metric.dispatch(self.__process)
+                extra_fields = metric.config['extra_fields']
+                if extra_fields is None:
+                    extra_fields = {}
+                extra_fields['app'] = self.__id
+
                 self._logger.emit_value(
                     metric_name,
                     metric_value,
-                    extra_fields=metric.config['extra_fields']
+                    extra_fields=extra_fields
                 )
         except psutil.NoSuchProcess:
             self.__process = None
