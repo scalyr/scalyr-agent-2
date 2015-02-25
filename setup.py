@@ -181,7 +181,14 @@ setup(
         'py2exe': {
             # TODO(windows): Auto-generate this list based on contents of the monitors directory.
             'includes': 'scalyr_agent.builtin_monitors.windows_system_metrics,'
-                        'scalyr_agent.builtin_monitors.windows_process_metrics',
+                        'scalyr_agent.builtin_monitors.windows_process_metrics,'
+                        'scalyr_agent.builtin_monitors.apache_monitor.py,'
+                        'scalyr_agent.builtin_monitors.graphite_monitor.py,'
+                        'scalyr_agent.builtin_monitors.mysql_monitor.py,'
+                        'scalyr_agent.builtin_monitors.nginx_monitor.py,'
+                        'scalyr_agent.builtin_monitors.shell_monitor.py,'
+                        'scalyr_agent.builtin_monitors.test_monitor.py,'
+                        'scalyr_agent.builtin_monitors.url_monitor.py,',
             'dll_excludes': ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
         }
     }
