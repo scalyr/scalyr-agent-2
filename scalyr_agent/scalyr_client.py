@@ -145,14 +145,22 @@ class ScalyrClientSession(object):
         """
         return self.send(self.add_events_request())[0]
 
-    def send(self, add_events_request):
-        """Sends an AddEventsRequest to Scalyr.
+    def __send_request(self, request_path, body=None, body_func=None, is_post=True):
+        """Sends a request either using POST or GET to Scalyr at the specified request path.  It may be either
+        a POST or GET.
 
-        The AddEventsRequest should have been retrieved using the 'add_events_request' method on this object.
+        Parses, returns response.
 
-        @param add_events_request: The request containing any log lines/events to copy to the server.
+        @param request_path: The path of the URL to post to.
+        @param [body]: The body string to send.  May be None if body_func is specified.  Ignored if not POST.
+        @param [body_func]:  A function that will be invoked to retrieve the body to send in the post.  Ignored if not
+            POST.
+        @param [is_post]:  True if this request should be sent using a POST, otherwise GET.
 
-        @type add_events_request: AddEventsRequest
+        @type request_path: str
+        @type body: str|None
+        @type body_func: func|None
+        @type is_post: bool
 
         @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
             sent, and the full response.
@@ -182,8 +190,6 @@ class ScalyrClientSession(object):
                          'Please update your configuration file to re-enable server certificate validation.',
                          limit_once_per_x_secs=86400, limit_key='nocertwarning', error_code='client/sslverifyoff')
 
-        # TODO:  Break this part out into a generic invokeApi method once we need to support
-        # multiple Scalyr service API calls.
         response = ''
         try:
             try:
@@ -230,18 +236,24 @@ class ScalyrClientSession(object):
                               error_code='client/connectionFailed')
                 return 'client/connectionFailed', 0, ''
 
-            # Update the time that request it is being sent, according the client's clock.
-            add_events_request.set_client_time(current_time)
+            if is_post:
+                if body is None:
+                    body_str = body_func()
+                else:
+                    body_str = body
+            else:
+                body_str = ""
 
-            body_str = add_events_request.get_payload()
-
-            self.total_request_bytes_sent += len(body_str)
+            self.total_request_bytes_sent += len(body_str) + len(request_path)
 
             # noinspection PyBroadException
             try:
-                log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST /addEvents with body \"%s\"', body_str)
-                self.__connection.request('POST', '/addEvents', body=body_str,
-                                          headers=self.__standard_headers)
+                if is_post:
+                    log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
+                    self.__connection.request('POST', request_path, body=body_str, headers=self.__standard_headers)
+                else:
+                    log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
+                    self.__connection.request('GET', request_path, headers=self.__standard_headers)
 
                 response = self.__connection.getresponse().read()
                 bytes_received = len(response)
@@ -300,6 +312,28 @@ class ScalyrClientSession(object):
                 self.total_requests_failed += 1
                 self.close(current_time=current_time)
             self.total_response_bytes_received += bytes_received
+
+    def send(self, add_events_request):
+        """Sends an AddEventsRequest to Scalyr.
+
+        The AddEventsRequest should have been retrieved using the 'add_events_request' method on this object.
+
+        @param add_events_request: The request containing any log lines/events to copy to the server.
+
+        @type add_events_request: AddEventsRequest
+
+        @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
+            sent, and the full response.
+        @rtype: (str, int, str)
+        """
+        current_time = time.time()
+
+        def generate_body():
+            add_events_request.set_client_time(current_time)
+
+            return add_events_request.get_payload()
+
+        return self.__send_request('/addEvents', body_func=generate_body)
 
     def close(self, current_time=None):
         """Closes the underlying connection to the Scalyr server.
@@ -398,27 +432,12 @@ class ScalyrClientSession(object):
 
         return '%s;%s;agent-%s;%s;' % (platform_value, python_version_str, agent_version, ssl_str)
 
-    def get_latest_agent_version(self):
+    def perform_agent_version_check(self, track='stable'):
         """Query the Scalyr API to determine if a newer version is available
         """
-        # TODO: Query Scalyr API for latest version.  For now assume it is 2.0.5
-        latest_version = '2.0.5'
-        current_version = self.__agent_version
-        
-        # TODO: Default response is hard-coded for now
-        response = {
-            'update_required': False,
-            'url': 'http://10.0.0.109:8000/ScalyrService_2.0.5.msi'
-        }
+        url_path = "/ajax?method=performAgentVersionCheck&installedVersion=%s&track=%s" % (self.__agent_version, track)
 
-        # TODO: A more robust version comparison should be done
-        # If latest_version > client_version modify the default response
-        for latest, current in zip(latest_version.split('.'), current_version.split('.')):
-            if int(latest) > int(current):
-                response['update_required'] = True
-                break
-
-        return response
+        return self.__send_request(url_path, is_post=False)
 
 
 class AddEventsRequest(object):
