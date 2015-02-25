@@ -188,7 +188,7 @@ setup(
                         'scalyr_agent.builtin_monitors.nginx_monitor,'
                         'scalyr_agent.builtin_monitors.shell_monitor,'
                         'scalyr_agent.builtin_monitors.test_monitor,'
-                        'scalyr_agent.builtin_monitors.url_monitor,',
+                        'scalyr_agent.builtin_monitors.url_monitor',
             'dll_excludes': ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
         }
     }
