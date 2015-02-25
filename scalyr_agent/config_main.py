@@ -44,7 +44,7 @@ import urllib
 from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL, SCALYR_VERSION
 scalyr_init()
 
-from scalyr_logging import set_log_destination
+from scalyr_agent.scalyr_logging import set_log_destination
 set_log_destination(use_stdout=True)
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
@@ -362,7 +362,9 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
 
     @param config: The configuration for this agent.
     @param release_track:  The release track to use when checking which version is the latest.
-    @param preserve_msi:  Whether or not to delete the MSI file once the upgrade is finished.
+    @param preserve_msi:  Whether or not to delete the MSI file once the upgrade is finished.  Note, this
+        argument is essentially ignored for now and we always leave the file because we cannot delete it with
+        the current way we exec the msiexec process.
 
     @rtype config: Configuration
     @rtype release_track: str
@@ -424,23 +426,28 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure('Failed to download installation package')
 
-                print 'Performing upgrade.'
-                return_code = subprocess.call(['msiexec.exe', '/i', "{}".format(download_location)])
+                print ('Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to complete '
+                       'the upgrade process.')
 
-                if return_code == 0:
-                    print 'Installation completed successfully.  If your agent was already running, it has been ' \
-                          'restarted.'
+                # Because this file, config_main.py, is part of the currently installed Scalyr Agent package, we have
+                # to finish our use of it before the upgrade can proceed.  So, we just fork off the msiexec process
+                # in detached mode and terminate this program.  This means we cannot report any errors that happen
+                # here, but I don't see a way around this for now.
+                # noinspection PyUnresolvedReferences
+                from win32process import DETACHED_PROCESS
+                subprocess.Popen(['msiexec.exe', '/i', "{}".format(download_location)],
+                                 shell=False, stdin=None, stdout=None, stderr=None, close_fds=True,
+                                 creationflags=DETACHED_PROCESS)
 
-                    return 0
-
-                raise UpgradeFailure('The installer returned a non-success status code (%d)' % return_code)
+                return 0
             except IOError, error:
                 raise UpgradeFailure('Could not download the installer, returned error %s' % str(error))
 
         finally:
-            if os.path.isfile(download_location) and not preserve_msi:
-                os.unlink(download_location)
-            elif os.path.isfile(download_location):
+            # TODO:  Actually delete the temporary file.  We cannot right now since our execution finishes
+            # before the msiexec process runs, but maybe we can do something like have a small shell script
+            # that runs the upgrader and then deletes the file.  Something to consider post-alpha release.
+            if preserve_msi:
                 print 'Downloaded installer file has been left at %s' % download_location
 
     except UpgradeFailure, error:
