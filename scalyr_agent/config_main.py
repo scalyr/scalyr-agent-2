@@ -44,9 +44,14 @@ import urllib
 from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL, SCALYR_VERSION
 scalyr_init()
 
+from scalyr_logging import set_log_destination
+set_log_destination(use_stdout=True)
+
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
+
+import scalyr_agent.json_lib as json_lib
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -347,55 +352,105 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     # For now, we do not do anything.
     return 0
 
-def upgrade_windows_install(config_file, url, preserve_msi=False):
-    """Performs an upgrade for an existing Scalyr Agent 2 that was previously installed using a Windows MSI install file.
 
-    @param config_file: The configuration for this agent.
-    @param url: The url where the Windows MSI install file can be downloaded.
+def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
+    """Performs an upgrade for an existing Scalyr Agent 2 that was previously installed using a Windows MSI install
+    file.
+
+    This will contact the Scalyr servers to see what the most up-to-date version of the agent is and, if necessary,
+    download an MSI file.
+
+    @param config: The configuration for this agent.
+    @param release_track:  The release track to use when checking which version is the latest.
+    @param preserve_msi:  Whether or not to delete the MSI file once the upgrade is finished.
+
+    @rtype config: Configuration
+    @rtype release_track: str
+    @rtype preserve_msi: bool
 
     @return: The exit status code.
     """
+    # The URL path of the agent to upgrade to.
+    url_path = None
+
     try:
         platform_controller = PlatformController.new_platform()
-        default_paths = platform_controller.default_paths
+        my_default_paths = platform_controller.default_paths
 
         # Ensure agent was installed via MSI
         if MSI_INSTALL != platform_controller.install_type:
-            raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the '
-                    'upgrade windows command.')
+            raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the upgrade windows '
+                                 'command.')
 
         # Ensure that the user has not changed the defaults for the config, data, and log directory.
-        if default_paths.config_file_path != config_file.file_path:
+        if my_default_paths.config_file_path != config.file_path:
             raise UpgradeFailure('The agent is not using the default configuration file so you may not use the '
-                                 'upgrade tarball command.')
-        if default_paths.agent_data_path != config_file.agent_data_path:
+                                 'upgrade windows command.')
+        if my_default_paths.agent_data_path != config.agent_data_path:
             raise UpgradeFailure('The agent is not using the default data directory so you may not use the upgrade '
-                                 'tarball command.')
-        if default_paths.agent_log_path != config_file.agent_log_path:
+                                 'windows command.')
+        if my_default_paths.agent_log_path != config.agent_log_path:
             raise UpgradeFailure('The agent is not using the default log directory so you may not use the upgrade '
-                                 'tarball command.')
+                                 'windows command.')
 
-        msifile = os.path.join(default_paths.agent_data_path, 'update.msi')
-        
+        # Determine if a newer version is available
+        client = ScalyrClientSession(config.scalyr_server, config.api_key, SCALYR_VERSION, quiet=True)
+        status, size, response = client.perform_agent_version_check(release_track)
+
+        if status.lower() != 'success':
+            raise UpgradeFailure('Failed to contact the Scalyr servers to check for latest update.  Error code '
+                                 'was "%s"' % status)
+
+        # TODO:  We shouldn't have to reparse response on JSON, but for now that, that's what the client library
+        # does.
+        data_payload = json_lib.parse(response)['data']
+
+        if not data_payload['update_required']:
+            print 'The latest version is already installed.'
+            return 0
+
+        print 'Attempting to upgrade agent from version %s to version %s.' % (SCALYR_VERSION,
+                                                                              data_payload['current_version'])
+        url_path = data_payload['urls']['win32']
+
+        file_portion = url_path[url_path.rfind('/')+1:]
+        download_location = os.path.join(tempfile.gettempdir(), file_portion)
+
         try:
-            urllib.urlretrieve(url, msifile)
-        except IOError, error:
-            raise UpgradeFailure(error.strerror[1])
-        finally:
-            if not os.path.isfile(msifile):
-                raise UpgradeFailure('Failed to download installation package')
+            try:
+                print 'Downloading agent from %s.' % url_path
+                urllib.urlretrieve(url_path, download_location)
 
-        run_command('ScalyrAgentService.exe stop')
-        run_command('ScalyrAgentService.exe remove')
-        return_code = subprocess.call(['msiexec.exe', '/i', "{}".format(msifile)])
-        print 'Installation complete.  Restart this shell to reload the environment'
+                if not os.path.isfile(download_location):
+                    raise UpgradeFailure('Failed to download installation package')
+
+                print 'Performing upgrade.'
+                return_code = subprocess.call(['msiexec.exe', '/i', "{}".format(download_location)])
+
+                if return_code == 0:
+                    print 'Installation completed successfully.  If your agent was already running, it has been ' \
+                          'restarted.'
+
+                    return 0
+
+                raise UpgradeFailure('The installer returned a non-success status code (%d)' % return_code)
+            except IOError, error:
+                raise UpgradeFailure('Could not download the installer, returned error %s' % str(error))
+
+        finally:
+            if os.path.isfile(download_location) and not preserve_msi:
+                os.unlink(download_location)
+            elif os.path.isfile(download_location):
+                print 'Downloaded installer file has been left at %s' % download_location
 
     except UpgradeFailure, error:
         print >>sys.stderr
         print >>sys.stderr, 'The upgrade failed due to the following reason: %s' % error.message
+        if url_path is not None:
+            print >>sys.stderr, 'You may try downloading and running the installer file yourself.'
+            print >>sys.stderr, 'The installer can be downloaded from %s' % url_path
+        print >>sys.stderr, 'Please e-mail contact@scalyr.com for help resolving this issue.'
         return 1
-
-    return 0
 
 
 # TODO:  This code is shared with build_package.py.  We should move this into a common
@@ -584,6 +639,9 @@ if __name__ == '__main__':
     if 'win32' == sys.platform:
         parser.add_option("", "--upgrade-windows", dest="upgrade_windows", action="store_true", default=False,
                           help='Upgrade the agent if a new version is available')
+        parser.add_option("", "--release-track", dest="release_track", default="stable",
+                          help='The release track to use when upgrading using --upgrade-windows.  This defaults to '
+                          '"stable" and is what consumers should use.')
         # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
         # beyond just Windows.
         parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
@@ -689,16 +747,6 @@ if __name__ == '__main__':
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
     if 'win32' == sys.platform and options.upgrade_windows:
-        # Determine if a newer version is available
-        client = ScalyrClientSession(config_file.scalyr_server, config_file.api_key, SCALYR_VERSION)
-        response = client.get_latest_agent_version()
-        if response['update_required']:
-            url = response['url']
-            print "A newer version is available"
-            print url
-            print '======================================================='
-            sys.exit(upgrade_windows_install(config_file, url))
-        else:
-            print "The latest version is already installed"
+        sys.exit(upgrade_windows_install(config_file, options.release_track))
         
     sys.exit(0)
