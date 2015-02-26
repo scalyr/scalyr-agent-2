@@ -10,7 +10,7 @@
   // can be used to filter data from a particular server or group of servers.
   server_attributes: {
      // Fill in this field if you'd like to override the server's hostname.
-     // serverHost: "REPLACE_THIS",
+     // serverHost: "REPLACE THIS",
      
      // You can add whatever additional fields you'd like.
      // tier: "production"
