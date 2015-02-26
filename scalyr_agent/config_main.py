@@ -101,7 +101,7 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file = None
 
             if 'win32' == sys.platform:
-                os.unlink(original_file)
+                os.unlink(config_file_path)
 
             # Determine how to make the file have the same permissions as the original config file.  For now, it
             # does not matter since if this command is only run as part of the install process, the file should
