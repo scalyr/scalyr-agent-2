@@ -457,6 +457,8 @@ class WindowsPlatformController(PlatformController):
         # If this assumption changes, fix that in config_main.py.
         _set_config_path_registry_entry(self.__config_file_path)
         win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
+        if not quiet:
+            print 'The agent has started.'
 
     def stop_agent_service(self, quiet):
         """Stops the agent service using the platform-specific method.

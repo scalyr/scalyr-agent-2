@@ -240,10 +240,10 @@
                 <!-- I wanted the "Note" to be bold and then have normal text after it.. the only way I could figure -->
                 <!-- out how to do that is just start them at the same Y position and add in spaces to make room -->
                 <!-- for the "Note:" text to be displayed. -->
-                <Control Id="FurtherText" Hidden="yes" Type="Text" X="135" Y="110" Width="220" Height="80" Transparent="yes" NoPrefix="yes" Text="           The Scalyr Agent 2 has not been started.  You must first edit the configuration file to provide your API key.&#13;&#10;&#13;&#10;Please see the configuration file for a link to more instructions.">
+                <Control Id="FurtherText" Hidden="yes" Type="Text" X="135" Y="110" Width="220" Height="80" Transparent="yes" NoPrefix="yes" Text="           The Scalyr Agent 2 has not been started.  We will now open the configuration file so you can enter your API key.">
                     <Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
                 <Control Id="Title" Hidden="yes" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bigger}Completed the Scalyr Agent 2 Installation" ><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
-                <Control Id="EditConfigCheckBox" Hidden="yes" Type="CheckBox" X="135" Y="170" Width="220" Height="40" Property="EDITCONFIG" CheckBoxValue="1" Text="Edit the configuration file on exit."><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="EditConfigCheckBox" Hidden="yes" Type="CheckBox" X="135" Y="170" Width="220" Height="40" Property="EDITCONFIG" CheckBoxValue="1" Text="Open the configuration file."><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
 
                 <!-- Now for the elements that are only shown if this is an upgrade -->
                 <Control Id="UpDescription" Hidden="yes" Type="Text" X="135" Y="70" Width="220" Height="40" Transparent="yes" NoPrefix="yes" Text="Click the Finish button to exit the installer." ><Condition Action="show">WIX_UPGRADE_DETECTED</Condition></Control>

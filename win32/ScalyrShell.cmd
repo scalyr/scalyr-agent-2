@@ -33,8 +33,7 @@ if "%~1"=="status" (
 
 ECHO.
 ECHO.
-ECHO Command execution finished.  Closing window.
-PAUSE
+PAUSE > nul
 EXIT
 
 
