@@ -93,6 +93,13 @@ def set_api_key(config, config_file_path, new_api_key):
             if found != 1:
                 print >>sys.stderr, 'The existing API key could not be found in file, failing'
                 sys.exit(1)
+
+            # For Win32, we must make sure the files are closed before rename.
+            tmp_file.close()
+            tmp_file = None
+            original_file.close()
+            original_file = None
+
             # Determine how to make the file have the same permissions as the original config file.  For now, it
             # does not matter since if this command is only run as part of the install process, the file should
             # be owned by root already.
