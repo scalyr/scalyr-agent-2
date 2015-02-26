@@ -3,13 +3,16 @@
 // https://www.scalyr.com/help/scalyr-agent-2
 
 {
-  // A "Write Logs" api key for your account, available at https://www.scalyr.com/keys
+  // Enter a "Write Logs" api key for your account. These are available at https://www.scalyr.com/keys
   api_key: "REPLACE_THIS",
 
   // Fields describing this server. These fields are attached to each log message, and
   // can be used to filter data from a particular server or group of servers.
   server_attributes: {
-     // serverHost: "specify this field to override the server's hostname",
+     // Fill in this field if you'd like to override the server's hostname.
+     // serverHost: "REPLACE_THIS",
+     
+     // You can add whatever additional fields you'd like.
      // tier: "production"
   }
 
