@@ -3,7 +3,7 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
-### Windows System Metrics:
+# Windows System Metrics:
 
 A Scalyr agent monitor that records system metrics for Windows platforms.
 
