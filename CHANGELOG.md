@@ -9,6 +9,10 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 20, 2015 13:30 -0800
 
 This release is under active development.  Actual release date TBD.
 
+New features:
+
+* Add a new option ``--set-server-host`` in scalyr-agent-2-config to set the server host from the commandline.
+
 ## 2.0.5 "Eccentric Elk" - Feb 26, 2015
 
 <!---

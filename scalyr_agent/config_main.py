@@ -127,6 +127,57 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file.close()
 
 
+def set_server_host(config, new_server_host):
+    """Creates a new configuration file in the ``agent.d`` directory to set the ``serverHost`` server attribute
+    to the specified value.
+
+    @param config: The Configuration object.
+    @param new_server_host: The value for the ``serverHost`` server attribute.
+    """
+
+    host_path = os.path.join(config.config_directory, 'server_host.json')
+    tmp_host_path = '%s.tmp' % host_path
+
+    try:
+        try:
+            if os.path.isfile(tmp_host_path):
+                os.unlink(tmp_host_path)
+
+            config_json = {
+                'server_attributes': {
+                    'serverHost': new_server_host
+                }
+            }
+
+            config_content = json_lib.serialize(config_json)
+
+            tmp_file = open(tmp_host_path, 'w')
+            print >>tmp_file, '// Sets the server host attribute.'
+            print >>tmp_file, config_content
+            tmp_file.close()
+
+            if 'win32' == sys.platform and os.path.isfile(host_path):
+                os.unlink(host_path)
+
+            os.rename(tmp_host_path, host_path)
+        except IOError, error:
+                if error.errno == 13:
+                    print >>sys.stderr, 'You do not have permission to write to the file and directory required '
+                    print >>sys.stderr, 'to set the server host.  Ensure you can write to the file at path'
+                    print >>sys.stderr, '\'%s\' and create files in its parent directory.' % host_path
+                else:
+                    print >>sys.stderr, 'Error attempting to update the server host: %s' % str(error)
+                    print >>sys.stderr, traceback.format_exc()
+                sys.exit(1)
+        except Exception, err:
+            print >>sys.stderr, 'Error attempting to update the server host attribute: %s' % str(err)
+            print >> sys.stderr, traceback.format_exc()
+            sys.exit(1)
+    finally:
+        if os.path.isfile(tmp_host_path):
+            os.unlink(tmp_host_path)
+
+
 def update_user_id(file_path, new_uid):
     """Change the owner of file_path to the new_uid.
 
@@ -636,6 +687,12 @@ if __name__ == '__main__':
     parser.add_option("", "--set-key", dest="api_key",
                       help="Update the configuration file with the new API key."
                            "The API key is used to authenticate requests to the Scalyr servers for the account.")
+    parser.add_option("", "--set-server-host", dest="server_host",
+                      help="Adds a new configuration file in the ``agent.d`` directory to set the serverHost "
+                           "server attribute.  Warning, if there are any other Scalyr configuration files that sets "
+                           "a value for ``serverHost``, that value may override the one trying to be set here.  You "
+                           "must be sure the ``agent.json`` file nor any file in ``agent.d`` sets a value for "
+                           "``serverHost`` otherwise this might not work.")
     parser.add_option("", "--set-user", dest="executing_user",
                       help="Update which user account is used to run the agent.")
     parser.add_option("", "--upgrade-tarball", dest="upgrade_tarball",
@@ -748,6 +805,9 @@ if __name__ == '__main__':
         set_api_key(config_file, options.config_filename, api_key)
     elif options.api_key is not None:
         set_api_key(config_file, options.config_filename, options.api_key)
+
+    if options.server_host is not None:
+        set_server_host(config_file, options.server_host)
 
     if options.executing_user is not None:
         set_executing_user(config_file, options.config_filename, options.executing_user)
