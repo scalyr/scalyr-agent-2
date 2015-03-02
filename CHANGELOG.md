@@ -13,6 +13,10 @@ New features:
 
 * Add a new option ``--set-server-host`` in scalyr-agent-2-config to set the server host from the commandline.
 
+Bug fixes:
+
+* Fix failing to accept unicode characters in metric values
+
 ## 2.0.5 "Eccentric Elk" - Feb 26, 2015
 
 <!---

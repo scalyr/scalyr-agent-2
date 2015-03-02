@@ -46,6 +46,8 @@ class SerializeTests(unittest.TestCase):
         self.__run_string_test_case('Escaped\5', '"Escaped\\u0005"')
         self.__run_string_test_case('Escaped\17', '"Escaped\\u000f"')
         self.__run_string_test_case('Escaped\177', '"Escaped\\u007f"')
+        self.__run_string_test_case('Escaped\177', '"Escaped\\u007f"')
+        self.__run_string_test_case(u'\u2192', '"\\u2192"')
 
         self.assertEquals(serialize('Escaped\xE2\x82\xAC', use_fast_encoding=True), '"Escaped\xe2\\u0082\xac"')
         self.assertEquals(serialize('Escaped\xE2\x82\xAC', use_fast_encoding=False), '"Escaped\\u20ac"')
