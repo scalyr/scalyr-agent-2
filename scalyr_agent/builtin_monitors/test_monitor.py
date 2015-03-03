@@ -45,6 +45,15 @@ class RandomMonitor(ScalyrMonitor):
         #                    this module should be saved.  It uses the same fields as the entries in agent.json's
         #                    "logs" section.  You can set the path for the log file, as well as the attributes
         #                    such as the parser, etc.
+        #  self._log_write_rate:  The allowed average number of bytes per second that can be written to the metric
+        #                         log for this monitor.  If this monitor tries to emit more than these number of
+        #                         bytes, then log lines are dropped (and a warning message is emitted to the log
+        #                         indicating how many lines were dropped).  The actual rate limit is calculated using
+        #                         a leaky bucket algorithm, where this is the fill rate (per second) of the bucket.
+        #  self._log_max_write_burst:  The maximum allowed log write burst rate.  This is used in conjunction with
+        #                              self._log_write_rate to rate limit how many bytes this monitor can write to
+        #                              the metric log.  The actual rate limit is calculated using a leaky bucket
+        #                              algorithm, where this is the bucket size.
         self.__counter = 0
         # A required configuration field.
         self.__gauss_mean = self._config.get('gauss_mean',  convert_to=float, min_value=0, max_value=10,
