@@ -69,3 +69,7 @@ class RandomMonitor(ScalyrMonitor):
         self._logger.emit_value('uniform', random.random(), extra_fields={'count': self.__counter})
         self._logger.emit_value('gauss', random.gauss(self.__gauss_mean, self.__gauss_stddev),
                                 extra_fields={'count': self.__counter})
+
+        # You may also emit full log lines to the metric log by using the special emit_to_metric_log=True parameter.
+        # Otherwise, the log lines will be assumed to be errors and will go to the agent.log
+        # self._logger.info('This will go to the metric log', emit_to_metric_log=True)

@@ -320,7 +320,8 @@ class AgentLogger(logging.Logger):
         string_buffer.close()
 
     def _log(self, level, msg, args, exc_info=None, extra=None, error_code=None, metric_log_for_monitor=None,
-             error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None):
+             error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None,
+             emit_to_metric_log=False):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
         New arguments (beyond inherited arguments):
@@ -339,6 +340,8 @@ class AgentLogger(logging.Logger):
         @param limit_key:  This can only be specified if limit_once_per_x_secs is not None.  It is an arbitrary string
             that uniquely identifies the set of log records that should only be emitted once per time interval.
         @param current_time:  This is only used for testing.  It sets the value to use for the current time.
+        @param emit_to_metric_log:  If True, then writes the record to the metric log handler for this logger.
+            This must only be used if this logger was assigned to a specific monitor.
         """
         if current_time is None:
             current_time = time.time()
@@ -347,6 +350,11 @@ class AgentLogger(logging.Logger):
             raise Exception('You must specify a limit key if you specify limit_once_per_x_secs')
         if limit_once_per_x_secs is None and limit_key is not None:
             raise Exception('You cannot set a limit key if you did not specify limit_once_per_x_secs')
+
+        if emit_to_metric_log and self.__monitor is None:
+            raise Exception('You cannot set emit_to_metric_log=True on a non-monitor logger instance')
+        elif emit_to_metric_log:
+            metric_log_for_monitor = self.__monitor
 
         # Make sure we limit the number of times we emit this record if it has been requested.
         if limit_once_per_x_secs is not None:
