@@ -17,7 +17,9 @@
             <Directory Id='ProgramFilesFolder' >
                 <Directory Id='APPLICATIONROOTDIRECTORY' Name='Scalyr' >
                     <Directory Id='APPLICATIONCERTS' Name='certs' />
-                    <Directory Id='APPLICATIONBINDIR' Name='bin' />
+                    <Directory Id='APPLICATIONBINDIR' Name='bin'>
+                      <Directory ID='THIRDPARTYLICENSES' Name = 'third_party_licenses'/>
+                    </Directory>
                     <Directory Id='DEFAULTAPPCONFIG' Name='config'>
                         <Directory Id='CONFIGTEMPLATES' Name='templates' />
                     </Directory>
@@ -99,12 +101,28 @@
             <!-- put in the dist directory by py2exe that should be distributed.  There's probably a wix way to do -->
             <!-- but it's too much of a pain to learn. -->
 
-            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <!-- EXPAND_FROM_BIN EXCLUDE:third_party_licenses,scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
             <Component Id='$COMPONENT_ID' Guid='$COMPONENT_GUID' >
               <File Id='$FILE_ID' DiskId='1' KeyPath='yes' Checksum='yes'  Source='$FILE_SOURCE' />
             </Component>
             <!-- EXPAND_FROM_BIN -->
-
+            <Directory Ref Id='THIRDPARTYLICENSES'>
+              <Component Id='TPL_README' Guid='' >
+                <File Id='TPL_README_md' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\README.md' />
+              </Component>
+              <Component Id='TPL_ACTIVESTATE' Guid='' >
+                <File Id='TPL_ACTIVESTATE_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_activestate.txt' />
+              </Component>
+              <Component Id='TPL_PSUTIL' Guid='' >
+                <File Id='TPL_PSUTIL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_psutil.txt' />
+              </Component>
+              <Component Id='TPL_PYMYSQL' Guid='' >
+                <File Id='TPL_PYMYSQL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_pymysql.txt' />
+              </Component>
+              <Component Id='TPL_TCOLLECTOR' Guid='' >
+                <File Id='TPL_TCOLLECTOR_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_tcollector.txt' />
+              </Component>
+            </Directory>
         </DirectoryRef>
 
 
@@ -157,9 +175,16 @@
             <ComponentRef Id='data_dir' />
             <ComponentRef Id='config_d_dir' />
 
-            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <!-- EXPAND_FROM_BIN EXCLUDE:third_party_licenses,scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
             <ComponentRef Id='$COMPONENT_ID' />
             <!-- EXPAND_FROM_BIN -->
+
+            <ComponentRef Id='TPL_README' />
+            <ComponentRef Id='TPL_ACTIVESTATE' />
+            <ComponentRef Id='TPL_PSUTIL' />
+            <ComponentRef Id='TPL_PYMYSQL' />
+            <ComponentRef Id='TPL_TCOLLECTOR' />
+
         </Feature>
 
         <!-- This UI section really needs to be fixed.  I am not a wix expert so had to just learn it by trial and -->
