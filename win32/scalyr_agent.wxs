@@ -18,7 +18,7 @@
                 <Directory Id='APPLICATIONROOTDIRECTORY' Name='Scalyr' >
                     <Directory Id='APPLICATIONCERTS' Name='certs' />
                     <Directory Id='APPLICATIONBINDIR' Name='bin'>
-                      <Directory ID='THIRDPARTYLICENSES' Name = 'third_party_licenses'/>
+                      <Directory Id='THIRDPARTYLICENSES' Name = 'third_party_licenses'/>
                     </Directory>
                     <Directory Id='DEFAULTAPPCONFIG' Name='config'>
                         <Directory Id='CONFIGTEMPLATES' Name='templates' />
@@ -106,25 +106,25 @@
               <File Id='$FILE_ID' DiskId='1' KeyPath='yes' Checksum='yes'  Source='$FILE_SOURCE' />
             </Component>
             <!-- EXPAND_FROM_BIN -->
-            <Directory Ref Id='THIRDPARTYLICENSES'>
-              <Component Id='TPL_README' Guid='' >
-                <File Id='TPL_README_md' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\README.md' />
-              </Component>
-              <Component Id='TPL_ACTIVESTATE' Guid='' >
-                <File Id='TPL_ACTIVESTATE_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_activestate.txt' />
-              </Component>
-              <Component Id='TPL_PSUTIL' Guid='' >
-                <File Id='TPL_PSUTIL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_psutil.txt' />
-              </Component>
-              <Component Id='TPL_PYMYSQL' Guid='' >
-                <File Id='TPL_PYMYSQL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_pymysql.txt' />
-              </Component>
-              <Component Id='TPL_TCOLLECTOR' Guid='' >
-                <File Id='TPL_TCOLLECTOR_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_tcollector.txt' />
-              </Component>
-            </Directory>
         </DirectoryRef>
 
+        <DirectoryRef Id='THIRDPARTYLICENSES'>
+          <Component Id='TPL_README' Guid='9739570e-c74b-4321-b33d-f6e8c4619b99' >
+            <File Id='TPL_README_md' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\README.md' />
+          </Component>
+          <Component Id='TPL_ACTIVESTATE' Guid='2785563d-c0f3-4822-af27-be7fdcf41c41' >
+            <File Id='TPL_ACTIVESTATE_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_activestate.txt' />
+          </Component>
+          <Component Id='TPL_PSUTIL' Guid='e65730a0-69ad-4add-8cb9-caaaa9d2321d' >
+            <File Id='TPL_PSUTIL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_psutil.txt' />
+          </Component>
+          <Component Id='TPL_PYMYSQL' Guid='bdc3b829-89e6-4961-ad1f-1a5e385a9e30' >
+            <File Id='TPL_PYMYSQL_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_pymysql.txt' />
+          </Component>
+          <Component Id='TPL_TCOLLECTOR' Guid='e1984987-f9e1-4aa3-860e-c05cba4580b2' >
+            <File Id='TPL_TCOLLECTOR_TXT' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\third_party_licenses\LICENSE_tcollector.txt' />
+          </Component>
+        </DirectoryRef>
 
         <!-- Application Menu Shortcuts -->
         <DirectoryRef Id='ApplicationProgramsFolder'>

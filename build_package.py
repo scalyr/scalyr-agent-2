@@ -160,7 +160,7 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, 'LICENSE.txt'), 'LICENSE.txt')
 
     # Copy the third party licenses
-    shutil.copy(make_path(agent_source_root, 'scalyr_agent/third_party/licenses'), 'licenses')
+    shutil.copytree(make_path(agent_source_root, 'scalyr_agent/third_party/licenses'), 'licenses')
 
     # Copy the config file.
     cat_files([make_path(agent_source_root, 'config/agent.json')], 'agent_config.tmpl', convert_newlines=True)
