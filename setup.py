@@ -91,8 +91,8 @@ service_config = Target(
 
 my_data_files = [('', [path.join('source_root', 'VERSION')])]
 
-for my_license in os.listdir(path.join('source_root', 'licenses')):
-    license_file = path.join('source_root', 'licenses', my_license)
+for my_license in os.listdir(path.join('data_files', 'licenses')):
+    license_file = path.join('data_files', 'licenses', my_license)
     if os.path.isfile(license_file):
         x = 'third_party_licenses', [license_file]
         my_data_files.append(x)
@@ -164,7 +164,7 @@ setup(
     # need to place data files outside of your packages.
     # see http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    data_files=[('', [path.join('source_root', 'VERSION')])],
+    data_files=my_data_files,
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow
