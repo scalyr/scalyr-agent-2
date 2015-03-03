@@ -45,6 +45,15 @@ class RandomMonitor(ScalyrMonitor):
         #                    this module should be saved.  It uses the same fields as the entries in agent.json's
         #                    "logs" section.  You can set the path for the log file, as well as the attributes
         #                    such as the parser, etc.
+        #  self._log_write_rate:  The allowed average number of bytes per second that can be written to the metric
+        #                         log for this monitor.  If this monitor tries to emit more than these number of
+        #                         bytes, then log lines are dropped (and a warning message is emitted to the log
+        #                         indicating how many lines were dropped).  The actual rate limit is calculated using
+        #                         a leaky bucket algorithm, where this is the fill rate (per second) of the bucket.
+        #  self._log_max_write_burst:  The maximum allowed log write burst rate.  This is used in conjunction with
+        #                              self._log_write_rate to rate limit how many bytes this monitor can write to
+        #                              the metric log.  The actual rate limit is calculated using a leaky bucket
+        #                              algorithm, where this is the bucket size.
         self.__counter = 0
         # A required configuration field.
         self.__gauss_mean = self._config.get('gauss_mean',  convert_to=float, min_value=0, max_value=10,
@@ -60,3 +69,7 @@ class RandomMonitor(ScalyrMonitor):
         self._logger.emit_value('uniform', random.random(), extra_fields={'count': self.__counter})
         self._logger.emit_value('gauss', random.gauss(self.__gauss_mean, self.__gauss_stddev),
                                 extra_fields={'count': self.__counter})
+
+        # You may also emit full log lines to the metric log by using the special emit_to_metric_log=True parameter.
+        # Otherwise, the log lines will be assumed to be errors and will go to the agent.log
+        # self._logger.info('This will go to the metric log', emit_to_metric_log=True)

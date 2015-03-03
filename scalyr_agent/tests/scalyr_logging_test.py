@@ -83,6 +83,22 @@ class ScalyrLoggingTest(unittest.TestCase):
 
         monitor_logger.closeMetricLog()
 
+    def test_logging_to_metric_log(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor('testing')
+        metric_file_path = tempfile.mktemp('.log')
+
+        monitor_logger = scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo(1)')
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+        monitor_logger.info('foobaz is fine', emit_to_metric_log=True)
+
+        self.assertEquals(monitor_instance.reported_lines, 1)
+
+        # The value should only appear in the metric log file and not the main one.
+        self.assertTrue(self.__log_contains('foobaz is fine', file_path=metric_file_path))
+        self.assertFalse(self.__log_contains('foobaz is fine'))
+
+        monitor_logger.closeMetricLog()
+
     def test_metric_logging_with_bad_name(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor('testing')
         metric_file_path = tempfile.mktemp('.log')

@@ -320,7 +320,8 @@ class AgentLogger(logging.Logger):
         string_buffer.close()
 
     def _log(self, level, msg, args, exc_info=None, extra=None, error_code=None, metric_log_for_monitor=None,
-             error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None):
+             error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None,
+             emit_to_metric_log=False):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
         New arguments (beyond inherited arguments):
@@ -339,6 +340,8 @@ class AgentLogger(logging.Logger):
         @param limit_key:  This can only be specified if limit_once_per_x_secs is not None.  It is an arbitrary string
             that uniquely identifies the set of log records that should only be emitted once per time interval.
         @param current_time:  This is only used for testing.  It sets the value to use for the current time.
+        @param emit_to_metric_log:  If True, then writes the record to the metric log handler for this logger.
+            This must only be used if this logger was assigned to a specific monitor.
         """
         if current_time is None:
             current_time = time.time()
@@ -347,6 +350,11 @@ class AgentLogger(logging.Logger):
             raise Exception('You must specify a limit key if you specify limit_once_per_x_secs')
         if limit_once_per_x_secs is None and limit_key is not None:
             raise Exception('You cannot set a limit key if you did not specify limit_once_per_x_secs')
+
+        if emit_to_metric_log and self.__monitor is None:
+            raise Exception('You cannot set emit_to_metric_log=True on a non-monitor logger instance')
+        elif emit_to_metric_log:
+            metric_log_for_monitor = self.__monitor
 
         # Make sure we limit the number of times we emit this record if it has been requested.
         if limit_once_per_x_secs is not None:
@@ -419,7 +427,8 @@ class AgentLogger(logging.Logger):
     # for error checking.
     __opened_monitors__ = {}
 
-    def openMetricLogForMonitor(self, path, monitor, max_bytes=20*1024*1024, backup_count=5):
+    def openMetricLogForMonitor(self, path, monitor, max_bytes=20*1024*1024, backup_count=5,
+                                max_write_burst=100000, log_write_rate=2000):
         """Open the metric log for this logger instance for the specified monitor.
 
         This must be called before any metrics are reported using the 'emit_value' method.  This opens the
@@ -435,13 +444,18 @@ class AgentLogger(logging.Logger):
         @param monitor: The ScalyrMonitor instance that will emit metrics to the log.
         @param max_bytes: The maximum number of bytes to write to the log file before it is rotated.
         @param backup_count: The number of old log files to keep around.
+        @param max_write_burst: The maximum burst of bytes to allow to be written into the log. This is the bucket size
+            in the "leaky bucket" algorithm.
+        @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
+            bucket fill rate in the "leaky bucket" algorithm.
         """
         if self.__metric_handler is not None:
             self.closeMetricLog()
 
         self.__metric_handler = MetricLogHandler.get_handler_for_path(path, max_bytes=max_bytes,
-                                                                      backup_count=backup_count)
-
+                                                                      backup_count=backup_count,
+                                                                      max_write_burst=max_write_burst,
+                                                                      log_write_rate=log_write_rate)
         self.__metric_handler.open_for_monitor(monitor)
         self.__monitor = monitor
         AgentLogger.__opened_monitors__[monitor] = True
@@ -719,9 +733,14 @@ class MetricLogHandler(object):
     This is a base class that is used below to implement different versions of the MetricLogHandler that either
     uses a rotating log file or writes to stdout.
     """
-    def __init__(self, file_path):
+    def __init__(self, file_path, max_write_burst=10000, log_write_rate=2000):
         """Creates the handler instance.  This should not be used directly.  Use MetricLogHandler.get_handler_for_path
         instead.
+
+        @param max_write_burst: The maximum burst of bytes to allow to be written into the log. This is the bucket size
+            in the "leaky bucket" algorithm.
+        @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
+            bucket fill rate in the "leaky bucket" algorithm.
         """
         # The monitor instances that should emit their metrics to this log file.
         self.__monitors = {}
@@ -745,7 +764,7 @@ class MetricLogHandler(object):
         # Add the filter and our formatter to this handler.
         self.addFilter(Filter(self.__monitors))
         formatter = MetricLogFormatter()
-        self.addFilter(RateLimiterLogFilter(formatter))
+        self.addFilter(RateLimiterLogFilter(formatter, max_write_burst=max_write_burst, log_write_rate=log_write_rate))
         self.setFormatter(formatter)
 
     # noinspection PyPep8Naming
@@ -786,7 +805,8 @@ class MetricLogHandler(object):
         MetricLogHandler.__use_stdout__ = use_stdout
 
     @staticmethod
-    def get_handler_for_path(file_path, max_bytes=20*1024*1024, backup_count=5):
+    def get_handler_for_path(file_path, max_bytes=20*1024*1024, backup_count=5, max_write_burst=100000,
+                             log_write_rate=2000):
         """Returns the MetricLogHandler to use for the specified file path.  This must be used to get
         MetricLogHandler instances.
 
@@ -801,14 +821,20 @@ class MetricLogHandler(object):
         @param file_path: The file path for the metric log file.
         @param max_bytes: The maximum number of bytes to write to the log file before it is rotated.
         @param backup_count: The number of previous log files to keep.
+        @param max_write_burst: The maximum burst of bytes to allow to be written into the log. This is the bucket size
+            in the "leaky bucket" algorithm.
+        @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
+            bucket fill rate in the "leaky bucket" algorithm.
 
         @return: The handler instance to use.
         """
         if not file_path in MetricLogHandler.__metric_log_handlers__:
             if not MetricLogHandler.__use_stdout__:
-                result = MetricRotatingLogHandler(file_path, max_bytes=max_bytes, backup_count=backup_count)
+                result = MetricRotatingLogHandler(file_path, max_bytes=max_bytes, backup_count=backup_count,
+                                                  max_write_burst=max_write_burst, log_write_rate=log_write_rate)
             else:
-                result = MetricStdoutLogHandler(file_path)
+                result = MetricStdoutLogHandler(file_path, max_write_burst=max_write_burst,
+                                                log_write_rate=log_write_rate)
             MetricLogHandler.__metric_log_handlers__[file_path] = result
         return MetricLogHandler.__metric_log_handlers__[file_path]
 
@@ -851,16 +877,16 @@ class MetricLogHandler(object):
 
 
 class MetricRotatingLogHandler(logging.handlers.RotatingFileHandler, MetricLogHandler):
-    def __init__(self, file_path, max_bytes, backup_count):
+    def __init__(self, file_path, max_bytes, backup_count, max_write_burst=100000, log_write_rate=2000):
         logging.handlers.RotatingFileHandler.__init__(self, file_path, maxBytes=max_bytes, backupCount=backup_count)
-        MetricLogHandler.__init__(self, file_path)
+        MetricLogHandler.__init__(self, file_path, max_write_burst=max_write_burst, log_write_rate=log_write_rate)
         self.propagate = False
 
 
 class MetricStdoutLogHandler(logging.StreamHandler, MetricLogHandler):
-    def __init__(self, file_path):
+    def __init__(self, file_path, max_write_burst=100000, log_write_rate=2000):
         logging.StreamHandler.__init__(self, WrapStdout())
-        MetricLogHandler.__init__(self, file_path)
+        MetricLogHandler.__init__(self, file_path, max_write_burst=max_write_burst, log_write_rate=log_write_rate)
         self.propagate = False
 
 

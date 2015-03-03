@@ -48,6 +48,9 @@ def serialize(value, output=None, use_fast_encoding=False):
         written to output and the output object is returned.
     """
     if output is None:
+        # TODO:  Note, the problem here is that cStringIO.StringIO does not except unicode characters.  We need to
+        # make a whole change to only use StringIO.StringIO, but it is not clear how that would impact performance.
+        # We are going to defer for now.
         output = StringIO()
         # Remember that we have to return a string and not the output object.
         return_as_string = True
@@ -133,7 +136,6 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
 
     @return: The escaped string.
     """
-    result = StringIO()
     if type(string_value) is unicode:
         type_index = 1
     elif not use_fast_encoding:
@@ -147,6 +149,9 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
         return ESCAPE_OPT.sub(replace, string_value)
     else:
         type_index = 0
+
+
+    result = StringIO()
     for x in string_value:
         x_ord = ord(x)
         if x_ord in ESCAPES:
@@ -156,7 +161,10 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
         # 159 = \u009f
         # 8192 = \u2000
         # 8447 = \u20ff
-        elif 0 <= x_ord <= 31 or 127 <= x_ord <= 159 or 8192 <= x_ord <= 8447:
+        # TODO: Fix this.  For now, we are disabling this optimization to only write common punctuation marks
+        # out escaped.  We are instead going to right anything that has higher ascii (and is 4 bytes).
+        #elif 0 <= x_ord <= 31 or 127 <= x_ord <= 159 or 8192 <= x_ord <= 8447:
+        elif 0 <= x_ord <= 31 or 127 <= x_ord <= 159 or 8192 <= x_ord < 65536:
             if type_index == 0:
                 result.write('\\u%0.4x' % x_ord)
             else:

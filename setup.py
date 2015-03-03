@@ -34,6 +34,7 @@ from setuptools import setup, find_packages  # Always prefer setuptools over dis
 from codecs import open  # To use a consistent encoding
 from os import path
 
+import os
 import sys
 
 if path.isdir('source_root'):
@@ -87,6 +88,14 @@ service_config = Target(
     cmdline_style='pywin32'
 )
 
+
+my_data_files = [('', [path.join('source_root', 'VERSION')])]
+
+for my_license in os.listdir(path.join('source_root', 'licenses')):
+    license_file = path.join('source_root', 'licenses', my_license)
+    if os.path.isfile(license_file):
+        x = 'third_party_licenses', [license_file]
+        my_data_files.append(x)
 
 setup(
     name='scalyr-agent-2',

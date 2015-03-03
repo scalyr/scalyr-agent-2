@@ -68,7 +68,7 @@ class ScalyrMonitor(StoppableThread):
 
         If a derived class overrides __init__, they must invoke this method in the override method.
 
-        This method will set default values forall public attributes (log_config, disabled, etc).  These
+        This method will set default values for all public attributes (log_config, disabled, etc).  These
         may be overwritten by the derived class.
 
         The derived classes must raise an Exception (or something derived from Exception)
@@ -104,6 +104,15 @@ class ScalyrMonitor(StoppableThread):
 
         self._sample_interval_secs = sample_interval_secs
         self.__metric_log_open = False
+
+        # These variables control the rate limiter on how fast we can write to the metric log.
+        # The first one is the average number of bytes that can be written per second.  This is the bucket fill rate
+        # in the "leaky bucket" algorithm used to calculate the rate limit.  Derived classes may change this.
+        self._log_write_rate = 2000
+        # This is the maximum size of a write burst to the log.  This is the bucket size in the "leaky bucket" algorithm
+        # used to calculate the rate limit.  Derived classes may change this.
+        self._log_max_write_burst = 100000
+
         self._initialize()
 
         StoppableThread.__init__(self, name='metric thread')
@@ -225,7 +234,8 @@ class ScalyrMonitor(StoppableThread):
         """Opens the logger for this monitor.
 
         This must be invoked before the monitor is started."""
-        self._logger.openMetricLogForMonitor(self.log_config['path'], self)
+        self._logger.openMetricLogForMonitor(self.log_config['path'], self, max_write_burst=self._log_max_write_burst,
+                                             log_write_rate=self._log_write_rate)
         self.__metric_log_open = True
         return True
 

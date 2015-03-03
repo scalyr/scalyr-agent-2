@@ -9,6 +9,16 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 20, 2015 13:30 -0800
 
 This release is under active development.  Actual release date TBD.
 
+New features:
+
+* Add a new option ``--set-server-host`` in scalyr-agent-2-config to set the server host from the commandline.
+* Add new instance variables ``_log_write_rate`` and ``_log_max_write_burst`` to ScalyrMonitor to allow monitor developers to override the rate limits imposed on their monitor's log.  See the comments in test_monitor.py for more details.
+* Add new parameter ``emit_to_metric_log=True`` to force a log line to go to the metric log instead of the agent log for monitors.  See the comments in test_monitor.py for more details.
+
+Bug fixes:
+
+* Fix failing to accept unicode characters in metric values
+
 ## 2.0.5 "Eccentric Elk" - Feb 26, 2015
 
 <!---
