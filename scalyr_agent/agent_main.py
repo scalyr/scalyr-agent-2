@@ -64,17 +64,13 @@ from optparse import OptionParser
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.util import RunState
+from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
 from scalyr_agent.agent_status import report_status
-from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning
-
-from scalyr_agent.platforms import register_supported_platforms
-register_supported_platforms()
-
-import getpass
+from scalyr_agent.platform_controller import PlatformController, AgentAlreadyRunning, CannotExecuteAsUser
+from scalyr_agent.platform_controller import AgentNotRunning
 
 STATUS_FILE = 'last_status'
 
@@ -96,6 +92,9 @@ class ScalyrAgent(object):
         self.__config = None
         # The platform-specific controller that does things like fork daemon processes, sleeps, etc.
         self.__controller = platform_controller
+        # A helper for running this script as another user if need be.
+        self.__escalator = None
+
         # The DefaultPaths object for defining the default paths for various things like the log directory based on
         # the platform.
         self.__default_paths = platform_controller.default_paths
@@ -175,7 +174,6 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         no_fork = command_options.no_fork
-        no_change_user = command_options.no_change_user
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == 'version':
@@ -192,13 +190,15 @@ class ScalyrAgent(object):
         if self.__config is None:
             print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
 
-        self.__controller.consume_config(self.__config)
+        self.__controller.consume_config(self.__config, config_file_path)
+
+        self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd())
 
         # noinspection PyBroadException
         try:
             # Execute the command.
             if command == 'start':
-                return self.__start(quiet, no_fork, no_change_user)
+                return self.__start(quiet, no_fork)
             elif command == 'inner_run':
                 return self.__run(self.__controller)
             elif command == 'stop':
@@ -213,9 +213,9 @@ class ScalyrAgent(object):
                     print >> sys.stderr, 'Assuming agent data path is \'%s\'' % agent_data_path
                 return self.__detailed_status(agent_data_path)
             elif command == 'restart':
-                return self.__restart(quiet, no_fork, no_change_user)
+                return self.__restart(quiet, no_fork)
             elif command == 'condrestart':
-                return self.__condrestart(quiet, no_fork, no_change_user)
+                return self.__condrestart(quiet, no_fork)
             else:
                 print >> sys.stderr, 'Unknown command given: "%s".' % command
                 return 1
@@ -247,7 +247,7 @@ class ScalyrAgent(object):
             if not fail_on_error:
                 return None
             print >> sys.stderr, 'Configuration file uses a monitor that is not supported on this system'
-            print >> sys.stderr, 'Monitor \'%s\' cannot be used due to: %s\n' % (e.monitor_name, e.message)
+            print >> sys.stderr, 'Monitor \'%s\' cannot be used due to: %s\n' % (e.monitor_name, str(e))
             print >> sys.stderr, 'If you require support for this monitor for your system, please e-mail'
             print >> sys.stderr, 'contact@scalyr.com.\n'
         except Exception, e:
@@ -258,7 +258,7 @@ class ScalyrAgent(object):
         print >> sys.stderr, 'Terminating agent, please fix the configuration file and restart agent.'
         sys.exit(1)
 
-    def __start(self, quiet, no_fork, no_change_user):
+    def __start(self, quiet, no_fork):
         """Executes the start command.
 
         This will perform some initial checks to see if the agent can be started, such as making sure it can
@@ -272,27 +272,25 @@ class ScalyrAgent(object):
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
-        @param no_change_user: True if this process should not attempt to try to fork a new process to change
-            the executing user to match the owner of the configuration file.
 
         @type quiet: bool
         @type no_fork: bool
-        @type no_change_user: bool
 
         @return:  The exit status code for the process.
         @rtype: int
         """
+        # Before we begin, make sure the user has set an API key... a common step that can be forgotten.
+        # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
+        if self.__config.api_key == 'REPLACE_THIS' or self.__config.api_key == '':
+            print >> sys.stderr, 'Error, you have not set a valid api key in the configuration file.'
+            print >> sys.stderr, ('Edit the file %s and replace the value for "api_key" with a valid logs '
+                                  'write key for your account.' % self.__config.file_path)
+            print >> sys.stderr, 'You can see your write logs keys at https://www.scalyr.com/keys'
+            return 1
+
         # First, see if we have to change the user that is executing this script to match the owner of the config.
-        running_user = os.geteuid()
-        desired_user = os.stat(self.__config.file_path).st_uid
-        # We set no_change_user is a safety flag to avoid recursion.. if we believe we started a new process that
-        # is running as the right user, do not do it again if that is not the case.
-        if no_change_user:
-            if running_user != desired_user:
-                print >> sys.stderr, 'No change user is selected by agent is not being run by correct user.'
-                print >> sys.stderr, 'Terminating agent, please restart agent using correct user.'
-        else:
-            self.__controller.run_as_user(desired_user, os.path.realpath(__file__), sys.argv[1:])
+        if self.__escalator.is_user_change_required():
+            return self.__escalator.change_user_and_rerun_script('start the scalyr agent')
 
         # Make sure we do not try to start it up again.
         self.__fail_if_already_running()
@@ -300,8 +298,8 @@ class ScalyrAgent(object):
         try:
             self.__verify_can_write_to_logs_and_data(self.__config)
         except Exception, e:
-            print >> sys.stderr, '%s' % e.message
-            print >> 'Terminating agent, please fix the error and restart the agent.'
+            print >> sys.stderr, '%s' % str(e)
+            print >> sys.stderr, 'Terminating agent, please fix the error and restart the agent.'
             return 1
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
@@ -359,6 +357,22 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        # First, see if we have to change the user that is executing this script to match the owner of the config.
+        if self.__escalator.is_user_change_required():
+            try:
+                return self.__escalator.change_user_and_rerun_script('retrieved detailed status', handle_error=False)
+            except CannotExecuteAsUser:
+                # For now, we just ignore the error and try to get the status anyway.  This might work on Linux
+                # platforms depending on permissions.  This is legacy behavior.
+                pass
+
+        try:
+            self.__controller.is_agent_running(fail_if_not_running=True)
+        except AgentNotRunning, e:
+            print 'The agent does not appear to be running.'
+            print "%s" % str(e)
+            return 1
+
         # The status works by sending telling the running agent to dump the status into a well known file and
         # then we read it from there, echoing it to stdout.
         if not os.path.isdir(data_directory):
@@ -390,7 +404,7 @@ class ScalyrAgent(object):
                 # TODO:  We probably should just get the name of the user running the agent and output it
                 # here, instead of hard coding it to root.
                 print >> sys.stderr, ('To view agent status, you must be running as the same user as the agent. '
-                                      'Try running this command as root.')
+                                      'Try running this command as root or Administrator.')
                 return 2
 
         # We wait for five seconds at most to get the status.
@@ -433,8 +447,19 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
-        status = self.__controller.stop_agent_service(quiet)
-        return status
+        # First, see if we have to change the user that is executing this script to match the owner of the config.
+        if self.__escalator.is_user_change_required():
+            return self.__escalator.change_user_and_rerun_script('stop the scalyr agent')
+
+        try:
+            self.__controller.is_agent_running(fail_if_not_running=True)
+            status = self.__controller.stop_agent_service(quiet)
+            return status
+        except AgentNotRunning, e:
+            print >> sys.stderr, 'Failed to stop the agent because it does not appear to be running.'
+            print >> sys.stderr, "%s" % str(e)
+            return 0  # For the sake of restart, we need to return non-error code here.
+
 
     def __status(self):
         """Execute the 'status' command to indicate if the agent is running or not.
@@ -449,22 +474,23 @@ class ScalyrAgent(object):
             print 'The agent does not appear to be running.'
             return 4
 
-    def __condrestart(self, quiet, no_fork, no_change_user):
+    def __condrestart(self, quiet, no_fork):
         """Execute the 'condrestart' command which will only restart the agent if it is already running.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
-        @param no_change_user: True if this process should not attempt to try to fork a new process to change
-            the executing user to match the owner of the configuration file.
 
         @type quiet: bool
         @type no_fork: bool
-        @type no_change_user: bool
 
         @return: the exit status code
         @rtype: int
         """
+        # First, see if we have to change the user that is executing this script to match the owner of the config.
+        if self.__escalator.is_user_change_required():
+            return self.__escalator.change_user_and_rerun_script('restart the scalyr agent')
+
         if self.__controller.is_agent_running():
             if not quiet:
                 print 'Agent is running, restarting now.'
@@ -472,30 +498,31 @@ class ScalyrAgent(object):
                 print >>sys.stderr, 'Failed to stop the running agent.  Cannot restart until it is killed.'
                 return 1
 
-            return self.__start(quiet, no_fork, no_change_user)
+            return self.__start(quiet, no_fork)
         elif not quiet:
             print 'Agent is not running, not restarting.'
             return 0
         else:
             return 0
 
-    def __restart(self, quiet, no_fork, no_change_user):
+    def __restart(self, quiet, no_fork):
         """Execute the 'restart' which will start the agent, stopping the existing agent if it is running.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
-        @param no_change_user: True if this process should not attempt to try to fork a new process to change
-            the executing user to match the owner of the configuration file.
 
         @type quiet: bool
         @type no_fork: bool
-        @type no_change_user: bool
 
         @return: the exit status code, zero if it was successfully restarted, non-zero if it was not running or
             could not be started.
         @rtype: int
         """
+        # First, see if we have to change the user that is executing this script to match the owner of the config.
+        if self.__escalator.is_user_change_required():
+            return self.__escalator.change_user_and_rerun_script('restart the scalyr agent')
+
         if self.__controller.is_agent_running():
             if not quiet:
                 print 'Agent is running, stopping it now.'
@@ -503,7 +530,7 @@ class ScalyrAgent(object):
                 print >>sys.stderr, 'Failed to stop the running agent.  Cannot restart until it is killed'
                 return 1
 
-        return self.__start(quiet, no_fork, no_change_user)
+        return self.__start(quiet, no_fork)
 
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
@@ -637,7 +664,8 @@ class ScalyrAgent(object):
         try:
             self.__controller.is_agent_running(fail_if_running=True)
         except AgentAlreadyRunning, e:
-            print >> sys.stderr, "%s" % e.message
+            print >> sys.stderr, 'Failed to start agent because it is already running.'
+            print >> sys.stderr, "%s" % str(e)
             sys.exit(4)
 
     def __update_debug_log_level(self, debug_level):
@@ -743,7 +771,7 @@ class ScalyrAgent(object):
         # Basic agent stats first.
         result = AgentStatus()
         result.launch_time = self.__start_time
-        result.user = getpass.getuser()
+        result.user = self.__controller.get_current_user()
         result.version = SCALYR_VERSION
         result.server_host = self.__config.server_attributes['serverHost']
         result.scalyr_server = self.__config.scalyr_server
@@ -936,9 +964,9 @@ class WorkerThread(object):
         log.debug('Shutting client')
         self.__scalyr_client.close()
 
+
 if __name__ == '__main__':
     my_controller = PlatformController.new_platform()
-
     parser = OptionParser(usage='Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)',
                           version='scalyr-agent v' + SCALYR_VERSION)
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -949,15 +977,12 @@ if __name__ == '__main__':
                       help="For status command, prints detailed information about running agent.")
     parser.add_option("", "--no-fork", action="store_true", dest="no_fork", default=False,
                       help="For the run command, does not fork the program to the background.")
-    parser.add_option("", "--no-change-user", action="store_true", dest="no_change_user", default=False,
-                      help="Forces agent to not change which user is executing agent.  Requires the right user is "
-                           "already being used.  This is used internally to prevent infinite loops in changing to"
-                           "the correct user.  Users should not need to set this option.")
+
     my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()
-
     my_controller.consume_options(options)
+
     if len(args) < 1:
         print >> sys.stderr, 'You must specify a command, such as "start", "stop", or "status".'
         parser.print_help(sys.stderr)

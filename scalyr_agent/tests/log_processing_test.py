@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import sys
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -40,8 +41,8 @@ class TestLogFileIterator(unittest.TestCase):
         self.mark(time_advance=0)
 
     def tearDown(self):
-        shutil.rmtree(self.__tempdir)
         self.log_file.close()
+        shutil.rmtree(self.__tempdir)
 
     def readline(self, time_advance=10):
         self.__fake_time += time_advance
@@ -107,6 +108,10 @@ class TestLogFileIterator(unittest.TestCase):
         self.assertEquals(self.readline(), '')
 
     def test_deleted_file(self):
+        # Since it cannot keep file handles open when they are deleted, win32 cannot handle this case:
+        if sys.platform == 'win32':
+            return
+
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
@@ -139,6 +144,10 @@ class TestLogFileIterator(unittest.TestCase):
         self.assertEquals(self.readline(), '')
 
     def test_rotating_log_file_with_move(self):
+        # Since it cannot keep file handles open when they are deleted/moved, win32 cannot handle this case:
+        if sys.platform == 'win32':
+            return
+
         self.append_file(self.__path,
                          'L001\n')
 
@@ -199,6 +208,10 @@ class TestLogFileIterator(unittest.TestCase):
         self.assertEquals(self.readline(), '')
 
     def test_holes_in_file(self):
+        # Since it cannot keep file handles open when they are moved/deleted, win32 cannot handle this case:
+        if sys.platform == 'win32':
+            return
+
         # This is a more general case of the rotated_file_with_truncation_and_deletion.
         # It essentially creates holes in the virtual file that the __fill_buffer code most correctly
         # deal with.
@@ -430,20 +443,22 @@ class TestLogFileIterator(unittest.TestCase):
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'w')
+        file_handle = open(path, 'wb')
         file_handle.write(contents)
         file_handle.close()
 
     def append_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'a')
+        file_handle = open(path, 'ab')
         file_handle.write(contents)
         file_handle.close()
 
     def delete_file(self, path):
+        self.log_file.prepare_for_inactivity()
         os.remove(path)
 
     def move_file(self, original_path, new_path):
+        self.log_file.prepare_for_inactivity()
         os.rename(original_path, new_path)
 
     def truncate_file(self, path):
@@ -773,13 +788,13 @@ class TestLogFileProcessor(unittest.TestCase):
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'w')
+        file_handle = open(path, 'wb')
         file_handle.write(contents)
         file_handle.close()
 
     def append_file(self, path, *lines):
         contents = ''.join(lines)
-        file_handle = open(path, 'a')
+        file_handle = open(path, 'ab')
         file_handle.write(contents)
         file_handle.close()
 

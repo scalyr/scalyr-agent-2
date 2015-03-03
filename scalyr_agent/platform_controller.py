@@ -18,40 +18,37 @@
 __author__ = 'czerwin@scalyr.com'
 
 
-import os
+import sys
 
-from __scalyr__ import get_install_root
-
-# The constants for install_type used below in the initializer for a
-# platform instance.
-PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
-TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
-DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
+from __scalyr__ import INSTALL_TYPE
 
 
 class PlatformController:
-    def __init__(self, install_type):
+    def __init__(self):
         """Initializes a platform instance.
-
-        @param install_type: One of the constants describing the install type, such as PACKAGE_INSTALL, TARBALL_INSTALL,
-            or DEV_INSTALL.
-        @type install_type: int
         """
-        self._install_type = install_type
+        self._install_type = INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
     __platform_classes__ = []
+    __platforms_registered__ = False
 
     @staticmethod
-    def register_platform(platform_class):
-        """Register a new platform class that could be instantiated during the 'new_platform' method.
-
-        The class must derive from PlatformController.
-
-        @param platform_class:  The derived PlatformController class
-        @type platform_class: class
+    def __register_supported_platforms():
+        """Adds all available platforms to the '__platforms_registered__' array.
+         a new platform class that could be instantiated during the 'new_platform' method.
         """
-        PlatformController.__platform_classes__.append(platform_class)
+        if sys.platform == 'win32':
+            from scalyr_agent.platform_windows import WindowsPlatformController
+            PlatformController.__platform_classes__.append(WindowsPlatformController)
+        else:
+            from scalyr_agent.platform_linux import LinuxPlatformController
+            PlatformController.__platform_classes__.append(LinuxPlatformController)
+
+            from scalyr_agent.platform_posix import PosixPlatformController
+            PlatformController.__platform_classes__.append(PosixPlatformController)
+
+        PlatformController.__platforms_registered__ = True
 
     @staticmethod
     def new_platform():
@@ -64,18 +61,12 @@ class PlatformController:
         @return: The PlatformController instance to use
         @rtype: PlatformController
         """
-        # Determine which type of install this is.  We do this based on
-        # whether or not certain files exist in the root of the source tree.
-        install_root = get_install_root()
-        if os.path.exists(os.path.join(install_root, 'packageless')):
-            install_type = TARBALL_INSTALL
-        elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
-            install_type = DEV_INSTALL
-        else:
-            install_type = PACKAGE_INSTALL
+        # If we haven't initialized the platforms array, then do so.
+        if not PlatformController.__platforms_registered__:
+            PlatformController.__register_supported_platforms()
 
         for platform_class in PlatformController.__platform_classes__:
-            result = platform_class(install_type)
+            result = platform_class()
             if result.can_handle_current_platform():
                 return result
         return None
@@ -123,14 +114,17 @@ class PlatformController:
         """
         pass
 
-    def consume_config(self, config):
+    def consume_config(self, config, path_to_config):
         """Invoked after 'consume_options' is called to set the Configuration object to be used.
 
         This will be invoked before the scalyr-agent-2 command performs any real work and while stdout and stderr
         are still be displayed to the screen.
 
         @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
+        @param path_to_config: The full path to file that was read to create the config object.
+
         @type config: configuration.Configuration
+        @type path_to_config: str
         """
         pass
 
@@ -158,39 +152,92 @@ class PlatformController:
         """
         return []
 
-    def run_as_user(self, user_id, script_file, script_arguments):
-        """Restarts this process with the same arguments as the specified user.
+    def get_file_owner(self, file_path):
+        """Returns the user name of the owner of the specified file.
 
-        This will re-run the entire Python script so that it is executing as the specified user.
-        It will also add in the '--no-change-user' option which can be used by the script being executed with the
-        next proces that it was the result of restart so that it probably shouldn't do that again.
+        @param file_path: The path of the file.
+        @type file_path: str
 
-        @param user_id: The user id to run as, typically 0 for root.
-        @param script_file: The path to the Python script file that was executed.
-        @param script_arguments: The arguments passed in on the command line that need to be used for the new
-            command line.
-
-        @type user_id: int
-        @type script_file: str
-        @type script_arguments: list<str>
+        @return: The user name of the owner.
+        @rtype: str
         """
         pass
 
-    def is_agent_running(self, fail_if_running=False):
+    def set_file_owner(self, file_path, owner):
+        """Sets the owner of the specified file.
+
+        @param file_path: The path of the file.
+        @param owner: The new owner of the file.  This should be a string returned by either `get_file_ower` or
+            `get_current_user`.
+        @type file_path: str
+        @type owner: str
+        """
+        pass
+
+    def get_current_user(self):
+        """Returns the effective user name running this process.
+
+        The effective user may not be the same as the initiator of the process if the process has escalated its
+        privileges.
+
+        @return: The name of the effective user running this process.
+        @rtype: str
+        """
+        pass
+
+    def run_as_user(self, user_name, script_file, script_binary, script_arguments):
+        """Runs the specified script with the same arguments as the specified user.
+
+        This will run the entire Python script so that it is executing as the specified user.
+        It will also add in the '--no-change-user' option which can be used by the script being executed with the
+        next process that it was the result of restart so that it probably shouldn't do that again.
+
+        Note, in some system implementations, the current process is replaced by the new process, so this method
+        does not ever return to the caller.
+
+        @param user_name: The user to run as, typically 'root' or 'Administrator'.
+        @param script_file: The path to the Python script file that was executed if it can be determined.  If it cannot
+            then this will be None and script_binary will be supplied.
+        @param script_binary:  The binary that is being executed.  This is only supplied if script_file is None.
+            On some systems, such as Windows running a script frozen by py2exe, the script is embedded in an actual
+            executable.
+        @param script_arguments: The arguments passed in on the command line that need to be used for the new
+            command line.
+
+        @return The status code for the executed script, if it returns at all.
+
+        @type user_name: str
+        @type script_file: str|None
+        @type script_binary: str|None
+        @type script_arguments: list<str>
+
+        @rtype int
+
+        @raise CannotExecuteAsUser: Indicates that the current process could not change the specified user for
+            some reason to execute the script.
+        """
+        pass
+
+    def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by this platform implementation.
 
-        This will optionally raise an Exception with an appropriate error message if the agent is not running.
+        This will optionally raise an Exception with an appropriate error message if the agent is running or not
+        runnning.
 
         @param fail_if_running:  True if the method should raise an Exception with a platform-specific error message
+            explaining how it determined the agent is running.
+        @param fail_if_not_running: True if the method should raise an Exception with a platform-specific error message
             explaining how it determined the agent is not running.
+
         @type fail_if_running: bool
+        @type fail_if_not_running: bool
 
         @return: True if the agent process is already running.
         @rtype: bool
 
-        @raise AgentAlreadyRunning: If the agent is running and fail_if_running is True.
+        @raise AgentAlreadyRunning
+        @raise AgentNotRunning
         """
-        pass
 
     def start_agent_service(self, agent_run_method, quiet):
         """Start the agent service using the platform-specific method.
@@ -273,5 +320,25 @@ class DefaultPaths(object):
 
 class AgentAlreadyRunning(Exception):
     """Raised to signal the agent is already running.
+    """
+    pass
+
+
+class AgentNotRunning(Exception):
+    """Raised to signal the agent is not running.
+    """
+    pass
+
+
+class CannotExecuteAsUser(Exception):
+    """Raised to signal that the platform cannot change to the requested user.
+
+    This usually means the current user is not privileged (root)."""
+    def __init__(self, error_message):
+        self.error_message = error_message
+
+
+class ChangeUserNotSupported(Exception):
+    """Raised to signal that this platform has not implemented the operation of changing its executing user.
     """
     pass

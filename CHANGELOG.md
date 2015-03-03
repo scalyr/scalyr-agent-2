@@ -1,6 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.6 "Furious Falcon" - Mar 20, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 20, 2015 13:30 -0800
+--->
+
+This release is under active development.  Actual release date TBD.
+
+## 2.0.5 "Eccentric Elk" - Feb 26, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Feb 26, 2015 13:30 -0800
+--->
+
+New features:
+
+* Support for Windows.  Many changes to support this platform.
+
 ## 2.0.4 "Dubious Dog" - Jan 20, 2015
 
 <!---

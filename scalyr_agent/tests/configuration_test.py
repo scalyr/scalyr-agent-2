@@ -24,6 +24,7 @@ import unittest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.json_lib import JsonObject, JsonArray
+from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
 
 
 class TestConfiguration(unittest.TestCase):
@@ -34,7 +35,7 @@ class TestConfiguration(unittest.TestCase):
         os.makedirs(self.__config_fragments_dir)
 
     def test_basic_case(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
@@ -42,8 +43,8 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
-        self.assertEquals(config.agent_data_path, '/var/lib/scalyr-agent-2')
+        self.assertPathEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
+        self.assertPathEquals(config.agent_data_path, '/var/lib/scalyr-agent-2')
         self.assertEquals(config.additional_monitor_module_paths, '')
         self.assertEquals(config.config_directory, self.__config_fragments_dir)
         self.assertEquals(config.implicit_metric_monitor, True)
@@ -72,13 +73,15 @@ class TestConfiguration(unittest.TestCase):
         self.assertTrue(config.verify_server_certificate)
 
         self.assertEquals(len(config.logs), 4)
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
         self.assertEquals(config.logs[0].config.get_json_object('attributes'), JsonObject())
         self.assertEquals(config.logs[0].config.get_json_array('sampling_rules'), JsonArray())
         self.assertEquals(config.logs[0].config.get_json_array('redaction_rules'), JsonArray())
-        self.assertEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/linux_system_metrics.log')
-        self.assertEquals(config.logs[3].config.get_string('path'), '/var/log/scalyr-agent-2/linux_process_metrics.log')
+        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
+        self.assertPathEquals(config.logs[2].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertPathEquals(config.logs[3].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_process_metrics.log')
 
         self.assertEquals(len(config.monitors), 2)
         self.assertEquals(config.monitors[0].config.get_string('module'),
@@ -91,7 +94,7 @@ class TestConfiguration(unittest.TestCase):
                           'scalyr_agent.builtin_monitors.linux_process_metrics.log')
 
     def test_empty_config(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there"
           }
         """)
@@ -101,15 +104,17 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.api_key, "hi there")
         self.assertEquals(len(config.logs), 3)
 
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/linux_system_metrics.log')
-        self.assertEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/linux_process_metrics.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
+        self.assertPathEquals(config.logs[1].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertPathEquals(config.logs[2].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_process_metrics.log')
 
     def test_overriding_basic_settings(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
-            agent_log_path: "silly1",
-            agent_data_path: "silly2",
+            agent_log_path: "/var/silly1",
+            agent_data_path: "/var/silly2",
             additional_monitor_module_paths: "silly3",
             config_directory: "silly4",
             implicit_metric_monitor: false,
@@ -131,14 +136,14 @@ class TestConfiguration(unittest.TestCase):
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
-            logs: [ { path:"/var/log/tomcat6/access.log"} ]
+            logs: [ { path: "/var/log/tomcat6/access.log"} ]
           }
         """)
         config = self.__create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(config.agent_log_path, 'silly1')
-        self.assertEquals(config.agent_data_path, 'silly2')
+        self.assertPathEquals(config.agent_log_path, '/var/silly1')
+        self.assertPathEquals(config.agent_data_path, '/var/silly2')
         self.assertEquals(config.additional_monitor_module_paths, 'silly3')
         self.assertEquals(config.config_directory, os.path.join(self.__config_dir, 'silly4'))
         self.assertEquals(config.implicit_metric_monitor, False)
@@ -163,11 +168,11 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.request_too_large_adjustment, 0.75)
         self.assertEquals(config.debug_level, 1)
         self.assertEquals(config.request_deadline, 30.0)
-        self.assertEquals(config.ca_cert_path, '/var/lib/foo.pem')
+        self.assertPathEquals(config.ca_cert_path, '/var/lib/foo.pem')
         self.assertFalse(config.verify_server_certificate)
 
     def test_missing_api_key(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
@@ -176,7 +181,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_string_value(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             agent_log_path: [ "hi" ],
           }
@@ -185,7 +190,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_json_attributes(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             server_attributes: [ "hi" ],
           }
@@ -194,7 +199,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_string_attribute_values(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             server_attributes: { hi: [ 1 ] },
           }
@@ -203,7 +208,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_bool_value(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             implicit_metric_monitor: [ 1 ],
           }
@@ -212,7 +217,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_sampling_rules(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -234,7 +239,7 @@ class TestConfiguration(unittest.TestCase):
 
     def test_bad_sampling_rules(self):
         # Missing match_expression.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -245,7 +250,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Bad regular expression.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -256,7 +261,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Missing sampling.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -267,7 +272,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Not number for percentage.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -278,7 +283,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Bad percentage.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -289,7 +294,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_redaction_rules(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -315,7 +320,7 @@ class TestConfiguration(unittest.TestCase):
 
     def test_bad_redaction_rules(self):
         # Missing match expression.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -326,7 +331,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Match expression is not a regexp.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -337,7 +342,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
         # Replacement is not a string.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -348,19 +353,19 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_configuration_directory(self):
-        self.__write_file(""" { api_key: "hi there"
+        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             server_attributes: {  serverHost:"foo.com" }
           }
         """)
 
-        self.__write_config_fragment_file('nginx.json', """ {
+        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            logs: [ { path: "/var/log/nginx/access.log" } ],
            server_attributes: { webServer:"true"}
           }
         """)
 
-        self.__write_config_fragment_file('apache.json', """ {
+        self.__write_config_fragment_file_with_separator_conversion('apache.json', """ {
            logs: [ { path: "/var/log/apache/access.log" } ]
           }
         """)
@@ -375,21 +380,21 @@ class TestConfiguration(unittest.TestCase):
         self.assertTrue(additional_paths[1].endswith('nginx.json'))
 
         self.assertEquals(len(config.logs), 6)
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
-        self.assertEquals(config.logs[1].config.get_string('path'), '/var/log/apache/access.log')
-        self.assertEquals(config.logs[2].config.get_string('path'), '/var/log/nginx/access.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
+        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/apache/access.log')
+        self.assertPathEquals(config.logs[2].config.get_string('path'), '/var/log/nginx/access.log')
         self.assertEquals(config.logs[0].config.get_json_array('sampling_rules'), JsonArray())
 
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
 
     def test_bad_fields_in_configuration_directory(self):
-        self.__write_file(""" { api_key: "hi there"
+        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }]
           }
         """)
 
-        self.__write_config_fragment_file('nginx.json', """ {
+        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            api_key: "should cause an error",
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
@@ -399,12 +404,12 @@ class TestConfiguration(unittest.TestCase):
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_ignore_non_json_files_in_config_dir(self):
-        self.__write_file(""" { api_key: "hi there"
+        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }]
           }
         """)
 
-        self.__write_config_fragment_file('nginx', """ {
+        self.__write_config_fragment_file_with_separator_conversion('nginx', """ {
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
         """)
@@ -415,7 +420,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(len(config.logs), 4)
 
     def test_parser_specification(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             implicit_agent_log_collection: false,
             api_key: "hi there",
             logs: [ { path: "/tmp/foo.txt",
@@ -428,7 +433,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.logs[0].config['attributes']['parser'], 'foo-parser')
 
     def test_monitors(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             monitors: [ { module: "httpPuller"} ]
           }
@@ -442,13 +447,14 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.monitors[0].config.get_string('log_path'), 'httpPuller.log')
         self.assertEquals(config.monitors[0].config.get_string('id'), '')
 
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
+        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
         self.assertEquals(config.logs[1].config.get_json_object('attributes').get_string('parser'), 'agent-metrics')
-        self.assertEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertPathEquals(config.logs[2].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
 
     def test_multiple_modules(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             monitors: [ { module: "httpPuller"}, { module: "hithere.httpPuller" }, { module: "another"},
                         { module: "foo", id: "fixed_id" } ]
@@ -482,14 +488,15 @@ class TestConfiguration(unittest.TestCase):
                           'scalyr_agent.builtin_monitors.linux_process_metrics.log')
         self.assertEquals(config.monitors[5].config.get_string('id'), 'agent')
 
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
-        self.assertEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/another.log')
-        self.assertEquals(config.logs[3].config.get_string('path'), '/var/log/scalyr-agent-2/foo.log')
-        self.assertEquals(config.logs[4].config.get_string('path'), '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
+        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
+        self.assertPathEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/another.log')
+        self.assertPathEquals(config.logs[3].config.get_string('path'), '/var/log/scalyr-agent-2/foo.log')
+        self.assertPathEquals(config.logs[4].config.get_string('path'),
+                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
 
     def test_equivalent_configuration(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
@@ -503,7 +510,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertTrue(config_a.equivalent(config_b))
 
         # Now write a new file that is slightly different.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/nginx/access.log"} ]
           }
@@ -515,7 +522,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertFalse(config_a.equivalent(config_b))
 
     def test_equivalent_configuration_ignore_debug_level(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
           }
         """)
@@ -523,7 +530,7 @@ class TestConfiguration(unittest.TestCase):
         config_a.parse()
 
         # Now write a new file that is slightly different.
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             api_key: "hi there",
             debug_level: 1,
           }
@@ -541,7 +548,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config_b.debug_level, 1)
 
     def test_multiple_calls_to_bad_config(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
@@ -558,7 +565,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertTrue(error_seen)
 
     def test_substitution(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR" ],
             api_key: "hi$TEST_VAR",
           }
@@ -571,7 +578,7 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.api_key, 'hibye')
 
     def test_json_array_substitution(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR", "DIR_VAR" ],
             api_key: "hi$TEST_VAR",
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
@@ -585,10 +592,10 @@ class TestConfiguration(unittest.TestCase):
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
-        self.assertEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
+        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
 
     def test_empty_substitution(self):
-        self.__write_file(""" {
+        self.__write_file_with_separator_conversion(""" {
             import_vars: [ "UNDEFINED_VAR" ],
             api_key: "hi$UNDEFINED_VAR",
           }
@@ -599,12 +606,37 @@ class TestConfiguration(unittest.TestCase):
 
         self.assertEquals(config.api_key, 'hi')
 
-    def __write_file(self, contents):
+    def __convert_separators(self, contents):
+        """Recursively converts all path values for fields in a JsonObject that end in 'path'.
+
+        If this is a JsonArray, iterators over the elements.
+        @param contents: The contents to convert in a valid Json atom (JsonObject, JsonArray, or primitive)
+        @return: The passed in object.
+        """
+        contents_type = type(contents)
+        if contents_type is dict or contents_type is JsonObject:
+            for key in contents:
+                value = contents[key]
+                value_type = type(value)
+                if key.endswith('path') and (value_type is str or value_type is unicode):
+                    contents[key] = self.convert_path(contents[key])
+                elif value_type in (dict, JsonObject, list, JsonArray):
+                    self.__convert_separators(value)
+        elif contents_type is list or contents_type is JsonArray:
+            for i in range(len(contents)):
+                self.__convert_separators(contents[i])
+        return contents
+
+    def __write_file_with_separator_conversion(self, contents):
+        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+
         fp = open(self.__config_file, 'w')
         fp.write(contents)
         fp.close()
 
-    def __write_config_fragment_file(self, file_path, contents):
+    def __write_config_fragment_file_with_separator_conversion(self, file_path, contents):
+        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+
         full_path = os.path.join(self.__config_fragments_dir, file_path)
         fp = open(full_path, 'w')
         fp.write(contents)
@@ -629,10 +661,66 @@ class TestConfiguration(unittest.TestCase):
         def monitor_factory(config, _):
             return TestConfiguration.MonitorObject(config)
 
-        default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
-                                     '/var/lib/scalyr-agent-2')
+        default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),
+                                     self.convert_path('/etc/scalyr-agent-2/agent.json'),
+                                     self.convert_path('/var/lib/scalyr-agent-2'))
 
         monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
                     JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
                                pid='$$', id='agent')]
         return Configuration(self.__config_file, default_paths, monitors, log_factory, monitor_factory)
+
+    # noinspection PyPep8Naming
+    def assertPathEquals(self, actual_path, expected_path):
+        """Similar to `assertEquals` but the expected path is converted to the underlying system's dir separators
+        before comparison.
+
+        @param actual_path:  The actual path.  This should already be using the correct separator characters.
+        @param expected_path:  The expected path.  This should use `/`'s as the separator character.  It will be
+            converted to this system's actual separators.
+
+        @type actual_path: str
+        @type expected_path: str
+        """
+        self.assertEquals(actual_path, self.convert_path(expected_path))
+
+    def make_path(self, parent_directory, path):
+        """Returns the full path created by joining path to parent_directory.
+
+        This method is a convenience function because it allows path to use forward slashes
+        to separate path components rather than the platform's separator character.
+
+        @param parent_directory: The parent directory. This argument must use the system's separator character. This may
+            be None if path is relative to the current working directory.
+        @param path: The path to add to parent_directory. This should use forward slashes as the separator character,
+            regardless of the platform's character.
+
+        @return:  The path created by joining the two with using the system's separator character.
+        """
+        if parent_directory is None and os.path.sep == '/':
+            return path
+
+        if parent_directory is None:
+            result = ''
+        elif path.startswith('/'):
+            result = ''
+        else:
+            result = parent_directory
+
+        for path_part in path.split('/'):
+            if len(path_part) > 0:
+                result = os.path.join(result, path_part)
+
+        if os.path.sep == '\\':
+            result = 'C:\\%s' % result
+        return result
+
+    def convert_path(self, path):
+        """Converts the forward slashes in path to the platform's separator and returns the value.
+
+        @param path: The path to convert. This should use forward slashes as the separator character, regardless of the
+            platform's character.
+
+        @return: The path created by converting the forward slashes to the platform's separator.
+        """
+        return self.make_path(None, path)

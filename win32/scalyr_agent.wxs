@@ -1,0 +1,306 @@
+<?xml version='1.0'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+    <Product Id='$(var.PRODUCTCODE)' Name='Scalyr Agent 2' Version='$(var.VERSION)'
+        Language='1033' UpgradeCode='$(var.UPGRADECODE)' Manufacturer='Scalyr' >
+
+        <Package Description='Scalyr Agent' Manufacturer='Scalyr' InstallerVersion='200'
+            Comments='Scalyr Agent for Windows Platforms' Compressed='yes'
+            InstallPrivileges='elevated' InstallScope='perMachine'
+            />
+        <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
+
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+            AllowSameVersionUpgrades="yes"/>
+
+        <!-- Define directory structure -->
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='ProgramFilesFolder' >
+                <Directory Id='APPLICATIONROOTDIRECTORY' Name='Scalyr' >
+                    <Directory Id='APPLICATIONCERTS' Name='certs' />
+                    <Directory Id='APPLICATIONBINDIR' Name='bin' />
+                    <Directory Id='DEFAULTAPPCONFIG' Name='config'>
+                        <Directory Id='CONFIGTEMPLATES' Name='templates' />
+                    </Directory>
+                </Directory>
+            </Directory>
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='Scalyr' />
+            </Directory>
+        </Directory>
+
+        <!-- Define files within directory structure -->
+        <DirectoryRef Id='APPLICATIONCERTS'>
+            <Component Id='ca_certs.crt' Guid='B2011AAE-03FB-46AC-91CC-A3E116DF054D'>
+                <File Id='ca_certs.crt' Source='Scalyr\certs\ca_certs.crt' KeyPath='yes' Checksum='yes' />
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='CONFIGTEMPLATES'>
+            <Component Id='config_tmpl' Guid='571081B1-6926-45D0-A7EE-8D55E7531E16'>
+                <File Id='config.tmpl' Name='agent_config.tmpl' KeyPath='yes' Checksum='yes' Source='data_files\agent_config.tmpl' />
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='APPLICATIONROOTDIRECTORY'>
+            <Directory Id='DEFAULTAPPLOGS' Name='log'>
+                <Component Id='log_dir' Guid='3af7df35-608a-4cd0-8356-6cb03def0a66' SharedDllRefCount='no' KeyPath='no'
+                           NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
+            <Directory Id='DEFAULTAPPDATA' Name='data'>
+                <Component Id='data_dir' Guid='728d4e24-29b2-4320-9c64-c902d9df0d10' SharedDllRefCount='no' KeyPath='no'
+                           NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
+        </DirectoryRef>
+
+        <DirectoryRef Id='DEFAULTAPPCONFIG'>
+            <Directory Id='DEFAULTAPPAGENTD' Name='agent.d'>
+                <Component Id='config_d_dir' Guid='7f375f4b-cc38-4d4a-af26-e60154f05392' SharedDllRefCount='no'
+                           KeyPath='no' NeverOverwrite='no' Permanent='no' Transitive='no' Win64='no' Location='either'>
+                    <CreateFolder/>
+                </Component>
+            </Directory>
+        </DirectoryRef>
+
+        <!-- Scalyr Application Files -->
+        <DirectoryRef Id='APPLICATIONBINDIR'>
+            <Component Id='scalyr_agent_2' Guid='5f035924-953c-4d3c-b5c7-74df47a4b1a7' >
+              <File Id='scalyr_agent_2_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2.exe' />
+                  <Environment Action="set" Id="SetPathToInstallFolderToSystemPath" Name="PATH" System="yes"
+                      Value="[APPLICATIONBINDIR]" Permanent="no" Part="last"/>
+                  <Environment Action="set" Id="SetScalyrEnv" Name="SCALYR" System="yes"
+                      Value="[APPLICATIONROOTDIRECTORY]" Permanent="no" Part="all"/>
+            </Component>
+
+            <Component Id='scalyr_agent_2_config' Guid='87f0aa3c-f5be-49bd-9fd3-5d735f3793f2' >
+              <File Id='scalyr_agent_2_config_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\scalyr-agent-2-config.exe' />
+            </Component>
+
+            <Component Id='ScalyrAgentService' Guid='cf5da252-7803-45c0-b33b-e1745925cd09' >
+              <File Id='ScalyrAgentService_exe' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrAgentService.exe' />
+              <ServiceInstall Id="ServiceInstaller" Type="ownProcess" Vital="yes" Name="ScalyrAgentService"
+                              DisplayName="Scalyr Agent Service"
+                              Description="The Scalyr Agent sends logs and metrics to Scalyr."
+                              Start="auto"
+                              Account="LocalSystem"
+                              ErrorControl="normal"
+                              Interactive="no" />
+              <ServiceControl Id="StartService" Stop="both" Remove="uninstall" Name="ScalyrAgentService" Wait="yes" />
+            </Component>
+
+            <Component Id='ScalyrShell' Guid='180482b7-d9de-4b95-bbf9-4f2c34acd5c5' >
+              <File Id='ScalyrShell_cmd' DiskId='1' KeyPath='yes' Checksum='yes'  Source='Scalyr\bin\ScalyrShell.cmd' />
+            </Component>
+
+            <!-- This next stanza is me cheating.  We have build_package.py expand it to all the files that were -->
+            <!-- put in the dist directory by py2exe that should be distributed.  There's probably a wix way to do -->
+            <!-- but it's too much of a pain to learn. -->
+
+            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <Component Id='$COMPONENT_ID' Guid='$COMPONENT_GUID' >
+              <File Id='$FILE_ID' DiskId='1' KeyPath='yes' Checksum='yes'  Source='$FILE_SOURCE' />
+            </Component>
+            <!-- EXPAND_FROM_BIN -->
+
+        </DirectoryRef>
+
+
+        <!-- Application Menu Shortcuts -->
+        <DirectoryRef Id='ApplicationProgramsFolder'>
+            <Component Id='ApplicationShortcut' Guid='a55c9c08-ad2e-4c63-a434-26a226b45c57'>
+                <Shortcut Id='EditConfig' Name='Edit agent configuration' Description='Default application logs folder'
+                        Target='[SystemFolder]notepad.exe' Arguments='[DEFAULTAPPCONFIG]\agent.json' />
+
+                <Shortcut Id='StartScalyrShortcut' Name='Start the Scalyr Agent'
+                    Description='Executes the command to start the agent in a console window, displaying output.'
+                    Target='[#ScalyrShell_cmd]' Arguments='start' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+
+                <Shortcut Id='StopScalyrShortcut' Name='Stop the Scalyr Agent'
+                    Description='Executes the command to stop the agent in a console window, displaying output'
+                    Target='[#ScalyrShell_cmd]' Arguments='stop' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+
+                <Shortcut Id='ScalyrStatusShortcut' Name='View agent status'
+                    Description='Executes the command to display the detailed status in a console window.'
+                    Target='[#ScalyrShell_cmd]' Arguments='status' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+
+
+                <Shortcut Id='ApplicationLogs' Name='View logs folder' Description='Open default application logs folder'
+                    Target='[WindowsFolder]explorer.exe' Arguments='[DEFAULTAPPLOGS]' />
+
+                <Shortcut Id='UninstallProduct' Name='Uninstall' Description='Uninstalls the Scalyr Agent 2'
+                    Target='[SystemFolder]msiexec.exe' Arguments='/x [ProductCode]' />
+
+                <Shortcut Id='CmdShellShortcut' Name='Command prompt'
+                    Description='Opens a console window to use for executing Scalyr Agent commands.'
+                    Target='[#ScalyrShell_cmd]' WorkingDirectory='APPLICATIONROOTDIRECTORY' />
+
+                <RemoveFolder Id='ApplicationProgramsFolder' On='uninstall' />
+                <RegistryValue Root='HKCU' Key='Software\Scalyr\ScalyrAgent2'
+                    Name='installed' Type='integer' Value='1' KeyPath='yes' />
+            </Component>
+        </DirectoryRef>
+
+
+        <!-- -->
+        <Feature Id='ScalyrApplication' Title='Scalyr Application' Level='1'>
+            <ComponentRef Id='scalyr_agent_2' />
+            <ComponentRef Id='scalyr_agent_2_config' />
+            <ComponentRef Id='ScalyrAgentService' />
+            <ComponentRef Id='ScalyrShell' />
+            <ComponentRef Id='ApplicationShortcut' />
+            <ComponentRef Id='ca_certs.crt' />
+            <ComponentRef Id='config_tmpl' />
+            <ComponentRef Id='log_dir' />
+            <ComponentRef Id='data_dir' />
+            <ComponentRef Id='config_d_dir' />
+
+            <!-- EXPAND_FROM_BIN EXCLUDE:scalyr-agent-2.exe,scalyr-agent-2-config.exe,ScalyrAgentService.exe,ScalyrShell.cmd -->
+            <ComponentRef Id='$COMPONENT_ID' />
+            <!-- EXPAND_FROM_BIN -->
+        </Feature>
+
+        <!-- This UI section really needs to be fixed.  I am not a wix expert so had to just learn it by trial and -->
+        <!-- error.  I'm sure there are much better ways to do what I'm doing.  Plus, I did not use the localization -->
+        <!-- features and a bunch of other stuff. -->
+        <UI Id="UserInterface">
+            <Property Id="WIXUI_INSTALLDIR" Value="TARGETDIR" />
+            <Property Id="WixUI_Mode" Value="Custom" />
+            <Property Id="ApplicationFolderName" Value="Scalyr" />
+            <Property Id="WixAppFolder" Value="Scalyr" />
+
+            <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+
+            <TextStyle Id="WixUI_Font_Bold" FaceName="Tahoma" Size="8" Bold="yes"/>
+            <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="9" Bold="yes" />
+            <TextStyle Id="WixUI_Font_Title"  FaceName="Tahoma" Size="9" Bold="yes" />
+
+            <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+            <DialogRef Id="ProgressDlg" />
+            <DialogRef Id="ErrorDlg" />
+            <DialogRef Id="FilesInUse" />
+            <DialogRef Id="FatalError" />
+            <DialogRef Id="UserExit" />
+
+
+
+            <!-- The main point of these UI changes are to show a different welcome and exit dialog depending on -->
+            <!-- whether or not you are upgrading or you are installing for the first time.  So, we have a -->
+            <!-- InstallWelcomeDlg and an UpdateWelcomeDlg.  Due to the fact we can only trigger on dialog show -->
+            <!-- event on the successful exit of the installer, we have to use just a single CombinedExitDialog -->
+            <!-- and then change the contents based on the condition -->
+
+            <Dialog Id="InstallWelcomeDlg" Width="370" Height="270" Title="Installing Scalyr Agent 2">
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+                </Control>
+                <Control Id="Bitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="!(loc.WelcomeDlgBitmap)" />
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="!(loc.WixUIBack)" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+                <Control Id="Description" Type="Text" X="135" Y="80" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="This will install the [ProductName] on your computer. After installation, you will have to edit the configuration file to set your API key and then start the agent.&#13;&#10;&#13;&#10;Click Next to continue or Cancel to exit." />
+                <Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bigger}Welcome to the Scalyr Agent 2 Installer" />
+            </Dialog>
+
+            <Dialog Id="UpgradeWelcomeDlg" Width="370" Height="270" Title="Upgrading Scalyr Agent 2">
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+                    <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+                </Control>
+                <Control Id="Bitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="!(loc.WelcomeDlgBitmap)" />
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="!(loc.WixUIBack)" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+                <Control Id="Description" Type="Text" X="135" Y="80" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="This will upgrade the [ProductName] on your computer. If the agent is currently running, it will be restarted when the upgrade finishes.&#13;&#10;&#13;&#10;Click Next to continue or Cancel to exit."/>
+                <Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bigger}Welcome to the Scalyr Agent 2 Installer" />
+            </Dialog>
+
+            <!-- This dialog contains content for both the install and upgrade finish dialog.  It conditionally -->
+            <!-- shows the right content.  There might be a better way to do this.  We can run an custom action -->
+            <!-- on the exit and then have that custom action decide which dialog to show.. but I could not find -->
+            <!-- how to get a Custom Action to show a dialog. -->
+
+            <Dialog Id="CombinedExitDialog" Width="370" Height="270" Title="Scalyr Agent Installer">
+                <!-- First, the common elements between both the upgrade and the install versions. -->
+                <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIFinish)">
+                    <Publish Event="EndDialog" Value="Return">1</Publish>
+                    <Publish Event='DoAction' Value='LaunchEditConfig'>(NOT Installed) AND (EDITCONFIG = 1) AND NOT WIX_UPGRADE_DETECTED</Publish></Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Disabled="yes" Text="!(loc.WixUICancel)"/>
+                <Control Id="Bitmap"  Type="Bitmap" X="0" Y="0" Width="370" Height="234" TabSkip="no" Text="!(loc.ExitDialogBitmap)"/>
+                <Control Id="Back"  Type="PushButton" X="180" Y="243" Width="56" Height="17" Disabled="yes" Text="!(loc.WixUIBack)"/>
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0"/>
+
+                <!-- Now for the elements that are only shown if this is an install -->
+                <Control Id="Description" Hidden="yes" Type="Text" X="135" Y="70" Width="220" Height="40" Transparent="yes" NoPrefix="yes" Text="Click the Finish button to exit the installer.">
+                  <Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="NoteText" Hidden="yes" Type="Text" X="135" Y="110" Width="220" Height="80" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bold}Note:"><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+                <!-- I wanted the "Note" to be bold and then have normal text after it.. the only way I could figure -->
+                <!-- out how to do that is just start them at the same Y position and add in spaces to make room -->
+                <!-- for the "Note:" text to be displayed. -->
+                <Control Id="FurtherText" Hidden="yes" Type="Text" X="135" Y="110" Width="220" Height="80" Transparent="yes" NoPrefix="yes" Text="           The Scalyr Agent 2 has not been started.  We will now open the configuration file so you can enter your API key.">
+                    <Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="Title" Hidden="yes" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bigger}Completed the Scalyr Agent 2 Installation" ><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="EditConfigCheckBox" Hidden="yes" Type="CheckBox" X="135" Y="170" Width="220" Height="40" Property="EDITCONFIG" CheckBoxValue="1" Text="Open the configuration file."><Condition Action="show">NOT WIX_UPGRADE_DETECTED</Condition></Control>
+
+                <!-- Now for the elements that are only shown if this is an upgrade -->
+                <Control Id="UpDescription" Hidden="yes" Type="Text" X="135" Y="70" Width="220" Height="40" Transparent="yes" NoPrefix="yes" Text="Click the Finish button to exit the installer." ><Condition Action="show">WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="UpFurtherText" Hidden="yes" Type="Text" X="135" Y="110" Width="220" Height="80" Transparent="yes" NoPrefix="yes" Text="The Scalyr Agent 2 has been upgraded.  If it was already running, it should have been restarted."><Condition Action="show">WIX_UPGRADE_DETECTED</Condition></Control>
+                <Control Id="UpTitle" Hidden="yes" Type="Text" X="135" Y="20" Width="220" Height="60" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Bigger}Completed the Scalyr Agent 2 Upgrade" ><Condition Action="show">WIX_UPGRADE_DETECTED</Condition></Control>
+             </Dialog>
+
+            <Publish Dialog="InstallWelcomeDlg" Control="Next" Event="EndDialog" Value="Return" Order="2">1</Publish>
+            <Publish Dialog="UpgradeWelcomeDlg" Control="Next" Event="EndDialog" Value="Return" Order="3">1</Publish>
+
+        </UI>
+
+        <UIRef Id="WixUI_Common" />
+        <InstallUISequence>
+            <Show Dialog="InstallWelcomeDlg" Before="ProgressDlg" Overridable="yes">NOT WIX_UPGRADE_DETECTED</Show>
+            <Show Dialog="UpgradeWelcomeDlg" Before="ProgressDlg" Overridable="yes">WIX_UPGRADE_DETECTED</Show>
+            <Show Dialog="CombinedExitDialog" OnExit="success" Overridable="yes"/>
+        </InstallUISequence>
+
+        <AdminUISequence>
+            <Show Dialog="CombinedExitDialog" OnExit="success" Overridable="yes"/>
+        </AdminUISequence>
+
+        <Property Id="EDITCONFIG" Value="1"/>
+        <Property Id="MSIUSEREALADMINDETECTION" Value="1" />
+
+        <!-- Custom action for opening the configuration with notepad at the end of the install -->
+        <!-- We would have liked to have used the WinsShell function so it was opened with the default -->
+        <!-- text program for the user, but since it ends in .json, WinShell doesn't know what to do. -->
+        <!-- Also, this will run as the installing user, so it's not clear if there will be permission issues. -->
+        <CustomAction Id="LaunchEditConfig" Directory="DEFAULTAPPCONFIG"
+            ExeCommand='"[SystemFolder]notepad.exe" "[DEFAULTAPPCONFIG]agent.json"'
+            Execute="immediate" Impersonate="yes" Return="asyncNoWait"/>
+
+
+        <!-- We this elaborate custom action to execute the config tool to initialize the configuration. -->
+        <!-- We must execute this using the SYSTEM/INSTALLER account rather than the impersonating as the -->
+        <!-- user running the installation.  Because of this, we have defer execution and set impersonate to no. -->
+        <!-- Also, we use the CAQuietExec utility so a console window isn't popped up. -->
+        <!-- Since the action is deferred, we have to do a dance where we set a property with the command first. -->
+        <CustomAction Id='CheckForCondRestart_set' Property='CheckForCondRestart' Execute='immediate'
+            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --mark-conditional-restart'/>
+        <CustomAction Id="CheckForCondRestart" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
+            Return="ignore" Impersonate="no"/>
+
+        <CustomAction Id='InitializeConfig_set' Property='InitializeConfig' Execute='immediate'
+            Value='"[APPLICATIONBINDIR]\scalyr-agent-2-config.exe" --init-config --no-error-if-config-exists --conditional-restart'/>
+        <CustomAction Id="InitializeConfig" BinaryKey="WixCA" DllEntry="CAQuietExec" Execute="deferred"
+            Return="check" Impersonate="no"/>
+
+        <InstallExecuteSequence>
+          <WriteEnvironmentStrings />
+          <Custom Action="CheckForCondRestart_set" Before="InstallInitialize"></Custom>
+          <Custom Action="CheckForCondRestart" After="InstallInitialize">REMOVE AND UPGRADINGPRODUCTCODE AND Installed</Custom>
+
+          <Custom Action="InitializeConfig_set" After="CostFinalize"></Custom>
+          <Custom Action="InitializeConfig" Before="InstallFinalize">NOT Installed AND NOT REMOVE</Custom>
+        </InstallExecuteSequence>
+    </Product>
+</Wix>
