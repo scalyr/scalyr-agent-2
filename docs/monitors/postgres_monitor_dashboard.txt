@@ -1,0 +1,146 @@
+{
+  duration: "4h",
+  
+  graphs: [
+    {
+      label: "Active Connections",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.connections'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Size of the database on disk.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.size'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Deadlocks",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.deadlocks'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Disk Blocks Read",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.disk_blocks' type='read'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Disk Blocks in Buffer Cache",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.disk_blocks' type='hit'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Number of temporary files created.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.temp_files'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Amount of data written to temp files.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.temp_bytes'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of transactions committed.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.transactions' result='committed'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of transactions rolled back.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.transactions' result='rolledback'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows returned.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows' op='returned'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows touched (looked at/read/fetched).",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows' op='fetched'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows inserted.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows' op='inserted'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Number of rows updated.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows' op='updated'",
+          label: "number"
+        }
+      ]
+    },    
+    {
+      label: "Number of rows deleted.",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='postgres.database.query_rows' op='deleted'",
+          label: "number"
+        }
+      ]
+    },
+  ],
+}

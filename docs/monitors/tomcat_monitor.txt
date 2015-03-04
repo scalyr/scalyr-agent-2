@@ -1,0 +1,134 @@
+Tomcat Monitor
+
+This agent monitor plugin records performance and usage data from a Tomcat server.
+
+
+Configuring Tomcat
+
+In order to use this monitor, you will need to configure a couple of things in your Tomcat 
+instance:
+
+- Installation of the management utilities
+- Adding a user role with monitoring privileges
+- Optional, but recommended, locking down the access to the manager application
+
+Installation of the Management Utilities
+
+If you are (or have) installed Tomcat from sources, please consult the documentation for your
+version of Tomcat at http://tomcat.apache.org.  For Redhat (and related variants), the 
+administrator webapps are contained in a package  named tomcat<version>-admin-webapps.
+For Debian (and related variants) the administrator webapps are contained in the package
+named tomcat<version>-admin.
+
+To check to see, say for Tomcat version 7, if you already have the admin webapps already 
+installed, you can issue the command 'dpkg -l | grep tomcat7' or look for the file 
+manager.xml in the directory /etc/tomcat7/Catalina/localhost.
+
+Adding a User Role with Monitoring Privileges
+
+Users are configured in a file named tomcat-users.xml.  This file, for Ubuntu, is located
+(for version 7 of Tomcat) in /etc/tomcat7.  Tomcat provides a number of roles with differing
+types of access.  For purposes of getting server status, that role is "manager-status".  The
+details of the Manager can be found in the Tomcat documentation here:  http://tomcat.apache.org/tomcat-7.0-doc/manager-howto.html
+
+To add user "statusmon" with password "getstatus", you would open up the tomcat-users.xml file
+and edit the tomcat-users section to resemble:
+
+<tomcat-users>
+  ...
+  <role rolename="manager-status"/>
+  <user username="statusmon" password="getstatus" roles="manager-status"/>
+</tomcat-users>
+
+As with any configuration change, you will need to restart Tomcat for the changes to take hold.
+
+Locking Down the Manager Application
+
+Given the manager applications can reveal data about the system (as well as allow control,
+depending on configuration), it is advisable that you restrict access to them.  In order to
+do this, you will need to edit the file manager.xml.  This file is typically found in 
+${CATALINA_BASE}/conf/[enginename]/[hostname], for Ubuntu, the default location is:  
+/etc/tomcat7/Catalina/localhost.
+
+In that file you will find an XML stanza similar to:
+
+  <Context path="/manager" 
+          docBase="/usr/share/tomcat7-admin/manager" 
+          antiResourceLocking="false" privileged="true" />
+        
+To restrict access to only localhost (127.0.0.1), update the stanza to:
+
+  <Context path="/manager" 
+          docBase="/usr/share/tomcat7-admin/manager" 
+          antiResourceLocking="false" privileged="true">
+      <Valve className="org.apache.catalina.valves.RemoteAddrValve"
+         allow="127\.0\.0\.1" />
+  </Context>
+  
+Again, restart Tomcat to have changes take hold.
+
+Verifying the Configuration
+
+Using a browser (or command line tool), you can verify that the manager application is 
+running by visiting the URL:  http://localhost/manager/status  If you configured a username
+and password, then you could also use the format:  http://<username>:<password>@localhost/manager/status.
+
+When you visit the page, you should see a number of details about the running Tomcat instance.
+
+
+Configuring Scalyr Agent
+
+In order to use the Tomcat monitor, you need to enter a configuration in the agent.json
+file.  A typical fragment resembles:
+
+  monitors: [
+    {
+      module:              "scalyr_agent.builtin_monitors.tomcat_monitor",
+      id:                  "tomcat",
+      monitor_url:         "http://localhost/manager/status",
+      monitor_username:    "statusmon",
+      monitor_password:    "getstatus" 
+    }
+  ]
+  
+The valid configuration options for the module are:
+
+monitor_url -- Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.
+monitor_user -- The username required to access the monitor URL.
+monitor_password -- The pasword associated with the monitor_user required to access the monitor URL.
+source_address -- Optional (defaults to 127.0.0.1). The IP address to be used as the source address when fetching
+                  the monitor URL.  Some servers require this to be 127.0.0.1 because they only server the monitor
+                  page to requests from localhost.              
+
+
+Metrics
+
+Below are the metrics exposed by the Tomcat monitor.  It should be noted that all byte 
+values are in megabytes and all time values are in milliseconds.
+
+tomcat.runtime.memory_bytes type='free' -- The amount of memory free.
+tomcat.runtime.memory_bytes type='total' -- The total amount of memory available.
+tomcat.runtime.memory_bytes type='max' -- The maximum amount of memory free.
+tomcat.runtime.threads type='max' -- The maximum number of threads available/configured.
+tomcat.runtime.threads type='active' -- The number of threads currently active.
+tomcat.runtime.threads type='busy' -- The number of threads currently busy.
+tomcat.runtime.processing_time_max -- The value represents the largest amount of time spent processing a single request.
+tomcat.runtime.processing_time -- The value represents the largest amount of time spent processing the current request.
+tomcat.runtime.request_count -- The value represents the total number of requests made.
+tomcat.runtime.error_count -- The value represents the total number requests that resulted in errors.
+tomcat.runtime.network_bytes type='received' -- The value represents the total number bytes received by the server.
+tomcat.runtime.network_bytes type='sent' -- The value represents the total number sent by the server.
+
+In versions 7 and 8, Tomcat exposes information about different memory pools.  The following statistics are
+exposed for those those memory pools.  The pools are:
+
+cms_old_gen -- The memory pool for objects that have exised for some time in the survivor space / are long lived.
+eden_space -- The memory space from which objects are initially allocated.
+survivor_space -- 
+cms_perm_gen -- The memory pool for objects that have survived garbage collection of the Eden Space.
+code_cache -- Memory used for caching the compilation and storage of native code.
+
+tomcat.memory_pools.initial pool='...' -- The iniital amount of memory allocated to the memory pool.
+tomcat.memory_pools.allocated pool='...' -- The total amount of memory allocated to the memory pool.
+tomcat.memory_pools.max pool='...' -- The maximum amount of memory allocated to the memory pool.
+tomcat.memory_pools.used pool='...' -- The total amount of memory used within the memory pool.

@@ -1,0 +1,66 @@
+{
+  duration: "4h",
+  
+  graphs: [
+    {
+      label: "Free memory",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.memory_bytes' type='free'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Current number of active threads",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.threads' type='active'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Current number of threads busy",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.threads' type='busy'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Maximum processing time required for a request",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.processing_time_max'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Number of requests made",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.request_count'",
+          label: "number"
+        }
+      ]
+    },
+    {
+      label: "Number of requests that resulted in errors",
+      plots: [
+        {
+          facet: "value",
+          filter: "metric='tomcat.runtime.error_count'",
+          label: "number"
+        }
+      ]
+    },
+  ],
+}
