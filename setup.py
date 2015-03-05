@@ -29,6 +29,14 @@
 #        password = <Password from passpack.. no need for quotes>
 # 3.  Build and upload:
 #     python setup.py sdist bdist_wheel --universal upload
+#
+# Disclaimer!  This is not a really operational setup.py file.  We need to improve this
+# so it does work as a Python user would normally expect.  It only supports two uses
+# cases right now:  uploading the Python module to pypi (instructions above) and
+# building the Windows installer using py2exe.  However, building the Windows installer
+# only works via the build_package.py script.  If you try to just invoke the build
+# from here, the files would not be set up correctly.  We need to improve this, but
+# it is low on the list of priorities right now.
 
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
 from codecs import open  # To use a consistent encoding
@@ -36,6 +44,7 @@ from os import path
 
 import os
 import sys
+import shutil
 
 if path.isdir('source_root'):
     sys.path.append('source_root')
@@ -70,7 +79,7 @@ if "win32" == sys.platform:
     import py2exe
 
 # Get the long description from the relevant file
-with open(path.join(path.dirname(get_install_root()), 'DESCRIPTION.rst'), encoding='utf-8') as f:
+with open(path.join(get_install_root(), 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 
@@ -88,14 +97,22 @@ service_config = Target(
     cmdline_style='pywin32'
 )
 
-
-my_data_files = [('', [path.join('source_root', 'VERSION')])]
-
-for my_license in os.listdir(path.join('data_files', 'licenses')):
-    license_file = path.join('data_files', 'licenses', my_license)
-    if os.path.isfile(license_file):
-        x = 'third_party_licenses', [license_file]
-        my_data_files.append(x)
+# Determine which of the two uses cases we are executing.. either we are on Windows building the
+# Windows installer using py2exe, or we are uploading the module to pypi.
+if 'win32' == sys.platform:
+    my_data_files = [('', [path.join('source_root', 'VERSION')])]
+    for my_license in os.listdir(path.join('data_files', 'licenses')):
+        license_file = path.join('data_files', 'licenses', my_license)
+        if os.path.isfile(license_file):
+            x = 'third_party_licenses', [license_file]
+            my_data_files.append(x)
+    my_package_data = None
+else:
+    my_data_files = []
+    my_package_data = {'scalyr_agent': ['VERSION']}
+    # Copy VERSION to the source directory to make it easier to include it as package data.  There's
+    # is surely a better way here, but my setup.py fu is very weak.
+    shutil.copy('VERSION', 'scalyr_agent')
 
 setup(
     name='scalyr-agent-2',
@@ -160,6 +177,8 @@ setup(
     #    'sample': ['package_data.dat'],
     #},
 
+    package_data=my_package_data,
+
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages.
     # see http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
@@ -202,3 +221,10 @@ setup(
         }
     }
 )
+
+if 'win32' != sys.platform:
+    # Delete the temporary copy of VERSION that we created above.
+    tmp_path = os.path.join('scalyr_agent', 'VERSION')
+    if os.path.isfile(tmp_path):
+        os.unlink(tmp_path)
+
