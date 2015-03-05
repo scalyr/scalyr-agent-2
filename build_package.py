@@ -115,11 +115,17 @@ def build_win32_installer_package(variant, version):
         print >>sys.stderr, 'See http://wixtoolset.org.'
         sys.exit(1)
 
-    # What do I need?
-    # - Make the cert file
-    # - Make the json file
-    # - Put the sources in the right place.
-    # - Put __scalyr__.py at the top of the directory.
+    try:
+        import psutil
+    except ImportError:
+        # noinspection PyUnusedLocal
+        psutil = None
+        print >>sys.stderr, 'Error, the psutil Python module is not installed.  This is required to build the'
+        print >>sys.stderr, 'Windows version of the Scalyr Agent.  Please download and install it.'
+        print >>sys.stderr, 'See http://pythonhosted.org/psutil/'
+        print >>sys.stderr, 'On many systems, executing "pip install psutil" will install the package.'
+        sys.exit(1)
+
     make_directory('source_root')
     make_directory('data_files')
 
