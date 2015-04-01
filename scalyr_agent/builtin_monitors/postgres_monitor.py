@@ -366,8 +366,6 @@ instance."""
         
         if "database_name" not in self._config or "database_username" not in self._config or "database_password" not in self._config:
             raise Exception("database_name, database_username and database_password must be specified in the configuration.")
-            
-        self._sample_interval_secs = 30 # how often to check the database status    
 
         self._db = PostgreSQLDb ( database = database,
                                   host = host,

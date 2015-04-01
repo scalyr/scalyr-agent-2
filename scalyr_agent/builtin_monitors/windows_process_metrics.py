@@ -535,7 +535,7 @@ class ProcessMonitor(ScalyrMonitor):
                                     'can be done with the following command:'
                                     '  pip install psutil')
 
-        sample_interval_secs = kw.get('sample_interval_secs', 30)
+        sample_interval_secs = kw.get('sample_interval_secs', None)
         super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
         self.__process = None
 

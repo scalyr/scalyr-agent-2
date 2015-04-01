@@ -36,6 +36,11 @@ log = scalyr_logging.getLogger(__name__)
 
 
 class ScalyrMonitor(StoppableThread):
+    """The default number of seconds between gathering a sample.  This is the global default, which should
+    be set from the configuration file.
+    """
+    DEFAULT_SAMPLE_INTERVAL_SECS = 30.0
+
     """The base class for all monitors used by the agent.
 
     An instance of a monitor will be created for every reference to this module in the "monitors"
@@ -58,8 +63,7 @@ class ScalyrMonitor(StoppableThread):
         disabled:  A boolean indicating if this module instance should be
             run.
     """
-
-    def __init__(self, monitor_config, logger, sample_interval_secs=30):
+    def __init__(self, monitor_config, logger, sample_interval_secs=None):
         """Constructs an instance of the monitor.
 
         It is optional for derived classes to override this method.  The can instead
@@ -78,7 +82,10 @@ class ScalyrMonitor(StoppableThread):
         @param monitor_config: A dict containing the configuration information for this module instance from the
             configuration file. The only valid values are strings, ints, longs, floats, and booleans.
         @param logger: The logger to use for output.
-        @param sample_interval_secs: The interval in seconds to wait between gathering samples.
+        @param sample_interval_secs: The interval in seconds to wait between gathering samples.  If None, it will
+            set the value from the ``sample_interval`` field in the monitor_config if present, or the default
+            interval time for all monitors in ``DEFAULT_SAMPLE_INTERVAL_SECS``.  Generally, you should probably
+            pass None here and allow the value to be taken from the configuration files.
         """
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
@@ -102,7 +109,14 @@ class ScalyrMonitor(StoppableThread):
         self.__reported_lines = 0
         self.__errors = 0
 
-        self._sample_interval_secs = sample_interval_secs
+        # Set the time between samples for this monitor.  We prefer configuration values over the values
+        # passed into the constructor.
+        if sample_interval_secs is not None:
+            self._sample_interval_secs = sample_interval_secs
+        else:
+            self._sample_interval_secs = self._config.get('sample_interval', convert_to=float,
+                                                          default=ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS)
+
         self.__metric_log_open = False
 
         # These variables control the rate limiter on how fast we can write to the metric log.

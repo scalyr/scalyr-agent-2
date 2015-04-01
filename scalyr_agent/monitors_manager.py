@@ -22,7 +22,7 @@ import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
-from scalyr_agent.scalyr_monitor import load_monitor_class
+from scalyr_agent.scalyr_monitor import load_monitor_class, ScalyrMonitor
 
 from __scalyr__ import get_package_root
 
@@ -141,7 +141,7 @@ class MonitorsManager(object):
         return load_monitor_class(monitor_module, os.pathsep.join(paths_to_pass))[0]
 
     @staticmethod
-    def build_monitor(monitor_config, additional_python_paths):
+    def build_monitor(monitor_config, additional_python_paths, default_sample_interval_secs):
         """Builds an instance of a ScalyrMonitor for the specified monitor configuration.
 
         @param monitor_config: The monitor configuration object for the monitor that should be created.  It will
@@ -158,6 +158,9 @@ class MonitorsManager(object):
         # Set up the logs to do the right thing.
         module_name = monitor_config['module']
         monitor_id = monitor_config['id']
+
+        # We have to update this variable before we create monitor instances so that it is used.
+        ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS = default_sample_interval_secs
 
         # Load monitor.
         monitor_class = MonitorsManager.load_monitor(module_name, additional_python_paths)

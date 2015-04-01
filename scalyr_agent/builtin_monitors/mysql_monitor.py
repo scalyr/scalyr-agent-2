@@ -752,8 +752,6 @@ class MysqlMonitor(ScalyrMonitor):
         else:
             raise Exception("database_username and database_password must be specified in the configuration.")
             
-        self._sample_interval_secs = 30 # how often to check the database status    
-            
         if self._database_connect_type == "socket":
             self._db = MysqlDB (type = self._database_connect_type,
                                 sockfile = self._database_socket,

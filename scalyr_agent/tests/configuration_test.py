@@ -54,6 +54,8 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(len(config.server_attributes), 1)
         self.assertTrue('serverHost' in config.server_attributes)
 
+        self.assertEquals(config.global_monitor_sample_interval, 30.0)
+
         self.assertEquals(config.max_allowed_request_size, 1*1024*1024)
         self.assertEquals(config.min_allowed_request_size, 100*1024)
 
@@ -121,6 +123,7 @@ class TestConfiguration(unittest.TestCase):
             implicit_agent_log_collection: false,
             use_unsafe_debugging: true,
             scalyr_server: "noland.scalyr.com",
+            global_monitor_sample_interval: 60.0,
             max_allowed_request_size: 2000000,
             min_allowed_request_size: 7000,
             min_request_spacing_interval: 2.0,
@@ -152,6 +155,8 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.scalyr_server, 'noland.scalyr.com')
         self.assertEquals(len(config.server_attributes), 2)
         self.assertEquals(config.server_attributes['region'], 'us-east')
+
+        self.assertEquals(config.global_monitor_sample_interval, 60.0)
 
         self.assertEquals(config.max_allowed_request_size, 2000000)
         self.assertEquals(config.min_allowed_request_size, 7000)
@@ -658,7 +663,8 @@ class TestConfiguration(unittest.TestCase):
         def log_factory(config):
             return TestConfiguration.LogObject(config)
 
-        def monitor_factory(config, _):
+        # noinspection PyUnusedLocal
+        def monitor_factory(config, _, ignored):
             return TestConfiguration.MonitorObject(config)
 
         default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),

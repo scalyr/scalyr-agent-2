@@ -194,7 +194,8 @@ class Configuration(object):
 
             if self.__monitor_factory is not None:
                 for entry in all_monitors:
-                    self.__monitors.append(self.__monitor_factory(entry, self.additional_monitor_module_paths))
+                    self.__monitors.append(self.__monitor_factory(entry, self.additional_monitor_module_paths,
+                                                                  self.global_monitor_sample_interval))
 
             # Get all of the paths for the logs currently being copied.
             all_paths = {}
@@ -392,6 +393,11 @@ class Configuration(object):
         return self.__get_config().get_string('ca_cert_path')
 
     @property
+    def global_monitor_sample_interval(self):
+        """Returns the configuration value for 'global_monitor_sample_interval'."""
+        return self.__get_config().get_float('global_monitor_sample_interval')
+
+    @property
     def verify_server_certificate(self):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
@@ -538,6 +544,8 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description)
 
         self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description)
+
+        self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description)
 
         self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description)
         self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description)

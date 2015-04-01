@@ -117,7 +117,9 @@ class CopyingParamsTest(unittest.TestCase):
         def log_factory(config):
             return CopyingParamsTest.LogObject(config)
 
-        def monitor_factory(config, _):
+        def monitor_factory(config, _, default_sample_secs):
+            if default_sample_secs != 30.0:
+                raise Exception('Default sample secs was not right')
             return CopyingParamsTest.MonitorObject(config)
 
         monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
