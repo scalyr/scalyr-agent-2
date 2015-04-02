@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.6 "Furious Falcon" - Apr 1, 2015
+## 2.0.6 "Furious Falcon" - Apr 2, 2015
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 1, 2015 16:30 -0700
