@@ -67,6 +67,16 @@ import time
 # If we're running as root and this user exists, we'll drop privileges.
 USER = "nobody"
 
+COLLECTION_INTERVAL = 30  # seconds
+
+# Scalyr edit:  Check environment variable for collection interval.  TODO:  See if we can centralize code, but
+# difficult without requiring collectors including common module which is goes against tcollector architecture.
+try:
+    if "TCOLLECTOR_SAMPLE_INTERVAL" in os.environ:
+        COLLECTION_INTERVAL = float(os.environ["TCOLLECTOR_SAMPLE_INTERVAL"])
+except ValueError:
+    pass
+
 
 def drop_privileges():
     """Drops privileges if running as root."""
@@ -82,13 +92,12 @@ def drop_privileges():
     os.setuid(ent.pw_uid)
 
 
-
 def main():
     """Main loop"""
     drop_privileges()
     sys.stdin.close()
 
-    interval = 30
+    interval = COLLECTION_INTERVAL
     page_size = resource.getpagesize()
 
     try:
