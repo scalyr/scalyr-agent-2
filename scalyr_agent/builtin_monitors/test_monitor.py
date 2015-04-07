@@ -67,7 +67,7 @@ class RandomMonitor(ScalyrMonitor):
         self.__counter += 1
         # Be sure to use emit_values to record the statistics the monitor wishes to send to Scalyr.
         self._logger.emit_value('uniform', random.random(), extra_fields={'count': self.__counter})
-        self._logger.emit_value('gauss-test', random.gauss(self.__gauss_mean, self.__gauss_stddev),
+        self._logger.emit_value('gauss', random.gauss(self.__gauss_mean, self.__gauss_stddev),
                                 extra_fields={'count': self.__counter})
 
         # You may also emit full log lines to the metric log by using the special emit_to_metric_log=True parameter.
