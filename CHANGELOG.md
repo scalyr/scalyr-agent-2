@@ -12,6 +12,7 @@ Note, this release is not yet finalized and the release date is TDB.
 Bug fixes:
 
 * Relax metric name checking to allow including dashes.
+* Fix bug where linux_system_metrics was ignoring the configured sample interval time.
 
 ## 2.0.6 "Furious Falcon" - Apr 2, 2015
 
