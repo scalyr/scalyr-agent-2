@@ -107,8 +107,8 @@ class ScalyrLoggingTest(unittest.TestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
 
         self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, '1name', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name-hi', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name', 5, {'hi-': 6})
+        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name+hi', 5)
+        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name', 5, {'hi+': 6})
 
         monitor_logger.closeMetricLog()
 
