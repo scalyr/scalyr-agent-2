@@ -391,7 +391,8 @@ class SystemMetricsMonitor(ScalyrMonitor):
 
         # Now run the main loop which will constantly watch the collector module files, reloading / spawning
         # collectors as necessary.  This should only terminate once is_stopped becomes true.
-        tcollector.main_loop(self.options, self.modules, None, self.tags, False, self._run_state)
+        tcollector.main_loop(self.options, self.modules, None, self.tags, False, self._run_state,
+                             self._sample_interval_secs)
 
         self._logger.debug('Shutting down')
 

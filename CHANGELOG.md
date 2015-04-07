@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.6 "Glorious Gerbil" - Apr 8, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 8, 2015 12:30 -0700
+--->
+
+Note, this release is not yet finalized and the release date is TDB.
+
+Bug fixes:
+
+* Relax metric name checking to allow including dashes.
+* Fix bug where linux_system_metrics was ignoring the configured sample interval time.
+
 ## 2.0.6 "Furious Falcon" - Apr 2, 2015
 
 <!---

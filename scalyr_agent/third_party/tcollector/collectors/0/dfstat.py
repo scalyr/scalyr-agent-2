@@ -41,6 +41,15 @@ import time
 
 COLLECTION_INTERVAL = 30  # seconds
 
+# Scalyr edit:  Check environment variable for collection interval.  TODO:  See if we can centralize code, but
+# difficult without requiring collectors including common module which is goes against tcollector architecture.
+try:
+    if "TCOLLECTOR_SAMPLE_INTERVAL" in os.environ:
+        COLLECTION_INTERVAL = float(os.environ["TCOLLECTOR_SAMPLE_INTERVAL"])
+except ValueError:
+    pass
+
+
 def main():
     """dfstats main loop"""
 
