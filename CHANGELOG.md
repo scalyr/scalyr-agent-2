@@ -4,10 +4,8 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.7 "Glorious Gerbil" - Apr 8, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 8, 2015 12:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 8, 2015 11:00 -0700
 --->
-
-Note, this release is not yet finalized and the release date is TDB.
 
 Bug fixes:
 
