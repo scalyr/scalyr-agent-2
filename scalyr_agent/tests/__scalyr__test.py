@@ -15,15 +15,15 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+
 __author__ = 'czerwin@scalyr.com'
 
 import os
-import unittest
 
 from scalyr_agent.__scalyr__ import get_install_root, get_package_root, SCALYR_VERSION
+from scalyr_agent.test_base import ScalyrTestCase
 
-
-class TestUtil(unittest.TestCase):
+class TestUtil(ScalyrTestCase):
 
     def test_version(self):
         self.assertTrue(SCALYR_VERSION.startswith('2.'))

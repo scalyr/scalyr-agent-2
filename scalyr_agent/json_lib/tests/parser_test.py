@@ -21,8 +21,10 @@ import unittest
 
 from scalyr_agent.json_lib.parser import ByteScanner, JsonParser, JsonParseException
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class ByteScannerTests(unittest.TestCase):
+
+class ByteScannerTests(ScalyrTestCase):
     def test_constructor(self):
         x = ByteScanner("Hi there")
 
@@ -126,7 +128,7 @@ class ByteScannerTests(unittest.TestCase):
         self.assertRaises(IndexError, x.line_number_for_offset, (-25))
 
 
-class JsonParserTests(unittest.TestCase):
+class JsonParserTests(ScalyrTestCase):
     def test_parsing_numbers(self):
         x = JsonParser.parse("123")
         self.assertEquals(x, 123)

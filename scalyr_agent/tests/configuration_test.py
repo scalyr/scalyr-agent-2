@@ -14,20 +14,21 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from scalyr_agent.platform_controller import DefaultPaths
+
 
 __author__ = 'czerwin@scalyr.com'
 
 import os
 import tempfile
-import unittest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
+from scalyr_agent.platform_controller import DefaultPaths
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class TestConfiguration(unittest.TestCase):
+class TestConfiguration(ScalyrTestCase):
     def setUp(self):
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')

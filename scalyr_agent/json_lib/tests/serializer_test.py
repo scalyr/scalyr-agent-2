@@ -17,12 +17,12 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
-
 from scalyr_agent.json_lib import serialize
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class SerializeTests(unittest.TestCase):
+
+class SerializeTests(ScalyrTestCase):
 
     def test_numbers(self):
         self.assertEquals(self.write(1), '1')

@@ -17,14 +17,14 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
 import cStringIO
 
 from scalyr_agent.agent_status import OverallStats, AgentStatus, ConfigStatus, LogProcessorStatus, MonitorStatus
 from scalyr_agent.agent_status import CopyingManagerStatus, MonitorManagerStatus, LogMatcherStatus, report_status
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class TestOverallStats(unittest.TestCase):
+class TestOverallStats(ScalyrTestCase):
 
     def test_read_file_as_json(self):
         a = OverallStats()
@@ -81,7 +81,7 @@ class TestOverallStats(unittest.TestCase):
         self.assertEquals(c.total_connections_created, 18)
 
 
-class TestReportStatus(unittest.TestCase):
+class TestReportStatus(ScalyrTestCase):
     def setUp(self):
         self.time = 1409958853
         self.status = AgentStatus()

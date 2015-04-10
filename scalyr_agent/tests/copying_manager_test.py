@@ -14,23 +14,25 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.platform_controller import DefaultPaths
+
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
 
 import os
 import tempfile
 
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingParameters
+from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.platform_controller import DefaultPaths
+
+from scalyr_agent.test_base import ScalyrTestCase
 
 ONE_MB = 1024 * 1024
 
 
-class CopyingParamsTest(unittest.TestCase):
+class CopyingParamsTest(ScalyrTestCase):
     def setUp(self):
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agentConfig.json')

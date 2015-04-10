@@ -20,12 +20,12 @@ __author__ = 'czerwin@scalyr.com'
 import os
 import re
 import tempfile
-import unittest
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class ScalyrLoggingTest(unittest.TestCase):
+class ScalyrLoggingTest(ScalyrTestCase):
     def setUp(self):
         self.__log_path = tempfile.mktemp('.log')
         scalyr_logging.set_log_destination(use_disk=True, logs_directory=os.path.dirname(self.__log_path),

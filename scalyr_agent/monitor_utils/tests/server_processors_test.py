@@ -17,8 +17,6 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
-
 import socket
 import struct
 import cStringIO
@@ -27,9 +25,10 @@ from scalyr_agent.monitor_utils.server_processors import RequestStream, Connecti
 from scalyr_agent.monitor_utils.server_processors import Int32RequestParser, LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import ConnectionIdleTooLong, RequestSizeExceeded
 from scalyr_agent.util import FakeRunState
+from scalyr_agent.test_base import ScalyrTestCase
 
 
-class TestInt32RequestParser(unittest.TestCase):
+class TestInt32RequestParser(ScalyrTestCase):
     def setUp(self):
         self.__buffer = cStringIO.StringIO()
 
@@ -119,7 +118,7 @@ class FakeSocket(object):
         self.__is_closed = True
 
 
-class TestRequestStream(unittest.TestCase):
+class TestRequestStream(ScalyrTestCase):
     def setUp(self):
         self.__fake_socket = FakeSocket()
         self.__fake_run_state = FakeRunState()
@@ -202,7 +201,7 @@ class TestRequestStream(unittest.TestCase):
         return self.__request_stream.at_end()
 
 
-class TestConnectionHandler(unittest.TestCase):
+class TestConnectionHandler(ScalyrTestCase):
     def setUp(self):
         self.__fake_socket = FakeSocket()
         self.__fake_run_state = FakeRunState()
@@ -273,3 +272,4 @@ class TestConnectionHandler(unittest.TestCase):
 
     def advance_time(self, delta):
         self.__fake_time += delta
+

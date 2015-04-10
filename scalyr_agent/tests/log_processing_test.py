@@ -14,7 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import sys
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -22,12 +21,14 @@ import os
 import shutil
 import tempfile
 import unittest
+import sys
 
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
 from scalyr_agent.log_processing import FileSystem
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class TestLogFileIterator(unittest.TestCase):
+class TestLogFileIterator(ScalyrTestCase):
 
     def setUp(self):
         self.__tempdir = tempfile.mkdtemp()
@@ -467,7 +468,7 @@ class TestLogFileIterator(unittest.TestCase):
         file_handle.close()
 
 
-class TestLogLineRedactor(unittest.TestCase):
+class TestLogLineRedactor(ScalyrTestCase):
 
     def run_test_case(self, redactor, line, expected_line, expected_redaction):
         (result_line, redacted) = redactor.process_line(line)
@@ -525,7 +526,7 @@ class TestLogLineRedactor(unittest.TestCase):
                            " HTTP/1.1\" 200 2045", True)
 
 
-class TestLogLineSampler(unittest.TestCase):
+class TestLogLineSampler(ScalyrTestCase):
     class TestableLogLineSampler(LogLineSampler):
         """
         A subclass of LogLineSampler that allows us to fix the generated random numbers to help with testing.
@@ -583,7 +584,7 @@ class TestLogLineSampler(unittest.TestCase):
         self.assertEquals(sampler.process_line('INFO Here is a line\n'), 0.2)
 
 
-class TestLogFileProcessor(unittest.TestCase):
+class TestLogFileProcessor(ScalyrTestCase):
 
     def setUp(self):
         self.__tempdir = tempfile.mkdtemp()

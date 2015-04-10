@@ -15,15 +15,16 @@
 #
 # author: Imron Alston <imron@imralsoftware.com>
 
+
 __author__ = 'imron@imralsoftware.com'
 
-import unittest
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.run_monitor import run_standalone_monitor
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class RunMonitorTest( unittest.TestCase ):
+class RunMonitorTest(ScalyrTestCase):
     def test_run_standalone_monitor( self ):
         config = """{
                  }"""
