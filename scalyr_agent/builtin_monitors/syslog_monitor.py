@@ -17,6 +17,7 @@
 __author__ = 'imron@imralsoftware.com'
 
 import errno
+import re
 from socket import error as socket_error
 import SocketServer
 
@@ -29,18 +30,19 @@ define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
                      convert_to=str, required_option=True)
 define_config_option( __monitor__, 'protocol',
-                     'Optional (defaults to udp). Defines which transport protocol to listen for syslog messages on. '
-                     'Valid values can be \'udp\' or \'tcp\', which can be combined with a comma to specify both, e.g. \'udp, tcp',
+                     'Optional (defaults to udp). Defines which transport protocols and ports to listen for syslog messages on. '
+                     'Valid values can be \'udp\' or \'tcp\', which can be bare, e.g. \'udp\' or combined with a port number, e.g. \'udp:10514\'.  '
+                     'Multiple values can be combined with a comma to specify both, e.g. \'udp, tcp',
                      convert_to=str, default='udp')
 
-define_config_option( __monitor__, 'udp_port',
-                     'Optional (defaults to 514). Defines which port to listen for udp syslog messages on. '
+define_config_option( __monitor__, 'default_udp_port',
+                     'Optional (defaults to 514). Defines which port to listen for udp syslog messages on if no port specified in the protocol option. '
                      'Note: ports lower than 1024 require the agent to run with root privileges. '
                      'Not used if ``protocol`` does not specify udp',
                      default=514, min_value=1, max_value=65535, convert_to=int)
 
-define_config_option( __monitor__, 'tcp_port',
-                     'Optional (defaults to 6514). Defines which port to listen for udp syslog messages on. '
+define_config_option( __monitor__, 'default_tcp_port',
+                     'Optional (defaults to 6514). Default port to listen for tcp syslog messages on if no port specified in the protocol option. '
                      'Not used if ``protocol`` does not specify tcp',
                      default=6514, min_value=1, max_value=65535, convert_to=int)
 
@@ -66,6 +68,7 @@ class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """
     def __init__( self, port ):
         address = ( 'localhost', port )
+        self.allow_reuse_address = True
         SocketServer.UDPServer.__init__( self, address, SyslogUDPHandler )
 
 class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
@@ -73,6 +76,7 @@ class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
     """
     def __init__( self, port ):
         address = ( 'localhost', port )
+        self.allow_reuse_address = True
         SocketServer.TCPServer.__init__( self, address, SyslogTCPHandler )
 
 class SyslogHandler:
@@ -82,26 +86,24 @@ class SyslogHandler:
         self.__logger = logger
 
     def handle( self, data ):
+        #TODO: Make this work better
         self.__logger.emit_value( "message", data )
 
 class SyslogServer:
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
-    configures handlers to process messages.
+    configures a handler to process messages.
 
     This removes the need for users of this class to care about the underlying protocol being used
     """
-    def __init__( self, protocol, config, logger ):
+    def __init__( self, protocol, port, logger ):
         server = None
         try:
-            port = 0
             if protocol == 'tcp':
-                port = config.get( 'tcp_port' )
                 server = SyslogTCPServer( port )
             elif protocol == 'udp':
-                port = config.get( 'udp_port' )
                 server = SyslogUDPServer( port )
 
-        except socket_error as e:
+        except socket_error, e:
             if e.errno == errno.EACCES and port < 1024:
                 raise Exception( 'Access denied when trying to create a %s server on a low port (%d). '
                                  'Please try again on a higher port, or as root.' % (protocol, port)  )
@@ -115,6 +117,7 @@ class SyslogServer:
         #create the syslog handler, and add to the list of servers
         server.syslog_handler = SyslogHandler( logger )
         server.syslog_transport_protocol = protocol
+        server.syslog_port = port
 
         self.__server = server
         self.__thread = None
@@ -126,7 +129,7 @@ class SyslogServer:
         self.__server.serve_forever()
 
     def start_threaded( self, run_state ):
-        self.__thread = StoppableThread( target=self.start, name="Syslog monitor thread for %s" % self.__server.syslog_transport_protocol )
+        self.__thread = StoppableThread( target=self.start, name="Syslog monitor thread for %s:%d" % (self.__server.syslog_transport_protocol, self.__server.syslog_port) )
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
@@ -138,7 +141,7 @@ class SyslogMonitor( ScalyrMonitor ):
     """Monitor plugin for syslog messages
 
     This plugin listens on one or more ports/protocols for syslog messages, and uploads them
-    to Scalyr servers.
+    to Scalyr.
     """
     def _initialize( self ):
 
@@ -148,29 +151,66 @@ class SyslogMonitor( ScalyrMonitor ):
         #any extra servers if we are listening for multiple protocols
         self.__extra_servers = []
 
-        #get a list of protocols from the protocol option
-        protocol_string = self._config.get( 'protocol' )
-        self.__protocol_list = [p.strip().lower() for p in protocol_string.split(',')]
+        #build list of protocols and ports from the protocol option
+        self.__server_list = self.__build_server_list( self._config.get( 'protocol' ) )
 
-        if len( self.__protocol_list ) == 0:
+
+    def __build_server_list( self, protocol_string ):
+        """Builds a list containing (protocol, port) tuples, based on a comma separated list
+        of protocols and optional ports e.g. protocol[:port], protocol[:port]
+        """
+
+        #split out each protocol[:port]
+        protocol_list = [p.strip().lower() for p in protocol_string.split(',')]
+
+        if len( protocol_list ) == 0:
             raise Exception('Invalid config state for Syslog Monitor. '
                             'No protocols specified')
 
-        allowed_protocols = [ 'tcp', 'udp' ]
+        default_ports = { 'tcp': self._config.get( 'default_tcp_port' ),
+                          'udp': self._config.get( 'default_udp_port' )
+                        }
 
-        for p in self.__protocol_list:
-            if p not in allowed_protocols:
+        server_list = []
+
+        #regular expression matching protocol:port
+        port_re = re.compile( '^(tcp|udp):(\d+)$' )
+        for p in protocol_list:
+
+            #protocol defaults to the full p for when match fails
+            protocol = p
+            port = 0
+
+            m = port_re.match( p )
+            if m:
+                protocol = m.group(1)
+                port = int( m.group(2) )
+
+            if protocol in default_ports:
+                #get the default port for this protocol if none was specified
+                if port == 0:
+                    port = default_ports[protocol]
+            else:
                 raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
-    def run( self ):
+            #only allow ports between 1 and 65535
+            if port < 1 or port > 65535:
+                raise Exception( 'Port values must be in the range 1-65535.  Current value: %d.' % port )
 
+            server_list.append( (protocol, port) )
+
+        #return a list with duplicates removed
+        return list( set( server_list ) )
+
+    def run( self ):
         try:
-            #create the main server from the first item in the protocol list
-            self.__server = SyslogServer( self.__protocol_list[0], self._config, self._logger )
+            #create the main server from the first item in the server list
+            protocol = self.__server_list[0]
+            self.__server = SyslogServer( protocol[0], protocol[1], self._logger )
 
             #iterate over the remaining items creating servers for each protocol
-            for p in self.__protocol_list[1:]:
-                server = SyslogServer( p, self._config, self._logger )
+            for p in self.__server_list[1:]:
+                server = SyslogServer( p[0], p[1], self._logger )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
@@ -179,8 +219,10 @@ class SyslogMonitor( ScalyrMonitor ):
 
             #start the main server
             self.__server.start( self._run_state )
-        except Exception as e:
+
+        except Exception, e:
             self._logger.exception('Monitor died due to exception:', error_code='failedMonitor')
+            raise
 
     def stop(self, wait_on_join=True, join_timeout=5):
 
