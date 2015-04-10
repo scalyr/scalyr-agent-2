@@ -452,7 +452,7 @@ class StoppableThread(threading.Thread):
         @type timeout: float|None
         """
         threading.Thread.join(self, timeout)
-        if not self.is_alive() and self.__exception_info is not None:
+        if not self.isAlive() and self.__exception_info is not None:
             raise self.__exception_info[0], self.__exception_info[1], self.__exception_info[2]
 
 

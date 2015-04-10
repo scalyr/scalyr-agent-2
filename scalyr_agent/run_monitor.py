@@ -100,7 +100,7 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting monitor')
         monitor.start()
 
-        while monitor.is_alive():
+        while monitor.isAlive():
             time.sleep(0.1)
     except BadMonitorConfiguration, e:
         print >>sys.stderr, 'Invalid monitor configuration: %s' % str(e)

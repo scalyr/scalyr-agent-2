@@ -18,7 +18,6 @@
 __author__ = 'czerwin@scalyr.com'
 
 import httplib
-import os
 import platform
 import re
 import socket
@@ -612,7 +611,7 @@ class AddEventsRequest(object):
             rebuild_buffer = StringIO()
             rebuild_buffer.write(self.__body)
             self.__body = None
-            rebuild_buffer.seek(-1 * original_postfix_length, os.SEEK_END)
+            rebuild_buffer.seek(-1 * original_postfix_length, 2)  # os.SEEK_END
             rebuild_buffer.truncate()
 
             rebuild_buffer.write(self.__post_fix_buffer.content())
