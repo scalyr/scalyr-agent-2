@@ -124,7 +124,11 @@ class SyslogServer:
 
     def start( self, run_state ):
         if run_state != None:
-            run_state.register_on_stop_callback( self.__server.shutdown )
+            server = self.__server
+            #shutdown is only available from python 2.6 onwards
+            #need to think of what to do for 2.4, which will hang on shutdown when run as standalone
+            if hasattr( server, 'shutdown' ):
+                run_state.register_on_stop_callback( server.shutdown )
 
         self.__server.serve_forever()
 
