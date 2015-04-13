@@ -17,6 +17,7 @@
 __author__ = 'imron@imralsoftware.com'
 
 import errno
+import logging
 import re
 from socket import error as socket_error
 import SocketServer
@@ -46,6 +47,20 @@ define_config_option( __monitor__, 'default_tcp_port',
                      'Not used if ``protocol`` does not specify tcp',
                      default=6514, min_value=1, max_value=65535, convert_to=int)
 
+define_config_option( __monitor__, 'message_log',
+                     'Optional (defaults to syslog_messages.log). Defines a log file name for storing syslog messages that come in over the network. '
+                     'Note: the file will be placed in the default Scalyr log directory unless it is an absolute path.',
+                     convert_to=str, default='syslog_messages.log')
+
+define_config_option( __monitor__, 'max_log_size',
+                     'Optional (defaults to 100 MB - 100*1024*1024). The maximum file size of the syslog messages log before log rotation occurs. '
+                     'Set to zero for infinite size.',
+                     convert_to=int, default=100*1024*1024)
+
+define_config_option( __monitor__, 'max_log_rotations',
+                     'Optional (defaults to 5). The maximum number of log rotations before deleting old logs. '
+                     'Set to zero for infinite rotations.',
+                     convert_to=int, default=5)
 
 
 class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
@@ -87,7 +102,7 @@ class SyslogHandler:
 
     def handle( self, data ):
         #TODO: Make this work better
-        self.__logger.emit_value( "message", data )
+        self.__logger.info( data )
 
 class SyslogServer:
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
@@ -148,7 +163,6 @@ class SyslogMonitor( ScalyrMonitor ):
     to Scalyr.
     """
     def _initialize( self ):
-
         #the main server
         self.__server = None
 
@@ -157,6 +171,17 @@ class SyslogMonitor( ScalyrMonitor ):
 
         #build list of protocols and ports from the protocol option
         self.__server_list = self.__build_server_list( self._config.get( 'protocol' ) )
+
+        #configure the logger and path
+        message_log = self._config.get( 'message_log' )
+
+        self.log_config = {
+            'parser': 'systemLog',
+            'path': message_log
+        }
+
+        self.__max_log_size = self._config.get( 'max_log_size' )
+        self.__max_log_rotations = self._config.get( 'max_log_rotations' )
 
 
     def __build_server_list( self, protocol_string ):
@@ -206,15 +231,36 @@ class SyslogMonitor( ScalyrMonitor ):
         #return a list with duplicates removed
         return list( set( server_list ) )
 
+    def __get_disk_logger( self, log_name, max_bytes, backup_count ):
+        name = __name__ + '.syslog'
+        log = logging.Logger( name )
+
+        #only configure once -- assumes all configuration happens on the same thread
+        import sys
+        if len( log.handlers ) == 0:
+            print >>sys.stdout, "No handlers yet for ", name
+            handler = logging.handlers.RotatingFileHandler( filename = log_name, maxBytes = max_bytes, backupCount = backup_count )
+            formatter = logging.Formatter()
+            handler.setFormatter( formatter )
+            log.addHandler( handler )
+            log.setLevel( logging.INFO )
+        else:
+            print >>sys.stdout, "Already has handlers: ", name
+        return log
+
+
+
     def run( self ):
         try:
+            self.__disk_logger = self.__get_disk_logger( self.log_config['path'], self.__max_log_size, self.__max_log_rotations )
+
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
-            self.__server = SyslogServer( protocol[0], protocol[1], self._logger )
+            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
-                server = SyslogServer( p[0], p[1], self._logger )
+                server = SyslogServer( p[0], p[1], self.__disk_logger )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
