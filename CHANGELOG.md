@@ -16,6 +16,7 @@ New features:
 Bug fixes:
 
 * Fix bug preventing turning off default system and agent process monitors.
+* Fix possible bugs preventing release of file handles
 
 
 ## 2.0.7 "Glorious Gerbil" - Apr 8, 2015

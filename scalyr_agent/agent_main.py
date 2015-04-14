@@ -688,7 +688,7 @@ class ScalyrAgent(object):
                     log.info('New configuration file seen.')
                     log.info('Stopping copying and metrics threads.')
                     worker_thread.stop()
-                    
+
                     worker_thread = None
 
                     self.__config = new_config
