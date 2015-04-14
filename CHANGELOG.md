@@ -1,6 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.8 "Hilarious Horse" - Apr 15, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 15, 2015 11:00 -0700
+--->
+
+Note, this release is in progress and the actual release date is TBD.
+
+New features:
+
+* Make log processing parameters such as ``max_log_offset_size`` adjustable via the configuration file.
+
+Bug fixes:
+
+* Fix bug preventing turning off default system and agent process monitors.
+* Fix possible bugs preventing release of file handles
+
+
 ## 2.0.7 "Glorious Gerbil" - Apr 8, 2015
 
 <!---

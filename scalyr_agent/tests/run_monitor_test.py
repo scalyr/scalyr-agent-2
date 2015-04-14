@@ -24,12 +24,14 @@ from scalyr_agent.run_monitor import run_standalone_monitor
 
 from scalyr_agent.test_base import ScalyrTestCase
 
+
 class RunMonitorTest(ScalyrTestCase):
     def test_run_standalone_monitor( self ):
         config = """{
                  }"""
 
-        run_standalone_monitor( "scalyr_agent.tests.empty_monitor", ".", config, float(0.5), scalyr_logging.DEBUG_LEVEL_1 )
+        run_standalone_monitor("scalyr_agent.tests.empty_monitor", ".", config, float(0.5),
+                               scalyr_logging.DEBUG_LEVEL_0)
 
 
 

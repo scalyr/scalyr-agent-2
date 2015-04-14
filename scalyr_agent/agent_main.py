@@ -672,26 +672,6 @@ class ScalyrAgent(object):
 
                         self.__verify_can_write_to_logs_and_data(new_config)
 
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was different than previous.  Reloading.')
-                        # We are about to reset the current workers and ScalyrClientSession, so we will lose their
-                        # contribution to the stats, so recalculate the base.
-                        base_overall_stats = self.__calculate_overall_stats(base_overall_stats)
-                        log.info('New configuration file seen.')
-                        log.info('Stopping copying and metrics threads.')
-                        worker_thread.stop()
-                        worker_thread = None
-
-                        self.__config = new_config
-                        self.__controller.consume_config(new_config, new_config.file_path)
-
-                        self.__start_or_stop_unsafe_debugging()
-                        log.info('Starting new copying and metrics threads')
-                        self.__scalyr_client = self.__create_client()
-
-                        worker_thread = self.__create_worker_thread(new_config)
-                        worker_thread.start(self.__scalyr_client)
-
-                        self.__current_bad_config = None
                     except Exception, e:
                         if self.__current_bad_config is None:
                             log.error(
@@ -700,6 +680,28 @@ class ScalyrAgent(object):
                         self.__current_bad_config = new_config
                         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config could not be read or parsed')
                         continue
+
+                    log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was different than previous.  Reloading.')
+                    # We are about to reset the current workers and ScalyrClientSession, so we will lose their
+                    # contribution to the stats, so recalculate the base.
+                    base_overall_stats = self.__calculate_overall_stats(base_overall_stats)
+                    log.info('New configuration file seen.')
+                    log.info('Stopping copying and metrics threads.')
+                    worker_thread.stop()
+
+                    worker_thread = None
+
+                    self.__config = new_config
+                    self.__controller.consume_config(new_config, new_config.file_path)
+
+                    self.__start_or_stop_unsafe_debugging()
+                    self.__scalyr_client = self.__create_client()
+
+                    log.info('Starting new copying and metrics threads')
+                    worker_thread = self.__create_worker_thread(new_config)
+                    worker_thread.start(self.__scalyr_client)
+
+                    self.__current_bad_config = None
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))

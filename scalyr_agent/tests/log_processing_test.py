@@ -25,8 +25,13 @@ import sys
 
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
 from scalyr_agent.log_processing import FileSystem
+from scalyr_agent import json_lib
+from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+
 
 class TestLogFileIterator(ScalyrTestCase):
 
@@ -37,7 +42,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.__fake_time = 10
 
         self.write_file(self.__path, '')
-        self.log_file = LogFileIterator(self.__path, self.__file_system)
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
         self.mark(time_advance=0)
 
@@ -324,7 +329,8 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L001\n')
         saved_checkpoint = self.log_file.get_checkpoint()
-        self.log_file = LogFileIterator(self.__path, self.__file_system, checkpoint=saved_checkpoint)
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+                                        checkpoint=saved_checkpoint)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
         self.mark()
@@ -339,7 +345,7 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L003\n',
                         'L004\n')
 
-        self.log_file = LogFileIterator(self.__path, self.__file_system,
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
                                         checkpoint=LogFileIterator.create_checkpoint(10))
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
@@ -597,7 +603,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         # For now, we create one that does not have any log attributes and only
         # counts the bytes of events messages as the cost.
         self.write_file(self.__path, '')
-        self.log_processor = LogFileProcessor(self.__path, file_system=self.__file_system,
+        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
                                               log_attributes={})
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
@@ -740,7 +746,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_log_attributes(self):
-        log_processor = LogFileProcessor(self.__path, file_system=self.__file_system,
+        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
                                          log_attributes={'host': 'scalyr-1'})
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
 
@@ -832,6 +838,32 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         def total_events(self):
             return len(self.events)
+
+
+def _create_configuration():
+    """Creates a blank configuration file with default values for testing.
+
+    @return: The configuration object
+    @rtype: Configuration
+    """
+    config_dir = tempfile.mkdtemp()
+    config_file = os.path.join(config_dir, 'agentConfig.json')
+    config_fragments_dir = os.path.join(config_dir, 'configs.d')
+    os.makedirs(config_fragments_dir)
+
+    fp = open(config_file, 'w')
+    fp.write(json_lib.serialize(JsonObject(api_key='fake')))
+    fp.close()
+
+    default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
+                                 '/var/lib/scalyr-agent-2')
+
+    config = Configuration(config_file, default_paths)
+    config.parse()
+
+    return config
+
+DEFAULT_CONFIG = _create_configuration()
 
 if __name__ == '__main__':
     unittest.main()
