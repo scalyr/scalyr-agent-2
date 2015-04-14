@@ -33,13 +33,16 @@ log = scalyr_logging.getLogger(__name__)
 
 class MonitorsManager(object):
     """Maintains the list of currently running ScalyrMonitor instances and allows control to start and stop them."""
-    def __init__(self, configuration):
+    def __init__(self, configuration, platform_controller):
         """Initializes the manager.
         @param configuration: The agent configuration that controls what monitors should be run.
+        @param platform_controller:  The controller for this server.
+
         @type configuration: scalyr_agent.Configuration
+        @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
-        self.__config = configuration
-        self.__monitors = configuration.monitors
+        self.__monitors = MonitorsManager.__create_monitors(configuration, platform_controller)
+
         # This lock protects __running_monitors.
         self.__lock = threading.Lock()
         # The list of monitors.  Each element is a ScalyrMonitor instance.  __lock must be held to modify this var.
@@ -71,7 +74,7 @@ class MonitorsManager(object):
         finally:
             self.__lock.release()
 
-    def start(self):
+    def start_manager(self):
         """Starts all of the required monitors running.
 
         Each monitor will run in its own thread.  This method will return after all of the monitor threads
@@ -92,7 +95,7 @@ class MonitorsManager(object):
         except:
             log.exception('Failed to start the monitors due to an exception')
 
-    def stop(self):
+    def stop_manager(self):
         """Stops all of the monitors.
 
         This will only return after all the threads for the monitors have been stopped and joined on.
@@ -109,6 +112,74 @@ class MonitorsManager(object):
                 monitor.close_metric_log()
         except:
             log.exception('Failed to stop the monitors due to an exception')
+
+    @property
+    def monitors(self):
+        """Returns the list of all monitors that should be run by this manager.
+
+        @return: The monitors.  You should not modify this list.
+        @rtype: list<ScalyrMonitor>
+        """
+        return self.__monitors
+
+    @staticmethod
+    def __create_monitors(configuration, platform_controller):
+        """Creates instances of the monitors that should be run based on the contents of the configuration file
+        and the platform controller.
+
+        @param configuration: The agent configuration that controls what monitors should be run.
+        @param platform_controller:  The controller for this server.  It may have default monitors that should be run.
+
+        @type configuration: scalyr_agent.Configuration
+        @type platform_controller: scalyr_agent.platform_controller.PlatformController
+        """
+
+        # Get all the monitors we will be running.  This is determined by the config file and the platform's default
+        # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
+        # may need to modify them.
+        all_monitors = []
+
+        for monitor in configuration.monitor_configs:
+            all_monitors.append(monitor.copy())
+
+        for monitor in platform_controller.get_default_monitors(configuration):
+            all_monitors.append(configuration.parse_monitor_config(
+                monitor, 'monitor with module name "%s" requested by platform' % monitor['module']).copy())
+
+        # We need to go back and fill in the monitor id if it is not set.  We do this by keeping a count of
+        # how many monitors we have with the same module name (just considering the last element of the module
+        # path).  We use the shortened form of the module name because that is used when emitting lines for
+        # this monitor in the logs -- see scalyr_logging.py.
+        monitors_by_module_name = {}
+        # Tracks which modules already had an id present in the module config.
+        had_id = {}
+
+        for entry in all_monitors:
+            module_name = entry['module'].split('.')[-1]
+            if not module_name in monitors_by_module_name:
+                index = 1
+            else:
+                index = monitors_by_module_name[module_name] + 1
+            if 'id' not in entry:
+                entry['id'] = index
+            else:
+                had_id[module_name] = True
+
+            monitors_by_module_name[module_name] = index
+
+        # Just as a simplification, if there is only one monitor with a given name, we remove the monitor_id
+        # to clean up it's name in the logs.
+        for entry in all_monitors:
+            module_name = entry['module'].split('.')[-1]
+            if monitors_by_module_name[module_name] == 1 and not module_name in had_id:
+                entry['id'] = ''
+
+        result = []
+
+        for entry in all_monitors:
+            result.append(MonitorsManager.build_monitor(entry, configuration.additional_monitor_module_paths,
+                          configuration.global_monitor_sample_interval))
+        return result
 
     @staticmethod
     def load_monitor(monitor_module, additional_python_paths):

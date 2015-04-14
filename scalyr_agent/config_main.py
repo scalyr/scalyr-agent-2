@@ -783,7 +783,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     try:
-        config_file = Configuration(options.config_filename, default_paths, controller.default_monitors, None, None)
+        config_file = Configuration(options.config_filename, default_paths)
         config_file.parse()
     except Exception, e:
         print >> sys.stderr, 'Error reading configuration file: %s' % str(e)

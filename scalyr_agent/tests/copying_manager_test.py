@@ -15,7 +15,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-
 __author__ = 'czerwin@scalyr.com'
 
 
@@ -23,11 +22,12 @@ import os
 import tempfile
 
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.copying_manager import CopyingParameters
-from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.copying_manager import CopyingParameters, CopyingManager
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.json_lib import JsonObject, JsonArray
+from scalyr_agent import json_lib
 
 ONE_MB = 1024 * 1024
 
@@ -115,16 +115,89 @@ class CopyingParamsTest(ScalyrTestCase):
 
         default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                      '/var/lib/scalyr-agent-2')
+        return Configuration(self.__config_file, default_paths)
 
-        def log_factory(config):
-            return CopyingParamsTest.LogObject(config)
 
-        def monitor_factory(config, _, default_sample_secs):
-            if default_sample_secs != 30.0:
-                raise Exception('Default sample secs was not right')
-            return CopyingParamsTest.MonitorObject(config)
+class CopyingManagerInitializationTest(ScalyrTestCase):
 
-        monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
-                    JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
-                               pid='$$', id='agent')]
-        return Configuration(self.__config_file, default_paths, monitors, log_factory, monitor_factory)
+    def test_from_config_file(self):
+        test_manager = self.__create_test_instance([
+            {
+                'path': '/tmp/hi.log'
+            }
+        ], [])
+        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(test_manager.log_matchers[0].config['path'], '/tmp/hi.log')
+        self.assertEquals(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/agent.log')
+
+    def test_from_monitors(self):
+        test_manager = self.__create_test_instance([
+        ], [
+            {
+                'path': '/tmp/hi_monitor.log',
+            }
+        ])
+        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEquals(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
+        self.assertEquals(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
+
+    def test_multiple_monitors_for_same_file(self):
+        test_manager = self.__create_test_instance([
+        ], [
+            {'path': '/tmp/hi_monitor.log'},
+            {'path': '/tmp/hi_monitor.log'},
+            {'path': '/tmp/hi_second_monitor.log'}
+        ])
+        self.assertEquals(len(test_manager.log_matchers), 3)
+        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEquals(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
+        self.assertEquals(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
+        self.assertEquals(test_manager.log_matchers[2].config['path'], '/tmp/hi_second_monitor.log')
+        self.assertEquals(test_manager.log_matchers[2].config['attributes']['parser'], 'agent-metrics')
+
+    def test_monitor_log_config_updated(self):
+        test_manager = self.__create_test_instance([
+        ], [
+            {'path': 'hi_monitor.log'},
+        ])
+        self.assertEquals(len(test_manager.log_matchers), 2)
+        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEquals(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
+
+        # We also verify the monitor instance itself's log config object was updated to have the full path.
+        self.assertEquals(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
+
+    def __create_test_instance(self, configuration_logs_entry, monitors_log_configs):
+        config_dir = tempfile.mkdtemp()
+        config_file = os.path.join(config_dir, 'agentConfig.json')
+        config_fragments_dir = os.path.join(config_dir, 'configs.d')
+        os.makedirs(config_fragments_dir)
+
+        logs_json_array = JsonArray()
+
+        for entry in configuration_logs_entry:
+            logs_json_array.add(JsonObject(content=entry))
+
+        fp = open(config_file, 'w')
+        fp.write(json_lib.serialize(JsonObject(api_key='fake', logs=logs_json_array)))
+        fp.close()
+
+        default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
+                                     '/var/lib/scalyr-agent-2')
+
+        config = Configuration(config_file, default_paths)
+        config.parse()
+
+        self.__monitor_fake_instances = []
+        for monitor_log_config in monitors_log_configs:
+            self.__monitor_fake_instances.append(FakeMonitor(monitor_log_config))
+
+        # noinspection PyTypeChecker
+        return CopyingManager(config, self.__monitor_fake_instances)
+
+
+class FakeMonitor(object):
+    def __init__(self, monitor_log_config):
+        self.module_name = 'fake_monitor'
+        self.log_config = monitor_log_config

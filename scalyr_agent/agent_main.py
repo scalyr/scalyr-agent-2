@@ -98,8 +98,6 @@ class ScalyrAgent(object):
         # The DefaultPaths object for defining the default paths for various things like the log directory based on
         # the platform.
         self.__default_paths = platform_controller.default_paths
-        # The default monitors for this platform.
-        self.__default_monitors = platform_controller.default_monitors
 
         self.__config_file_path = None
         # If the current contents of the configuration file has errors in it, then this will be set to the config
@@ -128,6 +126,8 @@ class ScalyrAgent(object):
         self.__unsafe_debugging_running = False
         # A reference to the remote shell debug server.
         self.__debug_server = None
+        # Used below for a small cache for a slight optimization.
+        self.__last_verify_config = None
 
     @staticmethod
     def agent_run_method(controller, config_file_path):
@@ -185,10 +185,20 @@ class ScalyrAgent(object):
             config_file_path = self.__default_paths.config_file_path
 
         self.__config_file_path = config_file_path
-        self.__config = self.__read_config(config_file_path, command != 'stop' and command != 'status')
 
-        if self.__config is None:
-            print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
+        try:
+            self.__config = self.__read_and_verify_config(config_file_path)
+        except Exception, e:
+            # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
+            # screw up the config and you want to let the rest of the system work enough to do the stop or get the
+            # status.
+            if command != 'stop' and command != 'status':
+                print >> sys.stderr, 'Error reading configuration file: %s' % str(e)
+                print >> sys.stderr, 'Terminating agent, please fix the configuration file and restart agent.'
+                return 1
+            else:
+                self.__config = None
+                print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
 
         self.__controller.consume_config(self.__config, config_file_path)
 
@@ -225,38 +235,75 @@ class ScalyrAgent(object):
             log.exception('Caught exception when attempt to execute command %s', command)
             return 1
 
-    def __read_config(self, config_file_path, fail_on_error):
-        """Read the configuration file, providing a helpful error message if it fails.
+    def __read_and_verify_config(self, config_file_path):
+        """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
+        having valid configurations.
 
-        @param config_file_path: The path to the configuration file
-        @param fail_on_error: If True, will exit the process with a non-zero status if the configuration cannot
-            be parsed.
-
+        @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
-        @type fail_on_error: bool
 
-        @return: The configuration file or None if it could not be parsed and fail_on_error is False.
-        @rtype: Configuration
+        @return: The configuration object.
+        @rtype: scalyr_agent.Configuration
+        """
+        config = self.__read_config(config_file_path)
+        self.__verify_config(config)
+        return config
+
+    def __read_config(self, config_file_path):
+        """Reads the configuration from the file path but does not do a full verification.
+
+        This will only throw an error if the files themselves cannot be read.  This includes the configuration
+        fragments in the agent.d file.
+
+        You must call ``__verify_config`` to fully verify the configuration.
+
+        @param config_file_path: The path to read the configuration from.
+        @type config_file_path: str
+
+        @return: The configuration object.
+        @rtype: scalyr_agent.Configuration
+        """
+        return Configuration(config_file_path, self.__default_paths)
+
+    def __verify_config(self, config):
+        """Verifies the passed in configuration object is valid, including the referenced monitors exist and have
+        valid configuration.
+
+        @param config: The configuration object.
+        @type config: scalyr_agent.Configuration
         """
         try:
-            config_file = Configuration(config_file_path, self.__default_paths, self.__default_monitors,
-                                        CopyingManager.build_log, MonitorsManager.build_monitor)
-            config_file.parse()
-            return config_file
+            config.parse()
+            monitors_manager = MonitorsManager(config, self.__controller)
+            copying_manager = CopyingManager(config, monitors_manager.monitors)
+            # To do the full verification, we have to create the managers.  However, this call does not need them,
+            # but it is very likely the caller of this method will invoke ``__create_worker_thread`` next, so let's
+            # save them for that call.  This helps us avoid having to read and instantiate the monitors multiple times.
+            self.__last_verify_config = {
+                'config': config,
+                'monitors_manager': monitors_manager,
+                'copying_manager': copying_manager
+            }
         except UnsupportedSystem, e:
-            if not fail_on_error:
-                return None
-            print >> sys.stderr, 'Configuration file uses a monitor that is not supported on this system'
-            print >> sys.stderr, 'Monitor \'%s\' cannot be used due to: %s\n' % (e.monitor_name, str(e))
-            print >> sys.stderr, 'If you require support for this monitor for your system, please e-mail'
-            print >> sys.stderr, 'contact@scalyr.com.\n'
-        except Exception, e:
-            if not fail_on_error:
-                return None
-            print >> sys.stderr, 'Error reading configuration file: %s' % str(e)
+            # We want to emit a better error message for this exception, so capture it here.
+            raise Exception('Configuration file uses a monitor that is not supported on this system Monitor \'%s\' '
+                            'cannot be used due to: %s.  If you require support for this monitor for your system, '
+                            'please e-mail contact@scalyr.com' % (e.monitor_name, str(e)))
 
-        print >> sys.stderr, 'Terminating agent, please fix the configuration file and restart agent.'
-        sys.exit(1)
+    def __create_worker_thread(self, config):
+        """Creates the worker thread that will run the copying and monitor managers for the specified configuration.
+
+        @param config: The configuration object.
+        @type config: scalyr_agent.Configuration
+
+        @return: The worker thread object to use.  You must start it.
+        @rtype: WorkerThread
+        """
+        # Use the cached results from __last_verify_config if available.  If not, force it to create them.
+        if self.__last_verify_config is None or self.__last_verify_config['config'] is not config:
+            self.__verify_config(config)
+        return WorkerThread(self.__last_verify_config['config'], self.__last_verify_config['copying_manager'],
+                            self.__last_verify_config['monitors_manager'])
 
     def __start(self, quiet, no_fork):
         """Executes the start command.
@@ -460,7 +507,6 @@ class ScalyrAgent(object):
             print >> sys.stderr, "%s" % str(e)
             return 0  # For the sake of restart, we need to return non-error code here.
 
-
     def __status(self):
         """Execute the 'status' command to indicate if the agent is running or not.
 
@@ -584,8 +630,8 @@ class ScalyrAgent(object):
                 self.__start_or_stop_unsafe_debugging()
 
                 self.__scalyr_client = self.__create_client()
-                worker_thread = WorkerThread(self.__config, self.__scalyr_client, logs_initial_positions)
-                worker_thread.start()
+                worker_thread = self.__create_worker_thread(self.__config)
+                worker_thread.start(self.__scalyr_client, logs_initial_positions)
 
                 self.__copying_manager = worker_thread.copying_manager
                 self.__monitors_manager = worker_thread.monitors_manager
@@ -605,26 +651,27 @@ class ScalyrAgent(object):
                         last_bw_stats_report_time = current_time
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Checking for any changes to config file')
-                    new_config = Configuration(self.__config_file_path, self.__default_paths, self.__default_monitors,
-                                               CopyingManager.build_log, MonitorsManager.build_monitor)
+                    new_config = None
                     try:
-                        new_config.parse()
+                        new_config = self.__read_config(self.__config_file_path)
+                        # TODO:  By parsing the configuration file, we are doing a lot of work just to have it thrown
+                        # out in a few seconds when we discover it is equivalent to the previous one.  Maybe we should
+                        # rework the equivalence so that it can work on the raw files, but this is difficult since
+                        # we need to parse the main configuration file to at least get the fragment directory.  For
+                        # now, we will just wait this work.  We only do it once every 30 secs anyway.
+
+                        self.__verify_config(new_config)
+
+                        # Update the debug_level based on the new config.. we always update it.
+                        self.__update_debug_log_level(new_config.debug_level)
+
+                        if self.__current_bad_config is None and new_config.equivalent(self.__config,
+                                                                                       exclude_debug_level=True):
+                            log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was not different than previous')
+                            continue
+
                         self.__verify_can_write_to_logs_and_data(new_config)
 
-                    except Exception, e:
-                        log.error(
-                            'Bad configuration file seen.  Ignoring, using last known good configuration file.  '
-                            'Exception was "%s"', str(e), error_code='badConfigFile')
-                        self.__current_bad_config = new_config
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config could not be read or parsed')
-                        continue
-
-                    self.__current_bad_config = None
-
-                    # See if the config has changed -- we ignore the debug_level setting since, if we are in the
-                    # middle of debugging some weird behavior, we do not to restart the how copy manager, etc.  We
-                    # just update the debugging logging level down below to whatever the new value is.
-                    if not self.__config.equivalent(new_config, exclude_debug_level=True):
                         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was different than previous.  Reloading.')
                         # We are about to reset the current workers and ScalyrClientSession, so we will lose their
                         # contribution to the stats, so recalculate the base.
@@ -633,21 +680,26 @@ class ScalyrAgent(object):
                         log.info('Stopping copying and metrics threads.')
                         worker_thread.stop()
                         worker_thread = None
+
                         self.__config = new_config
+                        self.__controller.consume_config(new_config, new_config.file_path)
 
                         self.__start_or_stop_unsafe_debugging()
                         log.info('Starting new copying and metrics threads')
                         self.__scalyr_client = self.__create_client()
-                        worker_thread = WorkerThread(self.__config, self.__scalyr_client)
-                        self.__copying_manager = worker_thread.copying_manager
-                        self.__monitors_manager = worker_thread.monitors_manager
 
-                        worker_thread.start()
-                    else:
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was not different than previous')
+                        worker_thread = self.__create_worker_thread(new_config)
+                        worker_thread.start(self.__scalyr_client)
 
-                    # Update the debug_level based on the new config.
-                    self.__update_debug_log_level(new_config.debug_level)
+                        self.__current_bad_config = None
+                    except Exception, e:
+                        if self.__current_bad_config is None:
+                            log.error(
+                                'Bad configuration file seen.  Ignoring, using last known good configuration file.  '
+                                'Exception was "%s"', str(e), error_code='badConfigFile')
+                        self.__current_bad_config = new_config
+                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config could not be read or parsed')
+                        continue
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
@@ -940,29 +992,35 @@ class ScalyrAgent(object):
 class WorkerThread(object):
     """A thread used to run the log copier and the monitor manager.
     """
-    def __init__(self, configuration, scalyr_client, logs_initial_positions=None):
-        self.__scalyr_client = scalyr_client
-        self.copying_manager = CopyingManager(scalyr_client, configuration, logs_initial_positions)
-        self.monitors_manager = MonitorsManager(configuration)
+    def __init__(self, configuration, copying_manager, monitors):
+        self.__scalyr_client = None
+        self.config = configuration
+        self.copying_manager = copying_manager
+        self.monitors_manager = monitors
 
-    def start(self):
-        self.copying_manager.start()
+    def start(self, scalyr_client, log_initial_positions=None):
+        if self.__scalyr_client is not None:
+            self.__scalyr_client.close()
+        self.__scalyr_client = scalyr_client
+
+        self.copying_manager.start_manager(scalyr_client, log_initial_positions)
         # We purposely wait for the copying manager to begin copying so that if the monitors create any new
         # files, they will be guaranteed to be copying up to the server starting at byte index zero.
         # Note, if copying never begins then the copying manager will sys exit, so this next call will never just
         # block indefinitely will the process hangs around.
         self.copying_manager.wait_for_copying_to_begin()
-        self.monitors_manager.start()
+        self.monitors_manager.start_manager()
 
     def stop(self):
         log.debug('Shutting down monitors')
-        self.monitors_manager.stop()
+        self.monitors_manager.stop_manager()
 
         log.debug('Shutting copy monitors')
-        self.copying_manager.stop()
+        self.copying_manager.stop_manager()
 
         log.debug('Shutting client')
-        self.__scalyr_client.close()
+        if self.__scalyr_client is not None:
+            self.__scalyr_client.close()
 
 
 if __name__ == '__main__':
