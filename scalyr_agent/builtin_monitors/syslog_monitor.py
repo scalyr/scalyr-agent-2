@@ -24,6 +24,8 @@ import SocketServer
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 from scalyr_agent.util import StoppableThread
+from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 
 __monitor__ = __name__
 
@@ -172,13 +174,22 @@ class SyslogMonitor( ScalyrMonitor ):
         #build list of protocols and ports from the protocol option
         self.__server_list = self.__build_server_list( self._config.get( 'protocol' ) )
 
+        #our disk logger
+        self.__disk_logger = None
+
         #configure the logger and path
         message_log = self._config.get( 'message_log' )
 
         self.log_config = {
             'parser': 'systemLog',
-            'path': message_log
+            'path': message_log,
         }
+
+        try:
+            attributes = JsonObject( { "monitor": "syslogmonitor" } )
+            self.log_config['attributes'] = attributes
+        except Exception, e:
+            self._logger.error( "Error setting monitor attribute in SyslogMonitor" )
 
         self.__max_log_size = self._config.get( 'max_log_size' )
         self.__max_log_rotations = self._config.get( 'max_log_rotations' )
@@ -231,28 +242,38 @@ class SyslogMonitor( ScalyrMonitor ):
         #return a list with duplicates removed
         return list( set( server_list ) )
 
-    def __get_disk_logger( self, log_name, max_bytes, backup_count ):
+
+    def open_metric_log( self ):
+        """Override open_metric_log to prevent a metric log from being created for the Syslog Monitor
+        and instead create our own logger which will log raw messages out to disk.
+        """
         name = __name__ + '.syslog'
-        log = logging.Logger( name )
+        self.__disk_logger = logging.Logger( name )
+
+        success = True
 
         #only configure once -- assumes all configuration happens on the same thread
-        import sys
-        if len( log.handlers ) == 0:
-            print >>sys.stdout, "No handlers yet for ", name
-            handler = logging.handlers.RotatingFileHandler( filename = log_name, maxBytes = max_bytes, backupCount = backup_count )
-            formatter = logging.Formatter()
-            handler.setFormatter( formatter )
-            log.addHandler( handler )
-            log.setLevel( logging.INFO )
-        else:
-            print >>sys.stdout, "Already has handlers: ", name
-        return log
+        if len( self.__disk_logger.handlers ) == 0:
+            try:
+                handler = logging.handlers.RotatingFileHandler( filename = self.log_config['path'], maxBytes = self.__max_log_size, backupCount = self.__max_log_rotations )
+                formatter = logging.Formatter()
+                handler.setFormatter( formatter )
+                self.__disk_logger.addHandler( handler )
+                self.__disk_logger.setLevel( logging.INFO )
+            except IOError, e:
+                success = False
+                self._logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
 
+        return success
 
+    def close_metric_log( self ):
+        #don't do anything here, but override it so the parent class isn't called
+        pass
 
     def run( self ):
         try:
-            self.__disk_logger = self.__get_disk_logger( self.log_config['path'], self.__max_log_size, self.__max_log_rotations )
+            if self.__disk_logger == None:
+                raise Exception( "No disk logger available for Syslog Monitor" )
 
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
