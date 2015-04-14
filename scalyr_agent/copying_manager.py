@@ -322,126 +322,133 @@ class CopyingManager(StoppableThread):
         # Make sure start_manager was invoked to start the thread and we have a scalyr client instance.
         assert self.__scalyr_client is not None
 
-        # noinspection PyBroadException
         try:
-            # Try to read the checkpoint state from disk.
-            current_time = time.time()
-            checkpoints_state = self.__read_checkpoint_state()
-            if checkpoints_state is None:
-                log.info('The checkpoints could not be read.  All logs will be copied starting at their current end')
-            elif (current_time - checkpoints_state['time']) > self.__config.max_allowed_checkpoint_age:
-                log.warn('The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will be '
-                         'copied starting at their current end.', scalyr_util.format_time(
-                         checkpoints_state['time']), error_code='staleCheckpointFile')
-                checkpoints_state = None
-
-            if checkpoints_state is None:
-                checkpoints = None
-            else:
-                checkpoints = checkpoints_state['checkpoints']
-
-            # Do the initial scan for any log files that match the configured logs we should be copying.  If there
-            # are checkpoints for them, make sure we start copying from the position we left off at.
-            self.__scan_for_new_logs_if_necessary(current_time=current_time,
-                                                  checkpoints=checkpoints,
-                                                  logs_initial_positions=self.__logs_initial_positions)
-
-            # The copying params that tell us how much we are allowed to send and how long we have to wait between
-            # attempts.
-            copying_params = CopyingParameters(self.__config)
-
-            # Just initialize the last time we had a success to now.  Make the logic below easier.
-            last_success = time.time()
-
-            # We are about to start copying.  We can tell waiting threads.
-            self.__copying_semaphore.release()
-
-            while self._run_state.is_running():
-                log.log(scalyr_logging.DEBUG_LEVEL_1, 'At top of copy log files loop.')
+            # noinspection PyBroadException
+            try:
+                # Try to read the checkpoint state from disk.
                 current_time = time.time()
-                # noinspection PyBroadException
-                try:
-                    # If we have a pending request and it's been too taken too long to send it, just drop it
-                    # on the ground and advance.
-                    if current_time - last_success > self.__config.max_retry_time:
-                        if self.__pending_add_events_task is not None:
-                            self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_DROP)
-                            self.__pending_add_events_task = None
-                        # Tell all of the processors to go to the end of the current log file.  We will start copying
-                        # from there.
-                        for processor in self.__log_processors:
-                            processor.skip_to_end('Too long since last successful request to server.',
-                                                  'skipNoServerSuccess', current_time=current_time)
+                checkpoints_state = self.__read_checkpoint_state()
+                if checkpoints_state is None:
+                    log.info(
+                        'The checkpoints could not be read.  All logs will be copied starting at their current end')
+                elif (current_time - checkpoints_state['time']) > self.__config.max_allowed_checkpoint_age:
+                    log.warn('The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
+                             'be copied starting at their current end.', scalyr_util.format_time(
+                             checkpoints_state['time']), error_code='staleCheckpointFile')
+                    checkpoints_state = None
 
-                    # Check for new logs.  If we do detect some new log files, they must have been created since our
-                    # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
-                    self.__scan_for_new_logs_if_necessary(current_time=current_time, copy_at_index_zero=True)
+                if checkpoints_state is None:
+                    checkpoints = None
+                else:
+                    checkpoints = checkpoints_state['checkpoints']
 
-                    # Collect log lines to send if we don't have one already.
-                    if self.__pending_add_events_task is None:
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Getting next batch of events to send.')
-                        self.__pending_add_events_task = self.__get_next_add_events_task(
-                            copying_params.current_bytes_allowed_to_send)
-                    else:
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Have pending batch of events, retrying to send.')
-                        # Take a look at the file system and see if there are any new bytes pending.  This updates the
-                        # statistics for each pending file.  This is important to do for status purposes if we have
-                        # not tried to invoke get_next_send_events_task in a while (since that already updates the
-                        # statistics).
-                        self.__scan_for_new_bytes(current_time=current_time)
+                # Do the initial scan for any log files that match the configured logs we should be copying.  If there
+                # are checkpoints for them, make sure we start copying from the position we left off at.
+                self.__scan_for_new_logs_if_necessary(current_time=current_time,
+                                                      checkpoints=checkpoints,
+                                                      logs_initial_positions=self.__logs_initial_positions)
 
-                    # Try to send the request if we have one.
-                    if self.__pending_add_events_task is not None:
-                        (result, bytes_sent, full_response) = self.__send_events(self.__pending_add_events_task)
+                # The copying params that tell us how much we are allowed to send and how long we have to wait between
+                # attempts.
+                copying_params = CopyingParameters(self.__config)
 
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Sent %ld bytes and received response with status="%s".',
-                                bytes_sent, result)
+                # Just initialize the last time we had a success to now.  Make the logic below easier.
+                last_success = time.time()
 
-                        if result == 'success' or 'discardBuffer' in result or 'requestTooLarge' in result:
-                            if result == 'success':
-                                self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
-                            elif 'discardBuffer' in result:
+                # We are about to start copying.  We can tell waiting threads.
+                self.__copying_semaphore.release()
+
+                while self._run_state.is_running():
+                    log.log(scalyr_logging.DEBUG_LEVEL_1, 'At top of copy log files loop.')
+                    current_time = time.time()
+                    # noinspection PyBroadException
+                    try:
+                        # If we have a pending request and it's been too taken too long to send it, just drop it
+                        # on the ground and advance.
+                        if current_time - last_success > self.__config.max_retry_time:
+                            if self.__pending_add_events_task is not None:
                                 self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_DROP)
-                            else:
-                                self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_RETRY)
-                            self.__pending_add_events_task = None
-                            self.__write_checkpoint_state()
+                                self.__pending_add_events_task = None
+                            # Tell all of the processors to go to the end of the current log file.  We will start
+                            # copying
+                            # from there.
+                            for processor in self.__log_processors:
+                                processor.skip_to_end('Too long since last successful request to server.',
+                                                      'skipNoServerSuccess', current_time=current_time)
 
+                        # Check for new logs.  If we do detect some new log files, they must have been created since our
+                        # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
+                        self.__scan_for_new_logs_if_necessary(current_time=current_time, copy_at_index_zero=True)
+
+                        # Collect log lines to send if we don't have one already.
+                        if self.__pending_add_events_task is None:
+                            log.log(scalyr_logging.DEBUG_LEVEL_1, 'Getting next batch of events to send.')
+                            self.__pending_add_events_task = self.__get_next_add_events_task(
+                                copying_params.current_bytes_allowed_to_send)
+                        else:
+                            log.log(scalyr_logging.DEBUG_LEVEL_1, 'Have pending batch of events, retrying to send.')
+                            # Take a look at the file system and see if there are any new bytes pending.  This updates
+                            # the statistics for each pending file.  This is important to do for status purposes if we
+                            # have not tried to invoke get_next_send_events_task in a while (since that already updates
+                            # the statistics).
+                            self.__scan_for_new_bytes(current_time=current_time)
+
+                        # Try to send the request if we have one.
+                        if self.__pending_add_events_task is not None:
+                            (result, bytes_sent, full_response) = self.__send_events(self.__pending_add_events_task)
+
+                            log.log(scalyr_logging.DEBUG_LEVEL_1,
+                                    'Sent %ld bytes and received response with status="%s".',
+                                    bytes_sent, result)
+
+                            if result == 'success' or 'discardBuffer' in result or 'requestTooLarge' in result:
+                                if result == 'success':
+                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
+                                elif 'discardBuffer' in result:
+                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_DROP)
+                                else:
+                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_RETRY)
+                                self.__pending_add_events_task = None
+                                self.__write_checkpoint_state()
+
+                            if result == 'success':
+                                last_success = current_time
+                        else:
+                            result = 'failedReadingLogs'
+                            bytes_sent = 0
+                            full_response = ''
+
+                            log.error('Failed to read logs for copying.  Will re-try')
+
+                        # Update the statistics and our copying parameters.
+                        self.__lock.acquire()
+                        copying_params.update_params(result, bytes_sent)
+                        self.__last_attempt_time = current_time
+                        self.__last_success_time = last_success
+                        self.__last_attempt_size = bytes_sent
+                        self.__last_response = full_response
+                        self.__last_response_status = result
                         if result == 'success':
-                            last_success = current_time
-                    else:
-                        result = 'failedReadingLogs'
-                        bytes_sent = 0
-                        full_response = ''
+                            self.__total_bytes_uploaded += bytes_sent
+                        self.__lock.release()
 
-                        log.error('Failed to read logs for copying.  Will re-try')
+                    except Exception:
+                        # TODO: Do not catch Exception here.  That is too board.  Disabling warning for now.
+                        log.exception('Failed while attempting to scan and transmit logs')
+                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Failed while attempting to scan and transmit logs')
+                        self.__lock.acquire()
+                        self.__last_attempt_time = current_time
+                        self.__total_errors += 1
+                        self.__lock.release()
 
-                    # Update the statistics and our copying parameters.
-                    self.__lock.acquire()
-                    copying_params.update_params(result, bytes_sent)
-                    self.__last_attempt_time = current_time
-                    self.__last_success_time = last_success
-                    self.__last_attempt_size = bytes_sent
-                    self.__last_response = full_response
-                    self.__last_response_status = result
-                    if result == 'success':
-                        self.__total_bytes_uploaded += bytes_sent
-                    self.__lock.release()
-
-                except Exception:
-                    # TODO: Do not catch Exception here.  That is too board.  Disabling warning for now.
-                    log.exception('Failed while attempting to scan and transmit logs')
-                    log.log(scalyr_logging.DEBUG_LEVEL_1, 'Failed while attempting to scan and transmit logs')
-                    self.__lock.acquire()
-                    self.__last_attempt_time = current_time
-                    self.__total_errors += 1
-                    self.__lock.release()
-
-                self._run_state.sleep_but_awaken_if_stopped(copying_params.current_sleep_interval)
-        except Exception:
-            # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
-            log.exception('Log copying failed due to exception')
-            sys.exit(1)
+                    self._run_state.sleep_but_awaken_if_stopped(copying_params.current_sleep_interval)
+            except Exception:
+                # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
+                log.exception('Log copying failed due to exception')
+                sys.exit(1)
+        finally:
+            for processor in self.__log_processors:
+                processor.close()
 
     def wait_for_copying_to_begin(self):
         """Block the current thread until this instance has finished its first scan and has begun copying.
@@ -604,6 +611,9 @@ class CopyingManager(StoppableThread):
                 LogFileProcessor.FAIL_AND_RETRY, LogFileProcessor.FAIL_AND_DROP.
             @type result: int
             """
+            # TODO:  This might not be bullet proof here.  We copy __log_processors and then update it at the end
+            # We could be susceptible to exceptions thrown in the middle of this method, though now should.
+
             # Copy the processor list because we may need to remove some processors if they are done.
             processor_list = self.__log_processors[:]
             self.__log_processors = []
@@ -624,6 +634,8 @@ class CopyingManager(StoppableThread):
                 if keep_it:
                     self.__log_processors.append(processor)
                     self.__log_paths_being_processed[processor.log_path] = True
+                else:
+                    processor.close()
 
         return AddEventsTask(add_events_request, handle_completed_callback)
 

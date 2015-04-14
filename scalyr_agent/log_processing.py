@@ -201,6 +201,8 @@ class LogFileIterator(object):
                         self.__pending_files.append(LogFileIterator.FileState(
                             LogFileIterator.FileState.create_json(0, initial_position, file_size, inode, True),
                             file_object))
+                    elif file_object is not None:
+                        file_object.close()
                 need_to_close = False
             finally:
                 if need_to_close:
@@ -244,6 +246,9 @@ class LogFileIterator(object):
         self.__refresh_pending_files(current_time)
 
         new_pending_files = []
+
+        # TODO:  None of this code should throw exceptions, but if it does, we could leave __pending_files
+        # in a weird state.  Maybe we should make this more bullet proof.
 
         # We throw out any __pending_file entries that are before the current mark position or can no longer be
         # read.
@@ -1405,6 +1410,19 @@ class LogFileProcessor(object):
         self.__total_bytes_pending = self.__log_file_iterator.available
         self.__lock.release()
 
+    def close(self):
+        """Closes the processor, closing all underlying file handles.
+
+        This does nothing if the processor is already closed.
+        """
+        try:
+            self.__lock.acquire()
+            if not self.__is_closed:
+                self.__log_file_iterator.close()
+                self.__is_closed = True
+        finally:
+            self.__lock.release()
+
     def get_checkpoint(self):
         return self.__log_file_iterator.get_checkpoint()
 
@@ -1710,40 +1728,55 @@ class LogMatcher(object):
         self.__lock.release()
 
         result = []
+        # We need to be careful that we throw out any processors that were created if we do hit an exception,
+        # so we track if we got to the return statement down below or not.
+        reached_return = False
+
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
-        for matched_file in glob.glob(self.__log_entry_config['path']):
-            # Only process it if we have permission to read it and it is not already being processed.
-            if not matched_file in existing_processors and self.__can_read_file(matched_file):
-                checkpoint_state = None
-                # Get the last checkpoint state if it exists.
-                if matched_file in previous_state:
-                    checkpoint_state = previous_state[matched_file]
-                    del previous_state[matched_file]
-                elif copy_at_index_zero:
-                    # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
-                    # then create a checkpoint to represent that.
-                    checkpoint_state = LogFileProcessor.create_checkpoint(0)
+        try:
+            for matched_file in glob.glob(self.__log_entry_config['path']):
+                # Only process it if we have permission to read it and it is not already being processed.
+                if not matched_file in existing_processors and self.__can_read_file(matched_file):
+                    checkpoint_state = None
+                    # Get the last checkpoint state if it exists.
+                    if matched_file in previous_state:
+                        checkpoint_state = previous_state[matched_file]
+                        del previous_state[matched_file]
+                    elif copy_at_index_zero:
+                        # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
+                        # then create a checkpoint to represent that.
+                        checkpoint_state = LogFileProcessor.create_checkpoint(0)
 
-                # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
-                # if the field or legacy field is not present.  Maybe we should override this regardless because the
-                # user could get it wrong.. but for now, we just let them screw it up if they want to.
-                log_attributes = dict(self.__log_entry_config['attributes'])
-                if 'logfile' not in log_attributes and 'filename' not in log_attributes:
-                    log_attributes['logfile'] = matched_file
+                    # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
+                    # if the field or legacy field is not present.  Maybe we should override this regardless because the
+                    # user could get it wrong.. but for now, we just let them screw it up if they want to.
+                    log_attributes = dict(self.__log_entry_config['attributes'])
+                    if 'logfile' not in log_attributes and 'filename' not in log_attributes:
+                        log_attributes['logfile'] = matched_file
 
-                # Create the processor to handle this log.
-                new_processor = LogFileProcessor(matched_file, self.__overall_config, log_attributes=log_attributes,
-                                                 checkpoint=checkpoint_state)
-                for rule in self.__log_entry_config['redaction_rules']:
-                    new_processor.add_redacter(rule['match_expression'], rule['replacement'])
-                for rule in self.__log_entry_config['sampling_rules']:
-                    new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
-                result.append(new_processor)
-                self.__lock.acquire()
+                    # Create the processor to handle this log.
+                    new_processor = LogFileProcessor(matched_file, self.__overall_config, log_attributes=log_attributes,
+                                                     checkpoint=checkpoint_state)
+                    for rule in self.__log_entry_config['redaction_rules']:
+                        new_processor.add_redacter(rule['match_expression'], rule['replacement'])
+                    for rule in self.__log_entry_config['sampling_rules']:
+                        new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
+                    result.append(new_processor)
+
+            self.__lock.acquire()
+            for new_processor in result:
                 self.__processors.append(new_processor)
-                self.__lock.release()
+            self.__lock.release()
 
-        return result
+            reached_return = True
+            return result
+
+        finally:
+            # If we didn't actually return the result, then we need to be sure to close the processors so that
+            # we release any file handles.
+            if not reached_return:
+                for new_processor in result:
+                    new_processor.close()
 
     def __can_read_file(self, file_path):
         """Determines if this process can read the file at the path.
