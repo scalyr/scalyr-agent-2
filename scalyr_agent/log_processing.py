@@ -1638,6 +1638,17 @@ class LogMatcher(object):
         # The lock that protects the __processor and __last_check vars.
         self.__lock = threading.Lock()
 
+    @property
+    def config(self):
+        """Returns the log entry configuration for this matcher.
+
+        This is used only for testing purposes.
+
+        @return: The configuration.  You must not modify this object.
+        @rtype: dict
+        """
+        return self.__log_entry_config
+
     def generate_status(self):
         """
         @return:  The status object describing the state of the log processors for this log file.

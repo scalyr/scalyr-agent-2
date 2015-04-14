@@ -36,8 +36,6 @@ class LinuxPlatformController(PosixPlatformController):
         """Initializes the POSIX platform instance.
         """
         PosixPlatformController.__init__(self, stdin=stdin, stdout=stdout, stderr=stderr)
-        self.__run_system_metrics = True
-        self.__run_agent_process_metrics = True
 
     def can_handle_current_platform(self):
         """Returns true if this platform object can handle the server this process is running on.
@@ -46,22 +44,6 @@ class LinuxPlatformController(PosixPlatformController):
         @rtype: bool
         """
         return _platform.lower().startswith('linux')
-
-    def consume_config(self, config, path_to_config):
-        """Invoked after 'consume_options' is called to set the Configuration object to be used.
-
-        This will be invoked before the scalyr-agent-2 command performs any real work and while stdout and stderr
-        are still be displayed to the screen.
-
-        @param config: The configuration object to use.  It will be None if the configuration could not be parsed.
-        @param path_to_config: The full path to file that was read to create the config object.
-
-        @type config: configuration.Configuration
-        @type path_to_config: str
-        """
-        PosixPlatformController.consume_config(self, config, path_to_config)
-        self.__run_system_metrics = config.implicit_metric_monitor
-        self.__run_agent_process_metrics = config.implicit_agent_process_metrics_monitor
 
     @property
     def default_paths(self):
@@ -88,23 +70,22 @@ class LinuxPlatformController(PosixPlatformController):
                                 os.path.join(base_dir, 'config', 'agent.json'),
                                 os.path.join(base_dir, 'data'))
 
-    @property
-    def default_monitors(self):
+    def get_default_monitors(self, config):
         """Returns the default monitors to use for this platform.
 
-        This is guaranteed to be invoked after consume_config is called to allow implementations to make what they
-        return be dependent on configuration options.
+        This method should return a list of dicts containing monitor configuration options just as you would specify
+        them in the configuration file.  The list may be empty.
 
-        This method should list of dicts containing monitor configuration options just as you would specify them in
-        the configuration file.  The list may be empty.
+        @param config The configuration object to use.
+        @type config configuration.Configuration
 
         @return: The default monitors
         @rtype: list<dict>
         """
         result = []
-        if self.__run_system_metrics:
+        if config.implicit_metric_monitor:
             result.append(JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'))
-        if self.__run_agent_process_metrics:
+        if config.implicit_agent_process_metrics_monitor:
             result.append(JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
                                      pid='$$', id='agent'))
         return result

@@ -50,7 +50,7 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, default_paths, default_monitors, log_factory, monitor_factory):
+    def __init__(self, file_path, default_paths):
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -61,21 +61,16 @@ class Configuration(object):
         self.__read_time = None
         # The exception, if any, that was raised when the state was read.  This will be a BadConfiguration exception.
         self.__last_error = None
-        # The list of log objects created by the log_factory passed into the parse method, one for each
-        # log configuration entry that was found in the configuration file or created for by a monitor.
-        self.__logs = []
-        # The list of monitor objects created by the monitor_factory passed into the parse method, one for
-        # each monitor entry that was found in the configuration file or implicit monitors.
-        self.__monitors = []
+        # The log configuration objects from the configuration file.  This does not include logs required by
+        # the monitors.
+        self.__log_configs = []
+        # The monitor configuration objects from the configuration file.  This does not include monitors that
+        # are created by default by the platform.
+        self.__monitor_configs = []
 
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
-
-        # A list of dict/JsonObjects specifying the monitors to run by default.  This comes from the PlatformController
-        # to automatically include platform-specific monitors.  On Linux machines, this would include the
-        # linux_system_metrics and linux_process_metrics for the agent process.
-        self.__default_monitors = default_monitors
 
         # Used to implement variable substitution in configuration file values.  This maps the variable name
         # to the value to use in its place.
@@ -83,8 +78,6 @@ class Configuration(object):
 
         # FIX THESE:
         # Add documentation, verify, etc.
-        self.__log_factory = log_factory
-        self.__monitor_factory = monitor_factory
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
         self.max_new_log_detection_time = 1 * 60
@@ -138,97 +131,72 @@ class Configuration(object):
                 self.__verify_log_entry_and_set_defaults(config, description='implicit rule')
                 agent_log = config
 
-            # Add in any platform-specific monitors.
-            platform_monitors = []
-            for monitor in self.__default_monitors:
-                config = JsonObject(content=monitor)
-                self.__verify_monitor_entry_and_set_defaults(config, 'default monitors for platform', -1)
-                platform_monitors.append(config)
-
-            all_logs = list(self.__config.get_json_array('logs'))
+            self.__log_configs = list(self.__config.get_json_array('logs'))
             if agent_log is not None:
-                all_logs.append(agent_log)
+                self.__log_configs.append(agent_log)
 
-            # We need to go back and fill in the monitor id if it is not set.  We do this by keeping a count of
-            # how many monitors we have with the same module name (just considering the last element of the module
-            # path).  We use the shortened form of the module name because that is used when emitting lines for
-            # this monitor in the logs -- see scalyr_logging.py.
-            monitors_by_module_name = {}
-            # Tracks which modules already had an id present in the module config.
-            had_id = {}
-            all_monitors = list(self.__config.get_json_array('monitors'))
-            for monitor in platform_monitors:
-                all_monitors.append(monitor)
-
-            for entry in all_monitors:
-                module_name = entry['module'].split('.')[-1]
-                if not module_name in monitors_by_module_name:
-                    index = 1
-                else:
-                    index = monitors_by_module_name[module_name] + 1
-                if 'id' not in entry:
-                    entry['id'] = index
-                else:
-                    had_id[module_name] = True
-
-                monitors_by_module_name[module_name] = index
-
-            # Just as a simplification, if there is only one monitor with a given name, we remove the monitor_id
-            # to clean up it's name in the logs.
-            for entry in all_monitors:
-                module_name = entry['module'].split('.')[-1]
-                if monitors_by_module_name[module_name] == 1 and not module_name in had_id:
-                    entry['id'] = ''
-
-            # Now build up __logs to have an object created for each log entry, and __monitors to have an object
-            # created for each monitor entry.
-            for entry in all_logs:
-                # Automatically add in the parser to the attributes section.  We make a copy of the object first
-                # just to be safe.
-                entry = JsonObject(content=entry)
-                if 'parser' in entry:
-                    entry['attributes']['parser'] = entry['parser']
-
-                if self.__log_factory is not None:
-                    self.__logs.append(self.__log_factory(entry))
-
-            if self.__monitor_factory is not None:
-                for entry in all_monitors:
-                    self.__monitors.append(self.__monitor_factory(entry, self.additional_monitor_module_paths,
-                                                                  self.global_monitor_sample_interval))
-
-            # Get all of the paths for the logs currently being copied.
-            all_paths = {}
-            for entry in self.__logs:
-                all_paths[entry.log_path] = True
-
-            # Now add in a logs entry for each monitor's log file if there is not already
-            # an entry for it.
-            for entry in self.__monitors:
-                log_config = entry.log_config
-                if type(log_config) is dict:
-                    log_config = JsonObject(content=log_config)
-
-                # If the log config does not specify a parser, we add it in.
-                self.__verify_or_set_optional_string(log_config, 'parser', 'agent-metrics',
-                                                     'log entry requested by module "%s"' % entry.module_name)
-                self.__verify_log_entry_and_set_defaults(
-                    log_config, description='log entry requested by module "%s"' % entry.module_name)
-
-                path = log_config['path']
-                # Update the monitor to have the complete log config entry.  This also guarantees that the path
-                # is absolute.
-                entry.log_config = log_config
-                if not path in all_paths:
-                    if 'parser' in log_config:
-                        log_config['attributes']['parser'] = log_config['parser']
-                    if self.__log_factory is not None:
-                        self.__logs.append(self.__log_factory(log_config))
-                    all_paths[path] = True
+            self.__monitor_configs = list(self.__config.get_json_array('monitors'))
 
         except BadConfiguration, e:
             self.__last_error = e
             raise e
+
+    def parse_log_config(self, log_config, default_parser=None, context_description='uncategorized log entry'):
+        """Parses a given configuration stanza for a log file and returns the complete config with all the
+        default values filled in.
+
+        This is useful for parsing a log configuration entry that was not originally included in the configuration
+        but whose contents still must be verified.  For example, a log configuration entry from a monitor.
+
+        @param log_config: The configuration entry for the log.
+        @param default_parser: If the configuration entry does not have a ``parser`` entry, set this as the default.
+        @param context_description: The context of where this entry came from, used when creating an error message
+            for the user.
+
+        @type log_config: dict|JsonObject
+        @type default_parser: str
+        @type context_description: str
+
+        @return: The full configuration for the log.
+        @rtype: JsonObject
+        """
+        if type(log_config) is dict:
+            log_config = JsonObject(content=log_config)
+
+        log_config = log_config.copy()
+
+        if default_parser is not None:
+            self.__verify_or_set_optional_string(log_config, 'parser', default_parser, context_description)
+        self.__verify_log_entry_and_set_defaults(log_config, description=context_description)
+
+        return log_config
+
+    def parse_monitor_config(self, monitor_config, context_description='uncategorized monitor entry'):
+        """Parses a given monitor configuration entry and returns the complete config with all default values
+        filled in.
+
+        This is useful for parsing a monitor configuration entry that was not originally included in the
+        configuration but whose contents still must be verified.  For example, a default monitor supplied by the
+        platform.
+
+        @param monitor_config: The configuration entry for the monitor.
+        @param context_description: The context of where this entry came from, used when creating an error message
+            for the user.
+
+        @type monitor_config: dict|JsonObject
+        @type context_description: str
+
+        @return: The full configuration for the monitor.
+        @rtype: JsonObject
+        """
+        if type(monitor_config) is dict:
+            monitor_config = JsonObject(content=monitor_config)
+
+        monitor_config = monitor_config.copy()
+
+        self.__verify_monitor_entry_and_set_defaults(monitor_config, context_description=context_description)
+
+        return monitor_config
 
     @property
     def read_time(self):
@@ -251,14 +219,24 @@ class Configuration(object):
         return self.__last_error
 
     @property
-    def logs(self):
-        """Returns the list of objects created by log_factory for each log configuration entry found in config."""
-        return self.__logs
+    def log_configs(self):
+        """Returns the list of configuration entries for all the logs specified in the configuration file.
+
+        Note, this does not include logs required by monitors.  It is only logs explicitly listed in the configuration
+        file and possible the agent log as well.
+
+        @rtype list<JsonObject>"""
+        return self.__log_configs
 
     @property
-    def monitors(self):
-        """Returns the list of objects created by monitor_factory for each monitor configuration entry."""
-        return self.__monitors
+    def monitor_configs(self):
+        """Returns the list of configuration entries for all monitores specified in the configuration file.
+
+        Note, this does not include default monitors for the platform.  It is only monitors explicitly listed in the
+        configuration file.
+
+        @rtype list<JsonObject>"""
+        return self.__monitor_configs
 
     @property
     def agent_data_path(self):
@@ -593,7 +571,7 @@ class Configuration(object):
 
         i = 0
         for monitor_entry in config.get_json_array('monitors'):
-            self.__verify_monitor_entry_and_set_defaults(monitor_entry, file_path, i)
+            self.__verify_monitor_entry_and_set_defaults(monitor_entry, file_path=file_path, entry_index=i)
             i += 1
 
     def __verify_log_entry_and_set_defaults(self, log_entry, description=None, config_file_path=None, entry_index=None):
@@ -650,7 +628,14 @@ class Configuration(object):
             self.__verify_or_set_optional_string(element, 'replacement', '', element_description)
             i += 1
 
-    def __verify_monitor_entry_and_set_defaults(self, monitor_entry, file_path, entry_index):
+        # We support the parser definition being at the top-level of the log config object, but we really need to
+        # put it in the attributes.
+        if 'parser' in log_entry:
+            # noinspection PyTypeChecker
+            log_entry['attributes']['parser'] = log_entry['parser']
+
+    def __verify_monitor_entry_and_set_defaults(self, monitor_entry, context_description=None,
+                                                file_path=None, entry_index=None):
         """Verifies that the config for the specified monitor meets all the required criteria and sets any defaults.
 
         Raises an exception if it does not.
@@ -660,14 +645,22 @@ class Configuration(object):
         @param entry_index: The index of the entry in the 'monitors' json array. Used to report errors to user.
         """
         # Verify that it has a module name
-        description = 'the entry with index=%i in the "monitors" array in configuration file "%s"' % (entry_index,
-                                                                                                      file_path)
+        if context_description is None:
+            description = 'the entry with index=%i in the "monitors" array in configuration file "%s"' % (entry_index,
+                                                                                                          file_path)
+        else:
+            description = context_description
+
         self.__verify_required_string(monitor_entry, 'module', description)
 
         module_name = monitor_entry.get_string('module')
 
-        description = 'the entry for module "%s" in the "monitors" array in configuration file "%s"' % (module_name,
-                                                                                                        file_path)
+        if context_description is None:
+            description = 'the entry for module "%s" in the "monitors" array in configuration file "%s"' % (module_name,
+                                                                                                            file_path)
+        else:
+            description = context_description
+
         # Verify that if it has a log_name field, it is a string.
         self.__verify_or_set_optional_string(monitor_entry, 'log_path', module_name + '.log', description)
 
