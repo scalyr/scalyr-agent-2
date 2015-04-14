@@ -701,6 +701,9 @@ class ScalyrAgent(object):
                     worker_thread = self.__create_worker_thread(new_config)
                     worker_thread.start(self.__scalyr_client)
 
+                    self.__copying_manager = worker_thread.copying_manager
+                    self.__monitors_manager = worker_thread.monitors_manager
+                    
                     self.__current_bad_config = None
 
                 # Log the stats one more time before we terminate.
