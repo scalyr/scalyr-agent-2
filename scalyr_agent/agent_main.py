@@ -703,7 +703,7 @@ class ScalyrAgent(object):
 
                     self.__copying_manager = worker_thread.copying_manager
                     self.__monitors_manager = worker_thread.monitors_manager
-                    
+
                     self.__current_bad_config = None
 
                 # Log the stats one more time before we terminate.

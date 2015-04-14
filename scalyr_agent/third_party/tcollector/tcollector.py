@@ -1059,8 +1059,9 @@ def spawn_collector(col):
     # if re.search('\.py$', col.name) is not None:
     #     ... load the py module directly instead of using a subprocess ...
     try:
+        # Scalyr edit:  Add in close_fds=True
         col.proc = subprocess.Popen(col.filename, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                                    stderr=subprocess.PIPE, close_fds=True)
     except OSError, e:
         LOG.error('Failed to spawn collector %s: %s' % (col.filename, e))
         return
