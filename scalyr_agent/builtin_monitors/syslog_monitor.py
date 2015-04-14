@@ -250,18 +250,21 @@ class SyslogMonitor( ScalyrMonitor ):
         name = __name__ + '.syslog'
         self.__disk_logger = logging.Logger( name )
 
+        #assume successful for when the logger handler has already been created
         success = True
 
         #only configure once -- assumes all configuration happens on the same thread
         if len( self.__disk_logger.handlers ) == 0:
+            #logger handler hasn't been created yet, so assume unsuccssful
+            success = False
             try:
                 handler = logging.handlers.RotatingFileHandler( filename = self.log_config['path'], maxBytes = self.__max_log_size, backupCount = self.__max_log_rotations )
                 formatter = logging.Formatter()
                 handler.setFormatter( formatter )
                 self.__disk_logger.addHandler( handler )
                 self.__disk_logger.setLevel( logging.INFO )
-            except IOError, e:
-                success = False
+                success = True
+            except Exception, e:
                 self._logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
 
         return success
