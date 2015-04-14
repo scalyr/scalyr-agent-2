@@ -92,15 +92,18 @@ class LogFileIterator(object):
     but then return to it by invoking 'seek'.
     """
 
-    def __init__(self, path, file_system=None, checkpoint=None):
+    def __init__(self, path, config, file_system=None, checkpoint=None):
         """
 
         @param path: The path of the file to read.
+        @param config: The configuration object containing values for parameters that govern how logs will be
+            processed, such as ``max_line_size``.
         @param file_system: The object to use to read the file system.  This is used for testing
             purposes.  If None, then will just use the native file system.
         @param checkpoint: The checkpoint object describing where to pick up reading the file.
 
         @type path: str
+        @type config: scalyr_agent.Configuration
         @type file_system: FileSystem
         @type checkpoint: dict
         """
@@ -155,10 +158,10 @@ class LogFileIterator(object):
         # written to it if not.
         self.at_end = False
 
-        self.__max_line_length = MAX_LINE_SIZE
-        self.__line_completion_wait_time = LINE_COMPLETION_WAIT_TIME
-        self.__log_deletion_delay = LOG_DELETION_DELAY
-        self.__page_size = READ_PAGE_SIZE
+        self.__max_line_length = config.max_line_size  # Defaults to 5 * 1024
+        self.__line_completion_wait_time = config.line_completion_wait_time  # Defaults to 5 * 60
+        self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
+        self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
@@ -1009,10 +1012,12 @@ class LogFileProcessor(object):
     to be sent to the server after applying any sampling and redaction rules.
     """
 
-    def __init__(self, file_path, log_attributes=None, file_system=None, checkpoint=None):
+    def __init__(self, file_path, config, log_attributes=None, file_system=None, checkpoint=None):
         """Initializes an instance.
 
         @param file_path: The path of the log file to process.
+        @param config:  The configuration object containing parameters that govern how the logs will be processed
+            such as ``max_line_length``.
         @param log_attributes: The attributes to include on all lines copied from this log to the server.
             These are typically the file attributes from the configuration file and include such things as the
             parser for the log, etc.
@@ -1022,6 +1027,7 @@ class LogFileProcessor(object):
             the processing to pick up from where it was when the checkpoint was created.
 
         @type file_path: str
+        @type config: scalyr_agent.Configuration
         @type log_attributes: dict or None
         @type file_system: FileSystem
         @type checkpoint: dict or None
@@ -1041,7 +1047,7 @@ class LogFileProcessor(object):
         self.__thread_name = 'Lines for file %s' % file_path
         self.__thread_id = LogFileProcessor.generate_unique_thread_id()
 
-        self.__log_file_iterator = LogFileIterator(file_path, file_system=file_system, checkpoint=checkpoint)
+        self.__log_file_iterator = LogFileIterator(file_path, config, file_system=file_system, checkpoint=checkpoint)
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
@@ -1069,8 +1075,8 @@ class LogFileProcessor(object):
         # The last time the log file was checked for new content.
         self.__last_scan_time = None
 
-        self.__copy_staleness_threshold = COPY_STALENESS_THRESHOLD
-        self.__max_log_offset_size = MAX_LOG_OFFSET_SIZE
+        self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
+        self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
 
         self.__last_success = None
 
@@ -1619,12 +1625,17 @@ class LogMatcher(object):
     that log file.  Finally, it also includes attributes that should be included with each log line from that
     log when sent to the server.
     """
-    def __init__(self, log_entry_config):
+    def __init__(self, overall_config, log_entry_config):
         """Initializes an instance.
+        @param overall_config:  The configuration object containing parameters that govern how the logs will be
+            processed such as ``max_line_length``.
         @param log_entry_config: The configuration entry from the logs array in the agent configuration file,
             which specifies the path for the log file, as well as redaction rules, etc.
+
+        @type overall_config: scalyr_agent.Configuration
         @type log_entry_config: dict
         """
+        self.__overall_config = overall_config
         self.__log_entry_config = log_entry_config
         self.log_path = self.__log_entry_config['path']
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
@@ -1721,7 +1732,8 @@ class LogMatcher(object):
                     log_attributes['logfile'] = matched_file
 
                 # Create the processor to handle this log.
-                new_processor = LogFileProcessor(matched_file, log_attributes, checkpoint=checkpoint_state)
+                new_processor = LogFileProcessor(matched_file, self.__overall_config, log_attributes=log_attributes,
+                                                 checkpoint=checkpoint_state)
                 for rule in self.__log_entry_config['redaction_rules']:
                     new_processor.add_redacter(rule['match_expression'], rule['replacement'])
                 for rule in self.__log_entry_config['sampling_rules']:

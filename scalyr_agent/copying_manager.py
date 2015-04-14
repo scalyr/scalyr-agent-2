@@ -276,22 +276,9 @@ class CopyingManager(StoppableThread):
         result = []
 
         for log_config in configs:
-            result.append(CopyingManager.build_log(log_config))
+            result.append(LogMatcher(configuration, log_config))
 
         return result
-
-    @staticmethod
-    def build_log(log_config):
-        """Returns a LogMatcher instance that will handle matching the log specified in the config.
-
-        @param log_config:  The configuration object containing the log file path to copy, including also
-            the attributes that should be included on all copied lines and the redaction and sampling rules.
-        @type log_config: dict
-
-        @return:  The LogMatcher that will handle the requested log.
-        @rtype: LogMatcher
-        """
-        return LogMatcher(log_config)
 
     def start_manager(self, scalyr_client, logs_initial_positions=None):
         """Starts the manager running and will not return until it has been stopped.

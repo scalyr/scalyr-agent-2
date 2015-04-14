@@ -376,6 +376,36 @@ class Configuration(object):
         return self.__get_config().get_float('global_monitor_sample_interval')
 
     @property
+    def max_line_size(self):
+        """Returns the configuration value for 'max_line_size'."""
+        return self.__get_config().get_int('max_line_size')
+
+    @property
+    def line_completion_wait_time(self):
+        """Returns the configuration value for 'line_completion_wait_time'."""
+        return self.__get_config().get_float('line_completion_wait_time')
+
+    @property
+    def max_log_offset_size(self):
+        """Returns the configuration value for 'max_log_offset_size'."""
+        return self.__get_config().get_int('max_log_offset_size')
+
+    @property
+    def read_page_size(self):
+        """Returns the configuration value for 'read_page_size'."""
+        return self.__get_config().get_int('read_page_size')
+
+    @property
+    def log_deletion_delay(self):
+        """Returns the configuration value for 'log_deletion_delay'."""
+        return self.__get_config().get_float('log_deletion_delay')
+
+    @property
+    def copy_staleness_threshold(self):
+        """Returns the configuration value for 'copy_staleness_threshold'."""
+        return self.__get_config().get_float('copy_staleness_threshold')
+
+    @property
     def verify_server_certificate(self):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
@@ -539,6 +569,39 @@ class Configuration(object):
 
         self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description)
         self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description)
+
+        # These parameters are used in log_processing.py to govern how logs are copied.
+
+        # The maximum allowed size for a line when reading from a log file.
+        # We do not strictly enforce this -- some lines returned by LogFileIterator may be
+        # longer than this due to some edge cases.
+        self.__verify_or_set_optional_int(config, 'max_line_size', 5 * 1024, description)
+
+        # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
+        # not currently end in a new line (referred to as a partial line).  It could be that the full line just hasn't
+        # made it all the way to disk yet.  After this time though, we will just return the bytes as a line
+        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5 * 60, description)
+
+        # The maximum negative offset relative to the end of a log the log file
+        # iterator is allowed to become.  If bytes are not being read quickly enough, then
+        # the iterator will automatically advance so that it is no more than this length
+        # to the end of the file.  This is essentially the maximum bytes a log file
+        # is allowed to be caught up when used in copying logs to Scalyr.
+        self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description)
+
+        # The number of bytes to read from a file at a time into the buffer.  This must
+        # always be greater than the MAX_LINE_SIZE
+        self.__verify_or_set_optional_int(config, 'read_page_size', 64 * 1024, description)
+
+        # The minimum time we wait for a log file to reappear on a file system after it has been removed before
+        # we consider it deleted.
+        self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description)
+
+        # If we have noticed that new bytes have appeared in a file but we do not read them before this threshold
+        # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the
+        # freshest bytes.
+        self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description)
+
         self.__verify_or_set_optional_int(config, 'debug_level', 0, description)
         debug_level = config.get_int('debug_level')
         if debug_level < 0 or debug_level > 5:

@@ -73,6 +73,14 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.request_too_large_adjustment, 0.5)
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
+
+        self.assertEquals(config.max_line_size, 5 * 1024)
+        self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
+        self.assertEquals(config.line_completion_wait_time, 5 * 60)
+        self.assertEquals(config.read_page_size, 64 * 1024)
+        self.assertEquals(config.copy_staleness_threshold, 15 * 60)
+        self.assertEquals(config.log_deletion_delay, 10 * 60)
+
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
 
@@ -125,6 +133,15 @@ class TestConfiguration(ScalyrTestCase):
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
+
+            max_line_size: 1024,
+            max_log_offset_size: 1048576,
+            line_completion_wait_time: 120,
+            read_page_size: 3072,
+            copy_staleness_threshold: 240,
+            log_deletion_delay: 300,
+
+
             logs: [ { path: "/var/log/tomcat6/access.log"} ]
           }
         """)
@@ -154,6 +171,13 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.high_water_request_spacing_adjustment, 2.0)
         self.assertEquals(config.low_water_bytes_sent, 5000)
         self.assertEquals(config.low_water_request_spacing_adjustment, -1.0)
+
+        self.assertEquals(config.max_line_size, 1 * 1024)
+        self.assertEquals(config.max_log_offset_size, 1 * 1024 * 1024)
+        self.assertEquals(config.line_completion_wait_time, 2 * 60)
+        self.assertEquals(config.read_page_size, 3 * 1024)
+        self.assertEquals(config.copy_staleness_threshold, 4 * 60)
+        self.assertEquals(config.log_deletion_delay, 5 * 60)
 
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)
@@ -633,6 +657,11 @@ class TestConfiguration(ScalyrTestCase):
             self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
 
     def __create_test_configuration_instance(self):
+        """Creates an instance of a Configuration file for testing.
+
+        @return:  The test instance
+        @rtype: Configuration
+        """
         default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),
                                      self.convert_path('/etc/scalyr-agent-2/agent.json'),
                                      self.convert_path('/var/lib/scalyr-agent-2'))
