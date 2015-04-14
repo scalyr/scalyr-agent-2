@@ -100,18 +100,28 @@ class MonitorsManager(object):
 
         This will only return after all the threads for the monitors have been stopped and joined on.
         """
-        # TODO:  Move this try statement out of here.  Let higher layers catch it.
-        # noinspection PyBroadException
-        try:
-            for monitor in self.__running_monitors:
+        # TODO:  Move these try statements out of here.  Let higher layers catch it.
+        for monitor in self.__running_monitors:
+            # noinspection PyBroadException
+            try:
                 log.info('Stopping monitor %s', monitor.monitor_name)
                 monitor.stop(wait_on_join=False)
+            except:
+                log.exception('Failed to stop the metric log without join due to an exception')
 
-            for monitor in self.__running_monitors:
+        for monitor in self.__running_monitors:
+            # noinspection PyBroadException
+            try:
                 monitor.stop(join_timeout=1)
+            except:
+                log.exception('Failed to stop the metric log due to an exception')
+
+        for monitor in self.__running_monitors:
+            # noinspection PyBroadException
+            try:
                 monitor.close_metric_log()
-        except:
-            log.exception('Failed to stop the monitors due to an exception')
+            except:
+                log.exception('Failed to close the metric log due to an exception')
 
     @property
     def monitors(self):
