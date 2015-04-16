@@ -174,14 +174,15 @@ class SyslogMonitor( ScalyrMonitor ):
         #build list of protocols and ports from the protocol option
         self.__server_list = self.__build_server_list( self._config.get( 'protocol' ) )
 
-        #our disk logger
+        #our disk logger and handler
         self.__disk_logger = None
+        self.__log_handler = None
 
         #configure the logger and path
         message_log = self._config.get( 'message_log' )
 
         self.log_config = {
-            'parser': 'systemLog',
+            'parser': 'syslogServer',
             'path': message_log,
         }
 
@@ -248,7 +249,7 @@ class SyslogMonitor( ScalyrMonitor ):
         and instead create our own logger which will log raw messages out to disk.
         """
         name = __name__ + '.syslog'
-        self.__disk_logger = logging.Logger( name )
+        self.__disk_logger = logging.getLogger( name )
 
         #assume successful for when the logger handler has already been created
         success = True
@@ -258,10 +259,10 @@ class SyslogMonitor( ScalyrMonitor ):
             #logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
-                handler = logging.handlers.RotatingFileHandler( filename = self.log_config['path'], maxBytes = self.__max_log_size, backupCount = self.__max_log_rotations )
+                self.__log_handler = logging.handlers.RotatingFileHandler( filename = self.log_config['path'], maxBytes = self.__max_log_size, backupCount = self.__max_log_rotations )
                 formatter = logging.Formatter()
-                handler.setFormatter( formatter )
-                self.__disk_logger.addHandler( handler )
+                self.__log_handler.setFormatter( formatter )
+                self.__disk_logger.addHandler( self.__log_handler )
                 self.__disk_logger.setLevel( logging.INFO )
                 success = True
             except Exception, e:
@@ -270,8 +271,9 @@ class SyslogMonitor( ScalyrMonitor ):
         return success
 
     def close_metric_log( self ):
-        #don't do anything here, but override it so the parent class isn't called
-        pass
+        if self.__log_handler:
+            self.__disk_logger.removeHandler( self.__log_handler )
+            self.__log_handler.close()
 
     def run( self ):
         try:

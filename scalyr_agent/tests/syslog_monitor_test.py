@@ -120,7 +120,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         #capture log output
         scalyr_logging.set_log_destination(use_stdout=True)
         scalyr_logging.set_log_level(scalyr_logging.DEBUG_LEVEL_0)
-        self.logger = scalyr_logging.getLogger( "syslog_monitor[test]" )
+        self.logger = logging.getLogger( "scalyr_agent.builtin_monitors.syslog_monitor.syslog" )
         self.logger.setLevel( logging.INFO )
         self.stream = StringIO();
         self.handler = logging.StreamHandler( self.stream )
@@ -137,7 +137,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
 
         #stop any running monitors - this might be open if an exception was thrown before a test called monitor.stop()
         if self.monitor != None:
-            self.monitor.stop()
+            self.monitor.stop( wait_on_join=False )
 
         self.logger.removeHandler( self.handler )
         self.handler.close()
@@ -145,6 +145,19 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         #restore stdout
         sys.stdout.close()
         sys.stdout = self.old
+
+    def connect( self, socket, addr, max_tries = 3 ):
+        connected = False
+        tries = 0
+        while not connected and tries < max_tries:
+            try:
+                socket.connect( addr )
+                connected = True
+            except:
+                time.sleep( 0.1 )
+            tries += 1
+
+        return connected
 
 
     def test_run_tcp_server( self ):
@@ -161,10 +174,10 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         self.sockets.append( s )
 
         expected = "TCP Test"
-        s.connect( ('localhost', 6514 ) )
-        s.send( expected )
+        self.connect( s, ('localhost', 6514 ) )
+        s.sendall( expected )
 
-        self.monitor.stop()
+        self.monitor.stop( wait_on_join=False )
         self.monitor = None
 
         self.handler.flush()
@@ -182,13 +195,15 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         self.monitor.open_metric_log()
         self.monitor.start()
 
+        time.sleep( 0.1 )
+
         s = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
         self.sockets.append( s )
 
         expected = "UDP Test"
         s.sendto( expected, ('localhost', 5514) )
 
-        self.monitor.stop()
+        self.monitor.stop( wait_on_join=False )
         self.monitor = None
 
         self.handler.flush()
@@ -205,9 +220,6 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         self.monitor.open_metric_log()
         self.monitor.start()
 
-        #sleep to make sure all the server threads have started
-        time.sleep( 0.001 )
-
         udp = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
         self.sockets.append( udp )
 
@@ -217,6 +229,11 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         tcp2 = socket.socket()
         self.sockets.append( tcp2 )
 
+        self.connect( tcp1, ('localhost', 8001) )
+        self.connect( tcp2, ('localhost', 8003) )
+
+        time.sleep( 0.1 )
+
         expected_udp1 = "UDP Test"
         udp.sendto( expected_udp1, ('localhost', 8000) )
 
@@ -224,14 +241,14 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         udp.sendto( expected_udp2, ('localhost', 8002) )
 
         expected_tcp1 = "TCP Test"
-        tcp1.connect( ('localhost', 8001 ) )
-        tcp1.send( expected_tcp1 )
+        tcp1.sendall( expected_tcp1 )
 
         expected_tcp2 = "TCP2 Test"
-        tcp2.connect( ('localhost', 8003) )
-        tcp2.send( expected_tcp2 )
+        tcp2.sendall( expected_tcp2 )
 
-        self.monitor.stop()
+
+
+        self.monitor.stop( wait_on_join=False )
         self.monitor = None
 
         self.handler.flush()
