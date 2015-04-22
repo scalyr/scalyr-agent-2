@@ -92,15 +92,18 @@ class LogFileIterator(object):
     but then return to it by invoking 'seek'.
     """
 
-    def __init__(self, path, file_system=None, checkpoint=None):
+    def __init__(self, path, config, file_system=None, checkpoint=None):
         """
 
         @param path: The path of the file to read.
+        @param config: The configuration object containing values for parameters that govern how logs will be
+            processed, such as ``max_line_size``.
         @param file_system: The object to use to read the file system.  This is used for testing
             purposes.  If None, then will just use the native file system.
         @param checkpoint: The checkpoint object describing where to pick up reading the file.
 
         @type path: str
+        @type config: scalyr_agent.Configuration
         @type file_system: FileSystem
         @type checkpoint: dict
         """
@@ -155,10 +158,10 @@ class LogFileIterator(object):
         # written to it if not.
         self.at_end = False
 
-        self.__max_line_length = MAX_LINE_SIZE
-        self.__line_completion_wait_time = LINE_COMPLETION_WAIT_TIME
-        self.__log_deletion_delay = LOG_DELETION_DELAY
-        self.__page_size = READ_PAGE_SIZE
+        self.__max_line_length = config.max_line_size  # Defaults to 5 * 1024
+        self.__line_completion_wait_time = config.line_completion_wait_time  # Defaults to 5 * 60
+        self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
+        self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
@@ -198,6 +201,8 @@ class LogFileIterator(object):
                         self.__pending_files.append(LogFileIterator.FileState(
                             LogFileIterator.FileState.create_json(0, initial_position, file_size, inode, True),
                             file_object))
+                    elif file_object is not None:
+                        file_object.close()
                 need_to_close = False
             finally:
                 if need_to_close:
@@ -241,6 +246,9 @@ class LogFileIterator(object):
         self.__refresh_pending_files(current_time)
 
         new_pending_files = []
+
+        # TODO:  None of this code should throw exceptions, but if it does, we could leave __pending_files
+        # in a weird state.  Maybe we should make this more bullet proof.
 
         # We throw out any __pending_file entries that are before the current mark position or can no longer be
         # read.
@@ -1009,10 +1017,12 @@ class LogFileProcessor(object):
     to be sent to the server after applying any sampling and redaction rules.
     """
 
-    def __init__(self, file_path, log_attributes=None, file_system=None, checkpoint=None):
+    def __init__(self, file_path, config, log_attributes=None, file_system=None, checkpoint=None):
         """Initializes an instance.
 
         @param file_path: The path of the log file to process.
+        @param config:  The configuration object containing parameters that govern how the logs will be processed
+            such as ``max_line_length``.
         @param log_attributes: The attributes to include on all lines copied from this log to the server.
             These are typically the file attributes from the configuration file and include such things as the
             parser for the log, etc.
@@ -1022,6 +1032,7 @@ class LogFileProcessor(object):
             the processing to pick up from where it was when the checkpoint was created.
 
         @type file_path: str
+        @type config: scalyr_agent.Configuration
         @type log_attributes: dict or None
         @type file_system: FileSystem
         @type checkpoint: dict or None
@@ -1041,7 +1052,7 @@ class LogFileProcessor(object):
         self.__thread_name = 'Lines for file %s' % file_path
         self.__thread_id = LogFileProcessor.generate_unique_thread_id()
 
-        self.__log_file_iterator = LogFileIterator(file_path, file_system=file_system, checkpoint=checkpoint)
+        self.__log_file_iterator = LogFileIterator(file_path, config, file_system=file_system, checkpoint=checkpoint)
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
@@ -1069,8 +1080,8 @@ class LogFileProcessor(object):
         # The last time the log file was checked for new content.
         self.__last_scan_time = None
 
-        self.__copy_staleness_threshold = COPY_STALENESS_THRESHOLD
-        self.__max_log_offset_size = MAX_LOG_OFFSET_SIZE
+        self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
+        self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
 
         self.__last_success = None
 
@@ -1399,6 +1410,19 @@ class LogFileProcessor(object):
         self.__total_bytes_pending = self.__log_file_iterator.available
         self.__lock.release()
 
+    def close(self):
+        """Closes the processor, closing all underlying file handles.
+
+        This does nothing if the processor is already closed.
+        """
+        try:
+            self.__lock.acquire()
+            if not self.__is_closed:
+                self.__log_file_iterator.close()
+                self.__is_closed = True
+        finally:
+            self.__lock.release()
+
     def get_checkpoint(self):
         return self.__log_file_iterator.get_checkpoint()
 
@@ -1619,12 +1643,17 @@ class LogMatcher(object):
     that log file.  Finally, it also includes attributes that should be included with each log line from that
     log when sent to the server.
     """
-    def __init__(self, log_entry_config):
+    def __init__(self, overall_config, log_entry_config):
         """Initializes an instance.
+        @param overall_config:  The configuration object containing parameters that govern how the logs will be
+            processed such as ``max_line_length``.
         @param log_entry_config: The configuration entry from the logs array in the agent configuration file,
             which specifies the path for the log file, as well as redaction rules, etc.
+
+        @type overall_config: scalyr_agent.Configuration
         @type log_entry_config: dict
         """
+        self.__overall_config = overall_config
         self.__log_entry_config = log_entry_config
         self.log_path = self.__log_entry_config['path']
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
@@ -1637,6 +1666,17 @@ class LogMatcher(object):
         self.__processors = []
         # The lock that protects the __processor and __last_check vars.
         self.__lock = threading.Lock()
+
+    @property
+    def config(self):
+        """Returns the log entry configuration for this matcher.
+
+        This is used only for testing purposes.
+
+        @return: The configuration.  You must not modify this object.
+        @rtype: dict
+        """
+        return self.__log_entry_config
 
     def generate_status(self):
         """
@@ -1688,39 +1728,55 @@ class LogMatcher(object):
         self.__lock.release()
 
         result = []
+        # We need to be careful that we throw out any processors that were created if we do hit an exception,
+        # so we track if we got to the return statement down below or not.
+        reached_return = False
+
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
-        for matched_file in glob.glob(self.__log_entry_config['path']):
-            # Only process it if we have permission to read it and it is not already being processed.
-            if not matched_file in existing_processors and self.__can_read_file(matched_file):
-                checkpoint_state = None
-                # Get the last checkpoint state if it exists.
-                if matched_file in previous_state:
-                    checkpoint_state = previous_state[matched_file]
-                    del previous_state[matched_file]
-                elif copy_at_index_zero:
-                    # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
-                    # then create a checkpoint to represent that.
-                    checkpoint_state = LogFileProcessor.create_checkpoint(0)
+        try:
+            for matched_file in glob.glob(self.__log_entry_config['path']):
+                # Only process it if we have permission to read it and it is not already being processed.
+                if not matched_file in existing_processors and self.__can_read_file(matched_file):
+                    checkpoint_state = None
+                    # Get the last checkpoint state if it exists.
+                    if matched_file in previous_state:
+                        checkpoint_state = previous_state[matched_file]
+                        del previous_state[matched_file]
+                    elif copy_at_index_zero:
+                        # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
+                        # then create a checkpoint to represent that.
+                        checkpoint_state = LogFileProcessor.create_checkpoint(0)
 
-                # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
-                # if the field or legacy field is not present.  Maybe we should override this regardless because the
-                # user could get it wrong.. but for now, we just let them screw it up if they want to.
-                log_attributes = dict(self.__log_entry_config['attributes'])
-                if 'logfile' not in log_attributes and 'filename' not in log_attributes:
-                    log_attributes['logfile'] = matched_file
+                    # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
+                    # if the field or legacy field is not present.  Maybe we should override this regardless because the
+                    # user could get it wrong.. but for now, we just let them screw it up if they want to.
+                    log_attributes = dict(self.__log_entry_config['attributes'])
+                    if 'logfile' not in log_attributes and 'filename' not in log_attributes:
+                        log_attributes['logfile'] = matched_file
 
-                # Create the processor to handle this log.
-                new_processor = LogFileProcessor(matched_file, log_attributes, checkpoint=checkpoint_state)
-                for rule in self.__log_entry_config['redaction_rules']:
-                    new_processor.add_redacter(rule['match_expression'], rule['replacement'])
-                for rule in self.__log_entry_config['sampling_rules']:
-                    new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
-                result.append(new_processor)
-                self.__lock.acquire()
+                    # Create the processor to handle this log.
+                    new_processor = LogFileProcessor(matched_file, self.__overall_config, log_attributes=log_attributes,
+                                                     checkpoint=checkpoint_state)
+                    for rule in self.__log_entry_config['redaction_rules']:
+                        new_processor.add_redacter(rule['match_expression'], rule['replacement'])
+                    for rule in self.__log_entry_config['sampling_rules']:
+                        new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
+                    result.append(new_processor)
+
+            self.__lock.acquire()
+            for new_processor in result:
                 self.__processors.append(new_processor)
-                self.__lock.release()
+            self.__lock.release()
 
-        return result
+            reached_return = True
+            return result
+
+        finally:
+            # If we didn't actually return the result, then we need to be sure to close the processors so that
+            # we release any file handles.
+            if not reached_return:
+                for new_processor in result:
+                    new_processor.close()
 
     def __can_read_file(self, file_path):
         """Determines if this process can read the file at the path.

@@ -17,12 +17,12 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
 
 from scalyr_agent.scalyr_client import AddEventsRequest, PostFixBuffer
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class AddEventsRequestTest(unittest.TestCase):
+class AddEventsRequestTest(ScalyrTestCase):
 
     def setUp(self):
         self.__body = {'token': 'fakeToken'}
@@ -152,7 +152,7 @@ class AddEventsRequestTest(unittest.TestCase):
         request.close()
 
 
-class PostFixBufferTest(unittest.TestCase):
+class PostFixBufferTest(ScalyrTestCase):
 
     def setUp(self):
         self.__format = '], threads: THREADS, client_time: TIMESTAMP }'

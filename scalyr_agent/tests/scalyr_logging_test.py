@@ -20,12 +20,12 @@ __author__ = 'czerwin@scalyr.com'
 import os
 import re
 import tempfile
-import unittest
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class ScalyrLoggingTest(unittest.TestCase):
+class ScalyrLoggingTest(ScalyrTestCase):
     def setUp(self):
         self.__log_path = tempfile.mktemp('.log')
         scalyr_logging.set_log_destination(use_disk=True, logs_directory=os.path.dirname(self.__log_path),
@@ -107,8 +107,8 @@ class ScalyrLoggingTest(unittest.TestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
 
         self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, '1name', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name-hi', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name', 5, {'hi-': 6})
+        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name+hi', 5)
+        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name', 5, {'hi+': 6})
 
         monitor_logger.closeMetricLog()
 

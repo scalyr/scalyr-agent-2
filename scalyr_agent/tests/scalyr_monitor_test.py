@@ -17,13 +17,12 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
-
 
 from scalyr_agent.scalyr_monitor import MonitorConfig, BadMonitorConfiguration, define_config_option
+from scalyr_agent.test_base import ScalyrTestCase
 
 
-class MonitorConfigTest(unittest.TestCase):
+class MonitorConfigTest(ScalyrTestCase):
 
     def test_base(self):
         config = MonitorConfig(

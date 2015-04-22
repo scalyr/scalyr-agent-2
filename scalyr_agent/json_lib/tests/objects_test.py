@@ -21,9 +21,10 @@ import unittest
 
 from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
+from scalyr_agent.test_base import ScalyrTestCase
 
 
-class JsonObjectTests(unittest.TestCase):
+class JsonObjectTests(ScalyrTestCase):
     def test_constructor(self):
         x = JsonObject(foo=5, bar=True)
         self.assertEquals(x["foo"], 5)
@@ -218,7 +219,7 @@ class JsonObjectTests(unittest.TestCase):
         self.assertTrue('bar' in keys)
 
 
-class JsonArrayTests(unittest.TestCase):
+class JsonArrayTests(ScalyrTestCase):
     def test_constructor(self):
         x = JsonArray("hi", True)
         self.assertEquals(len(x), 2)

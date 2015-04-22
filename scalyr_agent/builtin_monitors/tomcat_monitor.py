@@ -298,8 +298,6 @@ instance."""
             credentials_needed = True
         if credentials_needed:                             
             raise Exception("if monitor_user or monitor_password specified, both must be specified")
-            
-        self._sample_interval_secs = 30 # how often to check the database status    
 
     def _get_status(self, url):
         data = None

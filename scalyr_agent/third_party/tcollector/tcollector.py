@@ -799,14 +799,17 @@ def reset_for_new_run():
     ALIVE = True
 
 
-# Scalyr edit:  Added last two arguments.
-def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=None):
+# Scalyr edit:  Added last three arguments.
+def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=None, sample_interval_secs=30.0):
     """The main loop of the program that runs when we're not in stdin mode.
 
     The last argument is a function that if invoked will return true if the collector has been terminated.
     It takes an argument that, if not None, will be the number of seconds it will sleep for waiting for the
     collector to be marked as terminated.
     """
+    # Scalyr edit: Set the environment variable to override the sample intervals when the collectors are spawned.
+    # This relies on the individual collectors checking this variable.
+    os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = str(sample_interval_secs)
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():
@@ -1056,8 +1059,9 @@ def spawn_collector(col):
     # if re.search('\.py$', col.name) is not None:
     #     ... load the py module directly instead of using a subprocess ...
     try:
+        # Scalyr edit:  Add in close_fds=True
         col.proc = subprocess.Popen(col.filename, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+                                    stderr=subprocess.PIPE, close_fds=True)
     except OSError, e:
         LOG.error('Failed to spawn collector %s: %s' % (col.filename, e))
         return

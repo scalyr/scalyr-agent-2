@@ -13,23 +13,25 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# author: Steven Czerwinski <czerwin@scalyr.com>
+# author: Imron Alston <imron@imralsoftware.com>
 
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = 'imron@imralsoftware.com'
 
-import os
+import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.__scalyr__ import get_install_root, get_package_root, SCALYR_VERSION
+from scalyr_agent.run_monitor import run_standalone_monitor
+
 from scalyr_agent.test_base import ScalyrTestCase
 
-class TestUtil(ScalyrTestCase):
 
-    def test_version(self):
-        self.assertTrue(SCALYR_VERSION.startswith('2.'))
+class RunMonitorTest(ScalyrTestCase):
+    def test_run_standalone_monitor( self ):
+        config = """{
+                 }"""
 
-    def test_get_install_root(self):
-        self.assertEquals(os.path.basename(get_install_root()), 'scalyr-agent-2')
+        run_standalone_monitor("scalyr_agent.tests.empty_monitor", ".", config, float(0.5),
+                               scalyr_logging.DEBUG_LEVEL_0)
 
-    def test_get_package_root(self):
-        self.assertEquals(os.path.basename(get_package_root()), 'scalyr_agent')
+
+

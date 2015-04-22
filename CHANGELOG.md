@@ -1,19 +1,45 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.6 "Furious Falcon" - Mar 20, 2015
+## 2.0.8 "Hilarious Horse" - Apr 15, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 20, 2015 13:30 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 15, 2015 11:30 -0700
 --->
 
-This release is under active development.  Actual release date TBD.
+New features:
+
+* Make log processing parameters such as ``max_log_offset_size`` adjustable via the configuration file.
+
+Bug fixes:
+
+* Fix bug preventing turning off default system and agent process monitors.
+* Fix bugs preventing release of open file handles
+
+
+## 2.0.7 "Glorious Gerbil" - Apr 8, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 8, 2015 11:00 -0700
+--->
+
+Bug fixes:
+
+* Relax metric name checking to allow including dashes.
+* Fix bug where linux_system_metrics was ignoring the configured sample interval time.
+
+## 2.0.6 "Furious Falcon" - Apr 2, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 2, 2015 16:30 -0700
+--->
 
 New features:
 
 * Add a new option ``--set-server-host`` in scalyr-agent-2-config to set the server host from the commandline.
 * Add new instance variables ``_log_write_rate`` and ``_log_max_write_burst`` to ScalyrMonitor to allow monitor developers to override the rate limits imposed on their monitor's log.  See the comments in test_monitor.py for more details.
 * Add new parameter ``emit_to_metric_log=True`` to force a log line to go to the metric log instead of the agent log for monitors.  See the comments in test_monitor.py for more details.
+* Added new configuration parameters to easily change any or all monitor's sample rate.  Use ``global_monitor_sample_interval`` in the general configuration to set it for all monitors, or ``sample_interval`` in an individual monitor's config.  The value should be the number of seconds between samples and can be fractional.  
 
 Bug fixes:
 

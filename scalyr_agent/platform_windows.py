@@ -231,30 +231,25 @@ class WindowsPlatformController(PlatformController):
         """
         self.__config_file_path = os.path.abspath(path_to_config)
 
-    @property
-    def default_monitors(self):
+    def get_default_monitors(self, config):
         """Returns the default monitors to use for this platform.
 
-        This is guaranteed to be invoked after consume_config is called to allow implementations to make what they
-        return be dependent on configuration options.
+        This method should return a list of dicts containing monitor configuration options just as you would specify
+        them in the configuration file.  The list may be empty.
 
-        This method should list of dicts containing monitor configuration options just as you would specify them in
-        the configuration file.  The list may be empty.
+        @param config The configuration object to use.
+        @type config configuration.Configuration
 
         @return: The default monitors
         @rtype: list<dict>
         """
-        monitors = [
-            JsonObject(
-                module='scalyr_agent.builtin_monitors.windows_system_metrics'
-            ),
-            JsonObject(
-                module='scalyr_agent.builtin_monitors.windows_process_metrics',
-                pid='$$',
-                id='agent'
-            ),
-        ]
-        return monitors
+        result = []
+        if config.implicit_metric_monitor:
+            result.append(JsonObject(module='scalyr_agent.builtin_monitors.windows_system_metrics'))
+        if config.implicit_agent_process_metrics_monitor:
+            result.append(JsonObject(module='scalyr_agent.builtin_monitors.windows_process_metrics',
+                                     pid='$$', id='agent'))
+        return result
 
     def get_file_owner(self, file_path):
         """Returns the user name of the owner of the specified file.

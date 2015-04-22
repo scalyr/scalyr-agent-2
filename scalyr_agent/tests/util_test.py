@@ -14,14 +14,13 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import struct
-import threading
 
 __author__ = 'czerwin@scalyr.com'
 
 import os
 import tempfile
-import unittest
+import struct
+import threading
 
 import scalyr_agent.util as scalyr_util
 
@@ -29,8 +28,9 @@ from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, 
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.json_lib import JsonObject
 
+from scalyr_agent.test_base import ScalyrTestCase
 
-class TestUtil(unittest.TestCase):
+class TestUtil(ScalyrTestCase):
 
     def setUp(self):
         self.__tempdir = tempfile.mkdtemp()
@@ -70,7 +70,7 @@ class TestUtil(unittest.TestCase):
         self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 6), 'ok   t')
 
 
-class TestRateLimiter(unittest.TestCase):
+class TestRateLimiter(ScalyrTestCase):
     def setUp(self):
         self.__test_rate = RateLimiter(100, 10, current_time=0)
         self.__current_time = 0
@@ -95,7 +95,7 @@ class TestRateLimiter(unittest.TestCase):
         self.assertTrue(self.charge_if_available(60))
 
 
-class TestRunState(unittest.TestCase):
+class TestRunState(ScalyrTestCase):
 
     def test_basic_use(self):
         # We use a FakeRunState for testing just so we do not accidentally sleep.
@@ -132,7 +132,7 @@ class TestRunState(unittest.TestCase):
         self.assertTrue(self.called)
 
 
-class TestStoppableThread(unittest.TestCase):
+class TestStoppableThread(ScalyrTestCase):
     def setUp(self):
         self._run_counter = 0
 
@@ -141,7 +141,7 @@ class TestStoppableThread(unittest.TestCase):
         test_thread.start()
         test_thread.stop()
 
-        self.assertGreater(self._run_counter, 0)
+        self.assertTrue(self._run_counter > 0)
 
     def test_basic_extending(self):
         class TestThread(StoppableThread):
@@ -159,7 +159,7 @@ class TestStoppableThread(unittest.TestCase):
         test_thread.start()
         test_thread.stop()
 
-        self.assertGreater(test_thread.run_counter, 0)
+        self.assertTrue(test_thread.run_counter > 0)
 
     def test_exception(self):
         class TestException(Exception):
@@ -187,7 +187,7 @@ class TestStoppableThread(unittest.TestCase):
             run_state.sleep_but_awaken_if_stopped(0.03)
 
 
-class TestScriptEscalator(unittest.TestCase):
+class TestScriptEscalator(ScalyrTestCase):
     def test_is_user_change_required(self):
         (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'steve')
         self.assertTrue(test_instance.is_user_change_required())
@@ -237,7 +237,7 @@ class TestScriptEscalator(unittest.TestCase):
             return 0
 
 
-class TestRedirectorServer(unittest.TestCase):
+class TestRedirectorServer(ScalyrTestCase):
     """Tests the RedirectorServer code using fakes for stdout, stderr and the channel.
     """
     def setUp(self):
@@ -311,7 +311,7 @@ class TestRedirectorServer(unittest.TestCase):
         return stream_id, decoded_str
 
 
-class TestRedirectorClient(unittest.TestCase):
+class TestRedirectorClient(ScalyrTestCase):
     """Test the RedirectorClient by faking out the client channel and also the clock.
     """
     def setUp(self):
@@ -392,7 +392,7 @@ class TestRedirectorClient(unittest.TestCase):
         self._client_channel.simulate_server_write(struct.pack('i', code) + encoded_content)
 
 
-class TestRedirectionService(unittest.TestCase):
+class TestRedirectionService(ScalyrTestCase):
     """Tests both the RedirectorServer and the RedirectorClient communicating together.
     """
     def setUp(self):

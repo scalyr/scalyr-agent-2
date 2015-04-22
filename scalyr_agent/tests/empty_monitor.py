@@ -13,23 +13,15 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# author: Steven Czerwinski <czerwin@scalyr.com>
+# author: Imron Alston <imron@imralsoftware.com>
+#
+# An empty monitor, that will return immediately without doing anything
 
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = 'imron@imralsoftware.com'
 
-import os
+from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
-from scalyr_agent.__scalyr__ import get_install_root, get_package_root, SCALYR_VERSION
-from scalyr_agent.test_base import ScalyrTestCase
-
-class TestUtil(ScalyrTestCase):
-
-    def test_version(self):
-        self.assertTrue(SCALYR_VERSION.startswith('2.'))
-
-    def test_get_install_root(self):
-        self.assertEquals(os.path.basename(get_install_root()), 'scalyr-agent-2')
-
-    def test_get_package_root(self):
-        self.assertEquals(os.path.basename(get_package_root()), 'scalyr_agent')
+class EmptyMonitor( ScalyrMonitor ):
+    def run( self ):
+        pass

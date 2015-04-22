@@ -137,15 +137,15 @@ class PlatformController:
         """
         return None
 
-    @property
-    def default_monitors(self):
+    # noinspection PyUnusedLocal
+    def get_default_monitors(self, config):
         """Returns the default monitors to use for this platform.
-
-        This is guaranteed to be invoked after consume_config is called to allow implementations to make what they
-        return be dependent on configuration options.
 
         This method should return a list of dicts containing monitor configuration options just as you would specify
         them in the configuration file.  The list may be empty.
+
+        @param config The configuration object to use.
+        @type config configuration.Configuration
 
         @return: The default monitors
         @rtype: list<dict>

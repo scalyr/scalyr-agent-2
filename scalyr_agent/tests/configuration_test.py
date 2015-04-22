@@ -14,20 +14,22 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-from scalyr_agent.platform_controller import DefaultPaths
+
 
 __author__ = 'czerwin@scalyr.com'
 
 import os
 import tempfile
-import unittest
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
+from scalyr_agent.platform_controller import DefaultPaths
+
+from scalyr_agent.test_base import ScalyrTestCase
 
 
-class TestConfiguration(unittest.TestCase):
+class TestConfiguration(ScalyrTestCase):
     def setUp(self):
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')
@@ -54,6 +56,8 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(len(config.server_attributes), 1)
         self.assertTrue('serverHost' in config.server_attributes)
 
+        self.assertEquals(config.global_monitor_sample_interval, 30.0)
+
         self.assertEquals(config.max_allowed_request_size, 1*1024*1024)
         self.assertEquals(config.min_allowed_request_size, 100*1024)
 
@@ -69,29 +73,25 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.request_too_large_adjustment, 0.5)
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
+
+        self.assertEquals(config.max_line_size, 5 * 1024)
+        self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
+        self.assertEquals(config.line_completion_wait_time, 5 * 60)
+        self.assertEquals(config.read_page_size, 64 * 1024)
+        self.assertEquals(config.copy_staleness_threshold, 15 * 60)
+        self.assertEquals(config.log_deletion_delay, 10 * 60)
+
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
 
-        self.assertEquals(len(config.logs), 4)
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
-        self.assertEquals(config.logs[0].config.get_json_object('attributes'), JsonObject())
-        self.assertEquals(config.logs[0].config.get_json_array('sampling_rules'), JsonArray())
-        self.assertEquals(config.logs[0].config.get_json_array('redaction_rules'), JsonArray())
-        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertPathEquals(config.logs[2].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
-        self.assertPathEquals(config.logs[3].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_process_metrics.log')
+        self.assertEquals(len(config.log_configs), 2)
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
+        self.assertEquals(config.log_configs[0].get_json_object('attributes'), JsonObject())
+        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
+        self.assertEquals(config.log_configs[0].get_json_array('redaction_rules'), JsonArray())
+        self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
-        self.assertEquals(len(config.monitors), 2)
-        self.assertEquals(config.monitors[0].config.get_string('module'),
-                          'scalyr_agent.builtin_monitors.linux_system_metrics')
-        self.assertEquals(config.monitors[0].config.get_string('log_path'),
-                          'scalyr_agent.builtin_monitors.linux_system_metrics.log')
-        self.assertEquals(config.monitors[1].config.get_string('module'),
-                          'scalyr_agent.builtin_monitors.linux_process_metrics')
-        self.assertEquals(config.monitors[1].config.get_string('log_path'),
-                          'scalyr_agent.builtin_monitors.linux_process_metrics.log')
+        self.assertEquals(len(config.monitor_configs), 0)
 
     def test_empty_config(self):
         self.__write_file_with_separator_conversion(""" {
@@ -102,13 +102,9 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(len(config.logs), 3)
+        self.assertEquals(len(config.log_configs), 1)
 
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertPathEquals(config.logs[1].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
-        self.assertPathEquals(config.logs[2].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_process_metrics.log')
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
     def test_overriding_basic_settings(self):
         self.__write_file_with_separator_conversion(""" {
@@ -121,6 +117,7 @@ class TestConfiguration(unittest.TestCase):
             implicit_agent_log_collection: false,
             use_unsafe_debugging: true,
             scalyr_server: "noland.scalyr.com",
+            global_monitor_sample_interval: 60.0,
             max_allowed_request_size: 2000000,
             min_allowed_request_size: 7000,
             min_request_spacing_interval: 2.0,
@@ -136,6 +133,15 @@ class TestConfiguration(unittest.TestCase):
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
+
+            max_line_size: 1024,
+            max_log_offset_size: 1048576,
+            line_completion_wait_time: 120,
+            read_page_size: 3072,
+            copy_staleness_threshold: 240,
+            log_deletion_delay: 300,
+
+
             logs: [ { path: "/var/log/tomcat6/access.log"} ]
           }
         """)
@@ -153,6 +159,8 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(len(config.server_attributes), 2)
         self.assertEquals(config.server_attributes['region'], 'us-east')
 
+        self.assertEquals(config.global_monitor_sample_interval, 60.0)
+
         self.assertEquals(config.max_allowed_request_size, 2000000)
         self.assertEquals(config.min_allowed_request_size, 7000)
 
@@ -163,6 +171,13 @@ class TestConfiguration(unittest.TestCase):
         self.assertEquals(config.high_water_request_spacing_adjustment, 2.0)
         self.assertEquals(config.low_water_bytes_sent, 5000)
         self.assertEquals(config.low_water_request_spacing_adjustment, -1.0)
+
+        self.assertEquals(config.max_line_size, 1 * 1024)
+        self.assertEquals(config.max_log_offset_size, 1 * 1024 * 1024)
+        self.assertEquals(config.line_completion_wait_time, 2 * 60)
+        self.assertEquals(config.read_page_size, 3 * 1024)
+        self.assertEquals(config.copy_staleness_threshold, 4 * 60)
+        self.assertEquals(config.log_deletion_delay, 5 * 60)
 
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)
@@ -229,8 +244,8 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.logs), 4)
-        sampling_rules = config.logs[0].config.get_json_array('sampling_rules')
+        self.assertEquals(len(config.log_configs), 2)
+        sampling_rules = config.log_configs[0].get_json_array('sampling_rules')
         self.assertEquals(len(sampling_rules), 2)
         self.assertEquals(sampling_rules.get_json_object(0).get_string("match_expression"), "INFO")
         self.assertEquals(sampling_rules.get_json_object(0).get_float("sampling_rate"), 0)
@@ -308,8 +323,8 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.logs), 4)
-        redaction_rules = config.logs[0].config.get_json_array('redaction_rules')
+        self.assertEquals(len(config.log_configs), 2)
+        redaction_rules = config.log_configs[0].get_json_array('redaction_rules')
         self.assertEquals(len(redaction_rules), 3)
         self.assertEquals(redaction_rules.get_json_object(0).get_string("match_expression"), "password=")
         self.assertEquals(redaction_rules.get_json_object(0).get_string("replacement"), "password=foo")
@@ -379,11 +394,11 @@ class TestConfiguration(unittest.TestCase):
         self.assertTrue(additional_paths[0].endswith('apache.json'))
         self.assertTrue(additional_paths[1].endswith('nginx.json'))
 
-        self.assertEquals(len(config.logs), 6)
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/access.log')
-        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/apache/access.log')
-        self.assertPathEquals(config.logs[2].config.get_string('path'), '/var/log/nginx/access.log')
-        self.assertEquals(config.logs[0].config.get_json_array('sampling_rules'), JsonArray())
+        self.assertEquals(len(config.log_configs), 4)
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
+        self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/apache/access.log')
+        self.assertPathEquals(config.log_configs[2].get_string('path'), '/var/log/nginx/access.log')
+        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
 
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
@@ -417,7 +432,7 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.logs), 4)
+        self.assertEquals(len(config.log_configs), 2)
 
     def test_parser_specification(self):
         self.__write_file_with_separator_conversion(""" {
@@ -429,8 +444,8 @@ class TestConfiguration(unittest.TestCase):
         """)
         config = self.__create_test_configuration_instance()
         config.parse()
-        self.assertEquals(len(config.logs), 3)
-        self.assertEquals(config.logs[0].config['attributes']['parser'], 'foo-parser')
+        self.assertEquals(len(config.log_configs), 1)
+        self.assertEquals(config.log_configs[0]['attributes']['parser'], 'foo-parser')
 
     def test_monitors(self):
         self.__write_file_with_separator_conversion(""" {
@@ -441,59 +456,47 @@ class TestConfiguration(unittest.TestCase):
         config = self.__create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.monitors), 3)
-        self.assertEquals(len(config.logs), 4)
-        self.assertEquals(config.monitors[0].config.get_string('module'), 'httpPuller')
-        self.assertEquals(config.monitors[0].config.get_string('log_path'), 'httpPuller.log')
-        self.assertEquals(config.monitors[0].config.get_string('id'), '')
+        self.assertEquals(len(config.monitor_configs), 1)
+        self.assertEquals(len(config.log_configs), 1)
+        self.assertEquals(config.monitor_configs[0].get_string('module'), 'httpPuller')
+        self.assertEquals(config.monitor_configs[0].get_string('log_path'), 'httpPuller.log')
 
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
-        self.assertEquals(config.logs[1].config.get_json_object('attributes').get_string('parser'), 'agent-metrics')
-        self.assertPathEquals(config.logs[2].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
-    def test_multiple_modules(self):
+    def test_parse_log_config(self):
         self.__write_file_with_separator_conversion(""" {
-            api_key: "hi there",
-            monitors: [ { module: "httpPuller"}, { module: "hithere.httpPuller" }, { module: "another"},
-                        { module: "foo", id: "fixed_id" } ]
+            api_key: "hi there"
           }
         """)
         config = self.__create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.monitors), 6)
-        self.assertEquals(len(config.logs), 6)
-        self.assertEquals(config.monitors[0].config.get_string('module'), 'httpPuller')
-        self.assertEquals(config.monitors[0].config.get_string('log_path'), 'httpPuller.log')
-        self.assertEquals(config.monitors[0].config.get_string('id'), '1')
-        self.assertEquals(config.monitors[1].config.get_string('module'), 'hithere.httpPuller')
-        self.assertEquals(config.monitors[1].config.get_string('log_path'), 'hithere.httpPuller.log')
-        self.assertEquals(config.monitors[1].config.get_string('id'), '2')
-        self.assertEquals(config.monitors[2].config.get_string('module'), 'another')
-        self.assertEquals(config.monitors[2].config.get_string('log_path'), 'another.log')
-        self.assertEquals(config.monitors[2].config.get_string('id'), '')
-        self.assertEquals(config.monitors[3].config.get_string('module'), 'foo')
-        self.assertEquals(config.monitors[3].config.get_string('log_path'), 'foo.log')
-        self.assertEquals(config.monitors[3].config.get_string('id'), 'fixed_id')
-        self.assertEquals(config.monitors[4].config.get_string('module'),
-                          'scalyr_agent.builtin_monitors.linux_system_metrics')
-        self.assertEquals(config.monitors[4].config.get_string('log_path'),
-                          'scalyr_agent.builtin_monitors.linux_system_metrics.log')
-        self.assertEquals(config.monitors[4].config.get_string('id'), '')
-        self.assertEquals(config.monitors[5].config.get_string('module'),
-                          'scalyr_agent.builtin_monitors.linux_process_metrics')
-        self.assertEquals(config.monitors[5].config.get_string('log_path'),
-                          'scalyr_agent.builtin_monitors.linux_process_metrics.log')
-        self.assertEquals(config.monitors[5].config.get_string('id'), 'agent')
+        parsed_log_config = config.parse_log_config({
+            "path": 'hi.log'
+        })
 
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/scalyr-agent-2/agent.log')
-        self.assertPathEquals(config.logs[1].config.get_string('path'), '/var/log/scalyr-agent-2/httpPuller.log')
-        self.assertPathEquals(config.logs[2].config.get_string('path'), '/var/log/scalyr-agent-2/another.log')
-        self.assertPathEquals(config.logs[3].config.get_string('path'), '/var/log/scalyr-agent-2/foo.log')
-        self.assertPathEquals(config.logs[4].config.get_string('path'),
-                              '/var/log/scalyr-agent-2/linux_system_metrics.log')
+        self.assertEquals(parsed_log_config['path'], '/var/log/scalyr-agent-2/hi.log')
+
+        parsed_log_config = config.parse_log_config({
+            "path": '/var/log/scalyr-agent-2/hi.log'
+        }, default_parser="foo")
+
+        self.assertEquals(parsed_log_config['attributes']['parser'], 'foo')
+
+    def test_parse_monitor_config(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there"
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        parsed_monitor_config = config.parse_monitor_config({
+            "module": "foo"
+        })
+
+        self.assertEquals(parsed_monitor_config['module'], 'foo')
 
     def test_equivalent_configuration(self):
         self.__write_file_with_separator_conversion(""" {
@@ -592,7 +595,7 @@ class TestConfiguration(unittest.TestCase):
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
-        self.assertPathEquals(config.logs[0].config.get_string('path'), '/var/log/tomcat6/ok.log')
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/ok.log')
 
     def test_empty_substitution(self):
         self.__write_file_with_separator_conversion(""" {
@@ -654,21 +657,16 @@ class TestConfiguration(unittest.TestCase):
             self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
 
     def __create_test_configuration_instance(self):
+        """Creates an instance of a Configuration file for testing.
 
-        def log_factory(config):
-            return TestConfiguration.LogObject(config)
-
-        def monitor_factory(config, _):
-            return TestConfiguration.MonitorObject(config)
-
+        @return:  The test instance
+        @rtype: Configuration
+        """
         default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),
                                      self.convert_path('/etc/scalyr-agent-2/agent.json'),
                                      self.convert_path('/var/lib/scalyr-agent-2'))
 
-        monitors = [JsonObject(module='scalyr_agent.builtin_monitors.linux_system_metrics'),
-                    JsonObject(module='scalyr_agent.builtin_monitors.linux_process_metrics',
-                               pid='$$', id='agent')]
-        return Configuration(self.__config_file, default_paths, monitors, log_factory, monitor_factory)
+        return Configuration(self.__config_file, default_paths)
 
     # noinspection PyPep8Naming
     def assertPathEquals(self, actual_path, expected_path):

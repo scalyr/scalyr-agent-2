@@ -246,9 +246,9 @@ class AgentLogger(logging.Logger):
         self.__monitor = None
         self.__metric_handler = None
 
-        # The regular expression that must match for metric and field names.  Esentially, it has to begin with
-        # a letter, and only contain letters, digits, periods, and underscores.
-        self.__metric_or_field_name_rule = re.compile('[a-zA-Z][\w\.]*$')
+        # The regular expression that must match for metric and field names.  Essentially, it has to begin with
+        # a letter, and only contain letters, digits, periods, underscores, and dashes.
+        self.__metric_or_field_name_rule = re.compile('[a-zA-Z][\w\.\-]*$')
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
@@ -1170,8 +1170,8 @@ class BadMetricOrFieldName(Exception):
     """Exception raised when a metric or field name used to report a metric value is invalid."""
     def __init__(self, metric_or_field_name):
         Exception.__init__(self, 'A bad metric or field name of "%s" was seen when reporting metrics.  '
-                           'It must begin with a letter and only contain alphanumeric characters as well as periods'
-                           'and underscores.' % metric_or_field_name)
+                           'It must begin with a letter and only contain alphanumeric characters as well as periods,'
+                           'underscores, and dashes.' % metric_or_field_name)
 
 
 # A sentinel value used to indicate an argument was not specified.  We do not use None to indicate
