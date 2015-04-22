@@ -174,14 +174,15 @@ class JsonParser(object):
        servers.
     """
 
-    def __init__(self, input_scanner, allow_missing_commas=True):
+    def __init__(self, input_scanner, allow_missing_commas=True, check_duplicate_keys=False):
         """Initializes JsonParser for the specified input."""
         self.__scanner = input_scanner
         self.allow_missing_commas = allow_missing_commas
+        self.check_duplicate_keys = check_duplicate_keys
 
     @staticmethod
-    def parse(input_bytes):
-        return JsonParser(ByteScanner(input_bytes)).parse_value()
+    def parse(input_bytes, check_duplicate_keys=False):
+        return JsonParser(ByteScanner(input_bytes), True, check_duplicate_keys).parse_value()
 
     def parse_value(self):
         """Parses a Json value from the input."""
@@ -265,6 +266,9 @@ class JsonParser(object):
 
             # skip any whitespace after the colon
             self.__peek_next_non_whitespace()
+            if self.check_duplicate_keys and result_object.__contains__(key):
+                self.__error("Duplicate key [" + key + "]", object_start)
+
             result_object.put(key, self.parse_value())
       
             c = self.__peek_next_non_whitespace()
@@ -587,7 +591,7 @@ class JsonParser(object):
             return raw_c
 
 
-def parse(input_bytes):
+def parse(input_bytes, check_duplicate_keys=False):
     """Parses the input as JSON and returns its contents.
 
     It supports Scaylr's extensions to the Json format, including comments and
@@ -602,7 +606,8 @@ def parse(input_bytes):
        servers.
 
     @param input_bytes: A string containing the bytes to be parsed.
+    @param check_duplicate_keys: If true, then we throw an exception if any JSON object contains two entries with the same name.
 
         JsonParseException if there is an error in the parsing.
     """
-    return JsonParser.parse(input_bytes)
+    return JsonParser.parse(input_bytes, check_duplicate_keys)
