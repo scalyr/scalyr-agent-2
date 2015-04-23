@@ -187,7 +187,7 @@ class SyslogMonitor( ScalyrMonitor ):
         }
 
         try:
-            attributes = JsonObject( { "monitor": "syslogmonitor" } )
+            attributes = JsonObject( { "monitor": "agentSyslog" } )
             self.log_config['attributes'] = attributes
         except Exception, e:
             self._logger.error( "Error setting monitor attribute in SyslogMonitor" )
