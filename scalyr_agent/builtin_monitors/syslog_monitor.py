@@ -23,6 +23,8 @@ from socket import error as socket_error
 import SocketServer
 
 from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent.monitor_utils.server_processors import LineRequestParser
+from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
@@ -77,8 +79,13 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     a protocol neutral handler
     """
     def handle( self ):
-        data = self.request.recv( 1024 ).strip()
-        self.server.syslog_handler.handle( data )
+        parser = LineRequestParser( 8192 )
+        request_stream = RequestStream(self.request, parser.parse_request,
+                                       max_buffer_size=8192,
+                                       max_request_size=8192)
+        data = request_stream.read_request()
+        if data != None:
+            self.server.syslog_handler.handle( data.strip() )
 
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
