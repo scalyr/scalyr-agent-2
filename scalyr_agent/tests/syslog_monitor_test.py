@@ -25,9 +25,100 @@ import logging
 from cStringIO import StringIO
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
+from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
+from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.util import StoppableThread
+
+class SyslogFrameParserTestCase( unittest.TestCase ):
+    def test_framed_messages( self ):
+        parser = SyslogFrameParser( 32 )
+        message = StringIO()
+        message.write( "5 hello5 world" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "hello", actual )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "world", actual )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( None, actual )
+
+    def test_framed_message_incomplete( self ):
+        parser = SyslogFrameParser( 32 )
+        message = StringIO()
+        message.write( "11 hello" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( None, actual )
+
+        message.seek( 8 )
+        message.write( " world" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "hello world", actual )
+
+    def test_framed_message_invalid_frame_size( self ):
+        parser = SyslogFrameParser( 32 )
+        message = StringIO()
+        message.write( "1a1 hello" )
+        message.seek( 0 )
+
+        self.assertRaises( ValueError, lambda: parser.parse_request( message, 32 ) )
+
+    def test_framed_message_exceeds_max_size( self ):
+        parser = SyslogFrameParser( 10 )
+        message = StringIO()
+        message.write( "11 hello world" )
+        message.seek( 0 )
+
+        self.assertRaises( RequestSizeExceeded, lambda: parser.parse_request( message, 32 ) )
+
+    def test_unframed_messages( self ):
+        parser = SyslogFrameParser( 32 )
+        message = StringIO()
+        message.write( "hello\nworld\n" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "hello\n", actual )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "world\n", actual )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( None, actual )
+
+    def test_unframed_messages_incomplete( self ):
+        parser = SyslogFrameParser( 32 )
+        message = StringIO()
+        message.write( "hello" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( None, actual )
+
+        message.seek( 5 )
+        message.write( " world\n" )
+        message.seek( 0 )
+
+        actual = parser.parse_request( message, 32 )
+        self.assertEqual( "hello world\n", actual )
+
+    def test_unframed_message_exceeds_max_size( self ):
+        parser = SyslogFrameParser( 10 )
+        message = StringIO()
+        message.write( "hello world\n" )
+        message.seek( 0 )
+
+        self.assertRaises( RequestSizeExceeded, lambda: parser.parse_request( message, 32 ) )
+
+
 
 class SyslogMonitorTestCase( unittest.TestCase ):
     def assertNoException( self, func ):
@@ -122,7 +213,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         scalyr_logging.set_log_level(scalyr_logging.DEBUG_LEVEL_0)
         self.logger = logging.getLogger( "scalyr_agent.builtin_monitors.syslog_monitor.syslog" )
         self.logger.setLevel( logging.INFO )
-        self.stream = StringIO();
+        self.stream = StringIO()
         self.handler = logging.StreamHandler( self.stream )
         self.logger.addHandler( self.handler )
 
@@ -163,25 +254,30 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
     def test_run_tcp_server( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp',
+            'protocol': 'tcp:8514',
         }
 
         self.monitor = SyslogMonitor( config, self.logger )
         self.monitor.open_metric_log()
 
         self.monitor.start()
+
         s = socket.socket()
         self.sockets.append( s )
 
-        expected = "TCP Test"
-        self.connect( s, ('localhost', 6514 ) )
-        s.sendall( expected )
+        expected = "TCP TestXX\n"
+        self.connect( s, ('localhost', 8514 ) )
 
-        self.monitor.stop( wait_on_join=False )
+        s.sendall( expected )
+        time.sleep( 1 )
+
+        self.monitor.stop( wait_on_join=True )
         self.monitor = None
 
         self.handler.flush()
         actual = self.stream.getvalue().strip()
+
+        expected = expected.strip()
 
         self.assertTrue( expected in actual, "Unable to find '%s' in output:\n\t %s" % (expected, actual)  )
 
@@ -240,19 +336,20 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         expected_udp2 = "UDP2 Test"
         udp.sendto( expected_udp2, ('localhost', 8002) )
 
-        expected_tcp1 = "TCP Test"
+        expected_tcp1 = "TCP Test\n"
         tcp1.sendall( expected_tcp1 )
 
-        expected_tcp2 = "TCP2 Test"
+        expected_tcp2 = "TCP2 Test\n"
         tcp2.sendall( expected_tcp2 )
-
-
 
         self.monitor.stop( wait_on_join=False )
         self.monitor = None
 
         self.handler.flush()
         actual = self.stream.getvalue().strip()
+
+        expected_tcp1 = expected_tcp1.strip()
+        expected_tcp2 = expected_tcp2.strip()
 
         self.assertTrue( expected_udp1 in actual, "Unable to find '%s' in output:\n\t %s" % (expected_udp1, actual)  )
         self.assertTrue( expected_udp2 in actual, "Unable to find '%s' in output:\n\t %s" % (expected_udp2, actual)  )

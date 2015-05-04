@@ -24,6 +24,7 @@ import SocketServer
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
+from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
@@ -47,9 +48,9 @@ define_config_option( __monitor__, 'default_udp_port',
                      default=514, min_value=1, max_value=65535, convert_to=int)
 
 define_config_option( __monitor__, 'default_tcp_port',
-                     'Optional (defaults to 6514). Default port to listen for tcp syslog messages on if no port specified in the protocol option. '
+                     'Optional (defaults to 601). Default port to listen for tcp syslog messages on if no port specified in the protocol option. '
                      'Not used if ``protocol`` does not specify tcp',
-                     default=6514, min_value=1, max_value=65535, convert_to=int)
+                     default=601, min_value=1, max_value=65535, convert_to=int)
 
 define_config_option( __monitor__, 'message_log',
                      'Optional (defaults to syslog_messages.log). Defines a log file name for storing syslog messages that come in over the network. '
@@ -67,6 +68,96 @@ define_config_option( __monitor__, 'max_log_rotations',
                      convert_to=int, default=5)
 
 
+class SyslogFrameParser(object):
+    """Simple abstraction that implements a 'parse_request' that can be used to parse incoming syslog
+    messages.  These will either be terminated by a newline (or crlf) sequence, or begin with an
+    integer specifying the number of octects in the message.  The parser performs detection of
+    which type the message is and handles it appropriately.
+    """
+    def __init__(self, max_request_size):
+        """Creates a new instance.
+
+        @param max_request_size: The maximum number of bytes that can be contained in an individual request.
+        """
+        self.__max_request_size = max_request_size
+
+    def parse_request(self, input_buffer, _):
+        """Returns the next complete request from 'input_buffer'.
+
+        If the message is framed, then if the number of bytes in the buffer is >= the number of bytes in
+        the frame, then return the entire frame, otherwise return None and no bytes are consumed.
+
+        If the message is unframed, then if there is a complete line at the start of 'input_buffer' (where complete line is determined by it
+        ending in a newline character), then consumes those bytes from 'input_buffer' and returns the string
+        including the newline.  Otherwise None is returned and no bytes are consumed from 'input_buffer'
+
+        @param input_buffer: The bytes to read.
+        @param _: The number of bytes available in 'input_buffer'. (not used)
+
+        @return: A string containing the next complete request read from 'input_buffer' or None if there is none.
+
+            RequestSizeExceeded if a line is found to exceed the maximum request size.
+            ValueError if the message starts with a digit (e.g. is framed) but the frame size is not delimited by a space
+        """
+        new_position = None
+        try:
+            new_position = input_buffer.tell()
+            buf = input_buffer.read(self.__max_request_size + 1)
+
+            bytes_received = len(buf)
+
+            if bytes_received > self.__max_request_size:
+                # We just consume these bytes if the line did exceeded the maximum.  To some degree, this
+                # typically does not matter since once we see any error on a connection, we close it down.
+                new_position = None
+                raise RequestSizeExceeded(bytes_received, self.__max_request_size)
+
+            framed = False
+            if bytes_received > 0:
+                c = buf[0]
+                framed = (c >= '0' and c <= '9')
+            else:
+                return None
+
+            #offsets contains the start and end offsets of the message within the buffer.
+            #an end offset of 0 indicates there is not a valid message in the buffer yet
+            offsets = (0, 0)
+            if framed:
+                offsets = self._framed_offsets( buf, bytes_received )
+            else:
+                offsets = self._unframed_offsets( buf, bytes_received )
+
+            if offsets[1] != 0:
+                #our new position is going to be the previous position plus the end offset
+                new_position += offsets[1]
+
+                #return a slice containing the full message
+                return buf[ offsets[0]:offsets[1] ]
+
+            return None
+        finally:
+            if new_position is not None:
+                input_buffer.seek(new_position)
+
+    def _framed_offsets( self, frame_buffer, length ):
+        result = (0, 0)
+        pos = frame_buffer.find( ' ' )
+        if pos != -1:
+            frame_size = int( frame_buffer[0:pos] )
+            message_offset = pos + 1
+            if length - message_offset >= frame_size:
+                result = (message_offset, message_offset + frame_size)
+
+        return result
+
+    def _unframed_offsets( self, frame_buffer, length ):
+        result = (0, 0)
+        pos = frame_buffer.find( '\n' )
+        if pos != -1:
+            result = (0, pos + 1)
+
+        return result
+
 class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
     """Class that reads data from a UDP request and passes it to
     a protocol neutral handler
@@ -79,11 +170,13 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     a protocol neutral handler
     """
     def handle( self ):
-        parser = LineRequestParser( 8192 )
+
+        parser = SyslogFrameParser( 8192 )
         request_stream = RequestStream(self.request, parser.parse_request,
                                        max_buffer_size=8192,
                                        max_request_size=8192)
         data = request_stream.read_request()
+
         if data != None:
             self.server.syslog_handler.handle( data.strip() )
 
