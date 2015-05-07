@@ -21,6 +21,7 @@ import logging
 import re
 from socket import error as socket_error
 import SocketServer
+import time
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
@@ -36,10 +37,10 @@ define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
                      convert_to=str, required_option=True)
 define_config_option( __monitor__, 'protocol',
-                     'Optional (defaults to udp). Defines which transport protocols and ports to listen for syslog messages on. '
+                     'Optional (defaults to tcp). Defines which transport protocols and ports to listen for syslog messages on. '
                      'Valid values can be \'udp\' or \'tcp\', which can be bare, e.g. \'udp\' or combined with a port number, e.g. \'udp:10514\'.  '
                      'Multiple values can be combined with a comma to specify both, e.g. \'udp, tcp',
-                     convert_to=str, default='udp')
+                     convert_to=str, default='tcp')
 
 define_config_option( __monitor__, 'default_udp_port',
                      'Optional (defaults to 514). Defines which port to listen for udp syslog messages on if no port specified in the protocol option. '
@@ -56,6 +57,12 @@ define_config_option( __monitor__, 'message_log',
                      'Optional (defaults to syslog_messages.log). Defines a log file name for storing syslog messages that come in over the network. '
                      'Note: the file will be placed in the default Scalyr log directory unless it is an absolute path.',
                      convert_to=str, default='syslog_messages.log')
+
+define_config_option( __monitor__, 'tcp_buffer_size',
+                     'The maximum buffer size for a single TCP syslog message.'
+                     '\n\tNote: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
+                     'support messages up to 8192 bytes long.',
+                     default=8192, min_value=2048, max_value=65536, convert_to=int)
 
 define_config_option( __monitor__, 'max_log_size',
                      'Optional (defaults to 100 MB - 100*1024*1024). The maximum file size of the syslog messages log before log rotation occurs. '
@@ -170,15 +177,17 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     a protocol neutral handler
     """
     def handle( self ):
-
-        parser = SyslogFrameParser( 8192 )
+        buffer_size = self.server.tcp_buffer_size
+        parser = SyslogFrameParser( buffer_size )
         request_stream = RequestStream(self.request, parser.parse_request,
-                                       max_buffer_size=8192,
-                                       max_request_size=8192)
-        data = request_stream.read_request()
-
-        if data != None:
-            self.server.syslog_handler.handle( data.strip() )
+                                       max_buffer_size=buffer_size,
+                                       max_request_size=buffer_size)
+        while self.server.is_running() and not request_stream.is_closed():
+            data = request_stream.read_request()
+            if data != None:
+                self.server.syslog_handler.handle( data.strip() )
+            #don't hog the cpu
+            time.sleep( 0.01 )
 
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
@@ -188,35 +197,49 @@ class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
         self.allow_reuse_address = True
         SocketServer.UDPServer.__init__( self, address, SyslogUDPHandler )
 
+    def set_run_state( self, run_state ):
+        """Do Nothing only TCP connections need the runstate"""
+        pass
+
 class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
     """Class that creates a TCP SocketServer on a specified port
     """
-    def __init__( self, port ):
+    def __init__( self, port, tcp_buffer_size ):
         address = ( 'localhost', port )
         self.allow_reuse_address = True
+        self.__run_state = None
+        self.tcp_buffer_size = tcp_buffer_size
         SocketServer.TCPServer.__init__( self, address, SyslogTCPHandler )
 
-class SyslogHandler:
+    def set_run_state( self, run_state ):
+        self.__run_state = run_state
+
+    def is_running( self ):
+        if self.__run_state:
+            return self.__run_state.is_running()
+
+        return False
+
+class SyslogHandler(object):
     """Protocol neutral class for handling messages that come in from a syslog server
     """
     def __init__( self, logger ):
         self.__logger = logger
 
     def handle( self, data ):
-        #TODO: Make this work better
         self.__logger.info( data )
 
-class SyslogServer:
+class SyslogServer(object):
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
     configures a handler to process messages.
 
     This removes the need for users of this class to care about the underlying protocol being used
     """
-    def __init__( self, protocol, port, logger ):
+    def __init__( self, protocol, port, logger, config ):
         server = None
         try:
             if protocol == 'tcp':
-                server = SyslogTCPServer( port )
+                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ) )
             elif protocol == 'udp':
                 server = SyslogUDPServer( port )
 
@@ -239,17 +262,22 @@ class SyslogServer:
         self.__server = server
         self.__thread = None
 
-    def start( self, run_state ):
+
+    def __prepare_run_state( self, run_state ):
         if run_state != None:
             server = self.__server
+            server.set_run_state( run_state )
             #shutdown is only available from python 2.6 onwards
             #need to think of what to do for 2.4, which will hang on shutdown when run as standalone
             if hasattr( server, 'shutdown' ):
                 run_state.register_on_stop_callback( server.shutdown )
 
+    def start( self, run_state ):
+        self.__prepare_run_state( run_state )
         self.__server.serve_forever()
 
     def start_threaded( self, run_state ):
+        self.__prepare_run_state( run_state )
         self.__thread = StoppableThread( target=self.start, name="Syslog monitor thread for %s:%d" % (self.__server.syslog_transport_protocol, self.__server.syslog_port) )
         self.__thread.start()
 
@@ -382,11 +410,11 @@ class SyslogMonitor( ScalyrMonitor ):
 
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
-            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger )
+            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
-                server = SyslogServer( p[0], p[1], self.__disk_logger )
+                server = SyslogServer( p[0], p[1], self.__disk_logger, self._config )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads

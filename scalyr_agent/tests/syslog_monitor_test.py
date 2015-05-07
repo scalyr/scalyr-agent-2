@@ -271,7 +271,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         s.sendall( expected )
         time.sleep( 1 )
 
-        self.monitor.stop( wait_on_join=True )
+        self.monitor.stop( wait_on_join=False )
         self.monitor = None
 
         self.handler.flush()
@@ -314,7 +314,10 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         }
         self.monitor = SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) )
         self.monitor.open_metric_log()
+
         self.monitor.start()
+
+        time.sleep( 0.01 )
 
         udp = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
         self.sockets.append( udp )
@@ -328,7 +331,6 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         self.connect( tcp1, ('localhost', 8001) )
         self.connect( tcp2, ('localhost', 8003) )
 
-        time.sleep( 0.1 )
 
         expected_udp1 = "UDP Test"
         udp.sendto( expected_udp1, ('localhost', 8000) )
@@ -341,6 +343,8 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
 
         expected_tcp2 = "TCP2 Test\n"
         tcp2.sendall( expected_tcp2 )
+
+        time.sleep( 1 )
 
         self.monitor.stop( wait_on_join=False )
         self.monitor = None
@@ -355,6 +359,5 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
         self.assertTrue( expected_udp2 in actual, "Unable to find '%s' in output:\n\t %s" % (expected_udp2, actual)  )
         self.assertTrue( expected_tcp1 in actual, "Unable to find '%s' in output:\n\t %s" % (expected_tcp1, actual)  )
         self.assertTrue( expected_tcp2 in actual, "Unable to find '%s' in output:\n\t %s" % (expected_tcp2, actual)  )
-
 
 
