@@ -200,6 +200,22 @@ class TestRequestStream(ScalyrTestCase):
     def at_end(self):
         return self.__request_stream.at_end()
 
+class TestLineRequestEOF( ScalyrTestCase ):
+    def setUp(self):
+        self.__fake_socket = FakeSocket()
+        self.__fake_run_state = FakeRunState()
+
+        parser = LineRequestParser(100, eof_as_eol=True)
+        self.__request_stream = RequestStream(self.__fake_socket, parser.parse_request, max_buffer_size=100,
+                                              max_request_size=100)
+    def read_request(self):
+        return self.__request_stream.read_request(run_state=self.__fake_run_state)
+
+    def test_eof_as_eol( self ):
+        self.__fake_socket.add_input('Hi there\nGoodbye')
+        self.assertEquals(self.read_request(), 'Hi there\n')
+        self.assertEquals( self.read_request(), 'Goodbye' )
+
 
 class TestConnectionHandler(ScalyrTestCase):
     def setUp(self):

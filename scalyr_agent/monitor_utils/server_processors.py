@@ -134,12 +134,14 @@ class LineRequestParser(object):
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming requests
     that are terminated by either '\n' or '\r\n'.
     """
-    def __init__(self, max_request_size):
+    def __init__(self, max_request_size, eof_as_eol=False):
         """Creates a new instance.
 
         @param max_request_size: The maximum number of bytes that can be contained in an individual request.
+        @param eof_as_eol: If true then treat EOF as the end of a line
         """
         self.__max_request_size = max_request_size
+        self.__eof_as_eol = eof_as_eol
 
     def parse_request(self, input_buffer, _):
         """Returns the next complete request from 'input_buffer'.
@@ -169,7 +171,20 @@ class LineRequestParser(object):
 
             # Check to see if a complete line was actually returned since if readline() hit EOF, then
             # it will return whatever line was left without a newline.
-            if bytes_received > 0 and line[-1] == '\n':
+            return_line = False
+            if bytes_received > 0:
+                if line[-1] == '\n':
+                    return_line = True
+                else:
+                    # check if we want to return the remaining text when EOF is hit
+                    if self.__eof_as_eol:
+                        #this will return an empty string if EOF is reached
+                        last_line = input_buffer.read( 1 )
+                        if len( last_line ) == 0:
+                            #we have reach eof so also return
+                            return_line = True
+
+            if return_line:
                 original_position = None
                 return line
         finally:
@@ -400,6 +415,7 @@ class RequestStream(object):
                     return None
 
                 do_full_compaction = True
+
                 data = self.__socket.recv(self.__max_buffer_size - self.__get_buffer_write_position())
                 # If we get nothing back, then the connection has been closed.  If it is not closed and there is
                 # no data, then we would get a socket.timeout or socket.error which are handled below.
