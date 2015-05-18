@@ -274,12 +274,13 @@ class CopyingManager(StoppableThread):
             monitor.log_config = log_config
 
             #TODO: Find a way to refactor this with the above to avoid code repetition
-            for additional in monitors.additional_logs:
-                log_config = configuration.parse_log_config( additional['log_config'], default_parse='agent-metrics', context_description='Additional log entry requested by module "%s"' % name).copy()
-                if log_config['path'] not in all_paths:
-                    configs.append( log_config )
-                    all_paths[log_config['path']] = True
-                additional['log_config'] = log_config
+            if hasattr( monitor, 'additional_logs' ):
+                for additional in monitor.additional_logs:
+                    log_config = configuration.parse_log_config( additional['log_config'], default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+                    if log_config['path'] not in all_paths:
+                        configs.append( log_config )
+                        all_paths[log_config['path']] = True
+                    additional['log_config'] = log_config
 
         result = []
 
