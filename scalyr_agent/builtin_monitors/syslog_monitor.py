@@ -58,6 +58,10 @@ define_config_option( __monitor__, 'message_log',
                      'Note: the file will be placed in the default Scalyr log directory unless it is an absolute path.',
                      convert_to=str, default='syslog_messages.log')
 
+define_config_option( __monitor__, 'parser',
+                     'Optional (defaults to syslogServer). Defines the parser that should be specified for the message_log file.',
+                     convert_to=str, default='syslogServer')
+
 define_config_option( __monitor__, 'tcp_buffer_size',
                      'The maximum buffer size for a single TCP syslog message.'
                      '\n\tNote: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
@@ -360,7 +364,7 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
         message_log = self._config.get( 'message_log' )
 
         self.log_config = {
-            'parser': 'syslogServer',
+            'parser': self._config.get( 'parser' ),
             'path': message_log,
         }
 
