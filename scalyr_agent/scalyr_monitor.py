@@ -141,6 +141,9 @@ class ScalyrMonitor(StoppableThread):
         The derived classes must raise an Exception (or something derived from Exception)
         in this method if the provided configuration is invalid or if there is any other
         error known at this time preventing the module from running.
+
+        NOTE: This will be called everytime the agent script is run, including when *stopping* the agent.
+        Therefore it is not the best place to do things like create sockets/open files etc.
         """
         pass
 

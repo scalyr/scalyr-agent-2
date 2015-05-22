@@ -360,6 +360,11 @@ class RequestStream(object):
         self.__current_buffer_size = 0
         # Whether or not the socket has been closed and the stream should be considered at the end.
         self.__at_end = False
+
+        # Whether or not a socket error has occurred - we keep this separate from at_end to be able to
+        # distinguish between errors and eof.  This is useful when testing.
+        self.__socket_error = False
+
         # The actual buffer.  We will maintain an invariant that the position of the buffer is always pointing at
         # the next byte to read.
         self.__buffer = cStringIO.StringIO()
@@ -425,11 +430,13 @@ class RequestStream(object):
                 return None
 
             except socket.timeout:
+                self.__socket_error = True
                 return None
             except socket.error, e:
                 if e.errno == errno.EAGAIN:
                     return None
                 else:
+                    self.__socket_error = True
                     raise e
         finally:
             # We do a full compaction in general if we did not return anything and there is no room
@@ -447,6 +454,13 @@ class RequestStream(object):
         """Returns True if the underlying socket has been closed.
         """
         return self.__at_end
+
+    def is_closed(self):
+        """Returns True if the underlying socket has been closed - either due to reading EOF
+        or due to socket.timeouts and other exceptions.
+        We keep this separate from at_end so callers can detect just for EOF if they want.
+        """
+        return self.at_end() or self.__socket_error
 
     def get_buffer_size(self):
         """Returns the size of the underlying buffer, which may also include bytes for requests already returned
