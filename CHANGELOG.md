@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.9 "Intelligent Iguana" - May  27, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 27, 2015 11:30 -0700
+--->
+
+Note, this release is in progress.  Final feature set and release date are TBD.
+
+New features:
+
+* Added syslog monitor for receiving logs via syslog protocol.
+
 ## 2.0.8 "Hilarious Horse" - Apr 15, 2015
 
 <!---
