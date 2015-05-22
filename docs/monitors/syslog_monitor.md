@@ -69,6 +69,8 @@ Options:
 |||# ``message_log``      ||| Optional (defaults to syslog_messages.log). Defines a log file name for storing syslog \
                               messages that come in over the network. Note: the file will be placed in the default \
                               Scalyr log directory unless it is an absolute path.
+|||# ``parser``           ||| Optional (defaults to syslogServer). Defines the parser that should be specified for the \
+                              message_log file.
 |||# ``tcp_buffer_size``  ||| The maximum buffer size for a single TCP syslog message. Note: RFC 5425 (syslog over \
                               TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes \
                               long, and recommends they SHOULD support messages up to 8192 bytes long.
