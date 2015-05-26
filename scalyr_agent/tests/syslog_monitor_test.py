@@ -134,70 +134,70 @@ class SyslogMonitorConfigTest( SyslogMonitorTestCase ):
     def test_config_protocol_udp( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'udp'
+            'protocols': 'udp'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_udp_upper( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'UDP'
+            'protocols': 'UDP'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_tcp( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp'
+            'protocols': 'tcp'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_tcp_upper( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'TCP'
+            'protocols': 'TCP'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_multiple( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp, udp'
+            'protocols': 'tcp, udp'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_multiple_with_ports( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp:4096, udp:5082'
+            'protocols': 'tcp:4096, udp:5082'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
-    def test_config_protocol_multiple( self ):
+    def test_config_protocol_multiple_two( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp, udp'
+            'protocols': 'tcp, udp'
         }
         self.assertNoException( lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_invalid( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'XXX'
+            'protocols': 'XXX'
         }
         self.assertRaises( Exception, lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_protocol_empty( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': ''
+            'protocols': ''
         }
         self.assertRaises( Exception, lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
     def test_config_port_too_high( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'udp:70000'
+            'protocols': 'udp:70000'
         }
         self.assertRaises( Exception, lambda: SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) ) )
 
@@ -254,7 +254,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
     def test_run_tcp_server( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'tcp:8514',
+            'protocols': 'tcp:8514',
         }
 
         self.monitor = SyslogMonitor( config, self.logger )
@@ -285,7 +285,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
     def test_run_udp_server( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'udp:5514',
+            'protocols': 'udp:5514',
         }
         self.monitor = SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) )
         self.monitor.open_metric_log()
@@ -310,7 +310,7 @@ class SyslogMonitorConnectTest( SyslogMonitorTestCase ):
     def test_run_multiple_servers( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor',
-            'protocol': 'udp:8000, tcp:8001, udp:8002, tcp:8003',
+            'protocols': 'udp:8000, tcp:8001, udp:8002, tcp:8003',
         }
         self.monitor = SyslogMonitor( config, scalyr_logging.getLogger( "syslog_monitor[test]" ) )
         self.monitor.open_metric_log()

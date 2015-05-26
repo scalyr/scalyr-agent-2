@@ -34,40 +34,30 @@ __monitor__ = __name__
 define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
                      convert_to=str, required_option=True)
-define_config_option( __monitor__, 'protocol',
+define_config_option( __monitor__, 'protocols',
                      'Optional (defaults to tcp). Defines which transport protocols and ports to listen for syslog messages on. '
                      'Valid values can be \'udp\' or \'tcp\', which can be bare, e.g. \'udp\' or combined with a port number, e.g. \'udp:10514\'.  '
-                     'Multiple values can be combined with a comma to specify both, e.g. \'udp, tcp\'',
+                     'Multiple values can be combined with a comma to specify both, e.g. \'udp, tcp\'.  If no port is '
+                     'specified, then 514 is used for \'udp\' and 601 is used for \'tcp\'.',
                      convert_to=str, default='tcp')
 
-define_config_option(__monitor__, 'only_accept_local',
-                     'Optional (defaults to true). If true, then the plugin only accepts connections from localhost. '
-                     'If false, network connections are accepted from any host.',
-                     default=True, convert_to=bool)
-
-define_config_option( __monitor__, 'default_udp_port',
-                     'Optional (defaults to 514). Defines which port to listen for udp syslog messages on if no port is specified in the protocol option. '
-                     'Note: ports lower than 1024 require the agent to run with root privileges. '
-                     'Not used if ``protocol`` does not specify udp',
-                     default=514, min_value=1, max_value=65535, convert_to=int)
-
-define_config_option( __monitor__, 'default_tcp_port',
-                     'Optional (defaults to 601). Default port to listen for tcp syslog messages on if no port is specified in the protocol option. '
-                     'Not used if ``protocol`` does not specify tcp',
-                     default=601, min_value=1, max_value=65535, convert_to=int)
+define_config_option(__monitor__, 'accept_remote_connections',
+                     'Optional (defaults to false). If true, the plugin will accept network connections from any host, '
+                     'instead of just from localhost.',
+                     default=False, convert_to=bool)
 
 define_config_option( __monitor__, 'message_log',
-                     'Optional (defaults to syslog_messages.log). Defines a log file name for storing syslog messages that come in over the network. '
+                     'Optional (defaults to agent_syslog.log). Defines a log file name for storing syslog messages that are received by the agent syslog monitor. '
                      'Note: the file will be placed in the default Scalyr log directory unless it is an absolute path.',
-                     convert_to=str, default='syslog_messages.log')
+                     convert_to=str, default='agent_syslog.log')
 
 define_config_option( __monitor__, 'parser',
-                     'Optional (defaults to syslogServer). Defines the parser that should be specified for the message_log file.',
-                     convert_to=str, default='syslogServer')
+                     'Optional (defaults to agentSyslog). Defines the parser that should be specified for the message_log file.',
+                     convert_to=str, default='agentSyslog')
 
 define_config_option( __monitor__, 'tcp_buffer_size',
-                     'The maximum buffer size for a single TCP syslog message.'
-                     '\n\tNote: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
+                     'Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog message.  '
+                     'Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
                      'support messages up to 8192 bytes long.',
                      default=8192, min_value=2048, max_value=65536, convert_to=int)
 
@@ -199,8 +189,8 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
     """
-    def __init__( self, port, only_localhost=True ):
-        if only_localhost:
+    def __init__( self, port, accept_remote=False ):
+        if not accept_remote:
             address = ( 'localhost', port )
         else:
             address = ('', port )
@@ -215,8 +205,8 @@ class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
 class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
     """Class that creates a TCP SocketServer on a specified port
     """
-    def __init__( self, port, tcp_buffer_size, only_localhost=True ):
-        if only_localhost:
+    def __init__( self, port, tcp_buffer_size, accept_remote=False ):
+        if not accept_remote:
             address = ( 'localhost', port )
         else:
             address = ('', port )
@@ -250,13 +240,13 @@ class SyslogServer(object):
 
     This removes the need for users of this class to care about the underlying protocol being used
     """
-    def __init__( self, protocol, port, logger, config, only_localhost=True):
+    def __init__( self, protocol, port, logger, config, accept_remote=False):
         server = None
         try:
             if protocol == 'tcp':
-                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ), only_localhost=only_localhost )
+                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ), accept_remote=accept_remote )
             elif protocol == 'udp':
-                server = SyslogUDPServer( port, only_localhost=only_localhost )
+                server = SyslogUDPServer( port, accept_remote=accept_remote )
 
         except socket_error, e:
             if e.errno == errno.EACCES and port < 1024:
@@ -310,8 +300,8 @@ upload them to Scalyr.  This is useful for acting as a proxy between server appl
 syslog and Scalyr.
 
 The monitor accepts connections from the localhost (by default) and writes all received syslog messages to a single
-log file (defaulting to ``syslog_messages.log``) which is then copied to Scalyr.  This log file is configured
-to be parsed using the ``syslogServer`` parser.  You may wish to edit this parser to parse the line according to your
+log file (defaulting to ``agentSyslog.log``) which is then copied to Scalyr.  This log file is configured
+to be parsed using the ``agentSyslog`` parser.  You may wish to edit this parser to parse the line according to your
 specific syslog message format.
 
 ## Configuring Scalyr Agent
@@ -322,7 +312,7 @@ specify the protocol and ports to receive messages on.  A typical configuration 
   monitors: [
     {
       module:              "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocol:            "tcp:601,udp:514"
+      protocols:            "tcp:601,udp:514"
     }
   ]
 
@@ -332,14 +322,14 @@ allowed for the port.  Note, if you use ports 1024 or less on Linux, you must be
 
 You may wish to accept syslog connections from other hosts than just localhost.  For example, you may have a
 network device that cannot run the agent itself, but does use syslog to export its log.  You can configure
-the Syslog Monitor to accept non-localhost connections by setting the ``only_accept_local`` configuration option to
-false.  Here is a sample fragment that demonstrates this:
+the Syslog Monitor to accept non-localhost connections by setting the ``accept_remote_connections`` configuration option
+to true.  Here is a sample fragment that demonstrates this:
 
   monitors: [
     {
-      module:              "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocol:            "tcp:601,udp:514",
-      only_accept_local:   false
+      module:                      "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocols:                   "tcp:601,udp:514",
+      accept_remote_connections:   true
     }
   ]
 
@@ -379,14 +369,14 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
         self.__extra_servers = []
 
         #build list of protocols and ports from the protocol option
-        self.__server_list = self.__build_server_list( self._config.get( 'protocol' ) )
+        self.__server_list = self.__build_server_list( self._config.get( 'protocols' ) )
 
         #our disk logger and handler
         self.__disk_logger = None
         self.__log_handler = None
 
         #whether or not to accept only connections created on this localhost.
-        self.__only_accept_local = self._config.get( 'only_accept_local' )
+        self.__accept_remote_connections = self._config.get( 'accept_remote_connections' )
 
         #configure the logger and path
         message_log = self._config.get( 'message_log' )
@@ -418,8 +408,8 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
             raise Exception('Invalid config state for Syslog Monitor. '
                             'No protocols specified')
 
-        default_ports = { 'tcp': self._config.get( 'default_tcp_port' ),
-                          'udp': self._config.get( 'default_udp_port' )
+        default_ports = { 'tcp': 601,
+                          'udp': 514,
                         }
 
         server_list = []
@@ -493,12 +483,12 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
             self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
-                                          only_localhost=self.__only_accept_local )
+                                          accept_remote=self.__accept_remote_connections )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
                 server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
-                                       only_localhost=self.__only_accept_local )
+                                       accept_remote=self.__accept_remote_connections )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
