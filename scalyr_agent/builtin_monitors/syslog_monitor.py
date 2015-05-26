@@ -24,12 +24,10 @@ import SocketServer
 import time
 
 from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 
 __monitor__ = __name__
 
@@ -41,6 +39,11 @@ define_config_option( __monitor__, 'protocol',
                      'Valid values can be \'udp\' or \'tcp\', which can be bare, e.g. \'udp\' or combined with a port number, e.g. \'udp:10514\'.  '
                      'Multiple values can be combined with a comma to specify both, e.g. \'udp, tcp\'',
                      convert_to=str, default='tcp')
+
+define_config_option(__monitor__, 'only_accept_local',
+                     'Optional (defaults to true). If true, then the plugin only accepts connections from localhost. '
+                     'If false, network connections are accepted from any host.',
+                     default=True, convert_to=bool)
 
 define_config_option( __monitor__, 'default_udp_port',
                      'Optional (defaults to 514). Defines which port to listen for udp syslog messages on if no port is specified in the protocol option. '
@@ -196,8 +199,12 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
     """
-    def __init__( self, port ):
-        address = ( 'localhost', port )
+    def __init__( self, port, only_localhost=True ):
+        if only_localhost:
+            address = ( 'localhost', port )
+        else:
+            address = ('', port )
+
         self.allow_reuse_address = True
         SocketServer.UDPServer.__init__( self, address, SyslogUDPHandler )
 
@@ -208,8 +215,12 @@ class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
 class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
     """Class that creates a TCP SocketServer on a specified port
     """
-    def __init__( self, port, tcp_buffer_size ):
-        address = ( 'localhost', port )
+    def __init__( self, port, tcp_buffer_size, only_localhost=True ):
+        if only_localhost:
+            address = ( 'localhost', port )
+        else:
+            address = ('', port )
+
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
@@ -239,13 +250,13 @@ class SyslogServer(object):
 
     This removes the need for users of this class to care about the underlying protocol being used
     """
-    def __init__( self, protocol, port, logger, config ):
+    def __init__( self, protocol, port, logger, config, only_localhost=True):
         server = None
         try:
             if protocol == 'tcp':
-                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ) )
+                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ), only_localhost=only_localhost )
             elif protocol == 'udp':
-                server = SyslogUDPServer( port )
+                server = SyslogUDPServer( port, only_localhost=only_localhost )
 
         except socket_error, e:
             if e.errno == errno.EACCES and port < 1024:
@@ -298,7 +309,7 @@ The Syslog monitor can receive log messages received via the syslog protocol ove
 upload them to Scalyr.  This is useful for acting as a proxy between server applications that export their logs via
 syslog and Scalyr.
 
-The monitor accepts all connections from the local host and writes all received syslog messages to a single
+The monitor accepts connections from the localhost (by default) and writes all received syslog messages to a single
 log file (defaulting to ``syslog_messages.log``) which is then copied to Scalyr.  This log file is configured
 to be parsed using the ``syslogServer`` parser.  You may wish to edit this parser to parse the line according to your
 specific syslog message format.
@@ -319,7 +330,20 @@ As the fragment demonstrates, you may listen on one or more protocol/port combin
 list.  Only ``tcp`` or ``udp`` are allowed for the protocol specification, and any valid, unused port number is
 allowed for the port.  Note, if you use ports 1024 or less on Linux, you must be sure your agent is running as root.
 
-See the options section below for more information about all the available configuration options.
+You may wish to accept syslog connections from other hosts than just localhost.  For example, you may have a
+network device that cannot run the agent itself, but does use syslog to export its log.  You can configure
+the Syslog Monitor to accept non-localhost connections by setting the ``only_accept_local`` configuration option to
+false.  Here is a sample fragment that demonstrates this:
+
+  monitors: [
+    {
+      module:              "scalyr_agent.builtin_monitors.syslog_monitor",
+      protocol:            "tcp:601,udp:514",
+      only_accept_local:   false
+    }
+  ]
+
+See the options section below for more information about all of the available configuration options.
 
 ## Configuring syslog sources
 
@@ -331,14 +355,15 @@ on how to configure the syslog destination.  If you need help doing this, please
 ### Rsyslogd
 
 Rsyslogd is a popular syslog server used on Linux machines.  It uses a very rich configuration language that allows
-you to do complex operations with syslog messages it receives, such as splitting them up into separate
+you to do complex operations with the syslog messages it receives, such as splitting them up into separate
 log files by their log type or sending them to another syslog server over TCP/IP or UDP.
 
 You may wish to configure rsyslogd to send a subset of the syslog messages generated by that server to
 Scalyr.  There are many ways you can do this, but we will show you a simple example.
 
-Suppose you wish to send all log messages with type ``authpriv`` to a the Syslog Monitor over TCP/IP using port 601.
-You would add the following lines to your rsyslogd configuration, which is typically stored in ``/etc/rsyslogd.conf``:
+Suppose you wish to send all log messages with type ``authpriv`` to a the Syslog Monitor running on localhost over
+TCP/IP using port 601. You would add the following lines to your rsyslogd configuration, which is typically stored
+in ``/etc/rsyslogd.conf``:
 
   # Send all authpriv messasges to Scalyr.
   authpriv.*                                              @@localhost:601
@@ -359,6 +384,9 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
         #our disk logger and handler
         self.__disk_logger = None
         self.__log_handler = None
+
+        #whether or not to accept only connections created on this localhost.
+        self.__only_accept_local = self._config.get( 'only_accept_local' )
 
         #configure the logger and path
         message_log = self._config.get( 'message_log' )
@@ -464,11 +492,13 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
 
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
-            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config )
+            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
+                                          only_localhost=self.__only_accept_local )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
-                server = SyslogServer( p[0], p[1], self.__disk_logger, self._config )
+                server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
+                                       only_localhost=self.__only_accept_local )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
