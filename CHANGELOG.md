@@ -13,6 +13,10 @@ New features:
 
 * Added syslog monitor for receiving logs via syslog protocol.
 
+Bug fixes:
+
+* Fix bug causing agent to temporarily stop copying logs if the underlying log file disappeared or read access was removed for Windows.
+
 ## 2.0.8 "Hilarious Horse" - Apr 15, 2015
 
 <!---

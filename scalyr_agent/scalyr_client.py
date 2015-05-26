@@ -637,6 +637,7 @@ class AddEventsRequest(object):
         after this call.
         """
         self.__body = None
+        self.__buffer = None
 
     def __get_timestamp(self):
         """

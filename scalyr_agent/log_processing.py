@@ -620,7 +620,10 @@ class LogFileIterator(object):
                 # There is no entry representing the file at log_path, but it does exist, so we need to add it in.
                 self.__add_entry_for_log_path(latest_inode)
         except OSError, e:
-            if e.errno == errno.ENOENT:
+            # The file could have disappeared or the file permissions could have changed such that we can no longer
+            # read it.  We have to handle these cases gracefully.  We treat both like it has disappeared from our point
+            # of view.
+            if e.errno == errno.ENOENT or e.errno == errno.EACCES:
                 # The file doesn't exist.  See if we think we have a file handle that is for the log path, and if
                 # so, update it to reflect it no longer is.
                 if current_log_file is not None:

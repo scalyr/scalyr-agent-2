@@ -402,14 +402,21 @@ class CopyingManager(StoppableThread):
                                     bytes_sent, result)
 
                             if result == 'success' or 'discardBuffer' in result or 'requestTooLarge' in result:
-                                if result == 'success':
-                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
-                                elif 'discardBuffer' in result:
-                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_DROP)
-                                else:
-                                    self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_RETRY)
-                                self.__pending_add_events_task = None
-                                self.__write_checkpoint_state()
+                                try:
+                                    if result == 'success':
+                                        self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
+                                    elif 'discardBuffer' in result:
+                                        self.__pending_add_events_task.completion_callback(
+                                            LogFileProcessor.FAIL_AND_DROP)
+                                    else:
+                                        self.__pending_add_events_task.completion_callback(
+                                            LogFileProcessor.FAIL_AND_RETRY)
+                                finally:
+                                    # No matter what, we want to throw away the current event since the server said we
+                                    # could.  We have seen some bugs where we did not throw away the request because
+                                    # an exception was thrown during the callback.
+                                    self.__pending_add_events_task = None
+                                    self.__write_checkpoint_state()
 
                             if result == 'success':
                                 last_success = current_time

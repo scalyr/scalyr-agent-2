@@ -132,6 +132,27 @@ class TestLogFileIterator(ScalyrTestCase):
         self.mark(time_advance=60*11)
         self.assertTrue(self.log_file.at_end)
 
+    def test_losing_read_access(self):
+        # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
+        if sys.platform == 'win32':
+            return
+
+        self.append_file(self.__path,
+                         'L001\n',
+                         'L002\n')
+        restore_access = self.remove_read_access()
+        os.chmod(self.__tempdir, 0)
+        self.mark()
+
+        self.assertEquals(self.readline(), 'L001\n')
+        self.assertEquals(self.readline(), 'L002\n')
+        self.assertEquals(self.readline(), '')
+        self.assertFalse(self.log_file.at_end)
+
+        self.mark(time_advance=60*11)
+        self.assertTrue(self.log_file.at_end)
+        restore_access()
+
     def test_rotated_file_with_truncation(self):
         self.append_file(self.__path,
                          'L001\n',
@@ -467,6 +488,18 @@ class TestLogFileIterator(ScalyrTestCase):
     def move_file(self, original_path, new_path):
         self.log_file.prepare_for_inactivity()
         os.rename(original_path, new_path)
+
+    def remove_read_access(self):
+        # To simulate losing access to the log file, we just disable access to the whole directory.
+        # This is a bit of a cheap hack, but just wanted to make sure this test case is covered.
+        self.log_file.prepare_for_inactivity()
+        os.chmod(self.__tempdir, 0)
+
+        def restore_callback():
+            # we just put back all permissions to restore.
+            os.chmod(self.__tempdir, 0777)
+
+        return restore_callback
 
     def truncate_file(self, path):
         file_handle = open(path, 'w')
