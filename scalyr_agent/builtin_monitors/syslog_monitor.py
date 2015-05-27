@@ -227,20 +227,28 @@ class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
 
 class SyslogHandler(object):
     """Protocol neutral class for handling messages that come in from a syslog server
+
+    @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
+        must be supplied as the first argument.
     """
-    def __init__( self, logger ):
+    def __init__( self, logger, line_reporter ):
         self.__logger = logger
+        self.__line_reporter = line_reporter
 
     def handle( self, data ):
         self.__logger.info( data )
+        self.__line_reporter(data.count('\n'))
 
 class SyslogServer(object):
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
     configures a handler to process messages.
 
     This removes the need for users of this class to care about the underlying protocol being used
+
+    @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
+        must be supplied as the first argument.
     """
-    def __init__( self, protocol, port, logger, config, accept_remote=False):
+    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False):
         server = None
         try:
             if protocol == 'tcp':
@@ -260,7 +268,7 @@ class SyslogServer(object):
             raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
         #create the syslog handler, and add to the list of servers
-        server.syslog_handler = SyslogHandler( logger )
+        server.syslog_handler = SyslogHandler( logger, line_reporter )
         server.syslog_transport_protocol = protocol
         server.syslog_port = port
 
@@ -476,6 +484,9 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
             self.__log_handler.close()
 
     def run( self ):
+        def line_reporter(num_lines):
+            self.increment_counter(reported_lines=num_lines)
+
         try:
             if self.__disk_logger == None:
                 raise Exception( "No disk logger available for Syslog Monitor" )
@@ -483,12 +494,12 @@ Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicat
             #create the main server from the first item in the server list
             protocol = self.__server_list[0]
             self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
-                                          accept_remote=self.__accept_remote_connections )
+                                          line_reporter, accept_remote=self.__accept_remote_connections )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
                 server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
-                                       accept_remote=self.__accept_remote_connections )
+                                       line_reporter, accept_remote=self.__accept_remote_connections )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
