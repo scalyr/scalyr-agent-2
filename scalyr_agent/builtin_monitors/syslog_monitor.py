@@ -237,7 +237,8 @@ class SyslogHandler(object):
 
     def handle( self, data ):
         self.__logger.info( data )
-        self.__line_reporter(data.count('\n'))
+        # We add plus one because the calling code strips off the trailing new lines.
+        self.__line_reporter(data.count('\n') + 1)
 
 class SyslogServer(object):
     """Abstraction for a syslog server, that creates either a UDP or a TCP server, and
