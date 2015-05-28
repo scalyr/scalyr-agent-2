@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.9 "Intelligent Iguana" - May  27, 2015
+## 2.0.9 "Intelligent Iguana" - May  28, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 27, 2015 11:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 28, 2015 17:00 -0700
 --->
-
-Note, this release is in progress.  Final feature set and release date are TBD.
 
 New features:
 
