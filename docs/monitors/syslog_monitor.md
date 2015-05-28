@@ -1,100 +1,103 @@
-Description:
+/// DECLARE path=/help/monitors/syslog-monitor
+/// DECLARE title=Syslog Monitor
+/// DECLARE section=help
+/// DECLARE subsection=monitors
 
 # Syslog Monitor
 
-The Syslog monitor can receive log messages received via the syslog protocol over either syslog  UDP or TCP/IP and
-upload them to Scalyr.  This is useful for acting as a proxy between server applications that export their logs via
-syslog and Scalyr.
+The Syslog monitor allows the Scalyr Agent to act as a syslog server, proxying logs from any application or device
+that supports syslog. It can recieve log messages via the syslog TCP or syslog UDP protocols.
 
-The monitor accepts connections from the localhost (by default) and writes all received syslog messages to a single
-log file (defaulting to ``agentSyslog.log``) which is then copied to Scalyr.  This log file is configured
-to be parsed using the ``agentSyslog`` parser.  You may wish to edit this parser to parse the line according to your
-specific syslog message format.
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-## Configuring Scalyr Agent
 
-In order to use this monitor, you will first need to enable it in your agent's ``agent.json`` configuration file and
-specify the protocol and ports to receive messages on.  A typical configuration fragment is shown below:
+## Sample Configuration
 
-  monitors: [
-    {
-      module:              "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:            "tcp:601,udp:514"
-    }
-  ]
+This sample will configure the agent to accept syslog messages on TCP port 601 and UDP port 514, from localhost
+only:
 
-As the fragment demonstrates, you may listen on one or more protocol/port combinations using a comma-deliminated
-list.  Only ``tcp`` or ``udp`` are allowed for the protocol specification, and any valid, unused port number is
-allowed for the port.  Note, if you use ports 1024 or less on Linux, you must be sure your agent is running as root.
+    monitors: [
+      {
+        module:                    "scalyr_agent.builtin_monitors.syslog_monitor",
+        protocols:                 "tcp:601, udp:514",
+        accept_remote_connections: false
+      }
+    ]
 
-You may wish to accept syslog connections from other hosts than just localhost.  For example, you may have a
-network device that cannot run the agent itself, but does use syslog to export its log.  You can configure
-the Syslog Monitor to accept non-localhost connections by setting the ``accept_remote_connections`` configuration option
-to true.  Here is a sample fragment that demonstrates this:
+You can specify any number of protocol/port combinations. Note that on Linux, to use port numbers 1024 or lower,
+the agent must be running as root.
 
-  monitors: [
-    {
-      module:                      "scalyr_agent.builtin_monitors.syslog_monitor",
-      protocols:                   "tcp:601,udp:514",
-      accept_remote_connections:   true
-    }
-  ]
+You may wish to accept syslog connections from other devices on the network, such as a firewall or router which
+exports logs via syslog. Set ``accept_remote_connections`` to true to allow this.
 
-See the options section below for more information about all of the available configuration options.
+Additional options are documented in the Configuration Reference section, below.
 
-## Configuring syslog sources
 
-After your agent is configured to accept syslog connections, you must then configure your log sources to send
-messages to it.  If your application can send log messages directly, you will need to find instructions
-on how to configure the syslog destination.  If you need help doing this, please feel free to e-mail
-``contact@scalyr.com`` for help.
+## Log files and parsers
+
+By default, all syslog messages are written to a single log file, named ``agentSyslog.log``. You can use the
+``message_log`` option to specify a different file name (see Configuration Reference).
+
+If you'd like to send messages from different devices to different log files, you can include multiple syslog_monitor
+stanzas in your configuration file. Specify a different ``message_log`` for each monitor, and have each listen on a
+different port number. Then configure each device to send to the appropriate port.
+
+syslog_monitor logs use a parser named ``agentSyslog``. To set up parsing for your syslog messages, go to the
+[Parser Setup Page](/parsers?parser=agentSyslog) and click {{menuRef:Leave it to Us}} or
+{{menuRef:Build Parser By Hand}}. If you are using multiple syslog_monitor stanzas, you can specify a different
+parser for each one, using the ``parser`` option.
+
+
+## Sending messages via syslog
+
+To send messages to the Scalyr Agent using the syslog protocol, you must configure your application or network
+device. The documentation for your application or device should include instructions. We'll be happy to help out;
+please drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
+
 
 ### Rsyslogd
 
-Rsyslogd is a popular syslog server used on Linux machines.  It uses a very rich configuration language that allows
-you to do complex operations with the syslog messages it receives, such as splitting them up into separate
-log files by their log type or sending them to another syslog server over TCP/IP or UDP.
+To send messages from another Linux host, you may wish to use the popular ``rsyslogd`` utility. rsyslogd has a
+powerful configuration language, and can be used to forward all logs or only a selected set of logs.
 
-You may wish to configure rsyslogd to send a subset of the syslog messages generated by that server to
-Scalyr.  There are many ways you can do this, but we will show you a simple example.
+Here is a simple example. Suppose you have configured Scalyr's Syslog Monitor to listen on TCP port 601, and you
+wish to use rsyslogd on the local host to upload system log messages of type ``authpriv``. You would add the following
+lines to your rsyslogd configuration, which is typically in ``/etc/rsyslogd.conf``:
 
-Suppose you wish to send all log messages with type ``authpriv`` to a the Syslog Monitor running on localhost over
-TCP/IP using port 601. You would add the following lines to your rsyslogd configuration, which is typically stored
-in ``/etc/rsyslogd.conf``:
+    # Send all authpriv messasges to Scalyr.
+    authpriv.*                                              @@localhost:601
 
-  # Send all authpriv messasges to Scalyr.
-  authpriv.*                                              @@localhost:601
+Make sure that this line comes before any other filters that could match the authpriv messages. The ``@@`` prefix
+specifies TCP.
 
-You must ensure that the line appears in the file before any other filters that could match the authpriv messages.
-Note, the ``@@`` prefix indicates TCP/IP should be used.  A single ``@`` indicates UDP.
-    
-Options:
+
+## Viewing Data
+
+Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
+running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
+
+
+## Configuration Reference
+
 |||# Option                       ||| Usage
 |||# ``module``                   ||| Always ``scalyr_agent.builtin_monitors.syslog_monitor``
-|||# ``protocols``                ||| Optional (defaults to tcp). Defines which transport protocols and ports to \
-                                      listen for syslog messages on. Valid values can be 'udp' or 'tcp', which can be \
-                                      bare, e.g. 'udp' or combined with a port number, e.g. 'udp:10514'.  Multiple \
-                                      values can be combined with a comma to specify both, e.g. 'udp, tcp'.  If no \
-                                      port is specified, then 514 is used for 'udp' and 601 is used for 'tcp'.
+|||# ``protocols``                ||| Optional (defaults to ``tcp:601``). Lists the protocols and ports on which the \
+                                      agent will accept messages. You can include one or more entries, separated by \
+                                      commas. Each entry must be of the form ``tcp:NNN`` or ``udp:NNN``. Port \
+                                      numbers are optional, defaulting to 601 for TCP and 514 for UDP.
 |||# ``accept_remote_connections``||| Optional (defaults to false). If true, the plugin will accept network \
-                                      connections from any host, instead of just from localhost.
-|||# ``message_log``              ||| Optional (defaults to agent_syslog.log). Defines a log file name for storing \
-                                      syslog messages that are received by the agent syslog monitor. Note: the file \
-                                      will be placed in the default Scalyr log directory unless it is an absolute \
-                                      path.
-|||# ``parser``                   ||| Optional (defaults to agentSyslog). Defines the parser that should be specified \
-                                      for the message_log file.
-|||# ``tcp_buffer_size``          ||| Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog \
-                                      message.  Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be \
-                                      able to support messages at least 2048 bytes long, and recommends they SHOULD \
-                                      support messages up to 8192 bytes long.
-|||# ``max_log_size``             ||| Optional (defaults to 100 MB - 100*1024*1024). The maximum file size of the \
-                                      syslog messages log before log rotation occurs. Set to zero for infinite size.
-|||# ``max_log_rotations``        ||| Optional (defaults to 5). The maximum number of log rotations before deleting \
-                                      old logs. Set to zero for infinite rotations.
-
-Log reference:
-|||# Field||| Meaning
-
-Metrics:
-
+                                      connections from any host; otherwise, it will only accept connections from localhost.
+|||# ``message_log``              ||| Optional (defaults to ``agent_syslog.log``). Specifies the file name under which \
+                                      syslog messages are stored. The file will be placed in the default Scalyr log \
+                                      directory, unless it is an absolute path.
+|||# ``parser``                   ||| Optional (defaults to ``agentSyslog``). Defines the parser name associated with \
+                                      the log file.
+|||# ``max_log_size``             ||| Optional (defaults to 50 MB). How large the log file will grow before it is rotated. \
+                                      Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is \
+                                      only relevant for managing disk space on the host running the agent. However, a \
+                                      very small limit could cause logs to be dropped if there is a temporary network \
+                                      outage and the log overflows before it can be sent to Scalyr.
+|||# ``max_log_rotations``        ||| Optional (defaults to 2). The maximum number of log rotations before older log \
+                                      files are deleted. Set to zero for infinite rotations.
