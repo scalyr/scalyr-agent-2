@@ -72,7 +72,7 @@ Here is a typical configuration fragment:
     monitors: [
       {
           module: "scalyr_agent.builtin_monitors.apache_monitor",
-          status_url: "http://localhost:80/server-status"
+          status_url: "http://localhost:80/server-status/?auto"
       }
     ]
 
@@ -88,7 +88,9 @@ options, see Configuration Reference.
                                   Allows you to distinguish between values recorded by different monitors. This is especially \
                                   useful if you are running multiple Apache instances on a single server; you can monitor each \
                                   instance with a separate apache_monitor record in the Scalyr Agent configuration.
-|||# ``status_url``           ||| Specifies the URL -- in particular, the port number -- at which the Apache status module is served.
+|||# ``status_url``           ||| Specifies the URL -- in particular, the port number -- at which the Apache status module is served.  \
+                                  The URL should end in ``/?auto`` to indicate the machine-readable version of the page
+                                  should be returned.
 |||# ``source_address``       ||| Optional (defaults to '127.0.0.1'). The source IP address to use when fetching the server status.
 
 

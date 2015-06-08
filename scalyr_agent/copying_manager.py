@@ -440,7 +440,7 @@ class CopyingManager(StoppableThread):
                         self.__lock.release()
 
                     except Exception:
-                        # TODO: Do not catch Exception here.  That is too board.  Disabling warning for now.
+                        # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception('Failed while attempting to scan and transmit logs')
                         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Failed while attempting to scan and transmit logs')
                         self.__lock.acquire()
