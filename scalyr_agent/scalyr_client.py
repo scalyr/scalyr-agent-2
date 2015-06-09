@@ -258,7 +258,7 @@ class ScalyrClientSession(object):
                 bytes_received = len(response)
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, 'errno'):
+                if hasattr(error, 'errno') and error.errno is not None:
                     log.error('Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                               'will re-attempt', self.__full_address, error.errno, str(error),
                               error_code='client/requestFailed')

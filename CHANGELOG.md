@@ -13,6 +13,7 @@ Bug fixes:
 
 * Prevent syslog monitor from writing syslog message to agent log.
 * Performance improvement for syslog monitor to prevent it from flushing the traffic log file too often
+* Fix bug in error reporting from client that caused exceptions to be thrown while logging an exception
 
 ## 2.0.9 "Intelligent Iguana" - May  28, 2015
 
