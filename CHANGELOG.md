@@ -7,8 +7,6 @@ Scalyr Agent 2 Changes By Release
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 9, 2015 03:00 -0700
 --->
 
-Note, this release is pending and actual release date is TBD.
-
 Bug fixes:
 
 * Prevent syslog monitor from writing syslog message to agent log.
