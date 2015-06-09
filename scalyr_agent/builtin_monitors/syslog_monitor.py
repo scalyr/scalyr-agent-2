@@ -18,10 +18,12 @@ __author__ = 'imron@imralsoftware.com'
 
 import errno
 import logging
+import logging.handlers
 import re
 from socket import error as socket_error
 import SocketServer
 import time
+from threading import Timer
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
@@ -74,6 +76,11 @@ define_config_option( __monitor__, 'max_log_rotations',
                      'Optional (defaults to 2). The maximum number of log rotations before older log files are '
                      'deleted. Set to zero for infinite rotations.',
                      convert_to=int, default=2)
+
+define_config_option( __monitor__, 'log_flush_delay',
+                     'Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing '
+                     'the syslog messages.',
+                     convert_to=float, default=1.0)
 
 
 class SyslogFrameParser(object):
@@ -304,6 +311,49 @@ class SyslogServer(object):
             self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
 
+class _AutoFlushingLogger( logging.handlers.RotatingFileHandler ):
+    """
+    An extension to the RotatingFileHandler for logging that does not flush after every line is emitted.
+    Instead, it is guaranteed to flush once every ``flushDelay`` seconds.
+
+    This helps reduce the disk requests for high syslog traffic.
+    """
+    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0, flushDelay=1.0):
+        logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                      backupCount=backupCount, encoding=encoding, delay=delay)
+        self.__flushDelay = flushDelay
+        # If this is not None, then it is set to a timer that when it expires will flush the log handler.
+        # You must hold the I/O lock in order to set/manipulate this variable.
+        self.__timer = None
+
+    def flush(self):
+        if self.__flushDelay == 0:
+            self._internal_flush()
+        else:
+            self.acquire()
+            try:
+                if self.__timer is None:
+                    self.__timer = Timer(self.__flushDelay, self._internal_flush)
+                    self.__timer.start()
+            finally:
+                self.release()
+
+    def close(self):
+        logging.handlers.RotatingFileHandler.close(self)
+        self._internal_flush()
+
+    def _internal_flush(self):
+        logging.handlers.RotatingFileHandler.flush(self)
+        if self.__flushDelay > 0:
+            self.acquire()
+            try:
+                if self.__timer is not None:
+                    self.__timer.cancel()
+                    self.__timer = None
+            finally:
+                self.release()
+
+
 class SyslogMonitor( ScalyrMonitor ):
     """
 # Syslog Monitor
@@ -406,6 +456,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             'path': message_log,
         }
 
+        self.__flush_delay = self._config.get('log_flush_delay')
         try:
             attributes = JsonObject( { "monitor": "agentSyslog" } )
             self.log_config['attributes'] = attributes
@@ -479,11 +530,15 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             #logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
-                self.__log_handler = logging.handlers.RotatingFileHandler( filename = self.log_config['path'], maxBytes = self.__max_log_size, backupCount = self.__max_log_rotations )
+                self.__log_handler = _AutoFlushingLogger( filename = self.log_config['path'],
+                                                          maxBytes = self.__max_log_size,
+                                                          backupCount = self.__max_log_rotations,
+                                                          flushDelay = self.__flush_delay)
                 formatter = logging.Formatter()
                 self.__log_handler.setFormatter( formatter )
                 self.__disk_logger.addHandler( self.__log_handler )
                 self.__disk_logger.setLevel( logging.INFO )
+                self.__disk_logger.propagate = False
                 success = True
             except Exception, e:
                 self._logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
