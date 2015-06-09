@@ -101,3 +101,5 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                                       outage and the log overflows before it can be sent to Scalyr.
 |||# ``max_log_rotations``        ||| Optional (defaults to 2). The maximum number of log rotations before older log \
                                       files are deleted. Set to zero for infinite rotations.
+|||# ``log_flush_delay``          ||| Optional (defaults to 1.0). The time to wait in seconds between flushing the log \
+                                      file containing the syslog messages.

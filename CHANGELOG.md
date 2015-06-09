@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.9 "Jumpy Jaguar" - June  9, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 9, 2015 03:00 -0700
+--->
+
+Note, this release is pending and actual release date is TBD.
+
+Bug fixes:
+
+* Prevent syslog monitor from writing syslog message to agent log.
+* Performance improvement for syslog monitor to prevent it from flushing the traffic log file too often
+* Fix bug in error reporting from client that caused exceptions to be thrown while logging an exception
+
 ## 2.0.9 "Intelligent Iguana" - May  28, 2015
 
 <!---
