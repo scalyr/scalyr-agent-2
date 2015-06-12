@@ -9,6 +9,10 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 18, 2015 13:00 -0700
 
 Note, this release is still under development.  Release date and details are TBD.
 
+Bug fixes:
+
+* Do not fail Scalyr Agent service start if configuration file registry is not set (Windows)
+
 ## 2.0.10 "Jumpy Jaguar" - June  9, 2015
 
 <!---

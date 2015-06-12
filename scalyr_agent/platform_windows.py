@@ -99,17 +99,22 @@ def _set_config_path_registry_entry(value):
     return True
 
 
-def _get_config_path_registry_entry():
+def _get_config_path_registry_entry(default_config_path):
     """Returns the current value for the configuration file path from the Windows registry.
+
+    @param default_config_path: The path to use for the configuration file if the registry entry does not exist.
+    @type default_config_path: str
 
     @return: The file path.
     @rtype: str
     """
-    registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0,
-                                   _winreg.KEY_READ)
-    value, regtype = _winreg.QueryValueEx(registry_key, _CONFIG_KEY)
-    _winreg.CloseKey(registry_key)
-    return value
+    try:
+        registry_key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0, _winreg.KEY_READ)
+        value, regtype = _winreg.QueryValueEx(registry_key, _CONFIG_KEY)
+        _winreg.CloseKey(registry_key)
+        return value
+    except EnvironmentError:
+        return default_config_path
 
 
 # noinspection PyPep8Naming
@@ -152,7 +157,8 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     def start(self):
         from scalyr_agent.agent_main import ScalyrAgent
         self.controller = WindowsPlatformController()
-        ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry())
+        ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry(
+            self.controller.default_paths.config_file_path))
 
     def SvcOther(self, control):
         # See if the control signal is our custom one, otherwise dispatch it to the superclass.
