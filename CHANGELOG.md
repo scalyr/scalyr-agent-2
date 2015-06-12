@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.9 "Jumpy Jaguar" - June  9, 2015
+## 2.0.10 "Jumpy Jaguar" - June  9, 2015
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 9, 2015 03:00 -0700
