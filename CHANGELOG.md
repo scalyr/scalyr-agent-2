@@ -1,6 +1,14 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.11 "Keen Kangaroo" - June  18, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 18, 2015 13:00 -0700
+--->
+
+Note, this release is still under development.  Release date and details are TBD.
+
 ## 2.0.10 "Jumpy Jaguar" - June  9, 2015
 
 <!---
