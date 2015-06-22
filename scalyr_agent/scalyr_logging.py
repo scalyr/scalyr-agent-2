@@ -428,7 +428,8 @@ class AgentLogger(logging.Logger):
     __opened_monitors__ = {}
 
     def openMetricLogForMonitor(self, path, monitor, max_bytes=20*1024*1024, backup_count=5,
-                                max_write_burst=100000, log_write_rate=2000):
+                                max_write_burst=100000, log_write_rate=2000,
+                                flush_delay=0.0):
         """Open the metric log for this logger instance for the specified monitor.
 
         This must be called before any metrics are reported using the 'emit_value' method.  This opens the
@@ -448,6 +449,9 @@ class AgentLogger(logging.Logger):
             in the "leaky bucket" algorithm.
         @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
             bucket fill rate in the "leaky bucket" algorithm.
+        @param flush_delay:  The number of seconds to wait between flushing the underlying log file.  A value of
+            zero will turn off the delay.  If this is greater than zero, then some bytes might not be written to disk
+            if the agent shutdowns unexpectantly.
         """
         if self.__metric_handler is not None:
             self.closeMetricLog()
@@ -455,7 +459,8 @@ class AgentLogger(logging.Logger):
         self.__metric_handler = MetricLogHandler.get_handler_for_path(path, max_bytes=max_bytes,
                                                                       backup_count=backup_count,
                                                                       max_write_burst=max_write_burst,
-                                                                      log_write_rate=log_write_rate)
+                                                                      log_write_rate=log_write_rate,
+                                                                      flush_delay=flush_delay)
         self.__metric_handler.open_for_monitor(monitor)
         self.__monitor = monitor
         AgentLogger.__opened_monitors__[monitor] = True
@@ -764,7 +769,9 @@ class MetricLogHandler(object):
         # Add the filter and our formatter to this handler.
         self.addFilter(Filter(self.__monitors))
         formatter = MetricLogFormatter()
-        self.addFilter(RateLimiterLogFilter(formatter, max_write_burst=max_write_burst, log_write_rate=log_write_rate))
+        if max_write_burst >= 0 and log_write_rate >= 0:
+            self.addFilter(RateLimiterLogFilter(formatter, max_write_burst=max_write_burst,
+                                                log_write_rate=log_write_rate))
         self.setFormatter(formatter)
 
     # noinspection PyPep8Naming
@@ -806,7 +813,7 @@ class MetricLogHandler(object):
 
     @staticmethod
     def get_handler_for_path(file_path, max_bytes=20*1024*1024, backup_count=5, max_write_burst=100000,
-                             log_write_rate=2000):
+                             log_write_rate=2000, flush_delay=0.0):
         """Returns the MetricLogHandler to use for the specified file path.  This must be used to get
         MetricLogHandler instances.
 
@@ -825,13 +832,17 @@ class MetricLogHandler(object):
             in the "leaky bucket" algorithm.
         @param log_write_rate: The average number of bytes per second to allow to be written to the log. This is the
             bucket fill rate in the "leaky bucket" algorithm.
+        @param flush_delay:  The number of seconds to wait before flushing the underlying file handle after a line
+            has been written to the log file.  You may supply 0.0 to always flush.  This only applies to the log
+            file when it is being written to a physical log and not when it is written to stdout.
 
         @return: The handler instance to use.
         """
         if not file_path in MetricLogHandler.__metric_log_handlers__:
             if not MetricLogHandler.__use_stdout__:
                 result = MetricRotatingLogHandler(file_path, max_bytes=max_bytes, backup_count=backup_count,
-                                                  max_write_burst=max_write_burst, log_write_rate=log_write_rate)
+                                                  max_write_burst=max_write_burst, log_write_rate=log_write_rate,
+                                                  flush_delay=flush_delay)
             else:
                 result = MetricStdoutLogHandler(file_path, max_write_burst=max_write_burst,
                                                 log_write_rate=log_write_rate)
@@ -876,9 +887,67 @@ class MetricLogHandler(object):
             del MetricLogHandler.__metric_log_handlers__[self.__file_path]
 
 
-class MetricRotatingLogHandler(logging.handlers.RotatingFileHandler, MetricLogHandler):
-    def __init__(self, file_path, max_bytes, backup_count, max_write_burst=100000, log_write_rate=2000):
-        logging.handlers.RotatingFileHandler.__init__(self, file_path, maxBytes=max_bytes, backupCount=backup_count)
+class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
+    """
+    An extension to the RotatingFileHandler for logging that does not flush after every line is emitted.
+    Instead, it is guaranteed to flush once every ``flushDelay`` seconds.
+
+    This helps reduce the disk requests for high syslog traffic.
+    """
+    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0, flushDelay=0.0):
+        logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                      backupCount=backupCount, encoding=encoding, delay=delay)
+        self.__flushDelay = flushDelay
+        # If this is not None, then it is set to a timer that when it expires will flush the log handler.
+        # You must hold the I/O lock in order to set/manipulate this variable.
+        self.__timer = None
+
+    def set_flush_delay(self, flushDelay):
+        """Sets the flush delay.
+
+        Warning, this method is not thread safe.  You should invoke it soon after the constructore and before the
+        handler is actually in use.
+
+        @param flushDelay: The maximum number of seconds to wait to flush the underlying file handle.
+        @type flushDelay: float
+        @return:
+        @rtype:
+        """
+        self.__flushDelay = flushDelay
+
+    def flush(self):
+        if self.__flushDelay == 0:
+            self._internal_flush()
+        else:
+            self.acquire()
+            try:
+                if self.__timer is None:
+                    self.__timer = threading.Timer(self.__flushDelay, self._internal_flush)
+                    self.__timer.start()
+            finally:
+                self.release()
+
+    def close(self):
+        logging.handlers.RotatingFileHandler.close(self)
+        self._internal_flush()
+
+    def _internal_flush(self):
+        logging.handlers.RotatingFileHandler.flush(self)
+        if self.__flushDelay > 0:
+            self.acquire()
+            try:
+                if self.__timer is not None:
+                    self.__timer.cancel()
+                    self.__timer = None
+            finally:
+                self.release()
+
+
+class MetricRotatingLogHandler(AutoFlushingRotatingFileHandler, MetricLogHandler):
+    def __init__(self, file_path, max_bytes, backup_count, max_write_burst=100000, log_write_rate=2000,
+                 flush_delay=0.0):
+        AutoFlushingRotatingFileHandler.__init__(self, file_path, maxBytes=max_bytes, backupCount=backup_count,
+                                                 flushDelay=flush_delay)
         MetricLogHandler.__init__(self, file_path, max_write_burst=max_write_burst, log_write_rate=log_write_rate)
         self.propagate = False
 

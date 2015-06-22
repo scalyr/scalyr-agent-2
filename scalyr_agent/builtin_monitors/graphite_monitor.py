@@ -109,6 +109,11 @@ class GraphiteMonitor(ScalyrMonitor):
             raise Exception('The max_request_size of %d cannot be greater than the buffer size of %d' %
                             (self.__max_request_size, self.__buffer_size))
 
+        # We use different defaults for the log metric values so we need to update those variables.
+        self._log_write_rate = self._config.get('monitor_log_write_rate', convert_to=int, default=-1)
+        self._log_max_write_burst = self._config.get('monitor_log_max_write_burst', convert_to=int, default=-1)
+        self._log_flush_delay = self._config.get('monitor_log_flush_delay', convert_to=float, default=1.0, min_value=0)
+
     def run(self):
         # We have to (maybe) start up two servers.  Since each server requires its own thread, we may have
         # to create a new one (since we can use this thread to run one of the servers).

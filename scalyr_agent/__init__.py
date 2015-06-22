@@ -51,6 +51,7 @@ from scalyr_agent.scalyr_logging import getLogger
 from scalyr_agent.scalyr_logging import AgentLogger
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVEL_2
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
+from scalyr_agent.scalyr_logging import AutoFlushingRotatingFileHandler
 
 import json_lib
 import monitor_utils
@@ -58,4 +59,4 @@ import monitor_utils
 __all__ = ['ScalyrMonitor', 'MonitorConfig', 'BadMonitorConfiguration', 'UnsupportedSystem', 'getLogger', 'AgentLogger',
            'StoppableThread', 'RunState', 'DEBUG_LEVEL_0', 'DEBUG_LEVEL_1', 'DEBUG_LEVEL_2', 'DEBUG_LEVEL_3',
            'DEBUG_LEVEL_4', 'DEBUG_LEVEL_5', 'json_lib', 'monitor_utils', 'define_metric', 'define_config_option',
-           'define_log_field']
+           'define_log_field', 'AutoFlushingRotatingFileHandler']
