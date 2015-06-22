@@ -239,11 +239,15 @@ class DockerMonitor( ScalyrMonitor ):
         prefix = self._config.get( 'docker_log_prefix' ) + '-'
 
         for cid, name in containers.iteritems():
-            path = prefix + name + '-stdout.log'
+            path =  prefix + name + '-stdout.log'
+            if not os.path.isabs( path ):
+                path = os.path.join( self.__base_path, path )
             log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=attributes )
             result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
             path = prefix + name + '-stderr.log'
+            if not os.path.isabs( path ):
+                path = os.path.join( self.__base_path, path )
             log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=attributes )
             result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
 
@@ -254,15 +258,12 @@ class DockerMonitor( ScalyrMonitor ):
         self.__socket_file = self.__get_socket_file()
         self.container_id = self.__get_scalyr_container_id( self.__socket_file )
 
-        self.containers = self.__get_running_containers( self.__socket_file )
-
-        self.docker_logs = self.__get_docker_logs( self.containers )
-
-        self.docker_loggers = []
+        self.__base_path = ""
 
         #this lock governs the public list of additional logs
         self.__lock = threading.Lock()
         self.__additional_logs = []
+        self.__additional_logs_changed = True
 
 
     def __create_docker_logger( self, log ):
@@ -295,12 +296,24 @@ class DockerMonitor( ScalyrMonitor ):
         self.__additional_logs = []
         for log in self.docker_logs:
             self.__additional_logs.append( log['log_config'] )
+        self.__additional_logs_changed = True
+        self._logger.info( "logs have changed %s" % str( self ) )
         self.__lock.release()
+
+    def set_additional_log_path( self, path ):
+        """Sets a path to write any additional logs that are created by the plugin
+        """
+        self.__base_path = path
+
+    def additional_logs_have_changed( self ):
+        return self.__additional_logs_changed
 
     def get_additional_logs( self ):
         logs = []
         self.__lock.acquire()
         logs.extend( self.__additional_logs )
+        self.__additional_logs_changed = False
+        self._logger.info( "logs have reset" )
         self.__lock.release()
         return logs
 
@@ -340,9 +353,11 @@ class DockerMonitor( ScalyrMonitor ):
         if update_logs:
             self.__update_additional_logs( self.containers )
 
-        
-
     def run( self ):
+        self.containers = self.__get_running_containers( self.__socket_file )
+        self.docker_logs = self.__get_docker_logs( self.containers )
+        self.docker_loggers = []
+
         #create and start the DockerLoggers
         for log in self.docker_logs:
             self.docker_loggers.append( self.__create_docker_logger( log ) )
