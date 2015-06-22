@@ -11,12 +11,13 @@ Note, this release is still under development.  Release date and details are TBD
 
 New features:
 
-* Allow any monitor's metric log's rate limiter to be modified via configuration, along with flush aggregation
+* Allow any monitor's metric log's rate limiter to be modified via configuration, along with flush aggregation.
+* Provide ``--upgrade-without-ui`` on ``scalyr-agent-2-config`` to allow upgrading the agent without UI (Windows).
 
 Bug fixes:
 
-* Do not fail Scalyr Agent service start if configuration file registry is not set (Windows)
-* Remove rate limiter on metric log for graphite monitor and add in flush aggregation
+* Do not fail Scalyr Agent service start if configuration file registry is not set (Windows).
+* Remove rate limiter on metric log for graphite monitor and add in flush aggregation.
 
 ## 2.0.10 "Jumpy Jaguar" - June  9, 2015
 

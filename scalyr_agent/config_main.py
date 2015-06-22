@@ -414,7 +414,7 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     return 0
 
 
-def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
+def upgrade_windows_install(config, release_track="stable", preserve_msi=False, use_ui=True):
     """Performs an upgrade for an existing Scalyr Agent 2 that was previously installed using a Windows MSI install
     file.
 
@@ -426,10 +426,12 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
     @param preserve_msi:  Whether or not to delete the MSI file once the upgrade is finished.  Note, this
         argument is essentially ignored for now and we always leave the file because we cannot delete it with
         the current way we exec the msiexec process.
+    @param use_ui:  Whether or not the msiexec upgrade command should be run with the UI.
 
     @rtype config: Configuration
     @rtype release_track: str
     @rtype preserve_msi: bool
+    @rtype use_ui: bool
 
     @return: The exit status code.
     """
@@ -497,7 +499,10 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False):
                 # here, but I don't see a way around this for now.
                 # noinspection PyUnresolvedReferences
                 from win32process import DETACHED_PROCESS
-                subprocess.Popen(['msiexec.exe', '/i', "{}".format(download_location)],
+                upgrade_command = ['msiexec.exe', '/i', "{}".format(download_location)]
+                if not use_ui:
+                    upgrade_command.append('/qn')
+                subprocess.Popen(upgrade_command,
                                  shell=False, stdin=None, stdout=None, stderr=None, close_fds=True,
                                  creationflags=DETACHED_PROCESS)
 
@@ -717,6 +722,9 @@ if __name__ == '__main__':
         parser.add_option("", "--release-track", dest="release_track", default="stable",
                           help='The release track to use when upgrading using --upgrade-windows.  This defaults to '
                           '"stable" and is what consumers should use.')
+        parser.add_option("", "--upgrade-without-ui", dest="upgrade_windows_no_ui", action="store_true", default=False,
+                          help='If specified, will request the upgrade for the Windows agent will be run without the '
+                          'UI.')
         # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
         # beyond just Windows.
         parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
@@ -825,6 +833,6 @@ if __name__ == '__main__':
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
     if 'win32' == sys.platform and options.upgrade_windows:
-        sys.exit(upgrade_windows_install(config_file, options.release_track))
+        sys.exit(upgrade_windows_install(config_file, options.release_track, use_ui=not options.upgrade_windows_no_ui))
         
     sys.exit(0)
