@@ -178,18 +178,21 @@ class DockerMonitor( ScalyrMonitor ):
 
     def __get_scalyr_container_id( self, socket_file ):
         """Gets the container id of the scalyr-agent container
+        If the config option container_name is empty, then it is assumed that the scalyr agent is running
+        on the host and not in a container and None is returned.
         """
+        result = None
         name = self._config.get( 'container_name' )
 
-        request = DockerRequest( socket_file ).get( "/containers/%s/json" % name )
+        if name:
+            request = DockerRequest( socket_file ).get( "/containers/%s/json" % name )
 
-        result = None
-        if request.response_code == 200:
-            json = json_lib.parse( request.response_body() )
-            result = json['Id']
-            
-        if not result:
-            raise Exception( "Unabled to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
+            if request.response_code == 200:
+                json = json_lib.parse( request.response_body() )
+                result = json['Id']
+
+            if not result:
+                raise Exception( "Unabled to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
 
         return result
 
