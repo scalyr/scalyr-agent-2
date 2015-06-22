@@ -22,6 +22,7 @@ import re
 import socket
 import stat
 import time
+import threading
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonObject
@@ -122,9 +123,9 @@ class DockerRequest( object ):
 class DockerLogger( object ):
     def __init__( self, socket_file, cid, name, stream, log_path, max_log_size=20*1024*1024, max_log_rotations=2 ):
         self.__socket_file = socket_file
-        self.__cid = cid
-        self.__name = name
-        self.__stream = stream
+        self.cid = cid
+        self.name = name
+        self.stream = stream
         self.__log_path = log_path
 
         self.__logger = logging.Logger( cid + '.' + stream )
@@ -145,7 +146,7 @@ class DockerLogger( object ):
 
     def process_request( self, run_state ):
         request = DockerRequest( self.__socket_file )
-        request.get( '/containers/%s/logs?%s=1&follow=1&tail=0' % (self.__cid, self.__stream) )
+        request.get( '/containers/%s/logs?%s=1&follow=1&tail=0' % (self.cid, self.stream) )
         while run_state.is_running():
             line = request.readline()
             while line:
@@ -225,7 +226,7 @@ class DockerMonitor( ScalyrMonitor ):
                  'attributes': attributes
                }
 
-    def __get_additional_logs( self, containers ):
+    def __get_docker_logs( self, containers ):
         result = []
 
         attributes = None
@@ -255,20 +256,98 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.containers = self.__get_running_containers( self.__socket_file )
 
-        self.additional_logs = self.__get_additional_logs( self.containers )
+        self.docker_logs = self.__get_docker_logs( self.containers )
 
         self.docker_loggers = []
 
+        #this lock governs the public list of additional logs
+        self.__lock = threading.Lock()
+        self.__additional_logs = []
+
+
+    def __create_docker_logger( self, log ):
+        cid = log['cid']
+        name = self.containers[cid]
+        stream = log['stream']
+        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'] )
+        logger.start()
+        return logger
+
+    def __stop_loggers( self, stopping ):
+        if stopping:
+            for logger in self.docker_loggers:
+                if logger.cid in stopping:
+                    logger.stop( False, None )
+
+            self.docker_loggers = [l for l in self.docker_loggers if l.cid not in stopping]
+            self.docker_logs = [l for l in self.docker_logs if l['cid'] not in stopping]
+
+    def __start_loggers( self, starting ):
+        if starting:
+            docker_logs = self.__get_docker_logs( starting )
+            for log in docker_logs:
+                self.docker_loggers.append( self.__create_docker_logger( log ) )
+
+            self.docker_logs.extend( docker_logs )
+
+    def __update_additional_logs( self, docker_logs ):
+        self.__lock.acquire()
+        self.__additional_logs = []
+        for log in self.docker_logs:
+            self.__additional_logs.append( log['log_config'] )
+        self.__lock.release()
+
+    def get_additional_logs( self ):
+        logs = []
+        self.__lock.acquire()
+        logs.extend( self.__additional_logs )
+        self.__lock.release()
+        return logs
+
+    def gather_sample( self ):
+        running_containers = self.__get_running_containers( self.__socket_file )
+
+        update_logs = False
+
+        #get the containers that have started since the last sample
+        starting = {}
+        for cid, name in running_containers.iteritems():
+            if cid not in self.containers:
+                update_logs = True
+                self._logger.info( "Starting logger for container '%s'" % name )
+                starting[cid] = name
+
+        #get the containers that have stopped
+        stopping = {}
+        for cid, name in self.containers.iteritems():
+            if cid not in running_containers:
+                update_logs = True
+                self._logger.info( "Stopping logger for container '%s'" % name )
+                stopping[cid] = name
+
+        #stop the old loggers
+        self.__stop_loggers( stopping )
+
+        #update the list of running containers
+        #do this before starting new ones, as starting up new ones
+        #will access self.containers
+        self.containers = running_containers
+
+        #start the new ones
+        self.__start_loggers( starting )
+
+        #update list of log files
+        if update_logs:
+            self.__update_additional_logs( self.containers )
+
+        
 
     def run( self ):
         #create and start the DockerLoggers
-        for log in self.additional_logs:
-            cid = log['cid']
-            name = self.containers[cid]
-            stream = log['stream']
-            logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'] )
-            logger.start()
-            self.docker_loggers.append( logger )
+        for log in self.docker_logs:
+            self.docker_loggers.append( self.__create_docker_logger( log ) )
+
+        self.__update_additional_logs( self.containers )
 
         self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
         ScalyrMonitor.run( self )
@@ -280,6 +359,7 @@ class DockerMonitor( ScalyrMonitor ):
         #stop the DockerLoggers
         for logger in self.docker_loggers:
             logger.stop( wait_on_join, join_timeout )
+            self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
 
 
 

@@ -251,6 +251,14 @@ class ScalyrMonitor(StoppableThread):
         """
         self._sample_interval_secs = secs
 
+    def get_additional_logs( self ):
+        """
+        Gets any additional logs used by the monitor
+        @return: A list additional log_configs used by the monitor
+
+        """
+        return []
+
     def open_metric_log(self):
         """Opens the logger for this monitor.
 
