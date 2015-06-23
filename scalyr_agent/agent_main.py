@@ -1085,9 +1085,12 @@ if __name__ == '__main__':
     if options.config_filename is not None and not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
+    main_rc = 1
     try:
         main_rc = ScalyrAgent(my_controller).main(options.config_filename, args[0], options)
-        sys.exit(main_rc)
-    except Exception, e:
-        print >> sys.stderr, str(e)
+    except Exception, mainExcept:
+        print >> sys.stderr, str(mainExcept)
         sys.exit(1)
+
+    # We do this outside of the try block above because sys.exit raises an exception itself.
+    sys.exit(main_rc)
