@@ -326,9 +326,9 @@ class ScalyrAgent(object):
         # Make sure the user has set an API key... a common step that can be forgotten.
         # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
         if self.__config.api_key == 'REPLACE_THIS' or self.__config.api_key == '':
-            raise Exception('Error, you have not set a valid api key in the configuration file.\n' +
+            raise Exception('Error, you have not set a valid api key in the configuration file.\n'
                             'Edit the file %s and replace the value for "api_key" with a valid logs '
-                            'write key for your account.\n' +
+                            'write key for your account.\n'
                             'You can see your write logs keys at https://www.scalyr.com/keys' %
                             self.__config.file_path)
 
