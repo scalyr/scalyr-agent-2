@@ -19,6 +19,7 @@ Bug fixes:
 
 * Do not fail Scalyr Agent service start if configuration file registry is not set (Windows).
 * Remove rate limiter on metric log for graphite monitor and add in flush aggregation.
+* Fix that prevented graphite monitor thread from starting when accepting both text and pickle protocols
 
 ## 2.0.10 "Jumpy Jaguar" - June  9, 2015
 
