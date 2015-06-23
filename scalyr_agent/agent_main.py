@@ -200,9 +200,8 @@ class ScalyrAgent(object):
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
             # status.
             if command != 'stop' and command != 'status':
-                print >> sys.stderr, 'Error reading configuration file: %s' % str(e)
-                print >> sys.stderr, 'Terminating agent, please fix the configuration file and restart agent.'
-                return 1
+                raise Exception('Error reading configuration file: %s\n'
+                                'Terminating agent, please fix the configuration file and restart agent.' % str(e))
             else:
                 self.__config = None
                 print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
@@ -241,9 +240,13 @@ class ScalyrAgent(object):
                 return 1
         except SystemExit:
             return 0
-        except Exception:
-            log.exception('Caught exception when attempt to execute command %s', command)
-            return 1
+        except Exception, e:
+            # We special case the inner_run_with checks since we know that exception is human-readable.
+            if command == 'inner_run_with_checks':
+                raise e
+            else:
+                raise Exception('Caught exception when attempt to execute command %s.  Exception was %s' %
+                                (command, str(e)))
 
     def __read_and_verify_config(self, config_file_path):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
@@ -1081,4 +1084,10 @@ if __name__ == '__main__':
 
     if options.config_filename is not None and not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
-    sys.exit(ScalyrAgent(my_controller).main(options.config_filename, args[0], options))
+
+    try:
+        main_rc = ScalyrAgent(my_controller).main(options.config_filename, args[0], options)
+        sys.exit(main_rc)
+    except Exception, e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)

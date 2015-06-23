@@ -133,6 +133,9 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     def log(self, msg):
         servicemanager.LogInfoMsg(msg)
 
+    def error(self, msg):
+        servicemanager.LogErrorMsg(msg)
+
     def sleep(self, sec):
         win32api.Sleep(sec*1000, True)
 
@@ -161,9 +164,9 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
         try:
             ScalyrAgent.agent_run_method(self.controller, config_path, perform_config_check=True)
         except Exception, e:
-            self.log('Error seen while starting the Scalyr Agent: {}'.format(e))
-            self.log('Still attempting to run agent, but you must fix error.  Agent will re-read configuration file '
-                     'without restarting it.')
+            self.error('Error seen while starting the Scalyr Agent: {}'.format(e))
+            self.error('Still attempting to run agent, but you must fix error.  Agent will re-read configuration file '
+                       'without restarting it.')
             ScalyrAgent.agent_run_method(self.controller, config_path, perform_config_check=False)
 
     def SvcOther(self, control):
