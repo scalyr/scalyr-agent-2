@@ -13,6 +13,7 @@ New features:
 
 * Allow any monitor's metric log's rate limiter to be modified via configuration, along with flush aggregation.
 * Provide ``--upgrade-without-ui`` on ``scalyr-agent-2-config`` to allow upgrading the agent without UI (Windows).
+* Write user-friendly error message to event log when a major configuration problem is seen during start up (Windows)
 
 Bug fixes:
 
