@@ -122,10 +122,14 @@ class ScalyrMonitor(StoppableThread):
         # These variables control the rate limiter on how fast we can write to the metric log.
         # The first one is the average number of bytes that can be written per second.  This is the bucket fill rate
         # in the "leaky bucket" algorithm used to calculate the rate limit.  Derived classes may change this.
-        self._log_write_rate = 2000
+        self._log_write_rate = self._config.get('monitor_log_write_rate', convert_to=int, default=2000)
         # This is the maximum size of a write burst to the log.  This is the bucket size in the "leaky bucket" algorithm
         # used to calculate the rate limit.  Derived classes may change this.
-        self._log_max_write_burst = 100000
+        self._log_max_write_burst = self._config.get('monitor_log_max_write_burst', convert_to=int, default=100000)
+        # This is the number of seconds between waiting to flush the metric log (if there are pending bytes that
+        # need to be flushed to disk).  If this is greater than zero, then it will reduce the amount of disk
+        # flushing, but at the cost of possible loss of data if the agent shutdowns down unexpectantly.
+        self._log_flush_delay = self._config.get('monitor_log_flush_delay', convert_to=float, default=0.0, min_value=0)
 
         self._initialize()
 
@@ -252,7 +256,7 @@ class ScalyrMonitor(StoppableThread):
 
         This must be invoked before the monitor is started."""
         self._logger.openMetricLogForMonitor(self.log_config['path'], self, max_write_burst=self._log_max_write_burst,
-                                             log_write_rate=self._log_write_rate)
+                                             log_write_rate=self._log_write_rate, flush_delay=self._log_flush_delay)
         self.__metric_log_open = True
         return True
 

@@ -25,7 +25,7 @@ import SocketServer
 import time
 from threading import Timer
 
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.util import StoppableThread
@@ -192,7 +192,7 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                                        max_request_size=buffer_size)
         while self.server.is_running() and not request_stream.is_closed():
             data = request_stream.read_request()
-            if data != None:
+            if data is not None:
                 self.server.syslog_handler.handle( data.strip() )
             #don't hog the cpu
             time.sleep( 0.01 )
@@ -276,7 +276,7 @@ class SyslogServer(object):
                 raise
 
         #don't continue if the config had a protocol we don't recognize
-        if server == None:
+        if server is None:
             raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
         #create the syslog handler, and add to the list of servers
@@ -289,7 +289,7 @@ class SyslogServer(object):
 
 
     def __prepare_run_state( self, run_state ):
-        if run_state != None:
+        if run_state is not None:
             server = self.__server
             server.set_run_state( run_state )
             #shutdown is only available from python 2.6 onwards
@@ -307,51 +307,8 @@ class SyslogServer(object):
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
-        if self.__thread != None:
+        if self.__thread is not None:
             self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
-
-
-class _AutoFlushingLogger( logging.handlers.RotatingFileHandler ):
-    """
-    An extension to the RotatingFileHandler for logging that does not flush after every line is emitted.
-    Instead, it is guaranteed to flush once every ``flushDelay`` seconds.
-
-    This helps reduce the disk requests for high syslog traffic.
-    """
-    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0, flushDelay=1.0):
-        logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
-                                                      backupCount=backupCount, encoding=encoding, delay=delay)
-        self.__flushDelay = flushDelay
-        # If this is not None, then it is set to a timer that when it expires will flush the log handler.
-        # You must hold the I/O lock in order to set/manipulate this variable.
-        self.__timer = None
-
-    def flush(self):
-        if self.__flushDelay == 0:
-            self._internal_flush()
-        else:
-            self.acquire()
-            try:
-                if self.__timer is None:
-                    self.__timer = Timer(self.__flushDelay, self._internal_flush)
-                    self.__timer.start()
-            finally:
-                self.release()
-
-    def close(self):
-        logging.handlers.RotatingFileHandler.close(self)
-        self._internal_flush()
-
-    def _internal_flush(self):
-        logging.handlers.RotatingFileHandler.flush(self)
-        if self.__flushDelay > 0:
-            self.acquire()
-            try:
-                if self.__timer is not None:
-                    self.__timer.cancel()
-                    self.__timer = None
-            finally:
-                self.release()
 
 
 class SyslogMonitor( ScalyrMonitor ):
@@ -530,10 +487,11 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             #logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
-                self.__log_handler = _AutoFlushingLogger( filename = self.log_config['path'],
-                                                          maxBytes = self.__max_log_size,
-                                                          backupCount = self.__max_log_rotations,
-                                                          flushDelay = self.__flush_delay)
+                self.__log_handler = AutoFlushingRotatingFileHandler( filename = self.log_config['path'],
+                                                                      maxBytes = self.__max_log_size,
+                                                                      backupCount = self.__max_log_rotations,
+                                                                      flushDelay = self.__flush_delay)
+
                 formatter = logging.Formatter()
                 self.__log_handler.setFormatter( formatter )
                 self.__disk_logger.addHandler( self.__log_handler )
@@ -555,7 +513,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.increment_counter(reported_lines=num_lines)
 
         try:
-            if self.__disk_logger == None:
+            if self.__disk_logger is None:
                 raise Exception( "No disk logger available for Syslog Monitor" )
 
             #create the main server from the first item in the server list

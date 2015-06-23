@@ -416,8 +416,9 @@ class StoppableThread(threading.Thread):
                 self.__target(self._run_state)
             else:
                 self.run_and_propagate()
-        except Exception:
+        except Exception, e:
             self.__exception_info = sys.exc_info()
+            print >> sys.stderr, 'Received exception from run method in StoppableThread %s' % str(e)
             return None
 
     def run_and_propagate(self):

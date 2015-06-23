@@ -130,7 +130,7 @@ class ScalyrAgent(object):
         self.__last_verify_config = None
 
     @staticmethod
-    def agent_run_method(controller, config_file_path):
+    def agent_run_method(controller, config_file_path, perform_config_check=False):
         """Begins executing the agent service on the current thread.
 
         This will not return until the service is requested to terminate.
@@ -140,9 +140,12 @@ class ScalyrAgent(object):
 
         @param controller: The controller to use to run the service.
         @param config_file_path: The path to the configuration file to use.
+        @param perform_config_check:  If true, will check common configuration errors such as forgetting to
+            provide an api token and raise an exception if they fail.
 
         @type controller: PlatformController
         @type config_file_path: str
+        @type perform_config_check: bool
 
         @return: The return code when the agent exits.
         @rtype: int
@@ -156,7 +159,11 @@ class ScalyrAgent(object):
         my_options.no_fork = True
         my_options.no_change_user = True
 
-        return ScalyrAgent(controller).main(config_file_path, 'inner_run', my_options)
+        if perform_config_check:
+            command = 'inner_run_with_checks'
+        else:
+            command = 'inner_run'
+        return ScalyrAgent(controller).main(config_file_path, command, my_options)
 
     def main(self, config_file_path, command, command_options):
         """Run the Scalyr Agent.
@@ -193,9 +200,8 @@ class ScalyrAgent(object):
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
             # status.
             if command != 'stop' and command != 'status':
-                print >> sys.stderr, 'Error reading configuration file: %s' % str(e)
-                print >> sys.stderr, 'Terminating agent, please fix the configuration file and restart agent.'
-                return 1
+                raise Exception('Error reading configuration file: %s\n'
+                                'Terminating agent, please fix the configuration file and restart agent.' % str(e))
             else:
                 self.__config = None
                 print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
@@ -209,6 +215,9 @@ class ScalyrAgent(object):
             # Execute the command.
             if command == 'start':
                 return self.__start(quiet, no_fork)
+            elif command == 'inner_run_with_checks':
+                self.__perform_config_checks()
+                return self.__run(self.__controller)
             elif command == 'inner_run':
                 return self.__run(self.__controller)
             elif command == 'stop':
@@ -231,9 +240,13 @@ class ScalyrAgent(object):
                 return 1
         except SystemExit:
             return 0
-        except Exception:
-            log.exception('Caught exception when attempt to execute command %s', command)
-            return 1
+        except Exception, e:
+            # We special case the inner_run_with checks since we know that exception is human-readable.
+            if command == 'inner_run_with_checks':
+                raise e
+            else:
+                raise Exception('Caught exception when attempt to execute command %s.  Exception was %s' %
+                                (command, str(e)))
 
     def __read_and_verify_config(self, config_file_path):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
@@ -305,6 +318,48 @@ class ScalyrAgent(object):
         return WorkerThread(self.__last_verify_config['config'], self.__last_verify_config['copying_manager'],
                             self.__last_verify_config['monitors_manager'])
 
+    def __perform_config_checks(self):
+        """Perform checks for common configuration errors.  Raises an exception with a human-readable message
+        if any of the checks fail.
+
+        In particular, this checks if (1) the user has actually entered an api_key, (2) the agent process can
+        write to the logs directory, (3) we can send a request to the the configured scalyr server
+        and (4) the api key is correct.
+        """
+        # Make sure the user has set an API key... a common step that can be forgotten.
+        # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
+        if self.__config.api_key == 'REPLACE_THIS' or self.__config.api_key == '':
+            raise Exception('Error, you have not set a valid api key in the configuration file.\n'
+                            'Edit the file %s and replace the value for "api_key" with a valid logs '
+                            'write key for your account.\n'
+                            'You can see your write logs keys at https://www.scalyr.com/keys' %
+                            self.__config.file_path)
+
+        self.__verify_can_write_to_logs_and_data(self.__config)
+
+        # Send a test message to the server to make sure everything works.  If not, print a decent error message.
+        client = self.__create_client(quiet=True)
+        try:
+            ping_result = client.ping()
+            if ping_result != 'success':
+                if 'badClientClockSkew' in ping_result:
+                    # TODO:  The server does not yet send this error message, but it will in the future.
+                    raise Exception('Sending request to the server failed due to bad clock skew.  The system clock '
+                                    'on this host is too off from actual time.  Please fix the clock and try to '
+                                    'restart the agent.')
+                elif 'invalidApiKey' in ping_result:
+                    # TODO:  The server does not yet send this error message, but it will in the future.
+                    raise Exception('Sending request to the server failed due to an invalid API key.  This probably '
+                                    'means the \'api_key\' field in configuration file  \'%s\' is not correct.  '
+                                    'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
+                                    '\'api_key\' field in the configuration file' % self.__config.file_path)
+                else:
+                    raise Exception('Failed to send request to the server.  The server address could be wrong, there '
+                                    'maybe a network connectivity issue, or the provided api_token could be '
+                                    'incorrect.')
+        finally:
+            client.close()
+
     def __start(self, quiet, no_fork):
         """Executes the start command.
 
@@ -326,15 +381,6 @@ class ScalyrAgent(object):
         @return:  The exit status code for the process.
         @rtype: int
         """
-        # Before we begin, make sure the user has set an API key... a common step that can be forgotten.
-        # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
-        if self.__config.api_key == 'REPLACE_THIS' or self.__config.api_key == '':
-            print >> sys.stderr, 'Error, you have not set a valid api key in the configuration file.'
-            print >> sys.stderr, ('Edit the file %s and replace the value for "api_key" with a valid logs '
-                                  'write key for your account.' % self.__config.file_path)
-            print >> sys.stderr, 'You can see your write logs keys at https://www.scalyr.com/keys'
-            return 1
-
         # First, see if we have to change the user that is executing this script to match the owner of the config.
         if self.__escalator.is_user_change_required():
             return self.__escalator.change_user_and_rerun_script('start the scalyr agent')
@@ -342,37 +388,14 @@ class ScalyrAgent(object):
         # Make sure we do not try to start it up again.
         self.__fail_if_already_running()
 
+        # noinspection PyBroadException
         try:
-            self.__verify_can_write_to_logs_and_data(self.__config)
+            self.__perform_config_checks()
         except Exception, e:
+            print >> sys.stderr
             print >> sys.stderr, '%s' % str(e)
             print >> sys.stderr, 'Terminating agent, please fix the error and restart the agent.'
             return 1
-
-        # Send a test message to the server to make sure everything works.  If not, print a decent error message.
-        client = self.__create_client(quiet=True)
-        ping_result = client.ping()
-        if ping_result != 'success':
-            print >> sys.stderr
-
-            if 'badClientClockSkew' in ping_result:
-                # TODO:  The server does not yet send this error message, but it will in the future.
-                print >> sys.stderr, ('Sending request to the server failed due to bad clock skew.  The system clock '
-                                      'on this host is too off from actual time.  Please fix the clock and try to '
-                                      'restart the agent.')
-            elif 'invalidApiKey' in ping_result:
-                # TODO:  The server does not yet send this error message, but it will in the future.
-                print >> sys.stderr, ('Sending request to the server failed due to an invalid API key.  This probably '
-                                      'means the \'api_key\' field in configuration file  \'%s\' is not correct.  '
-                                      'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
-                                      '\'api_key\' field in the configuration file' % self.__config.file_path)
-            else:
-                print >> sys.stderr, ('Failed to send request to the server.  The server address could be wrong, there '
-                                      'maybe a network connectivity issue, or the provided api_token could be '
-                                      'incorrect.')
-            print >> sys.stderr, 'Terminating agent, please fix issue and restart agent.'
-            return 1
-        client.close()
 
         if not no_fork:
             # Do one last check to just cut down on the window of race conditions.
@@ -1061,4 +1084,10 @@ if __name__ == '__main__':
 
     if options.config_filename is not None and not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
-    sys.exit(ScalyrAgent(my_controller).main(options.config_filename, args[0], options))
+
+    try:
+        main_rc = ScalyrAgent(my_controller).main(options.config_filename, args[0], options)
+        sys.exit(main_rc)
+    except Exception, e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)

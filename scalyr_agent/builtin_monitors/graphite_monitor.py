@@ -109,6 +109,11 @@ class GraphiteMonitor(ScalyrMonitor):
             raise Exception('The max_request_size of %d cannot be greater than the buffer size of %d' %
                             (self.__max_request_size, self.__buffer_size))
 
+        # We use different defaults for the log metric values so we need to update those variables.
+        self._log_write_rate = self._config.get('monitor_log_write_rate', convert_to=int, default=-1)
+        self._log_max_write_burst = self._config.get('monitor_log_max_write_burst', convert_to=int, default=-1)
+        self._log_flush_delay = self._config.get('monitor_log_flush_delay', convert_to=float, default=1.0, min_value=0)
+
     def run(self):
         # We have to (maybe) start up two servers.  Since each server requires its own thread, we may have
         # to create a new one (since we can use this thread to run one of the servers).
@@ -131,10 +136,16 @@ class GraphiteMonitor(ScalyrMonitor):
         elif not self.__accept_pickle:
             text_server.run()
         else:
+            # We need a callback to start the text_server.  We cannot use text_server.run directly since it does
+            # not take a run_state argument.
+            # noinspection PyUnusedLocal
+            def run_text_server(run_state):
+                text_server.run()
+
             # If we are accepting both kinds of traffic, we need a second thread to handle one of the ports.. the
             # other one will be handled by this thread.
             # noinspection PyAttributeOutsideInit
-            self.__extra_thread = StoppableThread(target=text_server.run, name='Graphite monitor text server thread')
+            self.__extra_thread = StoppableThread(target=run_text_server, name='Graphite monitor text server thread')
             self.__extra_thread.start()
             pickle_server.run()
 

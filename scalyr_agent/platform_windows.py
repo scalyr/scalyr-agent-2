@@ -133,6 +133,9 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     def log(self, msg):
         servicemanager.LogInfoMsg(msg)
 
+    def error(self, msg):
+        servicemanager.LogErrorMsg(msg)
+
     def sleep(self, sec):
         win32api.Sleep(sec*1000, True)
 
@@ -157,8 +160,14 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
     def start(self):
         from scalyr_agent.agent_main import ScalyrAgent
         self.controller = WindowsPlatformController()
-        ScalyrAgent.agent_run_method(self.controller, _get_config_path_registry_entry(
-            self.controller.default_paths.config_file_path))
+        config_path = _get_config_path_registry_entry(self.controller.default_paths.config_file_path)
+        try:
+            ScalyrAgent.agent_run_method(self.controller, config_path, perform_config_check=True)
+        except Exception, e:
+            self.error('Error seen while starting the Scalyr Agent: {}'.format(e))
+            self.error('Still attempting to run agent, but you must fix error.  Agent will re-read configuration file '
+                       'without restarting it.')
+            ScalyrAgent.agent_run_method(self.controller, config_path, perform_config_check=False)
 
     def SvcOther(self, control):
         # See if the control signal is our custom one, otherwise dispatch it to the superclass.
