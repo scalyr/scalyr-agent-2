@@ -490,8 +490,11 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False, 
                 if not os.path.isfile(download_location):
                     raise UpgradeFailure('Failed to download installation package')
 
-                print ('Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to complete '
-                       'the upgrade process.')
+                if use_ui:
+                    print ('Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to '
+                           'complete the upgrade process.')
+                else:
+                    print ('Executing upgrade.  It will finish in the background.')
 
                 # Because this file, config_main.py, is part of the currently installed Scalyr Agent package, we have
                 # to finish our use of it before the upgrade can proceed.  So, we just fork off the msiexec process
