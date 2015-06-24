@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.11 "Keen Kangaroo" - June  18, 2015
+## 2.0.11 "Keen Kangaroo" - June  24, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 18, 2015 13:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 24, 2015 11:45 -0700
 --->
-
-Note, this release is still under development.  Release date and details are TBD.
 
 New features:
 
