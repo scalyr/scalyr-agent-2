@@ -208,7 +208,7 @@ class ScalyrAgent(object):
 
         self.__controller.consume_config(self.__config, config_file_path)
 
-        self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd())
+        self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd(), command_options.no_change_user)
 
         # noinspection PyBroadException
         try:

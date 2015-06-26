@@ -52,12 +52,12 @@ scalyr_init()
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.json_lib as json_lib
+from scalyr_agent.log_watcher import LogWatcher
 
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 log = scalyr_logging.getLogger('scalyr_agent.run_monitor')
-
 
 def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, monitor_sample_interval,
                            monitor_debug_level):

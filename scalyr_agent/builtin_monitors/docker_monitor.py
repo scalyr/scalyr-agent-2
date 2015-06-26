@@ -27,6 +27,7 @@ from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
+from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
@@ -126,7 +127,7 @@ class DockerLogger( object ):
         self.cid = cid
         self.name = name
         self.stream = stream
-        self.__log_path = log_path
+        self.log_path = log_path
 
         self.__logger = logging.Logger( cid + '.' + stream )
 
@@ -240,14 +241,10 @@ class DockerMonitor( ScalyrMonitor ):
 
         for cid, name in containers.iteritems():
             path =  prefix + name + '-stdout.log'
-            if not os.path.isabs( path ):
-                path = os.path.join( self.__base_path, path )
             log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=attributes )
             result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
             path = prefix + name + '-stderr.log'
-            if not os.path.isabs( path ):
-                path = os.path.join( self.__base_path, path )
             log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=attributes )
             result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
 
@@ -257,14 +254,12 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__socket_file = self.__get_socket_file()
         self.container_id = self.__get_scalyr_container_id( self.__socket_file )
+        self.__log_watcher = None
 
-        self.__base_path = ""
-
-        #this lock governs the public list of additional logs
-        self.__lock = threading.Lock()
-        self.__additional_logs = []
-        self.__additional_logs_changed = True
-
+    def set_log_watcher( self, log_watcher ):
+        """Provides a log_watcher object that monitors can use to add/remove log files
+        """
+        self.__log_watcher = log_watcher
 
     def __create_docker_logger( self, log ):
         cid = log['cid']
@@ -279,54 +274,31 @@ class DockerMonitor( ScalyrMonitor ):
             for logger in self.docker_loggers:
                 if logger.cid in stopping:
                     logger.stop( False, None )
+                    if self.__log_watcher:
+                        self._logger.info( "going to remove: %s" % logger.log_path)
+                        self.__log_watcher.remove_log_path( self, logger.log_path )
 
-            self.docker_loggers = [l for l in self.docker_loggers if l.cid not in stopping]
-            self.docker_logs = [l for l in self.docker_logs if l['cid'] not in stopping]
+            self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
+            self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
 
     def __start_loggers( self, starting ):
         if starting:
             docker_logs = self.__get_docker_logs( starting )
             for log in docker_logs:
+                if self.__log_watcher:
+                    log['log_config'] = self.__log_watcher.add_log_config( self, log['log_config'] )
+                    self._logger.info( "after: %s" % repr( log['log_config']['path'] ) )
                 self.docker_loggers.append( self.__create_docker_logger( log ) )
 
             self.docker_logs.extend( docker_logs )
 
-    def __update_additional_logs( self, docker_logs ):
-        self.__lock.acquire()
-        self.__additional_logs = []
-        for log in self.docker_logs:
-            self.__additional_logs.append( log['log_config'] )
-        self.__additional_logs_changed = True
-        self._logger.info( "logs have changed %s" % str( self ) )
-        self.__lock.release()
-
-    def set_additional_log_path( self, path ):
-        """Sets a path to write any additional logs that are created by the plugin
-        """
-        self.__base_path = path
-
-    def additional_logs_have_changed( self ):
-        return self.__additional_logs_changed
-
-    def get_additional_logs( self ):
-        logs = []
-        self.__lock.acquire()
-        logs.extend( self.__additional_logs )
-        self.__additional_logs_changed = False
-        self._logger.info( "logs have reset" )
-        self.__lock.release()
-        return logs
-
     def gather_sample( self ):
         running_containers = self.__get_running_containers( self.__socket_file )
-
-        update_logs = False
 
         #get the containers that have started since the last sample
         starting = {}
         for cid, name in running_containers.iteritems():
             if cid not in self.containers:
-                update_logs = True
                 self._logger.info( "Starting logger for container '%s'" % name )
                 starting[cid] = name
 
@@ -334,7 +306,6 @@ class DockerMonitor( ScalyrMonitor ):
         stopping = {}
         for cid, name in self.containers.iteritems():
             if cid not in running_containers:
-                update_logs = True
                 self._logger.info( "Stopping logger for container '%s'" % name )
                 stopping[cid] = name
 
@@ -349,10 +320,6 @@ class DockerMonitor( ScalyrMonitor ):
         #start the new ones
         self.__start_loggers( starting )
 
-        #update list of log files
-        if update_logs:
-            self.__update_additional_logs( self.containers )
-
     def run( self ):
         self.containers = self.__get_running_containers( self.__socket_file )
         self.docker_logs = self.__get_docker_logs( self.containers )
@@ -360,9 +327,9 @@ class DockerMonitor( ScalyrMonitor ):
 
         #create and start the DockerLoggers
         for log in self.docker_logs:
+            if self.__log_watcher:
+                log['log_config'] = self.__log_watcher.add_log_config( self, log['log_config'] )
             self.docker_loggers.append( self.__create_docker_logger( log ) )
-
-        self.__update_additional_logs( self.containers )
 
         self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
         ScalyrMonitor.run( self )
@@ -373,6 +340,8 @@ class DockerMonitor( ScalyrMonitor ):
 
         #stop the DockerLoggers
         for logger in self.docker_loggers:
+            if self.__log_watcher:
+                self.__log_watcher.remove_log_path( self, logger.log_path )
             logger.stop( wait_on_join, join_timeout )
             self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
 

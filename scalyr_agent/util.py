@@ -539,7 +539,7 @@ class ScriptEscalator(object):
     where as Windows will prompt the user for the Administrator's password.
     """
 
-    def __init__(self, controller, config_file_path, current_working_directory):
+    def __init__(self, controller, config_file_path, current_working_directory, no_change_user = False):
         """
         @param controller: The instance of the PlatformController being used to execute the script.
         @param config_file_path: The full path to the configuration file.
@@ -550,8 +550,13 @@ class ScriptEscalator(object):
         @type current_working_directory:  str
         """
         self.__controller = controller
-        self.__running_user = controller.get_current_user()
-        self.__desired_user = controller.get_file_owner(config_file_path)
+
+        self.__running_user = None
+        self.__desired_user = None
+
+        if no_change_user:
+            self.__running_user = controller.get_current_user()
+            self.__desired_user = controller.get_file_owner(config_file_path)
         self.__cwd = current_working_directory
 
     def is_user_change_required(self):

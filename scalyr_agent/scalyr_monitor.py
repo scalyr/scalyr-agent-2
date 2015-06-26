@@ -253,24 +253,10 @@ class ScalyrMonitor(StoppableThread):
         """
         self._sample_interval_secs = secs
 
-    def set_additional_log_path( self, path ):
-        """Sets a path to write any additional logs that are created by the plugin
+    def set_log_watcher( self, log_watcher ):
+        """Provides a log_watcher object that monitors can use to add/remove log files
         """
         pass
-
-    def additional_logs_has_changed( self ):
-        """Returns whether the additional logs have changed since the last call to 
-        get_additional_logs
-        """
-        return False
-
-    def get_additional_logs( self ):
-        """
-        Gets any additional logs used by the monitor
-        @return: A list additional log_configs used by the monitor
-
-        """
-        return []
 
     def open_metric_log(self):
         """Opens the logger for this monitor.

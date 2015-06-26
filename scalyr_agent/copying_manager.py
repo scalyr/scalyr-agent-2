@@ -25,6 +25,7 @@ import sys
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.log_watcher import LogWatcher
 
 from scalyr_agent import json_lib
 from scalyr_agent.util import StoppableThread
@@ -34,7 +35,7 @@ from scalyr_agent.agent_status import CopyingManagerStatus
 log = scalyr_logging.getLogger(__name__)
 
 
-class CopyingParameters(object):
+class CopyingParameters( object ):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
 
@@ -167,7 +168,7 @@ class AddEventsTask(object):
         self.completion_callback = completion_callback
 
 
-class CopyingManager(StoppableThread):
+class CopyingManager(StoppableThread, LogWatcher ):
     """Manages the process of copying all configured log files to the Scalyr server.
 
     This is run as its own thread.
@@ -199,7 +200,7 @@ class CopyingManager(StoppableThread):
         self.__all_paths = {}
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = CopyingManager.__create_log_matches(configuration, monitors, self.__all_paths)
+        self.__log_matchers = self.__create_log_matches(configuration, monitors )
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -236,6 +237,11 @@ class CopyingManager(StoppableThread):
         # A semaphore that we increment when this object has begun copying files (after first scan).
         self.__copying_semaphore = threading.Semaphore()
 
+        #set the log watcher variable of all monitors.  Do this last so everything is set up
+        #and configured when the monitor receives this call
+        for monitor in monitors:
+            monitor.set_log_watcher( self )
+
     @property
     def log_matchers(self):
         """Returns the list of log matchers that were created based on the configuration and passed in monitors.
@@ -247,39 +253,55 @@ class CopyingManager(StoppableThread):
         """
         return self.__log_matchers
 
-    @staticmethod
-    def __get_additional_logs_for_monitor( configuration, monitor, all_paths ):
-        """Creates log matches for any additional logs specified by the monitor
-        @param configuration: The configuration object.
-        @param monitors: A single ScalyrMonitor instance
-        @param all_paths: a dictionary of paths that have been added
+    def add_log_config( self, monitor, log_config ):
+        """Add the log_config item to the list of paths being watched
+        params: log_config - a log_config object containing the path to be added
+        returns: an updated log_config object
         """
-        configs = []
-        log.log(scalyr_logging.DEBUG_LEVEL_0, '%s checking if additional logs are ready %s' % (threading.currentThread(), str( monitor ) ) )
-        if monitor.additional_logs_has_changed():
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'yes' )
-            additional = monitor.get_additional_logs()
-            for additional in monitor.additional_logs:
-                log_config = configuration.parse_log_config( additional['log_config'], default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
-                if log_config['path'] not in all_paths:
-                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Additional log: %s' % log_config['path'] )
-                    configs.append( log_config )
-                    all_paths[log_config['path']] = True
-                else:
-                    log.log(scalyr_logging.DEBUG_LEVEL_0, '%s already in path' % log_config['path'] )
-        else:
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'no' )
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+        try:
+            self.__lock.acquire()
 
-        return configs
+            if log_config['path'] not in self.__all_paths:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
+                self.__log_matchers.append( LogMatcher(self.__config, log_config) )
+                self.__all_paths[log_config['path']] = 1
+            else:
+                self.__all_paths[log_config['path']] += 1
+        finally:
+            self.__lock.release()
 
+        return log_config
 
-    @staticmethod
-    def __create_log_matches(configuration, monitors, all_paths):
+    def remove_log_path( self, monitor, log_path ):
+        """Remove the log_path from the list of paths being watched
+        params: log_path - a string containing the path to the file no longer being watched
+        """
+        #get the list of paths with 0 reference counts
+        try:
+            self.__lock.acquire()
+            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Acquired lock' )
+            if log_path in self.__all_paths:
+                self.__all_paths[log_path] -= 1
+
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Decremented count is %d' % self.__all_paths[log_path] )
+                #paths with 0 reference counts need removing
+                if self.__all_paths[log_path] <= 0:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for monitor \'%s\'' % (log_path, monitor.module_name ) )
+                    #do the removals
+                    self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
+
+            else:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor.module_name, log_path) )
+        finally:
+            self.__lock.release()
+            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Released lock' )
+
+    def __create_log_matches(self, configuration, monitors ):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
         @param configuration: The Configuration object.
         @param monitors: A list of ScalyrMonitor instances whose logs should be copied.
-        @param all_paths: A dictionary specifying all_paths currently monitored by the copying_manager
 
         @type configuration: Configuration
         @type monitors: list<ScalyrMonitor>
@@ -291,21 +313,18 @@ class CopyingManager(StoppableThread):
 
         for entry in configuration.log_configs:
             configs.append(entry.copy())
-            all_paths[entry['path']] = True
+            self.__all_paths[entry['path']] = 1
 
         for monitor in monitors:
-            monitor.set_additional_log_path( configuration.agent_log_path )
             log_config = configuration.parse_log_config(
                 monitor.log_config, default_parser='agent-metrics',
                 context_description='log entry requested by module "%s"' % monitor.module_name).copy()
 
-            if log_config['path'] not in all_paths:
+            if log_config['path'] not in self.__all_paths:
                 configs.append(log_config)
-                all_paths[log_config['path']] = True
+                self.__all_paths[log_config['path']] = 1
 
             monitor.log_config = log_config
-
-            configs.extend( CopyingManager.__get_additional_logs_for_monitor( configuration, monitor, all_paths ) )
 
         result = []
 
@@ -699,28 +718,6 @@ class CopyingManager(StoppableThread):
         #else:
         #    return "success", 0, "{ status: \"success\", message: \"RPC not sent to server because it was empty\"}"
 
-    def __update_additional_logs( self ):
-        """Checks monitors for any changes to additional logs, and if so creates new log_matches for them
-        """
-        log.log(scalyr_logging.DEBUG_LEVEL_0, 'Checking for additional logs' )
-        configs = []
-        for monitor in self.__monitors:
-             configs.extend( CopyingManager.__get_additional_logs_for_monitor( self.__config, monitor, self.__all_paths ) )
-               
-        added = []
-        if configs:
-            for log_config in configs:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'adding path for: %s', log_config['path'] )
-                added.append(LogMatcher(self.__config, log_config))
-            
-        if added:
-            try:
-                self.__lock.acquire()
-                self.__log_matches.extend( added )
-                
-            finally:
-                self.__lock.release()
-
     def __scan_for_new_logs_if_necessary(self, current_time=None, checkpoints=None, logs_initial_positions=None,
                                          copy_at_index_zero=False):
         """If it has been sufficient time since we last checked, scan the file system for new files that match the
@@ -745,8 +742,6 @@ class CopyingManager(StoppableThread):
         if (self.__last_new_file_scan_time is None or
                 current_time - self.__last_new_file_scan_time < self.__config.max_new_log_detection_time):
             return
-
-        self.__update_additional_logs()
 
         self.__last_new_file_scan_time = current_time
 
