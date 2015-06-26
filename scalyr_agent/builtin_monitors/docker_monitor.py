@@ -275,7 +275,6 @@ class DockerMonitor( ScalyrMonitor ):
                 if logger.cid in stopping:
                     logger.stop( False, None )
                     if self.__log_watcher:
-                        self._logger.info( "going to remove: %s" % logger.log_path)
                         self.__log_watcher.remove_log_path( self, logger.log_path )
 
             self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
@@ -287,7 +286,6 @@ class DockerMonitor( ScalyrMonitor ):
             for log in docker_logs:
                 if self.__log_watcher:
                     log['log_config'] = self.__log_watcher.add_log_config( self, log['log_config'] )
-                    self._logger.info( "after: %s" % repr( log['log_config']['path'] ) )
                 self.docker_loggers.append( self.__create_docker_logger( log ) )
 
             self.docker_logs.extend( docker_logs )
