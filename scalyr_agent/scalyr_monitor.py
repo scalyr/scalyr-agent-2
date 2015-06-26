@@ -216,9 +216,7 @@ class ScalyrMonitor(StoppableThread):
                     self._logger.exception('Failed to gather sample due to the following exception')
                     self.increment_counter(errors=1)
 
-                self._logger.info('Sleeping for %d seconds' % self._sample_interval_secs )
                 self._sleep_but_awaken_if_stopped(self._sample_interval_secs)
-                self._logger.info('Awake')
             self._logger.info('Monitor has finished')
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not

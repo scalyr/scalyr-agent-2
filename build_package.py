@@ -55,7 +55,7 @@ def build_package(package_type, variant):
     The package is left in the current working directory.  The file name of the
     package is returned by this function.
 
-    @param package_type: One of 'rpm', 'deb', or 'tarball'. Determines which package type is built.
+    @param package_type: One of 'rpm', 'deb', 'docker', or 'tarball'. Determines which package type is built.
     @param variant: Adds the specified string into the package's iteration name. This may be None if no additional
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
@@ -76,6 +76,8 @@ def build_package(package_type, variant):
             artifact_file_name = build_tarball_package(variant, version)
         elif package_type == 'win32':
             artifact_file_name = build_win32_installer_package(variant, version)
+        elif package_type == 'docker':
+            artifact_file_name = build_docker_container(variant, version)
         else:
             assert package_type in ('deb', 'rpm')
             artifact_file_name = build_rpm_or_deb_package(package_type == 'rpm', variant, version)
@@ -96,6 +98,8 @@ def build_package(package_type, variant):
 # to be upgraded.
 _scalyr_guid_ = uuid.UUID('{0b52b8a0-22c7-4d50-92c1-8ea3b258984e}')
 
+def build_docker_container(variant, version):
+    pass
 
 def build_win32_installer_package(variant, version):
     """Builds an MSI that will install the agent on a win32 machine in the current working directory.
