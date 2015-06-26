@@ -280,11 +280,9 @@ class CopyingManager(StoppableThread, LogWatcher ):
         #get the list of paths with 0 reference counts
         try:
             self.__lock.acquire()
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Acquired lock' )
             if log_path in self.__all_paths:
                 self.__all_paths[log_path] -= 1
 
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Decremented count is %d' % self.__all_paths[log_path] )
                 #paths with 0 reference counts need removing
                 if self.__all_paths[log_path] <= 0:
                     log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for monitor \'%s\'' % (log_path, monitor.module_name ) )
@@ -295,7 +293,6 @@ class CopyingManager(StoppableThread, LogWatcher ):
                 log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor.module_name, log_path) )
         finally:
             self.__lock.release()
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Released lock' )
 
     def __create_log_matches(self, configuration, monitors ):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
