@@ -575,7 +575,7 @@ class Configuration(object):
         # The maximum allowed size for a line when reading from a log file.
         # We do not strictly enforce this -- some lines returned by LogFileIterator may be
         # longer than this due to some edge cases.
-        self.__verify_or_set_optional_int(config, 'max_line_size', 5 * 1024, description)
+        self.__verify_or_set_optional_int(config, 'max_line_size', 3400, description)
 
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
         # not currently end in a new line (referred to as a partial line).  It could be that the full line just hasn't

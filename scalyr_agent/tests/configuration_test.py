@@ -74,7 +74,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
 
-        self.assertEquals(config.max_line_size, 5 * 1024)
+        self.assertEquals(config.max_line_size, 3400)
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
         self.assertEquals(config.line_completion_wait_time, 5 * 60)
         self.assertEquals(config.read_page_size, 64 * 1024)

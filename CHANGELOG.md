@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.12 "Loopy Lama" - July 30, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 30, 2015 11:45 -0700
+--->
+
+Note, this release is under development so the release date and feature set is TBD.
+
+Bug fixes:
+
+* Reduce the default ``max_line_size`` value to 3400 to avoid truncation issues introduced by the server.
+
 ## 2.0.11 "Keen Kangaroo" - June  24, 2015
 
 <!---
