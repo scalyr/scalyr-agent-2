@@ -99,7 +99,40 @@ def build_package(package_type, variant):
 _scalyr_guid_ = uuid.UUID('{0b52b8a0-22c7-4d50-92c1-8ea3b258984e}')
 
 def build_docker_container(variant, version):
-    pass
+    """Creates a deb package of the source tree, and then builds a
+    docker container that contains the installed package
+    """
+
+    #build the deb file
+    package_file = build_rpm_or_deb_package( False, variant, version )
+
+    #create a Dockerfile from  Dockerfile.base, with {SCALYR_PKG}
+    #replaced by the package name
+    in_filename = make_path( __source_root__, 'Dockerfile.base' )
+    out_filename = 'Dockerfile'
+    lines = None
+    inf = open( in_filename, 'r' )
+    try:
+        lines = inf.readlines();
+    finally:
+        inf.close()
+
+    if lines:
+        outf = open( out_filename, 'w' )
+        try:
+            for line in lines:
+                line = line.replace( "{SCALYR_PKG}", package_file );
+                outf.write( line )
+        finally:
+            outf.close()
+
+    #build the docker image
+    image_name = 'scalyr/scalyr-agent:' + version
+    run_command( 'docker build -t %s .' % image_name, exit_on_fail=True, command_name='docker' )
+
+    print 'Created Docker Image: %s' % image_name
+
+    return package_file
 
 def build_win32_installer_package(variant, version):
     """Builds an MSI that will install the agent on a win32 machine in the current working directory.
@@ -1233,7 +1266,7 @@ class BadChangeLogFormat(Exception):
     pass
 
 if __name__ == '__main__':
-    parser = OptionParser(usage='Usage: python build_package.py [options] rpm|tarball|deb|win32')
+    parser = OptionParser(usage='Usage: python build_package.py [options] rpm|tarball|deb|docker|win32')
     parser.add_option('-v', '--variant', dest='variant', default=None,
                       help='An optional string that is included in the package name to identify a variant '
                       'of the main release created by a different packager.  '
@@ -1258,14 +1291,14 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if len(args) < 1:
-        print >> sys.stderr, 'You must specify the package you wish to build, such as "rpm", "deb", or "tarball".'
+        print >> sys.stderr, 'You must specify the package you wish to build, such as "rpm", "deb", "docker" or "tarball".'
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
         print >> sys.stderr, 'You may only specify one package to build.'
         parser.print_help(sys.stderr)
         sys.exit(1)
-    elif args[0] not in ('rpm', 'deb', 'tarball', 'win32'):
+    elif args[0] not in ('rpm', 'deb', 'docker', 'tarball', 'win32'):
         print >> sys.stderr, 'Unknown package type given: "%s"' % args[0]
         parser.print_help(sys.stderr)
         sys.exit(1)
