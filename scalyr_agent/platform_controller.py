@@ -281,6 +281,12 @@ class PlatformController:
         """
         pass
 
+    def agent_will_run( self ):
+        """Called before the agent starts running.  This allows the platform controller to do
+        any platform specific configuration before the agent starts running
+        """
+        pass
+
     def stop_agent_service(self, quiet):
         """Stops the agent service using the platform-specific method.
 

@@ -196,6 +196,26 @@ class PosixPlatformController(PlatformController):
                 remaining_parents -= 1
         return
 
+    def __write_pidfile(self):
+        """Writes the process's pid to a file"""
+        atexit.register(self.__delpid)
+        pid = os.getpid()
+
+        fp = None
+        try:
+            fp = file(self.__pidfile, 'w+')
+            # If we are on an OS that supports reading the commandline arguments from /proc, then use that
+            # to write more unique information about the running process to help avoid pid collison.
+            if self.__can_read_command_line(pid):
+                fp.write('%d %s\n' % (pid, self.__read_command_line(pid)))
+                self._log_init_debug('Wrote pidfile+ (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
+            else:
+                fp.write('%d\n' % pid)
+                self._log_init_debug('Wrote pidfile (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
+        finally:
+            if fp is not None:
+                fp.close()
+
     def __daemonize(self):
         """Fork off a background thread for execution.  If this method returns True, it is the new process, otherwise
         it is the original process.
@@ -533,6 +553,11 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
+
+    def agent_will_run( self ):
+        # write pidfile
+        self.__write_pidfile()
+
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
