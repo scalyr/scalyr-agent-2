@@ -403,9 +403,9 @@ class ScalyrAgent(object):
 
             if not quiet:
                 print "Configuration and server connection verified, starting agent in background."
-            self.__controller.start_agent_service(self.__run, quiet)
+            self.__controller.start_agent_service(self.__run, quiet, fork=True)
         else:
-            self.__run(self.__controller)
+            self.__controller.start_agent_service(self.__run, quiet, fork=False)
 
         return 0
 
@@ -451,6 +451,7 @@ class ScalyrAgent(object):
             return 1
 
         status_file = os.path.join(data_directory, STATUS_FILE)
+
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
         if os.path.isfile(status_file) and not os.access(status_file, os.W_OK):
@@ -612,9 +613,6 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
-
-        # perform any platform specific initialisation
-        controller.agent_will_run()
 
         self.__start_time = time.time()
         controller.register_for_termination(self.__handle_terminate)

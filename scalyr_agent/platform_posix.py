@@ -513,7 +513,7 @@ class PosixPlatformController(PlatformController):
 
         return pid is not None
 
-    def start_agent_service(self, agent_run_method, quiet):
+    def start_agent_service(self, agent_run_method, quiet, fork):
         """Start the daemon process by forking a new process.
 
         This method will invoke the agent_run_method that was passed in when initializing this object.
@@ -532,8 +532,11 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
-        if not self.__daemonize():
+        if fork and not self.__daemonize():
             return
+
+        # write pidfile
+        self.__write_pidfile()
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
@@ -553,10 +556,6 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
-
-    def agent_will_run( self ):
-        # write pidfile
-        self.__write_pidfile()
 
 
     def stop_agent_service(self, quiet):
