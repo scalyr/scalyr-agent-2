@@ -275,7 +275,8 @@ class PlatformController:
             function pointer (because the service is running in a separate address space and cannot be passed this
             pointer), then instead of invoking this method, you may invoke ScalyrAgent.agent_run_method instead.
         @param quiet: True if only error messages should be printed to stdout, stderr.
-        @param fork: True if the agent should run in a child process
+        @param fork: True if the agent should run in a child process.  Note: When false, status information will not
+            work under windows.
 
         @type agent_run_method: func(PlatformController)
         @type quiet: bool
