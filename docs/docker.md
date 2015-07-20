@@ -91,8 +91,8 @@ Note, this method is less than ideal, because the image's default command gets o
 
 An alternative method is to create a custom Dockerfile to copy your custom config file during the docker build process.
 
-Logging files from other containers
----------------------
+# <a name="log-volumes"></a>Logging files from other containers
+
 
 In order to log files from other containers, you must share volumes containing those log files with the scalyr-agent container.  You can then configure the scalyr-agent's agent.json file as per normal to copy those files to the Scalyr servers.
 
@@ -125,8 +125,7 @@ e.g. assuming you had followed the instructions in the link above and created a 
 
 And configure the scalyr agent’s agent.json to track any files of interest that existed in logdata’s volumes.
 
-Logging Stdout
-------------------
+# <a name="docker-socket"></a>Logging Stdout
 
 If you would like to use the scalyr-agent container to log another container’s stdout/stderr, this can be done with the built-in docker_monitor plugin.  In the monitors section of your agent.json file, add something similar to:
 
