@@ -58,10 +58,13 @@ class LineMatcher(object):
 
         return line
 
-    def _readline( self, file_like ):
+    def _readline( self, file_like, max_length=0 ):
         """
         """
-        line = file_like.readline( self._max_line_length )
+        if max_length == 0:
+            max_length = self._max_line_length
+
+        line = file_like.readline( max_length )
         partial = len( line) > 0 and line[-1] != '\n' and line[-1] != '\r'
         return line, partial
 
@@ -76,19 +79,22 @@ class LineMatcherCollection( LineMatcher ):
     def add_matcher( self, matcher ):
         self.__matchers.append( matcher )
 
-    def _readline( self, file_like ):
+    def _readline( self, file_like, max_length=0 ):
+
+        if max_length == 0:
+            max_length = self._max_line_length
 
         line = None
         partial = False
         for matcher in self.__matchers:
             offset = file_like.tell()
-            line, partial = matcher._readline( file_like )
+            line, partial = matcher._readline( file_like, max_length )
             if line:
                 break
             file_like.seek( offset )
         
         if not line:
-            line, partial =  LineMatcher._readline( self, file_like )
+            line, partial =  LineMatcher._readline( self, file_like, max_length )
             
         return line, partial
 
@@ -98,42 +104,42 @@ class LineGrouper( LineMatcher ):
         self._start_pattern = start_pattern
         self._continuation_pattern = continuation_pattern
 
+    def _readline( self, file_like, max_length=0 ):
+        if max_length == 0:
+            max_length = self._max_line_length
 
-class ContinueThrough( LineGrouper ):
-    """
-    """
-    def _readline( self, file_like ):
         start_offset = file_like.tell()
 
         line = ''
         partial = False
-        start_line, partial = LineGrouper._readline( self, file_like )
+        start_line, partial = LineMatcher._readline( self, file_like, max_length )
 
         if partial:
             return start_line, partial
 
-        start = self._start_pattern.match( start_line )
+        start = self._start_line( start_line )
         if start:
+            max_length -= len( start_line )
             next_offset = file_like.tell()
-            next_line, next_partial = LineGrouper._readline( self, file_like )
+            next_line, next_partial = LineMatcher._readline( self, file_like, max_length )
             if next_line:
-                cont = self._continuation_pattern.match( next_line )
+                cont = self._continue_line( next_line )
                 if cont:
                     line = start_line
-                    while cont:
+                    while cont and next_line and max_length > 0:
                         line += next_line
+                        max_length -= len( next_line )
                         next_offset = file_like.tell()
-                        next_line, partial = LineGrouper._readline( self, file_like )
-                        cont = self._continuation_pattern.match( next_line )
+                        next_line, partial = LineMatcher._readline( self, file_like, max_length )
+                        cont = self._continue_line( next_line )
 
                     file_like.seek( next_offset )
 
-                    if not next_line:
-                        partial = True
+                    partial = partial or cont
 
                 else:
-                    file_like.seek( next_offset )
-                    line = start_line
+                    file_like.seek( start_offset )
+                    line = ''
             else:
                 line = start_line
                 partial = True
@@ -142,14 +148,54 @@ class ContinueThrough( LineGrouper ):
             line, partial = '', False
 
         return line, partial
-            
 
-        
+    def _continue_line( self, line ):
+        return False
+
+    def _start_line( self, line ):
+        return self._start_pattern.search( line ) != None
+
+class ContinueThrough( LineGrouper ):
+    """
+    """
+    def _continue_line( self, line ):
+        if not line:
+            return True
+
+        return self._continuation_pattern.search( line ) != None
+            
 
 class ContinuePast( LineGrouper ):
     """
     """
-    pass
+    def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
+        LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
+        self.__last_line = False
+        self.__grouping = False
+
+    def _start_line( self, line ):
+        result = LineGrouper._start_line( self, line )
+        self.__grouping = result
+        self.__last_line = False
+
+        return result
+
+    def _continue_line( self, line ):
+        if self.__last_line:
+            self.__last_line = False
+            return False
+
+        match = self._continuation_pattern.search( line )
+        result = True
+        if self.__grouping:
+            if not match:
+                self.__grouping = False
+                self.__last_line = True
+        else:
+            if not match:
+                result = False
+
+        return result
     
 class HaltBefore( LineGrouper ):
     """

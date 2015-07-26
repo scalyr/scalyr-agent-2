@@ -21,9 +21,14 @@ import re
 import time
 import unittest
 
+import pdb
+
 from cStringIO import StringIO
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.line_matcher import ContinueThrough
+from scalyr_agent.line_matcher import ContinuePast
+from scalyr_agent.line_matcher import HaltBefore
+from scalyr_agent.line_matcher import HaltWith
 
 def make_string( string ):
     line = StringIO()
@@ -92,7 +97,7 @@ class ContinueThroughTestCase( unittest.TestCase ):
     def test_continue_through( self ):
         expected = "java.lang.Exception\n    at com.foo.bar(bar.java:123)\n    at com.foo.baz(baz.java:123)\n"
         expected_next = "next line\n"
-        line = make_string( expected + expected_next + expected_next )
+        line = make_string( expected + expected_next )
 
         matcher = ContinueThrough( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
@@ -100,20 +105,24 @@ class ContinueThroughTestCase( unittest.TestCase ):
         self.assertEqual( expected, actual )
 
         actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
         self.assertEqual( expected_next, actual )
 
     def test_first_line_match_second_line_no_match( self ):
         expected = "java.lang.Exception\n"
         expected_next = "haha Not a java.lang.Exception\n"
 
-        line = make_string( expected + expected_next + expected_next )
+        line = make_string( expected + expected_next )
         matcher = ContinueThrough( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
         self.assertEqual( expected, actual )
-        actual = matcher.readline( line, current_time )
-        self.assertEqual( expected_next, actual )
 
     def test_partial_first_line_match( self ):
         expected = "java.lang.Exception\n"
@@ -127,12 +136,12 @@ class ContinueThroughTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
 
-        line = append_string( line, expected_next + expected_last + expected_last )
+        line = append_string( line, expected_next + expected_last )
 
         actual = matcher.readline( line, current_time )
         self.assertEqual( expected + expected_next, actual )
 
-        actual = matcher.readline( line, current_time )
+        actual = line.readline()
         self.assertEqual( expected_last, actual )
 
     def test_partial_multiline_match( self ):
@@ -146,12 +155,12 @@ class ContinueThroughTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
 
-        line = append_string( line, expected_last + expected_last )
+        line = append_string( line, expected_last )
 
         actual = matcher.readline( line, current_time )
         self.assertEqual( expected, actual )
         
-        actual = matcher.readline( line, current_time )
+        actual = line.readline()
         self.assertEqual( expected_last, actual )
 
     def test_no_match( self ):
@@ -165,6 +174,9 @@ class ContinueThroughTestCase( unittest.TestCase ):
         self.assertEqual( '', actual )
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( line1, actual )
 
     def test_timeout_after_matching_start( self ):
         expected = "java.lang.Exception\n"
@@ -183,6 +195,9 @@ class ContinueThroughTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
 
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
     def test_timeout_after_matching_continue( self ):
         expected = "java.lang.Exception\n    at com.foo.bar(bar.java:123)\n"
         line = make_string( expected )
@@ -200,6 +215,9 @@ class ContinueThroughTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
 
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
 
     def test_too_long_matching_start( self ):
         expected = "java.lang."
@@ -211,13 +229,171 @@ class ContinueThroughTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( expected, actual )
 
-        line = append_string( line, "next line\n" )
-        actual = matcher.readline( line, current_time )
+        actual = line.readline()
         self.assertEqual( "Exception\n", actual )
 
     def test_too_long_after_matching_continue( self ):
-        self.assertTrue( False )
+        expected = "java.lang.Exception\n    at com"
+        remainder = ".foo.baz(baz.java:123)\n"
+        line = make_string( expected + remainder )
+
+        matcher = ContinueThrough( self.start_pattern, self.continuation_pattern, max_line_length = 30 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( remainder, actual )
+
+class ContinuePastTestCase( unittest.TestCase ):
+
+    def setUp( self ):
+        self.start_pattern = re.compile( r"\\$" )
+        self.continuation_pattern = re.compile( r"\\$" )
+
+    def test_continue_past( self ):
+        expected = "This is a multiline \\\nstring with each line\\\nseparated by backslashes\n"
+        expected_next = "next line\n"
+        line = make_string( expected + expected_next )
+
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
+    def test_first_line_match_second_line_no_match( self ):
+        expected = "multiline string \\\nthat ends here\n"
+        expected_next = "single line string\n"
+
+        line = make_string( expected + expected_next )
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
+    def test_partial_first_line_match( self ):
+        expected = "start of a multiline\\\n"
+        expected_next = "last line\n"
+        expected_last = "Another line\n"
+
+        line = make_string( expected )
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        line = append_string( line, expected_next + expected_last )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected + expected_next, actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_last, actual )
+
+    def test_partial_multiline_match( self ):
+        expected = "start of a multiline line\\\ncontinuation of a multiline line\\\nstill continuing\\\n"
+        expected_last = "Another line\n"
+
+        line = make_string( expected )
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        line = append_string( line, expected_last )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected + expected_last, actual )
+        
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    def test_no_match( self ):
+        line1 = "single line\n"
+        line2 = "another single  line\n"
+        line = make_string( line1 + line2 )
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( line1, actual )
+
+    def test_timeout_after_matching_start( self ):
+        expected = "start of a multiline\\\n"
+        line = make_string( expected )
+
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time - 6 )
+        self.assertEqual( '', actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    def test_timeout_after_matching_continue( self ):
+        expected = "start of a multiline\\\ncontinuation of a multiline\\\n"
+        line = make_string( expected )
+
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time - 6 )
+        self.assertEqual( '', actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
 
 
+    def test_too_long_matching_start( self ):
+        expected = "start of a"
+        line = make_string( expected + " multiline\\\n" )
 
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern, max_line_length = 10 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( " multiline\\\n", actual )
+
+    def test_too_long_after_matching_continue( self ):
+        expected = "start of a multiline\\\ncontinuing\\\nthis line "
+        remainder = "will be cut\n"
+        line = make_string( expected + remainder )
+
+        matcher = ContinuePast( self.start_pattern, self.continuation_pattern, max_line_length = 44 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( remainder, actual )
 
