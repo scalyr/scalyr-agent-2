@@ -206,4 +206,26 @@ class HaltBefore( LineGrouper ):
 class HaltWith( LineGrouper ):
     """
     """
-    pass
+    def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
+        LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
+        self.__last_line = False
+        self.__grouping = False
+
+    def _start_line( self, line ):
+        result = LineGrouper._start_line( self, line )
+        self.__last_line = False
+        return result
+
+    def _continue_line( self, line ):
+        if self.__last_line:
+            self.__last_line = False
+            return False
+
+        cont = self._continuation_pattern.search( line ) == None
+
+        if not cont:
+            self.__last_line = True
+            cont = True
+        return cont
+        
+
