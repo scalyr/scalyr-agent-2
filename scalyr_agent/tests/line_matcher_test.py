@@ -397,3 +397,153 @@ class ContinuePastTestCase( unittest.TestCase ):
         actual = line.readline()
         self.assertEqual( remainder, actual )
 
+class HaltBeforeTestCase( unittest.TestCase ):
+
+    def setUp( self ):
+        self.start_pattern = re.compile( r"^--begin" )
+        self.continuation_pattern = re.compile( r"^--begin" )
+
+    def test_halt_before( self ):
+        expected = "--begin\nThis is a multiline message\nThat will end when the\nnext one starts\n"
+        expected_next = "--begin\n"
+        line = make_string( expected + expected_next )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
+    def test_first_line_match_second_line_no_match( self ):
+        expected = "--begin\n"
+        expected_next = "--begin\n"
+
+        line = make_string( expected + expected_next )
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_next, actual )
+
+    def test_partial_first_line_match( self ):
+        expected = "--begin\n"
+        expected_next = "last line\n"
+        expected_last = "--begin\n"
+
+        line = make_string( expected )
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        line = append_string( line, expected_next + expected_last )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected + expected_next, actual )
+
+        actual = line.readline()
+        self.assertEqual( expected_last, actual )
+
+    def test_partial_multiline_match( self ):
+        expected = "--begin\ncontinuation of a multiline line\nstill continuing\n"
+        expected_last = "--begin\n"
+
+        line = make_string( expected )
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        line = append_string( line, expected_last )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+        
+        actual = line.readline()
+        self.assertEqual( expected_last, actual )
+
+    def test_no_match( self ):
+        line1 = "single line\n"
+        line2 = "another single  line\n"
+        line = make_string( line1 + line2 )
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( '', actual )
+
+        actual = line.readline()
+        self.assertEqual( line1, actual )
+
+    def test_timeout_after_matching_start( self ):
+        expected = "--begin\n"
+        line = make_string( expected )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time - 6 )
+        self.assertEqual( '', actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    def test_timeout_after_matching_continue( self ):
+        expected = "--begin\nMultiline\n"
+        line = make_string( expected )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
+        current_time = time.time()
+        actual = matcher.readline( line, current_time - 6 )
+        self.assertEqual( '', actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    def test_too_long_matching_start( self ):
+        expected = "--begin"
+
+        line = make_string( expected + " multiline\n" )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern, max_line_length = 7 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( " multiline\n", actual )
+
+    def test_too_long_after_matching_continue( self ):
+        expected = "--begin\nmultiline\nthis line "
+        remainder = "will be cut\n"
+        line = make_string( expected + remainder )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern, max_line_length = 28 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( remainder, actual )

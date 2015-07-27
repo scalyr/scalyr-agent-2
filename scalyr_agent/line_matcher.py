@@ -200,7 +200,8 @@ class ContinuePast( LineGrouper ):
 class HaltBefore( LineGrouper ):
     """
     """
-    pass
+    def _continue_line( self, line ):
+        return self._continuation_pattern.search( line ) == None
 
 class HaltWith( LineGrouper ):
     """
