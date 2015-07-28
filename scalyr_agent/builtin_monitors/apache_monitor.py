@@ -37,12 +37,22 @@ define_log_field(__monitor__, 'metric', 'The metric name.  See the metric tables
 define_log_field(__monitor__, 'value', 'The value of the metric.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration.')
 
-define_metric(__monitor__, 'apache.connections.active', 'The number of connections currently opened to the server.')
-define_metric(__monitor__, 'apache.connections.writing', 'The number of connections currently writing to the clients.')
-define_metric(__monitor__, 'apache.connections.idle', 'The number of connections currently idle/sending keep alives.')
-define_metric(__monitor__, 'apache.connections.closing', 'The number of connections currently closing.')
-define_metric(__monitor__, 'apache.workers.active', 'How many workers are currently active.')
-define_metric(__monitor__, 'apache.workers.idle', 'How many of the workers are currently idle.')
+define_metric(__monitor__, 'apache.connections.active', 'The number of connections that are being handled '
+                                                        'asynchronously (not using  workers) currently open on the '
+                                                        'server')
+define_metric(__monitor__, 'apache.connections.writing', 'The number of connections that are being handled '
+                                                         'asynchronously (not using workers) that are currently '
+                                                         'writing response data.')
+define_metric(__monitor__, 'apache.connections.idle', 'The number of connections that are being handled '
+                                                      'asynchronously (not using workers) that are currently '
+                                                      'idle / sending keepalives.')
+define_metric(__monitor__, 'apache.connections.closing', 'The number of connections that are being handled '
+                                                         'asynchronously (not using workers) that are currently '
+                                                         'closing.')
+define_metric(__monitor__, 'apache.workers.active', 'How many workers are currently active.  Each worker is a process '
+                                                    'handling an incoming request.')
+define_metric(__monitor__, 'apache.workers.idle', 'How many of the workers are currently idle.  Each worker is a '
+                                                  'process that can handle an incoming request.')
 
 
 # Taken from:

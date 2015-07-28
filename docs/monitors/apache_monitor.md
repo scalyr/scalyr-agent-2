@@ -141,9 +141,15 @@ Each event recorded by this plugin will have the following fields:
 The table below describes the metrics recorded by the Apache monitor.
 
 |||# Metric                         ||| Description
-|||# ``apache.connections.active``  ||| The number of connections currently open on the server.
-|||# ``apache.connections.writing`` ||| The number of connections currently writing response data.
-|||# ``apache.connections.idle``    ||| The number of connections currently idle / sending keepalives.
-|||# ``apache.connections.closing`` ||| The number of connections currently closing.
-|||# ``apache.workers.active``      ||| How many workers are currently active.
-|||# ``apache.workers.idle``        ||| How many of the workers are currently idle.
+|||# ``apache.connections.active``  ||| The number of connections that are being handled asynchronously (not using \
+                                        workers) currently open on the server.
+|||# ``apache.connections.writing`` ||| The number of connections that are being handled asynchronously (not using \
+                                        workers) that are currently writing response data.
+|||# ``apache.connections.idle``    ||| The number of connections that are being handled asynchronously (not using \
+                                        workers) that are currently idle / sending keepalives.
+|||# ``apache.connections.closing`` ||| The number of connections that are being handled asynchronously (not using \
+                                        workers) that are currently closing.
+|||# ``apache.workers.active``      ||| How many workers are currently active.  Each worker is a process handling an \
+                                        incoming request.
+|||# ``apache.workers.idle``        ||| How many of the workers are currently idle.  Each worker is a process that can \
+                                        handle an incoming request.
