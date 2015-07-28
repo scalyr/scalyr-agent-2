@@ -71,10 +71,9 @@ class LineMatcher(object):
 class LineMatcherCollection( LineMatcher ):
     """
     """
-    def __init__( self, max_line_length, line_completion_wait_time ):
-        LineMatcher.__init__( self, max_line_length, line_complete_wait_time )
+    def __init__( self, max_line_length=5*1024, line_completion_wait_time=5*60 ):
+        LineMatcher.__init__( self, max_line_length, line_completion_wait_time )
         self.__matchers = []
-        self.__current_match = None
 
     def add_matcher( self, matcher ):
         self.__matchers.append( matcher )

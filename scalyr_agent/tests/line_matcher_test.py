@@ -25,6 +25,7 @@ import pdb
 
 from cStringIO import StringIO
 from scalyr_agent.line_matcher import LineMatcher
+from scalyr_agent.line_matcher import LineMatcherCollection
 from scalyr_agent.line_matcher import ContinueThrough
 from scalyr_agent.line_matcher import ContinuePast
 from scalyr_agent.line_matcher import HaltBefore
@@ -699,3 +700,145 @@ class HaltWithTestCase( unittest.TestCase ):
 
 class LineMatcherCollectionTestCase( unittest.TestCase ):
 
+    def continue_through( self, start="^--multi", cont="^--", length=1024, timeout=60 ):
+        start_re = re.compile( start )
+        cont_re = re.compile( cont )
+        return ContinueThrough( start_re, cont_re, length, timeout )
+
+    def continue_through_string( self ):
+        return "--multi\n--next\n--last\n"
+
+    def continue_past( self, start=r"\\$", cont=r"\\$", length=1024, timeout=60 ):
+        start_re = re.compile( start )
+        cont_re = re.compile( cont )
+        return ContinuePast( start_re, cont_re, length, timeout )
+
+    def continue_past_string( self ):
+        return "continue past \\\nand past\\\nand stop\n"
+
+    def halt_before( self, start="^--begin", cont="^--last", length=1024, timeout=60 ):
+        start_re = re.compile( start )
+        cont_re = re.compile( cont )
+        return HaltBefore( start_re, cont_re, length, timeout )
+
+    def halt_before_string( self ):
+        return "--begin\nand halt before\nthe next line starting with the start pattern\n"
+
+    def halt_with( self, start="^--start", cont="^--end", length=1024, timeout=60 ):
+        start_re = re.compile( start )
+        cont_re = re.compile( cont )
+        return HaltWith( start_re, cont_re, length, timeout )
+
+    def halt_with_string( self ):
+        return "--start\nand stop after\nthe next line\n--end\n"
+
+    def single_string( self ):
+        return "a single line\n"
+
+    def line_matcher_collection( self, length=1024, timeout=60 ):
+        result = LineMatcherCollection( length, timeout )
+
+        result.add_matcher( self.continue_through() )
+        result.add_matcher( self.continue_past() )
+        result.add_matcher( self.halt_before() )
+        result.add_matcher( self.halt_with() )
+
+        return result
+
+    def test_continue_through( self ):
+
+        matcher = self.line_matcher_collection()
+        expected = self.continue_through_string()
+
+        current_time = time.time()
+        line = make_string( expected + self.single_string() )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( self.single_string(), actual )
+
+    def test_continue_past( self ):
+
+        matcher = self.line_matcher_collection()
+        expected = self.continue_past_string()
+
+        current_time = time.time()
+        line = make_string( expected + self.single_string() )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( self.single_string(), actual )
+
+    def test_halt_before( self ):
+
+        matcher = self.line_matcher_collection()
+        expected = self.halt_before_string()
+
+        current_time = time.time()
+        line = make_string( expected + "--last\n" )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( "--last\n", actual )
+
+    def test_halt_with( self ):
+
+        matcher = self.line_matcher_collection()
+        expected = self.halt_with_string()
+
+        current_time = time.time()
+        line = make_string( expected + self.single_string() )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( self.single_string(), actual )
+
+    def test_none( self ):
+        matcher = self.line_matcher_collection()
+        expected = self.single_string()
+
+        current_time = time.time()
+        line = make_string( expected )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    def test_all( self ):
+        matcher = self.line_matcher_collection()
+        end_marker = "--last\n"
+        expected = self.single_string() + self.halt_with_string() + self.halt_before_string() + end_marker + self.continue_past_string() + self.continue_through_string() + self.single_string()
+
+        current_time = time.time()
+        line = make_string( expected )
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.single_string(), actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.halt_with_string(), actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.halt_before_string(), actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( end_marker, actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.continue_past_string(), actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.continue_through_string(), actual )
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( self.single_string(), actual )
+
+        actual = line.readline()
+        self.assertEqual( '', actual )
+
+    
+    
