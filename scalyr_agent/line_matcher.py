@@ -19,7 +19,8 @@
 # https://www.scalyr.com/help/parsing-logs#multiline
 #
 # author: Imron Alston <imron@imralsoftware.com>
-import sys
+
+import re
 
 __author__ = 'imron@imralsoftware.com'
 
@@ -29,7 +30,7 @@ class LineMatcher(object):
     """
 
     def __init__( self , max_line_length=5*1024, line_completion_wait_time=5*60 ):
-        self._max_line_length = max_line_length
+        self.max_line_length = max_line_length
         self.__line_completion_wait_time = line_completion_wait_time
         self.__partial_line_time = None
 
@@ -44,7 +45,7 @@ class LineMatcher(object):
 
         # If we have a partial line then we should only
         # return it if sufficient time has passed.
-        if partial and len( line ) < self._max_line_length:
+        if partial and len( line ) < self.max_line_length:
 
             if self.__partial_line_time is None:
                 self.__partial_line_time = current_time
@@ -62,7 +63,7 @@ class LineMatcher(object):
         """
         """
         if max_length == 0:
-            max_length = self._max_line_length
+            max_length = self.max_line_length
 
         line = file_like.readline( max_length )
         partial = len( line) > 0 and line[-1] != '\n' and line[-1] != '\r'
@@ -81,7 +82,7 @@ class LineMatcherCollection( LineMatcher ):
     def _readline( self, file_like, max_length=0 ):
 
         if max_length == 0:
-            max_length = self._max_line_length
+            max_length = self.max_line_length
 
         line = None
         partial = False
@@ -100,12 +101,12 @@ class LineMatcherCollection( LineMatcher ):
 class LineGrouper( LineMatcher ):
     def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
         LineMatcher.__init__( self, max_line_length, line_completion_wait_time )
-        self._start_pattern = start_pattern
-        self._continuation_pattern = continuation_pattern
+        self._start_pattern = re.compile( start_pattern )
+        self._continuation_pattern = re.compile( continuation_pattern )
 
     def _readline( self, file_like, max_length=0 ):
         if max_length == 0:
-            max_length = self._max_line_length
+            max_length = self.max_line_length
 
         start_offset = file_like.tell()
 

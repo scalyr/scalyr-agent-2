@@ -17,7 +17,6 @@
 
 __author__ = 'imron@imralsoftware.com'
 
-import re
 import time
 import unittest
 
@@ -92,8 +91,8 @@ class SingleLineMatcherTestCase( unittest.TestCase ):
 class ContinueThroughTestCase( unittest.TestCase ):
 
     def setUp( self ):
-        self.start_pattern = re.compile( "^[^\\s]" )
-        self.continuation_pattern = re.compile( "^[\\s]+at" )
+        self.start_pattern = "^[^\\s]"
+        self.continuation_pattern = "^[\\s]+at"
 
     def test_continue_through( self ):
         expected = "java.lang.Exception\n    at com.foo.bar(bar.java:123)\n    at com.foo.baz(baz.java:123)\n"
@@ -250,8 +249,8 @@ class ContinueThroughTestCase( unittest.TestCase ):
 class ContinuePastTestCase( unittest.TestCase ):
 
     def setUp( self ):
-        self.start_pattern = re.compile( r"\\$" )
-        self.continuation_pattern = re.compile( r"\\$" )
+        self.start_pattern = r"\\$"
+        self.continuation_pattern = r"\\$"
 
     def test_continue_past( self ):
         expected = "This is a multiline \\\nstring with each line\\\nseparated by backslashes\n"
@@ -401,8 +400,8 @@ class ContinuePastTestCase( unittest.TestCase ):
 class HaltBeforeTestCase( unittest.TestCase ):
 
     def setUp( self ):
-        self.start_pattern = re.compile( r"^--begin" )
-        self.continuation_pattern = re.compile( r"^--begin" )
+        self.start_pattern = r"^--begin"
+        self.continuation_pattern = r"^--begin"
 
     def test_halt_before( self ):
         expected = "--begin\nThis is a multiline message\nThat will end when the\nnext one starts\n"
@@ -552,8 +551,8 @@ class HaltBeforeTestCase( unittest.TestCase ):
 class HaltWithTestCase( unittest.TestCase ):
 
     def setUp( self ):
-        self.start_pattern = re.compile( r"^--begin" )
-        self.continuation_pattern = re.compile( r"^--end" )
+        self.start_pattern = r"^--begin"
+        self.continuation_pattern = r"^--end"
 
     def test_halt_before( self ):
         expected = "--begin\nThis is a multiline message\nThat will end when the\nnext one starts\n--end\n"
@@ -701,33 +700,25 @@ class HaltWithTestCase( unittest.TestCase ):
 class LineMatcherCollectionTestCase( unittest.TestCase ):
 
     def continue_through( self, start="^--multi", cont="^--", length=1024, timeout=60 ):
-        start_re = re.compile( start )
-        cont_re = re.compile( cont )
-        return ContinueThrough( start_re, cont_re, length, timeout )
+        return ContinueThrough( start, cont, length, timeout )
 
     def continue_through_string( self ):
         return "--multi\n--next\n--last\n"
 
     def continue_past( self, start=r"\\$", cont=r"\\$", length=1024, timeout=60 ):
-        start_re = re.compile( start )
-        cont_re = re.compile( cont )
-        return ContinuePast( start_re, cont_re, length, timeout )
+        return ContinuePast( start, cont, length, timeout )
 
     def continue_past_string( self ):
         return "continue past \\\nand past\\\nand stop\n"
 
     def halt_before( self, start="^--begin", cont="^--last", length=1024, timeout=60 ):
-        start_re = re.compile( start )
-        cont_re = re.compile( cont )
-        return HaltBefore( start_re, cont_re, length, timeout )
+        return HaltBefore( start, cont, length, timeout )
 
     def halt_before_string( self ):
         return "--begin\nand halt before\nthe next line starting with the start pattern\n"
 
     def halt_with( self, start="^--start", cont="^--end", length=1024, timeout=60 ):
-        start_re = re.compile( start )
-        cont_re = re.compile( cont )
-        return HaltWith( start_re, cont_re, length, timeout )
+        return HaltWith( start, cont, length, timeout )
 
     def halt_with_string( self ):
         return "--start\nand stop after\nthe next line\n--end\n"

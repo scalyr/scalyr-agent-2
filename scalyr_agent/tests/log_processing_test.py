@@ -22,6 +22,7 @@ import shutil
 import tempfile
 import unittest
 import sys
+import pdb
 
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
 from scalyr_agent.log_processing import FileSystem
@@ -42,7 +43,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.__fake_time = 10
 
         self.write_file(self.__path, '')
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system)
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, line_groupers=None, file_system=self.__file_system)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
         self.mark(time_advance=0)
 
@@ -67,6 +68,76 @@ class TestLogFileIterator(ScalyrTestCase):
         result = self.readline()
 
         self.assertEquals(result, 'L1\n')
+
+    def test_continue_through_matcher( self ):
+        self.log_file.set_line_matcher( [ DEFAULT_CONTINUE_THROUGH ], 100, 60 )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--multi\n--continue\n--some more\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_continue_past_matcher( self ):
+        self.log_file.set_line_matcher( [ DEFAULT_CONTINUE_PAST ], 100, 60 )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--multi\\\n--continue\\\n--some more\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_halt_before_matcher( self ):
+        self.log_file.set_line_matcher( [ DEFAULT_HALT_BEFORE ], 100, 60 )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--begin\n--continue\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected, "--end\n",
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( "--end\n", self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_halt_with_matcher( self ):
+        self.log_file.set_line_matcher( [ DEFAULT_HALT_WITH ], 100, 60 )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--start\n--continue\n--stop\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_multiple_line_groupers( self ):
+        self.log_file.set_line_matcher( [ DEFAULT_CONTINUE_THROUGH, DEFAULT_CONTINUE_PAST, DEFAULT_HALT_BEFORE, DEFAULT_HALT_WITH ], 100, 100 )
+        self.log_file.set_parameters( 200, 200 )
+        expected = [ "--multi\n--continue\n--some more\n",
+                     "single line\n",
+                     "multi\\\n--continue\\\n--some more\n",
+                     "single line\n",
+                     "--begin\n--continue\n",
+                     "--end\n",
+                     "--start\n--continue\n--stop\n",
+                     "the end\n"]
+
+        self.append_file( self.__path, ''.join( expected ) )
+
+        for line in expected:
+            self.assertEquals( line, self.readline() )
 
     def test_multiple_scans(self):
         self.append_file(self.__path,
@@ -350,7 +421,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L001\n')
         saved_checkpoint = self.log_file.get_checkpoint()
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, line_groupers=None, file_system=self.__file_system,
                                         checkpoint=saved_checkpoint)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
@@ -366,7 +437,7 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L003\n',
                         'L004\n')
 
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, line_groupers=None, file_system=self.__file_system,
                                         checkpoint=LogFileIterator.create_checkpoint(10))
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
@@ -636,7 +707,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         # For now, we create one that does not have any log attributes and only
         # counts the bytes of events messages as the cost.
         self.write_file(self.__path, '')
-        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, line_groupers=None, file_system=self.__file_system,
                                               log_attributes={})
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
@@ -779,7 +850,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_log_attributes(self):
-        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, line_groupers=None, file_system=self.__file_system,
                                          log_attributes={'host': 'scalyr-1'})
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
 
@@ -898,5 +969,17 @@ def _create_configuration():
 
 DEFAULT_CONFIG = _create_configuration()
 
+DEFAULT_CONTINUE_THROUGH = {'start': '^--multi',
+                              'continueThrough': "^--"
+                           }
+DEFAULT_CONTINUE_PAST = {'start': r'\\$',
+                         'continuePast': r"\\$"
+                           }
+DEFAULT_HALT_BEFORE = {'start': "^--begin",
+                       'haltBefore': "^--end"
+                           }
+DEFAULT_HALT_WITH = {'start': "^--start",
+                     'haltWith': "^--stop"
+                           }
 if __name__ == '__main__':
     unittest.main()
