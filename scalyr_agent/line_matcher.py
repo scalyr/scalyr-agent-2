@@ -26,7 +26,13 @@ __author__ = 'imron@imralsoftware.com'
 
 
 class LineMatcher(object):
-    """
+    """ An abstraction for a Line Matcher.
+    Reads an entire 'line' from a file like object (e.g. anything implementing Python's
+    file interface such as StringIO).  By default it reads just a single line terminated
+    by a newline, however subclasses can override the _readline method to provide their
+    own definition of what a 'line' is.
+
+    This class also handles partial lines and timeouts between reading a full line.
     """
 
     def __init__( self , max_line_length=5*1024, line_completion_wait_time=5*60 ):
@@ -35,8 +41,10 @@ class LineMatcher(object):
         self.__partial_line_time = None
 
     def readline( self, file_like, current_time ):
+        #save the original position
         original_offset = file_like.tell()
 
+        #read a line, and whether or not this is a partial line from the file_like object
         line, partial = self._readline( file_like )
 
         if len( line ) == 0:
@@ -60,7 +68,13 @@ class LineMatcher(object):
         return line
 
     def _readline( self, file_like, max_length=0 ):
-        """
+        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        and returns either a full line, or a partial line.
+        @param file_like: a file like object (e.g. StringIO)
+        @param max_length: the maximum length to read from the file_like object
+
+        @returns - (string,bool) the content read from the file_like object and whether
+        this is a partial line or not.
         """
         if max_length == 0:
             max_length = self.max_line_length
@@ -70,7 +84,9 @@ class LineMatcher(object):
         return line, partial
 
 class LineMatcherCollection( LineMatcher ):
-    """
+    """ A group of line matchers.
+    Returns the line from the first line matcher that returns a non-empty line,
+    or a single newline terminated line if no matches are found.
     """
     def __init__( self, max_line_length=5*1024, line_completion_wait_time=5*60 ):
         LineMatcher.__init__( self, max_line_length, line_completion_wait_time )
@@ -80,7 +96,18 @@ class LineMatcherCollection( LineMatcher ):
         self.__matchers.append( matcher )
 
     def _readline( self, file_like, max_length=0 ):
+        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        and checks all self.__matchers to see if any of them match.  If so then return the 
+        first matching line, otherwise return a single newline terminated line from the input.
 
+        @param file_like: a file like object (e.g. StringIO)
+        @param max_length: the maximum length to read from the file_like object
+
+        @returns - (string,bool) the content read from the file_like object and whether
+        this is a partial line or not.
+        """
+
+        #default to our own max_line_length if no length has been specified
         if max_length == 0:
             max_length = self.max_line_length
 
@@ -88,23 +115,43 @@ class LineMatcherCollection( LineMatcher ):
         partial = False
         for matcher in self.__matchers:
             offset = file_like.tell()
+            #if we have a line, then break out of the loop
             line, partial = matcher._readline( file_like, max_length )
             if line:
                 break
+
+            #no match, so reset back to the original offset to prepare for the next line
             file_like.seek( offset )
         
+        #if we didn't match any of self.__matchers, then check to see if there is a
+        #single line waiting
         if not line:
             line, partial =  LineMatcher._readline( self, file_like, max_length )
             
         return line, partial
 
 class LineGrouper( LineMatcher ):
+    """ An abstraction for a LineMatcher that groups multiple lines as a single line.
+    Most of the complexity of multiline matching is handled by this class, and subclasses
+    are expected to override methods determining when a multiline begins, and whether the
+    multiline should continue.
+    """
     def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
         LineMatcher.__init__( self, max_line_length, line_completion_wait_time )
         self._start_pattern = re.compile( start_pattern )
         self._continuation_pattern = re.compile( continuation_pattern )
 
     def _readline( self, file_like, max_length=0 ):
+        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        and returns either a full line, or a partial line.
+        @param file_like: a file like object (e.g. StringIO)
+        @param max_length: the maximum length to read from the file_like object
+
+        @returns - (string,bool) the content read from the file_like object and whether
+        this is a partial line or not.  This function always returns either an empty string ''
+        or a complete multi-line string.
+        """
+        # default to our own max_line_length if no max_length is specified
         if max_length == 0:
             max_length = self.max_line_length
 
@@ -112,20 +159,30 @@ class LineGrouper( LineMatcher ):
 
         line = ''
         partial = False
+
+        #read a single line of input from the file_like object
         start_line, partial = LineMatcher._readline( self, file_like, max_length )
 
+        #early exit if is a partial line
         if partial:
             return start_line, partial
 
+        #check to see if this line starts a multiline
         start = self._start_line( start_line )
         if start:
             max_length -= len( start_line )
             next_offset = file_like.tell()
+
+            #read the next single line of input
             next_line, next_partial = LineMatcher._readline( self, file_like, max_length )
             if next_line:
+
+                #see if we are continuing the line
                 cont = self._continue_line( next_line )
                 if cont:
                     line = start_line
+                    # build up a multiline string by looping over all lines for as long as 
+                    # the multiline continues, there is still more input in the file and we still have space in our buffer
                     while cont and next_line and max_length > 0:
                         line += next_line
                         max_length -= len( next_line )
@@ -133,19 +190,31 @@ class LineGrouper( LineMatcher ):
                         next_line, partial = LineMatcher._readline( self, file_like, max_length )
                         cont = self._continue_line( next_line )
 
+                    #the previous loop potentially needs to read one line past the end of a multi-line
+                    #so reset the file position to the start of that line for future calls.
                     file_like.seek( next_offset )
 
+                    # if we are here and cont is true, it means that we are in the middle of a multiline
+                    # but there is no further input, so we have a partial line.
                     partial = partial or cont
 
+                #first line matched, but the second line failed to continue the multiline
                 else:
+                    #check if we can match a single line
                     if self._match_single_line():
                         line = start_line
+                    #otherwise reset the file position and return an empty line
                     else:
                         file_like.seek( start_offset )
                         line = ''
+
+            # first line started a multiline and now we are waiting for the next line of
+            # input, so return a partial line
             else:
                 line = start_line
                 partial = True
+
+        #the line didn't start a multiline, so reset the file position and return an empty line
         else:
             file_like.seek( start_offset )
             line, partial = '', False
@@ -153,18 +222,36 @@ class LineGrouper( LineMatcher ):
         return line, partial
 
     def _match_single_line( self ):
+        """ Returns whether or not the grouper can match a single line based on the start_pattern.
+        Defaults to false
+        """
         return False
 
     def _continue_line( self, line ):
+        """ Returns whether or not the grouper should continue matching a multiline.  Defaults to false
+        @param line - the next line of input
+        """
         return False
 
     def _start_line( self, line ):
+        """ Returns whether or not the grouper should start matching a multiline.
+        @param line - the next line of input
+        @return bool - whether or not the start pattern finds a match in the input line
+        """
         return self._start_pattern.search( line ) != None
 
 class ContinueThrough( LineGrouper ):
+    """  A ContinueThrough multiline grouper.
+    If the start_pattern matches, then all consecutive lines matching the continuation pattern are included in the line.
+    This is useful in cases such as a Java stack trace, where some indicator in the line (such as leading whitespace)
+    indicates that it is an extension of the preceeding line.
     """
-    """
+
     def _continue_line( self, line ):
+        """
+        @param line - the next line of input
+        @return bool - True if the line is empty or if the contination_pattern finds a match in the input line
+        """
         if not line:
             return True
 
@@ -172,7 +259,11 @@ class ContinueThrough( LineGrouper ):
             
 
 class ContinuePast( LineGrouper ):
-    """
+    """ A ContinuePast multiline grouper.
+    If the start pattern matches, then all consecutive lines matching the contuation pattern, plus one additional line,
+    are included in the line.
+    This is useful in cases where a log message ends with a continuation marker, such as a backslash, indicating
+    that the following line is part of the same message.
     """
     def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
         LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
@@ -187,24 +278,33 @@ class ContinuePast( LineGrouper ):
         return result
 
     def _continue_line( self, line ):
+        #if the previous call saw the last line of the pattern, then the next call should always return False
         if self.__last_line:
             self.__last_line = False
             return False
 
+        #see if we match the continuation pattern
         match = self._continuation_pattern.search( line )
         result = True
+
+        # if we are grouping lines and we don't have a match, then we need to flag that the next
+        # line will always end the line continuation
         if self.__grouping:
             if not match:
                 self.__grouping = False
                 self.__last_line = True
         else:
+            # we aren't grouping lines so if we don't have a match then the input doesn't match this
+            # line grouping pattern, so return False
             if not match:
                 result = False
 
         return result
     
 class HaltBefore( LineGrouper ):
-    """
+    """ A HaltBefore line grouper.
+    If the start pattern matches, then all consecutive lines not matching the contuation pattern are included in the line.
+    This is useful where a log line contains a marker indicating that it begins a new message.
     """
     def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
         LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
@@ -218,10 +318,13 @@ class HaltBefore( LineGrouper ):
         return self._continuation_pattern.search( line ) == None
 
     def _match_single_line( self ):
+        #HaltBefore can potentiall match a single line
         return self.__match_single
 
 class HaltWith( LineGrouper ):
-    """
+    """ A HaltWith line grouper.
+    If the start pattern matches, all consecutive lines, up to and including the first line matching the contuation pattern,
+    are included in the line. This is useful where a log line ends with a termination marker, such as a semicolon.
     """
     def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
         LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
@@ -234,12 +337,17 @@ class HaltWith( LineGrouper ):
         return result
 
     def _continue_line( self, line ):
+        #if we have previously been flagged that the last line has been reached, then return False to stop
+        #the line from continuing
         if self.__last_line:
             self.__last_line = False
             return False
 
+        #see if the continuation pattern matches
         cont = self._continuation_pattern.search( line ) == None
 
+        # if it doesn't, then we still continue the line for this input, but we have reached the end ofr
+        # the pattern so the next line should end the group
         if not cont:
             self.__last_line = True
             cont = True
