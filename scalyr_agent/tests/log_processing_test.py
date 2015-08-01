@@ -801,6 +801,45 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(1, events.total_events())
         self.assertEquals(events.get_message(0), 'Third line\n')
 
+    def _set_line_grouping_log_processor(self, line_groupers ):
+        # create a new log processer and do an initial scan, because we need a line grouper
+        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, line_groupers=line_groupers, file_system=self.__file_system, log_attributes={})
+        self.write_file(self.__path, '')
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+
+    def test_grouping_rules(self):
+        self._set_line_grouping_log_processor( [ DEFAULT_CONTINUE_THROUGH ] )
+        expected = "--multi\n--continue\n--some more\n"
+        last_line = "the end\n"
+
+        self.append_file( self.__path, expected + last_line )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals( expected, events.get_message(0) )
+
+    def test_grouping_and_sampling_rules(self):
+        self._set_line_grouping_log_processor( [ DEFAULT_CONTINUE_THROUGH ] )
+        expected = "--multi\n--continue\n--some more\n"
+        last_line = "the end\n"
+
+        # pass any line that has continue and drop any other lines
+        self.log_processor.add_sampler( 'continue', 1 )
+        self.log_processor.add_sampler( '.*', 0 )
+
+        self.append_file( self.__path, expected + last_line )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals( expected, events.get_message(0) )
+
+
     def test_sampling_rule(self):
         log_processor = self.log_processor
         log_processor.add_sampler('INFO', 0)
