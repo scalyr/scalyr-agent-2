@@ -433,9 +433,6 @@ class HaltBeforeTestCase( unittest.TestCase ):
         actual = matcher.readline( line, current_time )
         self.assertEqual( '', actual )
 
-        actual = line.readline()
-        self.assertEqual( expected_next, actual )
-
     def test_partial_first_line_match( self ):
         expected = "--begin\n"
         expected_next = "last line\n"

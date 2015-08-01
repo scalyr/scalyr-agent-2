@@ -138,8 +138,11 @@ class LineGrouper( LineMatcher ):
                     partial = partial or cont
 
                 else:
-                    file_like.seek( start_offset )
-                    line = ''
+                    if self._match_single_line():
+                        line = start_line
+                    else:
+                        file_like.seek( start_offset )
+                        line = ''
             else:
                 line = start_line
                 partial = True
@@ -148,6 +151,9 @@ class LineGrouper( LineMatcher ):
             line, partial = '', False
 
         return line, partial
+
+    def _match_single_line( self ):
+        return False
 
     def _continue_line( self, line ):
         return False
@@ -200,8 +206,19 @@ class ContinuePast( LineGrouper ):
 class HaltBefore( LineGrouper ):
     """
     """
+    def __init__( self, start_pattern, continuation_pattern, max_line_length = 5*1024, line_completion_wait_time=5*60 ):
+        LineGrouper.__init__( self, start_pattern, continuation_pattern, max_line_length, line_completion_wait_time )
+        self.__match_single = False
+
+    def _start_line( self, line ):
+        self.__match_single = LineGrouper._start_line( self, line )
+        return self.__match_single
+
     def _continue_line( self, line ):
         return self._continuation_pattern.search( line ) == None
+
+    def _match_single_line( self ):
+        return self.__match_single
 
 class HaltWith( LineGrouper ):
     """
