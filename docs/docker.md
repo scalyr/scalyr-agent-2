@@ -11,7 +11,7 @@ Dockerfile.base creates an image off docker’s default ubuntu image, installs p
 
 If needed, custom docker images can be created by making custom Dockerfiles and running the command
 
-	docker build -f MyNewDockerfile -t <tag>
+	docker build -f MyNewDockerfile -t <tag> .
 
 Where &lt;tag&gt; typically follows the format `company/product:version` e.g. scalyr/scalyr-agent:test
 
