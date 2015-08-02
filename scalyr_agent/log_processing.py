@@ -25,6 +25,7 @@ import sys
 
 __author__ = 'czerwin@scalyr.com'
 
+import datetime
 import errno
 import glob
 import os
@@ -154,6 +155,10 @@ class LogFileIterator(object):
         # Has closed been called.
         self.__is_closed = False
 
+
+        # Files that haven't been modified recently get closed in prepare_for_inactivity
+        self.__max_modification_duration = config.ignore_old_files_duration_in_seconds
+
         # We are at the 'end' if the log file has been deleted.  This is because we always expect more bytes to be
         # written to it if not.
         self.at_end = False
@@ -209,6 +214,7 @@ class LogFileIterator(object):
                     for file_state in self.__pending_files:
                         self.__close_file(file_state)
                     self.__pending_files = []
+
 
     def set_parameters(self, max_line_length=None, page_size=None):
         """Sets the various parameters for reading the file.
@@ -433,7 +439,20 @@ class LogFileIterator(object):
         # not allow for file deletes while someone has a file handle open, but you have to use the native win32 api
         # to be able to open files that work in such a way.. and it still does not allow for the parent dirs to be
         # deleted.)
-        if sys.platform == 'win32':
+        close_file = (sys.platform == 'win32')
+
+        # also close any files that haven't been modified for a certain amount of time.
+        # This can help prevent errors from having too many open files if we are scanning
+        # a directory with many files in it.
+        if self.__max_modification_duration:
+            current_datetime = datetime.datetime.now()
+            st = os.stat( self.__path )
+            modification_time = datetime.datetime.fromtimestamp( st.st_mtime )
+            delta = current_datetime - modification_time
+            if delta.total_seconds() > self.__max_modification_duration:
+                close_file = True
+
+        if close_file:
             for pending in self.__pending_files:
                 self.__close_file(pending)
 
@@ -1056,6 +1075,7 @@ class LogFileProcessor(object):
         self.__thread_id = LogFileProcessor.generate_unique_thread_id()
 
         self.__log_file_iterator = LogFileIterator(file_path, config, file_system=file_system, checkpoint=checkpoint)
+
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 

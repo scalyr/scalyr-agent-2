@@ -376,6 +376,11 @@ class Configuration(object):
         return self.__get_config().get_float('global_monitor_sample_interval')
 
     @property
+    def ignore_old_files_duration_in_seconds(self):
+        """Returns the configuration value for 'ignore_old_files_duration_in_seconds'."""
+        return self.__get_config().get_int('ignore_old_files_duration_in_seconds')
+
+    @property
     def max_line_size(self):
         """Returns the configuration value for 'max_line_size'."""
         return self.__get_config().get_int('max_line_size')
@@ -554,6 +559,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description)
 
         self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description)
+        self.__verify_or_set_optional_int(config, 'ignore_old_files_duration_in_seconds', 60*60*2, description)
 
         self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description)
         self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description)
