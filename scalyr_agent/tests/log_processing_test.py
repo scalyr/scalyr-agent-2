@@ -476,7 +476,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals( 1, open_count )
 
         modification_time = os.path.getmtime( self.__path )
-        modification_time -= DEFAULT_CONFIG.ignore_old_files_duration_in_seconds + 100
+        modification_time -= DEFAULT_CONFIG.close_old_files_duration_in_seconds + 100
         os.utime( self.__path, (modification_time, modification_time) )
 
         self.log_file.prepare_for_inactivity()

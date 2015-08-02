@@ -157,7 +157,7 @@ class LogFileIterator(object):
 
 
         # Files that haven't been modified recently get closed in prepare_for_inactivity
-        self.__max_modification_duration = config.ignore_old_files_duration_in_seconds
+        self.__max_modification_duration = config.close_old_files_duration_in_seconds
 
         # We are at the 'end' if the log file has been deleted.  This is because we always expect more bytes to be
         # written to it if not.
