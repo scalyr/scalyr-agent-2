@@ -445,12 +445,16 @@ class LogFileIterator(object):
         # This can help prevent errors from having too many open files if we are scanning
         # a directory with many files in it.
         if self.__max_modification_duration:
-            current_datetime = datetime.datetime.now()
-            st = os.stat( self.__path )
-            modification_time = datetime.datetime.fromtimestamp( st.st_mtime )
-            delta = current_datetime - modification_time
-            if delta.total_seconds() > self.__max_modification_duration:
-                close_file = True
+            try:
+                current_datetime = datetime.datetime.now()
+                st = os.stat( self.__path )
+                modification_time = datetime.datetime.fromtimestamp( st.st_mtime )
+                delta = current_datetime - modification_time
+                if delta.total_seconds() > self.__max_modification_duration:
+                    close_file = True
+
+            except OSError, e:
+                pass
 
         if close_file:
             for pending in self.__pending_files:
@@ -951,7 +955,11 @@ class LogFileIterator(object):
 
         This is only used for tests.
         """
-        return len(self.__pending_files)
+        result = 0
+        for pending_file in self.__pending_files:
+            if pending_file and pending_file.file_handle is not None:
+                result += 1
+        return result
 
     class BufferEntry(object):
         """Simple object used to represent a portion of the cache buffer holding a portion of a file."""
