@@ -171,6 +171,9 @@ class LogFileIterator(object):
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
 
+        # cache modification time to avoid calling stat twice
+        self.__modification_time = datetime.datetime.now()
+
         # The file system facade that we direct all I/O calls through
         # so that we can insert testing methods in the future if needed.
         self.__file_system = file_system
@@ -447,9 +450,7 @@ class LogFileIterator(object):
         if self.__max_modification_duration:
             try:
                 current_datetime = datetime.datetime.now()
-                st = os.stat( self.__path )
-                modification_time = datetime.datetime.fromtimestamp( st.st_mtime )
-                delta = current_datetime - modification_time
+                delta = current_datetime - self.__modification_time
                 if delta.total_seconds() > self.__max_modification_duration:
                     close_file = True
 
@@ -604,6 +605,7 @@ class LogFileIterator(object):
             stat_result = self.__file_system.stat(self.__path)
             latest_inode = stat_result.st_ino
             latest_size = stat_result.st_size
+            self.__modification_time = datetime.datetime.fromtimestamp( stat_result.st_mtime )
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:

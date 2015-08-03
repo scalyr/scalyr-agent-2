@@ -479,6 +479,7 @@ class TestLogFileIterator(ScalyrTestCase):
         modification_time -= DEFAULT_CONFIG.close_old_files_duration_in_seconds + 100
         os.utime( self.__path, (modification_time, modification_time) )
 
+        self.log_file.scan_for_new_bytes()
         self.log_file.prepare_for_inactivity()
 
         open_count = self.log_file.get_open_files_count()
