@@ -451,7 +451,8 @@ class LogFileIterator(object):
             try:
                 current_datetime = datetime.datetime.now()
                 delta = current_datetime - self.__modification_time
-                if delta.total_seconds() > self.__max_modification_duration:
+                total_micros = delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10**6
+                if total_micros > self.__max_modification_duration * 10**6:
                     close_file = True
 
             except OSError:
