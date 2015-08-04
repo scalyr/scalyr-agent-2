@@ -566,6 +566,22 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
         self.assertEquals(self.log_file.available, 40L)
 
+    def test_prepare_for_inactivity_closes_old_file_handles( self ):
+        self.append_file( self.__path, "some lines of text\n" )
+
+        open_count = self.log_file.get_open_files_count()
+        self.assertEquals( 1, open_count )
+
+        modification_time = os.path.getmtime( self.__path )
+        modification_time -= DEFAULT_CONFIG.close_old_files_duration_in_seconds + 100
+        os.utime( self.__path, (modification_time, modification_time) )
+
+        self.log_file.scan_for_new_bytes()
+        self.log_file.prepare_for_inactivity()
+
+        open_count = self.log_file.get_open_files_count()
+        self.assertEquals( 0, open_count )
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'wb')
