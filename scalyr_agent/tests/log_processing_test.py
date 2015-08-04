@@ -22,11 +22,14 @@ import shutil
 import tempfile
 import unittest
 import sys
+import pdb
 
+from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
 from scalyr_agent.log_processing import FileSystem
 from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib import JsonArray
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 
@@ -42,7 +45,11 @@ class TestLogFileIterator(ScalyrTestCase):
         self.__fake_time = 10
 
         self.write_file(self.__path, '')
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system)
+
+        log_config = { 'path' : self.__path }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
         self.mark(time_advance=0)
 
@@ -67,6 +74,92 @@ class TestLogFileIterator(ScalyrTestCase):
         result = self.readline()
 
         self.assertEquals(result, 'L1\n')
+
+    def test_continue_through_matcher( self ):
+
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
+        self.log_file.set_line_matcher( matcher )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--multi\n--continue\n--some more\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_continue_past_matcher( self ):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_PAST ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
+        self.log_file.set_line_matcher( matcher )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--multi\\\n--continue\\\n--some more\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_halt_before_matcher( self ):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_HALT_BEFORE ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
+        self.log_file.set_line_matcher( matcher )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--begin\n--continue\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected, "--end\n",
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( "--end\n", self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_halt_with_matcher( self ):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_HALT_WITH ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
+        self.log_file.set_line_matcher( matcher )
+        self.log_file.set_parameters( 100, 100 )
+
+        expected = "--start\n--continue\n--stop\n"
+        expected_next = "the end\n"
+        self.append_file( self.__path,
+                          expected,
+                          expected_next )
+
+        self.assertEquals( expected, self.readline() )
+        self.assertEquals( expected_next, self.readline() )
+
+    def test_multiple_line_groupers( self ):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH, DEFAULT_CONTINUE_PAST, DEFAULT_HALT_BEFORE, DEFAULT_HALT_WITH ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
+        self.log_file.set_line_matcher( matcher )
+        self.log_file.set_parameters( 200, 200 )
+        expected = [ "--multi\n--continue\n--some more\n",
+                     "single line\n",
+                     "multi\\\n--continue\\\n--some more\n",
+                     "single line\n",
+                     "--begin\n--continue\n",
+                     "--end\n",
+                     "--start\n--continue\n--stop\n",
+                     "the end\n"]
+
+        self.append_file( self.__path, ''.join( expected ) )
+
+        for line in expected:
+            self.assertEquals( line, self.readline() )
 
     def test_multiple_scans(self):
         self.append_file(self.__path,
@@ -350,7 +443,9 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L001\n')
         saved_checkpoint = self.log_file.get_checkpoint()
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        log_config = { 'path' : self.__path }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                         checkpoint=saved_checkpoint)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
@@ -366,7 +461,9 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L003\n',
                         'L004\n')
 
-        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        log_config = { 'path' : self.__path }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                         checkpoint=LogFileIterator.create_checkpoint(10))
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
@@ -636,7 +733,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         # For now, we create one that does not have any log attributes and only
         # counts the bytes of events messages as the cost.
         self.write_file(self.__path, '')
-        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
+        log_config = { 'path' : self.__path }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                               log_attributes={})
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
@@ -730,6 +829,49 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(1, events.total_events())
         self.assertEquals(events.get_message(0), 'Third line\n')
 
+    def _set_line_grouping_log_processor(self, log_config ):
+        # create a new log processer and do an initial scan, because we need a line grouper
+        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system, log_attributes={})
+        self.write_file(self.__path, '')
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+
+    def test_grouping_rules(self):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        self._set_line_grouping_log_processor( log_config )
+        expected = "--multi\n--continue\n--some more\n"
+        last_line = "the end\n"
+
+        self.append_file( self.__path, expected + last_line )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals( expected, events.get_message(0) )
+
+    def test_grouping_and_sampling_rules(self):
+        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        self._set_line_grouping_log_processor( log_config )
+        expected = "--multi\n--continue\n--some more\n"
+        last_line = "the end\n"
+
+        # pass any line that has continue and drop any other lines
+        self.log_processor.add_sampler( 'continue', 1 )
+        self.log_processor.add_sampler( '.*', 0 )
+
+        self.append_file( self.__path, expected + last_line )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals( expected, events.get_message(0) )
+
+
     def test_sampling_rule(self):
         log_processor = self.log_processor
         log_processor.add_sampler('INFO', 0)
@@ -779,8 +921,10 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_log_attributes(self):
-        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, file_system=self.__file_system,
-                                         log_attributes={'host': 'scalyr-1'})
+        vals = { 'path' : self.__path, 'attributes' : JsonObject( { 'host' : 'scalyr-1' } ) }
+        log_config = DEFAULT_CONFIG.parse_log_config( vals )
+        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
+                                         log_attributes=vals['attributes'])
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
 
         self.append_file(self.__path, 'First line\nSecond line\n')
@@ -898,5 +1042,17 @@ def _create_configuration():
 
 DEFAULT_CONFIG = _create_configuration()
 
+DEFAULT_CONTINUE_THROUGH = JsonObject( {'start': '^--multi',
+                              'continueThrough': "^--"
+                           } )
+DEFAULT_CONTINUE_PAST = JsonObject( {'start': r'\\$',
+                         'continuePast': r"\\$"
+                           } )
+DEFAULT_HALT_BEFORE = JsonObject( {'start': "^--begin",
+                       'haltBefore': "^--end"
+                           } )
+DEFAULT_HALT_WITH = JsonObject( {'start': "^--start",
+                     'haltWith': "^--stop"
+                           } )
 if __name__ == '__main__':
     unittest.main()
