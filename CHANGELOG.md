@@ -1,16 +1,21 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.12 "Loopy Lama" - July 30, 2015
+## 2.0.12 "Loopy Lama" - August 5, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 30, 2015 11:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 5, 2015 11:45 -0700
 --->
 
 Note, this release is under development so the release date and feature set is TBD.
 
+New features:
+
+* Enable line groupers on the agent.  Each log file may specify line grouping rules in its configuration.  The agent can use this to group consecutive log lines together into a single logic log line.  All future sampling and redaction rules will work on this single line instead of the individual log lines.
+
 Bug fixes:
 
+* Close file handles for files being scanned that have not had any activity in the last hour.  Should fix too many open files bug.
 * Reduce the default ``max_line_size`` value to 3400 to avoid truncation issues introduced by the server.
 
 ## 2.0.11 "Keen Kangaroo" - June  24, 2015
