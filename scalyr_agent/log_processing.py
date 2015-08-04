@@ -25,6 +25,7 @@ import sys
 
 __author__ = 'czerwin@scalyr.com'
 
+import datetime
 import errno
 import glob
 import os
@@ -153,6 +154,9 @@ class LogFileIterator(object):
         # Has closed been called.
         self.__is_closed = False
 
+        # Files that haven't been modified recently get closed in prepare_for_inactivity
+        self.__max_modification_duration = config.close_old_files_duration_in_seconds
+
         # We are at the 'end' if the log file has been deleted.  This is because we always expect more bytes to be
         # written to it if not.
         self.at_end = False
@@ -163,11 +167,17 @@ class LogFileIterator(object):
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         # create the line matcher objects for matching single and multiple lines
-        line_matcher = LineMatcher.create_line_matchers( log_config, config.max_line_size, config.line_completion_wait_time )
-        self.set_line_matcher( line_matcher )
+        line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
+                                                        config.line_completion_wait_time)
+        self.set_line_matcher(line_matcher)
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
+
+        # cache modification time to avoid calling stat twice
+        self.__modification_time = datetime.datetime.now()
+
+        self.__line_matcher = None
 
         # The file system facade that we direct all I/O calls through
         # so that we can insert testing methods in the future if needed.
@@ -213,7 +223,7 @@ class LogFileIterator(object):
                         self.__close_file(file_state)
                     self.__pending_files = []
 
-    def set_line_matcher( self, line_matcher ):
+    def set_line_matcher(self, line_matcher):
         """Sets the line matcher
         Useful for testing
         """
@@ -360,9 +370,8 @@ class LogFileIterator(object):
                     'Mismatch between expected index and actual %ld %ld',
                     expected_buffer_index, original_buffer_index)
 
-
         # read a complete line from our line_matcher
-        result = self.__line_matcher.readline( self.__buffer, current_time )
+        result = self.__line_matcher.readline(self.__buffer, current_time)
         if len(result) == 0:
             return result
 
@@ -433,7 +442,22 @@ class LogFileIterator(object):
         # not allow for file deletes while someone has a file handle open, but you have to use the native win32 api
         # to be able to open files that work in such a way.. and it still does not allow for the parent dirs to be
         # deleted.)
-        if sys.platform == 'win32':
+        close_file = (sys.platform == 'win32')
+
+        # also close any files that haven't been modified for a certain amount of time.
+        # This can help prevent errors from having too many open files if we are scanning
+        # a directory with many files in it.
+        if self.__max_modification_duration:
+            try:
+                current_datetime = datetime.datetime.now()
+                delta = current_datetime - self.__modification_time
+                if delta.total_seconds() > self.__max_modification_duration:
+                    close_file = True
+
+            except OSError:
+                pass
+
+        if close_file:
             for pending in self.__pending_files:
                 self.__close_file(pending)
 
@@ -581,6 +605,7 @@ class LogFileIterator(object):
             stat_result = self.__file_system.stat(self.__path)
             latest_inode = stat_result.st_ino
             latest_size = stat_result.st_size
+            self.__modification_time = datetime.datetime.fromtimestamp(stat_result.st_mtime)
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
@@ -932,7 +957,11 @@ class LogFileIterator(object):
 
         This is only used for tests.
         """
-        return len(self.__pending_files)
+        result = 0
+        for pending_file in self.__pending_files:
+            if pending_file and pending_file.file_handle is not None:
+                result += 1
+        return result
 
     class BufferEntry(object):
         """Simple object used to represent a portion of the cache buffer holding a portion of a file."""
@@ -1056,7 +1085,9 @@ class LogFileProcessor(object):
         self.__thread_name = 'Lines for file %s' % file_path
         self.__thread_id = LogFileProcessor.generate_unique_thread_id()
 
-        self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system, checkpoint=checkpoint)
+        self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system,
+                                                   checkpoint=checkpoint)
+
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
@@ -1759,8 +1790,8 @@ class LogMatcher(object):
                         log_attributes['logfile'] = matched_file
 
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config, log_attributes=log_attributes,
-                                                     checkpoint=checkpoint_state)
+                    new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config,
+                                                     log_attributes=log_attributes, checkpoint=checkpoint_state)
                     for rule in self.__log_entry_config['redaction_rules']:
                         new_processor.add_redacter(rule['match_expression'], rule['replacement'])
                     for rule in self.__log_entry_config['sampling_rules']:
