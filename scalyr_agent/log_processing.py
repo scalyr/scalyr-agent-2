@@ -167,17 +167,14 @@ class LogFileIterator(object):
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         # create the line matcher objects for matching single and multiple lines
-        line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
-                                                        config.line_completion_wait_time)
-        self.set_line_matcher(line_matcher)
+        self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
+                                                               config.line_completion_wait_time)
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
 
         # cache modification time to avoid calling stat twice
         self.__modification_time = datetime.datetime.now()
-
-        self.__line_matcher = None
 
         # The file system facade that we direct all I/O calls through
         # so that we can insert testing methods in the future if needed.
