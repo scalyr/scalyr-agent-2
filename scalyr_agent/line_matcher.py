@@ -35,6 +35,48 @@ class LineMatcher(object):
     This class also handles partial lines and timeouts between reading a full line.
     """
 
+    @staticmethod
+    def create_line_matchers( log_config, max_line_length, line_completion_wait_time ):
+        """Creates line matchers based on the config passed in
+        see: https://www.scalyr.com/help/parsing-logs#multiline for more info
+
+        If no lineGroupers attribute is found, then it defaults to a single line matcher
+
+        @param log_config: A JsonObject containing the log config
+        @param max_line_length: The maximum amount to read before returning a new line
+        @param line_completion_wait_time: The maximum amount of time to wait
+            if only a partial line is ready
+        @return - a line matcher object based on the config
+        """
+
+        line_groupers = log_config['lineGroupers']
+
+        #return a single line matcher if line_groupers is empty or None
+        if not line_groupers:
+            return LineMatcher( max_line_length, line_completion_wait_time )
+
+        #build a line matcher collection
+        result = LineMatcherCollection( max_line_length, line_completion_wait_time )
+        for grouper in line_groupers:
+            if "start" in grouper:
+                if "continueThrough" in grouper:
+                    matcher = ContinueThrough( grouper['start'], grouper['continueThrough'], max_line_length, line_completion_wait_time )
+                    result.add_matcher( matcher )
+                elif "continuePast" in grouper:
+                    matcher = ContinuePast( grouper['start'], grouper['continuePast'], max_line_length, line_completion_wait_time )
+                    result.add_matcher( matcher )
+                elif "haltBefore" in grouper:
+                    matcher = HaltBefore( grouper['start'], grouper['haltBefore'], max_line_length, line_completion_wait_time )
+                    result.add_matcher( matcher )
+                elif "haltWith" in grouper:
+                    matcher = HaltWith( grouper['start'], grouper['haltWith'], max_line_length, line_completion_wait_time )
+                    result.add_matcher( matcher )
+                else:
+                    raise Exception( 'Error, no continuation pattern found for line grouper: %s' % str( grouper ) )
+            else:
+                raise Exception( 'Error, no start pattern found for line grouper: %s' % str( grouper ) )
+        return result
+
     def __init__( self , max_line_length=5*1024, line_completion_wait_time=5*60 ):
         self.max_line_length = max_line_length
         self.__line_completion_wait_time = line_completion_wait_time

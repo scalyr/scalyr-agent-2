@@ -40,12 +40,7 @@ import scalyr_agent.util as scalyr_util
 from scalyr_agent.agent_status import LogMatcherStatus
 from scalyr_agent.agent_status import LogProcessorStatus
 
-from scalyr_agent.line_matcher import ContinuePast
-from scalyr_agent.line_matcher import ContinueThrough
-from scalyr_agent.line_matcher import HaltBefore
-from scalyr_agent.line_matcher import HaltWith
 from scalyr_agent.line_matcher import LineMatcher
-from scalyr_agent.line_matcher import LineMatcherCollection
 
 from cStringIO import StringIO
 from os import listdir
@@ -99,14 +94,13 @@ class LogFileIterator(object):
     but then return to it by invoking 'seek'.
     """
 
-    def __init__(self, path, config, line_groupers, file_system=None, checkpoint=None):
+    def __init__(self, path, config, log_config, file_system=None, checkpoint=None):
         """
 
         @param path: The path of the file to read.
         @param config: The configuration object containing values for parameters that govern how logs will be
             processed, such as ``max_line_size``.
-        @param line_groupers: a list of line groupers, as specified by: https://www.scalyr.com/help/parsing-logs#multiline
-            can be None
+        @param log_config: the specific log config for this log file
         @param file_system: The object to use to read the file system.  This is used for testing
             purposes.  If None, then will just use the native file system.
         @param checkpoint: The checkpoint object describing where to pick up reading the file.
@@ -169,7 +163,8 @@ class LogFileIterator(object):
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         # create the line matcher objects for matching single and multiple lines
-        self.set_line_matcher( line_groupers, self.__max_line_length, self.__line_completion_wait_time )
+        line_matcher = LineMatcher.create_line_matchers( log_config, config.max_line_size, config.line_completion_wait_time )
+        self.set_line_matcher( line_matcher )
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
@@ -218,36 +213,11 @@ class LogFileIterator(object):
                         self.__close_file(file_state)
                     self.__pending_files = []
 
-    def set_line_matcher( self, line_groupers, max_line_length, line_completion_wait_time ):
-        """Creates line matchers based on the line_groupers passed in
-        see: https://www.scalyr.com/help/parsing-logs#multiline for more info
-        If line_groupers is None then it defaults to matching single lines
+    def set_line_matcher( self, line_matcher ):
+        """Sets the line matcher
+        Useful for testing
         """
-        #return a single line matcher if line_groupers is empty or None
-        if not line_groupers:
-            self.__line_matcher = LineMatcher( max_line_length, line_completion_wait_time )
-            return
-
-        #build a line matcher collection
-        self.__line_matcher = LineMatcherCollection( max_line_length, line_completion_wait_time )
-        for grouper in line_groupers:
-            if "start" in grouper:
-                if "continueThrough" in grouper:
-                    matcher = ContinueThrough( grouper['start'], grouper['continueThrough'], max_line_length, line_completion_wait_time ) 
-                    self.__line_matcher.add_matcher( matcher )
-                elif "continuePast" in grouper:
-                    matcher = ContinuePast( grouper['start'], grouper['continuePast'], max_line_length, line_completion_wait_time ) 
-                    self.__line_matcher.add_matcher( matcher )
-                elif "haltBefore" in grouper:
-                    matcher = HaltBefore( grouper['start'], grouper['haltBefore'], max_line_length, line_completion_wait_time ) 
-                    self.__line_matcher.add_matcher( matcher )
-                elif "haltWith" in grouper:
-                    matcher = HaltWith( grouper['start'], grouper['haltWith'], max_line_length, line_completion_wait_time ) 
-                    self.__line_matcher.add_matcher( matcher )
-                else:
-                    print >>sys.stderr, 'Error, no continuation pattern found for line grouper: %s' % str( grouper )
-            else:
-                print >>sys.stderr, 'Error, no start pattern found for line grouper: %s' % str( grouper )
+        self.__line_matcher = line_matcher
 
     def set_parameters(self, max_line_length=None, page_size=None):
         """Sets the various parameters for reading the file.
@@ -1050,14 +1020,13 @@ class LogFileProcessor(object):
     to be sent to the server after applying any sampling and redaction rules.
     """
 
-    def __init__(self, file_path, config, line_groupers, log_attributes=None, file_system=None, checkpoint=None):
+    def __init__(self, file_path, config, log_config, log_attributes=None, file_system=None, checkpoint=None):
         """Initializes an instance.
 
         @param file_path: The path of the log file to process.
         @param config:  The configuration object containing parameters that govern how the logs will be processed
             such as ``max_line_length``.
-        @param line_groupers: a list of line groupers, as specified by: https://www.scalyr.com/help/parsing-logs#multiline
-            can be None
+        @param log_config: the log entry config for this specific log file
         @param log_attributes: The attributes to include on all lines copied from this log to the server.
             These are typically the file attributes from the configuration file and include such things as the
             parser for the log, etc.
@@ -1087,7 +1056,7 @@ class LogFileProcessor(object):
         self.__thread_name = 'Lines for file %s' % file_path
         self.__thread_id = LogFileProcessor.generate_unique_thread_id()
 
-        self.__log_file_iterator = LogFileIterator(file_path, config, line_groupers, file_system=file_system, checkpoint=checkpoint)
+        self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system, checkpoint=checkpoint)
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
@@ -1789,11 +1758,8 @@ class LogMatcher(object):
                     if 'logfile' not in log_attributes and 'filename' not in log_attributes:
                         log_attributes['logfile'] = matched_file
 
-                    # Get the lineGroupers object - can be None
-                    line_groupers = list( self.__log_entry_config['lineGroupers'] )
-
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(matched_file, self.__overall_config, line_groupers, log_attributes=log_attributes,
+                    new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config, log_attributes=log_attributes,
                                                      checkpoint=checkpoint_state)
                     for rule in self.__log_entry_config['redaction_rules']:
                         new_processor.add_redacter(rule['match_expression'], rule['replacement'])

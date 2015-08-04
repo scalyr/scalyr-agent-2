@@ -670,6 +670,8 @@ class Configuration(object):
 
         self.__verify_or_set_optional_attributes(log_entry, 'attributes', description)
 
+        self.__verify_or_set_optional_array( log_entry, 'lineGroupers', description )
+
         # Verify that if it has a sampling_rules array, then it is an array of json objects.
         self.__verify_or_set_optional_array(log_entry, 'sampling_rules', description)
         i = 0
