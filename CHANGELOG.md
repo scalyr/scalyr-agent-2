@@ -4,10 +4,8 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.12 "Loopy Lama" - August 5, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 5, 2015 11:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 5, 2015 15:30 -0700
 --->
-
-Note, this release is under development so the release date and feature set is TBD.
 
 New features:
 
