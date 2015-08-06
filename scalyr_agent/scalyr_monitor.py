@@ -63,7 +63,7 @@ class ScalyrMonitor(StoppableThread):
         disabled:  A boolean indicating if this module instance should be
             run.
     """
-    def __init__(self, monitor_config, logger, sample_interval_secs=None):
+    def __init__(self, monitor_config, logger, sample_interval_secs=None, global_config=None):
         """Constructs an instance of the monitor.
 
         It is optional for derived classes to override this method.  The can instead
@@ -86,10 +86,15 @@ class ScalyrMonitor(StoppableThread):
             set the value from the ``sample_interval`` field in the monitor_config if present, or the default
             interval time for all monitors in ``DEFAULT_SAMPLE_INTERVAL_SECS``.  Generally, you should probably
             pass None here and allow the value to be taken from the configuration files.
+        @param global_config: the global configuration object.  Monitors can use or ignore this as necessary
         """
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
         self.monitor_name = monitor_config['module']
+
+        # save the global config
+        self._global_config = global_config
+
         # The MonitorConfig object created from the config for this monitor instance.
         self._config = MonitorConfig(monitor_config, monitor_module=self.monitor_name)
         log_path = self.monitor_name.split('.')[-1] + '.log'
@@ -135,7 +140,7 @@ class ScalyrMonitor(StoppableThread):
 
         StoppableThread.__init__(self, name='metric thread')
 
-    def _initialize(self):
+    def _initialize( self ):
         """Can be overridden by derived classes to perform initialization functions before the monitor is run.
 
         This is meant to allow derived monitors to perform some initialization and configuration validation
@@ -148,6 +153,8 @@ class ScalyrMonitor(StoppableThread):
 
         NOTE: This will be called everytime the agent script is run, including when *stopping* the agent.
         Therefore it is not the best place to do things like create sockets/open files etc.
+
+        @param global_config: the global configuration object.  Monitors can use or ignore this as necessary
         """
         pass
 

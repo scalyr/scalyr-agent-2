@@ -57,6 +57,9 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController, DefaultPaths
+
 log = scalyr_logging.getLogger('scalyr_agent.run_monitor')
 
 def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, monitor_sample_interval,
@@ -94,7 +97,11 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
         signal.signal(sig, handle_shutdown_signal)
 
     try:
-        monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path, float(monitor_sample_interval))
+        controller = PlatformController.new_platform()
+        paths = controller.default_paths
+        global_config = Configuration( paths.config_file_path, paths )
+        global_config.parse()
+        monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path, float(monitor_sample_interval), global_config )
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Constructed monitor')
         monitor.open_metric_log()
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting monitor')

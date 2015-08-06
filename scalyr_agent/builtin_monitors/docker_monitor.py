@@ -16,14 +16,17 @@
 
 __author__ = 'imron@imralsoftware.com'
 
+import datetime
 import logging
 import os
 import re
 import socket
 import stat
+import sys
 import time
 import threading
 from scalyr_agent import ScalyrMonitor, define_config_option
+import scalyr_agent.util as scalyr_util
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
@@ -33,8 +36,8 @@ from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
 
 from scalyr_agent.util import StoppableThread
-from scalyr_agent.util import RunState
 
+from scalyr_agent.util import RunState
 
 __monitor__ = __name__
 
@@ -57,6 +60,15 @@ define_config_option( __monitor__, 'api_socket',
 define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
                      convert_to=str, default='docker')
+
+define_config_option( __monitor__, 'max_previous_lines',
+                     'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
+                     'when starting to log a containers stdout/stderr.',
+                     convert_to=int, default=5000)
+
+define_config_option( __monitor__, 'log_timestamps',
+                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
+                     convert_to=bool, default=False)
 
 class DockerRequest( object ):
 
@@ -122,12 +134,22 @@ class DockerRequest( object ):
                         self.__headers.append( cur_line )
 
 class DockerLogger( object ):
-    def __init__( self, socket_file, cid, name, stream, log_path, max_log_size=20*1024*1024, max_log_rotations=2 ):
+    def __init__( self, socket_file, cid, name, stream, log_path, config, last_request=None, max_log_size=20*1024*1024, max_log_rotations=2 ):
         self.__socket_file = socket_file
         self.cid = cid
         self.name = name
         self.stream = stream
         self.log_path = log_path
+        self.stream_name = name + "-" + stream
+
+        self.__max_previous_lines = config.get( 'max_previous_lines' )
+        self.__log_timestamps = config.get( 'log_timestamps' )
+
+        self.__last_request_lock = threading.Lock()
+
+        self.__last_request = time.time()
+        if last_request:
+            self.__last_request = last_request
 
         self.__logger = logging.Logger( cid + '.' + stream )
 
@@ -145,15 +167,64 @@ class DockerLogger( object ):
     def stop( self, wait_on_join=True, join_timeout=5 ):
         self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
+    def last_request( self ):
+        self.__last_request_lock.acquire()
+        result = self.__last_request
+        self.__last_request_lock.release()
+        return result
+
     def process_request( self, run_state ):
         request = DockerRequest( self.__socket_file )
-        request.get( '/containers/%s/logs?%s=1&follow=1&tail=0' % (self.cid, self.stream) )
+        request.get( '/containers/%s/logs?%s=1&follow=1&tail=%d&timestamps=1' % (self.cid, self.stream, self.__max_previous_lines) )
+
+        epoch = datetime.datetime.utcfromtimestamp( 0 )
+
         while run_state.is_running():
             line = request.readline()
             while line:
-                self.__logger.info( line.strip() )
+                dt, log_line = self.split_datetime_from_line( line )
+                timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
+
+                #see if we log the entire line including timestamps
+                if self.__log_timestamps:
+                    log_line = line
+
+                #check to make sure timestamp is >= to the last request
+                #Note: we can safely read last_request here because we are the only writer
+                if timestamp >= self.__last_request:
+                    self.__logger.info( log_line.strip() )
+
+                    #but we need to lock for writing
+                    self.__last_request_lock.acquire()
+                    self.__last_request = timestamp
+                    self.__last_request_lock.release()
+
                 line = request.readline()
             time.sleep( 0.1 )
+
+        # we are shutting down, so update our last request to be slightly later than it's current
+        # value to prevent duplicate logs when starting up again.
+        self.__last_request_lock.acquire()
+
+        #can't be any smaller than 0.01 because the time value is only saved to 2 decimal places
+        #on disk
+        self.__last_request += 0.01
+
+        self.__last_request_lock.release()
+
+    def split_datetime_from_line( self, line ):
+        """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
+        being the timestamp.
+        """
+        log_line = line
+        dt = datetime.datetime.utcnow()
+        pos = line.find( ' ' )
+        if pos > 0:
+            dt = scalyr_util.rfc3339_to_datetime( line[0:pos] )
+            log_line = line[pos+1:]
+
+        return (dt, log_line)
+
 
         
 
@@ -251,8 +322,14 @@ class DockerMonitor( ScalyrMonitor ):
         return result
 
     def _initialize( self ):
+        data_path = ""
+        if self._global_config:
+            data_path = self._global_config.agent_data_path
+
+        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
 
         self.__socket_file = self.__get_socket_file()
+        self.__checkpoints = {}
         self.container_id = self.__get_scalyr_container_id( self.__socket_file )
         self.__log_watcher = None
 
@@ -265,7 +342,11 @@ class DockerMonitor( ScalyrMonitor ):
         cid = log['cid']
         name = self.containers[cid]
         stream = log['stream']
-        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'] )
+        stream_name = name + '-' + stream
+        last_request = time.time()
+        if stream_name in self.__checkpoints:
+            last_request = self.__checkpoints[stream_name]
+        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
         logger.start()
         return logger
 
@@ -290,7 +371,34 @@ class DockerMonitor( ScalyrMonitor ):
 
             self.docker_logs.extend( docker_logs )
 
+    def __load_checkpoints( self ):
+        try:
+            checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
+        except:
+            self._logger.info( "Error reading checkpoint file '%s'.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
+            checkpoints = {}
+
+        if checkpoints:
+            for name, last_request in checkpoints.iteritems():
+                self.__checkpoints[name] = last_request
+
+    def __update_checkpoints( self ):
+        """Update the checkpoints for when each docker logger logged a request, and save the checkpoints
+        to file.
+        """
+
+        for logger in self.docker_loggers:
+            last_request = logger.last_request()
+            self.__checkpoints[logger.stream_name] = last_request
+
+        # save to disk
+        if self.__checkpoints:
+            tmp_file = self.__checkpoint_file + '~'
+            scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
+
     def gather_sample( self ):
+        self.__update_checkpoints()
+
         running_containers = self.__get_running_containers( self.__socket_file )
 
         #get the containers that have started since the last sample
@@ -318,7 +426,9 @@ class DockerMonitor( ScalyrMonitor ):
         #start the new ones
         self.__start_loggers( starting )
 
+
     def run( self ):
+        self.__load_checkpoints()
         self.containers = self.__get_running_containers( self.__socket_file )
         self.docker_logs = self.__get_docker_logs( self.containers )
         self.docker_loggers = []
@@ -343,5 +453,5 @@ class DockerMonitor( ScalyrMonitor ):
             logger.stop( wait_on_join, join_timeout )
             self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
 
-
+        self.__update_checkpoints()
 

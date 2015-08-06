@@ -7,7 +7,7 @@ From the root of the scalyr-agent repository run:
 
 This will build a .deb package of the current source tree, create a new docker image based on Dockerfile.base and install the previously created .deb file.
 
-Dockerfile.base creates an image off docker’s default ubuntu image, installs python and other dependencies, installs the previously created scalyr-agent.deb and sets a non-forking scalyr-agent-2 as the default command for the image (scalyr-agent-2 needs to be non-forking so the container keeps running once it starts up otherwise docker will exit as soon as the entry point program exits).
+Dockerfile.base creates an image off docker’s default ubuntu image, installs python and other dependencies, installs the previously created scalyr-agent.deb and sets a non-forking, non-changing-user scalyr-agent-2 as the default command for the image (scalyr-agent-2 needs to be non-forking so the container keeps running once it starts up otherwise docker will exit as soon as the entry point program exits.  If you are sharing an agent.json config file between the host and the containers, you also need to pass in --no-change-user to prevent missing user errors).
 
 If needed, custom docker images can be created by making custom Dockerfiles and running the command
 
@@ -40,6 +40,11 @@ If you would like to log the stdout/stderr of other docker containers via the do
 
 You can also specify additional volumes on the command line, for example in case you want to make logs files from other containers available to the scalyr-agent container.  [See here](#log-volumes) for how to configure such volumes.
 
+##Data files
+
+If you wish to persist checkpoint information about already logged files and/or Docker logs, it is recommended that your scalyr data directory is also mapped from the host to the container e.g.
+`-v /path/to/persistent/data-dir:/var/lib/scalyr-agent-2`
+
 
 #Stopping the scalyr-agent container
 
@@ -59,11 +64,11 @@ Assuming you have previously stopped a container named 'scalyr-agent', you can r
 
 To check the status of a currently running scalyr-agent container, use the following command:
 
-	docker exec scalyr-agent scalyr-agent-2 status
+	docker exec scalyr-agent scalyr-agent-2 --no-change-user status
 
 or
 
-	docker exec scalyr-agent scalyr-agent-2 status -v
+	docker exec scalyr-agent scalyr-agent-2 --no-change-user status -v
 
 to get more verbose output
 
@@ -85,7 +90,7 @@ Then commit this changes to a new image:
 
 You can now run the scalyr agent as follows:
 
-	docker run -d --name scalyr-agent custom/scalyr-agent scalyr-agent-2 --no-fork start
+	docker run -d --name scalyr-agent custom/scalyr-agent scalyr-agent-2 --no-fork --no-change-user start
 
 Note, this method is less than ideal, because the image's default command gets overridden and so you need to specify the full command and arguments each time.
 

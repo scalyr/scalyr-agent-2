@@ -16,4 +16,4 @@ RUN cd /tmp/scalyr && \
     cd / && \
     rm -rf /tmp/scalyr
 #END RUN
-CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "start" ]
+CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start" ]

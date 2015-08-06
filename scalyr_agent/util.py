@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import division
+
 import sys
 import struct
 import thread
@@ -21,11 +23,13 @@ import thread
 __author__ = 'czerwin@scalyr.com'
 
 import base64
+import datetime
 import os
 import random
 import threading
 import time
 
+import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
@@ -71,6 +75,27 @@ def read_file_as_json(file_path):
         if f is not None:
             f.close()
 
+def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
+    """Write a dict to a JSON encoded file
+    The file is first completely written to tmp_path, and then renamed to file_path
+
+    @param: file_path: The final path of the file
+    @param: tmp_path: A temporary path to write the file to
+    @param: info: A dict containing the JSON object to write
+    """
+    fp = None
+    try:
+        fp = open(tmp_path, 'w')
+        fp.write(json_lib.serialize(info))
+        fp.close()
+        fp = None
+        if sys.platform == 'win32' and os.path.isfile(file_path):
+            os.unlink(file_path)
+        os.rename(tmp_path, file_path)
+    except (IOError, OSError):
+        if fp is not None:
+            fp.close()
+        log.exception('Could not write checkpoint file due to error', error_code='failedCheckpointWrite')
 
 def create_unique_id():
     """
@@ -116,6 +141,70 @@ def remove_newlines_and_truncate(input_string, char_limit):
     """
     return input_string.replace('\n', ' ').replace('\r', ' ')[0:char_limit]
 
+def microseconds_since_epoch( date_time, epoch=None ):
+    """Returns the number of microseconds since the specified date time and the epoch.
+
+    @param date_time: a datetime.datetime object.
+    @param epoch: the beginning of the epoch, if None defaults to Jan 1, 1970
+
+    @type date_time: datetime.datetime
+    @type epoch: datetime.datetime
+    """
+    if not epoch:
+        epoch = datetime.datetime.utcfromtimestamp( 0 )
+
+    delta = date_time - epoch
+
+    #86400 is 24 * 60 * 60 e.g. total seconds in a day
+    return (delta.microseconds + (delta.seconds + delta.days * 86400) * 10**6)
+
+def seconds_since_epoch( date_time, epoch=None ):
+    """Returns the number of seconds since the specified date time and the epoch.
+
+    @param date_time: a datetime.datetime object.
+    @param epoch: the beginning of the epoch, if None defaults to Jan 1, 1970
+
+    @type date_time: datetime.datetime
+    @type epoch: datetime.datetime
+
+    @rtype float
+    """
+    return microseconds_since_epoch( date_time ) / 10.0**6
+
+def rfc3339_to_datetime( string ):
+    """Returns a date time from a rfc3339 formatted timestamp.
+
+    We have to do some tricksy things to support python 2.4, which doesn't support
+    datetime.strptime or the fractional component %f in format strings
+
+    This doesn't do any complex testing and assumes the string is well formed
+    and in UTC (e.g. uses Z at the end rather than a time offset)
+
+    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
+
+    @rtype datetime.datetime
+    """
+    # split the string in to main time and fractional component
+    parts = string.split(".")
+
+    #create a datetime object
+    try:
+        tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
+    except ValueError, e:
+        return None
+
+    dt = datetime.datetime( *(tm[0:6]) )
+
+    #now add the fractional part
+    fractions = parts[1]
+    if not fractions.endswith( 'Z' ):
+        return None
+
+    fractions = fractions[:-1]
+    to_micros = 6 - len(fractions)
+    micro = int( int( fractions ) * 10**to_micros )
+
+    return dt.replace( microsecond=micro )
 
 def format_time(time_value):
     """Returns the time converted to a string in the common format used throughout the agent and in UTC.
@@ -141,7 +230,6 @@ def format_time(time_value):
         if result[8] == '0':
             result = '%s %s' % (result[:8], result[9:])
         return result
-
 
 def get_pid_tid():
     """Returns a string containing the current process and thread id in the format "(pid=%pid) (tid=%tid)".
@@ -554,7 +642,7 @@ class ScriptEscalator(object):
         self.__running_user = None
         self.__desired_user = None
 
-        if no_change_user:
+        if not no_change_user:
             self.__running_user = controller.get_current_user()
             self.__desired_user = controller.get_file_owner(config_file_path)
         self.__cwd = current_working_directory

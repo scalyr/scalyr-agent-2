@@ -594,20 +594,7 @@ class CopyingManager(StoppableThread, LogWatcher ):
         # We have had problems in the past with corrupted checkpoint files due to failures during the write.
         file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
         tmp_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json~')
-        fp = None
-        try:
-            fp = open(tmp_path, 'w')
-            fp.write(json_lib.serialize(state))
-            fp.close()
-            fp = None
-            if sys.platform == 'win32' and os.path.isfile(file_path):
-                os.unlink(file_path)
-            os.rename(tmp_path, file_path)
-        except (IOError, OSError):
-            if fp is not None:
-                fp.close()
-            log.exception('Could not write checkpoint file due to error %s' % scalyr_util.get_pid_tid(),
-                          error_code='failedCheckpointWrite')
+        scalyr_util.atomic_write_dict_as_json_file( file_path, tmp_path, state )
 
     def __get_next_add_events_task(self, bytes_allowed_to_send):
         """Returns a new AddEventsTask getting all of the pending bytes from the log files that need to be copied.
