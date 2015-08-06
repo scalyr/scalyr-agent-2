@@ -148,6 +148,10 @@ The docker_monitor module has a number of configuration options:
 
 * `docker_log_prefix` - a prefix added to the start of all log files created by the docker_monitor plugin.  Defaults to 'docker', so for a container named 'my-container', the plugin would create the log file docker-my-container-stdout.log
 
+* `max_previous_lines` - when starting to track the logs of a container, the maximum number of lines to search backwards to find the most recent output.  Defaults to 5000.
+
+* `log_timestamps` - whether or not to include the Docker timestamps in the logs.  Defaults to False.
+
 When running, the docker_monitor plugin will upload standard error and output of all running docker containers on the host.
 
 In order to have access to logs from other containers, the docker_monitor plugin requires a valid docker API socket.  You can provide this socket to the scalyr-agent container when you run it by adding an extra -v parameter to the run command `-v /run/docker.sock:/var/scalyr/docker.sock`
