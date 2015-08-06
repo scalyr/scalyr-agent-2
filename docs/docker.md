@@ -45,6 +45,9 @@ You can also specify additional volumes on the command line, for example in case
 If you wish to persist checkpoint information about already logged files and/or Docker logs, it is recommended that your scalyr data directory is also mapped from the host to the container e.g.
 `-v /path/to/persistent/data-dir:/var/lib/scalyr-agent-2`
 
+##Scalyr log directory
+
+To avoid writing files to the container’s filesystem, it is also recommended that you configure the scalyr logging directory to a location mapped on the host, e.g. by adding the parameter `-v /path/to/directory/on/host:/var/log/scalyr-agent-2` to the docker run command, or by setting up a [data volume container](https://docs.docker.com/userguide/dockervolumes/#creating-and-mounting-a-data-volume-container).
 
 #Stopping the scalyr-agent container
 
@@ -92,14 +95,14 @@ You can now run the scalyr agent as follows:
 
 	docker run -d --name scalyr-agent custom/scalyr-agent scalyr-agent-2 --no-fork --no-change-user start
 
-Note, this method is less than ideal, because the image's default command gets overridden and so you need to specify the full command and arguments each time.
+Note, this method is less than ideal, because the image’s default command gets overridden and so you need to specify the full command and arguments each time.
 
 An alternative method is to create a custom Dockerfile to copy your custom config file during the docker build process.
 
 # <a name="log-volumes"></a>Logging files from other containers
 
 
-In order to log files from other containers, you must share volumes containing those log files with the scalyr-agent container.  You can then configure the scalyr-agent's agent.json file as per normal to copy those files to the Scalyr servers.
+In order to log files from other containers, you must share volumes containing those log files with the scalyr-agent container.  You can then configure the scalyr-agent’s agent.json file as per normal to copy those files to the Scalyr servers.
 
 There are numerous ways to share volumes from other containers.  See the docker documentation on [managing data in containers](https://docs.docker.com/userguide/dockervolumes/)
 
