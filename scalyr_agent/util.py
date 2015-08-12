@@ -40,7 +40,6 @@ try:
 except ImportError:
     uuid = None
 
-
 def read_file_as_json(file_path):
     """Reads the entire file as a JSON value and return it.
 
@@ -81,17 +80,21 @@ def create_unique_id():
     if uuid is not None:
         # Here the uuid should be based on the mac of the machine.
         base_value = uuid.uuid1().bytes
+        method = 'a'
     else:
         # Otherwise, get as good of a 16 byte random number as we can and prefix it with
         # the current time.
         try:
             base_value = os.urandom(16)
+            method = 'b'
         except NotImplementedError:
             base_value = ''
             for i in range(16):
                 base_value += random.randrange(256)
+            method = 'c'
         base_value = str(time.time()) + base_value
-    return base64.urlsafe_b64encode(sha1(base_value).digest())
+    result = base64.urlsafe_b64encode(sha1(base_value).digest()) + method
+    return result
 
 
 def remove_newlines_and_truncate(input_string, char_limit):

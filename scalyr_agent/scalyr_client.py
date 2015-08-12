@@ -96,6 +96,9 @@ class ScalyrClientSession(object):
         self.__connection = None
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
+        if not quiet:
+            log.info('Using session_id=%s' % self.__session_id)
+
         # The time of the last success.
         self.__last_success = None
         # The version number of the installed agent
