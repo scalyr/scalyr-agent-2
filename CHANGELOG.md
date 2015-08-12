@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.13 "Moonstruck Monkey" - August 14, 2015
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 14, 2015 15:30 -0700
+--->
+
+Note, this release is still under development so the feature set and release date are TBD.
+
+Bug fixes:
+
+* Added some extra diagnostic information to help investigate some customer issues
+
 ## 2.0.12 "Loopy Lama" - August 5, 2015
 
 <!---
