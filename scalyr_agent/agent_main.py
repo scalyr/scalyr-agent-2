@@ -651,7 +651,9 @@ class ScalyrAgent(object):
                 log.info('Starting scalyr agent... (version=%s) %s' % (SCALYR_VERSION, scalyr_util.get_pid_tid()))
                 log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting scalyr agent... (version=%s) %s' % (
                     SCALYR_VERSION, scalyr_util.get_pid_tid()))
-
+                if self.__config.debug_init:
+                    self.__controller.emit_init_debug(log)
+                
                 self.__start_or_stop_unsafe_debugging()
 
                 self.__scalyr_client = self.__create_client()
