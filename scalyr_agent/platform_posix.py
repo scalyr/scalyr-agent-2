@@ -28,6 +28,7 @@ import signal
 
 from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
+import scalyr_agent.util as scalyr_util
 
 from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
 
@@ -63,6 +64,10 @@ class PosixPlatformController(PlatformController):
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
         self.__no_change_user = False
+        # A list of log lines collected for debugging the initialization sequence.
+        self.__init_debug_lines = []
+        self.__is_initializing = True
+
         PlatformController.__init__(self)
 
     def can_handle_current_platform(self):
@@ -147,6 +152,21 @@ class PosixPlatformController(PlatformController):
                                 os.path.join(base_dir, 'config', 'agent.json'),
                                 os.path.join(base_dir, 'data'))
 
+    def emit_init_debug(self, logger):
+        """Writes any debug information the controller has collected about the initialization of the agent_service
+        to the provided logger.
+
+        This is required because the initialization sequence occurs before the agent log is set up to write to
+        a file instead of standard out.  Using this, we can collect the information and then output it once the
+        logger is set up.
+
+        @param logger: The logger to use to write the debug information.
+        @type logger: Logger
+        """
+        for line in self.__init_debug_lines:
+            logger.info('     %s' % line)
+        return
+
     def __daemonize(self):
         """Fork off a background thread for execution.  If this method returns True, it is the new process, otherwise
         it is the original process.
@@ -161,6 +181,8 @@ class PosixPlatformController(PlatformController):
         # such weird details as making sure it can never be the session leader for the old process.
 
         # Do the first fork.
+        original_pid = os.getpid()
+        self._log_init_debug('Forking service %s' % scalyr_util.get_pid_tid())
         try:
             pid = os.fork()
             if pid > 0:
@@ -169,6 +191,8 @@ class PosixPlatformController(PlatformController):
         except OSError, e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
+
+        self._log_init_debug('Second fork (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
 
         # decouple from parent environment
         os.chdir("/")
@@ -185,6 +209,8 @@ class PosixPlatformController(PlatformController):
         except OSError, e:
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
+
+        self._log_init_debug('Finished forking (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
 
         # redirect standard file descriptors
         sys.stdout.flush()
@@ -207,8 +233,10 @@ class PosixPlatformController(PlatformController):
             # to write more unique information about the running process to help avoid pid collison.
             if self.__can_read_command_line(pid):
                 fp.write('%d %s\n' % (pid, self.__read_command_line(pid)))
+                self._log_init_debug('Wrote pidfile+ (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
             else:
                 fp.write('%d\n' % pid)
+                self._log_init_debug('Wrote pidfile (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
         finally:
             if fp is not None:
                 fp.close()
@@ -233,6 +261,7 @@ class PosixPlatformController(PlatformController):
             contents = pf.read().strip().split()
             pf.close()
         except IOError:
+            self._log_init_debug('Checked pidfile: does not exist %s' % scalyr_util.get_pid_tid())
             return None
 
         pid = int(contents[0])
@@ -241,6 +270,7 @@ class PosixPlatformController(PlatformController):
         except OSError, e:
             # ESRCH indicates the process is not running, in which case we ignore the pidfile.
             if e.errno == errno.ESRCH:
+                self._log_init_debug('Checked pidfile: target pid (%d) missing %s' % (pid, scalyr_util.get_pid_tid()))
                 return None
             # EPERM indicates the current user does not have permission to signal the process.. so it exists
             # but may not be the agent process.  We will just try our /proc/pid/commandline trick below if we can.
@@ -251,16 +281,20 @@ class PosixPlatformController(PlatformController):
         # original agent process.  For Linux systems with /proc, we see if the commandlines match up.
         # For all other Posix systems, (Mac OS X, etc) we bail for now.
         if not self.__can_read_command_line(pid):
+            self._log_init_debug('Checked pidfile: target pid (%d) exists %s' % (pid, scalyr_util.get_pid_tid()))
             return pid
 
         # Handle the case that we have an old pid file that didn't have the commandline right into it.
         if len(contents) == 1:
+            self._log_init_debug('Checked pidfile: target pid (%d) exists- %s' % (pid, scalyr_util.get_pid_tid()))
             return pid
 
         command_line = self.__read_command_line(pid)
         if contents[1] == command_line:
+            self._log_init_debug('Checked pidfile: target pid (%d) exists+ %s' % (pid, scalyr_util.get_pid_tid()))
             return pid
         else:
+            self._log_init_debug('Checked pidfile: target pid (%d) missing+ %s' % (pid, scalyr_util.get_pid_tid()))
             return None
 
     def __can_read_command_line(self, pid):
@@ -289,6 +323,19 @@ class PosixPlatformController(PlatformController):
         finally:
             if pf is not None:
                 pf.close()
+
+    def _log_init_debug(self, line):
+        """If we are still in the initialization phase (i.e., we have not started the agent service), then append
+        the specified line to the list that will be written out in the ``emit_init_debug`` method.
+
+        @param line: The line containing debug information.
+        @type line: str
+        """
+        if self.__is_initializing:
+            current_time = time.time()
+            time_str = '%s.%03dZ' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(current_time)),
+                                     int(current_time % 1 * 1000))
+            self.__init_debug_lines.append('%s   (%s)' % (line, time_str))
 
     def get_file_owner(self, file_path):
         """Returns the user name of the owner of the specified file.
@@ -388,6 +435,7 @@ class PosixPlatformController(PlatformController):
         @raise AgentAlreadyRunning
         @raise AgentNotRunning
         """
+        self._log_init_debug('Checking if agent is running %s' % scalyr_util.get_pid_tid())
         pid = self.__read_pidfile()
 
         if fail_if_running and pid is not None:
@@ -404,6 +452,8 @@ class PosixPlatformController(PlatformController):
 
         This method will invoke the agent_run_method that was passed in when initializing this object.
         """
+        self._log_init_debug('Starting agent %s' % scalyr_util.get_pid_tid())
+        
         # noinspection PyUnusedLocal
         def handle_terminate(signal_num, frame):
             if self.__termination_handler is not None:
@@ -426,6 +476,7 @@ class PosixPlatformController(PlatformController):
         original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
 
         try:
+            self.__is_initializing = False
             result = agent_run_method(self)
 
             if result is not None:
