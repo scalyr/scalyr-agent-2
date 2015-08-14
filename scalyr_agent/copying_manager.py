@@ -556,7 +556,8 @@ class CopyingManager(StoppableThread):
         except (IOError, OSError):
             if fp is not None:
                 fp.close()
-            log.exception('Could not write checkpoint file due to error', error_code='failedCheckpointWrite')
+            log.exception('Could not write checkpoint file due to error %s' % scalyr_util.get_pid_tid(),
+                          error_code='failedCheckpointWrite')
 
     def __get_next_add_events_task(self, bytes_allowed_to_send):
         """Returns a new AddEventsTask getting all of the pending bytes from the log files that need to be copied.
