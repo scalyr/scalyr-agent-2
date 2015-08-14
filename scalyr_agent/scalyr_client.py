@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import os
+import thread
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -97,7 +99,8 @@ class ScalyrClientSession(object):
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
         if not quiet:
-            log.info('Using session_id=%s' % self.__session_id)
+            log.info('Using session_id=%s pid=%s tid=%s' % (self.__session_id, str(os.getpid()),
+                                                            str(thread.get_ident())))
 
         # The time of the last success.
         self.__last_success = None
