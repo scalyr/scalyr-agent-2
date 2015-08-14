@@ -16,6 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 import sys
 import struct
+import thread
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -140,6 +141,18 @@ def format_time(time_value):
         if result[8] == '0':
             result = '%s %s' % (result[:8], result[9:])
         return result
+
+
+def get_pid_tid():
+    """Returns a string containing the current process and thread id in the format "(pid=%pid) (tid=%tid)".
+    @return: The string containing the process and thread id.
+    @rtype: str
+    """
+    # noinspection PyBroadException
+    try:
+        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(thread.get_ident()))
+    except:
+        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
 
 class JsonReadFileException(Exception):

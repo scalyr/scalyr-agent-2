@@ -36,7 +36,6 @@ __author__ = 'czerwin@scalyr.com'
 import errno
 import os
 import sys
-import thread
 import time
 
 from __scalyr__ import SCALYR_VERSION, scalyr_init
@@ -649,10 +648,9 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
-                log.info('Starting scalyr agent... (version=%s) (pid=%s) (tid=%s)' % (SCALYR_VERSION, str(os.getpid()),
-                                                                                      str(thread.get_ident())))
-                log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting scalyr agent... (version=%s) (pid=%s) (tid=%s)' % (
-                    SCALYR_VERSION, str(os.getpid()), str(thread.get_ident())))
+                log.info('Starting scalyr agent... (version=%s) %s' % (SCALYR_VERSION, scalyr_util.get_pid_tid()))
+                log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting scalyr agent... (version=%s) %s' % (
+                    SCALYR_VERSION, scalyr_util.get_pid_tid()))
 
                 self.__start_or_stop_unsafe_debugging()
 
