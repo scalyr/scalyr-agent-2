@@ -163,8 +163,26 @@ class PosixPlatformController(PlatformController):
         @param logger: The logger to use to write the debug information.
         @type logger: Logger
         """
+        logger.info('Emitting log lines saved during initialization: %s' % scalyr_util.get_pid_tid())
         for line in self.__init_debug_lines:
             logger.info('     %s' % line)
+
+        logger.info('Parent pids:')
+        current_child = os.getpid()
+        current_parent = self.__get_ppid(os.getpid())
+
+        remaining_parents = 10
+        while current_parent is not None and remaining_parents > 0:
+            if self.__can_read_command_line(current_parent):
+                logger.info('    ppid=%d cmd=%s parent_of=%d' % (current_parent,
+                                                                 self.__read_command_line(current_parent),
+                                                                 current_child))
+            else:
+                logger.info('    ppid=%d cmd=Unknown parent_of=%d' % (current_parent, current_child))
+            current_child = current_parent
+            current_parent = self.__get_ppid(current_parent)
+            remaining_parents -= 1
+
         return
 
     def __daemonize(self):
@@ -295,6 +313,33 @@ class PosixPlatformController(PlatformController):
             return pid
         else:
             self._log_init_debug('Checked pidfile: target pid (%d) missing+ %s' % (pid, scalyr_util.get_pid_tid()))
+            return None
+
+    def __get_ppid(self, pid):
+        """Returns the pid of the parent process for pid.  If there is no parent or it cannot be determined, None.
+        @param pid:  The id of the process whose parent should be found.
+        @type pid: int
+
+        @return: The parent process id, or None if there is none.
+        @rtype: int|None
+        """
+        if os.path.isfile('/proc/%d/stat' % pid):
+            pf = None
+            try:
+                # noinspection PyBroadException
+                try:
+                    pf = file('/proc/%d/stat' % pid, 'r')
+                    ppid = int(pf.read().split()[3])
+                    if ppid == 0:
+                        return None
+                    else:
+                        return ppid
+                except:
+                    return None
+            finally:
+                if pf is not None:
+                    pf.close()
+        else:
             return None
 
     def __can_read_command_line(self, pid):
@@ -453,7 +498,7 @@ class PosixPlatformController(PlatformController):
         This method will invoke the agent_run_method that was passed in when initializing this object.
         """
         self._log_init_debug('Starting agent %s' % scalyr_util.get_pid_tid())
-        
+
         # noinspection PyUnusedLocal
         def handle_terminate(signal_num, frame):
             if self.__termination_handler is not None:
