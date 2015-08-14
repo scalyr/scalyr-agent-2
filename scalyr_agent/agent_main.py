@@ -653,7 +653,7 @@ class ScalyrAgent(object):
                     SCALYR_VERSION, scalyr_util.get_pid_tid()))
                 if self.__config.debug_init:
                     self.__controller.emit_init_debug(log)
-                
+
                 self.__start_or_stop_unsafe_debugging()
 
                 self.__scalyr_client = self.__create_client()
@@ -924,13 +924,19 @@ class ScalyrAgent(object):
         @type overall_stats: OverallStats
         """
         stats = overall_stats
+        # Ok, this is cheating, but we are going to hide some debug information in this line when it is turned on.
+        if self.__config.debug_init:
+            extra = ' is_agent=%d' % self.__controller.is_agent()
+        else:
+            extra = ''
+
         log.info('agent_requests requests_sent=%ld requests_failed=%ld bytes_sent=%ld bytes_received=%ld '
-                 'request_latency_secs=%lf connections_created=%ld ' % (stats.total_requests_sent,
-                                                                        stats.total_requests_failed,
-                                                                        stats.total_request_bytes_sent,
-                                                                        stats.total_response_bytes_received,
-                                                                        stats.total_request_latency_secs,
-                                                                        stats.total_connections_created))
+                 'request_latency_secs=%lf connections_created=%ld%s' % (stats.total_requests_sent,
+                                                                         stats.total_requests_failed,
+                                                                         stats.total_request_bytes_sent,
+                                                                         stats.total_response_bytes_received,
+                                                                         stats.total_request_latency_secs,
+                                                                         stats.total_connections_created, extra))
 
     def __calculate_overall_stats(self, base_overall_stats):
         """Return a newly calculated overall stats for the agent.

@@ -461,6 +461,27 @@ class PosixPlatformController(PlatformController):
         print >>sys.stderr, ('Running as %s' % user_name)
         return os.execvp("sudo", arguments)
 
+    def is_agent(self):
+        """Checks to see if this current process is the official agent service.
+
+        A result of zero, indicates this process is the official agent service.  All other values are platform
+        specific codes indicating how it decided this process was not the agent service.
+
+        @return: Zero if it is the current process, otherwise a platform specific code.
+        @rtype: int
+        """
+        agent_pid = self.__read_pidfile()
+        if agent_pid is not None:
+            if agent_pid == os.getpid():
+                return 0
+            else:
+                return agent_pid
+
+        if os.path.isfile(self.__pidfile):
+            return -1
+        else:
+            return -2
+
     def is_agent_running(self, fail_if_running=False, fail_if_not_running=False):
         """Returns true if the agent service is running, as determined by the pidfile.
 

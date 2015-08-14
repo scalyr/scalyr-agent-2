@@ -252,6 +252,17 @@ class PlatformController:
         @raise AgentNotRunning
         """
 
+    def is_agent(self):
+        """Checks to see if this current process is the official agent service.
+
+        A result of zero, indicates this process is the official agent service.  All other values are platform
+        specific codes indicating how it decided this process was not the agent service.
+
+        @return: Zero if it is the current process, otherwise a platform specific code.
+        @rtype: int
+        """
+        return 0
+
     def start_agent_service(self, agent_run_method, quiet):
         """Start the agent service using the platform-specific method.
 
