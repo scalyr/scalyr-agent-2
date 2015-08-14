@@ -83,6 +83,7 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
+        self.assertFalse(config.debug_init)
 
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
@@ -140,6 +141,7 @@ class TestConfiguration(ScalyrTestCase):
             read_page_size: 3072,
             copy_staleness_threshold: 240,
             log_deletion_delay: 300,
+            debug_init: true,
 
 
             logs: [ { path: "/var/log/tomcat6/access.log"} ]
@@ -185,6 +187,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.request_deadline, 30.0)
         self.assertPathEquals(config.ca_cert_path, '/var/lib/foo.pem')
         self.assertFalse(config.verify_server_certificate)
+        self.assertTrue(config.debug_init)
 
     def test_missing_api_key(self):
         self.__write_file_with_separator_conversion(""" {

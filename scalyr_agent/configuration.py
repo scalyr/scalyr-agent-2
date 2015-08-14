@@ -411,6 +411,11 @@ class Configuration(object):
         return self.__get_config().get_float('copy_staleness_threshold')
 
     @property
+    def debug_init(self):
+        """Returns the configuration value for 'debug_init'."""
+        return self.__get_config().get_bool('debug_init')
+
+    @property
     def verify_server_certificate(self):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
@@ -607,6 +612,8 @@ class Configuration(object):
         # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the
         # freshest bytes.
         self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description)
+
+        self.__verify_or_set_optional_bool(config, 'debug_init', False, description)
 
         self.__verify_or_set_optional_int(config, 'debug_level', 0, description)
         debug_level = config.get_int('debug_level')
