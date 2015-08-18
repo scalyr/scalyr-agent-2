@@ -1114,8 +1114,15 @@ class LogFileProcessor(object):
         self.__last_scan_time = None
 
         self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
-        self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
-        self.__max_existing_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
+
+        # if we don't have a checkpoint or if the checkpoint doesn't contain pending files
+        # then we assume this is a new file and we only go back at most max_log_offset_size bytes
+        if checkpoint is None or 'pending_files' not in checkpoint:
+            self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
+        else:
+            # otherwise this is an existing file so we can go back at most
+            # max_existing_log_offset_size bytes
+            self.__max_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
 
         self.__last_success = None
 
