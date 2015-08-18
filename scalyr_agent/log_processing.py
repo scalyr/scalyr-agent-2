@@ -58,13 +58,6 @@ MAX_LINE_SIZE = 5 * 1024
 # all the way to disk yet.  After this time though, we will just return the bytes as a line.
 LINE_COMPLETION_WAIT_TIME = 5 * 60
 
-# The maximum negative offset relative to the end of a log the log file
-# iterator is allowed to become.  If bytes are not being read quickly enough, then
-# the iterator will automatically advance so that it is no more than this length
-# to the end of the file.  This is essentially the maximum bytes a log file
-# is allowed to be caught up when used in copying logs to Scalyr.
-MAX_LOG_OFFSET_SIZE = 5 * 1024 * 1024
-
 # The number of bytes to read from a file at a time into the buffer.  This must
 # always be greater than the MAX_LINE_SIZE
 READ_PAGE_SIZE = 64 * 1024
@@ -1115,6 +1108,8 @@ class LogFileProcessor(object):
 
         self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
 
+        self.__max_existing_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
+
         # if we don't have a checkpoint or if the checkpoint doesn't contain pending files
         # then we assume this is a new file and we only go back at most max_log_offset_size bytes
         if checkpoint is None or 'pending_files' not in checkpoint:
@@ -1122,7 +1117,7 @@ class LogFileProcessor(object):
         else:
             # otherwise this is an existing file so we can go back at most
             # max_existing_log_offset_size bytes
-            self.__max_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
+            self.__max_log_offset_size = self.__max_existing_log_offset_size
 
         self.__last_success = None
 
@@ -1300,6 +1295,10 @@ class LogFileProcessor(object):
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
             # do some clean up work until the next time we need it.
             self.__log_file_iterator.prepare_for_inactivity()
+
+            # If we get here on what was a new file, then the file is now an existing file, so set the maximum log
+            # offset size to use the size for existing files
+            self.__max_log_offset_size = self.__max_existing_log_offset_size
 
             # Define the callback to return.
             def completion_callback(result):
