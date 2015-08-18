@@ -76,6 +76,7 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.max_line_size, 3400)
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
+        self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
         self.assertEquals(config.line_completion_wait_time, 5 * 60)
         self.assertEquals(config.read_page_size, 64 * 1024)
         self.assertEquals(config.copy_staleness_threshold, 15 * 60)
@@ -137,6 +138,7 @@ class TestConfiguration(ScalyrTestCase):
 
             max_line_size: 1024,
             max_log_offset_size: 1048576,
+            max_existing_log_offset_size: 2097152,
             line_completion_wait_time: 120,
             read_page_size: 3072,
             copy_staleness_threshold: 240,
@@ -176,6 +178,7 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.max_line_size, 1 * 1024)
         self.assertEquals(config.max_log_offset_size, 1 * 1024 * 1024)
+        self.assertEquals(config.max_existing_log_offset_size, 2 * 1024 * 1024)
         self.assertEquals(config.line_completion_wait_time, 2 * 60)
         self.assertEquals(config.read_page_size, 3 * 1024)
         self.assertEquals(config.copy_staleness_threshold, 4 * 60)

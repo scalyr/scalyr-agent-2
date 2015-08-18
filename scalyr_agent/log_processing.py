@@ -1115,6 +1115,7 @@ class LogFileProcessor(object):
 
         self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
         self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
+        self.__max_existing_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
 
         self.__last_success = None
 

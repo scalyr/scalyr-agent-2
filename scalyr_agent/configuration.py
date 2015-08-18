@@ -396,6 +396,11 @@ class Configuration(object):
         return self.__get_config().get_int('max_log_offset_size')
 
     @property
+    def max_existing_log_offset_size(self):
+        """Returns the configuration value for 'max_existing_log_offset_size'."""
+        return self.__get_config().get_int('max_existing_log_offset_size')
+
+    @property
     def read_page_size(self):
         """Returns the configuration value for 'read_page_size'."""
         return self.__get_config().get_int('read_page_size')
@@ -593,12 +598,19 @@ class Configuration(object):
         # made it all the way to disk yet.  After this time though, we will just return the bytes as a line
         self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5 * 60, description)
 
-        # The maximum negative offset relative to the end of a log the log file
+        # The maximum negative offset relative to the end of a previously unseen log the log file
         # iterator is allowed to become.  If bytes are not being read quickly enough, then
         # the iterator will automatically advance so that it is no more than this length
-        # to the end of the file.  This is essentially the maximum bytes a log file
+        # to the end of the file.  This is essentially the maximum bytes a new log file
         # is allowed to be caught up when used in copying logs to Scalyr.
         self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description)
+
+        # The maximum negative offset relative to the end of an existing log the log file
+        # iterator is allowed to become.  If bytes are not being read quickly enough, then
+        # the iterator will automatically advance so that it is no more than this length
+        # to the end of the file.  This is essentially the maximum bytes an existing log file
+        # is allowed to be caught up when used in copying logs to Scalyr.
+        self.__verify_or_set_optional_int(config, 'max_existing_log_offset_size', 100 * 1024 * 1024, description)
 
         # The number of bytes to read from a file at a time into the buffer.  This must
         # always be greater than the MAX_LINE_SIZE
