@@ -396,6 +396,11 @@ class Configuration(object):
         return self.__get_config().get_int('max_log_offset_size')
 
     @property
+    def max_sequence_number(self):
+        """Returns the maximum sequence number"""
+        return self.__get_config().get_int('max_sequence_number')
+
+    @property
     def read_page_size(self):
         """Returns the configuration value for 'read_page_size'."""
         return self.__get_config().get_int('read_page_size')
@@ -599,6 +604,13 @@ class Configuration(object):
         # to the end of the file.  This is essentially the maximum bytes a log file
         # is allowed to be caught up when used in copying logs to Scalyr.
         self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description)
+
+        # The maximum sequence number for a given sequence
+        # The sequence number is typically the total number of bytes read from a given file
+        # (across restarts and log rotations), and it resets to zero (and begins a new sequence)
+        # for each file once the current sequence_number exceeds this value
+        # defaults to 1 TB
+        self.__verify_or_set_optional_int( config, 'max_sequence_number', 1024**4, description )
 
         # The number of bytes to read from a file at a time into the buffer.  This must
         # always be greater than the MAX_LINE_SIZE
