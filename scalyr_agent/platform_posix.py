@@ -196,7 +196,7 @@ class PosixPlatformController(PlatformController):
                 remaining_parents -= 1
         return
 
-    def __write_pidfile(self):
+    def __write_pidfile(self, original_pid ):
         """Writes the process's pid to a file"""
         atexit.register(self.__delpid)
         pid = os.getpid()
@@ -532,11 +532,12 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
+        original_pid = os.getpid()
         if fork and not self.__daemonize():
             return
 
         # write pidfile
-        self.__write_pidfile()
+        self.__write_pidfile( original_pid )
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
