@@ -387,7 +387,7 @@ class DockerMonitor( ScalyrMonitor ):
         if stopping:
             for logger in self.docker_loggers:
                 if logger.cid in stopping:
-                    logger.stop( False, None )
+                    logger.stop( wait_on_join=True, join_timeout=1 )
                     if self.__log_watcher:
                         self.__log_watcher.remove_log_path( self, logger.log_path )
 
