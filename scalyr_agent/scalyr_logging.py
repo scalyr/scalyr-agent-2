@@ -895,8 +895,15 @@ class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
     This helps reduce the disk requests for high syslog traffic.
     """
     def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0, flushDelay=0.0):
-        logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
-                                                      backupCount=backupCount, encoding=encoding, delay=delay)
+        # We handle delay specially because it is not a valid option for the Python 2.4 logging libraries, so we
+        # really only pass it if the caller is really trying to set it to something other than the default.
+        if delay != 0:
+            logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                          backupCount=backupCount, encoding=encoding, delay=delay)
+        else:
+            logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                          backupCount=backupCount, encoding=encoding)
+
         self.__flushDelay = flushDelay
         # If this is not None, then it is set to a timer that when it expires will flush the log handler.
         # You must hold the I/O lock in order to set/manipulate this variable.
@@ -928,8 +935,16 @@ class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
                 self.release()
 
     def close(self):
+        if self.__flushDelay > 0:
+            self.acquire()
+            self.__flushDelay = 0
+            try:
+                if self.__timer is not None:
+                    self.__timer.cancel()
+                    self.__timer = None
+            finally:
+                self.release()
         logging.handlers.RotatingFileHandler.close(self)
-        self._internal_flush()
 
     def _internal_flush(self):
         logging.handlers.RotatingFileHandler.flush(self)
