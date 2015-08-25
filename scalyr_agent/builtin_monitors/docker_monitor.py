@@ -22,6 +22,7 @@ import os
 import re
 import socket
 import stat
+import struct
 import sys
 import time
 import threading
@@ -86,13 +87,13 @@ class DockerRequest( object ):
         return self
 
     def response_body( self ):
-        
+
         result = ""
         while not self.__request_stream.at_end():
             line = self.__request_stream.read_request()
             if line != None:
                 result += line
-            
+
         return result
 
     def readline( self ):
@@ -103,7 +104,7 @@ class DockerRequest( object ):
             return None
 
         return self.__request_stream.read_request()
-        
+
     def __read_headers( self ):
         """reads HTTP headers from the request stream, leaving the stream at the first line of data"""
         self.response_code = 400
@@ -182,6 +183,7 @@ class DockerLogger( object ):
         while run_state.is_running():
             line = request.readline()
             while line:
+                line = self.strip_docker_header( line )
                 dt, log_line = self.split_datetime_from_line( line )
                 timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
 
@@ -212,6 +214,37 @@ class DockerLogger( object ):
 
         self.__last_request_lock.release()
 
+    def strip_docker_header( self, line ):
+        """Docker prepends some lines with an 8 byte header.  The first 4 bytes a byte containg the stream id
+        0, 1 or 2 for stdin, stdout and stderr respectively, followed by 3 bytes of padding.
+
+        The next 4 bytes contain the size of the message.
+
+        This function checks for the existence of the the 8 byte header and if the length field matches the remaining
+        length of the line then it strips the first 8 bytes.
+
+        If the lengths don't match or if an expected stream type is not found then the line is left alone
+        """
+
+        # the docker header has a stream id, which is a single byte, followed by 3 bytes of padding
+        # and then a 4-byte int in big-endian (network) order
+        fmt = '>B3xI'
+        size = struct.calcsize( fmt )
+
+        # make sure the length of the line has as least as many bytes required by the header
+        if len( line ) >= size:
+            stream, length = struct.unpack( fmt, line[0:size] )
+
+            # We expect a value of 0, 1 or 2 for stream.  Anything else indicates we don't have
+            # a docker header
+            # We also expect length to be the length of the remaining line
+            if stream in [ 0, 1, 2 ] and len( line[size:] ) == length:
+                #We have a valid docker header, so strip it
+                line = line[size:]
+
+        return line
+
+
     def split_datetime_from_line( self, line ):
         """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
         being the timestamp.
@@ -226,7 +259,7 @@ class DockerLogger( object ):
         return (dt, log_line)
 
 
-        
+
 
 class DockerMonitor( ScalyrMonitor ):
     """Monitor plugin for docker containers
@@ -292,7 +325,7 @@ class DockerMonitor( ScalyrMonitor ):
         return result
 
     def __create_log_config( self, parser, path, attributes ):
-        
+
         return { 'parser': parser,
                  'path': path,
                  'attributes': attributes
@@ -441,7 +474,7 @@ class DockerMonitor( ScalyrMonitor ):
 
         self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
         ScalyrMonitor.run( self )
-        
+
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
