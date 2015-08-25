@@ -29,6 +29,7 @@ import threading
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.json_lib as json_lib
+import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.log_watcher import LogWatcher
@@ -39,6 +40,8 @@ from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.util import StoppableThread
 
 from scalyr_agent.util import RunState
+
+log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
@@ -185,21 +188,24 @@ class DockerLogger( object ):
             while line:
                 line = self.strip_docker_header( line )
                 dt, log_line = self.split_datetime_from_line( line )
-                timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
+                if not dt:
+                    log.error( 'No timestamp found on line: \'%s\'', line )
+                else:
+                    timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
 
-                #see if we log the entire line including timestamps
-                if self.__log_timestamps:
-                    log_line = line
+                    #see if we log the entire line including timestamps
+                    if self.__log_timestamps:
+                        log_line = line
 
-                #check to make sure timestamp is >= to the last request
-                #Note: we can safely read last_request here because we are the only writer
-                if timestamp >= self.__last_request:
-                    self.__logger.info( log_line.strip() )
+                    #check to make sure timestamp is >= to the last request
+                    #Note: we can safely read last_request here because we are the only writer
+                    if timestamp >= self.__last_request:
+                        self.__logger.info( log_line.strip() )
 
-                    #but we need to lock for writing
-                    self.__last_request_lock.acquire()
-                    self.__last_request = timestamp
-                    self.__last_request_lock.release()
+                        #but we need to lock for writing
+                        self.__last_request_lock.acquire()
+                        self.__last_request = timestamp
+                        self.__last_request_lock.release()
 
                 line = request.readline()
             time.sleep( 0.1 )
