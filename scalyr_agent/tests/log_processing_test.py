@@ -24,6 +24,7 @@ import unittest
 import sys
 import pdb
 
+from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
 from scalyr_agent.log_processing import FileSystem
@@ -200,27 +201,38 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L03\n',
                          'L04\n')
+        _, first_sequence_number = self.log_file.get_sequence()
+
         self.mark()
 
         self.assertEquals(self.readline(), 'L03\n')
         self.assertEquals(self.readline(), 'L04\n')
         self.assertEquals(self.readline(), '')
 
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
+
     def test_deleted_file(self):
         # Since it cannot keep file handles open when they are deleted, win32 cannot handle this case:
         if sys.platform == 'win32':
             return
 
+        _, first_sequence_number = self.log_file.get_sequence()
+
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
         self.delete_file(self.__path)
+
         self.mark()
 
         self.assertEquals(self.readline(), 'L001\n')
         self.assertEquals(self.readline(), 'L002\n')
         self.assertEquals(self.readline(), '')
         self.assertFalse(self.log_file.at_end)
+
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
 
         self.mark(time_advance=60*11)
         self.assertTrue(self.log_file.at_end)
@@ -255,6 +267,8 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), 'L002\n')
         self.assertEquals(self.readline(), '')
 
+        _, first_sequence_number = self.log_file.get_sequence()
+
         self.truncate_file(self.__path)
         self.append_file(self.__path,
                          'L003\n')
@@ -262,6 +276,9 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L003\n')
         self.assertEquals(self.readline(), '')
+        
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
 
     def test_rotating_log_file_with_move(self):
         # Since it cannot keep file handles open when they are deleted/moved, win32 cannot handle this case:
@@ -274,6 +291,8 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), 'L001\n')
         self.assertEquals(self.readline(), '')
 
+        _, first_sequence_number = self.log_file.get_sequence()
+
         self.append_file(self.__path,
                          'L002\n',
                          'L003\n')
@@ -284,8 +303,20 @@ class TestLogFileIterator(ScalyrTestCase):
         self.mark()
 
         self.assertEquals(self.readline(), 'L002\n')
+
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
+
+        _, first_sequence_number = self.log_file.get_sequence()
         self.assertEquals(self.readline(), 'L003\n')
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
+
+        _, first_sequence_number = self.log_file.get_sequence()
         self.assertEquals(self.readline(), 'L004\n')
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number > first_sequence_number )
+
         self.assertEquals(self.readline(), 'L005\n')
         self.assertEquals(self.readline(), '')
 
@@ -362,8 +393,11 @@ class TestLogFileIterator(ScalyrTestCase):
 
         # Read through massively rotated file and verify all of the parts are there.
         self.assertEquals(self.readline(), 'L001\n')
+
         self.assertEquals(self.readline(), 'L002\n')
         self.assertEquals(self.readline(), 'L003\n')
+        _, first_sequence_number = self.log_file.get_sequence()
+
         self.assertEquals(self.readline(), 'L004\n')
         self.assertEquals(self.readline(), 'L005\n')
         hole_position = self.log_file.tell()
@@ -381,6 +415,9 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.seek(original_position)
 
         self.assertEquals(self.readline(), 'L003\n')
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number == first_sequence_number )
+
         self.assertEquals(self.readline(), 'L004\n')
         self.assertEquals(self.readline(), 'L007\n')
         self.assertEquals(self.readline(), '')
@@ -417,10 +454,14 @@ class TestLogFileIterator(ScalyrTestCase):
         position = self.log_file.tell()
         self.assertEquals(self.readline(), 'L001\n')
         self.assertEquals(self.readline(), 'L002\n')
+        _, first_sequence_number = self.log_file.get_sequence()
 
         self.log_file.seek(position)
         self.assertEquals(self.readline(), 'L001\n')
         self.assertEquals(self.readline(), 'L002\n')
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertTrue( second_sequence_number == first_sequence_number )
+
 
     def test_set_invalid_position_after_mark(self):
         self.append_file(self.__path,
@@ -443,6 +484,10 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L001\n')
         saved_checkpoint = self.log_file.get_checkpoint()
+
+        self.assertTrue( 'sequence_id' in saved_checkpoint )
+        self.assertTrue( 'sequence_number' in saved_checkpoint )
+
         log_config = { 'path' : self.__path }
         log_config = DEFAULT_CONFIG.parse_log_config( log_config )
         self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
@@ -504,9 +549,12 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L005\n',
                          'L006\n')
         self.mark()
+        _, first_sequence_number = self.log_file.get_sequence()
         self.assertEquals(self.log_file.available, 30L)
 
         self.assertEquals(self.log_file.advance_to_end(), 30L)
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertEqual( 30L, second_sequence_number )
 
         self.append_file(self.__path,
                          'L007\n',
@@ -1176,6 +1224,99 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(events.get_message(1), 'Second line\n')
         self.assertEquals(len(events.threads), 1)
 
+    def test_sequence_id_and_number( self ):
+        log_processor = self.log_processor
+        self.append_file(self.__path, 'First line\n')
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(1, events.total_events())
+        first_sid, first_sn, sd = events.get_sequence(0)
+
+        self.assertTrue( first_sid != None )
+        self.assertTrue( first_sn != None )
+        self.assertEquals( None, sd )
+
+    def test_sequence_delta( self ):
+        log_processor = self.log_processor
+        second_line = 'second line\n'
+        expected_delta = len( second_line )
+        self.append_file(self.__path, 'First line\n')
+        self.append_file(self.__path, second_line)
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(2, events.total_events())
+        first_sid, first_sn, sd = events.get_sequence(0)
+
+        second_sid, second_sn, sd = events.get_sequence(1)
+        self.assertEquals( None, second_sid )
+        self.assertEquals( None, second_sn )
+        self.assertEquals( expected_delta, sd )
+
+    def test_sequence_reset( self ):
+        config = _create_configuration( { 'max_sequence_number' : 20 } )
+
+        log_config = { 'path' : self.__path }
+        log_config = config.parse_log_config( log_config )
+
+        log_processor = LogFileProcessor(self.__path, config, log_config, file_system=self.__file_system, log_attributes={})
+        self.write_file(self.__path, '')
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+
+        first_line = 'the first line\n'
+        second_line = 'second line\n'
+
+        self.append_file(self.__path, first_line )
+        self.append_file(self.__path, second_line)
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(2, events.total_events())
+
+        first_sid, _, _ = events.get_sequence(0)
+
+        third_line = 'third line\n'
+        self.append_file(self.__path, third_line)
+
+        log_processor.scan_for_new_bytes(current_time=self.__fake_time)
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(1, events.total_events())
+
+        third_sid, third_sn, third_sd = events.get_sequence(0)
+
+        self.assertNotEqual( first_sid, third_sid )
+        self.assertNotEqual( None, third_sid )
+        self.assertNotEqual( None, third_sn )
+        self.assertEqual( None, third_sd )
+
+    def test_sequence_id_is_string( self ):
+        # test if UUID is a string, to make sure it can be handled by json
+        log_processor = self.log_processor
+        self.append_file(self.__path, 'First line\n')
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(1, events.total_events())
+        first_sid, _, _ = events.get_sequence(0)
+        self.assertTrue( isinstance( first_sid, basestring ) )
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'wb')
@@ -1194,9 +1335,11 @@ class TestLogFileProcessor(ScalyrTestCase):
             self.__limit = limit
             self.__thread_limit = thread_limit
             self.threads = {}
+            self.__event_sequencer = EventSequencer()
 
-        def add_event(self, event):
+        def add_event(self, event, sequence_id=None, sequence_number=None):
             if len(self.events) < self.__limit:
+                self.__event_sequencer.add_sequence_fields( event, sequence_id, sequence_number )
                 self.events.append(event)
                 return True
             else:
@@ -1219,11 +1362,27 @@ class TestLogFileProcessor(ScalyrTestCase):
             """Returns the message field from an events object."""
             return self.events[index]['attrs']['message']
 
+        def get_sequence( self, index ):
+            si = None
+            if 'si' in self.events[index]:
+                si = self.events[index]['si']
+
+            sn = None
+            if 'sn' in self.events[index]:
+                sn = self.events[index]['sn']
+
+            sd = None
+            if 'sd' in self.events[index]:
+                sd = self.events[index]['sd']
+
+            return (si, sn, sd)
+
         def total_events(self):
             return len(self.events)
 
 
-def _create_configuration( extra_vals=None):
+
+def _create_configuration( extra=None ):
     """Creates a blank configuration file with default values for testing.
 
     @return: The configuration object
@@ -1235,7 +1394,7 @@ def _create_configuration( extra_vals=None):
     os.makedirs(config_fragments_dir)
 
     fp = open(config_file, 'w')
-    fp.write(json_lib.serialize(JsonObject( extra_vals, api_key='fake')))
+    fp.write(json_lib.serialize(JsonObject( extra, api_key='fake')))
     fp.close()
 
     default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',

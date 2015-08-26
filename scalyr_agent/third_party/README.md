@@ -13,6 +13,7 @@ The following libraries are included:
 
   * [tcollector](#tcollector)
   * [PyMySQL](#PyMySQL)
+  * [uuid](#uuid)
 
 ## tcollector<a name="tcollector">
 
@@ -35,6 +36,10 @@ library only supports Python 2.6 and higher, whereas the agent attempts to suppo
 there is enough customer demand to allow the `mysql_monitor` to run with Python 2.4 or 2.5, we may fork and
 invest the time to make the necessary modifications.
 
+## uuid<a name="uuid">
 
+UUID object and generation functions compatible with Python 2.4.  The standard Python uuid module only supports
+Python 2.5 and higher but was based on a package available from [pypi](https://pypi.python.org/pypi/uuid/).  
+That package still supports earlier versions of Python and so this is just a straight copy from that package.
 
 

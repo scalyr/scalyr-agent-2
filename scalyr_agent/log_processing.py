@@ -38,6 +38,8 @@ import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 
+import scalyr_agent.third_party.uuid.uuid as uuid
+
 from scalyr_agent.agent_status import LogMatcherStatus
 from scalyr_agent.agent_status import LogProcessorStatus
 
@@ -169,6 +171,15 @@ class LogFileIterator(object):
         # cache modification time to avoid calling stat twice
         self.__modification_time = datetime.datetime.now()
 
+        # sequence id for this file
+        self.__sequence_id = self.__get_unique_id()
+
+        # the value of the sequence number at the last mark, the sequence_number is a combination
+        # of this and self.__position
+        self.__sequence_number_at_mark = 0
+
+        self.__max_sequence_number = config.max_sequence_number # defaults to 1TB
+
         # The file system facade that we direct all I/O calls through
         # so that we can insert testing methods in the future if needed.
         self.__file_system = file_system
@@ -181,6 +192,14 @@ class LogFileIterator(object):
         if checkpoint is not None:
             need_to_close = True
             try:
+                if 'sequence_id' in checkpoint:
+                    # only set the sequence id if the checkpoint also has a sequence number.
+                    # If it's missing the sequence number then something has become corrupted
+                    # so we shouldn't use it
+                    if 'sequence_number' in checkpoint:
+                        self.__sequence_number_at_mark = checkpoint['sequence_number']
+                        self.__sequence_id = checkpoint['sequence_id']
+
                 if 'position' in checkpoint:
                     self.__position = checkpoint['position']
                     for state in checkpoint['pending_files']:
@@ -238,6 +257,29 @@ class LogFileIterator(object):
         if page_size is not None:
             self.__page_size = page_size
 
+    def __get_unique_id( self ):
+        """Returns a uuid as a string
+        We want uuids as strings mostly as a convenience for json_lib
+        """
+        return str( uuid.uuid4() )
+
+    def get_sequence( self ):
+        """Gets the current sequence id and sequence number of the iterator
+        The sequence id is a globally unique number that groups a set of sequence numbers
+
+        @return: A tuple containing a (sequence_id, sequence_number)
+        @rtype: (uuid.UUID, int)
+        """
+        return (self.__sequence_id, self.__sequence_number_at_mark + self.__position)
+
+    def __increase_sequence_number( self, amount ):
+        """Increases the sequence number and resets both the sequence number and the id
+        if the sequence number exceeds the maximum value"""
+        self.__sequence_number_at_mark += amount;
+        if self.__sequence_number_at_mark > self.__max_sequence_number:
+            self.__sequence_id = self.__get_unique_id()
+            self.__sequence_number_at_mark = 0
+
     def mark(self, current_time=None):
         """Marks the current location of the file.
 
@@ -280,6 +322,7 @@ class LogFileIterator(object):
                 buffer_entry.position_start -= self.__position
                 buffer_entry.position_end -= self.__position
 
+        self.__increase_sequence_number( self.__position )
         self.__position = 0
 
         self.__pending_files = new_pending_files
@@ -928,7 +971,13 @@ class LogFileIterator(object):
         pending_files = []
         for pending_file in self.__pending_files:
             pending_files.append(pending_file.to_json())
-        return {'position': self.__position, 'pending_files': pending_files}
+        result = {'position': self.__position, 'pending_files': pending_files}
+
+        if self.__sequence_id:
+            result['sequence_id'] = self.__sequence_id
+            result['sequence_number'] = self.__sequence_number_at_mark
+
+        return result
 
     @staticmethod
     def create_checkpoint(initial_position):
@@ -1030,7 +1079,7 @@ class LogFileIterator(object):
 
     class Position(object):
         """Represents a position in the iterator."""
-        def __init__(self, mark_generation, position):
+        def __init__(self, mark_generation, position ):
             self.mark_offset = position
             self.mark_generation = mark_generation
 
@@ -1268,7 +1317,9 @@ class LogFileProcessor(object):
                 if len(line) > 0:
                     # Try to add the line to the request, but it will let us know if it exceeds the limit it can
                     # send.
-                    if not add_events_request.add_event(self.__create_events_object(line, sample_result)):
+                    sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
+                    event = self.__create_events_object(line, sample_result)
+                    if not add_events_request.add_event( event, sequence_id=sequence_id, sequence_number=sequence_number ):
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
                         break
@@ -1430,6 +1481,7 @@ class LogFileProcessor(object):
             log as well as a 'message' field containing event_message.
         """
         attrs = self.__log_attributes.copy()
+
         attrs['message'] = event_message
         if sampling_rate != 1.0:
             attrs['sample_rate'] = sampling_rate
@@ -1498,7 +1550,6 @@ class LogFileProcessor(object):
         LogFileProcessor.__thread_id_lock.release()
 
         return 'log_%d' % new_id
-
 
 class LogLineSampler(object):
     """Encapsulates all of the configured sampling rules to perform on lines from a single log file.
