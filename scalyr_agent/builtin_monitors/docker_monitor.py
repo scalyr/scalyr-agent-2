@@ -371,6 +371,7 @@ class DockerMonitor( ScalyrMonitor ):
         self.__checkpoints = {}
         self.container_id = self.__get_scalyr_container_id( self.__socket_file )
         self.__log_watcher = None
+        self.__start_time = time.time()
 
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
@@ -382,7 +383,7 @@ class DockerMonitor( ScalyrMonitor ):
         name = self.containers[cid]
         stream = log['stream']
         stream_name = name + '-' + stream
-        last_request = time.time()
+        last_request = self.__start_time
         if stream_name in self.__checkpoints:
             last_request = self.__checkpoints[stream_name]
         logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
