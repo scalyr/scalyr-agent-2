@@ -441,6 +441,76 @@ class ScalyrClientSession(object):
 
         return self.__send_request(url_path, is_post=False)
 
+class EventSequencer( object ):
+    """Responsible for keeping track of sequences for an AddEventsRequest
+
+    This abstraction keeps track of previously seen sequence_ids and numbers
+    And adds the appropriate fields to an event based on provided sequence ids
+    and values.
+
+    This is a standalone class so that various test objects can also use the same
+    logic
+    """
+
+    def __init__( self ):
+        # the previously used sequence_id, used to determine if we need to send the sequence_id
+        # with an event
+        self.__previous_sequence_id = None
+
+        # the previously seen sequence_number - used to calculate deltas for the sequence_number
+        self.__previous_sequence_number = None
+
+    def reset( self ):
+        """Resets the sequence tracking"""
+        self.__previous_sequence_id = None
+        self.__previous_sequence_number = None
+
+    def get_memento( self ):
+        """returns internal state of the sequencer as a tuple
+        Callers can use this method to set and restore the internal state of the sequencer
+        """
+        return (self.__previous_sequence_id, self.__previous_sequence_number)
+
+
+    def restore_from_memento( self, memento ):
+        """Restores the state of the EventSequencer with the values from a previous
+        call to get_memento
+        """
+        self.__previous_sequence_id = memento[0]
+        self.__previous_sequence_number = memento[1]
+
+
+    def add_sequence_fields( self, event, sequence_id, sequence_number ):
+        """
+        If sequence_id and sequence_number are non-None then this method will automatically add the following
+        fields:
+
+        'si' set to the value of sequence_id if it is different from the previously seen sequence_id
+        'sn' set to the value of sequence_number if we haven't previously seen a sequence number
+        'sd' set to the delta of the sequence_number and the previously seen sequence_number
+
+        The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+        """
+
+        # only add sequence information if both the sequence fields are valid
+        if sequence_id is not None and sequence_number is not None:
+
+            # add the 'si' field if necessary
+            if sequence_id != self.__previous_sequence_id:
+                event['si'] = sequence_id
+                self.__previous_sequence_id = sequence_id
+                # a new sequence id means we should also send the full sequence number
+                # so make sure that __previous_sequence_number is None
+                self.__previous_sequence_number = None
+
+            # if we don't have a previous sequence number then send the full number
+            # otherwise send the delta
+            if self.__previous_sequence_number is None:
+                event['sn'] = sequence_number
+            else:
+                event['sd'] = sequence_number - self.__previous_sequence_number
+
+            self.__previous_sequence_number = sequence_number
 
 class AddEventsRequest(object):
     """Used to construct an AddEventsRequest to eventually send.
@@ -523,6 +593,9 @@ class AddEventsRequest(object):
         # If we have finished serializing the body, it is stored here until the close() method is invoked.
         self.__body = None
 
+        # Used to add sequence fields to an event
+        self.__event_sequencer = EventSequencer()
+
     @property
     def __current_size(self):
         """
@@ -554,16 +627,27 @@ class AddEventsRequest(object):
         return self.__post_fix_buffer.add_thread_entry(thread_id, thread_name,
                                                        fail_if_buffer_exceeds=available_size_for_post_fix)
 
-    def add_event(self, event, timestamp=None):
+    def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
 
         It will automatically add in a 'ts' field to event containing a new timestamp based on the current time
         but ensuring it is greater than any previous timestamp that has been used.
 
+        If sequence_id and sequence_number are specified then this method will automatically add the following
+        fields:
+
+        'si' set to the value of sequence_id if it is different from the previously seen sequence_id
+        'sn' set to the value of sequence_number if we haven't previously seen a sequence number
+        'sd' set to the delta of the sequence_number and the previously seen sequence_number
+
+        The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+
         It is illegal to invoke this method if 'get_payload' has already been invoked.
 
         @param event: The event object, usually a dict or a JsonObject.
         @param timestamp: The timestamp to use for the event. This should only be used for testing.
+        @param sequence_id: A globally unique id, grouping a set of sequence_numbers
+        @param sequence_number: A monotonically increasing sequence_number
 
         @return: True if the event's serialized JSON was added to the request, or False if that would have resulted
             in the maximum request size being exceeded so it did not.
@@ -576,12 +660,19 @@ class AddEventsRequest(object):
         if timestamp is None:
             timestamp = self.__get_timestamp()
 
+        # get copy of event sequencer state in case the event wasn't actually added
+        # and we need to restore it
+        memento = self.__event_sequencer.get_memento()
+
+        self.__event_sequencer.add_sequence_fields( event, sequence_id, sequence_number )
         event['ts'] = str(timestamp)
         json_lib.serialize(event, output=self.__buffer, use_fast_encoding=True)
 
         # Check if we exceeded the size, if so chop off what we just added.
+        # Also reset previously seen sequence numbers and ids
         if self.__current_size > self.__max_size:
             self.__buffer.truncate(start_pos)
+            self.__event_sequencer.restore_from_memento( memento )
             return False
 
         self.__events_added += 1
@@ -675,6 +766,9 @@ class AddEventsRequest(object):
         self.__events_added = position.events_added
         self.__buffer.truncate(position.buffer_size)
         self.__post_fix_buffer.set_position(position.postfix_buffer_position)
+
+        #reset previously seen sequence id and numbers
+        self.__event_sequencer.reset()
 
     class Position(object):
         """Represents a position in the added events.
