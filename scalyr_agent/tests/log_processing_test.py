@@ -803,11 +803,14 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = { 'max_log_offset_size': 20 }
+        extra = { 'max_log_offset_size': 20,
+                  'max_existing_log_offset_size' : 10 }
+
         config = _create_configuration( extra )
 
         log_config = { 'path' : self.__path }
         self._set_new_log_processor( config, log_config, None )
+        self.log_processor.set_max_log_offset_size( 20 )
 
         expected = "a string of 20bytes\n"
         self.append_file( self.__path, expected )
@@ -823,11 +826,13 @@ class TestLogFileProcessor(ScalyrTestCase):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance. This test checks we skip to the end of
         # the file if the max_log_offset_size is exceeded
-        extra = { 'max_log_offset_size': 20 }
+        extra = { 'max_log_offset_size': 20,
+                  'max_existing_log_offset_size': 30 }
         config = _create_configuration( extra )
 
         log_config = { 'path' : self.__path }
         self._set_new_log_processor( config, log_config )
+        self.log_processor.set_max_log_offset_size( 20 )
 
         expected = "a string of 21 bytes\n"
         self.append_file( self.__path, expected )
@@ -843,7 +848,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = { 'max_log_offset_size': 20 }
+        extra = { 'max_log_offset_size': 20,
+                  'max_existing_log_offset_size': 10 }
+
         config = _create_configuration( extra )
 
         log_config = { 'path' : self.__path }
@@ -851,6 +858,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         checkpoint = { 'initial_position': 0 }
 
         self._set_new_log_processor( config, log_config, checkpoint )
+        self.log_processor.set_max_log_offset_size( 20 )
 
         expected = "a string of 20bytes\n"
         self.append_file( self.__path, expected )
@@ -867,12 +875,14 @@ class TestLogFileProcessor(ScalyrTestCase):
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we skip to the end
         # of the file if max_log_offset_size is exceeded
-        extra = { 'max_log_offset_size': 20 }
+        extra = { 'max_log_offset_size': 20,
+                  'max_existing_log_offset_size': 30 }
         config = _create_configuration( extra )
 
         log_config = { 'path' : self.__path }
         checkpoint = { 'initial_position': 0 }
         self._set_new_log_processor( config, log_config, checkpoint )
+        self.log_processor.set_max_log_offset_size( 20 )
 
         expected = "a string of 21 bytes\n"
         self.append_file( self.__path, expected )
@@ -889,7 +899,10 @@ class TestLogFileProcessor(ScalyrTestCase):
         # as the maximum readback distance.  This test checks we log messages within
         # that size
         self.append_file( self.__path, "some random bytes\n" )
-        self.log_processor.scan_for_new_bytes()
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        self.assertEquals( 1, events.total_events() )
 
         checkpoint = self.log_processor.get_checkpoint()
 
@@ -919,6 +932,10 @@ class TestLogFileProcessor(ScalyrTestCase):
         # of the file if max_log_offset_size is exceeded
         self.append_file( self.__path, "some random bytes\n" )
         self.log_processor.scan_for_new_bytes()
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        self.assertEquals( 1, events.total_events() )
 
         checkpoint = self.log_processor.get_checkpoint()
 
@@ -939,6 +956,39 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time)
 
         self.assertEquals( 0, events.total_events() )
+
+    def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing( self ):
+        extra = { 'max_log_offset_size': 20,
+                  'max_existing_log_offset_size': 30 }
+
+        config = _create_configuration( extra )
+
+        log_config = { 'path' : self.__path }
+        self._set_new_log_processor( config, log_config, checkpoint=None )
+        self.log_processor.set_max_log_offset_size( 20 )
+
+        expected = "a string of 20bytes\n"
+        self.append_file( self.__path, expected )
+
+        self.log_processor.set_max_log_offset_size( extra['max_log_offset_size'] )
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals( 1, events.total_events() )
+        self.assertEquals( expected, events.get_message( 0 ) )
+
+        expected = "a string of almost 30 bytes\n"
+        self.append_file( self.__path, expected )
+        self.log_processor.scan_for_new_bytes()
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals( 1, events.total_events() )
+        self.assertEquals( expected, events.get_message( 0 ) )
+
 
     def test_fail_and_retry(self):
         log_processor = self.log_processor

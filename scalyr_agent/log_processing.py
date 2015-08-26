@@ -1121,6 +1121,13 @@ class LogFileProcessor(object):
 
         self.__last_success = None
 
+    def set_max_log_offset_size( self, max_log_offset_size ):
+        """Sets the max_log_offset_size.
+
+        Used for testing
+        """
+        self.__max_log_offset_size = max_log_offset_size
+
     def generate_status(self):
         """Generates and returns a status object for this particular processor.
 
