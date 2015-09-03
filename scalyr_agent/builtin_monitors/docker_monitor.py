@@ -41,7 +41,7 @@ from scalyr_agent.util import StoppableThread
 
 from scalyr_agent.util import RunState
 
-log = scalyr_logging.getLogger(__name__)
+global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
@@ -73,6 +73,11 @@ define_config_option( __monitor__, 'max_previous_lines',
 define_config_option( __monitor__, 'log_timestamps',
                      'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
                      convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'host_hostname',
+                     'Optional (defaults to HOST_HOSTNAME). An environment variable containing the hostname of the docker host.  If the environment'
+                     'varible exists and is set, then the plugin will add a serverHost attribute containing this value to each of the docker logs.\n',
+                     convert_to=str, default='HOST_HOSTNAME')
 
 class DockerRequest( object ):
 
@@ -189,7 +194,7 @@ class DockerLogger( object ):
                 line = self.strip_docker_header( line )
                 dt, log_line = self.split_datetime_from_line( line )
                 if not dt:
-                    log.error( 'No timestamp found on line: \'%s\'', line )
+                    global_log.error( 'No timestamp found on line: \'%s\'', line )
                 else:
                     timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
 
@@ -343,6 +348,9 @@ class DockerMonitor( ScalyrMonitor ):
         attributes = None
         try:
             attributes = JsonObject( { "monitor": "agentDocker" } )
+            if self.__host_hostname:
+                attributes['serverHost'] = self.__host_hostname
+
         except Exception, e:
             self._logger.error( "Error setting monitor attribute in DockerMonitor" )
             raise
@@ -373,6 +381,10 @@ class DockerMonitor( ScalyrMonitor ):
         self.__log_watcher = None
         self.__start_time = time.time()
 
+        hostname_var = self._config.get( 'host_hostname' )
+
+        self.__host_hostname = os.getenv( hostname_var, '' ).strip()
+
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
@@ -386,6 +398,7 @@ class DockerMonitor( ScalyrMonitor ):
         last_request = self.__start_time
         if stream_name in self.__checkpoints:
             last_request = self.__checkpoints[stream_name]
+
         logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
         logger.start()
         return logger
