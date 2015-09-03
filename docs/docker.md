@@ -40,6 +40,14 @@ If you would like to log the stdout/stderr of other docker containers via the do
 
 You can also specify additional volumes on the command line, for example in case you want to make logs files from other containers available to the scalyr-agent container.  [See here](#log-volumes) for how to configure such volumes.
 
+##Hostnames for logs
+
+By default, logs uploaded by the docker monitor will have a 'serverHost' attribute equal to the container ID.  If you would like to specify a custom hostname instead, then when you create the scalyr-agent container you can set the HOST_HOSTNAME environment variable in the container with the value you’d like to use for the serverHost attribute. e.g. 
+
+    docker run -d --name scalyr-agent -e HOST_HOSTNAME=`hostname` ...
+
+This will set the HOST_HOSTNAME environment variable to the hostname of the Docker host.  The scalyr-agent will then check if this variable is set, and if so use it as the value for serverHost.
+
 ##Data files
 
 If you wish to persist checkpoint information about already logged files and/or Docker logs, it is recommended that your scalyr data directory is also mapped from the host to the container e.g.
@@ -154,6 +162,8 @@ The docker_monitor module has a number of configuration options:
 * `max_previous_lines` - when starting to track the logs of a container, the maximum number of lines to search backwards to find the most recent output.  Defaults to 5000.
 
 * `log_timestamps` - whether or not to include the Docker timestamps in the logs.  Defaults to False.
+
+* `host_hostname` - the name of an environment variable to check for the hostname of the Docker host.  If this environment variable exists and is set then the scalyr-agent will set the serverHost attribute of each docker log to the contents of this environment variable.
 
 When running, the docker_monitor plugin will upload standard error and output of all running docker containers on the host.
 
