@@ -709,7 +709,7 @@ class PidfileManager(object):
             contents = pf.read().strip().split()
             pf.close()
         except IOError:
-            self._log_debug('Checked pidfile: does not exist %s' % scalyr_util.get_pid_tid())
+            self._log_debug('Checked pidfile: does not exist')
             return None
 
         pid = int(contents[0])
@@ -726,21 +726,49 @@ class PidfileManager(object):
                 raise e
 
         # If we got here, the process is running, and we have to see if we can determine if it is really the
-        # original agent process.  For Linux systems with /proc, we see if the commandlines match up.
-        # For all other Posix systems, (Mac OS X, etc) we bail for now.
-        if not self.__check_command_line or (not _can_read_command_line(pid) and command_line is None):
+        # original agent process.  For Linux systems with /proc, we see if the commandlines match up if
+        # this instance is requested to.  For all other Posix systems, (Mac OS X, etc) we bail for now.
+
+        # Read the command line of the current agent process as stored in the pidfile.  None means it
+        # could not be read.
+        if len(contents) >= 2:
+            command_line_from_pidfile = contents[1]
+        else:
+            self._log_debug('Could not retrieve commandline from pidfile')
+            command_line_from_pidfile = None
+
+        # Get the commandline of the process whose pid is stored in the pidfile.  This is only set to
+        # None if we cannot retrieve it.
+        if _can_read_command_line(pid) and command_line is None:
+            command_line = _read_command_line(pid)
+        else:
+            self._log_debug('Could not retrieve commandline from /proc')
+
+        # We can only attempt the check if we had a pidfile that contained the commandline -- otherwise
+        # we might be working with an old pidfile that doesn't have it.
+        if command_line_from_pidfile is not None:
+            commands_match = command_line_from_pidfile == command_line
+        else:
+            commands_match = True
+
+        # We always log a message if we see a command mismatch because this could be an indication of a bug
+        if not commands_match:
+            self._log_debug('Mismatch between commands seen in pidfile and on /proc: "%s" vs "%s"' %
+                            (str(command_line_from_pidfile), str(command_line)))
+
+        if not self.__check_command_line:
             self._log_debug('Checked pidfile: exists')
             return pid
-
-        # Handle the case that we have an old pid file that didn't have the commandline right into it.
-        if len(contents) == 1:
-            self._log_debug('Checked pidfile: exists-')
+        elif command_line is None:
+            # We could not read the command from /proc so we do not do the check either.
+            self._log_debug('Checked pidfile: exists*')
+            return pid
+        elif command_line_from_pidfile is None:
+            # There was no command line in the pidfile, so we skip the check as well..
+            self._log_debug('Checked pidfile: exists#')
             return pid
 
-        if command_line is None:
-            command_line = _read_command_line(pid)
-
-        if contents[1] == command_line:
+        if commands_match:
             self._log_debug('Checked pidfile: exists+')
             return pid
         else:
