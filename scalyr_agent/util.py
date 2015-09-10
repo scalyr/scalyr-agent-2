@@ -35,11 +35,11 @@ try:
 except ImportError:
     from sha import sha as sha1
 
-# Try to use the UUID library if it is available (Python 2.5 or greater).
 try:
-    import uuid
+    import scalyr_agent.third_party.uuid.uuid as uuid
 except ImportError:
     uuid = None
+
 
 def read_file_as_json(file_path):
     """Reads the entire file as a JSON value and return it.
