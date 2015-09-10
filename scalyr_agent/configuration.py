@@ -426,6 +426,11 @@ class Configuration(object):
         return self.__get_config().get_bool('debug_init')
 
     @property
+    def pidfile_advanced_reuse_guard(self):
+        """Returns the configuration value for 'pidfile_advanced_reuse_guard'."""
+        return self.__get_config().get_bool('pidfile_advanced_reuse_guard')
+
+    @property
     def verify_server_certificate(self):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
@@ -639,6 +644,8 @@ class Configuration(object):
         self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description)
 
         self.__verify_or_set_optional_bool(config, 'debug_init', False, description)
+
+        self.__verify_or_set_optional_bool(config, 'pidfile_advanced_reuse_guard', False, description)
 
         self.__verify_or_set_optional_int(config, 'debug_level', 0, description)
         debug_level = config.get_int('debug_level')

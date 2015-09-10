@@ -86,6 +86,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
         self.assertFalse(config.debug_init)
+        self.assertFalse(config.pidfile_advanced_reuse_guard)
 
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
@@ -146,7 +147,7 @@ class TestConfiguration(ScalyrTestCase):
             copy_staleness_threshold: 240,
             log_deletion_delay: 300,
             debug_init: true,
-
+            pidfile_advanced_reuse_guard: true,
 
             logs: [ { path: "/var/log/tomcat6/access.log"} ]
           }
@@ -194,6 +195,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertPathEquals(config.ca_cert_path, '/var/lib/foo.pem')
         self.assertFalse(config.verify_server_certificate)
         self.assertTrue(config.debug_init)
+        self.assertTrue(config.pidfile_advanced_reuse_guard)
 
     def test_missing_api_key(self):
         self.__write_file_with_separator_conversion(""" {

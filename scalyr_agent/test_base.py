@@ -44,6 +44,12 @@ if sys.version_info < (2, 5, 0):
             else:
                 self.assertTrue(obj is not None, '%s is None' % (str(obj)))
 
+        def assertGreater(self, a, b, msg=None):
+            """Included for symmetry with assertIsNone."""
+            if msg is not None:
+                self.assertTrue(a > b, msg)
+            else:
+                self.assertTrue(a > b, '%s is greater than %s' % (str(a), str(b)))
 else:
     class ScalyrTestCase(unittest.TestCase):
         """The base class for Scalyr tests.
@@ -56,4 +62,7 @@ else:
             pass
 
         def assertIsNotNone(self, obj, msg=None):
+            pass
+
+        def assertGreater(self, a, b, msg=None):
             pass

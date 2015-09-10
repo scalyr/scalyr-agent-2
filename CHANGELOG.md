@@ -14,6 +14,11 @@ Features:
 * New sequence id and number implementation to help prevent events being added to the database multiple times
 * Create new configuration option ``max_existing_log_offset_size`` to set a separate on how far back in a log file we are willing to go for a log file we have been previously copying.
 
+Bug fixes:
+
+* Fixed some race conditions in writing the pidfile on POSIX systems.
+* Disabled checking the command of the running agent process to guard against pid re-use since this was leading to some false negatives in the ``is the agent running`` checks.
+
 ## 2.0.13 "Moonstruck Monkey" - August 14, 2015
 
 <!---

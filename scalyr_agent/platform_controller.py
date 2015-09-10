@@ -128,16 +128,18 @@ class PlatformController:
         """
         pass
 
-    def emit_init_debug(self, logger):
-        """Writes any debug information the controller has collected about the initialization of the agent_service
+    def emit_init_log(self, logger, include_debug):
+        """Writes any logged information the controller has collected about the initialization of the agent_service
         to the provided logger.
 
         This is required because the initialization sequence occurs before the agent log is set up to write to
         a file instead of standard out.  Using this, we can collect the information and then output it once the
         logger is set up.
 
-        @param logger: The logger to use to write the debug information.
+        @param logger: The logger to use to write the information.
+        @param include_debug:  If True, include debug level logging as well.
         @type logger: Logger
+        @type include_debug: bool
         """
         return
 
