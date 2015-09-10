@@ -93,6 +93,13 @@ class TestPidfileManager(ScalyrTestCase):
     def test_logger(self):
         def log_it(message):
             self.__logged_messages.append(message)
+        self.__test_manager.set_options(logger=log_it)
+        self.__test_manager.read_pid()
+        self.assertGreater(len(self.__logged_messages), 0)
+
+    def test_debug_logger(self):
+        def log_it(message):
+            self.__logged_messages.append(message)
         self.__test_manager.set_options(debug_logger=log_it)
         self.__test_manager.read_pid()
         self.assertGreater(len(self.__logged_messages), 0)

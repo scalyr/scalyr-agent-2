@@ -677,6 +677,9 @@ class PidfileManager(object):
         # The name of the file we must get an advisory lock on whenever we attempt to write the pidfile.
         self.__pidfile_lock = os.path.join(os.path.dirname(pidfile), '.%s.lock' % os.path.basename(pidfile))
         # A function that takes a single argument that will be invoked whenever this abstraction wishes to
+        # report a message that should be included in the log.
+        self.__logger = None
+        # A function that takes a single argument that will be invoked whenever this abstraction wishes to
         # report a debug message.
         self.__debug_logger = None
         # Previously, whenever we wrote a pidfile, we included both the pid of the running agent and the command
@@ -709,7 +712,7 @@ class PidfileManager(object):
             contents = pf.read().strip().split()
             pf.close()
         except IOError:
-            self._log_debug('Checked pidfile: does not exist')
+            self._log('Checked pidfile: does not exist')
             return None
 
         pid = int(contents[0])
@@ -718,7 +721,7 @@ class PidfileManager(object):
         except OSError, e:
             # ESRCH indicates the process is not running, in which case we ignore the pidfile.
             if e.errno == errno.ESRCH:
-                self._log_debug('Checked pidfile: missing')
+                self._log('Checked pidfile: missing')
                 return None
             # EPERM indicates the current user does not have permission to signal the process.. so it exists
             # but may not be the agent process.  We will just try our /proc/pid/commandline trick below if we can.
@@ -753,26 +756,26 @@ class PidfileManager(object):
 
         # We always log a message if we see a command mismatch because this could be an indication of a bug
         if not commands_match:
-            self._log_debug('Mismatch between commands seen in pidfile and on /proc: "%s" vs "%s"' %
-                            (str(command_line_from_pidfile), str(command_line)))
+            self._log('Mismatch between commands seen in pidfile and on /proc: "%s" vs "%s"' %
+                      (str(command_line_from_pidfile), str(command_line)))
 
         if not self.__check_command_line:
-            self._log_debug('Checked pidfile: exists')
+            self._log('Checked pidfile: exists')
             return pid
         elif command_line is None:
             # We could not read the command from /proc so we do not do the check either.
-            self._log_debug('Checked pidfile: exists*')
+            self._log('Checked pidfile: exists*')
             return pid
         elif command_line_from_pidfile is None:
             # There was no command line in the pidfile, so we skip the check as well..
-            self._log_debug('Checked pidfile: exists#')
+            self._log('Checked pidfile: exists#')
             return pid
 
         if commands_match:
-            self._log_debug('Checked pidfile: exists+')
+            self._log('Checked pidfile: exists+')
             return pid
         else:
-            self._log_debug('Checked pidfile: missing+')
+            self._log('Checked pidfile: missing+')
             return None
 
     def write_pid(self, pid=None, command_line=None):
@@ -792,12 +795,14 @@ class PidfileManager(object):
         """
         # write pidfile.  We only allow writing to the pidfile if you have an advisory lock on the lock file.
         # This will block until we have the lock, but that's ok.
+        self._log('Writing pidfile')
         self._lock_pidfile()
         try:
             # Once we have the lock, we have to make sure the original pid file still indicates an agent process
             # is still not running.  We have to be holding the lock when we read this to make sure it is a true
             # compare and swap.
             if self.read_pid() is not None:
+                self._log('Did not write pidfile: exists')
                 return False
 
             # Now we can write it.
@@ -815,10 +820,10 @@ class PidfileManager(object):
                     if command_line is None:
                         command_line = _read_command_line(pid)
                     fp.write('%d %s\n' % (pid, command_line))
-                    self._log_debug('Wrote pidfile+')
+                    self._log('Wrote pidfile+, commit pending')
                 else:
                     fp.write('%d\n' % pid)
-                    self._log_debug('Wrote pidfile')
+                    self._log('Wrote pidfile, commit pending')
 
                 # make sure that all data is on disk
                 # see http://stackoverflow.com/questions/7433057/is-rename-without-fsync-safe
@@ -833,7 +838,7 @@ class PidfileManager(object):
                     fp.close()
 
             os.rename(tmp_pidfile, self.__pidfile)
-            self._log_debug('Renamed pidfile')
+            self._log('Committed pidfile')
             return True
 
         finally:
@@ -844,21 +849,26 @@ class PidfileManager(object):
         if os.path.isfile(self.__pidfile):
             os.remove(self.__pidfile)
 
-    def set_options(self, debug_logger=None, check_command_line=None):
+    def set_options(self, logger=None, debug_logger=None, check_command_line=None):
         """Sets some options related to managing the pid.
 
-        @param debug_logger A callback that takes a single argument ``message``.  This callback will be invoked
-            whenever the abstraction wishes to log a debug message.  We have to take this approach rather than
+        @param logger A callback that takes a single argument ``message``.  This callback will be invoked
+            whenever the abstraction wishes to log a message.  We have to take this approach rather than
             just relying on the logger abstractions because the process has not opened the agent log by the time
             the pidfile is being checked.
+        @param debug_logger A callback that takes a single argument ``message``.  This callback will be invoked
+            whenever the abstraction wishes to log a debug message.
         @param check_command_line:  Whether or not, when reading the pidfile, the command in the pidfile should
             be checked against the running process in order to verify it is still the same process.  This is
             an advanced option to help protect against issues due to pid reuse, but in practice, we believe this
             is causing false negatives and are disabling it for now.
 
+        @type logger: Function(str)
         @type debug_logger: Function(str)
         @type check_command_line: bool
         """
+        if logger is not None:
+            self.__logger = logger
         if debug_logger is not None:
             self.__debug_logger = debug_logger
         if check_command_line is not None:
@@ -871,6 +881,8 @@ class PidfileManager(object):
             raise Exception('Trying to lock pidfile when it is already locked.')
         # We have to be sure we create the pidfile lock only once so everyone sees it.
         attempts = 50
+        if not os.path.isfile(self.__pidfile_lock):
+            self._log('Creating pid lock file')
         while not os.path.isfile(self.__pidfile_lock) and attempts > 0:
             attempts -= 1
             fd = None
@@ -913,6 +925,9 @@ class PidfileManager(object):
         if self.__debug_logger is not None:
             self.__debug_logger(message)
 
+    def _log(self, message):
+        if self.__logger is not None:
+            self.__logger(message)
 
 class StatusReporter(object):
     """Used to send back a status message to process A from process B where process A has forked process B.
