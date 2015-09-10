@@ -247,8 +247,10 @@ class PosixPlatformController(PlatformController):
         except OSError, e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
+        except SystemExit, e:
+            raise e
         except Exception, e:
-            reporter.report_status('forked #2 failed due to generic error: %s' % str(e))
+            reporter.report_status('forked #1 failed due to generic error: %s' % str(e))
             sys.exit(1)
 
         debug_logger('Second fork')
@@ -270,6 +272,8 @@ class PosixPlatformController(PlatformController):
             reporter.report_status('fork #2 failed: %d (%s)' % (e.errno, e.strerror))
             sys.stderr.write('fork #2 failed: %d (%s)\n' % (e.errno, e.strerror))
             sys.exit(1)
+        except SystemExit, e:
+            raise e
         except Exception, e:
             reporter.report_status('forked #2 failed due to generic error: %s' % str(e))
             sys.exit(1)

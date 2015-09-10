@@ -78,7 +78,7 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    if uuid is not None:
+    if uuid is not None and hasattr(uuid, 'uuid1'):
         # Here the uuid should be based on the mac of the machine.
         base_value = uuid.uuid1().bytes
         method = 'a'
