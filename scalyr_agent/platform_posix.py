@@ -66,8 +66,9 @@ class PosixPlatformController(PlatformController):
         # The method to invoke when status is requested by another process.
         self.__status_handler = None
         self.__no_change_user = False
-        # A list of log lines collected for debugging the initialization sequence.
-        self.__init_debug_lines = []
+        # A list of log lines collected for debugging the initialization sequence.  The entries
+        # are tuples of the line and a boolean indicating whether or not it is a debug entry.
+        self.__init_log_lines = []
         self.__is_initializing = True
 
         # Whether or not to use the commandline in the pidfile to help protect against pid re-use.
@@ -159,37 +160,40 @@ class PosixPlatformController(PlatformController):
                                 os.path.join(base_dir, 'config', 'agent.json'),
                                 os.path.join(base_dir, 'data'))
 
-    def emit_init_debug(self, logger):
-        """Writes any debug information the controller has collected about the initialization of the agent_service
+    def emit_init_log(self, logger, include_debug):
+        """Writes any logged information the controller has collected about the initialization of the agent_service
         to the provided logger.
 
         This is required because the initialization sequence occurs before the agent log is set up to write to
         a file instead of standard out.  Using this, we can collect the information and then output it once the
         logger is set up.
 
-        @param logger: The logger to use to write the debug information.
+        @param logger: The logger to use to write the information.
+        @param include_debug:  If True, include debug level logging as well.
         @type logger: Logger
+        @type include_debug: bool
         """
         logger.info('Emitting log lines saved during initialization: %s' % scalyr_util.get_pid_tid())
-        for line in self.__init_debug_lines:
-            logger.info('     %s' % line)
+        for line_entry in self.__init_log_lines:
+            if not line_entry[1] or include_debug:
+                logger.info('     %s' % line_entry[0])
 
-        logger.info('Parent pids:')
-        current_child = os.getpid()
-        current_parent = self.__get_ppid(os.getpid())
+        if include_debug:
+            logger.info('Parent pids:')
+            current_child = os.getpid()
+            current_parent = self.__get_ppid(os.getpid())
 
-        remaining_parents = 10
-        while current_parent is not None and remaining_parents > 0:
-            if _can_read_command_line(current_parent):
-                logger.info('    ppid=%d cmd=%s parent_of=%d' % (current_parent,
-                                                                 _read_command_line(current_parent),
-                                                                 current_child))
-            else:
-                logger.info('    ppid=%d cmd=Unknown parent_of=%d' % (current_parent, current_child))
-            current_child = current_parent
-            current_parent = self.__get_ppid(current_parent)
-            remaining_parents -= 1
-
+            remaining_parents = 10
+            while current_parent is not None and remaining_parents > 0:
+                if _can_read_command_line(current_parent):
+                    logger.info('    ppid=%d cmd=%s parent_of=%d' % (current_parent,
+                                                                     _read_command_line(current_parent),
+                                                                     current_child))
+                else:
+                    logger.info('    ppid=%d cmd=Unknown parent_of=%d' % (current_parent, current_child))
+                current_child = current_parent
+                current_parent = self.__get_ppid(current_parent)
+                remaining_parents -= 1
         return
 
     def __daemonize(self):
@@ -206,6 +210,9 @@ class PosixPlatformController(PlatformController):
 
         def debug_logger(message):
             self._log_init_debug('%s (orig_pid=%s) %s' % (message, original_pid, scalyr_util.get_pid_tid()))
+
+        def logger(message):
+            self._log_init('%s (orig_pid=%s) %s' % (message, original_pid, scalyr_util.get_pid_tid()))
 
         # Create a temporary file that we will use to communicate between the calling process and the daemonize
         # process.
@@ -282,7 +289,8 @@ class PosixPlatformController(PlatformController):
 
             # Write out our process id to the pidfile.
             pidfile = PidfileManager(self.__pidfile)
-            pidfile.set_options(debug_logger=debug_logger, check_command_line=self.__verify_command_in_pidfile)
+            pidfile.set_options(debug_logger=debug_logger, logger=logger,
+                                check_command_line=self.__verify_command_in_pidfile)
 
             if not pidfile.write_pid():
                 reporter.report_status('alreadyRunning')
@@ -291,7 +299,7 @@ class PosixPlatformController(PlatformController):
             atexit.register(pidfile.delete_pid)
 
             reporter.report_status('success')
-            debug_logger('Becoming service')
+            logger('Process has been daemonized')
             return True
         except Exception, e:
             reporter.report_status('Finalizing fork failed due to generic error: %s' % str(e))
@@ -324,18 +332,31 @@ class PosixPlatformController(PlatformController):
         else:
             return None
 
-    def _log_init_debug(self, line):
+    def _log_init(self, line, is_debug=False):
         """If we are still in the initialization phase (i.e., we have not started the agent service), then append
-        the specified line to the list that will be written out in the ``emit_init_debug`` method.
+        the specified line to the list that will be written out in the ``emit_init_log`` method.
 
-        @param line: The line containing debug information.
+        @param line: The line containing information.
+        @param is_debug:  True if this represents a debug level log record and should only be emitted to the actual
+            log if the configuration's debug_init True is true.
         @type line: str
+        @type is_debug: bool
         """
         if self.__is_initializing:
             current_time = time.time()
             time_str = '%s.%03dZ' % (time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(current_time)),
                                      int(current_time % 1 * 1000))
-            self.__init_debug_lines.append('%s   (%s)' % (line, time_str))
+            self.__init_log_lines.append(['%s   (%s)' % (line, time_str), is_debug])
+
+    def _log_init_debug(self, line):
+        """If we are still in the initialization phase (i.e., we have not started the agent service), then append
+        the specified line to the list that will be written out in the ``emit_init_log`` method and mark it
+        as debug.
+
+        @param line: The line containing debug information.
+        @type line: str
+        """
+        self._log_init(line, True)
 
     def get_file_owner(self, file_path):
         """Returns the user name of the owner of the specified file.
@@ -655,8 +676,12 @@ class PosixPlatformController(PlatformController):
         def debug_logger(message):
             self._log_init_debug('%s %s' % (message, scalyr_util.get_pid_tid()))
 
+        def logger(message):
+            self._log_init('%s %s' % (message, scalyr_util.get_pid_tid()))
+
         manager = PidfileManager(self.__pidfile)
-        manager.set_options(debug_logger=debug_logger, check_command_line=self.__verify_command_in_pidfile)
+        manager.set_options(debug_logger=debug_logger, logger=logger,
+                            check_command_line=self.__verify_command_in_pidfile)
         return manager.read_pid()
 
 
@@ -928,6 +953,7 @@ class PidfileManager(object):
     def _log(self, message):
         if self.__logger is not None:
             self.__logger(message)
+
 
 class StatusReporter(object):
     """Used to send back a status message to process A from process B where process A has forked process B.
