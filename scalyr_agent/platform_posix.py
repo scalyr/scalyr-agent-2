@@ -196,25 +196,16 @@ class PosixPlatformController(PlatformController):
                 remaining_parents -= 1
         return
 
-    def __write_pidfile(self, original_pid ):
-        """Writes the process's pid to a file"""
-        atexit.register(self.__delpid)
-        pid = os.getpid()
+    def __write_pidfile(self, debug_logger=None, logger=None):
+        pidfile = PidfileManager(self.__pidfile)
+        pidfile.set_options(debug_logger=debug_logger, logger=logger,
+                            check_command_line=self.__verify_command_in_pidfile)
 
-        fp = None
-        try:
-            fp = file(self.__pidfile, 'w+')
-            # If we are on an OS that supports reading the commandline arguments from /proc, then use that
-            # to write more unique information about the running process to help avoid pid collison.
-            if self.__can_read_command_line(pid):
-                fp.write('%d %s\n' % (pid, self.__read_command_line(pid)))
-                self._log_init_debug('Wrote pidfile+ (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
-            else:
-                fp.write('%d\n' % pid)
-                self._log_init_debug('Wrote pidfile (orig_pid=%s) %s' % (original_pid, scalyr_util.get_pid_tid()))
-        finally:
-            if fp is not None:
-                fp.close()
+        if not pidfile.write_pid():
+            return False
+
+        atexit.register(pidfile.delete_pid)
+        return True
 
     def __daemonize(self):
         """Fork off a background thread for execution.  If this method returns True, it is the new process, otherwise
@@ -312,15 +303,9 @@ class PosixPlatformController(PlatformController):
             os.dup2(se.fileno(), sys.stderr.fileno())
 
             # Write out our process id to the pidfile.
-            pidfile = PidfileManager(self.__pidfile)
-            pidfile.set_options(debug_logger=debug_logger, logger=logger,
-                                check_command_line=self.__verify_command_in_pidfile)
-
-            if not pidfile.write_pid():
+            if not self.__write_pidfile( debug_logger=debug_logger, logger=logger):
                 reporter.report_status('alreadyRunning')
                 return False
-
-            atexit.register(pidfile.delete_pid)
 
             reporter.report_status('success')
             logger('Process has been daemonized')
@@ -532,12 +517,14 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
-        original_pid = os.getpid()
-        if fork and not self.__daemonize():
-            return
-
-        # write pidfile
-        self.__write_pidfile( original_pid )
+        if fork:
+            if not self.__daemonize():
+                return
+        else:
+            # we are not a fork, so write the pid to a file
+            if not self.__write_pidfile():
+                raise AgentAlreadyRunning( 'The pidfile %s exists and indicates it is running pid=%d' % (
+                self.__pidfile, pid))
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
