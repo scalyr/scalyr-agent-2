@@ -41,6 +41,9 @@ coverage.xml
 .project
 .pydevproject
 
+# Vim Swap Files
+*.swp
+
 # Rope
 .ropeproject
 
