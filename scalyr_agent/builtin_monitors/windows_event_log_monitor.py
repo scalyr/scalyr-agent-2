@@ -14,6 +14,12 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@imralsoftware.com>
 
+import win32evtlog
+import win32evtlogutil
+import win32con
+
+from scalyr_agent import ScalyrMonitor, define_config_option
+
 __author__ = 'imron@imralsoftware.com'
 
 __monitor__ = __name__
@@ -26,10 +32,14 @@ define_config_option( __monitor__, 'sources',
                      'You can use this to specify which event sources you are interested in listening to.',
                      convert_to=str, default='Application, Security, System')
 
-define_config_option(__monitor__, 'type',
+define_config_option(__monitor__, 'event_types',
                      'Optional (defaults to ``All``). A comma separated list of event types to log.\n'
                      'Valid values are: All, Error, Warning, Information, AuditSuccess and AuditFailure',
                      default='All', convert_to=str)
+
+define_config_option(__monitor__, 'server_name',
+                     'Optional (defaults to ``localhost``). The remote server where the event log is to be opened\n',
+                     default='localhost', convert_to=str)
 
 class WindowEventLogMonitor( ScalyrMonitor ):
     """
@@ -59,10 +69,74 @@ only:
 
     """
     def _initialize( self ):
-        pass
+        #convert sources into a list
+        sources = self._config.get( 'sources' )
+        self.__source_list = [s.strip() for s in sources.split(',')]
+        self.__event_logs = {}
 
+        #convert event types in to a list
+        event_types = self._config.get( 'event_types' )
+        event_filter = [s.strip() for s in event_types.split(',')]
+
+        # build the event filter
+        self.__event_types = {}
+        if 'All' in event_filter:
+            event_filter = [ 'Error', 'Warning', 'Information', 'AuditSuccess', 'AuditFailure' ]
+
+        for event in event_filter:
+            if event == 'Error':
+                self.__event_types[ win32con.EVENTLOG_ERROR_TYPE ] = event
+            elif event == 'Warning':
+                self.__event_types[ win32con.EVENTLOG_WARNING_TYPE ] = event
+            elif event == 'Information':
+                self.__event_types[ win32con.EVENTLOG_INFORMATION_TYPE ] = event
+            elif event == 'AuditSuccess':
+                self.__event_types[ win32con.EVENTLOG_AUDIT_SUCCESS ] = event
+            elif event == 'AuditFailure':
+                self.__event_types[ win32con.EVENTLOG_AUDIT_FAILURE ] = event
+
+        self.__server = self._config.get( 'localhost' )
+
+
+    def __read_from_event_log( self, source, event_log, event_types ):
+
+        flags = win32evtlog.EVENTLOG_FORWARDS_READ|win32evtlog.EVENTLOG_SEQUENTIAL_READ
+
+        events = True
+        while events:
+            events = win32evtlog.ReadEventLog( event_log, flags, 0 )
+            for event in events:
+                if event.EventType in event_types:
+                    self.__log_event( source, event )
+
+    def __log_event( self, source, event ):
+        event_type = self.__event_types[ event.EventType ]
+        data = event.StringInserts
+
+        source = source.split( '/' )[0]
+
+        event_message = str( win32evtlogutil.SafeFormatMessage( event, source ) )
+
+        self._logger.emit_value( "EventLog", source, extra_fields={
+            'Source': event.SourceName,
+            'RecordNumber': event.RecordNumber,
+            'Type' : event_type,
+            'EventId': event.EventID,
+            'Category': event.EventCategory,
+            'Message' : event_message,
+        } )
+
+    def run( self ):
+        for source in self.__source_list:
+            event_log = win32evtlog.OpenEventLog( self.__server, source )
+            if event_log:
+                self.__event_logs[source] = event_log
+
+        ScalyrMonitor.run( self )
 
     def gather_sample( self ):
+        for source, event_log in self.__event_logs.iteritems():
+            self.__read_from_event_log( source, event_log, self.__event_types )
 
 
 
