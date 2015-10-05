@@ -213,7 +213,7 @@ class DockerLogger( object ):
                         self.__last_request_lock.release()
 
                 line = request.readline()
-            time.sleep( 0.1 )
+            run_state.sleep_but_awaken_if_stopped( 0.1 )
 
         # we are shutting down, so update our last request to be slightly later than it's current
         # value to prevent duplicate logs when starting up again.
