@@ -196,6 +196,17 @@ class PosixPlatformController(PlatformController):
                 remaining_parents -= 1
         return
 
+    def __write_pidfile(self, debug_logger=None, logger=None):
+        pidfile = PidfileManager(self.__pidfile)
+        pidfile.set_options(debug_logger=debug_logger, logger=logger,
+                            check_command_line=self.__verify_command_in_pidfile)
+
+        if not pidfile.write_pid():
+            return False
+
+        atexit.register(pidfile.delete_pid)
+        return True
+
     def __daemonize(self):
         """Fork off a background thread for execution.  If this method returns True, it is the new process, otherwise
         it is the original process.
@@ -292,15 +303,9 @@ class PosixPlatformController(PlatformController):
             os.dup2(se.fileno(), sys.stderr.fileno())
 
             # Write out our process id to the pidfile.
-            pidfile = PidfileManager(self.__pidfile)
-            pidfile.set_options(debug_logger=debug_logger, logger=logger,
-                                check_command_line=self.__verify_command_in_pidfile)
-
-            if not pidfile.write_pid():
+            if not self.__write_pidfile( debug_logger=debug_logger, logger=logger):
                 reporter.report_status('alreadyRunning')
                 return False
-
-            atexit.register(pidfile.delete_pid)
 
             reporter.report_status('success')
             logger('Process has been daemonized')
@@ -493,7 +498,7 @@ class PosixPlatformController(PlatformController):
 
         return pid is not None
 
-    def start_agent_service(self, agent_run_method, quiet):
+    def start_agent_service(self, agent_run_method, quiet, fork):
         """Start the daemon process by forking a new process.
 
         This method will invoke the agent_run_method that was passed in when initializing this object.
@@ -512,8 +517,14 @@ class PosixPlatformController(PlatformController):
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
         # or the new forked one.  If it are the original process, then we just return.
-        if not self.__daemonize():
-            return
+        if fork:
+            if not self.__daemonize():
+                return
+        else:
+            # we are not a fork, so write the pid to a file
+            if not self.__write_pidfile():
+                raise AgentAlreadyRunning( 'The pidfile %s exists and indicates it is running pid=%d' % (
+                self.__pidfile, pid))
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
@@ -533,6 +544,7 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
+
 
     def stop_agent_service(self, quiet):
         """Stop the daemon

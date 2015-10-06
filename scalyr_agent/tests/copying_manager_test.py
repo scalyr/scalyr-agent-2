@@ -201,3 +201,6 @@ class FakeMonitor(object):
     def __init__(self, monitor_log_config):
         self.module_name = 'fake_monitor'
         self.log_config = monitor_log_config
+
+    def set_log_watcher( self, log_watcher ):
+        pass

@@ -17,6 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import datetime
 import os
 import tempfile
 import struct
@@ -50,10 +51,57 @@ class TestUtil(ScalyrTestCase):
 
         self.assertRaises(JsonReadFileException, scalyr_util.read_file_as_json, self.__path)
 
+    def test_atomic_write_dict_as_json_file(self):
+        info = { 'a': "hi" }
+        scalyr_util.atomic_write_dict_as_json_file( self.__path, self.__path + '~', info )
+
+        json_object = scalyr_util.read_file_as_json( self.__path )
+        self.assertEquals( json_object, JsonObject( a='hi' ) )
+
     def __create_file(self, path, contents):
         fp = open(path, 'w')
         fp.write(contents)
         fp.close()
+
+    def test_seconds_since_epoch( self ):
+        dt = datetime.datetime( 2015, 8, 6, 14, 40, 56 )
+        expected = 1438872056.0
+        actual = scalyr_util.seconds_since_epoch( dt )
+        self.assertEquals( expected, actual )
+
+    def test_microseconds_since_epoch( self ):
+        dt = datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
+        expected = 1438872056123456
+        actual = scalyr_util.microseconds_since_epoch( dt )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_datetime( self ):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected =  datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
+        actual = scalyr_util.rfc3339_to_datetime( s )
+
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_datetime_truncated_nano( self ):
+        s = "2015-08-06T14:40:56.123456789Z"
+        expected =  datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
+        actual = scalyr_util.rfc3339_to_datetime( s )
+
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_datetime_bad_format_date_and_time_separator( self ):
+        s = "2015-08-06 14:40:56.123456789Z"
+        expected = None
+        actual = scalyr_util.rfc3339_to_datetime( s )
+        self.assertEquals( expected, actual )
+        
+    def test_rfc3339_to_datetime_bad_format_has_timezone( self ):
+        # currently this function only handles UTC.  Remove this test if
+        # updated to be more flexible
+        s = "2015-08-06T14:40:56.123456789+04:00"
+        expected = None
+        actual = scalyr_util.rfc3339_to_datetime( s )
+        self.assertEquals( expected, actual )
 
     def test_uuid(self):
         first = scalyr_util.create_unique_id()
@@ -206,7 +254,7 @@ class TestScriptEscalator(ScalyrTestCase):
     def create_test_instance(self, current_user, config_file, config_owner):
         controller = TestScriptEscalator.ControllerMock(current_user, config_file, config_owner)
         # noinspection PyTypeChecker
-        return ScriptEscalator(controller, config_file, os.getcwd()), controller
+        return ScriptEscalator(controller, config_file, os.getcwd() ), controller
 
     class ControllerMock(object):
         def __init__(self, running_user, expected_config_file, config_owner):

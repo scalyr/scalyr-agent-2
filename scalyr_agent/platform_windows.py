@@ -449,7 +449,7 @@ class WindowsPlatformController(PlatformController):
             if hscm is not None:
                 win32service.CloseServiceHandle(hscm)
 
-    def start_agent_service(self, agent_run_method, quiet):
+    def start_agent_service(self, agent_run_method, quiet, fork):
         """Start the agent service using the platform-specific method.
 
         This method must return once the agent service has been started.
@@ -459,6 +459,8 @@ class WindowsPlatformController(PlatformController):
             function pointer (because the service is running in a separate address space and cannot be passed this
             pointer), then instead of invoking this method, you may invoke ScalyrAgent.agent_run_method instead.
         @param quiet: True if only error messages should be printed to stdout, stderr.
+        @param fork: True if the agent should run in a child process.  Note: When false, status information will not
+            work under windows.
 
         @type agent_run_method: func(PlatformController)
         @type quiet: bool
@@ -466,7 +468,12 @@ class WindowsPlatformController(PlatformController):
         # NOTE:  The config_main.py file relies on it being ok to pass in None for agent_run_method.
         # If this assumption changes, fix that in config_main.py.
         _set_config_path_registry_entry(self.__config_file_path)
-        win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
+        if fork:
+            win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
+        else:
+            if agent_run_method:
+                agent_run_method()
+
         if not quiet:
             print 'The agent has started.'
 

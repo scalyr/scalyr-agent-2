@@ -187,8 +187,11 @@ class MonitorsManager(object):
         result = []
 
         for entry in all_monitors:
+            # we pass the configuration separately even though additional paths and sample interval come
+            # from there, because other places (e.g. run_standalone_monitor) may call build_monitor with
+            # values for those that don't come from a configuration file
             result.append(MonitorsManager.build_monitor(entry, configuration.additional_monitor_module_paths,
-                          configuration.global_monitor_sample_interval))
+                          configuration.global_monitor_sample_interval, configuration))
         return result
 
     @staticmethod
@@ -222,13 +225,14 @@ class MonitorsManager(object):
         return load_monitor_class(monitor_module, os.pathsep.join(paths_to_pass))[0]
 
     @staticmethod
-    def build_monitor(monitor_config, additional_python_paths, default_sample_interval_secs):
+    def build_monitor(monitor_config, additional_python_paths, default_sample_interval_secs, global_config ):
         """Builds an instance of a ScalyrMonitor for the specified monitor configuration.
 
         @param monitor_config: The monitor configuration object for the monitor that should be created.  It will
             have keys such as 'module' that specifies the module containing the monitor, as well as others.
         @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
             instantiating the module in case it needs to packages in other directories.
+        @param global_config: The global configuration object
 
         @type monitor_config: dict
         @type additional_python_paths: str
@@ -247,4 +251,4 @@ class MonitorsManager(object):
         monitor_class = MonitorsManager.load_monitor(module_name, additional_python_paths)
 
         # Instantiate and initialize it.
-        return monitor_class(monitor_config, scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)))
+        return monitor_class(monitor_config, scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)), global_config=global_config)

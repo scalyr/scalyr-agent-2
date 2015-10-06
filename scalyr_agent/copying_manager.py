@@ -25,6 +25,7 @@ import sys
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.log_watcher import LogWatcher
 
 from scalyr_agent import json_lib
 from scalyr_agent.util import StoppableThread
@@ -34,7 +35,7 @@ from scalyr_agent.agent_status import CopyingManagerStatus
 log = scalyr_logging.getLogger(__name__)
 
 
-class CopyingParameters(object):
+class CopyingParameters( object ):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
 
@@ -167,7 +168,7 @@ class AddEventsTask(object):
         self.completion_callback = completion_callback
 
 
-class CopyingManager(StoppableThread):
+class CopyingManager(StoppableThread, LogWatcher ):
     """Manages the process of copying all configured log files to the Scalyr server.
 
     This is run as its own thread.
@@ -190,8 +191,16 @@ class CopyingManager(StoppableThread):
         """
         StoppableThread.__init__(self, name='log copier thread')
         self.__config = configuration
+        # Keep track of monitors
+        self.__monitors = monitors
+
+        # We keep track of which paths we have configs for so that when we add in the configuration for the monitor
+        # log files we don't re-add in the same path.  This can easily happen if a monitor is used multiple times
+        # but they are all just writing to the same monitor file.
+        self.__all_paths = {}
+
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = CopyingManager.__create_log_matches(configuration, monitors)
+        self.__log_matchers = self.__create_log_matches(configuration, monitors )
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -228,6 +237,11 @@ class CopyingManager(StoppableThread):
         # A semaphore that we increment when this object has begun copying files (after first scan).
         self.__copying_semaphore = threading.Semaphore()
 
+        #set the log watcher variable of all monitors.  Do this last so everything is set up
+        #and configured when the monitor receives this call
+        for monitor in monitors:
+            monitor.set_log_watcher( self )
+
     @property
     def log_matchers(self):
         """Returns the list of log matchers that were created based on the configuration and passed in monitors.
@@ -239,11 +253,51 @@ class CopyingManager(StoppableThread):
         """
         return self.__log_matchers
 
-    @staticmethod
-    def __create_log_matches(configuration, monitors):
+    def add_log_config( self, monitor, log_config ):
+        """Add the log_config item to the list of paths being watched
+        params: log_config - a log_config object containing the path to be added
+        returns: an updated log_config object
+        """
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+        try:
+            self.__lock.acquire()
+
+            if log_config['path'] not in self.__all_paths:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
+                self.__log_matchers.append( LogMatcher(self.__config, log_config) )
+                self.__all_paths[log_config['path']] = 1
+            else:
+                self.__all_paths[log_config['path']] += 1
+        finally:
+            self.__lock.release()
+
+        return log_config
+
+    def remove_log_path( self, monitor, log_path ):
+        """Remove the log_path from the list of paths being watched
+        params: log_path - a string containing the path to the file no longer being watched
+        """
+        #get the list of paths with 0 reference counts
+        try:
+            self.__lock.acquire()
+            if log_path in self.__all_paths:
+                self.__all_paths[log_path] -= 1
+
+                #paths with 0 reference counts need removing
+                if self.__all_paths[log_path] <= 0:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for monitor \'%s\'' % (log_path, monitor.module_name ) )
+                    #do the removals
+                    self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
+
+            else:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor.module_name, log_path) )
+        finally:
+            self.__lock.release()
+
+    def __create_log_matches(self, configuration, monitors ):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
-        @param configuration: The configuration object.
+        @param configuration: The Configuration object.
         @param monitors: A list of ScalyrMonitor instances whose logs should be copied.
 
         @type configuration: Configuration
@@ -254,22 +308,18 @@ class CopyingManager(StoppableThread):
         """
         configs = []
 
-        # We keep track of which paths we have configs for so that when we add in the configuration for the monitor
-        # log files we don't re-add in the same path.  This can easily happen if a monitor is used multiple times
-        # but they are all just writing to the same monitor file.
-        all_paths = {}
         for entry in configuration.log_configs:
             configs.append(entry.copy())
-            all_paths[entry['path']] = True
+            self.__all_paths[entry['path']] = 1
 
         for monitor in monitors:
             log_config = configuration.parse_log_config(
                 monitor.log_config, default_parser='agent-metrics',
                 context_description='log entry requested by module "%s"' % monitor.module_name).copy()
 
-            if log_config['path'] not in all_paths:
+            if log_config['path'] not in self.__all_paths:
                 configs.append(log_config)
-                all_paths[log_config['path']] = True
+                self.__all_paths[log_config['path']] = 1
 
             monitor.log_config = log_config
 
@@ -544,20 +594,7 @@ class CopyingManager(StoppableThread):
         # We have had problems in the past with corrupted checkpoint files due to failures during the write.
         file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
         tmp_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json~')
-        fp = None
-        try:
-            fp = open(tmp_path, 'w')
-            fp.write(json_lib.serialize(state))
-            fp.close()
-            fp = None
-            if sys.platform == 'win32' and os.path.isfile(file_path):
-                os.unlink(file_path)
-            os.rename(tmp_path, file_path)
-        except (IOError, OSError):
-            if fp is not None:
-                fp.close()
-            log.exception('Could not write checkpoint file due to error %s' % scalyr_util.get_pid_tid(),
-                          error_code='failedCheckpointWrite')
+        scalyr_util.atomic_write_dict_as_json_file( file_path, tmp_path, state )
 
     def __get_next_add_events_task(self, bytes_allowed_to_send):
         """Returns a new AddEventsTask getting all of the pending bytes from the log files that need to be copied.
