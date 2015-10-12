@@ -215,6 +215,7 @@ setup(
                         'scalyr_agent.builtin_monitors.mysql_monitor,'
                         'scalyr_agent.builtin_monitors.nginx_monitor,'
                         'scalyr_agent.builtin_monitors.shell_monitor,'
+                        'scalyr_agent.builtin_monitors.syslog_monitor,'
                         'scalyr_agent.builtin_monitors.test_monitor,'
                         'scalyr_agent.builtin_monitors.url_monitor,'
                         'scalyr_agent.builtin_monitors.windows_event_log_monitor',
