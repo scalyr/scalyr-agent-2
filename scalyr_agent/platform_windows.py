@@ -472,7 +472,7 @@ class WindowsPlatformController(PlatformController):
             win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
         else:
             if agent_run_method:
-                agent_run_method()
+                agent_run_method( self )
 
         if not quiet:
             print 'The agent has started.'
