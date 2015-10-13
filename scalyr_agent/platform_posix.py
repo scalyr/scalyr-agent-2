@@ -303,7 +303,7 @@ class PosixPlatformController(PlatformController):
             os.dup2(se.fileno(), sys.stderr.fileno())
 
             # Write out our process id to the pidfile.
-            if not self.__write_pidfile( debug_logger=debug_logger, logger=logger):
+            if not self.__write_pidfile(debug_logger=debug_logger, logger=logger):
                 reporter.report_status('alreadyRunning')
                 return False
 
@@ -498,7 +498,7 @@ class PosixPlatformController(PlatformController):
 
         return pid is not None
 
-    def start_agent_service(self, agent_run_method, quiet, fork):
+    def start_agent_service(self, agent_run_method, quiet, fork=True):
         """Start the daemon process by forking a new process.
 
         This method will invoke the agent_run_method that was passed in when initializing this object.
@@ -523,8 +523,8 @@ class PosixPlatformController(PlatformController):
         else:
             # we are not a fork, so write the pid to a file
             if not self.__write_pidfile():
-                raise AgentAlreadyRunning( 'The pidfile %s exists and indicates it is running pid=%d' % (
-                self.__pidfile, pid))
+                raise AgentAlreadyRunning('The pidfile %s exists and indicates it is running pid=%s' % (
+                    self.__pidfile, str(self.__read_pidfile())))
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
@@ -544,7 +544,6 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
-
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
