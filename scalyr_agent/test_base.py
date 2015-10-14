@@ -59,10 +59,10 @@ else:
         """
 
         def assertIsNone(self, obj, msg=None):
-            pass
+            unittest.TestCase.assertIsNone(self, obj, msg=msg)
 
         def assertIsNotNone(self, obj, msg=None):
-            pass
+            unittest.TestCase.assertIsNotNone(self, obj, msg=msg)
 
         def assertGreater(self, a, b, msg=None):
-            pass
+            unittest.TestCase.assertGreater(self, a, b, msg=msg)

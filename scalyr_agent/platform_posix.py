@@ -198,13 +198,14 @@ class PosixPlatformController(PlatformController):
 
     def __write_pidfile(self, debug_logger=None, logger=None):
         pidfile = PidfileManager(self.__pidfile)
-        pidfile.set_options(debug_logger=debug_logger, logger=logger,
-                            check_command_line=self.__verify_command_in_pidfile)
+        pidfile.set_options(debug_logger=debug_logger, logger=logger)
 
-        if not pidfile.write_pid():
+        writer = pidfile.create_writer()
+        release_callback = writer.write_pid()
+        if release_callback is None:
             return False
 
-        atexit.register(pidfile.delete_pid)
+        atexit.register(release_callback)
         return True
 
     def __daemonize(self):
@@ -303,7 +304,7 @@ class PosixPlatformController(PlatformController):
             os.dup2(se.fileno(), sys.stderr.fileno())
 
             # Write out our process id to the pidfile.
-            if not self.__write_pidfile( debug_logger=debug_logger, logger=logger):
+            if not self.__write_pidfile(debug_logger=debug_logger, logger=logger):
                 reporter.report_status('alreadyRunning')
                 return False
 
@@ -498,7 +499,7 @@ class PosixPlatformController(PlatformController):
 
         return pid is not None
 
-    def start_agent_service(self, agent_run_method, quiet, fork):
+    def start_agent_service(self, agent_run_method, quiet, fork=True):
         """Start the daemon process by forking a new process.
 
         This method will invoke the agent_run_method that was passed in when initializing this object.
@@ -523,8 +524,8 @@ class PosixPlatformController(PlatformController):
         else:
             # we are not a fork, so write the pid to a file
             if not self.__write_pidfile():
-                raise AgentAlreadyRunning( 'The pidfile %s exists and indicates it is running pid=%d' % (
-                self.__pidfile, pid))
+                raise AgentAlreadyRunning('The pidfile %s exists and indicates it is running pid=%s' % (
+                    self.__pidfile, str(self.__read_pidfile())))
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
         # get a INT, then we write a status file.. this is what a process will send us when the command
@@ -544,7 +545,6 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
-
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
@@ -696,8 +696,7 @@ class PosixPlatformController(PlatformController):
             self._log_init('%s %s' % (message, scalyr_util.get_pid_tid()))
 
         manager = PidfileManager(self.__pidfile)
-        manager.set_options(debug_logger=debug_logger, logger=logger,
-                            check_command_line=self.__verify_command_in_pidfile)
+        manager.set_options(debug_logger=debug_logger, logger=logger)
         return manager.read_pid()
 
 
@@ -715,182 +714,120 @@ class PidfileManager(object):
         @type pidfile: str
         """
         self.__pidfile = pidfile
-        # The name of the file we must get an advisory lock on whenever we attempt to write the pidfile.
-        self.__pidfile_lock = os.path.join(os.path.dirname(pidfile), '.%s.lock' % os.path.basename(pidfile))
         # A function that takes a single argument that will be invoked whenever this abstraction wishes to
         # report a message that should be included in the log.
         self.__logger = None
         # A function that takes a single argument that will be invoked whenever this abstraction wishes to
         # report a debug message.
         self.__debug_logger = None
-        # Previously, whenever we wrote a pidfile, we included both the pid of the running agent and the command
-        # of that process as read from the /proc file system.  The command line was suppose to provide some guard
-        # against the cases where the pidfile is stale, but there happens to be another process running that has
-        # the pid of the old agent process (pid reuse).  We would check both that the pid is running and that the
-        # command line of that process is still the same as what was in the pid file.  However, we think this
-        # has been causing false negatives on some systems, so we are disabling checking it by default now.  We still
-        # write the command line to the pid file, but we do not check it.  We can override this with a config option.
-        self.__check_command_line = True
-        # Whether or not we have an advisory lock on the lock file.
-        self.__locked = False
-        # The file pointer for the open lock file.  When we close this, the advisory lock will go away.
-        self.__lock_fd = None
 
-    def read_pid(self, command_line=None):
+    def read_pid(self):
         """Reads the pid file and returns the process id contained in it.
 
         This also verifies as best as it can that the process returned is running and is really an agent
         process.
 
-        @param command_line:  For testing purposes only.  The value the system should use as the command line
-            for the pid in the pid file.
-        @type command_line: str
+        Note, if the agent is just in the process of starting, this might still return None due to race conditions.
+
         @return The id of the agent process or None if there is none or it cannot be read.
         @rtype: int or None
         """
+        # The current invariants on the pidfile:
+        #    - Contents: "$pid locked\n" where $pid is the process of the running agent.
+        #          We used "locked" to distinguish that the agent is using the new method of locking the pidfile
+        #          by holding a flock on it.  Finally, it is really important we terminate it with a newline
+        #          because when we read the file, it is how we know if the file has been finished being written.
+        #    - While the agent is running:
+        #       * holds an exclusive flock on the pid file.
+        #    - When the agent terminates:
+        #       * the flock is released and the file is deleted.  Note, due to crashes, the file may not be
+        #         actually deleted.
+        #
+        # Note, we do have to handle legacy pidfiles with this code base -- after all, when we upgrade,
+        # we need the new agent to understand that the old one is still running.
+        # So, if the pidfile does not have 'locked' in it, we fall back to the scheme where we look to see if the
+        # pid is still running using a kill call.
+        pf = None
+        self._log_debug('Reading pidfile')
         try:
-            pf = file(self.__pidfile, 'r')
-            contents = pf.read().strip().split()
+            # Read the pidfile
+            try:
+                pf = file(self.__pidfile, 'r')
+                raw_contents = pf.read()
+            except IOError:
+                self._log('Checked pidfile: does not exist')
+                return None
+
+            if not '\n' in raw_contents:
+                # This means the write to the pidfile is half-finished, so we just pretend like the file
+                # did not exist.  This means the higher level code will think the agent isn't running, but
+                # that's ok because this can have false negatives (and the agent is just starting, so who's to
+                # say that we looked before it had even written the file).
+                self._log('Checked pidfile: not finished writing')
+                return None
+            contents = raw_contents.strip().split()
+
+            # Attempt to get a lock on it to see if the agent process is actually still holding a lock on it.
+            try:
+                fcntl.flock(pf, fcntl.LOCK_SH | fcntl.LOCK_NB)
+                was_locked = False
+                try:
+                    fcntl.flock(pf, fcntl.LOCK_UN)
+                except IOError, e:
+                    self._log_debug('Unexpected error seen releasing lock: %s' % str(e))
+            except IOError, e:
+                # Triggered if the LOCK_SH call fails, indicating another process holds the lock.
+                if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
+                    was_locked = True
+                else:
+                    self._log_debug('Unexpected error seen checking on lock status: %s' % str(e))
+                    was_locked = False
             pf.close()
-        except IOError:
-            self._log('Checked pidfile: does not exist')
-            return None
+            pf = None
+
+        finally:
+            if pf is not None:
+                pf.close()
 
         pid = int(contents[0])
+
+        # If the pid file was locked, we know the agent is still running.
+        if was_locked:
+            self._log('Checked pidfile: exists')
+            return pid
+
+        # If we see 'locked' in the pidfile, then we know a new agent did write it, but it's no longer running
+        # (since the file was not locked).
+        if len(contents) == 2 and contents[1] == 'locked':
+            self._log('Checked pidfile: missing-')
+            return None
+
+        # We have a legacy agent pid file.  We see if the process is still alive on the pid in the pidfile.
         try:
             os.kill(pid, 0)
         except OSError, e:
             # ESRCH indicates the process is not running, in which case we ignore the pidfile.
             if e.errno == errno.ESRCH:
-                self._log('Checked pidfile: missing')
+                self._log('Checked pidfile: missing+')
                 return None
-            # EPERM indicates the current user does not have permission to signal the process.. so it exists
-            # but may not be the agent process.  We will just try our /proc/pid/commandline trick below if we can.
+            # EPERM indicates the current user does not have permission to signal the process.. so, we just assume
+            # it is the agent.
             elif e.errno != errno.EPERM:
                 raise e
 
-        # If we got here, the process is running, and we have to see if we can determine if it is really the
-        # original agent process.  For Linux systems with /proc, we see if the commandlines match up if
-        # this instance is requested to.  For all other Posix systems, (Mac OS X, etc) we bail for now.
+        self._log('Checked pidfile: exists*')
+        return pid
 
-        # Read the command line of the current agent process as stored in the pidfile.  None means it
-        # could not be read.
-        if len(contents) >= 2:
-            command_line_from_pidfile = contents[1]
-        else:
-            self._log_debug('Could not retrieve commandline from pidfile')
-            command_line_from_pidfile = None
+    def create_writer(self):
+        """Creates an object that will help atomically locking the pidfile and updating it to point to the
+        current process.
 
-        # Get the commandline of the process whose pid is stored in the pidfile.  This is only set to
-        # None if we cannot retrieve it.
-        if _can_read_command_line(pid) and command_line is None:
-            command_line = _read_command_line(pid)
-        else:
-            self._log_debug('Could not retrieve commandline from /proc')
-
-        # We can only attempt the check if we had a pidfile that contained the commandline -- otherwise
-        # we might be working with an old pidfile that doesn't have it.
-        if command_line_from_pidfile is not None:
-            commands_match = command_line_from_pidfile == command_line
-        else:
-            commands_match = True
-
-        # We always log a message if we see a command mismatch because this could be an indication of a bug
-        if not commands_match:
-            self._log('Mismatch between commands seen in pidfile and on /proc: "%s" vs "%s"' %
-                      (str(command_line_from_pidfile), str(command_line)))
-
-        if not self.__check_command_line:
-            self._log('Checked pidfile: exists')
-            return pid
-        elif command_line is None:
-            # We could not read the command from /proc so we do not do the check either.
-            self._log('Checked pidfile: exists*')
-            return pid
-        elif command_line_from_pidfile is None:
-            # There was no command line in the pidfile, so we skip the check as well..
-            self._log('Checked pidfile: exists#')
-            return pid
-
-        if commands_match:
-            self._log('Checked pidfile: exists+')
-            return pid
-        else:
-            self._log('Checked pidfile: missing+')
-            return None
-
-    def write_pid(self, pid=None, command_line=None):
-        """Attempts to update the pidfile to write the pid of the current process in it.
-
-        This will not succeed if another running process's pid is already in the pidfile.
-
-        @param pid:  For testing purposes only.  The pid to write into the file (instead of the current process's pid).
-        @param command_line:  For testing purposes only.  The command line to use when writing into the pidfile
-            instead of the command line of the current process.
-
-        @type pid: int
-        @type command_line: str or unknown
-        @return:  True iff the pid file was successfully updated with this process's pid.  False if there is another
-            pid in the pidfile of a running process.
-        @rtype: bool
+        @return: An object that can be used to write the pid.
+        @rtype: PidfileManager.PidWriter
         """
-        # write pidfile.  We only allow writing to the pidfile if you have an advisory lock on the lock file.
-        # This will block until we have the lock, but that's ok.
-        self._log('Writing pidfile')
-        self._lock_pidfile()
-        try:
-            # Once we have the lock, we have to make sure the original pid file still indicates an agent process
-            # is still not running.  We have to be holding the lock when we read this to make sure it is a true
-            # compare and swap.
-            if self.read_pid() is not None:
-                self._log('Did not write pidfile: exists')
-                return False
+        return PidfileManager.PidWriter(self.__pidfile, self)
 
-            # Now we can write it.
-            if pid is None:
-                pid = os.getpid()
-
-            # To make updating the pidfile atomic, we first write to a temporary file and then rename it.
-            tmp_pidfile = '%s.tmp' % self.__pidfile
-            fp = None
-            try:
-                fp = file(tmp_pidfile, 'w+')
-                # If we are on an OS that supports reading the commandline arguments from /proc, then use that
-                # to write more unique information about the running process to help avoid pid collison.
-                if _can_read_command_line(pid) or command_line is not None:
-                    if command_line is None:
-                        command_line = _read_command_line(pid)
-                    fp.write('%d %s\n' % (pid, command_line))
-                    self._log('Wrote pidfile+, commit pending')
-                else:
-                    fp.write('%d\n' % pid)
-                    self._log('Wrote pidfile, commit pending')
-
-                # make sure that all data is on disk
-                # see http://stackoverflow.com/questions/7433057/is-rename-without-fsync-safe
-                fp.flush()
-                os.fsync(fp.fileno())
-                fp.close()
-
-                fp = None
-
-            finally:
-                if fp is not None:
-                    fp.close()
-
-            os.rename(tmp_pidfile, self.__pidfile)
-            self._log('Committed pidfile')
-            return True
-
-        finally:
-            self._unlock_pidfile()
-
-    def delete_pid(self):
-        """Deletes the pid file"""
-        if os.path.isfile(self.__pidfile):
-            os.remove(self.__pidfile)
-
-    def set_options(self, logger=None, debug_logger=None, check_command_line=None):
+    def set_options(self, logger=None, debug_logger=None):
         """Sets some options related to managing the pid.
 
         @param logger A callback that takes a single argument ``message``.  This callback will be invoked
@@ -899,68 +836,14 @@ class PidfileManager(object):
             the pidfile is being checked.
         @param debug_logger A callback that takes a single argument ``message``.  This callback will be invoked
             whenever the abstraction wishes to log a debug message.
-        @param check_command_line:  Whether or not, when reading the pidfile, the command in the pidfile should
-            be checked against the running process in order to verify it is still the same process.  This is
-            an advanced option to help protect against issues due to pid reuse, but in practice, we believe this
-            is causing false negatives and are disabling it for now.
 
         @type logger: Function(str)
         @type debug_logger: Function(str)
-        @type check_command_line: bool
         """
         if logger is not None:
             self.__logger = logger
         if debug_logger is not None:
             self.__debug_logger = debug_logger
-        if check_command_line is not None:
-            self.__check_command_line = check_command_line
-
-    def _lock_pidfile(self):
-        """Blocks until this process has an advisory lock on the pidfile's lock file.
-        """
-        if self.__lock_fd is not None:
-            raise Exception('Trying to lock pidfile when it is already locked.')
-        # We have to be sure we create the pidfile lock only once so everyone sees it.
-        attempts = 50
-        if not os.path.isfile(self.__pidfile_lock):
-            self._log('Creating pid lock file')
-        while not os.path.isfile(self.__pidfile_lock) and attempts > 0:
-            attempts -= 1
-            fd = None
-            try:
-                try:
-                    fd = os.open(self.__pidfile_lock, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-                    """ @type: int"""
-                    os.write(fd, 'lock\n')
-                    os.close(fd)
-                    fd = None
-                except OSError, e:
-                    if e.errno == errno.EEXIST:
-                        continue
-                    else:
-                        raise e
-            finally:
-                if fd is not None:
-                    os.close(fd)
-
-        if not os.path.isfile(self.__pidfile_lock):
-            raise Exception('Could not create the pid lock file for some reason')
-
-        self.__lock_fd = file(self.__pidfile_lock, 'w')
-         # This will block until we are the only process with a lock on the file.  Blocking is ok for now..
-        fcntl.lockf(self.__lock_fd, fcntl.LOCK_EX)
-        self.__locked = True
-
-    def _unlock_pidfile(self):
-        """Release this process's advisory lock on the pidfile's lock file.
-        """
-        if self.__lock_fd is None or not self.__locked:
-            raise Exception('Trying to unlock pidfile when it is not locked.')
-        try:
-            self.__lock_fd.close()
-            self.__locked = False
-        finally:
-            self.__lock_fd = None
 
     def _log_debug(self, message):
         if self.__debug_logger is not None:
@@ -969,6 +852,194 @@ class PidfileManager(object):
     def _log(self, message):
         if self.__logger is not None:
             self.__logger(message)
+
+    class PidWriter(object):
+        """Used to atomically acquire the lock on the pidfile and rewrite its contents to point to
+        the current process.
+
+        This abstraction breaks acquiring the lock into a separate operation from updating it.  That's because
+        we could acquire the lock before we fork the agent, because flocks are passed to child processes.  This
+        would simplify the child process' logic (because it would know for sure it can be the new agent).  However,
+        this approach is currently controlled using a config flag because not all POSIX systems have a true
+        implement of flock and I'm too nervous to turn it on.  After all, it just solves a very particular
+        race condition.
+        """
+        def __init__(self, pidfile, manager):
+            """Initializes the writer.
+
+            @param pidfile  The path to the pidfile.
+            @param manager:  The instance of the manager that created this writer.
+            @type pidfile: str
+            @type manager: PidfileManager
+            """
+            self.__pidfile = pidfile
+            self.__manager = manager
+            self.__locked_fd = None
+
+        def acquire_pid_lock(self):
+            """Atomically acquire the lock on the pid file, if no one else has the lock.
+
+            If the file does not exist, this call will create it.  If the file does exist, its contents
+            are not changed until ``write_pid`` is actually invoked.
+
+            You do not need to invoke this before ``write_pid``.  If it has not been invoked, ``write_pid`` will
+            acquire the lock.
+
+            This can be used by a parent process to lock the pidfile and then have a forked child process actually
+            write its pid to the pidfile.
+
+            This method is guaranteed to not give false positive (saying you have the lock when there is another
+            process has it).
+
+            @return:  If the lock was acquired, then a function that, when invoked, will release the lock.  If
+                the lock was not acquired, None.  Note, you may disregard the returned function if you subsequently
+                invoke ``write_pid``.  IMPORTANT:  Do not release the lock on the pidfile until the agent process
+                terminates.
+            @rtype: Func
+            """
+            # By the time we leave this method, we must either have a lock on the file
+            # or we saw that the file exists and we could not get the lock on it.
+
+            # Note, it's important to call read_pid to see if it things an agent is running since ``read_pid``
+            # checks legancy pid methods, whereas the code below only checks the current pid scheme.
+            if self.__manager.read_pid() is not None:
+                return None
+
+            # Check if file exists, and if not, we have to be sure to create exclusively... we have to guarantee
+            # that there is only one inode out there for this file among all processes ... we can't create the
+            # file in one process, get an fd for it, and then have another process create the file again (unknowningly
+            # overwriting the first one) and get another fd for it.  That would mean they would be getting locks on
+            # different files.
+            fd = None
+            """ @type: int"""
+            if not os.path.isfile(self.__pidfile):
+                try:
+                    self._log_debug('Creating pidfile')
+                    fd = os.open(self.__pidfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                except OSError, e:
+                    if e.errno != errno.EEXIST:
+                        raise e
+
+            if fd is None:
+                try:
+                    # If the file already exist, open it for write.. but be sure not to create it if it does not
+                    # exist.  That would mean someone, since our os.path.isfile check deleted it... which means
+                    # an agent just finished... we pretend like we got a colision and couldn't become the agent.
+                    fd = os.open(self.__pidfile, os.O_WRONLY)
+                    self._log_debug('Opened pidfile for writing')
+                except OSError, e:
+                    if e.errno == errno.ENOENT:
+                        # Someone just deleted the pid file.. an agent is just finishing, so just say we couldn't
+                        # acquire the lock.
+                        self._log('Acquire pidfile failed*')
+                        return None
+                    else:
+                        raise e
+
+            fp = None
+            try:
+                try:
+                    # Grab the lock on the file if possible.
+                    fp = os.fdopen(fd, 'w')
+                    fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except IOError, e:
+                    if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
+                        # Someone else had the lock.
+                        self._log('Acquire pidfile failed-')
+                        return None
+                    else:
+                        raise e
+
+                self.__locked_fd = fp
+                self._log('Acquire succeeded')
+                fp = None
+                fd = None
+                return self.__release_lock
+            finally:
+                if fp is not None:
+                    fp.close()
+                elif fd is not None:
+                    os.close(fd)
+
+        def write_pid(self, pid=None):
+            """Writes the current process id into the pid file, acquiring the lock if needed.
+
+            This must be invoked to actually update the contents of the pidfile.  It is not necessary to invoke
+            ``acquire_pid_lock`` before invoking this method.
+
+            This will not return a false positive.  If the method indicates the pidfile was successfully locked
+            and acquired, then no other process believes it is the agent.
+
+            @param pid:  The pid to write into the pidfile.  This is only used for testing.  If None, the current
+                processes pid is used.
+            @type pid: int
+            @return:  If the lock was acquired and the pid was successfully written, then returns a function that, when
+                invoked, will release the lock.  This function should be used in place of any previous one returned
+                by ``acquire_pid_lock``.  IMPORTANT:  Do not release the lock on the pidfile until the agent process
+                terminates.
+            @rtype: Func
+            """
+            if self.__locked_fd is None:
+                self.acquire_pid_lock()
+            else:
+                # If we already acquire_pid_lock was already invoked, then we might be using the scheme where a
+                # parent process acquired it separately.  To help cover over the fact some POSIX systems do not
+                # have a proper flock implementation, try to make sure we really have the lock.
+                try:
+                    fcntl.flock(self.__locked_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    self._log_debug('Refreshed pidfile lock')
+                except IOError, e:
+                    if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
+                        self._log('Write pidfile failed-')
+                        return None
+                    else:
+                        raise e
+
+            if self.__locked_fd is None:
+                self._log('Write pidfile failed+')
+                return None
+
+            if pid is None:
+                pid = os.getpid()
+
+            fp = self.__locked_fd
+            fp.truncate()
+            # Very important that we terminate this with a newline.
+            fp.write('%d locked\n' % pid)
+            self._log('Wrote pidfile')
+
+            # make sure that all data is on disk
+            fp.flush()
+            os.fsync(fp.fileno())
+
+            return self.__release_lock
+
+        def __release_lock(self):
+            """Invoked to release the lock on the pidfile.
+
+            This should only be called when the process terminates.
+            @return:
+            @rtype:
+            """
+            if self.__locked_fd is None:
+                return
+
+            os.unlink(self.__pidfile)
+            try:
+                fcntl.flock(self.__locked_fd, fcntl.LOCK_UN)
+            except IOError, e:
+                self._log('Unexpected error seen releasing lock: %s' % str(e))
+
+            self.__locked_fd.close()
+            self.__locked_fd = None
+
+        def _log_debug(self, message):
+            # noinspection PyProtectedMember
+            self.__manager._log_debug(message)
+
+        def _log(self, message):
+            # noinspection PyProtectedMember
+            self.__manager._log(message)
 
 
 class StatusReporter(object):

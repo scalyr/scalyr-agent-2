@@ -17,7 +17,7 @@
 import os
 import tempfile
 import errno
-import threading
+import fcntl
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -60,39 +60,89 @@ class TestPidfileManager(ScalyrTestCase):
         """@type: PidfileManager"""
         self.__logged_messages = []
 
+    # read pid no existing file
+    # read pid not finished writing
+    # read pid with lock
+    # read pid with lock not held
+    # read pid of old format no pid
+    # read pid of old format with pid
+
+    # write pid no existing
+    # write pid with existing
+    # try to write pid with someone holding lock
+    # try to write pid with someone with the legacy format with active pid
+
     def test_read_pid_no_existing_pidfile(self):
         self.assertIsNone(self.__test_manager.read_pid())
 
-    def test_write_pid_no_existing_pidfile(self):
-        my_pid = os.getpid()
-        self.__test_manager.write_pid(pid=my_pid)
-        self.assertEquals(self.__test_manager.read_pid(), my_pid)
-
-    def test_read_pid_existing_pidfile_with_stale_pid(self):
-        self._write_pid(pid=self._find_unused_pid())
+    def test_read_pid_write_not_finished(self):
+        self._write_pidfile_contents('12345')
         self.assertIsNone(self.__test_manager.read_pid())
 
-    def test_read_pid_command_matching(self):
-        self.__test_manager.set_options(check_command_line=True)
-        my_pid = os.getpid()
-        self.__test_manager.write_pid(pid=my_pid, command_line='foo')
-        # Test the case where the command comes back the same as what we originally wrote.
-        self.assertEquals(self.__test_manager.read_pid(command_line='foo'), my_pid)
-        # Test the case where the command comes back different as what we originally wrote.
-        self.assertNotEqual(self.__test_manager.read_pid(command_line='bar'), my_pid)
+    def test_read_pid_pidfile_empty(self):
+        self._write_pidfile_contents('')
+        self.assertIsNone(self.__test_manager.read_pid())
 
-    def test_read_pid_not_matching_command(self):
-        self.__test_manager.set_options(check_command_line=False)
-        my_pid = os.getpid()
-        self.__test_manager.write_pid(pid=my_pid, command_line='foo')
-        # Test the case where the command comes back the same as what we originally wrote.
-        self.assertEquals(self.__test_manager.read_pid(command_line='foo'), my_pid)
-        # Test the case where the command comes back different as what we originally wrote.
-        self.assertEquals(self.__test_manager.read_pid(command_line='bar'), my_pid)
+    def test_read_pid_with_agent_running(self):
+        release_lock = self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=True)
+        self.assertEquals(os.getpid(), self.__test_manager.read_pid())
+        release_lock()
+
+    def test_read_pid_with_agent_gone_without_delete(self):
+        self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=False)
+        self.assertIsNone(self.__test_manager.read_pid())
+
+    def test_read_pid_old_format_pid_not_running(self):
+        self._write_pidfile_contents('%s command\n' % self._find_unused_pid(), hold_lock=False)
+        self.assertIsNone(self.__test_manager.read_pid())
+
+    def test_read_pid_old_format_pid_running(self):
+        self._write_pidfile_contents('%s command\n' % os.getpid(), hold_lock=False)
+        self.assertEquals(os.getpid(), self.__test_manager.read_pid())
+
+    def test_write_pid_no_existing(self):
+        self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
+        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+
+    def test_write_pid_with_existing_but_not_running(self):
+        self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=False)
+        self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
+        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+
+    def test_write_pid_while_already_running(self):
+        releaser = self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=True)
+        self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
+        releaser()
+
+    def test_write_pid_while_legacy_agent_running(self):
+        self._write_pidfile_contents('%s command\n' % os.getpid(), hold_lock=False)
+        self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
+
+    def test_release_after_write_pid(self):
+        release_lock = self.__test_manager.create_writer().write_pid(pid=1234)
+        release_lock()
+
+        self.assertFalse(os.path.isfile(self.__pidfile_name))
+
+        release_lock = self.__test_manager.create_writer().write_pid(pid=1234)
+        self.assertIsNotNone(release_lock)
+        release_lock()
+
+    def test_acquire_then_write_pid(self):
+        writer = self.__test_manager.create_writer()
+        release_lock = writer.acquire_pid_lock()
+        self.assertIsNotNone(release_lock)
+
+        release_lock = writer.write_pid(pid=1234)
+        self.assertIsNotNone(release_lock)
+
+        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+        release_lock()
 
     def test_logger(self):
         def log_it(message):
             self.__logged_messages.append(message)
+
         self.__test_manager.set_options(logger=log_it)
         self.__test_manager.read_pid()
         self.assertGreater(len(self.__logged_messages), 0)
@@ -100,31 +150,10 @@ class TestPidfileManager(ScalyrTestCase):
     def test_debug_logger(self):
         def log_it(message):
             self.__logged_messages.append(message)
+
         self.__test_manager.set_options(debug_logger=log_it)
         self.__test_manager.read_pid()
         self.assertGreater(len(self.__logged_messages), 0)
-
-    def test_write_pid_detects_new_agent_during_write(self):
-        self.__test_manager = InstrumentedPidfileManager(self.__pidfile_name)
-        self.__test_manager.simulate_block()
-
-        other_agent_is_alive = [False]
-
-        def attempt_to_write_pid():
-            other_agent_is_alive[0] = not self.__test_manager.write_pid(pid=-1)
-
-        thread = threading.Thread(target=attempt_to_write_pid)
-        thread.start()
-
-        self.__test_manager.wait_until_blocked()
-        my_pid = os.getpid()
-        self._write_pid(my_pid)
-        self.__test_manager.simulate_unblock()
-
-        thread.join()
-
-        self.assertTrue(other_agent_is_alive)
-        self.assertEquals(self.__test_manager.read_pid(), my_pid)
 
     def _create_tempfile_name(self):
         handle, name = tempfile.mkstemp()
@@ -136,10 +165,34 @@ class TestPidfileManager(ScalyrTestCase):
             os.unlink(name)
         return name
 
-    def _write_pid(self, pid):
-        manager = PidfileManager(self.__pidfile_name)
-        manager.write_pid(pid=pid)
+    def _write_pidfile_contents(self, contents, hold_lock=False):
+        fp = open(self.__pidfile_name, 'w')
+        if len(contents) > 0:
+            fp.write(contents)
+            fp.flush()
 
+        def release_it():
+            fcntl.flock(fp, fcntl.LOCK_UN)
+            fp.close()
+
+        if hold_lock:
+            fcntl.flock(fp, fcntl.LOCK_EX)
+            return release_it
+        else:
+            fp.close()
+            return None
+
+    def _read_pidfile_contents(self):
+        fp = open(self.__pidfile_name, 'r')
+        result = fp.read()
+        fp.close()
+        return result
+
+
+    # def _write_pid(self, pid):
+    #     manager = PidfileManager(self.__pidfile_name)
+    #     manager.write_pid(pid=pid)
+    #
     def _find_unused_pid(self):
         result = 10000
         while True:
@@ -150,55 +203,6 @@ class TestPidfileManager(ScalyrTestCase):
                 if e.errno == errno.ESRCH:
                     return result
             result += 1
-
-
-class InstrumentedPidfileManager(PidfileManager):
-    def __init__(self, pidfile):
-        self.__is_blocking = False
-        self.__is_blocking_condition = threading.Condition()
-        self.__unblock = True
-        self.__unblock_condition = threading.Condition()
-
-        PidfileManager.__init__(self, pidfile)
-
-    def _lock_pidfile(self):
-        self.__is_blocking_condition.acquire()
-        self.__is_blocking = True
-        self.__is_blocking_condition.notifyAll()
-        self.__is_blocking_condition.release()
-
-        self.__unblock_condition.acquire()
-        try:
-            while True:
-                if self.__unblock:
-                    return
-                self.__unblock_condition.wait()
-        finally:
-            self.__unblock_condition.release()
-
-    def _unlock_pidfile(self):
-        return
-
-    def wait_until_blocked(self):
-        self.__is_blocking_condition.acquire()
-        try:
-            while True:
-                if self.__is_blocking:
-                    return
-                self.__is_blocking_condition.wait()
-        finally:
-            self.__is_blocking_condition.release()
-
-    def simulate_unblock(self):
-        self.__unblock_condition.acquire()
-        self.__unblock = True
-        self.__unblock_condition.notifyAll()
-        self.__unblock_condition.release()
-
-    def simulate_block(self):
-        self.__unblock_condition.acquire()
-        self.__unblock = False
-        self.__unblock_condition.release()
 
 # Disable these tests on non-POSIX
 if os.name != 'posix':
