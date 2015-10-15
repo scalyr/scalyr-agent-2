@@ -612,6 +612,9 @@ class CopyingManager(StoppableThread, LogWatcher ):
         # Initialize the looping variable to the processor we last left off at on a previous run through this method.
         # This is an index into the __log_processors list.
         current_processor = self.__current_processor
+        # The list could have shrunk since the last time we were in this loop, so adjust current_process if needed.
+        if current_processor >= len(self.__log_processors):
+            current_processor = 0
 
         # Track which processor we first look at in this method.
         first_processor = current_processor
