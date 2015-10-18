@@ -74,11 +74,6 @@ define_config_option( __monitor__, 'log_timestamps',
                      'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
                      convert_to=bool, default=False)
 
-define_config_option( __monitor__, 'host_hostname',
-                     'Optional (defaults to HOST_HOSTNAME). An environment variable containing the hostname of the docker host.  If the environment'
-                     'varible exists and is set, then the plugin will add a serverHost attribute containing this value to each of the docker logs.\n',
-                     convert_to=str, default='HOST_HOSTNAME')
-
 class DockerRequest( object ):
 
     def __init__( self, sock_file, max_request_size=64*1024 ):
@@ -370,8 +365,17 @@ class DockerMonitor( ScalyrMonitor ):
 
     def _initialize( self ):
         data_path = ""
+        self.__host_hostname = ""
         if self._global_config:
             data_path = self._global_config.agent_data_path
+
+            if self._global_config.server_attributes:
+                if 'serverHost' in self._global_config.server_attributes:
+                    self.__host_hostname = self._global_config.server_attributes['serverHost']
+                else:
+                    self._logger.info( "no server host in server attributes" )
+            else:
+                self._logger.info( "no server attributes in global config" )
 
         self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
 
@@ -380,10 +384,6 @@ class DockerMonitor( ScalyrMonitor ):
         self.container_id = self.__get_scalyr_container_id( self.__socket_file )
         self.__log_watcher = None
         self.__start_time = time.time()
-
-        hostname_var = self._config.get( 'host_hostname' )
-
-        self.__host_hostname = os.getenv( hostname_var, '' ).strip()
 
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
