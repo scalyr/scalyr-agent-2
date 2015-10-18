@@ -449,7 +449,7 @@ class WindowsPlatformController(PlatformController):
             if hscm is not None:
                 win32service.CloseServiceHandle(hscm)
 
-    def start_agent_service(self, agent_run_method, quiet, fork):
+    def start_agent_service(self, agent_run_method, quiet, fork=True):
         """Start the agent service using the platform-specific method.
 
         This method must return once the agent service has been started.
@@ -472,7 +472,7 @@ class WindowsPlatformController(PlatformController):
             win32serviceutil.StartService(_SCALYR_AGENT_SERVICE_)
         else:
             if agent_run_method:
-                agent_run_method( self )
+                agent_run_method(self)
 
         if not quiet:
             print 'The agent has started.'
