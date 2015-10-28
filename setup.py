@@ -43,6 +43,7 @@ from codecs import open  # To use a consistent encoding
 from os import path
 
 import os
+import re
 import sys
 import shutil
 
@@ -51,7 +52,25 @@ if path.isdir('source_root'):
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
 
+_file_version = SCALYR_VERSION
+
 if "win32" == sys.platform:
+
+    # For prereleases, we use weird version numbers like 4.0.4.pre5.1 .  That does not work for Windows which
+    # requires X.X.X.X.  So, we convert if necessary.
+    if len(_file_version.split('.')) == 5:
+        parts = _file_version.split('.')
+        del parts[3]
+        _file_version = '.'.join(parts)
+
+    version = re.compile( '^\d+(\.\d+)?(\.\d+)?(\.\d+)?$' )
+
+    # if we still don't have a valid version string, then bail
+    if not version.match( _file_version ):
+        #we have an unknown version string - so bail
+        raise Exception( "Invalid version string: %s\nThis will cause issues with the windows installer, which requires version strings to be N.N.N.N" % _file_version )
+
+
     # ModuleFinder can't handle runtime changes to __path__, but win32com uses them
     try:
         # py2exe 0.6.4 introduced a replacement modulefinder.
@@ -85,7 +104,7 @@ with open(path.join(get_install_root(), 'DESCRIPTION.rst'), encoding='utf-8') as
 
 class Target:
     def __init__(self, **kw):
-        self.version = SCALYR_VERSION
+        self.version = _file_version
         self.description = 'TODO'
         self.copyright = 'TODO'
         self.__dict__.update(kw)
@@ -117,7 +136,7 @@ else:
 setup(
     name='scalyr-agent-2',
 
-    version=SCALYR_VERSION,
+    version=_file_version,
 
     description='The Python modules that implements Scalyr Agent 2',
     long_description=long_description,
