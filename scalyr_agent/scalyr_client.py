@@ -257,7 +257,9 @@ class ScalyrClientSession(object):
                     log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
                     self.__connection.request('GET', request_path, headers=self.__standard_headers)
 
-                response = self.__connection.getresponse().read()
+                http_response = self.__connection.getresponse()
+                status_code = http_response.status
+                response = http_response.read()
                 bytes_received = len(response)
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
@@ -272,6 +274,11 @@ class ScalyrClientSession(object):
 
             log.log(scalyr_logging.DEBUG_LEVEL_5, 'Response was received with body \"%s\"', response)
 
+            if status_code == 429:
+                log.error('Received "too busy" response from server.  Will re-attempt',
+                          error_code='serverTooBusy')
+                return 'serverTooBusy', len(body_str), response
+
             # If we got back an empty result, that often means the connection has been closed or reset.
             if len(response) == 0:
                 log.error('Received empty response, server may have reset connection.  Will re-attempt',
@@ -284,9 +291,9 @@ class ScalyrClientSession(object):
                 response_as_json = json_lib.parse(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
-                log.exception('Failed to parse response of \'%s\' due to exception.  Closing connection, will '
-                              're-attempt', scalyr_util.remove_newlines_and_truncate(response, 1000),
-                              error_code='parseResponseFailed')
+                log.error('Failed to parse response of \'%s\' due to exception.  Closing connection, will '
+                          're-attempt', scalyr_util.remove_newlines_and_truncate(response, 1000),
+                          error_code='parseResponseFailed')
                 return 'parseResponseFailed', len(body_str), response
 
             self.__last_success = current_time
