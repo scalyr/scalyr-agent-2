@@ -45,8 +45,8 @@ stanzas in your configuration file. Specify a different ``message_log`` for each
 different port number. Then configure each device to send to the appropriate port.
 
 syslog_monitor logs use a parser named ``agentSyslog``. To set up parsing for your syslog messages, go to the
-[Parser Setup Page](/parsers?parser=agentSyslog) and click {{menuRef:Leave it to Us}} or
-{{menuRef:Build Parser By Hand}}. If you are using multiple syslog_monitor stanzas, you can specify a different
+[Parser Setup Page](/parsers) and click one of the action buttons for the agentSyslog parser, such as
+{{menuRef:Ask us to create for you}}. If you are using multiple syslog_monitor stanzas, you can specify a different
 parser for each one, using the ``parser`` option.
 
 
