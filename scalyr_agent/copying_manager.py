@@ -380,7 +380,7 @@ class CopyingManager(StoppableThread, LogWatcher ):
                 checkpoints_state = self.__read_checkpoint_state()
                 if checkpoints_state is None:
                     log.info(
-                        'The checkpoints could not be read.  All logs will be copied starting at their current end')
+                        'The checkpoints were not read.  All logs will be copied starting at their current end')
                 elif (current_time - checkpoints_state['time']) > self.__config.max_allowed_checkpoint_age:
                     log.warn('The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
                              'be copied starting at their current end.', scalyr_util.format_time(
