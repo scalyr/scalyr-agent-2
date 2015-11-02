@@ -21,7 +21,7 @@ import os
 import re
 import scalyr_agent.third_party.tcollector.tcollector as tcollector
 from Queue import Empty
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration, define_metric, define_log_field
+from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration, define_metric, define_log_field, define_config_option
 from scalyr_agent.third_party.tcollector.tcollector import ReaderThread
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent import StoppableThread
@@ -228,6 +228,10 @@ define_log_field(__monitor__, 'monitor', 'Always ``linux_system_metrics``.')
 define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "proc.stat.cpu".')
 define_log_field(__monitor__, 'value', 'The metric value.')
 
+define_config_option(__monitor__, 'network_interface_prefixes',
+                     'The prefixes for the network interfaces to gather statistics for.  This is either a string '
+                     'or a list of strings.  The prefix must be the entire string starting after ``/dev/`` and to the'
+                     'first numeric digit.  For example, ``eth`` matches all devices starting with ``/dev/eth``.')
 
 class TcollectorOptions(object):
     """Bare minimum implementation of an object to represent the tcollector options.
@@ -240,6 +244,8 @@ class TcollectorOptions(object):
         # An option we created to prevent the tcollector code from failing on fatal in certain locations.
         # Instead, an exception will be thrown.
         self.no_fatal_on_error = True
+        # A list of the prefixes for network interfaces to report.  Usually defaults to ["eth"]
+        self.network_interface_prefixes = None
 
 
 class WriterThread(StoppableThread):
@@ -369,6 +375,10 @@ class SystemMetricsMonitor(ScalyrMonitor):
 
         self.options = TcollectorOptions()
         self.options.cdir = collector_directory
+
+        self.options.network_interface_prefixes = self._config('network_interface_prefixes', default="eth")
+        if isinstance(self.options.network_interface_prefixes, basestring):
+            self.options.network_interface_prefixes = [self.options.network_interface_prefixes]
 
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags

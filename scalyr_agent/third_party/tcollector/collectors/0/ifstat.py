@@ -41,10 +41,24 @@ try:
 except ValueError:
     pass
 
+# Scalyr edit:  Check environment variable for for additional network interface prefixes.
+NETWORK_INTERFACE_PREFIX = "eth"
+
+try:
+    if "TCOLLECTOR_INTERFACE_PREFIX" in os.environ:
+        NETWORK_INTERFACE_PREFIX = os.environ["TCOLLECTOR_INTERFACE_PREFIX"]
+except ValueError:
+    pass
+
 
 def main():
     """ifstat main loop"""
     interval = COLLECTION_INTERVAL
+
+    # Scalyr edit:
+    network_interface_prefixes = str.split(NETWORK_INTERFACE_PREFIX)
+    for i in range(len(network_interface_prefixes)):
+        network_interface_prefixes[i] = network_interface_prefixes[i].strip()
 
     f_netdev = open("/proc/net/dev", "r")
 
@@ -60,7 +74,11 @@ def main():
         f_netdev.seek(0)
         ts = int(time.time())
         for line in f_netdev:
-            m = re.match("\s+(eth\d+):(.*)", line)
+            # Scalyr edit
+            for interface in network_interface_prefixes:
+                m = re.match("\s+(%s\d+):(.*)" % interface, line)
+                if m:
+                    break
             if not m:
                 continue
             stats = m.group(2).split(None)

@@ -810,6 +810,8 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
     # Scalyr edit: Set the environment variable to override the sample intervals when the collectors are spawned.
     # This relies on the individual collectors checking this variable.
     os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = str(sample_interval_secs)
+    # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
+    os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(options.network_interface_prefixes)
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():

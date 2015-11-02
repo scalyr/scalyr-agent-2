@@ -16,6 +16,7 @@ Features:
 * Enabled ``syslog_monitor`` for Windows platforms
 * Preview release of ``windows_event_log_monitor``, a monitor for copying the Windows event log to Scalyr.
 * Preview release of docker support.  E-mail contact@scalyr.com for more details
+* Added new option ``network_interface_prefixes`` to linux_system_metrics monitor to override the prefix for monitored network interfaces.
 
 Bug fixes:
 
