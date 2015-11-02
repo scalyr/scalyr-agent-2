@@ -428,7 +428,7 @@ class DockerMonitor( ScalyrMonitor ):
         try:
             checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
         except:
-            self._logger.info( "Error reading checkpoint file '%s'.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
+            self._logger.info( "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
             checkpoints = {}
 
         if checkpoints:

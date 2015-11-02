@@ -41,6 +41,11 @@ define_config_option(__monitor__, 'event_types',
                      'Valid values are: All, Error, Warning, Information, AuditSuccess and AuditFailure',
                      default='All', convert_to=str)
 
+define_config_option(__monitor__, 'maximum_records_per_source',
+                     'Optional (defaults to ``10000``). The maximum number of records to read from the end of each log source'
+                     'per gather_sample.\n',
+                     default='10000', convert_to=int)
+
 define_config_option(__monitor__, 'error_repeat_interval',
                      'Optional (defaults to ``300``). The number of seconds to wait before logging similar errors in the event log.\n',
                      default='300', convert_to=int)
@@ -84,10 +89,11 @@ and System sources:
         self.__checkpoint_file = os.path.join( data_path, "windows-event-checkpoints.json" )
         self.__checkpoints = {}
 
+        self.__maximum_records = self._config.get('maximum_records_per_source')
+
         #convert sources into a list
         sources = self._config.get( 'sources' )
         self.__source_list = [s.strip() for s in sources.split(',')]
-        self.__event_logs = {}
 
         #convert event types in to a list
         event_types = self._config.get( 'event_types' )
@@ -121,7 +127,7 @@ and System sources:
         try:
             checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
         except:
-            self._logger.info( "Error reading checkpoint file '%s'.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
+            self._logger.info( "No checkpoint file '%s' exists.\nAll logs will be read starting from their current end.", self.__checkpoint_file )
             checkpoints = {}
 
         if checkpoints:
@@ -134,34 +140,47 @@ and System sources:
             tmp_file = self.__checkpoint_file + '~'
             scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
 
-    def __read_from_event_log( self, source, event_log, event_types ):
+    def __read_from_event_log( self, source, event_types ):
 
-        flags = win32evtlog.EVENTLOG_FORWARDS_READ|win32evtlog.EVENTLOG_SEEK_READ
+        event_log = win32evtlog.OpenEventLog( self.__server, source )
+        if not event_log:
+            self._logger.error( "Unknown error opening event log for '%s'" % source )
+            return
+
+        #we read events in reverse from the end of the log to avoid problems when
+        #seeking directly to a record in a large log file
+        flags = win32evtlog.EVENTLOG_BACKWARDS_READ|win32evtlog.EVENTLOG_SEQUENTIAL_READ
 
         offset = 0
 
-        #use the checkpoint
+        #use the checkpoint if it exists
         if source in self.__checkpoints:
             offset = self.__checkpoints[source]
-        else:
-            # or the most recent log if there was no checkpoint for this source
-            offset = win32evtlog.GetNumberOfEventLogRecords( event_log )
 
+        #a list of events that we haven't yet seen
+        event_list = []
         try:
             events = True
             while events:
                     events = win32evtlog.ReadEventLog( event_log, flags, offset )
                     for event in events:
-                        # ignore the record if it's same as the offset (because we seek to the
-                        # last record we have seen)
-                        # and also if it is not an event type we are interested in
-                        if offset != event.RecordNumber and event.EventType in event_types:
-                            self.__log_event( source, event )
-                        self.__checkpoints[source] = event.RecordNumber
-                    offset = 0
-                    flags = win32evtlog.EVENTLOG_FORWARDS_READ|win32evtlog.EVENTLOG_SEQUENTIAL_READ
+                        #if we encounter our last seen record, then we are done
+                        if offset == event.RecordNumber or len( event_list ) >= self.__maximum_records:
+                            events = False
+                            break
+                        else:
+                            # add the event to our list of interested events
+                            # if it is one we are interested in
+                            if event.EventType in event_types:
+                                event_list.append( event )
         except Exception, error:
             self._logger.error( "Error reading from event log: %s", str( error ), limit_once_per_x_secs=self.__error_repeat_interval, limit_key="EventLogError" )
+
+        #now print out records in reverse order (which will put them in correct chronological order
+        #because we initially read them in reverse)
+        for event in reversed( event_list ):
+            self.__log_event( source, event )
+            self.__checkpoints[source] = event.RecordNumber
 
 
     def __log_event( self, source, event ):
@@ -186,15 +205,8 @@ and System sources:
             'Message' : event_message,
         } )
 
-    def __open_event_logs( self ):
-        for source in self.__source_list:
-            event_log = win32evtlog.OpenEventLog( self.__server, source )
-            if event_log:
-                self.__event_logs[source] = event_log
-
     def run( self ):
         self.__load_checkpoints()
-        self.__open_event_logs()
 
         ScalyrMonitor.run( self )
 
@@ -206,8 +218,8 @@ and System sources:
         self.__update_checkpoints()
 
     def gather_sample( self ):
-        for source, event_log in self.__event_logs.iteritems():
-            self.__read_from_event_log( source, event_log, self.__event_types )
+        for source in self.__source_list:
+            self.__read_from_event_log( source, self.__event_types )
 
         self.__update_checkpoints()
 
