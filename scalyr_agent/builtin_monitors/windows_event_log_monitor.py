@@ -191,7 +191,7 @@ and System sources:
         # we need to get the root source e.g. Application in Application/MyApplication
         # to use with SafeFormatMessage
         source = source.split( '/' )[0]
-        event_message = str( win32evtlogutil.SafeFormatMessage( event, source ) )
+        event_message =  win32evtlogutil.SafeFormatMessage( event, source )
         time_format = "%Y-%m-%d %H:%M:%SZ"
 
         self._logger.emit_value( "EventLog", source, extra_fields={
@@ -202,7 +202,7 @@ and System sources:
             'Type' : event_type,
             'EventId': event.EventID,
             'Category': event.EventCategory,
-            'Message' : event_message,
+            'EventMsg' : event_message,
         } )
 
     def run( self ):
