@@ -1,7 +1,16 @@
+#Downloading the docker image
+
+The easiest way to run the scalyr-agent in docker is to download the official image from Docker Hub.  To do this, run:
+
+`docker pull scalyr/scalyr-agent`
+
+The default `:latest` tag will always point to the current release version of the agent.  If you need to specify the version of the agent, use the appropriate tag:
+
+`docker pull scalyr/scalyr-agent:2.0.14`
+
 #Building the docker image
 
-
-From the root of the scalyr-agent repository run:
+If you want to build the image yourself, run the following from the root of the scalyr-agent repository:
 
 	python build_package.py docker
 
