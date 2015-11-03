@@ -23,7 +23,6 @@ import shutil
 import tempfile
 import unittest
 import sys
-import pdb
 
 from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
