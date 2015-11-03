@@ -376,7 +376,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         self.options = TcollectorOptions()
         self.options.cdir = collector_directory
 
-        self.options.network_interface_prefixes = self._config('network_interface_prefixes', default="eth")
+        self.options.network_interface_prefixes = self._config.get('network_interface_prefixes', default="eth")
         if isinstance(self.options.network_interface_prefixes, basestring):
             self.options.network_interface_prefixes = [self.options.network_interface_prefixes]
 
