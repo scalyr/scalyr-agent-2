@@ -17,6 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import atexit
 import os
 import shutil
 import tempfile
@@ -701,6 +702,18 @@ class TestLogLineRedactor(ScalyrTestCase):
 
         self.run_test_case(redactor, "foo secretoption=czerwin", "foo secretoption=fake", True)
 
+    def test_unicode_redactions( self ):
+        redacter = LogLineRedacter( '/var/fake_log' )
+        # redaction rules are created as unicode, to cause conflict with a utf-8 string
+        redacter.add_redaction_rule( u'(.*)', u'bb\\1bb' )
+
+        # build the utf8 string
+        utf8_string = unichr( 8230 ).encode( 'utf-8' )
+        expected = 'bb' + utf8_string + 'bb'
+
+        # go go go
+        self.run_test_case( redacter, utf8_string, expected, True )
+
     def test_multiple_redactions(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
@@ -1151,6 +1164,45 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
         self.assertEquals(events.get_message(0), 'GET /foo&password=foo&start=true\n')
 
+    def test_redacting_utf8( self ):
+
+        #build this manually following a similar process to the main agent, because this will create
+        #redaction rules that are unicode strings
+        path = self.__path
+        extra = { 'logs' : [
+                            {
+                                'path' : path,
+                                'redaction_rules' : [ { 'match_expression' : 'aa(.*)aa', 'replacement': 'bb\\1bb' } ]
+                            }
+                           ]
+                }
+
+        config = _create_configuration( extra )
+        log_config = {}
+        for entry in config.log_configs:
+            if entry['path'] == path:
+                log_config = entry.copy()
+
+        log_config = config.parse_log_config( log_config )
+        log_processor = LogFileProcessor(path, config, log_config, file_system=self.__file_system)
+        for rule in log_config['redaction_rules']:
+            log_processor.add_redacter(rule['match_expression'], rule['replacement'])
+        log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
+
+        # create a utf8 string that will cause conflict when matched/replaced against a unicode string
+        utf8_string = (u'aa' + unichr( 8230 ) + u'aa').encode( "utf-8")
+        self.append_file(self.__path, utf8_string + "\n")
+
+        # read the log
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        # make sure everything is good
+        expected = ('bb' + unichr( 8230 ) + 'bb\n').encode( "utf-8" )
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals(events.get_message(0), expected )
+
+
     def test_signals_deletion(self):
         log_processor = self.log_processor
 
@@ -1402,6 +1454,9 @@ def _create_configuration( extra=None ):
 
     config = Configuration(config_file, default_paths)
     config.parse()
+
+    #we need to delete the config dir when done
+    atexit.register( shutil.rmtree, config_dir)
 
     return config
 

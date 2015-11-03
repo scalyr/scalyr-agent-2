@@ -1714,9 +1714,21 @@ class LogLineRedacter(object):
         @return: A sequence of two elements, the line with the redaction applied (if any) and True or False
             indicating if a redaction was applied.
         """
-        (result, matches) = redaction_rule.redaction_expression.subn(
-            redaction_rule.replacement_text, line)
+        try:
+            (result, matches) = redaction_rule.redaction_expression.subn(
+                redaction_rule.replacement_text, line)
+        except UnicodeDecodeError:
+            # if our line contained non-ascii characters and our redaction_rules
+            # are unicode, then the previous replace will fail.
+            # Try again, but this time convert the line to utf-8
+            (result, matches) = redaction_rule.redaction_expression.subn(
+                redaction_rule.replacement_text, line.decode( 'utf-8' ))
+
         if matches > 0:
+            # if our result is a unicode string, lets convert it back to utf-8
+            # to avoid any conflicts
+            if type( result ) == unicode:
+                result = result.encode( 'utf-8' )
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
