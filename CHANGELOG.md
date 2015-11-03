@@ -25,6 +25,7 @@ Bug fixes:
 * Disabled checking the command of the running agent process to guard against pid re-use since this was leading to some false negatives in the ``is the agent running`` checks.
 * Remove exception logging when bad response received from server
 * Print more informative message when server responds with ``server too busy``
+* Fix Utf-8 encoding bug with redaction rules
 
 ## 2.0.13 "Moonstruck Monkey" - August 14, 2015
 
