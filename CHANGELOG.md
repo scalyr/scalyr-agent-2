@@ -1,18 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.14 "Neurotic Nightingale" - October 19, 2015
+## 2.0.14 "Neurotic Nightingale" - November 4, 2015
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 19, 2015 2:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 4, 2015 11:30 -0800
 --->
-
-Note, this release is still under development and the actual release date is TBD.
 
 Features:
 
 * New sequence id and number implementation to help prevent events being added to the database multiple times
-* Create new configuration option ``max_existing_log_offset_size`` to set a separate on how far back in a log file we are willing to go for a log file we have been previously copying.
+* Create new configuration option ``max_existing_log_offset_size`` to set a limit on how far back in a log file we are willing to go for a log file we have been previously copying.
 * Enabled ``syslog_monitor`` for Windows platforms
 * Preview release of ``windows_event_log_monitor``, a monitor for copying the Windows event log to Scalyr.
 * Preview release of docker support.  E-mail contact@scalyr.com for more details
