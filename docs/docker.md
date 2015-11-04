@@ -1,7 +1,20 @@
+#Downloading the docker image
+
+The easiest way to run the scalyr-agent in docker is to download the official image from Docker Hub.  To do this, run:
+
+`docker pull scalyr/scalyr-agent`
+
+The default `:latest` tag will always point to the current release version of the agent.  If you need to specify the version of the agent, use the appropriate tag:
+
+`docker pull scalyr/scalyr-agent:2.0.14`
+
 #Building the docker image
 
+If you want to build the image yourself, you have two options, depending on your environment.
 
-From the root of the scalyr-agent repository run:
+#### 1.  If you've already cloned the agent repository
+
+Run the following from the root of the scalyr-agent repository:
 
 	python build_package.py docker
 
@@ -9,18 +22,24 @@ This will build a .deb package of the current source tree, create a new docker i
 
 Dockerfile.base creates an image off docker’s default ubuntu image, installs python and other dependencies, installs the previously created scalyr-agent.deb and sets a non-forking, non-changing-user scalyr-agent-2 as the default command for the image (scalyr-agent-2 needs to be non-forking so the container keeps running once it starts up otherwise docker will exit as soon as the entry point program exits.  If you are sharing an agent.json config file between the host and the containers, you also need to pass in --no-change-user to prevent missing user errors).
 
-If needed, custom docker images can be created by making custom Dockerfiles and running the command
+#### 2.  To build the image and agent from source
+
+You can use a custom Dockerfile and run the command:
 
 	docker build -f MyNewDockerfile -t <tag> .
 
 Where &lt;tag&gt; typically follows the format `company/product:version` e.g. scalyr/scalyr-agent:test
+
+This will build a docker image that downloads the scalyr-agent repository and builds it from source.
+
+We have provided a sample Dockerfile ([Dockerfile.build_from_source](Dockerfile.build_from_source)) to illustrate.
 
 #Running the scalyr-agent
 
 
 Once you have created the scalyr-agent image, it can be run with the following command:
 
-	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json scalyr/scalyr-agent:2.0.6
+	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json scalyr/scalyr-agent:2.0.14
 
 Where:
 
@@ -30,7 +49,7 @@ Where:
 
 * `-v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json` maps /path/to/config/agent.json on the host, to /etc/scalyr-agent-2/agent.json on the container.  This allows you to specify a custom config file when running the container.  Note, you can’t use ~ in this path. [See here](#permanent-config) for making a permanent config file.  
 
-* `scalyr/scalyr-agent:2.0.6` specifies the tag of the image to run.  In this case for version 2.0.6 of the scalyr-agent.
+* `scalyr/scalyr-agent:2.0.14` specifies the tag of the image to run.  In this case the 2.0.14 version of the scalyr-agent.
 
 If you want to see the available docker images on your machine, run the command
 
@@ -80,7 +99,7 @@ to get more verbose output
 
 If you wish to create a permanent config file for your scalyr-agent image so you don’t have to specify it on the command line each time, you can do it as follows:
 
-	docker run -it -v /:/mnt/host --name custom-scalyr scalyr/scalyr-agent:2.0.6 /bin/bash
+	docker run -it -v /:/mnt/host --name custom-scalyr scalyr/scalyr-agent:2.0.14 /bin/bash
 
 and from the container’s command prompt run
 
@@ -110,7 +129,7 @@ As a simple example, imagine you have an apache container, that was configured t
 
 So the full command to run the container would be:
 
-	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json -v /var/log/httpd/access.log:/var/log/httpd/access.log -v /run/docker.sock:/var/scalyr/docker.sock  scalyr/scalyr-agent:2.0.6
+	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json -v /var/log/httpd/access.log:/var/log/httpd/access.log -v /run/docker.sock:/var/scalyr/docker.sock  scalyr/scalyr-agent:2.0.14
 
 You would then configure your agent.json to have:
 
@@ -129,7 +148,7 @@ This volume would be shared among all containers, with each container configured
 
 e.g. assuming you had followed the instructions in the link above and created a data volume container called 'logdata'.  You could then run the scalyr-agent container with the following command:
 
-	docker run -d --name scalyr-agent --volumes-from logdata -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json scalyr/scalyr-agent:2.0.6
+	docker run -d --name scalyr-agent --volumes-from logdata -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json scalyr/scalyr-agent:2.0.14
 
 And configure the scalyr agent’s agent.json to track any files of interest that existed in logdata’s volumes.
 
@@ -163,4 +182,4 @@ Which maps `/run/docker.sock` on the host to `/var/scalyr/docker.sock` on the co
 
 A typical run command making use of this would look something like:
 
-	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json -v /run/docker.sock:/var/scalyr/docker.sock scalyr/scalyr-agent:2.0.6
+	docker run -d --name scalyr-agent -v /path/to/config/agent.json:/etc/scalyr-agent-2/agent.json -v /run/docker.sock:/var/scalyr/docker.sock scalyr/scalyr-agent:2.0.14
