@@ -18,9 +18,14 @@ import datetime
 import os
 import scalyr_agent.util as scalyr_util
 import time
-import win32evtlog
-import win32evtlogutil
-import win32con
+try:
+    import win32evtlog
+    import win32evtlogutil
+    import win32con
+except ImportError:
+    win32evtlog = None
+    win32evtlogutil = None
+    win32con = None
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 
@@ -58,8 +63,8 @@ class WindowEventLogMonitor( ScalyrMonitor ):
     """
 # Window Event Log Monitor
 
-The Windows Event Log monitor upload messages from the windows event log to the Scalyr servers.
-It can listen to multiple different event sources, and also filter by messages of a certain type.
+The Windows Event Log monitor uploads messages from the Windows Event Log to the Scalyr servers.
+It can listen to multiple different event sources and also filter by messages of a certain type.
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
@@ -116,7 +121,7 @@ and System sources:
             elif event == 'AuditFailure':
                 self.__event_types[ win32con.EVENTLOG_AUDIT_FAILURE ] = event
 
-        self.__server = self._config.get( 'localhost' )
+        self.__server = self._config.get( 'server_name' )
 
         self.__error_repeat_interval = self._config.get( 'error_repeat_interval' )
 
