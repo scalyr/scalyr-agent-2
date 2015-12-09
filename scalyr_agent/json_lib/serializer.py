@@ -123,6 +123,12 @@ ESCAPE_DCT_OPT.setdefault(chr(127), '\\u007f')
 
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 
+# Used for an optimization when escaping a string. This regexp matches a continious seqeuence of regular ascii
+# characters (from char 32 to 127).
+SIMPLE_MATCHER = re.compile('^[ -~]*')
+# Find the two characters " and \ that need to be escaped from the above regular ascii characters.
+ESCAPE_ME = re.compile(r'(\"|\\)')
+
 
 def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=True):
     """Returns a string that is properly escaped by JSON standards.
@@ -150,10 +156,19 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
     else:
         type_index = 0
 
-
     result = StringIO()
-    for x in string_value:
-        x_ord = ord(x)
+    pos = 0
+    len_sv = len(string_value)
+
+    while pos < len_sv:
+        simple = SIMPLE_MATCHER.match(string_value, pos)
+        if simple is not None:
+            pos = simple.end(0)
+            result.write(ESCAPE_ME.sub("\\\\\\1", simple.group(0)))
+            if pos >= len_sv:
+                continue
+
+        x_ord = ord(string_value[pos])
         if x_ord in ESCAPES:
             result.write(ESCAPES[x_ord][type_index])
         # Reference: http://www.unicode.org/versions/Unicode5.1.0/
@@ -170,5 +185,7 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
             else:
                 result.write(u'\\u%0.4x' % x_ord)
         else:
-            result.write(x)
+            result.write(string_value[pos])
+        pos += 1
+
     return result.getvalue()
