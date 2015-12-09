@@ -486,7 +486,6 @@ class EventSequencer( object ):
         self.__previous_sequence_id = memento[0]
         self.__previous_sequence_number = memento[1]
 
-
     def add_sequence_fields( self, event, sequence_id, sequence_number ):
         """
         If sequence_id and sequence_number are non-None then this method will automatically add the following
@@ -497,6 +496,14 @@ class EventSequencer( object ):
         'sd' set to the delta of the sequence_number and the previously seen sequence_number
 
         The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+
+        @param event: The event to update
+        @param sequence_id: The sequence id
+        @param sequence_number: The sequence number
+
+        @type event: Event
+        @type sequence_id: long
+        @type sequence_number: long
         """
 
         # only add sequence information if both the sequence fields are valid
@@ -504,7 +511,7 @@ class EventSequencer( object ):
 
             # add the 'si' field if necessary
             if sequence_id != self.__previous_sequence_id:
-                event['si'] = sequence_id
+                event.set_sequence_id(sequence_id)
                 self.__previous_sequence_id = sequence_id
                 # a new sequence id means we should also send the full sequence number
                 # so make sure that __previous_sequence_number is None
@@ -513,11 +520,12 @@ class EventSequencer( object ):
             # if we don't have a previous sequence number then send the full number
             # otherwise send the delta
             if self.__previous_sequence_number is None:
-                event['sn'] = sequence_number
+                event.set_sequence_number(sequence_number)
             else:
-                event['sd'] = sequence_number - self.__previous_sequence_number
+                event.set_sequence_number_delta(sequence_number - self.__previous_sequence_number)
 
             self.__previous_sequence_number = sequence_number
+
 
 class AddEventsRequest(object):
     """Used to construct an AddEventsRequest to eventually send.
@@ -552,33 +560,7 @@ class AddEventsRequest(object):
         json_lib.serialize(base_body, output=string_buffer, use_fast_encoding=True)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
-        location = string_buffer.tell()
-        while location > 0:
-            location -= 1
-            string_buffer.seek(location)
-            if string_buffer.read(1) == '}':
-                break
-
-        # Now look for the first non-white character.  We need to add in a comma after it.
-        last_char = None
-        while location > 0:
-            location -= 1
-            string_buffer.seek(location)
-            last_char = string_buffer.read(1)
-            if not last_char.isspace():
-                break
-
-        # If the character happened to a comma, back up over that since we want to write our own comma.
-        if location > 0 and last_char == ',':
-            location -= 1
-
-        if location < 0:
-            raise Exception('Could not locate trailing "}" and non-whitespace in base JSON for add events request')
-
-        # Now chop off everything after the character at the location.
-        location += 1
-        string_buffer.seek(location)
-        string_buffer.truncate()
+        _rewind_past_close_curly(string_buffer)
 
         # Append the start of our events field.
         string_buffer.write(', events: [')
@@ -637,24 +619,30 @@ class AddEventsRequest(object):
     def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
 
-        It will automatically add in a 'ts' field to event containing a new timestamp based on the current time
+        It will automatically set the event's timestamp field to a new timestamp based on the current time
         but ensuring it is greater than any previous timestamp that has been used.
 
-        If sequence_id and sequence_number are specified then this method will automatically add the following
-        fields:
+        If sequence_id and sequence_number are specified then this method will automatically set the following
+        Event fields fields:
 
-        'si' set to the value of sequence_id if it is different from the previously seen sequence_id
-        'sn' set to the value of sequence_number if we haven't previously seen a sequence number
-        'sd' set to the delta of the sequence_number and the previously seen sequence_number
+        'sequence_id' set to the value of sequence_id if it is different from the previously seen sequence_id
+        'sequence_number' set to the value of sequence_number if we haven't previously seen a sequence number
+        'sequence_number_delta' set to the delta of the sequence_number and the previously seen sequence_number
 
-        The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+        The 'sequence_number' and 'sequence_number_delta' fields are mutually exclusive.  Only one or the other will be
+        used.
 
         It is illegal to invoke this method if 'get_payload' has already been invoked.
 
-        @param event: The event object, usually a dict or a JsonObject.
+        @param event: The event object.
         @param timestamp: The timestamp to use for the event. This should only be used for testing.
         @param sequence_id: A globally unique id, grouping a set of sequence_numbers
         @param sequence_number: A monotonically increasing sequence_number
+
+        @type event: Event
+        @type timestamp: long
+        @type sequence_id: long
+        @type sequence_number: long
 
         @return: True if the event's serialized JSON was added to the request, or False if that would have resulted
             in the maximum request size being exceeded so it did not.
@@ -671,9 +659,9 @@ class AddEventsRequest(object):
         # and we need to restore it
         memento = self.__event_sequencer.get_memento()
 
-        self.__event_sequencer.add_sequence_fields( event, sequence_id, sequence_number )
-        event['ts'] = str(timestamp)
-        json_lib.serialize(event, output=self.__buffer, use_fast_encoding=True)
+        self.__event_sequencer.add_sequence_fields(event, sequence_id, sequence_number)
+        event.set_timestamp(timestamp)
+        event.serialize(self.__buffer)
 
         # Check if we exceeded the size, if so chop off what we just added.
         # Also reset previously seen sequence numbers and ids
@@ -973,6 +961,336 @@ class PostFixBuffer(object):
         assert(len(self.__threads) >= position[2])
         if position[2] < len(self.__threads):
             self.__threads = self.__threads[0:position[2]]
+
+
+class Event(object):
+    """Encapsulates a single event that will be included in an ``AddEventsRequest``.
+
+    This abstraction has many optimizations to improve serialization time.
+    """
+    def __init__(self, thread_id=None, attrs=None, base=None):
+        """Creates an instance of an event to include in an AddEventsRequest.
+
+        This constructor has two ways of being used.
+
+        First, specifying the thread_id and attributes that will apply to the event.  The attributes typically only
+        include the attributes for the log file that the event belongs to. You then must set the per-log line
+        attributes (such as timestamp and message) using the setters provided below.
+
+        The second form is to create an event based on the copy of an already existing ``Event`` instance.  This
+        decreases overall serialization time because the ``attrs`` and ``thread_id`` field's serialization is only
+        performed once across all for the original copy and shared to all derived copies.
+
+        This is meant to really optimize the case where we create one base ``Event`` object for each log file that
+        we are uploading (specifying that log's thread id and attributes in the constructor).  Then, every time
+        we upload a log line for that log, we copy the base ``Event`` instance and then set the per-log line
+        attributes using the provided setters.
+
+        @param thread_id:  Used if not specifying ``base``.  The thread id for the event.
+        @param attrs:  Used if not specifying ``base``.  The attributes for the event, excluding any attributes
+            that can be set via the provided setters.  If you include one of those attributes in ``attrs``, the
+            resulting behavior is undefined.
+        @param base:  Used if not specifying ``thread_id`` or ``attrs``.  The instance of ``Event`` to copy to
+            create this instance.  Only the original ``thread_id`` and ``attrs`` that was passed into ``base``
+            are copied.  Anything set using the provided ``setters`` will not be used.
+
+        @type thread_id: str
+        @type attrs: dict
+        @type base: Event
+        """
+        # When we serialize this event object in an AddEventsRequest, it will have the following fields, in this
+        # form:
+        #   {
+        #      thread_id: "234234",         // str, the thread id for the log.
+        #      attrs: {
+        #         <log attributes>          // the keys,values for all attributes for this log.
+        #         message: "Log content",   // str, the log line content.
+        #         rate: 0.8,                // float, if this is a subsampled line, the rate at each it was selected.
+        #      },
+        #      ts: "123123123",   // <str, the timestamp for the log line>
+        #      si: "123123",      //<str, the sequence identifier>
+        #      sn: 10,            // <int, the sequence number -- not provided if sd is provided>
+        #      sd: 1,             // <int, the sequence number delta -- provided instead of sn>
+        #   }
+        #
+        # So, we can pre-serialize the first part of the message based on thread_id and attrs, and keep a copy of
+        # that to then serialize the rest of the per-log line fields for later.
+        #
+        # The serialization_base (this pre-serialization) will look like:
+        #
+        #   {
+        #      thread_id: "234234",         // str, the thread id for the log.
+        #      attrs: {
+        #         <log attributes>          // the keys,values for all attributes for this log.
+        #         message:
+        #
+        # Note, we put in the ``message`` field name, so the next thing we have to serialize is the log line content.
+        # We also then have to close off the attrs object, and eventually the overall object to finish the
+        # serialization.
+
+        # We only stash a copy of attrs for debugging/testing purposes.  We really will just serialize it into
+        # __serialization_base.
+        self.__attrs = attrs
+        if (attrs is not None or thread_id is not None) and base is not None:
+            raise Exception('Cannot use both attrs/thread_id and base')
+
+        if base is not None:
+            # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
+            # the per-log file attributes.
+            self.__serialization_base = base.__serialization_base
+            self.__attrs = base.__attrs
+        else:
+            # A new event.  We have to create the serialization base using provided information/
+            tmp_buffer = StringIO()
+            # Open base for the event object.
+            tmp_buffer.write('{')
+            if thread_id is not None:
+                tmp_buffer.write('thread:')
+                json_lib.serialize(thread_id, use_fast_encoding=True, output=tmp_buffer)
+                tmp_buffer.write(', ')
+            if attrs is not None:
+                # Serialize the attrs object, but we have to remove the closing brace because we want to
+                # insert more fields.
+                tmp_buffer.write('attrs:')
+                json_lib.serialize(attrs, use_fast_encoding=True, output=tmp_buffer)
+                _rewind_past_close_curly(tmp_buffer)
+                tmp_buffer.write(',')
+            else:
+                # Open brace for the attrs object.
+                tmp_buffer.write('attrs:{')
+
+            # Add the message field into the json object.
+            tmp_buffer.write('message:')
+
+            self.__serialization_base = tmp_buffer.getvalue()
+
+        # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
+        # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
+        # json object, the __sequence_id field will begin with a double quote.  HOWEVER, message (for optimization
+        # purposes) is not pre-serialized and will not be blackslashed escaped/quoted before being added to the
+        # output buffer.
+        self.__message = None
+        self.__timestamp = None
+        self.__sequence_id = None
+        self.__sequence_number = None
+        self.__sequence_number_delta = None
+        self.__sampling_rate = None
+
+    @property
+    def attrs(self):
+        """Only use for testing.
+
+        @return: The attributes object as originally based into the constructor or the constructor of the base
+            object that was to create this instance.
+        @rtype: dict
+        """
+        return self.__attrs
+
+    def set_message(self, message):
+        """Sets the message field for the attributes for this event.
+
+        @param message:  The message content.
+        @type message: str
+        @return:  This object.
+        @rtype: Event
+        """
+        self.__message = message
+        return self
+
+    @property
+    def message(self):
+        """Used only for testing.
+        @return:  The message content
+        @rtype: str
+        """
+        return self.__message
+
+    def set_timestamp(self, timestamp):
+        """Sets the timestamp field for the attributes for this event.
+
+        @param timestamp:  The timestamp, in nanoseconds past epoch.
+        @type timestamp: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
+        self.__timestamp = '"%s"' % str(timestamp)
+        return self
+
+    @property
+    def timestamp(self):
+        """Used only for testing.
+
+        @return: the timestamp for the event.
+        @rtype: long
+        """
+        # We have to cut off the quotes we surrounded the field with when we serialized it.
+        if self.__timestamp is not None:
+            return long(self.__timestamp[1:-1])
+        else:
+            return None
+
+    def set_sequence_id(self, sid):
+        """Sets the sequence id for the event.  If this is not invoked, no sequence id will be included
+        in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
+        as the last serialized event's).
+
+        @param sequence_id:  The unique id for the sequence this event belongs.  This must be globally unique and
+            usually tied to a single log file.  Generally, use UUID here.
+        @type sequence_id: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # This is serialized as a string to get around overflow issues, so put in a string now.
+        self.__sequence_id = '"%s"' % str(sid)
+        return self
+
+    @property
+    def sequence_id(self):
+        """Used for testing purposes only
+        @return:  The sequence id or None if not set.
+        @rtype: str
+        """
+        # We have to cut off the quotes we surrounded the field with when we serialized it.
+        if self.__sequence_id is not None:
+            return self.__sequence_id[1:-1]
+        return None
+
+    def set_sequence_number(self, snum):
+        """Sets the sequence number for the event.  If this is not invoked, no sequence number will be included
+        in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
+        as the last serialized event's and you use ``sequence_number_delta`` instead to specify the delta between
+        this events sequence number and the last one.).
+
+        @param sequence_number:  The sequence number for the event.
+        @type sequence_number: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # It is serialized as a number, so just a toString is called for.
+        self.__sequence_number = str(snum)
+        return self
+
+    @property
+    def sequence_number(self):
+        """Used for testing purposes only.
+        @return: The sequence number or None if not set.
+        @rtype: long
+        """
+        # We have to convert it back to a number.
+        if self.__sequence_number is not None:
+            return long(self.__sequence_number)
+        else:
+            return None
+
+    def set_sequence_number_delta(self, sdelta):
+        """Sets the sequence number delta for the event.  If this is not invoked, no sequence number delta will be
+        included in the serialized event.  (Which is what you should do if you specify a ``sequence_number`` instead).
+
+        @param sequence_number_delta:  The delta between the last sequence number of the one for this event.
+        @type sequence_number_delta: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # It is serialized as a number, so just a toString is called for.
+        self.__sequence_number_delta = str(sdelta)
+        return self
+
+    @property
+    def sequence_number_delta(self):
+        """Uses for testing purposes only.
+        @return:  The sequence number delta if set or None.
+        @rtype: long
+        """
+        # We have to convert it back to a number.
+        if self.__sequence_number_delta is not None:
+            return long(self.__sequence_number_delta)
+        else:
+            return None
+
+    def set_sampling_rate(self, rate):
+        """Sets the message field for the attributes for this event.
+
+        @param message:  The message content.
+        @type message: str
+        @return:  This object.
+        @rtype: Event
+        """
+        self.__sampling_rate = str(rate)
+        return self
+
+    def serialize(self, output_buffer):
+        """Serialize the event into ``output_buffer``.
+
+        @param output_buffer: The buffer to serialize to.
+        @type output_buffer: StringIO
+        """
+        output_buffer.write(self.__serialization_base)
+        json_lib.serialize(self.__message, use_fast_encoding=True, output=output_buffer)
+        self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
+        # close off attrs object.
+        output_buffer.write('}')
+
+        self.__write_field_if_not_none(',ts:', self.__timestamp, output_buffer)
+        self.__write_field_if_not_none(',si:', self.__sequence_id, output_buffer)
+        self.__write_field_if_not_none(',sn:', self.__sequence_number, output_buffer)
+        self.__write_field_if_not_none(',sd:', self.__sequence_number_delta, output_buffer)
+        # close off the event object.
+        output_buffer.write('}')
+
+    def __write_field_if_not_none(self, field_name, field_value, output_buffer):
+        """If the specified field value is not None, then emit the field name and the value to the output buffer.
+
+        @param field_name: The text to emit before the value.
+        @param field_value: The value to emit.
+        @param output_buffer: The buffer to serialize to.
+
+        @type field_name: str
+        @type field_value: str or None
+        @type output_buffer: StringIO
+        """
+        if field_value is not None:
+            output_buffer.write(field_name)
+            output_buffer.write(field_value)
+
+
+def _rewind_past_close_curly(output_buffer):
+    """A utility function for rewinding a buffer that had a JSON object emitted to it.  It rewinds past the
+    last closing curly brace in the buffer, and then also erases the last non-whitespace character after that
+    if it is a comma (which shouldn't happen in practice).  This is meant to prepare the buffer for emitting
+    new fields into the JSON object's serialization.
+
+    @param output_buffer:  The buffer to rewind.
+    @type output_buffer: StringO
+    """
+    # Now go back and find the last '}' and delete it so that we can open up the JSON again.
+    location = output_buffer.tell()
+    while location > 0:
+        location -= 1
+        output_buffer.seek(location)
+        if output_buffer.read(1) == '}':
+            break
+
+    # Now look for the first non-white character.  We need to add in a comma after it.
+    last_char = None
+    while location > 0:
+        location -= 1
+        output_buffer.seek(location)
+        last_char = output_buffer.read(1)
+        if not last_char.isspace():
+            break
+
+    # If the character happened to a comma, back up over that since we want to write our own comma.
+    if location > 0 and last_char == ',':
+        location -= 1
+
+    if location < 0:
+        raise Exception('Could not locate trailing "}" and non-whitespace in JSON serialization')
+
+    # Now chop off everything after the character at the location.
+    location += 1
+    output_buffer.seek(location)
+    output_buffer.truncate()
 
 
 # The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically

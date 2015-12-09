@@ -45,6 +45,8 @@ from scalyr_agent.agent_status import LogProcessorStatus
 
 from scalyr_agent.line_matcher import LineMatcher
 
+from scalyr_agent.scalyr_client import Event
+
 from cStringIO import StringIO
 from os import listdir
 from os.path import isfile, join
@@ -1131,7 +1133,8 @@ class LogFileProcessor(object):
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
-        self.__log_attributes = log_attributes
+        # The base event that will be used to insert all events from this log.
+        self.__base_event = Event(thread_id=self.__thread_id, attrs=log_attributes)
         # The redacter to perform on all log lines from this log file.
         self.__redacter = LogLineRedacter(file_path)
         # The sampler to apply to all log lines from this log file.
@@ -1319,7 +1322,7 @@ class LogFileProcessor(object):
                     # send.
                     sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
                     event = self.__create_events_object(line, sample_result)
-                    if not add_events_request.add_event( event, sequence_id=sequence_id, sequence_number=sequence_number ):
+                    if not add_events_request.add_event(event, sequence_id=sequence_id, sequence_number=sequence_number):
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
                         break
@@ -1474,21 +1477,17 @@ class LogFileProcessor(object):
         @param sampling_rate:  The sampling rate that had been used to decide if the event_message should be
             sent to the server.
 
-        @return: A dict containing the correct fields that when serialized to JSON and added to an addEvents request
-            will insert the specified event along with any log attributes associated with this log.  In particular,
-            it will contain a 'attrs' field.  The ts (timestamp) field is not set because the AddEventRequest object
-            will set its value.  The attrs field will be another dict containing all of the log attributes for this
-            log as well as a 'message' field containing event_message.
+        @return: An scalyr_client.Event object containing the correct fields that when serialized to JSON and added to
+            an addEvents request will insert the specified event along with any log attributes associated with this log.
+            In particular, when serialized, it will contain the attrs field.  The ts (timestamp) and sequence-related
+            fields are not set because the AddEventRequest object will set them.  The attrs JSON field will be another
+            JSON containing all of the log attributes for this log as well as a 'message' field containing event_message.
         """
-        attrs = self.__log_attributes.copy()
-
-        attrs['message'] = event_message
+        result = Event(base=self.__base_event)
+        result.set_message(event_message)
         if sampling_rate != 1.0:
-            attrs['sample_rate'] = sampling_rate
-        return {
-            'thread': self.__thread_id,
-            'attrs': attrs,
-        }
+            result.set_sampling_rate(sampling_rate)
+        return result
 
     def scan_for_new_bytes(self, current_time=None):
         """Checks the underlying file to see if any new bytes are available or if the file has been rotated.

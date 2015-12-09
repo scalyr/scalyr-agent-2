@@ -1239,8 +1239,8 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
         self.assertEquals(events.total_events(), 2)
-        self.assertEquals('scalyr-1', events.events[0]['attrs']['host'])
-        self.assertEquals('scalyr-1', events.events[1]['attrs']['host'])
+        self.assertEquals('scalyr-1', events.events[0].attrs['host'])
+        self.assertEquals('scalyr-1', events.events[1].attrs['host'])
 
     def test_unique_id(self):
         first_thread_id = LogFileProcessor.generate_unique_thread_id()
@@ -1411,22 +1411,11 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         def get_message(self, index):
             """Returns the message field from an events object."""
-            return self.events[index]['attrs']['message']
+            return self.events[index].message
 
         def get_sequence( self, index ):
-            si = None
-            if 'si' in self.events[index]:
-                si = self.events[index]['si']
-
-            sn = None
-            if 'sn' in self.events[index]:
-                sn = self.events[index]['sn']
-
-            sd = None
-            if 'sd' in self.events[index]:
-                sd = self.events[index]['sd']
-
-            return (si, sn, sd)
+            return (self.events[index].sequence_id, self.events[index].sequence_number,
+                    self.events[index].sequence_number_delta)
 
         def total_events(self):
             return len(self.events)
