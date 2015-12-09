@@ -18,6 +18,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import datetime
 import os
 import threading
 import time
@@ -27,7 +28,6 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.log_watcher import LogWatcher
 
-from scalyr_agent import json_lib
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
@@ -372,6 +372,15 @@ class CopyingManager(StoppableThread, LogWatcher ):
         # Make sure start_manager was invoked to start the thread and we have a scalyr client instance.
         assert self.__scalyr_client is not None
 
+        if self.__config.copying_thread_profile_interval > 0:
+            import cProfile
+            profiler = cProfile.Profile()
+            profiler.enable()
+            profile_dump_interval = self.__config.copying_thread_profile_interval
+        else:
+            profiler = None
+            profile_dump_interval = 0
+
         try:
             # noinspection PyBroadException
             try:
@@ -489,6 +498,13 @@ class CopyingManager(StoppableThread, LogWatcher ):
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
 
+                        if profiler is not None:
+                            seconds_past_epoch = int(time.time())
+                            if seconds_past_epoch % profile_dump_interval == 0:
+                                profiler.disable()
+                                profiler.dump_stats('%s%s' % (self.__config.copying_thread_profile_output_path,
+                                                              datetime.datetime.now().strftime("%H_%M_%S.out")))
+                                profiler.enable()
                     except Exception:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
                         log.exception('Failed while attempting to scan and transmit logs')
@@ -506,6 +522,8 @@ class CopyingManager(StoppableThread, LogWatcher ):
         finally:
             for processor in self.__log_processors:
                 processor.close()
+            if profiler is not None:
+                profiler.disable()
 
     def wait_for_copying_to_begin(self):
         """Block the current thread until this instance has finished its first scan and has begun copying.

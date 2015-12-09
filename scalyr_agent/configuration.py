@@ -292,6 +292,22 @@ class Configuration(object):
         return self.__get_config().get_bool('use_unsafe_debugging')
 
     @property
+    def copying_thread_profile_interval(self):
+        """Returns the interval (in seconds) between outputs of the profiling for the copying thread.
+        This should be zero unless you are profiling the copying thread.
+        """
+        return self.__get_config().get_int('copying_thread_profile_interval')
+
+    @property
+    def copying_thread_profile_output_path(self):
+        """Returns the path prefix for writing all profiling dumps for the copying thread, when
+        ``copying_thread_profile_interval`` is greater than zero.
+        @return:
+        @rtype:
+        """
+        return self.__get_config().get_string('copying_thread_profile_output_path')
+
+    @property
     def config_directory(self):
         """Returns the configuration value for 'config_directory', resolved to full path if necessary."""
         config_directory = self.__get_config().get_string('config_directory')
@@ -577,6 +593,10 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description)
 
         self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description)
+
+        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description)
+        self.__verify_or_set_optional_string(config, 'copying_thread_profile_output_path',
+                                             '/tmp/copying_thread_profiles_', description)
 
         self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description)
         self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description)
