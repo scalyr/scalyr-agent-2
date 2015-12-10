@@ -278,6 +278,13 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse('sd' in event)
         request.close()
 
+    def test_timing_data(self):
+        request = AddEventsRequest(self.__body)
+        request.increment_timing_data(foo=1, bar=2)
+        request.increment_timing_data(foo=5)
+
+        self.assertEquals(request.get_timing_data(), 'foo=6.0 bar=2.0')
+
 
 class EventTest(ScalyrTestCase):
     def setUp(self):

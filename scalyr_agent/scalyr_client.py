@@ -585,6 +585,9 @@ class AddEventsRequest(object):
         # Used to add sequence fields to an event
         self.__event_sequencer = EventSequencer()
 
+        # Used to record some performance timing data for debugging/analysis
+        self.__timing_data = dict()
+
     @property
     def __current_size(self):
         """
@@ -727,6 +730,42 @@ class AddEventsRequest(object):
         """
         self.__body = None
         self.__buffer = None
+
+    def increment_timing_data(self, **key_values):
+        """Increments the timing data kept as part of this data structure to help diagnosis performance issues.
+
+        The arguments should be key/value pairs where the keys name some sort of timing component and the value
+        by which to increment the count for that timing component.
+
+        If this is the first time a timing component is being incremented, the initial value is set to zero.
+        """
+        for key, value in key_values.iteritems():
+            if key in self.__timing_data:
+                amount = self.__timing_data[key]
+            else:
+                amount = 0.0
+            amount += value
+            self.__timing_data[key] = amount
+
+    def get_timing_data(self):
+        """Serializes all of the timing data that has been collected via ``increment_timing_data``.
+
+        @return: A string of the key/value pairs for all timing data.
+        @rtype: str
+        """
+        output_buffer = StringIO()
+        first_time = True
+
+        for key, value in self.__timing_data.iteritems():
+            if not first_time:
+                output_buffer.write(' ')
+            else:
+                first_time = False
+            output_buffer.write(key)
+            output_buffer.write('=')
+            output_buffer.write(str(value))
+
+        return output_buffer.getvalue()
 
     def __get_timestamp(self):
         """

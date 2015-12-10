@@ -1420,6 +1420,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         def total_events(self):
             return len(self.events)
 
+        def increment_timing_data(self, **key_values):
+            pass
+
 
 
 def _create_configuration( extra=None ):

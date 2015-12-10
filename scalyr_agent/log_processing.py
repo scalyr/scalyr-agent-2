@@ -33,6 +33,7 @@ import random
 import re
 import threading
 import time
+import timeit
 
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -1281,6 +1282,10 @@ class LogFileProcessor(object):
         original_position = self.__log_file_iterator.tell()
         original_events_position = add_events_request.position()
 
+        fast_get_time = timeit.default_timer
+
+        start_process_time = fast_get_time()
+
         # noinspection PyBroadException
         try:
             # Keep track of some states about the lines/events we process.
@@ -1292,6 +1297,9 @@ class LogFileProcessor(object):
             lines_dropped_by_sampling = 0L
             bytes_dropped_by_sampling = 0L
 
+            time_spent_reading = 0.0
+            time_spent_serializing = 0.0
+
             buffer_filled = False
             added_thread_id = False
 
@@ -1299,7 +1307,9 @@ class LogFileProcessor(object):
             while True:
                 position = self.__log_file_iterator.tell()
 
+                time_spent_reading += fast_get_time()
                 line = self.__log_file_iterator.readline(current_time=current_time)
+                time_spent_reading -= fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
                 if len(line) == 0:
@@ -1321,11 +1331,17 @@ class LogFileProcessor(object):
                     # Try to add the line to the request, but it will let us know if it exceeds the limit it can
                     # send.
                     sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
+
+                    time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line, sample_result)
                     if not add_events_request.add_event(event, sequence_id=sequence_id, sequence_number=sequence_number):
+                        time_spent_serializing -= fast_get_time()
+
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
                         break
+
+                    time_spent_serializing -= fast_get_time()
 
                     # Try to add the thread id if we have not done so far.  This should only be added once per file.
                     if not added_thread_id:
@@ -1345,6 +1361,11 @@ class LogFileProcessor(object):
                 lines_copied += 1
 
             final_position = self.__log_file_iterator.tell()
+
+            add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
+                                                     reading_time=time_spent_reading,
+                                                     process_time=(fast_get_time() - start_process_time),
+                                                     lines=lines_read, bytes=bytes_read, files=1)
 
             # To do proper account when an RPC has failed and we retry it, we track how many bytes are
             # actively being processed.  We will update this once the completion callback has been invoked.
