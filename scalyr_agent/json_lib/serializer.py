@@ -18,6 +18,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import re
+import struct
 
 from cStringIO import StringIO
 from scalyr_agent.json_lib import JsonConversionException, JsonObject, JsonArray
@@ -35,7 +36,7 @@ ESCAPES = {
 }
 
 
-def serialize(value, output=None, use_fast_encoding=False):
+def serialize(value, output=None, use_fast_encoding=False, use_length_prefix_string=False):
     """Serializes the specified value as JSON.
 
     @param value: The value to write. Can be a bool, int, long, float, dict, and list. If this value is a list or dict,
@@ -61,9 +62,12 @@ def serialize(value, output=None, use_fast_encoding=False):
     if value is None:
         output.write('null')
     elif value_type is str or value_type is unicode:
-        output.write('"')
-        output.write(__to_escaped_string(value, use_fast_encoding=use_fast_encoding))
-        output.write('"')
+        if not use_length_prefix_string:
+            output.write('"')
+            output.write(__to_escaped_string(value, use_fast_encoding=use_fast_encoding))
+            output.write('"')
+        else:
+            serialize_as_length_prefixed_string(value, output)
     elif value_type is dict or value_type is JsonObject:
         output.write('{')
         first = True
@@ -189,3 +193,19 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
         pos += 1
 
     return result.getvalue()
+
+
+def serialize_as_length_prefixed_string(value, output_buffer):
+    """Serializes the str or unicode value using the length-prefixed format special to Scalyr.
+
+    This is a bit more efficient since the value does not need to be blackslash or quote escaped.
+    
+    @param value: The string value to serialize.
+    @param output_buffer: The buffer to serialize the string to.
+
+    @type value: str or unicode
+    @type output_buffer: StringIO
+    """
+    output_buffer.write('`s')
+    output_buffer.write(struct.pack('>i', len(value)))
+    output_buffer.write(value)

@@ -20,6 +20,8 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import struct
+
 from scalyr_agent.json_lib import JsonArray, JsonObject, JsonParseException
 
 
@@ -208,6 +210,8 @@ class JsonParser(object):
                 return self.__parse_number()
             elif c == '}':
                 return self.__error("'}' can only be used to end an object")
+            elif c == '`':
+                return self.__parse_length_prefixed_string()
             else:
                 if c is None:
                     if start_pos == 0:
@@ -327,7 +331,26 @@ class JsonParser(object):
                 else:
                     self.__error("Unexpected character [%s] in array... are you "
                                  "missing a comma?" % c)
-  
+
+    def __parse_length_prefixed_string(self):
+        """Parses the string literal from the Scalyr-specific format using length prefixed strings.  The scanner must
+        be at the backtick (`).
+
+        @return: The string literal
+        @rtype: str
+        """
+        # The format is `s[x]YYYY   where [x] is a 4 byte big endian signed int containing the number of bytes
+        # to read as the string, and YYYY is those number of bytes.  It is encoded as UTF-8
+        self.__scanner.read_ubyte()
+        if self.__scanner.peek_next_ubyte(none_if_bad_index=True) != 's':
+            self.__error("unsupported back-tick format.  Only supports length prefixed string (`s)")
+        self.__scanner.read_ubyte()
+        # Next four bytes will be the length of the string to read, in big-endian order.  The length is a signed int.
+        encoded_num_bytes = self.__scanner.read_ubytes(4)
+        num_bytes = struct.unpack('>i', encoded_num_bytes)[0]
+        return self.__scanner.read_ubytes(num_bytes)
+
+
     def __parse_string_with_concatenation(self):
         """Parse a string literal. The scanner must be at the first '"'.
 

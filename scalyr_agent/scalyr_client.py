@@ -21,6 +21,7 @@ import httplib
 import platform
 import re
 import socket
+import struct
 import sys
 import time
 
@@ -1133,7 +1134,10 @@ class Event(object):
         @return:  This object.
         @rtype: Event
         """
-        self.__message = message
+        if message is unicode:
+            self.__message = message.encode('utf-8')
+        else:
+            self.__message = message
         return self
 
     @property
@@ -1265,7 +1269,10 @@ class Event(object):
         @type output_buffer: StringIO
         """
         output_buffer.write(self.__serialization_base)
-        json_lib.serialize(self.__message, use_fast_encoding=True, output=output_buffer)
+        # Use a special serialization format for message so that we don't have to send CPU time escaping it.  This
+        # is just a length prefixed format understood by Scalyr servers.
+        json_lib.serialize_as_length_prefixed_string(self.__message, output_buffer)
+
         self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
         # close off attrs object.
         output_buffer.write('}')

@@ -40,7 +40,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventOne"},ts:"1"},{attrs:{message:"eventTwo"},ts:"2"}]"""
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             """, threads: [], client_time: 1 }""")
         self.assertEquals(request.total_events, 2)
         request.close()
@@ -68,7 +68,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventOne"},ts:"1"},{attrs:{message:"eventTwo"},ts:"2"}]"""
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             """, threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""")
 
         self.assertEquals(request.total_events, 2)
@@ -83,7 +83,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventOne"},ts:"1"}], threads: [], client_time: 1 }""")
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], threads: [], client_time: 1 }""")
         request.close()
 
     def test_maximum_bytes_exceeded_from_threads(self):
@@ -111,7 +111,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventThree"},ts:"3"}], threads: [], client_time: 1 }""")
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], threads: [], client_time: 1 }""")
 
         request.close()
 
@@ -129,7 +129,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventThree"},ts:"3"}], """
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], """
             """threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""")
 
         request.close()
@@ -143,13 +143,13 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventOne"},ts:"1"},{attrs:{message:"eventTwo"},ts:"2"}]"""
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             """, threads: [], client_time: 100 }""")
 
         request.set_client_time(2)
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:"eventOne"},ts:"1"},{attrs:{message:"eventTwo"},ts:"2"}]"""
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
             """, threads: [], client_time: 2 }""")
         request.close()
 
@@ -244,7 +244,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body, max_size=180)
         request.set_client_time(1)
         self.assertTrue(request.add_event(Event().set_message('eventOne'), timestamp=1L, sequence_id=first_id, sequence_number=first_number))
-        self.assertFalse(request.add_event(Event(attrs={'name': 'eventTwo', 'long': 'some really long text'}), timestamp=2L, sequence_id=second_id, sequence_number=second_number))
+        self.assertFalse(request.add_event(Event(attrs={'name': 'eventTwo', 'long': 'some really long text'}).set_message('eventTwo'), timestamp=2L, sequence_id=second_id, sequence_number=second_number))
         self.assertTrue(request.add_event(Event().set_message('eventThree'), timestamp=3L, sequence_id=first_id, sequence_number=first_number+expected_delta))
         self.assertEquals(request.total_events, 2)
 
@@ -303,7 +303,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", attrs:{"parser":"bar",message:"my_message",sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
         self.assertEquals(
             json_lib.JsonObject(thread="foo", ts="42", si="1", sn=2, sd=3,
@@ -319,7 +319,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{attrs:{message:"my_message"}}',
+            '{attrs:{message:`s\x00\x00\x00\nmy_message}}',
             output_buffer.getvalue())
 
     def test_no_thread_id(self):
@@ -335,7 +335,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{attrs:{"parser":"bar",message:"my_message",sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
 
     def test_no_attrs(self):
@@ -351,7 +351,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"biz", attrs:{message:"my_message",sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"biz", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
 
     def test_create_from_template(self):
@@ -368,7 +368,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", attrs:{"parser":"bar",message:"my_message",sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
 
 

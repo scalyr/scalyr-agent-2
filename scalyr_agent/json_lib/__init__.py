@@ -39,7 +39,8 @@ from scalyr_agent.json_lib.exceptions import JsonMissingFieldException, JsonPars
 from scalyr_agent.json_lib.objects import JsonObject, JsonArray
 from scalyr_agent.json_lib.parser import parse
 from scalyr_agent.json_lib.serializer import serialize
+from scalyr_agent.json_lib.serializer import serialize_as_length_prefixed_string
 
 
 __all__ = ['parse', 'serialize', 'JsonObject', 'JsonArray', 'JsonConversionException', 'JsonMissingFieldException',
-           'JsonParseException']
+           'JsonParseException', 'serialize_as_length_prefixed_string']
