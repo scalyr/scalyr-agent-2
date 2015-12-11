@@ -446,7 +446,7 @@ class CopyingManager(StoppableThread, LogWatcher ):
                                 copying_params.current_bytes_allowed_to_send)
                             if self.__pending_add_events_task is not None:
                                 log.log(scalyr_logging.DEBUG_LEVEL_1, 'Times from building add event request: %s',
-                                        self.__pending_add_events_task.get_timing_data())
+                                        self.__pending_add_events_task.add_events_request.get_timing_data())
                         else:
                             log.log(scalyr_logging.DEBUG_LEVEL_1, 'Have pending batch of events, retrying to send.')
                             # Take a look at the file system and see if there are any new bytes pending.  This updates

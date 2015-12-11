@@ -199,7 +199,7 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     """Serializes the str or unicode value using the length-prefixed format special to Scalyr.
 
     This is a bit more efficient since the value does not need to be blackslash or quote escaped.
-    
+
     @param value: The string value to serialize.
     @param output_buffer: The buffer to serialize the string to.
 
