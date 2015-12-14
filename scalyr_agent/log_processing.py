@@ -134,11 +134,11 @@ class LogFileIterator(object):
         # The objects of this list are of type LogFileIterator.FileState.  Each object has two important fields
         # position_start and position_end which specify where the contents of the file falls in terms of mark position.
         self.__pending_files = []
-        # Roughly, the number of times mark has been invoked.  We use this to help differiente between positions
-        # retrieved at different marked points.  We disallow going back to a previous position after mark has been
-        # invoked.  At each new mark generation, we reset the mark position to zero.
-        self.__mark_generation = 0L
-        # The current position we are reading from, in mark position coordinates.
+        # Track what mark generation is being used.  We change the generation every time mark() is invoked.  This
+        # allows us to reset the self.__position field to zero so that we can avoid overflowing.
+        self.__mark_generation = LogFileIterator.MarkGeneration()
+
+        # The current position we are reading from, relative to the position that was last passed into mark.
         self.__position = 0L
         # The StringIO buffer holding the bytes to be read.
         self.__buffer = None
@@ -273,25 +273,28 @@ class LogFileIterator(object):
         @return: A tuple containing a (sequence_id, sequence_number)
         @rtype: (uuid.UUID, int)
         """
-        return (self.__sequence_id, self.__sequence_number_at_mark + self.__position)
+        return self.__sequence_id, self.__sequence_number_at_mark + self.__position
 
     def __increase_sequence_number( self, amount ):
         """Increases the sequence number and resets both the sequence number and the id
         if the sequence number exceeds the maximum value"""
-        self.__sequence_number_at_mark += amount;
+        self.__sequence_number_at_mark += amount
         if self.__sequence_number_at_mark > self.__max_sequence_number:
             self.__sequence_id = self.__get_unique_id()
             self.__sequence_number_at_mark = 0
 
-    def mark(self, current_time=None):
-        """Marks the current location of the file.
+    def mark(self, position, current_time=None):
+        """Marks the specified location of the file.
 
         After this call, you cannot call the 'seek' method on a position that occurred before this mark.
 
         Note, this should be called once in a while, otherwise this abstraction will never close file handles
         for old files.
 
+        @param position: The position to mark.
         @param current_time: If not None, the time in seconds past epoch.  Used for testing purposes.
+
+        @type position: LogFileIterator.Position
         @type current_time: float or None
         """
         if current_time is None:
@@ -308,38 +311,50 @@ class LogFileIterator(object):
 
         # We throw out any __pending_file entries that are before the current mark position or can no longer be
         # read.
+        mark_position = position.get_offset_into_buffer()
         for pending_file in self.__pending_files:
-            if not pending_file.valid or (self.__position >= pending_file.position_end
+            if not pending_file.valid or (mark_position >= pending_file.position_end
                                           and not pending_file.is_log_file):
                 self.__close_file(pending_file)
             else:
                 new_pending_files.append(pending_file)
 
         # We zero center the mark position.
+        position_delta = mark_position
         for pending_file in new_pending_files:
-            pending_file.position_start -= self.__position
-            pending_file.position_end -= self.__position
+            pending_file.position_start -= position_delta
+            pending_file.position_end -= position_delta
 
         if self.__buffer is not None:
             for buffer_entry in self.__buffer_contents_index:
-                buffer_entry.position_start -= self.__position
-                buffer_entry.position_end -= self.__position
+                buffer_entry.position_start -= position_delta
+                buffer_entry.position_end -= position_delta
 
-        self.__increase_sequence_number( self.__position )
-        self.__position = 0
+        self.__increase_sequence_number(self.__position)
+        self.__position -= position_delta
 
         self.__pending_files = new_pending_files
-        self.__mark_generation += 1
+        self.__mark_generation = LogFileIterator.MarkGeneration(previous_generation=self.__mark_generation,
+                                                                position_advanced=position_delta)
 
-    def tell(self):
+    def tell(self, dest=None):
         """Returns a position.
 
         This position can be used to invoke the 'seek' method later to return to this point.
 
+        @param dest:  If not None, update the specified Position object with the location, rather than creating
+            a new Position object.
+        @type dest:  LogFileIterator.Position
+
         @return: An opaque token that represents this position.
         @rtype: LogFileIterator.Position
         """
-        return LogFileIterator.Position(self.__mark_generation, self.__position)
+        if dest is not None:
+            dest.mark_generation = self.__mark_generation
+            dest.mark_offset = self.__position
+            return dest
+        else:
+            return LogFileIterator.Position(self.__mark_generation, self.__position)
 
     def seek(self, position):
         """Sets the position to the supposed position value.
@@ -350,15 +365,17 @@ class LogFileIterator(object):
             to the 'tell' method.
         @type position: LogFileIterator.Position
         """
-        if position.mark_generation != self.__mark_generation:
-            raise Exception('Attempt to seek to a position from a previous mark generation')
-        buffer_index = self.__determine_buffer_index(position.mark_offset)
+        mark_offset = position.get_offset_into_buffer()
+        if mark_offset < 0:
+            raise Exception('Attempt to seek to a position that occurs before further set mark.')
+
+        buffer_index = self.__determine_buffer_index(mark_offset)
         if buffer_index is not None:
             self.__buffer.seek(buffer_index)
         else:
             self.__reset_buffer()
 
-        self.__position = position.mark_offset
+        self.__position = mark_offset
 
     def bytes_between_positions(self, first, second):
         """Returns the number of bytes between the two positions.
@@ -371,7 +388,7 @@ class LogFileIterator(object):
         @return:  The number of bytes between the two positions.
         @rtype: int
         """
-        if first.mark_generation != second.mark_generation:
+        if first.mark_generation is not second.mark_generation:
             raise Exception('Attempt to compare positions from two different mark generations')
 
         return second.mark_offset - first.mark_offset
@@ -396,15 +413,16 @@ class LogFileIterator(object):
         if self.__buffer is None or (self.__available_buffer_bytes() < self.__max_line_length and
                                      self.__more_file_bytes_available()):
             self.__fill_buffer(current_time)
-        original_buffer_index = self.__buffer.tell()
 
-        expected_buffer_index = self.__determine_buffer_index(self.__position)
+        # The following code and the sanity check below were to check for an old bug that was fixed a long time ago.
+        # original_buffer_index = self.__buffer.tell()
+        # expected_buffer_index = self.__determine_buffer_index(self.__position)
         # Just a sanity check.
-        if len(self.__buffer_contents_index) > 0 and self.__position != self.__buffer_contents_index[-1].position_end:
-            if expected_buffer_index != original_buffer_index:
-                assert expected_buffer_index == original_buffer_index, (
-                    'Mismatch between expected index and actual %ld %ld',
-                    expected_buffer_index, original_buffer_index)
+        #if len(self.__buffer_contents_index) > 0 and self.__position != self.__buffer_contents_index[-1].position_end:
+        #    if expected_buffer_index != original_buffer_index:
+        #        assert expected_buffer_index == original_buffer_index, (
+        #            'Mismatch between expected index and actual %ld %ld',
+        #            expected_buffer_index, original_buffer_index)
 
         # read a complete line from our line_matcher
         result = self.__line_matcher.readline(self.__buffer, current_time)
@@ -414,12 +432,12 @@ class LogFileIterator(object):
         self.__position = self.__determine_mark_position(self.__buffer.tell())
 
         # Just a sanity check.
-        if len(self.__buffer_contents_index) > 0:
-            expected_size = self.__buffer_contents_index[-1].buffer_index_end
-            actual_size = self.__file_system.get_file_size(self.__buffer)
-            if expected_size != actual_size:
-                assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
-                                                      expected_size, actual_size)
+        #if len(self.__buffer_contents_index) > 0:
+        #    expected_size = self.__buffer_contents_index[-1].buffer_index_end
+        #    actual_size = self.__file_system.get_file_size(self.__buffer)
+        #    if expected_size != actual_size:
+        #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
+        #                                              expected_size, actual_size)
 
         return result
 
@@ -437,16 +455,10 @@ class LogFileIterator(object):
         self.__refresh_pending_files(current_time=current_time)
 
         skipping = self.available
-
-        for pending in self.__pending_files:
-            self.__close_file(pending)
-        self.__pending_files = []
-        self.__buffer_contents_index = None
-        self.__buffer = None
-        self.__mark_generation += 1
-        self.__position = 0
-
-        self.mark()
+        # Go to the end.
+        self.__position += skipping
+        # Force us to re-read the memory buffer.
+        self.__reset_buffer()
 
         return skipping
 
@@ -1082,9 +1094,68 @@ class LogFileIterator(object):
 
     class Position(object):
         """Represents a position in the iterator."""
-        def __init__(self, mark_generation, position ):
+        def __init__(self, mark_generation, position):
+            # The offset from the mark generation.
             self.mark_offset = position
+            # The mark generation that was current when this position was made.
             self.mark_generation = mark_generation
+
+        def get_offset_into_buffer(self):
+            """Returns the number of bytes this position is from the most recent mark() call.
+
+            @return:  The offset from the most recent mark call.
+            @rtype: int
+            """
+            return self.mark_generation.get_offset_into_buffer(self.mark_offset)
+
+    class MarkGeneration(object):
+        """Represents a generation of positions.  All positions made within the same MarkGeneration are all
+        relative to the same location in the file.
+
+        The main job of this abstraction is to keep track of the offsets from one mark generation to the next
+        so that we can always calculate the offset, even for positions made with an old generation.
+
+        """
+        def __init__(self, previous_generation=None, position_advanced=0):
+            """Creates a new mark generation.  There are two forms of this initializer.  The first ever created
+            MarkGeneration object for an instance of the LogFileIterator will not have any of the arguments
+            supplied to indicate it is the root.  Otherwise, it will have the information supplied from the
+            pervious generation.
+
+            @param previous_generation:  The previous mark generation, if there was any.  This must be used if
+                there was a previous generation because this will update that generation's offset so that their
+                positions point to the correct location.
+            @param position_advanced:  The number of bytes that this this generation is offset from the previous
+                generation, if there was one.
+            @type previous_generation: LogFileIterator.MarkGeneration
+            @type position_advanced: int
+            """
+            # Note, we are very particular that we store references to the next generation, instead of the previous,
+            # so that if there are no more Position objects referencing a given MarkGeneration, then that MarkGeneration
+            # will be garbage collected.
+            #
+            # The mark generation that was made next after this one, if any.  If this is None, it indicates this
+            # mark generation instance is the current generation.
+            self.__next_generation = None
+            # The offset of this mark generation's positions to the next one, if there is one.
+            self.__offset_to_next = 0
+            if previous_generation is not None:
+                previous_generation.__next_generation = self
+                previous_generation.__offset_to_next = -1 * position_advanced
+
+        def get_offset_into_buffer(self, position):
+            """Calculates the offset for the position to the most recent mark call.
+
+            @param position:  The position relative to this mark generation's mark.
+            @type position: int
+            @return:  The offset of the position to the most recent mark call.
+            @rtype: int
+            """
+            current_generation = self
+            while current_generation.__next_generation is not None:
+                position += current_generation.__offset_to_next
+                current_generation = current_generation.__next_generation
+            return position
 
 
 class LogFileProcessor(object):
@@ -1265,7 +1336,7 @@ class LogFileProcessor(object):
         self.__last_scan_time = current_time
         self.__lock.release()
 
-        self.__log_file_iterator.mark(current_time=current_time)
+        self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
 
         # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
         if current_time - self.__last_success > self.__copy_staleness_threshold:
@@ -1417,7 +1488,7 @@ class LogFileProcessor(object):
 
                         # Do a mark to cleanup any state in the iterator.  We know we won't have to roll back
                         # to before this point now.
-                        self.__log_file_iterator.mark(current_time)
+                        self.__log_file_iterator.mark(final_position, current_time=current_time)
                         if self.__log_file_iterator.at_end:
                             self.__log_file_iterator.close()
                             self.__is_closed = True
@@ -1425,6 +1496,7 @@ class LogFileProcessor(object):
                         else:
                             return False
                     elif result == LogFileProcessor.FAIL_AND_DROP:
+                        self.__log_file_iterator.mark(final_position, current_time=current_time)
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         self.__total_bytes_failed += bytes_read
                         return False
@@ -1465,8 +1537,7 @@ class LogFileProcessor(object):
         """
         if current_time is None:
             current_time = time.time()
-        skipped_bytes = self.__log_file_iterator.advance_to_end()
-        self.__log_file_iterator.mark(current_time=current_time)
+        skipped_bytes = self.__log_file_iterator.advance_to_end(current_time=current_time)
 
         self.__lock.acquire()
         self.__total_bytes_skipped += skipped_bytes
