@@ -148,7 +148,7 @@ class ScalyrClientSession(object):
         """
         return self.send(self.add_events_request())[0]
 
-    def __send_request(self, request_path, body=None, body_func=None, is_post=True):
+    def __send_request(self, request_path, body=None, body_func=None, is_post=True, block_on_response=True):
         """Sends a request either using POST or GET to Scalyr at the specified request path.  It may be either
         a POST or GET.
 
@@ -159,15 +159,19 @@ class ScalyrClientSession(object):
         @param [body_func]:  A function that will be invoked to retrieve the body to send in the post.  Ignored if not
             POST.
         @param [is_post]:  True if this request should be sent using a POST, otherwise GET.
+        @param [block_on_response]:  True if this request should block, waiting for the response.  If False, it will
+            not block, but instead return a function, that will invoked, will block.
 
         @type request_path: str
         @type body: str|None
         @type body_func: func|None
         @type is_post: bool
+        @type block_on_response: bool
 
-        @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
-            sent, and the full response.
-        @rtype: (str, int, str)
+        @return: If block_on_response is True, a tuple containing the status message in the response
+            (such as 'success'), the number of bytes sent, and the full response.  If block_on_response is False,
+            then returns a function, that will invoked, will block and return the tuple.
+        @rtype: (str, int, str) or Function
         """
         current_time = time.time()
 
@@ -177,8 +181,6 @@ class ScalyrClientSession(object):
             return 'client/connectionClosed', 0, ''
 
         self.total_requests_sent += 1
-        was_success = False
-        bytes_received = 0
 
         if self.__use_ssl:
             if not __has_ssl__:
@@ -193,7 +195,8 @@ class ScalyrClientSession(object):
                          'Please update your configuration file to re-enable server certificate validation.',
                          limit_once_per_x_secs=86400, limit_key='nocertwarning', error_code='client/sslverifyoff')
 
-        response = ''
+        was_sent = False
+
         try:
             try:
                 if self.__connection is None:
@@ -258,10 +261,6 @@ class ScalyrClientSession(object):
                     log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
                     self.__connection.request('GET', request_path, headers=self.__standard_headers)
 
-                http_response = self.__connection.getresponse()
-                status_code = http_response.status
-                response = http_response.read()
-                bytes_received = len(response)
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, 'errno') and error.errno is not None:
@@ -270,6 +269,55 @@ class ScalyrClientSession(object):
                               error_code='client/requestFailed')
                 else:
                     log.exception('Failed to send request due to exception.  Closing connection, will re-attempt',
+                                  error_code='requestFailed')
+                return 'requestFailed', len(body_str), ''
+
+            was_sent = True
+
+            def receive_response():
+                self.__receive_response(body_str, current_time)
+
+            if not block_on_response:
+                return receive_response
+            else:
+                return receive_response()
+
+        finally:
+            if not was_sent:
+                self.total_request_latency_secs += (time.time() - current_time)
+                self.total_requests_failed += 1
+                self.close(current_time=current_time)
+
+    def __receive_response(self, body_str, send_time):
+        """Receives a response for a request previously sent using __send_request.
+
+        @param body_str: The body of the request that was sent.
+        @param send_time: The time of day when the request was sent.
+
+        @type body_str: str
+        @type send_time: float
+        @return:  The tuple containing the status message in the response  (such as 'success'), the number of bytes
+            sent, and the full response.
+        @rtype: (str, int, str)
+        """
+        response = ''
+        was_success = False
+        bytes_received = 0
+
+        try:
+            try:
+                http_response = self.__connection.getresponse()
+                status_code = http_response.status
+                response = http_response.read()
+                bytes_received = len(response)
+            except Exception, error:
+                # TODO: Do not just catch Exception.  Do narrower scope.
+                if hasattr(error, 'errno') and error.errno is not None:
+                    log.error('Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
+                              'connection, will re-attempt', self.__full_address, error.errno, str(error),
+                              error_code='client/requestFailed')
+                else:
+                    log.exception('Failed to receive response due to exception.  Closing connection, will re-attempt',
                                   error_code='requestFailed')
                 return 'requestFailed', len(body_str), response
 
@@ -297,7 +345,7 @@ class ScalyrClientSession(object):
                           error_code='parseResponseFailed')
                 return 'parseResponseFailed', len(body_str), response
 
-            self.__last_success = current_time
+            self.__last_success = send_time
 
             if 'status' in response_as_json:
                 status = response_as_json['status']
@@ -317,24 +365,27 @@ class ScalyrClientSession(object):
                 return 'unknownError', len(body_str), response
 
         finally:
-            self.total_request_latency_secs += (time.time() - current_time)
+            self.total_request_latency_secs += (time.time() - send_time)
             if not was_success:
                 self.total_requests_failed += 1
-                self.close(current_time=current_time)
+                self.close(current_time=send_time)
             self.total_response_bytes_received += bytes_received
 
-    def send(self, add_events_request):
+    def send(self, add_events_request, block_on_response=True):
         """Sends an AddEventsRequest to Scalyr.
 
         The AddEventsRequest should have been retrieved using the 'add_events_request' method on this object.
 
         @param add_events_request: The request containing any log lines/events to copy to the server.
-
+        @param block_on_response:  If True, this method will block, waiting for the response from the server.
+            Otherwise, it will not block.  Instead, a function will be returned, that when invoked, will block.
         @type add_events_request: AddEventsRequest
+        @type block_on_response: bool
 
-        @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
-            sent, and the full response.
-        @rtype: (str, int, str)
+        @return: If block_on_response is True, a tuple containing the status message in the response
+            (such as 'success'), the number of bytes sent, and the full response.  If block_on_response is False,
+            then returns a function, that will invoked, will block and return the tuple.
+        @rtype: (str, int, str) or Function
         """
         current_time = time.time()
 
@@ -343,7 +394,7 @@ class ScalyrClientSession(object):
 
             return add_events_request.get_payload()
 
-        return self.__send_request('/addEvents', body_func=generate_body)
+        return self.__send_request('/addEvents', body_func=generate_body, block_on_response=block_on_response)
 
     def close(self, current_time=None):
         """Closes the underlying connection to the Scalyr server.
@@ -448,6 +499,7 @@ class ScalyrClientSession(object):
         url_path = "/ajax?method=performAgentVersionCheck&installedVersion=%s&track=%s" % (self.__agent_version, track)
 
         return self.__send_request(url_path, is_post=False)
+
 
 class EventSequencer( object ):
     """Responsible for keeping track of sequences for an AddEventsRequest
