@@ -1170,6 +1170,9 @@ class Event(object):
         self.__sequence_number = None
         self.__sequence_number_delta = None
         self.__sampling_rate = None
+        # Whether or not any of the non-fast path fields were included.  The fast fields are message, timestamp, snd.
+        self.__has_non_optimal_fields = False
+        self.__num_optimal_fields = 0
 
     @property
     def attrs(self):
@@ -1189,6 +1192,8 @@ class Event(object):
         @return:  This object.
         @rtype: Event
         """
+        if self.__message is None and message is not None:
+            self.__num_optimal_fields += 1
         if message is unicode:
             self.__message = message.encode('utf-8')
         else:
@@ -1212,6 +1217,8 @@ class Event(object):
         @rtype: Event
         """
         # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
+        if self.__timestamp is None and timestamp is not None:
+            self.__num_optimal_fields += 1
         self.__timestamp = '"%s"' % str(timestamp)
         return self
 
@@ -1241,6 +1248,7 @@ class Event(object):
         """
         # This is serialized as a string to get around overflow issues, so put in a string now.
         self.__sequence_id = '"%s"' % str(sid)
+        self.__has_non_optimal_fields = True
         return self
 
     @property
@@ -1252,6 +1260,7 @@ class Event(object):
         # We have to cut off the quotes we surrounded the field with when we serialized it.
         if self.__sequence_id is not None:
             return self.__sequence_id[1:-1]
+        self.__has_non_optimal_fields = True
         return None
 
     def set_sequence_number(self, snum):
@@ -1265,6 +1274,7 @@ class Event(object):
         @return:  This object.
         @rtype: Event
         """
+        self.__has_non_optimal_fields = True
         # It is serialized as a number, so just a toString is called for.
         self.__sequence_number = str(snum)
         return self
@@ -1291,6 +1301,8 @@ class Event(object):
         @rtype: Event
         """
         # It is serialized as a number, so just a toString is called for.
+        if self.__sequence_number_delta is None and sdelta is not None:
+            self.__num_optimal_fields += 1
         self.__sequence_number_delta = str(sdelta)
         return self
 
@@ -1314,6 +1326,7 @@ class Event(object):
         @return:  This object.
         @rtype: Event
         """
+        self.__has_non_optimal_fields = True
         self.__sampling_rate = str(rate)
         return self
 
@@ -1328,14 +1341,22 @@ class Event(object):
         # is just a length prefixed format understood by Scalyr servers.
         json_lib.serialize_as_length_prefixed_string(self.__message, output_buffer)
 
-        self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
-        # close off attrs object.
-        output_buffer.write('}')
+        # We fast path the very common case of just a timestamp and sequence delta fields.
+        if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:
+            output_buffer.write('}')
+            output_buffer.write(',sd:')
+            output_buffer.write(self.__sequence_number_delta)
+            output_buffer.write(',ts:')
+            output_buffer.write(self.__timestamp)
+        else:
+            self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
+            # close off attrs object.
+            output_buffer.write('}')
 
-        self.__write_field_if_not_none(',ts:', self.__timestamp, output_buffer)
-        self.__write_field_if_not_none(',si:', self.__sequence_id, output_buffer)
-        self.__write_field_if_not_none(',sn:', self.__sequence_number, output_buffer)
-        self.__write_field_if_not_none(',sd:', self.__sequence_number_delta, output_buffer)
+            self.__write_field_if_not_none(',ts:', self.__timestamp, output_buffer)
+            self.__write_field_if_not_none(',si:', self.__sequence_id, output_buffer)
+            self.__write_field_if_not_none(',sn:', self.__sequence_number, output_buffer)
+            self.__write_field_if_not_none(',sd:', self.__sequence_number_delta, output_buffer)
         # close off the event object.
         output_buffer.write('}')
 

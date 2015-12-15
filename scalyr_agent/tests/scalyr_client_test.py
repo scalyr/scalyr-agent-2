@@ -310,6 +310,80 @@ class EventTest(ScalyrTestCase):
                                 attrs=json_lib.JsonObject(parser="bar", message="my_message", sample_rate=0.5)),
             json_lib.parse(output_buffer.getvalue()))
 
+    def test_fast_path_fields(self):
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message("my_message")
+        x.set_sequence_number_delta(3)
+        x.set_timestamp(42L)
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
+            output_buffer.getvalue())
+
+    def test_individual_fields(self):
+        # snd
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message('my_message')
+        x.set_sequence_number_delta(3)
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3}',
+            output_buffer.getvalue())
+
+        # timestamp
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message('my_message')
+        x.set_timestamp(42)
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},ts:"42"}',
+            output_buffer.getvalue())
+
+        # sampling_rate
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message('my_message')
+        x.set_sampling_rate(0.5)
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
+            output_buffer.getvalue())
+
+        # sid
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message('my_message')
+        x.set_sequence_id('hi')
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},si:"hi"}',
+            output_buffer.getvalue())
+
+        # seq num
+        x = Event(thread_id='foo', attrs={"parser": "bar"})
+        x.set_message('my_message')
+        x.set_sequence_number(5)
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
+            output_buffer.getvalue())
+
     def test_only_message(self):
         x = Event()
         x.set_message("my_message")
