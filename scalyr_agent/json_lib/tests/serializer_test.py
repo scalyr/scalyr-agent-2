@@ -65,6 +65,10 @@ class SerializeTests(ScalyrTestCase):
     def test_length_prefixed_strings(self):
         self.assertEquals('`s\x00\x00\x00\x0cHowdy folks!', serialize('Howdy folks!', use_length_prefix_string=True))
 
+    def test_length_prefixed_strings_with_unicode(self):
+        self.assertEquals('`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!', serialize(u'Howdy \u84b8 folks!',
+                                                                                   use_length_prefix_string=True))
+
     def write(self, value):
         return serialize(value, use_fast_encoding=True)
 

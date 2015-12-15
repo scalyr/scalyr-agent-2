@@ -207,5 +207,9 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     @type output_buffer: StringIO
     """
     output_buffer.write('`s')
-    output_buffer.write(struct.pack('>i', len(value)))
-    output_buffer.write(value)
+    if type(value) is unicode:
+        to_serialize = value.encode('utf-8')
+    else:
+        to_serialize = value
+    output_buffer.write(struct.pack('>i', len(to_serialize)))
+    output_buffer.write(to_serialize)
