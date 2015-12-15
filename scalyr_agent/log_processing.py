@@ -1359,6 +1359,8 @@ class LogFileProcessor(object):
         # fast_get_time = timeit.default_timer
         # start_process_time = fast_get_time()
 
+        position = self.__log_file_iterator.tell()
+
         # noinspection PyBroadException
         try:
             # Keep track of some states about the lines/events we process.
@@ -1378,29 +1380,31 @@ class LogFileProcessor(object):
 
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
-                position = self.__log_file_iterator.tell()
+                position = self.__log_file_iterator.tell(dest=position)
 
                 #time_spent_reading -= fast_get_time()
                 line = self.__log_file_iterator.readline(current_time=current_time)
+                line_len = len(line)
                 #time_spent_reading += fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
-                if len(line) == 0:
+                if line_len == 0:
                     break
 
                 # We have a line, process it and see what comes out.
-                bytes_read += len(line)
+                bytes_read += line_len
                 lines_read += 1L
 
                 sample_result = self.__sampler.process_line(line)
                 if sample_result is None:
                     lines_dropped_by_sampling += 1L
-                    bytes_dropped_by_sampling += len(line)
+                    bytes_dropped_by_sampling += line_len
                     continue
 
                 (line, redacted) = self.__redacter.process_line(line)
+                line_len = len(line)
 
-                if len(line) > 0:
+                if line_len > 0:
                     # Try to add the line to the request, but it will let us know if it exceeds the limit it can
                     # send.
                     sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
@@ -1430,7 +1434,7 @@ class LogFileProcessor(object):
 
                 if redacted:
                     total_redactions += 1L
-                bytes_copied += len(line)
+                bytes_copied += line_len
                 lines_copied += 1
 
             final_position = self.__log_file_iterator.tell()
