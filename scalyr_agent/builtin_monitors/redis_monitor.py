@@ -24,17 +24,18 @@ import time
 from scalyr_agent import ScalyrMonitor
 
 from redis.client import Redis
-from redis.exceptions import ConnectionError
+from redis.exceptions import ConnectionError, TimeoutError
 
 
 class RedisHost( object ):
     """Class that holds various information about a specific redis connection
     """
-    def __init__( self, host, port, password ):
+    def __init__( self, host, port, password, connection_timeout ):
         #redis instance information
         self.__host = host
         self.__port = port
         self.__password = password
+        self.__connection_timeout = connection_timeout
 
         # ID of the last slowlog entry
         self.last_id = 0
@@ -53,6 +54,9 @@ class RedisHost( object ):
         # was reset
         self.__reset = False
 
+        # run_id of the redis server
+        self.__run_id = None
+
 
         # String for display purposes
         self.__display_string = ""
@@ -62,26 +66,35 @@ class RedisHost( object ):
         """Check if we are currently connected to a redis instance"""
         return self.__redis != None
 
-    def __update_latest( self ):
+    def __update_latest( self, redis ):
         """Get the most recent entry in the slow log and store its ID.
 
         If it's the first connection for this RedisHost just get the
         latest entry in the slowlog, otherwise ignore because we will have
         previous values for the last_id and timestamp.
         """
-        if self.__redis and self.__first_connection:
+        if self.__first_connection:
+            pipeline = redis.pipeline( transaction=False )
+            results = pipeline.info().slowlog_get( 1 ).execute()
+            if len( results ) != 2:
+                raise Exception( "Error initializing slowlog data" )
+
             self.__first_connection = False
-            latest = self.__redis.slowlog_get( 1 )
+            self.check_for_reset( results[0] )
+            self.__reset = False
+            latest = results[1]
             if latest:
                 self.last_id = latest[0]['id']
                 self.last_timestamp = latest[0]['start_time']
 
 
-    def reset_connection( self ):
-        """Called when the connection is reset
-        """
-        self.__reset = True
-        self.__redis = None
+    def check_for_reset( self, info ):
+        if not 'run_id' in info:
+            raise Exception( "Unsupported redis version.  redis_monitor requires a version of redis >= 2.4.17" )
+
+        if self.__run_id != info['run_id']:
+            self.__reset = True
+            self.__run_id = info['run_id']
 
     def log_slowlog_entries( self, logger, lines_to_fetch ):
         """Fetch entries from the redis slowlog and emit them to Scalyr
@@ -90,17 +103,30 @@ class RedisHost( object ):
         has been reset in between calls to this function
         """
 
-        # fetch the entries
-        entries = self.redis.slowlog_get( lines_to_fetch )
+        # pipeline info and slowlog calls
+        pipe = self.redis.pipeline( transaction=False )
+
+        results = pipe.info().slowlog_get( lines_to_fetch ).execute()
+
+        if len( results ) != 2:
+            raise Exception( "Error fetching slowlog data" )
+
+        self.check_for_reset( results[0] )
+
+        entries = results[1]
 
         # by default use the id based predicate to get the entries
         key = 'id'
         value = self.last_id
 
+        #default warning message
+        warning = "Too many log messages since last query.  Some log lines may have been dropped"
+
         # if our connection was reset since the last time we checked the slowlog then
         # get entries based on timestamp instead, because the server might have been restarted
         # which will invalidate any previous ids
         if self.__reset:
+            warning = "Redis server reset detected for %s.  Some log lines may have been dropped" % self.display_string
             key = 'start_time'
             value = self.last_timestamp
 
@@ -136,7 +162,7 @@ class RedisHost( object ):
                 break
 
         if not found_previous:
-            logger.warn( "Too many log messages since last query.  Some log lines may have been dropped" )
+            logger.warn( warning )
 
         # print it out in reverse because redis sends entries in reverse order
         for entry in reversed( unseen_entries ):
@@ -167,12 +193,76 @@ class RedisHost( object ):
         Performing lazy initialization if it hasn't already been created
         """
         if not self.__redis:
-            self.__redis = Redis( host=self.__host, port=self.__port, password=self.__password )
-            self.__update_latest()
+            redis = Redis( host=self.__host, port=self.__port, password=self.__password, socket_timeout=self.__connection_timeout )
+            self.__update_latest( redis )
+            #__update_latest can raise an exception, so don't assign to self until it
+            #completes successfully
+            self.__redis = redis
         return self.__redis
 
 class RedisMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that imports the Redis SLOWLOG.
+    """
+# Redis Monitor
+
+A Scalyr agent monitor that imports the Redis SLOWLOG.
+
+The Redis monitor queries the slowlog of a number of Redis servers, and uploads the logs
+to the Scalyr servers.
+
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+
+
+## Configuration
+
+The following example will configure the agent to query a redis server located at localhost:6379 and that does not require
+a password
+
+    monitors: [
+      {
+        module:                    "scalyr_agent.builtin_monitors.redis_monitor",
+      }
+    ]
+
+Additional configuration options are as follows:
+
+*   hosts - an array of 'host' objects. Each host object can contain any or all of the following keys: "host", "port", "password".
+    Missing keys will be filled in with the defaults: 'localhost', 6379, and <None>.
+
+    For example:
+
+    hosts: [
+        { "host": "redis.example.com", "password": "secret" },
+        { "port": 6380 }
+    ]
+
+    Will create connections to 2 Redis servers: redis.example.com:6379 with the password 'secret' and
+    localhost:6380 without a password.
+
+    Each host in the list will be queried once per sample interval.
+
+*   lines_to_fetch - the number of lines to fetch from the slowlog each sample interval.  Defaults to 500.
+    This value should be set based on your expected load.  If more than this number of messages are logged to the
+    slowlog between sample intervals then some lines will be dropped.
+
+    You should make sure that the redis-server slowlog-max-len config option is set to at least the same size as
+    this value.
+
+    You should also set your sample_interval to match your expected traffic (see below).
+
+*   connection_timeout - the number of seconds to wait when querying a Redis server before timing out and giving up.
+    Defaults to 5.
+
+*   connection_error_repeat_interval - if multiple connection errors are detected, the number of seconds to wait before
+    redisplaying an error message.  Defaults to 300.
+
+
+*   sample_interval - the number of seconds to wait between successive queryies to the Redis slowlog.  This defaults to 30 seconds
+    for most monitors, however if you are expecting a high volume of logs you should set this to a low enough value
+    such that the number of messages you receive in this interval does not exceed the value of `lines_to_fetch`, otherwise
+    some log lines will be dropped.
+
     """
     def _initialize(self):
         """Performs monitor-specific initialization."""
@@ -181,6 +271,13 @@ class RedisMonitor(ScalyrMonitor):
 
         # The number of seconds to wait before redisplaying connection errors
         self.__connection_error_repeat_interval = self._config.get('connection_error_repeat_interval', default=300, convert_to=int, min_value=10, max_value=6000)
+
+        # The number of seconds to wait when querying the redis server
+        self.__connection_timeout = self._config.get('connection_timeout', default=5, convert_to=int, min_value=0, max_value=60)
+
+        # Redis-py requires None rather than 0 if no timeout
+        if self.__connection_timeout == 0:
+            self.__connection_timeout = None
 
         # A list of RedisHosts
         self.__redis_hosts = []
@@ -199,7 +296,7 @@ class RedisMonitor(ScalyrMonitor):
             config.update( host )
 
             #create a new redis host
-            self.__redis_hosts.append( RedisHost( config['host'], config['port'], config['password'] ) )
+            self.__redis_hosts.append( RedisHost( config['host'], config['port'], config['password'], self.__connection_timeout ) )
 
     def gather_sample(self):
 
@@ -212,7 +309,7 @@ class RedisMonitor(ScalyrMonitor):
                     self._logger.error( "Unable to establish connection: %s" % ( host.display_string ), limit_once_per_x_secs=self.__connection_error_repeat_interval, limit_key=host.display_string )
                 else:
                     self._logger.error( "Connection to redis lost: %s" % host.display_string )
-
-                host.reset_connection()
+            except TimeoutError, e:
+                self._logger.warn( "Connection timed out: %s" % host.display_string )
 
 
