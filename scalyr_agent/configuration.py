@@ -451,6 +451,13 @@ class Configuration(object):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
 
+    @property
+    def pipeline_threshold(self):
+        """Returns the percentage an add events request must be of the maximum allowed request size to
+        trigger pipelining the next add events request.
+        """
+        return self.__get_config().get_float('pipeline_threshold')
+
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
 
@@ -657,6 +664,11 @@ class Configuration(object):
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
         self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description)
+
+        # The percentage of the maximum message size a message (max_allowed_request_size) has to be to trigger
+        # pipelining the next add events request.  This intentionally set to 110% to prevent it from being used unless
+        # explicitly requested.
+        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description)
 
         # If we have noticed that new bytes have appeared in a file but we do not read them before this threshold
         # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the

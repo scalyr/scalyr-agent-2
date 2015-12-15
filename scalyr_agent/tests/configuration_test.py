@@ -91,6 +91,8 @@ class TestConfiguration(ScalyrTestCase):
         self.assertFalse(config.debug_init)
         self.assertFalse(config.pidfile_advanced_reuse_guard)
 
+        self.assertEquals(config.pipeline_threshold, 1.1)
+
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
         self.assertEquals(config.log_configs[0].get_json_object('attributes'), JsonObject())
@@ -140,6 +142,7 @@ class TestConfiguration(ScalyrTestCase):
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
+            pipeline_threshold: 0.5,
 
             max_line_size: 1024,
             max_log_offset_size: 1048576,
@@ -196,6 +199,8 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.copying_thread_profile_interval, 2)
         self.assertEquals(config.copying_thread_profile_output_path, '/tmp/some_profiles')
+
+        self.assertEquals(config.pipeline_threshold, 0.5)
 
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)
