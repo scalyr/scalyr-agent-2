@@ -146,7 +146,8 @@ class RedisHost( object ):
     def log_entry( self, logger, entry ):
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
-        logger.emit_value( 'host', self.display_string, extra_fields={
+        logger.emit_value( 'redis', 'slowlog', extra_fields={
+            'host': self.display_string,
             'ts': time.strftime( time_format, time.gmtime( entry['start_time'] ) ),
             'exectime' : entry['duration'],
             'command' : entry['command']
