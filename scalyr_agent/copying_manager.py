@@ -414,12 +414,15 @@ class CopyingManager(StoppableThread, LogWatcher ):
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
                 last_success = time.time()
 
+                pipeline_byte_threshold = self.__config.pipeline_threshold * float(self.__config.max_allowed_request_size)
+
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
                 while self._run_state.is_running():
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'At top of copy log files loop.')
                     current_time = time.time()
+                    pipeline_time = 0.0
                     # noinspection PyBroadException
                     try:
                         # If we have a pending request and it's been too taken too long to send it, just drop it
@@ -459,16 +462,44 @@ class CopyingManager(StoppableThread, LogWatcher ):
                         if self.__pending_add_events_task is not None:
                             log.log(scalyr_logging.DEBUG_LEVEL_1, 'Sending an add event request')
 
-                            (result, bytes_sent, full_response) = self.__send_events(self.__pending_add_events_task)
+                            # Send the request, but don't block for the response yet.
+                            get_response = self.__send_events(self.__pending_add_events_task)
+
+                            # If we are sending very large requests, we will try to optimize for future requests
+                            # by overlapping building the request with waiting for the response on the current request
+                            # (pipelining).
+                            if self.__pending_add_events_task.add_events_request.current_size >= pipeline_byte_threshold:
+                                log.log(scalyr_logging.DEBUG_LEVEL_1, 'Getting pipelined batch of events to send.')
+                                # Time how long it takes us to build it because we will subtract it from how long we
+                                # have to wait before we send the next request.
+                                pipeline_time = time.time()
+                                pipelined_add_events_task = self.__get_next_add_events_task(
+                                    copying_params.current_bytes_allowed_to_send)
+                                if pipelined_add_events_task is not None:
+                                    log.log(scalyr_logging.DEBUG_LEVEL_1, 'Times from building pipelined add event '
+                                                                          'request: %s',
+                                            self.__pending_add_events_task.add_events_request.get_timing_data())
+                            else:
+                                pipelined_add_events_task = None
+
+                            # Now block for the response.
+                            (result, bytes_sent, full_response) = get_response()
+
+                            if pipelined_add_events_task is not None:
+                                pipeline_time = time.time() - pipeline_time
+                            else:
+                                pipeline_time = 0.0
 
                             log.log(scalyr_logging.DEBUG_LEVEL_1,
                                     'Sent %ld bytes and received response with status="%s".',
                                     bytes_sent, result)
 
                             if result == 'success' or 'discardBuffer' in result or 'requestTooLarge' in result:
+                                next_add_events_task = None
                                 try:
                                     if result == 'success':
                                         self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
+                                        next_add_events_task = pipelined_add_events_task
                                     elif 'discardBuffer' in result:
                                         self.__pending_add_events_task.completion_callback(
                                             LogFileProcessor.FAIL_AND_DROP)
@@ -479,7 +510,7 @@ class CopyingManager(StoppableThread, LogWatcher ):
                                     # No matter what, we want to throw away the current event since the server said we
                                     # could.  We have seen some bugs where we did not throw away the request because
                                     # an exception was thrown during the callback.
-                                    self.__pending_add_events_task = None
+                                    self.__pending_add_events_task = next_add_events_task
                                     self.__write_checkpoint_state()
 
                             if result == 'success':
@@ -519,7 +550,9 @@ class CopyingManager(StoppableThread, LogWatcher ):
                         self.__total_errors += 1
                         self.__lock.release()
 
-                    self._run_state.sleep_but_awaken_if_stopped(copying_params.current_sleep_interval)
+                    if pipeline_time < copying_params.current_sleep_interval:
+                        self._run_state.sleep_but_awaken_if_stopped(copying_params.current_sleep_interval -
+                                                                    pipeline_time)
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
                 log.exception('Log copying failed due to exception')
@@ -711,20 +744,20 @@ class CopyingManager(StoppableThread, LogWatcher ):
         return AddEventsTask(add_events_request, handle_completed_callback)
 
     def __send_events(self, add_events_task):
-        """Sends the AddEventsRequest contained in the task.
+        """Sends the AddEventsRequest contained in the task but does not block on the response.
 
         @param add_events_task: The task whose request should be sent.
         @type add_events_task: AddEventsTask
 
-        @return: The result of sending the request.  It is a tuple of the status message, the number of
-            bytes sent, and the actual response itself.
-        @rtype: (str, int, str)
+        @return: A function, that when invoked, will block on the response and return a tuple containing the status
+            message, the number of bytes sent, and the actual response itself.
+        @rtype: func
         """
         # TODO: Re-enable not actually sending an event if it is empty.  However, if we turn this on, it
         # currently causes too much error output and the client connection closes too frequently.  We need to
         # actually send some sort of application level keep alive.
         #if add_events_task.add_events_request.total_events > 0:
-        return self.__scalyr_client.send(add_events_task.add_events_request)
+        return self.__scalyr_client.send(add_events_task.add_events_request, block_on_response=False)
         #else:
         #    return "success", 0, "{ status: \"success\", message: \"RPC not sent to server because it was empty\"}"
 

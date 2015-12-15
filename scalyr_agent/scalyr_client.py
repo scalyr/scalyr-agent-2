@@ -275,7 +275,7 @@ class ScalyrClientSession(object):
             was_sent = True
 
             def receive_response():
-                self.__receive_response(body_str, current_time)
+                return self.__receive_response(body_str, current_time)
 
             if not block_on_response:
                 return receive_response
@@ -642,13 +642,16 @@ class AddEventsRequest(object):
         self.__timing_data = dict()
 
     @property
-    def __current_size(self):
+    def current_size(self):
         """
         @return: The number of bytes that will be used to send the current request.  This include both the bytes
             from the events and the post fix.
         @rtype: int
         """
-        return self.__buffer.tell() + self.__post_fix_buffer.length
+        if self.__buffer is not None:
+            return self.__buffer.tell() + self.__post_fix_buffer.length
+        else:
+            return len(self.__body)
 
     def add_thread(self, thread_id, thread_name):
         """Registers the specified thread for this AddEvents request.
@@ -721,7 +724,7 @@ class AddEventsRequest(object):
 
         # Check if we exceeded the size, if so chop off what we just added.
         # Also reset previously seen sequence numbers and ids
-        if self.__current_size > self.__max_size:
+        if self.current_size > self.__max_size:
             self.__buffer.truncate(start_pos)
             self.__event_sequencer.restore_from_memento( memento )
             return False
