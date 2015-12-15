@@ -1227,6 +1227,9 @@ class LogFileProcessor(object):
 
         self.__total_redactions = 0L
 
+        # the count of sampling and redaction rules. Used to detect when there are none.
+        self.__num_redaction_and_sampling_rules = 0
+
         # The last time the log file was checked for new content.
         self.__last_scan_time = None
 
@@ -1395,14 +1398,18 @@ class LogFileProcessor(object):
                 bytes_read += line_len
                 lines_read += 1L
 
-                sample_result = self.__sampler.process_line(line)
-                if sample_result is None:
-                    lines_dropped_by_sampling += 1L
-                    bytes_dropped_by_sampling += line_len
-                    continue
+                if self.__num_redaction_and_sampling_rules > 0:
+                    sample_result = self.__sampler.process_line(line)
+                    if sample_result is None:
+                        lines_dropped_by_sampling += 1L
+                        bytes_dropped_by_sampling += line_len
+                        continue
 
-                (line, redacted) = self.__redacter.process_line(line)
-                line_len = len(line)
+                    (line, redacted) = self.__redacter.process_line(line)
+                    line_len = len(line)
+                else:
+                    sample_result = 1.0
+                    redacted = False
 
                 if line_len > 0:
                     # Try to add the line to the request, but it will let us know if it exceeds the limit it can
@@ -1557,6 +1564,7 @@ class LogFileProcessor(object):
         @param sampling_rate: The rate to include any line that matches the expression in the results sent to the
             server.
         """
+        self.__num_redaction_and_sampling_rules += 1
         self.__sampler.add_rule(match_expression, sampling_rate)
 
     def add_redacter(self, match_expression, replacement):
@@ -1567,6 +1575,7 @@ class LogFileProcessor(object):
         @param replacement: The text to replace the matched expression with. You may use \1, \2, etc to use sub
             expressions from the match regular expression.
         """
+        self.__num_redaction_and_sampling_rules += 1
         self.__redacter.add_redaction_rule(match_expression, replacement)
 
     def __create_events_object(self, event_message, sampling_rate):
