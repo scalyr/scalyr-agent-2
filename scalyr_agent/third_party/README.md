@@ -14,6 +14,7 @@ The following libraries are included:
   * [tcollector](#tcollector)
   * [PyMySQL](#PyMySQL)
   * [uuid](#uuid)
+  * [redis-py](#redis-py)
 
 ## tcollector<a name="tcollector">
 
@@ -42,4 +43,12 @@ UUID object and generation functions compatible with Python 2.4.  The standard P
 Python 2.5 and higher but was based on a package available from [pypi](https://pypi.python.org/pypi/uuid/).  
 That package still supports earlier versions of Python and so this is just a straight copy from that package.
 
+## redis-py<a name="redis-py">
 
+A redis client for Python.  For additional details, please visit the [redis-py github repository](https://github.com/andymccurdy/redis-py).
+
+The `redis_monitor` depends on this library.
+
+Currently this library is just a straight copy, but we may wish to fork it in the future.  The original
+library only supports Python 2.6 or higher.  If there is enough customer demand to allow the `redis_monitor`
+to run with earlier versions of Python we may fork and invest the time to make the necessary modifications.
