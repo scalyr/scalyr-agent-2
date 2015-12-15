@@ -519,7 +519,10 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L004\n')
 
         self.assertEquals(self.readline(), 'L001\n')
-        saved_checkpoint = self.log_file.get_checkpoint()
+        self.mark(self.log_file.tell())
+        self.assertEquals(self.readline(), 'L002\n')
+
+        saved_checkpoint = self.log_file.get_mark_checkpoint()
 
         self.assertTrue( 'sequence_id' in saved_checkpoint )
         self.assertTrue( 'sequence_number' in saved_checkpoint )

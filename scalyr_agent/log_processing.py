@@ -973,8 +973,8 @@ class LogFileIterator(object):
             if pending_file is not None:
                 pending_file.close()
 
-    def get_checkpoint(self):
-        """Returns a check point representing the position of the iterator.
+    def get_mark_checkpoint(self):
+        """Returns a check point representing the position of the iterator that was last marked.
 
         This can be used in the constructor to pick up where the iterator last left off.
 
@@ -986,7 +986,7 @@ class LogFileIterator(object):
         pending_files = []
         for pending_file in self.__pending_files:
             pending_files.append(pending_file.to_json())
-        result = {'position': self.__position, 'pending_files': pending_files}
+        result = {'position': 0, 'pending_files': pending_files}
 
         if self.__sequence_id:
             result['sequence_id'] = self.__sequence_id
@@ -1621,7 +1621,7 @@ class LogFileProcessor(object):
             self.__lock.release()
 
     def get_checkpoint(self):
-        return self.__log_file_iterator.get_checkpoint()
+        return self.__log_file_iterator.get_mark_checkpoint()
 
     @staticmethod
     def create_checkpoint(initial_position):
