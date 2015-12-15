@@ -1451,6 +1451,7 @@ class LogFileProcessor(object):
             #                                         reading_time=time_spent_reading,
             #                                         process_time=start_process_time,
             #                                         lines=lines_read, bytes=bytes_read, files=1)
+            add_events_request.increment_timing_data(lines=lines_read, bytes=bytes_read, files=1)
 
             # To do proper account when an RPC has failed and we retry it, we track how many bytes are
             # actively being processed.  We will update this once the completion callback has been invoked.
