@@ -21,7 +21,6 @@ import httplib
 import platform
 import re
 import socket
-import struct
 import sys
 import time
 
@@ -178,7 +177,7 @@ class ScalyrClientSession(object):
         # Refuse to try to send the message if the connection has been recently closed and we have not waited
         # long enough to try to re-open it.  We do this to avoid excessive connection opens and SYN floods.
         if self.__last_connection_close is not None and current_time - self.__last_connection_close < 30:
-            return 'client/connectionClosed', 0, ''
+            return self.__wrap_response_if_necessary('client/connectionClosed', 0, '', block_on_response)
 
         self.total_requests_sent += 1
 
@@ -240,7 +239,7 @@ class ScalyrClientSession(object):
                     log.error('Failed to connect to "%s" due to exception.  Exception was %s.  Closing connection, '
                               'will re-attempt', self.__full_address, str(error),
                               error_code='client/connectionFailed')
-                return 'client/connectionFailed', 0, ''
+                return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
 
             if is_post:
                 if body is None:
@@ -270,7 +269,7 @@ class ScalyrClientSession(object):
                 else:
                     log.exception('Failed to send request due to exception.  Closing connection, will re-attempt',
                                   error_code='requestFailed')
-                return 'requestFailed', len(body_str), ''
+                return self.__wrap_response_if_necessary('requestFailed', len(body_str), '', block_on_response)
 
             was_sent = True
 
@@ -370,6 +369,41 @@ class ScalyrClientSession(object):
                 self.total_requests_failed += 1
                 self.close(current_time=send_time)
             self.total_response_bytes_received += bytes_received
+
+    def __wrap_response_if_necessary(self, status_message, bytes_sent, response, block_on_response):
+        """Wraps the response as appropriate based on whether or not the caller is expecting to block on the
+        response or not.
+
+        If the caller requested to not block on the response, then they are expecting a function to be returned
+        that, when invoked, will block and return the result.  If the caller did requested to block on the response,
+        then the response should be returned directly.
+
+        This is used to cover cases where there was an error and we do not have to block on the response from
+        the server.  Instead, we already have the response to return.  However, we still need to return the
+        right type of object to the caller.
+
+        @param status_message: The status message for the response.
+        @param bytes_sent: The number of bytes that were sent.
+        @param response: The response to return.
+        @param block_on_response: Whether or not the caller requested to block, waiting for the response.  This controls
+            whether or not a function is returned or just the response tuple directly.
+
+        @type status_message: str
+        @type bytes_sent: int
+        @type response: str
+        @type block_on_response: bool
+
+        @return: Either a func or a response tuple (status message, num of bytes sent, response body) depending on
+            the value of ``block_on_response``.
+        @rtype: func or (str, int, str)
+        """
+        if block_on_response:
+            return status_message, bytes_sent, response
+
+        def wrap():
+            return status_message, bytes_sent, response
+
+        return wrap
 
     def send(self, add_events_request, block_on_response=True):
         """Sends an AddEventsRequest to Scalyr.
