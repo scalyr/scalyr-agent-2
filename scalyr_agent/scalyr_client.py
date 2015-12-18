@@ -766,6 +766,15 @@ class AddEventsRequest(object):
         self.__events_added += 1
         return True
 
+    @property
+    def num_events(self):
+        """Returns the number of events added to this request so far.
+
+        @return:  The number of events added to this request.
+        @rtype: int
+        """
+        return self.__events_added
+
     def set_client_time(self, current_time):
         """Update the 'client_time' field in the request.
 
