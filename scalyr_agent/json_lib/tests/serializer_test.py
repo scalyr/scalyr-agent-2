@@ -17,7 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-from scalyr_agent.json_lib import serialize
+from scalyr_agent.json_lib import serialize, serialize_as_length_prefixed_string
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -61,6 +61,13 @@ class SerializeTests(ScalyrTestCase):
     def test_array(self):
         self.assertEquals(self.write([1, 2, 5]), '[1,2,5]')
         self.assertEquals(self.write([]), '[]')
+
+    def test_length_prefixed_strings(self):
+        self.assertEquals('`s\x00\x00\x00\x0cHowdy folks!', serialize('Howdy folks!', use_length_prefix_string=True))
+
+    def test_length_prefixed_strings_with_unicode(self):
+        self.assertEquals('`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!', serialize(u'Howdy \u84b8 folks!',
+                                                                                   use_length_prefix_string=True))
 
     def write(self, value):
         return serialize(value, use_fast_encoding=True)

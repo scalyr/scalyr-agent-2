@@ -147,7 +147,7 @@ class ScalyrClientSession(object):
         """
         return self.send(self.add_events_request())[0]
 
-    def __send_request(self, request_path, body=None, body_func=None, is_post=True):
+    def __send_request(self, request_path, body=None, body_func=None, is_post=True, block_on_response=True):
         """Sends a request either using POST or GET to Scalyr at the specified request path.  It may be either
         a POST or GET.
 
@@ -158,26 +158,28 @@ class ScalyrClientSession(object):
         @param [body_func]:  A function that will be invoked to retrieve the body to send in the post.  Ignored if not
             POST.
         @param [is_post]:  True if this request should be sent using a POST, otherwise GET.
+        @param [block_on_response]:  True if this request should block, waiting for the response.  If False, it will
+            not block, but instead return a function, that will invoked, will block.
 
         @type request_path: str
         @type body: str|None
         @type body_func: func|None
         @type is_post: bool
+        @type block_on_response: bool
 
-        @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
-            sent, and the full response.
-        @rtype: (str, int, str)
+        @return: If block_on_response is True, a tuple containing the status message in the response
+            (such as 'success'), the number of bytes sent, and the full response.  If block_on_response is False,
+            then returns a function, that will invoked, will block and return the tuple.
+        @rtype: (str, int, str) or Function
         """
         current_time = time.time()
 
         # Refuse to try to send the message if the connection has been recently closed and we have not waited
         # long enough to try to re-open it.  We do this to avoid excessive connection opens and SYN floods.
         if self.__last_connection_close is not None and current_time - self.__last_connection_close < 30:
-            return 'client/connectionClosed', 0, ''
+            return self.__wrap_response_if_necessary('client/connectionClosed', 0, '', block_on_response)
 
         self.total_requests_sent += 1
-        was_success = False
-        bytes_received = 0
 
         if self.__use_ssl:
             if not __has_ssl__:
@@ -192,7 +194,8 @@ class ScalyrClientSession(object):
                          'Please update your configuration file to re-enable server certificate validation.',
                          limit_once_per_x_secs=86400, limit_key='nocertwarning', error_code='client/sslverifyoff')
 
-        response = ''
+        was_sent = False
+
         try:
             try:
                 if self.__connection is None:
@@ -236,7 +239,7 @@ class ScalyrClientSession(object):
                     log.error('Failed to connect to "%s" due to exception.  Exception was %s.  Closing connection, '
                               'will re-attempt', self.__full_address, str(error),
                               error_code='client/connectionFailed')
-                return 'client/connectionFailed', 0, ''
+                return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
 
             if is_post:
                 if body is None:
@@ -257,10 +260,6 @@ class ScalyrClientSession(object):
                     log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
                     self.__connection.request('GET', request_path, headers=self.__standard_headers)
 
-                http_response = self.__connection.getresponse()
-                status_code = http_response.status
-                response = http_response.read()
-                bytes_received = len(response)
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, 'errno') and error.errno is not None:
@@ -269,6 +268,55 @@ class ScalyrClientSession(object):
                               error_code='client/requestFailed')
                 else:
                     log.exception('Failed to send request due to exception.  Closing connection, will re-attempt',
+                                  error_code='requestFailed')
+                return self.__wrap_response_if_necessary('requestFailed', len(body_str), '', block_on_response)
+
+            was_sent = True
+
+            def receive_response():
+                return self.__receive_response(body_str, current_time)
+
+            if not block_on_response:
+                return receive_response
+            else:
+                return receive_response()
+
+        finally:
+            if not was_sent:
+                self.total_request_latency_secs += (time.time() - current_time)
+                self.total_requests_failed += 1
+                self.close(current_time=current_time)
+
+    def __receive_response(self, body_str, send_time):
+        """Receives a response for a request previously sent using __send_request.
+
+        @param body_str: The body of the request that was sent.
+        @param send_time: The time of day when the request was sent.
+
+        @type body_str: str
+        @type send_time: float
+        @return:  The tuple containing the status message in the response  (such as 'success'), the number of bytes
+            sent, and the full response.
+        @rtype: (str, int, str)
+        """
+        response = ''
+        was_success = False
+        bytes_received = 0
+
+        try:
+            try:
+                http_response = self.__connection.getresponse()
+                status_code = http_response.status
+                response = http_response.read()
+                bytes_received = len(response)
+            except Exception, error:
+                # TODO: Do not just catch Exception.  Do narrower scope.
+                if hasattr(error, 'errno') and error.errno is not None:
+                    log.error('Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
+                              'connection, will re-attempt', self.__full_address, error.errno, str(error),
+                              error_code='client/requestFailed')
+                else:
+                    log.exception('Failed to receive response due to exception.  Closing connection, will re-attempt',
                                   error_code='requestFailed')
                 return 'requestFailed', len(body_str), response
 
@@ -296,7 +344,7 @@ class ScalyrClientSession(object):
                           error_code='parseResponseFailed')
                 return 'parseResponseFailed', len(body_str), response
 
-            self.__last_success = current_time
+            self.__last_success = send_time
 
             if 'status' in response_as_json:
                 status = response_as_json['status']
@@ -316,24 +364,62 @@ class ScalyrClientSession(object):
                 return 'unknownError', len(body_str), response
 
         finally:
-            self.total_request_latency_secs += (time.time() - current_time)
+            self.total_request_latency_secs += (time.time() - send_time)
             if not was_success:
                 self.total_requests_failed += 1
-                self.close(current_time=current_time)
+                self.close(current_time=send_time)
             self.total_response_bytes_received += bytes_received
 
-    def send(self, add_events_request):
+    def __wrap_response_if_necessary(self, status_message, bytes_sent, response, block_on_response):
+        """Wraps the response as appropriate based on whether or not the caller is expecting to block on the
+        response or not.
+
+        If the caller requested to not block on the response, then they are expecting a function to be returned
+        that, when invoked, will block and return the result.  If the caller did requested to block on the response,
+        then the response should be returned directly.
+
+        This is used to cover cases where there was an error and we do not have to block on the response from
+        the server.  Instead, we already have the response to return.  However, we still need to return the
+        right type of object to the caller.
+
+        @param status_message: The status message for the response.
+        @param bytes_sent: The number of bytes that were sent.
+        @param response: The response to return.
+        @param block_on_response: Whether or not the caller requested to block, waiting for the response.  This controls
+            whether or not a function is returned or just the response tuple directly.
+
+        @type status_message: str
+        @type bytes_sent: int
+        @type response: str
+        @type block_on_response: bool
+
+        @return: Either a func or a response tuple (status message, num of bytes sent, response body) depending on
+            the value of ``block_on_response``.
+        @rtype: func or (str, int, str)
+        """
+        if block_on_response:
+            return status_message, bytes_sent, response
+
+        def wrap():
+            return status_message, bytes_sent, response
+
+        return wrap
+
+    def send(self, add_events_request, block_on_response=True):
         """Sends an AddEventsRequest to Scalyr.
 
         The AddEventsRequest should have been retrieved using the 'add_events_request' method on this object.
 
         @param add_events_request: The request containing any log lines/events to copy to the server.
-
+        @param block_on_response:  If True, this method will block, waiting for the response from the server.
+            Otherwise, it will not block.  Instead, a function will be returned, that when invoked, will block.
         @type add_events_request: AddEventsRequest
+        @type block_on_response: bool
 
-        @return: A tuple containing the status message in the response (such as 'success'), the number of bytes
-            sent, and the full response.
-        @rtype: (str, int, str)
+        @return: If block_on_response is True, a tuple containing the status message in the response
+            (such as 'success'), the number of bytes sent, and the full response.  If block_on_response is False,
+            then returns a function, that will invoked, will block and return the tuple.
+        @rtype: (str, int, str) or Function
         """
         current_time = time.time()
 
@@ -342,7 +428,7 @@ class ScalyrClientSession(object):
 
             return add_events_request.get_payload()
 
-        return self.__send_request('/addEvents', body_func=generate_body)
+        return self.__send_request('/addEvents', body_func=generate_body, block_on_response=block_on_response)
 
     def close(self, current_time=None):
         """Closes the underlying connection to the Scalyr server.
@@ -448,6 +534,7 @@ class ScalyrClientSession(object):
 
         return self.__send_request(url_path, is_post=False)
 
+
 class EventSequencer( object ):
     """Responsible for keeping track of sequences for an AddEventsRequest
 
@@ -486,7 +573,6 @@ class EventSequencer( object ):
         self.__previous_sequence_id = memento[0]
         self.__previous_sequence_number = memento[1]
 
-
     def add_sequence_fields( self, event, sequence_id, sequence_number ):
         """
         If sequence_id and sequence_number are non-None then this method will automatically add the following
@@ -497,6 +583,14 @@ class EventSequencer( object ):
         'sd' set to the delta of the sequence_number and the previously seen sequence_number
 
         The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+
+        @param event: The event to update
+        @param sequence_id: The sequence id
+        @param sequence_number: The sequence number
+
+        @type event: Event
+        @type sequence_id: long
+        @type sequence_number: long
         """
 
         # only add sequence information if both the sequence fields are valid
@@ -504,7 +598,7 @@ class EventSequencer( object ):
 
             # add the 'si' field if necessary
             if sequence_id != self.__previous_sequence_id:
-                event['si'] = sequence_id
+                event.set_sequence_id(sequence_id)
                 self.__previous_sequence_id = sequence_id
                 # a new sequence id means we should also send the full sequence number
                 # so make sure that __previous_sequence_number is None
@@ -513,11 +607,12 @@ class EventSequencer( object ):
             # if we don't have a previous sequence number then send the full number
             # otherwise send the delta
             if self.__previous_sequence_number is None:
-                event['sn'] = sequence_number
+                event.set_sequence_number(sequence_number)
             else:
-                event['sd'] = sequence_number - self.__previous_sequence_number
+                event.set_sequence_number_delta(sequence_number - self.__previous_sequence_number)
 
             self.__previous_sequence_number = sequence_number
+
 
 class AddEventsRequest(object):
     """Used to construct an AddEventsRequest to eventually send.
@@ -552,33 +647,7 @@ class AddEventsRequest(object):
         json_lib.serialize(base_body, output=string_buffer, use_fast_encoding=True)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
-        location = string_buffer.tell()
-        while location > 0:
-            location -= 1
-            string_buffer.seek(location)
-            if string_buffer.read(1) == '}':
-                break
-
-        # Now look for the first non-white character.  We need to add in a comma after it.
-        last_char = None
-        while location > 0:
-            location -= 1
-            string_buffer.seek(location)
-            last_char = string_buffer.read(1)
-            if not last_char.isspace():
-                break
-
-        # If the character happened to a comma, back up over that since we want to write our own comma.
-        if location > 0 and last_char == ',':
-            location -= 1
-
-        if location < 0:
-            raise Exception('Could not locate trailing "}" and non-whitespace in base JSON for add events request')
-
-        # Now chop off everything after the character at the location.
-        location += 1
-        string_buffer.seek(location)
-        string_buffer.truncate()
+        _rewind_past_close_curly(string_buffer)
 
         # Append the start of our events field.
         string_buffer.write(', events: [')
@@ -603,14 +672,20 @@ class AddEventsRequest(object):
         # Used to add sequence fields to an event
         self.__event_sequencer = EventSequencer()
 
+        # Used to record some performance timing data for debugging/analysis
+        self.__timing_data = dict()
+
     @property
-    def __current_size(self):
+    def current_size(self):
         """
         @return: The number of bytes that will be used to send the current request.  This include both the bytes
             from the events and the post fix.
         @rtype: int
         """
-        return self.__buffer.tell() + self.__post_fix_buffer.length
+        if self.__buffer is not None:
+            return self.__buffer.tell() + self.__post_fix_buffer.length
+        else:
+            return len(self.__body)
 
     def add_thread(self, thread_id, thread_name):
         """Registers the specified thread for this AddEvents request.
@@ -637,24 +712,30 @@ class AddEventsRequest(object):
     def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
 
-        It will automatically add in a 'ts' field to event containing a new timestamp based on the current time
+        It will automatically set the event's timestamp field to a new timestamp based on the current time
         but ensuring it is greater than any previous timestamp that has been used.
 
-        If sequence_id and sequence_number are specified then this method will automatically add the following
-        fields:
+        If sequence_id and sequence_number are specified then this method will automatically set the following
+        Event fields fields:
 
-        'si' set to the value of sequence_id if it is different from the previously seen sequence_id
-        'sn' set to the value of sequence_number if we haven't previously seen a sequence number
-        'sd' set to the delta of the sequence_number and the previously seen sequence_number
+        'sequence_id' set to the value of sequence_id if it is different from the previously seen sequence_id
+        'sequence_number' set to the value of sequence_number if we haven't previously seen a sequence number
+        'sequence_number_delta' set to the delta of the sequence_number and the previously seen sequence_number
 
-        The 'sn' and 'sd' fields are mutually exclusive.  Only one or the other will be used
+        The 'sequence_number' and 'sequence_number_delta' fields are mutually exclusive.  Only one or the other will be
+        used.
 
         It is illegal to invoke this method if 'get_payload' has already been invoked.
 
-        @param event: The event object, usually a dict or a JsonObject.
+        @param event: The event object.
         @param timestamp: The timestamp to use for the event. This should only be used for testing.
         @param sequence_id: A globally unique id, grouping a set of sequence_numbers
         @param sequence_number: A monotonically increasing sequence_number
+
+        @type event: Event
+        @type timestamp: long
+        @type sequence_id: long
+        @type sequence_number: long
 
         @return: True if the event's serialized JSON was added to the request, or False if that would have resulted
             in the maximum request size being exceeded so it did not.
@@ -671,19 +752,28 @@ class AddEventsRequest(object):
         # and we need to restore it
         memento = self.__event_sequencer.get_memento()
 
-        self.__event_sequencer.add_sequence_fields( event, sequence_id, sequence_number )
-        event['ts'] = str(timestamp)
-        json_lib.serialize(event, output=self.__buffer, use_fast_encoding=True)
+        self.__event_sequencer.add_sequence_fields(event, sequence_id, sequence_number)
+        event.set_timestamp(timestamp)
+        event.serialize(self.__buffer)
 
         # Check if we exceeded the size, if so chop off what we just added.
         # Also reset previously seen sequence numbers and ids
-        if self.__current_size > self.__max_size:
+        if self.current_size > self.__max_size:
             self.__buffer.truncate(start_pos)
             self.__event_sequencer.restore_from_memento( memento )
             return False
 
         self.__events_added += 1
         return True
+
+    @property
+    def num_events(self):
+        """Returns the number of events added to this request so far.
+
+        @return:  The number of events added to this request.
+        @rtype: int
+        """
+        return self.__events_added
 
     def set_client_time(self, current_time):
         """Update the 'client_time' field in the request.
@@ -739,6 +829,42 @@ class AddEventsRequest(object):
         """
         self.__body = None
         self.__buffer = None
+
+    def increment_timing_data(self, **key_values):
+        """Increments the timing data kept as part of this data structure to help diagnosis performance issues.
+
+        The arguments should be key/value pairs where the keys name some sort of timing component and the value
+        by which to increment the count for that timing component.
+
+        If this is the first time a timing component is being incremented, the initial value is set to zero.
+        """
+        for key, value in key_values.iteritems():
+            if key in self.__timing_data:
+                amount = self.__timing_data[key]
+            else:
+                amount = 0.0
+            amount += value
+            self.__timing_data[key] = amount
+
+    def get_timing_data(self):
+        """Serializes all of the timing data that has been collected via ``increment_timing_data``.
+
+        @return: A string of the key/value pairs for all timing data.
+        @rtype: str
+        """
+        output_buffer = StringIO()
+        first_time = True
+
+        for key, value in self.__timing_data.iteritems():
+            if not first_time:
+                output_buffer.write(' ')
+            else:
+                first_time = False
+            output_buffer.write(key)
+            output_buffer.write('=')
+            output_buffer.write(str(value))
+
+        return output_buffer.getvalue()
 
     def __get_timestamp(self):
         """
@@ -973,6 +1099,363 @@ class PostFixBuffer(object):
         assert(len(self.__threads) >= position[2])
         if position[2] < len(self.__threads):
             self.__threads = self.__threads[0:position[2]]
+
+
+class Event(object):
+    """Encapsulates a single event that will be included in an ``AddEventsRequest``.
+
+    This abstraction has many optimizations to improve serialization time.
+    """
+    def __init__(self, thread_id=None, attrs=None, base=None):
+        """Creates an instance of an event to include in an AddEventsRequest.
+
+        This constructor has two ways of being used.
+
+        First, specifying the thread_id and attributes that will apply to the event.  The attributes typically only
+        include the attributes for the log file that the event belongs to. You then must set the per-log line
+        attributes (such as timestamp and message) using the setters provided below.
+
+        The second form is to create an event based on the copy of an already existing ``Event`` instance.  This
+        decreases overall serialization time because the ``attrs`` and ``thread_id`` field's serialization is only
+        performed once across all for the original copy and shared to all derived copies.
+
+        This is meant to really optimize the case where we create one base ``Event`` object for each log file that
+        we are uploading (specifying that log's thread id and attributes in the constructor).  Then, every time
+        we upload a log line for that log, we copy the base ``Event`` instance and then set the per-log line
+        attributes using the provided setters.
+
+        @param thread_id:  Used if not specifying ``base``.  The thread id for the event.
+        @param attrs:  Used if not specifying ``base``.  The attributes for the event, excluding any attributes
+            that can be set via the provided setters.  If you include one of those attributes in ``attrs``, the
+            resulting behavior is undefined.
+        @param base:  Used if not specifying ``thread_id`` or ``attrs``.  The instance of ``Event`` to copy to
+            create this instance.  Only the original ``thread_id`` and ``attrs`` that was passed into ``base``
+            are copied.  Anything set using the provided ``setters`` will not be used.
+
+        @type thread_id: str
+        @type attrs: dict
+        @type base: Event
+        """
+        # When we serialize this event object in an AddEventsRequest, it will have the following fields, in this
+        # form:
+        #   {
+        #      thread_id: "234234",         // str, the thread id for the log.
+        #      attrs: {
+        #         <log attributes>          // the keys,values for all attributes for this log.
+        #         message: "Log content",   // str, the log line content.
+        #         rate: 0.8,                // float, if this is a subsampled line, the rate at each it was selected.
+        #      },
+        #      ts: "123123123",   // <str, the timestamp for the log line>
+        #      si: "123123",      //<str, the sequence identifier>
+        #      sn: 10,            // <int, the sequence number -- not provided if sd is provided>
+        #      sd: 1,             // <int, the sequence number delta -- provided instead of sn>
+        #   }
+        #
+        # So, we can pre-serialize the first part of the message based on thread_id and attrs, and keep a copy of
+        # that to then serialize the rest of the per-log line fields for later.
+        #
+        # The serialization_base (this pre-serialization) will look like:
+        #
+        #   {
+        #      thread_id: "234234",         // str, the thread id for the log.
+        #      attrs: {
+        #         <log attributes>          // the keys,values for all attributes for this log.
+        #         message:
+        #
+        # Note, we put in the ``message`` field name, so the next thing we have to serialize is the log line content.
+        # We also then have to close off the attrs object, and eventually the overall object to finish the
+        # serialization.
+
+        # We only stash a copy of attrs for debugging/testing purposes.  We really will just serialize it into
+        # __serialization_base.
+        self.__attrs = attrs
+        if (attrs is not None or thread_id is not None) and base is not None:
+            raise Exception('Cannot use both attrs/thread_id and base')
+
+        if base is not None:
+            # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
+            # the per-log file attributes.
+            self.__serialization_base = base.__serialization_base
+            self.__attrs = base.__attrs
+        else:
+            # A new event.  We have to create the serialization base using provided information/
+            tmp_buffer = StringIO()
+            # Open base for the event object.
+            tmp_buffer.write('{')
+            if thread_id is not None:
+                tmp_buffer.write('thread:')
+                json_lib.serialize(thread_id, use_fast_encoding=True, output=tmp_buffer)
+                tmp_buffer.write(', ')
+            if attrs is not None:
+                # Serialize the attrs object, but we have to remove the closing brace because we want to
+                # insert more fields.
+                tmp_buffer.write('attrs:')
+                json_lib.serialize(attrs, use_fast_encoding=True, output=tmp_buffer)
+                _rewind_past_close_curly(tmp_buffer)
+                tmp_buffer.write(',')
+            else:
+                # Open brace for the attrs object.
+                tmp_buffer.write('attrs:{')
+
+            # Add the message field into the json object.
+            tmp_buffer.write('message:')
+
+            self.__serialization_base = tmp_buffer.getvalue()
+
+        # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
+        # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
+        # json object, the __sequence_id field will begin with a double quote.  HOWEVER, message (for optimization
+        # purposes) is not pre-serialized and will not be blackslashed escaped/quoted before being added to the
+        # output buffer.
+        self.__message = None
+        self.__timestamp = None
+        self.__sequence_id = None
+        self.__sequence_number = None
+        self.__sequence_number_delta = None
+        self.__sampling_rate = None
+        # Whether or not any of the non-fast path fields were included.  The fast fields are message, timestamp, snd.
+        self.__has_non_optimal_fields = False
+        self.__num_optimal_fields = 0
+
+    @property
+    def attrs(self):
+        """Only use for testing.
+
+        @return: The attributes object as originally based into the constructor or the constructor of the base
+            object that was to create this instance.
+        @rtype: dict
+        """
+        return self.__attrs
+
+    def set_message(self, message):
+        """Sets the message field for the attributes for this event.
+
+        @param message:  The message content.
+        @type message: str
+        @return:  This object.
+        @rtype: Event
+        """
+        if self.__message is None and message is not None:
+            self.__num_optimal_fields += 1
+        if message is unicode:
+            self.__message = message.encode('utf-8')
+        else:
+            self.__message = message
+        return self
+
+    @property
+    def message(self):
+        """Used only for testing.
+        @return:  The message content
+        @rtype: str
+        """
+        return self.__message
+
+    def set_timestamp(self, timestamp):
+        """Sets the timestamp field for the attributes for this event.
+
+        @param timestamp:  The timestamp, in nanoseconds past epoch.
+        @type timestamp: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
+        if self.__timestamp is None and timestamp is not None:
+            self.__num_optimal_fields += 1
+        self.__timestamp = '"%s"' % str(timestamp)
+        return self
+
+    @property
+    def timestamp(self):
+        """Used only for testing.
+
+        @return: the timestamp for the event.
+        @rtype: long
+        """
+        # We have to cut off the quotes we surrounded the field with when we serialized it.
+        if self.__timestamp is not None:
+            return long(self.__timestamp[1:-1])
+        else:
+            return None
+
+    def set_sequence_id(self, sid):
+        """Sets the sequence id for the event.  If this is not invoked, no sequence id will be included
+        in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
+        as the last serialized event's).
+
+        @param sequence_id:  The unique id for the sequence this event belongs.  This must be globally unique and
+            usually tied to a single log file.  Generally, use UUID here.
+        @type sequence_id: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # This is serialized as a string to get around overflow issues, so put in a string now.
+        self.__sequence_id = '"%s"' % str(sid)
+        self.__has_non_optimal_fields = True
+        return self
+
+    @property
+    def sequence_id(self):
+        """Used for testing purposes only
+        @return:  The sequence id or None if not set.
+        @rtype: str
+        """
+        # We have to cut off the quotes we surrounded the field with when we serialized it.
+        if self.__sequence_id is not None:
+            return self.__sequence_id[1:-1]
+        self.__has_non_optimal_fields = True
+        return None
+
+    def set_sequence_number(self, snum):
+        """Sets the sequence number for the event.  If this is not invoked, no sequence number will be included
+        in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
+        as the last serialized event's and you use ``sequence_number_delta`` instead to specify the delta between
+        this events sequence number and the last one.).
+
+        @param sequence_number:  The sequence number for the event.
+        @type sequence_number: long
+        @return:  This object.
+        @rtype: Event
+        """
+        self.__has_non_optimal_fields = True
+        # It is serialized as a number, so just a toString is called for.
+        self.__sequence_number = str(snum)
+        return self
+
+    @property
+    def sequence_number(self):
+        """Used for testing purposes only.
+        @return: The sequence number or None if not set.
+        @rtype: long
+        """
+        # We have to convert it back to a number.
+        if self.__sequence_number is not None:
+            return long(self.__sequence_number)
+        else:
+            return None
+
+    def set_sequence_number_delta(self, sdelta):
+        """Sets the sequence number delta for the event.  If this is not invoked, no sequence number delta will be
+        included in the serialized event.  (Which is what you should do if you specify a ``sequence_number`` instead).
+
+        @param sequence_number_delta:  The delta between the last sequence number of the one for this event.
+        @type sequence_number_delta: long
+        @return:  This object.
+        @rtype: Event
+        """
+        # It is serialized as a number, so just a toString is called for.
+        if self.__sequence_number_delta is None and sdelta is not None:
+            self.__num_optimal_fields += 1
+        self.__sequence_number_delta = str(sdelta)
+        return self
+
+    @property
+    def sequence_number_delta(self):
+        """Uses for testing purposes only.
+        @return:  The sequence number delta if set or None.
+        @rtype: long
+        """
+        # We have to convert it back to a number.
+        if self.__sequence_number_delta is not None:
+            return long(self.__sequence_number_delta)
+        else:
+            return None
+
+    def set_sampling_rate(self, rate):
+        """Sets the message field for the attributes for this event.
+
+        @param message:  The message content.
+        @type message: str
+        @return:  This object.
+        @rtype: Event
+        """
+        self.__has_non_optimal_fields = True
+        self.__sampling_rate = str(rate)
+        return self
+
+    def serialize(self, output_buffer):
+        """Serialize the event into ``output_buffer``.
+
+        @param output_buffer: The buffer to serialize to.
+        @type output_buffer: StringIO
+        """
+        output_buffer.write(self.__serialization_base)
+        # Use a special serialization format for message so that we don't have to send CPU time escaping it.  This
+        # is just a length prefixed format understood by Scalyr servers.
+        json_lib.serialize_as_length_prefixed_string(self.__message, output_buffer)
+
+        # We fast path the very common case of just a timestamp and sequence delta fields.
+        if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:
+            output_buffer.write('}')
+            output_buffer.write(',sd:')
+            output_buffer.write(self.__sequence_number_delta)
+            output_buffer.write(',ts:')
+            output_buffer.write(self.__timestamp)
+        else:
+            self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
+            # close off attrs object.
+            output_buffer.write('}')
+
+            self.__write_field_if_not_none(',ts:', self.__timestamp, output_buffer)
+            self.__write_field_if_not_none(',si:', self.__sequence_id, output_buffer)
+            self.__write_field_if_not_none(',sn:', self.__sequence_number, output_buffer)
+            self.__write_field_if_not_none(',sd:', self.__sequence_number_delta, output_buffer)
+        # close off the event object.
+        output_buffer.write('}')
+
+    def __write_field_if_not_none(self, field_name, field_value, output_buffer):
+        """If the specified field value is not None, then emit the field name and the value to the output buffer.
+
+        @param field_name: The text to emit before the value.
+        @param field_value: The value to emit.
+        @param output_buffer: The buffer to serialize to.
+
+        @type field_name: str
+        @type field_value: str or None
+        @type output_buffer: StringIO
+        """
+        if field_value is not None:
+            output_buffer.write(field_name)
+            output_buffer.write(field_value)
+
+
+def _rewind_past_close_curly(output_buffer):
+    """A utility function for rewinding a buffer that had a JSON object emitted to it.  It rewinds past the
+    last closing curly brace in the buffer, and then also erases the last non-whitespace character after that
+    if it is a comma (which shouldn't happen in practice).  This is meant to prepare the buffer for emitting
+    new fields into the JSON object's serialization.
+
+    @param output_buffer:  The buffer to rewind.
+    @type output_buffer: StringO
+    """
+    # Now go back and find the last '}' and delete it so that we can open up the JSON again.
+    location = output_buffer.tell()
+    while location > 0:
+        location -= 1
+        output_buffer.seek(location)
+        if output_buffer.read(1) == '}':
+            break
+
+    # Now look for the first non-white character.  We need to add in a comma after it.
+    last_char = None
+    while location > 0:
+        location -= 1
+        output_buffer.seek(location)
+        last_char = output_buffer.read(1)
+        if not last_char.isspace():
+            break
+
+    # If the character happened to a comma, back up over that since we want to write our own comma.
+    if location > 0 and last_char == ',':
+        location -= 1
+
+    if location < 0:
+        raise Exception('Could not locate trailing "}" and non-whitespace in JSON serialization')
+
+    # Now chop off everything after the character at the location.
+    location += 1
+    output_buffer.seek(location)
+    output_buffer.truncate()
 
 
 # The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically

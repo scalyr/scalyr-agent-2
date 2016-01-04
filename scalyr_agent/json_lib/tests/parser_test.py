@@ -169,6 +169,10 @@ class JsonParserTests(ScalyrTestCase):
         self.assertRaises(JsonParseException, JsonParser.parse, 
                           "\"Hi there\" + Hi")
 
+    def test_parsing_length_prefixed_strings(self):
+        x = JsonParser.parse('`s\x00\x00\x00\x0cHowdy folks!')
+        self.assertEquals('Howdy folks!', x)
+
     def test_parsing_boolean(self):
         x = JsonParser.parse("true")
         self.assertEquals(x, True)

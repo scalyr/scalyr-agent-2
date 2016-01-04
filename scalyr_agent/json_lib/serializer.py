@@ -18,6 +18,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import re
+import struct
 
 from cStringIO import StringIO
 from scalyr_agent.json_lib import JsonConversionException, JsonObject, JsonArray
@@ -35,7 +36,7 @@ ESCAPES = {
 }
 
 
-def serialize(value, output=None, use_fast_encoding=False):
+def serialize(value, output=None, use_fast_encoding=False, use_length_prefix_string=False):
     """Serializes the specified value as JSON.
 
     @param value: The value to write. Can be a bool, int, long, float, dict, and list. If this value is a list or dict,
@@ -61,9 +62,12 @@ def serialize(value, output=None, use_fast_encoding=False):
     if value is None:
         output.write('null')
     elif value_type is str or value_type is unicode:
-        output.write('"')
-        output.write(__to_escaped_string(value, use_fast_encoding=use_fast_encoding))
-        output.write('"')
+        if not use_length_prefix_string:
+            output.write('"')
+            output.write(__to_escaped_string(value, use_fast_encoding=use_fast_encoding))
+            output.write('"')
+        else:
+            serialize_as_length_prefixed_string(value, output)
     elif value_type is dict or value_type is JsonObject:
         output.write('{')
         first = True
@@ -123,6 +127,12 @@ ESCAPE_DCT_OPT.setdefault(chr(127), '\\u007f')
 
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 
+# Used for an optimization when escaping a string. This regexp matches a continious seqeuence of regular ascii
+# characters (from char 32 to 127).
+SIMPLE_MATCHER = re.compile('^[ -~]*')
+# Find the two characters " and \ that need to be escaped from the above regular ascii characters.
+ESCAPE_ME = re.compile(r'(\"|\\)')
+
 
 def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=True):
     """Returns a string that is properly escaped by JSON standards.
@@ -150,10 +160,19 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
     else:
         type_index = 0
 
-
     result = StringIO()
-    for x in string_value:
-        x_ord = ord(x)
+    pos = 0
+    len_sv = len(string_value)
+
+    while pos < len_sv:
+        simple = SIMPLE_MATCHER.match(string_value, pos)
+        if simple is not None:
+            pos = simple.end(0)
+            result.write(ESCAPE_ME.sub("\\\\\\1", simple.group(0)))
+            if pos >= len_sv:
+                continue
+
+        x_ord = ord(string_value[pos])
         if x_ord in ESCAPES:
             result.write(ESCAPES[x_ord][type_index])
         # Reference: http://www.unicode.org/versions/Unicode5.1.0/
@@ -170,5 +189,27 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
             else:
                 result.write(u'\\u%0.4x' % x_ord)
         else:
-            result.write(x)
+            result.write(string_value[pos])
+        pos += 1
+
     return result.getvalue()
+
+
+def serialize_as_length_prefixed_string(value, output_buffer):
+    """Serializes the str or unicode value using the length-prefixed format special to Scalyr.
+
+    This is a bit more efficient since the value does not need to be blackslash or quote escaped.
+
+    @param value: The string value to serialize.
+    @param output_buffer: The buffer to serialize the string to.
+
+    @type value: str or unicode
+    @type output_buffer: StringIO
+    """
+    output_buffer.write('`s')
+    if type(value) is unicode:
+        to_serialize = value.encode('utf-8')
+    else:
+        to_serialize = value
+    output_buffer.write(struct.pack('>i', len(to_serialize)))
+    output_buffer.write(to_serialize)

@@ -83,10 +83,15 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.copy_staleness_threshold, 15 * 60)
         self.assertEquals(config.log_deletion_delay, 10 * 60)
 
+        self.assertEquals(config.copying_thread_profile_interval, 0)
+        self.assertEquals(config.copying_thread_profile_output_path, '/tmp/copying_thread_profiles_')
+
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
         self.assertFalse(config.debug_init)
         self.assertFalse(config.pidfile_advanced_reuse_guard)
+
+        self.assertEquals(config.pipeline_threshold, 1.1)
 
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
@@ -137,6 +142,7 @@ class TestConfiguration(ScalyrTestCase):
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
+            pipeline_threshold: 0.5,
 
             max_line_size: 1024,
             max_log_offset_size: 1048576,
@@ -148,6 +154,9 @@ class TestConfiguration(ScalyrTestCase):
             log_deletion_delay: 300,
             debug_init: true,
             pidfile_advanced_reuse_guard: true,
+
+            copying_thread_profile_interval: 2,
+            copying_thread_profile_output_path: "/tmp/some_profiles",
 
             logs: [ { path: "/var/log/tomcat6/access.log"} ]
           }
@@ -187,6 +196,11 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.read_page_size, 3 * 1024)
         self.assertEquals(config.copy_staleness_threshold, 4 * 60)
         self.assertEquals(config.log_deletion_delay, 5 * 60)
+
+        self.assertEquals(config.copying_thread_profile_interval, 2)
+        self.assertEquals(config.copying_thread_profile_output_path, '/tmp/some_profiles')
+
+        self.assertEquals(config.pipeline_threshold, 0.5)
 
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)

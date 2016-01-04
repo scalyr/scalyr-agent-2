@@ -292,6 +292,22 @@ class Configuration(object):
         return self.__get_config().get_bool('use_unsafe_debugging')
 
     @property
+    def copying_thread_profile_interval(self):
+        """Returns the interval (in seconds) between outputs of the profiling for the copying thread.
+        This should be zero unless you are profiling the copying thread.
+        """
+        return self.__get_config().get_int('copying_thread_profile_interval')
+
+    @property
+    def copying_thread_profile_output_path(self):
+        """Returns the path prefix for writing all profiling dumps for the copying thread, when
+        ``copying_thread_profile_interval`` is greater than zero.
+        @return:
+        @rtype:
+        """
+        return self.__get_config().get_string('copying_thread_profile_output_path')
+
+    @property
     def config_directory(self):
         """Returns the configuration value for 'config_directory', resolved to full path if necessary."""
         config_directory = self.__get_config().get_string('config_directory')
@@ -434,6 +450,13 @@ class Configuration(object):
     def verify_server_certificate(self):
         """Returns the configuration value for 'verify_server_certificate'."""
         return self.__get_config().get_bool('verify_server_certificate')
+
+    @property
+    def pipeline_threshold(self):
+        """Returns the percentage an add events request must be of the maximum allowed request size to
+        trigger pipelining the next add events request.
+        """
+        return self.__get_config().get_float('pipeline_threshold')
 
     def equivalent(self, other, exclude_debug_level=False):
         """Returns true if other contains the same configuration information as this object.
@@ -578,6 +601,10 @@ class Configuration(object):
 
         self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description)
 
+        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description)
+        self.__verify_or_set_optional_string(config, 'copying_thread_profile_output_path',
+                                             '/tmp/copying_thread_profiles_', description)
+
         self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description)
         self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description)
 
@@ -637,6 +664,11 @@ class Configuration(object):
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
         self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description)
+
+        # The percentage of the maximum message size a message (max_allowed_request_size) has to be to trigger
+        # pipelining the next add events request.  This intentionally set to 110% to prevent it from being used unless
+        # explicitly requested.
+        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description)
 
         # If we have noticed that new bytes have appeared in a file but we do not read them before this threshold
         # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the
