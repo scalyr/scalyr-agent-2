@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.15 "Marauding Mouse" - January 4, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 4, 2016 11:30 -0800
+--->
+
+Features:
+
+* Added plugin for reading SLOWLOG from redis
+* Heavily optimized common path for copying logs to increase throughput
+
 ## 2.0.14 "Neurotic Nightingale" - November 4, 2015
 
 <!---
