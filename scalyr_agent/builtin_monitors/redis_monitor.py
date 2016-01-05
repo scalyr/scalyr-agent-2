@@ -19,12 +19,15 @@
 
 __author__ = 'imron@scalyr.com'
 
+import re
 import time
 
 from scalyr_agent import ScalyrMonitor
 
 from redis.client import Redis
 from redis.exceptions import ConnectionError, TimeoutError
+
+MORE_BYTES = re.compile( '\.\.\. \(\d+ more bytes\)$' )
 
 
 class RedisHost( object ):
@@ -170,6 +173,27 @@ class RedisHost( object ):
 
 
     def log_entry( self, logger, entry ):
+        # check to see if redis truncated the command
+        match = MORE_BYTES.search( entry['command'] )
+        if match:
+            pos, length = match.span()
+            pos -= 1
+            # find the first byte which is not a 'middle' byte in utf8
+            # middle bytes always begin with b10xxxxxx which means they
+            # will be >= b10000000 and <= b10111111
+            while pos > 0 and 0x80 <= ord( entry['command'][pos] ) <= 0xBF:
+                pos -= 1
+
+            # at this point, entry['command'][pos] will either be a single byte character or
+            # the start of a truncated multibyte character.
+            # If it's a single character, skip over it so it's included in the slice
+            # If it's the start of a truncated multibyte character don't do anything
+            # and the truncated bytes will be removed with the slice
+            if ord( entry['command'][pos] ) < 0x80:
+                pos += 1
+
+            #slice off any unwanted parts of the string
+            entry['command'] = entry['command'][:pos] + match.group()
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
         logger.emit_value( 'redis', 'slowlog', extra_fields={
