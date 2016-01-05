@@ -33,6 +33,13 @@ class SerializeTests(ScalyrTestCase):
         self.assertEquals(self.write(True), 'true')
         self.assertEquals(self.write(False), 'false')
 
+    def test_4byte_utf8(self):
+        actual = '\xF0\xAA\x9A\xA5'
+        expected_fast = '"\xf0\xaa\\u009a\xa5"'
+        expected_slow = '"\\u2a6a5"'
+        self.assertEquals(serialize( actual, use_fast_encoding=True), expected_fast )
+        self.assertEquals(serialize( actual, use_fast_encoding=False), expected_slow )
+
     def test_string(self):
         self.__run_string_test_case('Hi there', '"Hi there"')
         self.__run_string_test_case('Hi there\n', '"Hi there\\n"')
