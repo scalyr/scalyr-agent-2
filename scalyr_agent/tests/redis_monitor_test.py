@@ -33,23 +33,34 @@ class DummyLogger( object ):
 
 class RedisHostTestCase( unittest.TestCase ):
 
-    def test_truncated_utf8_message( self ):
+    def setUp( self ):
         config = {
             'module': 'scalyr_agent.builtin_monitors.syslog_monitor'
             }
-        logger = DummyLogger()
-        host = RedisHost( 'localhost', 6379, '', 1000 )
+        self.logger = DummyLogger()
+        self.host = RedisHost( 'localhost', 6379, '', 1000 )
 
-        expected = 'abc... (4 more bytes)'
-        command = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' )
-
-        entry = { 'command' : command,
+        self.entry = { 'command' : '',
                   'start_time' : time.time(),
                   'duration' : 100,
                   'id' : 1
                 }
 
-        host.log_entry( logger, entry )
 
-        self.assertEquals( expected, logger.command )
+    def test_truncated_utf8_message( self ):
+        expected = 'abc... (4 more bytes)'
+
+        self.entry['command'] = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' )
+
+        self.host.log_entry( self.logger, self.entry )
+        self.assertEquals( expected, self.logger.command )
+
+    def test_non_truncated_utf8_message( self ):
+
+        expected = 'abc... (4 more bytes)'
+        self.entry['command'] = 'abc... (4 more bytes)'
+
+        self.host.log_entry( self.logger, self.entry )
+
+        self.assertEquals( expected, self.logger.command )
 
