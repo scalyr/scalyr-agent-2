@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.16 "Operating Otter" - January 31, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 31, 2016 11:30 -0800
+--->
+
+Note, this release is under development.  Actual release date is TBD.
+
+Bug fixes:
+
+* Fix UTF-8 truncation bug in redis plugin
+
 ## 2.0.15 "Marauding Mouse" - January 4, 2016
 
 <!---
