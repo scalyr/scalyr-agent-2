@@ -27,9 +27,13 @@ from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
 class DummyLogger( object ):
     def __init__( self ):
         self.command = ''
+        self.warning = ''
 
     def emit_value( self, key, value, extra_fields ):
         self.command = extra_fields['command']
+
+    def warn( self, message ):
+        self.warning = message
 
 class RedisHostTestCase( unittest.TestCase ):
 
@@ -46,11 +50,20 @@ class RedisHostTestCase( unittest.TestCase ):
                   'id' : 1
                 }
 
+    def test_invalild_utf8_message( self ):
+        expected = u'abc\ufffddef'
+
+        self.entry['command'] = pack( '3sB13s', 'abc', 0xce, 'def' ).rstrip( '\0' )
+
+        self.host.log_entry( self.logger, self.entry )
+        self.assertEquals( expected, self.logger.command )
+        self.assertTrue( self.logger.warning.startswith( "Redis command contains invalid utf8" ) )
+
 
     def test_truncated_utf8_message( self ):
         expected = 'abc... (4 more bytes)'
 
-        self.entry['command'] = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' )
+        self.entry['command'] = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' ).rstrip( '\0' )
 
         self.host.log_entry( self.logger, self.entry )
         self.assertEquals( expected, self.logger.command )

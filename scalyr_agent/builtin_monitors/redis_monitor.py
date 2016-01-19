@@ -19,6 +19,7 @@
 
 __author__ = 'imron@scalyr.com'
 
+import binascii
 import re
 import time
 
@@ -195,12 +196,19 @@ class RedisHost( object ):
             #slice off any unwanted parts of the string
             entry['command'] = entry['command'][:pos] + match.group()
 
+        command = ""
+        try:
+            command = entry['command'].decode( 'utf8' )
+        except UnicodeDecodeError, e:
+            logger.warn( "Redis command contains invalid utf8: %s" % binascii.hexlify( entry['command'] ) )
+            command = entry['command'].decode( 'utf8', errors="replace" )
+
         time_format = "%Y-%m-%d %H:%M:%SZ"
         logger.emit_value( 'redis', 'slowlog', extra_fields={
             'host': self.display_string,
             'ts': time.strftime( time_format, time.gmtime( entry['start_time'] ) ),
             'exectime' : entry['duration'],
-            'command' : entry['command']
+            'command' : command
         } )
         self.last_id = entry['id']
         self.last_timestamp = entry['start_time']
