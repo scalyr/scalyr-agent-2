@@ -41,6 +41,10 @@ class RedisHost( object ):
         self.__password = password
         self.__connection_timeout = connection_timeout
 
+        # how long to delay between invalid utf8 warnings
+        # 0 is never show warnings
+        self.utf8_warning_interval = 0
+
         # ID of the last slowlog entry
         self.last_id = 0
 
@@ -200,7 +204,8 @@ class RedisHost( object ):
         try:
             command = entry['command'].decode( 'utf8' )
         except UnicodeDecodeError, e:
-            logger.warn( "Redis command contains invalid utf8: %s" % binascii.hexlify( entry['command'] ) )
+            if self.utf8_warning_interval:
+                logger.warn( "Redis command contains invalid utf8: %s" % binascii.hexlify( entry['command'] ), limit_once_per_x_secs=self.utf8_warning_interval, limit_key="redis-utf8" )
             command = entry['command'].decode( 'utf8', errors="replace" )
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
@@ -289,6 +294,9 @@ Additional configuration options are as follows:
 *   connection_error_repeat_interval - if multiple connection errors are detected, the number of seconds to wait before
     redisplaying an error message.  Defaults to 300.
 
+*   utf8_warning_interval - the minimum amount of time in seconds to wait between issuing warnings about invalid utf8 in redis slow
+    log messages.  Set to 0 to disable the warning altogether. Defaults to 0
+
 
 *   sample_interval - the number of seconds to wait between successive queryies to the Redis slowlog.  This defaults to 30 seconds
     for most monitors, however if you are expecting a high volume of logs you should set this to a low enough value
@@ -306,6 +314,9 @@ Additional configuration options are as follows:
 
         # The number of seconds to wait when querying the redis server
         self.__connection_timeout = self._config.get('connection_timeout', default=5, convert_to=int, min_value=0, max_value=60)
+
+        # The number of seconds to wait before reissuing warnings about invalid utf8 in slowlog messages.
+        self.__utf8_warning_interval = self._config.get('utf8_warning_interval', default=0, convert_to=int, min_value=0, max_value=6000)
 
         # Redis-py requires None rather than 0 if no timeout
         if self.__connection_timeout == 0:
@@ -328,7 +339,9 @@ Additional configuration options are as follows:
             config.update( host )
 
             #create a new redis host
-            self.__redis_hosts.append( RedisHost( config['host'], config['port'], config['password'], self.__connection_timeout ) )
+            redis_host = RedisHost( config['host'], config['port'], config['password'], self.__connection_timeout ) 
+            redis_host.utf8_warning_interval = self.__utf8_warning_interval
+            self.__redis_hosts.append( redis_host )
 
     def gather_sample(self):
 
