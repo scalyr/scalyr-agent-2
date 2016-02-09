@@ -56,7 +56,7 @@ def main():
     interval = COLLECTION_INTERVAL
 
     # Scalyr edit:
-    network_interface_prefixes = str.split(NETWORK_INTERFACE_PREFIX)
+    network_interface_prefixes = str.split(NETWORK_INTERFACE_PREFIX, ',')
     for i in range(len(network_interface_prefixes)):
         network_interface_prefixes[i] = network_interface_prefixes[i].strip()
 
