@@ -295,7 +295,7 @@ Additional configuration options are as follows:
     redisplaying an error message.  Defaults to 300.
 
 *   utf8_warning_interval - the minimum amount of time in seconds to wait between issuing warnings about invalid utf8 in redis slow
-    log messages.  Set to 0 to disable the warning altogether. Defaults to 0
+    log messages.  Set to 0 to disable the warning altogether. Defaults to 600
 
 
 *   sample_interval - the number of seconds to wait between successive queryies to the Redis slowlog.  This defaults to 30 seconds
@@ -316,7 +316,7 @@ Additional configuration options are as follows:
         self.__connection_timeout = self._config.get('connection_timeout', default=5, convert_to=int, min_value=0, max_value=60)
 
         # The number of seconds to wait before reissuing warnings about invalid utf8 in slowlog messages.
-        self.__utf8_warning_interval = self._config.get('utf8_warning_interval', default=0, convert_to=int, min_value=0, max_value=6000)
+        self.__utf8_warning_interval = self._config.get('utf8_warning_interval', default=600, convert_to=int, min_value=0, max_value=6000)
 
         # Redis-py requires None rather than 0 if no timeout
         if self.__connection_timeout == 0:

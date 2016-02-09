@@ -9,9 +9,15 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 31, 2016 11:30 -0800
 
 Note, this release is under development.  Actual release date is TBD.
 
+Features:
+
+* Windows Event Log monitor now supports the EvtLog API implemented by Windows Vista and newer system.  This allows for more expressive queries, as well as selecting events by severity level such as "Critical".
+
 Bug fixes:
 
-* Fix UTF-8 truncation bug in redis plugin
+* Fix UTF-8 truncation bug in redis plugin.
+* New option in redis plugin that controls logging of UTF-8 converstion errors.  See the ``utf8_warning_interval`` for more details.
+
 
 ## 2.0.15 "Marauding Mouse" - January 4, 2016
 
