@@ -18,6 +18,7 @@ Bug fixes:
 * Fix UTF-8 truncation bug in redis plugin.
 * New option in redis plugin that controls logging of UTF-8 converstion errors.  See the ``utf8_warning_interval`` for more details.
 * Fix bug where ``network_interface_prefixes`` option was broken when listing multiple interfaces.
+* Fix ``no attribute _tunnel_host`` bug with python 2.4 ssl library
 
 
 ## 2.0.15 "Marauding Mouse" - January 4, 2016
