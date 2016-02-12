@@ -517,13 +517,11 @@ and System sources:
             event_filter = [ 'Error', 'Warning', 'Information', 'AuditSuccess', 'AuditFailure' ]
 
         if evtapi:
-            self._logger.info( "Using new Evt API" )
             if sources != DEFAULT_SOURCES or events != DEFAULT_EVENTS:
                 raise Exception( "Sources and Events not supported with the new EvtLog API.  Please use the 'channels' configuration option instead" )
 
             result = NewApi( self._config, self._logger, channels )
         else:
-            self._logger.info( "Evt API not detected.  Using older EventLog API" )
             if channels:
                 raise Exception( "Channels are not supported on the older Win32 EventLog API" )
 
@@ -533,6 +531,11 @@ and System sources:
 
     def run( self ):
         self.__load_checkpoints()
+        if isinstance( self.__api, NewApi ):
+            self._logger.info( "Using new Evt API" )
+        if isinstance( self.__api, OldApi ):
+            self._logger.info( "Evt API not detected.  Using older EventLog API" )
+
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):
