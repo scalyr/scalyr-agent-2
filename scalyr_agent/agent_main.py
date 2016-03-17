@@ -778,8 +778,9 @@ class ScalyrAgent(object):
             ca_file = self.__config.ca_cert_path
         else:
             ca_file = None
+        use_requests_lib = self.__config.use_requests_lib
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
-                                   request_deadline=self.__config.request_deadline, ca_file=ca_file)
+                                   request_deadline=self.__config.request_deadline, ca_file=ca_file, use_requests_lib=use_requests_lib)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.

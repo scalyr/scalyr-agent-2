@@ -15,6 +15,7 @@ The following libraries are included:
   * [PyMySQL](#PyMySQL)
   * [uuid](#uuid)
   * [redis-py](#redis-py)
+  * [Requests](#requests)
 
 ## tcollector<a name="tcollector">
 
@@ -52,3 +53,13 @@ The `redis_monitor` depends on this library.
 Currently this library is just a straight copy, but we may wish to fork it in the future.  The original
 library only supports Python 2.6 or higher.  If there is enough customer demand to allow the `redis_monitor`
 to run with earlier versions of Python we may fork and invest the time to make the necessary modifications.
+
+## Requests<a name="requests-py">
+
+Improved HTTP request handling.  For additional details, please visit the [requests homepage](http://docs.python-requests.org/).
+
+This is a straight copy from the main Requests git repository.  Currently this library is just a straight
+copy, but we may wish to fork it in the future.  The original library only supports Python 2.6 or higher.
+If there is enough customer demand to allow Requests to run with earlier versions of Python we may fork
+and invest the time to make the necessary modifications.
+
