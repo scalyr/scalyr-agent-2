@@ -35,6 +35,7 @@ except Exception:
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.connection import ConnectionFactory
 
 from cStringIO import StringIO
 
@@ -48,7 +49,7 @@ class ScalyrClientSession(object):
     The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
     are monotonically increasing within a session.
     """
-    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None):
+    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -70,30 +71,20 @@ class ScalyrClientSession(object):
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
+
+        # The full URL address
+        self.__full_address = server
+
         # Verify the server address looks right.
         parsed_server = re.match('^(http://|https://|)([^:]*)(:\d+|)$', server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
 
-        # The full URL address
-        self.__full_address = server
-        # The host for the server.
-        self.__host = parsed_server.group(2)
-        # Whether or not the connection uses SSL.  For production use, this should always be true.  We only
-        # use non-SSL when testing against development versions of the Scalyr server.
-        self.__use_ssl = parsed_server.group(1) == 'https://'
 
-        # Determine the port, defaulting to the right one based on protocol if not given.
-        if parsed_server.group(3) != '':
-            self.__port = int(parsed_server.group(3)[1:])
-        elif self.__use_ssl:
-            self.__port = 443
-        else:
-            self.__port = 80
-
-        # The HTTPConnection object that has been opened to the servers, if one has been opened.
+        # The Connection object that has been opened to the servers, if one has been opened.
         self.__connection = None
+        self.__use_requests = use_requests_lib
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
         if not quiet:
@@ -181,64 +172,16 @@ class ScalyrClientSession(object):
 
         self.total_requests_sent += 1
 
-        if self.__use_ssl:
-            if not __has_ssl__:
-                log.warn('No ssl library available so cannot verify server certificate when communicating with Scalyr. '
-                         'This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. '
-                         'To solve this, install the Python ssl library. '
-                         'For more details, see https://www.scalyr.com/help/scalyr-agent#ssl',
-                         limit_once_per_x_secs=86400, limit_key='nosslwarning', error_code='client/nossl')
-            elif self.__ca_file is None:
-                log.warn('Server certificate validation has been disabled while communicating with Scalyr. '
-                         'This means traffic is encrypted but can be intercepted through a man-in-the-middle attach. '
-                         'Please update your configuration file to re-enable server certificate validation.',
-                         limit_once_per_x_secs=86400, limit_key='nocertwarning', error_code='client/sslverifyoff')
 
         was_sent = False
 
         try:
             try:
                 if self.__connection is None:
-                    if self.__use_ssl:
-                        # If we do not have the SSL library, then we cannot do server certificate validation anyway.
-                        if __has_ssl__:
-                            ca_file = self.__ca_file
-                        else:
-                            ca_file = None
-                        self.__connection = HTTPSConnectionWithTimeoutAndVerification(self.__host, self.__port,
-                                                                                      self.__request_deadline,
-                                                                                      ca_file, __has_ssl__)
-
-                    else:
-                        self.__connection = HTTPConnectionWithTimeout(self.__host, self.__port, self.__request_deadline)
-                    self.__connection.connect()
+                    self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
+                                                                       self.__ca_file, self.__standard_headers, self.__use_requests )
                     self.total_connections_created += 1
-            except (socket.error, socket.herror, socket.gaierror), error:
-                if hasattr(error, 'errno'):
-                    errno = error.errno
-                else:
-                    errno = None
-                if __has_ssl__ and isinstance(error, ssl.SSLError):
-                    log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
-                              'for the root Certificate Authority could not be parsed, or we attempted to connect to '
-                              'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
-                              'changed and you should update your agent to get the new certificate).  The returned '
-                              'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
-                              self.__full_address, errno, str(error), error_code='client/connectionFailed')
-                elif errno == 61:  # Connection refused
-                    log.error('Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
-                              self.__full_address, error_code='client/connectionFailed')
-                elif errno == 8:  # Unknown name
-                    log.error('Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
-                              self.__full_address, error_code='client/connectionFailed')
-                elif errno is not None:
-                    log.error('Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
-                              'will re-attempt', self.__full_address, errno, str(error),
-                              error_code='client/connectionFailed')
-                else:
-                    log.error('Failed to connect to "%s" due to exception.  Exception was %s.  Closing connection, '
-                              'will re-attempt', self.__full_address, str(error),
-                              error_code='client/connectionFailed')
+            except Exception, e:
                 return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
 
             if is_post:
@@ -255,10 +198,10 @@ class ScalyrClientSession(object):
             try:
                 if is_post:
                     log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
-                    self.__connection.request('POST', request_path, body=body_str, headers=self.__standard_headers)
+                    self.__connection.post( request_path, body=body_str )
                 else:
                     log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
-                    self.__connection.request('GET', request_path, headers=self.__standard_headers)
+                    self.__connection.get( request_path )
 
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
@@ -305,9 +248,8 @@ class ScalyrClientSession(object):
 
         try:
             try:
-                http_response = self.__connection.getresponse()
-                status_code = http_response.status
-                response = http_response.read()
+                status_code = self.__connection.status_code()
+                response = self.__connection.response()
                 bytes_received = len(response)
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
@@ -1278,7 +1220,7 @@ class Event(object):
         else:
             return None
 
-    def set_sequence_id(self, sid):
+    def set_sequence_id(self, sequence_id):
         """Sets the sequence id for the event.  If this is not invoked, no sequence id will be included
         in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
         as the last serialized event's).
@@ -1290,7 +1232,7 @@ class Event(object):
         @rtype: Event
         """
         # This is serialized as a string to get around overflow issues, so put in a string now.
-        self.__sequence_id = '"%s"' % str(sid)
+        self.__sequence_id = '"%s"' % str(sequence_id)
         self.__has_non_optimal_fields = True
         return self
 
@@ -1306,7 +1248,7 @@ class Event(object):
         self.__has_non_optimal_fields = True
         return None
 
-    def set_sequence_number(self, snum):
+    def set_sequence_number(self, sequence_number):
         """Sets the sequence number for the event.  If this is not invoked, no sequence number will be included
         in the serialized event.  (Which is an optimization that can be used if the sequence id is the same
         as the last serialized event's and you use ``sequence_number_delta`` instead to specify the delta between
@@ -1319,7 +1261,7 @@ class Event(object):
         """
         self.__has_non_optimal_fields = True
         # It is serialized as a number, so just a toString is called for.
-        self.__sequence_number = str(snum)
+        self.__sequence_number = str(sequence_number)
         return self
 
     @property
@@ -1334,7 +1276,7 @@ class Event(object):
         else:
             return None
 
-    def set_sequence_number_delta(self, sdelta):
+    def set_sequence_number_delta(self, sequence_number_delta):
         """Sets the sequence number delta for the event.  If this is not invoked, no sequence number delta will be
         included in the serialized event.  (Which is what you should do if you specify a ``sequence_number`` instead).
 
@@ -1344,9 +1286,9 @@ class Event(object):
         @rtype: Event
         """
         # It is serialized as a number, so just a toString is called for.
-        if self.__sequence_number_delta is None and sdelta is not None:
+        if self.__sequence_number_delta is None and sequence_number_delta is not None:
             self.__num_optimal_fields += 1
-        self.__sequence_number_delta = str(sdelta)
+        self.__sequence_number_delta = str(sequence_number_delta)
         return self
 
     @property
@@ -1362,10 +1304,10 @@ class Event(object):
             return None
 
     def set_sampling_rate(self, rate):
-        """Sets the message field for the attributes for this event.
+        """Sets the sampling rate field for this event.
 
-        @param message:  The message content.
-        @type message: str
+        @param rate The rate
+        @type rate float
         @return:  This object.
         @rtype: Event
         """

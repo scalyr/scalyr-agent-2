@@ -387,6 +387,11 @@ class Configuration(object):
         return self.__get_config().get_string('ca_cert_path')
 
     @property
+    def use_requests_lib(self):
+        """Returns the configuration value for 'use_requests_lib'."""
+        return self.__get_config().get_bool('use_requests_lib')
+
+    @property
     def global_monitor_sample_interval(self):
         """Returns the configuration value for 'global_monitor_sample_interval'."""
         return self.__get_config().get_float('global_monitor_sample_interval')
@@ -687,6 +692,7 @@ class Configuration(object):
 
         self.__verify_or_set_optional_string(config, 'ca_cert_path', Configuration.default_ca_cert_path(),
                                              description)
+        self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description)
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description)
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
