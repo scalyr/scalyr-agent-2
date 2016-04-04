@@ -219,6 +219,15 @@ class MysqlDB(object):
 
     def _query(self, sql):
         """Executes the given SQL statement and returns a sequence of rows."""
+
+        # Check to see if we have a cursor - if not, try to reconnect to the db
+        if not self._cursor:
+            self._reconnect()
+
+        # If we still don't have a valid connection, then return
+        if not self._cursor:
+            return None
+
         try:
             self._cursor.execute(sql)
         except pymysql.OperationalError, (errcode, msg):
@@ -250,23 +259,38 @@ class MysqlDB(object):
         if not self._isShowGlobalStatusSafe():
             return None
         result = []
-        for metric, value in self._query("SHOW /*!50000 GLOBAL */ STATUS"):
+
+        query_str = "SHOW /*!50000 GLOBAL */ STATUS"
+        query = self._query(query_str)
+        if not query:
+            self._logger.warn( "Query failed: %s" % query_str )
+            return None
+
+        for metric, value in query:
             value = self._parse_value(value)
             metric_name = metric.lower()
             # Do not include com_ counters except for com_select, com_delete, com_replace, com_insert, com_update
             if not metric_name.startswith('com_') or metric_name in __coms_to_report__:
                 result.append( { "field": "global.%s" % metric_name, "value": value } )
+
         return result
 
     def gather_global_variables(self):
         result = []
-        for metric, value in self._query("SHOW /*!50000 GLOBAL */ VARIABLES"):
+        query_str = "SHOW /*!50000 GLOBAL */ VARIABLES"
+        query = self._query(query_str)
+        if not query:
+            self._logger.warn( "Query failed: %s" % query_str )
+            return None
+
+        for metric, value in query:
             value = self._parse_value(value)
             metric_name = metric.lower()
             # To reduce the amount of metrics we write, we only include the variables that
             # we actually need.
             if metric_name == 'max_connections' or metric_name == 'open_files_limit':
                 result.append( { "field": "vars.%s" % metric_name, "value": value } )
+
         return result
     
     def _has_innodb(self, globalStatus):
@@ -489,6 +513,10 @@ class MysqlDB(object):
         result = []
         states = {}
         process_status = self._query("SHOW PROCESSLIST")
+        if not process_status:
+            self._logger.warn( "Error gathering process list" )
+            return None
+
         for row in process_status:
             id, user, host, db_, cmd, time, state = row[:7]
             states[cmd] = states.get(cmd, 0) + 1
