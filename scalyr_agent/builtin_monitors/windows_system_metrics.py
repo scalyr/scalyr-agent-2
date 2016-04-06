@@ -127,7 +127,11 @@ def partion_disk_usage(sub_metric):
     def gather_metric():
         if mountpoints_initialized[0] == 0:
             for p in psutil.disk_partitions():
-                mountpoints.append(p.mountpoint)
+                # Only add to list of mountpoints if fstype is
+                # specified.  This prevents reading from empty drives
+                # such as cd-roms, card readers etc.
+                if p.fstype:
+                    mountpoints.append(p.mountpoint)
             mountpoints_initialized[0] = 1
 
         for mountpoint in mountpoints:
