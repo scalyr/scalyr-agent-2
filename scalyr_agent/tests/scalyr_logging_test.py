@@ -106,9 +106,12 @@ class ScalyrLoggingTest(ScalyrTestCase):
         monitor_logger = scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo(1)')
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
 
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, '1name', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name+hi', 5)
-        self.assertRaises(scalyr_logging.BadMetricOrFieldName, monitor_logger.emit_value, 'name', 5, {'hi+': 6})
+        monitor_logger.emit_value('1name', 5)
+        self.assertTrue(self.__log_contains('sa_1name', file_path=metric_file_path))
+        monitor_logger.emit_value('name+hi', 5)
+        self.assertTrue(self.__log_contains('name_hi', file_path=metric_file_path))
+        monitor_logger.emit_value('name', 5, {'hi+': 6})
+        self.assertTrue(self.__log_contains('hi_', file_path=metric_file_path))
 
         monitor_logger.closeMetricLog()
 

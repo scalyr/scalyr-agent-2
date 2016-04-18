@@ -247,7 +247,8 @@ class AgentLogger(logging.Logger):
         self.__metric_handler = None
 
         # The regular expression that must match for metric and field names.  Essentially, it has to begin with
-        # a letter, and only contain letters, digits, periods, underscores, and dashes.
+        # a letter, and only contain letters, digits, periods, underscores, and dashes.  If you change this, be
+        # sure to fix the __force_valid_metric_or_field_name method below.
         self.__metric_or_field_name_rule = re.compile('[a-zA-Z][\w\.\-]*$')
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
@@ -295,8 +296,7 @@ class AgentLogger(logging.Logger):
         string_buffer = StringIO()
         if not type(metric_name) in (str, unicode):
             raise UnsupportedValueType(metric_name=metric_name)
-        if not self.__is_valid_metric_or_field_name(metric_name):
-            raise BadMetricOrFieldName(metric_name)
+        metric_name = self.__force_valid_metric_or_field_name(metric_name, is_metric=True)
 
         if not type(metric_value) in (str, unicode, bool, int, long, float):
             raise UnsupportedValueType(metric_name=metric_name, metric_value=metric_value)
@@ -307,12 +307,12 @@ class AgentLogger(logging.Logger):
             for field_name in extra_fields:
                 if not type(field_name) in (str, unicode):
                     raise UnsupportedValueType(field_name=field_name)
-                if not self.__is_valid_metric_or_field_name(field_name):
-                    raise BadMetricOrFieldName(field_name)
 
                 field_value = extra_fields[field_name]
                 if not type(field_value) in (str, unicode, bool, int, long, float):
                     raise UnsupportedValueType(field_name=field_name, field_value=field_value)
+
+                field_name = self.__force_valid_metric_or_field_name(field_name, is_metric=False)
 
                 string_buffer.write(' %s=%s' % (field_name, json_lib.serialize(field_value)))
 
@@ -473,9 +473,43 @@ class AgentLogger(logging.Logger):
             del AgentLogger.__opened_monitors__[self.__monitor]
             self.__monitor = None
 
-    def __is_valid_metric_or_field_name(self, name):
-        """Returns true if name is a valid metric or field name"""
-        return self.__metric_or_field_name_rule.match(name) is not None
+    def __force_valid_metric_or_field_name(self, name, is_metric=True):
+        """Forces the given metric or field name to be valid.
+
+        A valid metric/field name must being with a letter and only contain alphanumeric characters including
+        periods, underscores, and dashes.
+
+        If it is not valid, it will replace invalid characters with underscores.  If it does not being with a letter
+        a sa_ is added as a prefix.
+
+        If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
+
+        @param name: The metric name
+        @type name: str
+        @param is_metric: Whether or not the name is a metric or field name
+        @type is_metric: bool
+        @return: The metric / field name to use, which may be the original string.
+        @rtype: str
+        """
+        if self.__metric_or_field_name_rule.match(name) is not None:
+            return name
+
+        if is_metric:
+            self.warn('Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
+                      'alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been '
+                      'fixed by replacing invalid characters with underscores.  Other metric names may be invalid '
+                      '(only reporting first occurrence).', limit_once_per_x_secs=86400, limit_key='badmetricname',
+                      error_code='client/badMetricName')
+        else:
+            self.warn('Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
+                      'alphanumeric characters as well as periods, underscores, and dashes.  The field name has been '
+                      'fixed by replacing invalid characters with underscores.  Other field names may be invalid '
+                      '(only reporting first occurrence).', limit_once_per_x_secs=86400, limit_key='badfieldname',
+                      error_code='client/badFieldName')
+
+        if not re.match('^[a-zA-Z]', name):
+            name = 'sa_' + name
+        return re.sub("[^\w\-\.]", '_', name)
 
     def report_values(self, values, monitor=None):
         """Records the specified values (a dict) to the underlying log.
