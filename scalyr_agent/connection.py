@@ -39,7 +39,7 @@ class ConnectionFactory:
     to handle the connection.
     """
     @staticmethod
-    def connection( server, request_deadline, ca_file, headers, use_requests ):
+    def connection( server, request_deadline, ca_file, headers, use_requests, quiet=False ):
         """ Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
@@ -48,12 +48,14 @@ class ConnectionFactory:
         @param ca_file: the path to a certifcate bundle for ssl verification
         @param headers: any headers to send with each request made on the connection
         @param use_requests: whether or not to use Requests for handling queries
+        @param quiet:  Whether or not to emit non-error log messages.
 
         @type server: str
         @type request_deadline: float
         @type ca_file: str
         @type headers: dict
         @type use_requests: bool
+        @type quiet: bool
 
         @return: A new Connection object
         @rtype: Connection
@@ -71,11 +73,11 @@ class ConnectionFactory:
         else:
             result = HttplibConnection( server, request_deadline, ca_file, headers )
 
-        if use_requests:
-            log.info( "Using Requests for HTTP(S) connections" )
-        else:
-            log.info( "Using Httplib for HTTP(S) connections" )
-
+        if not quiet:
+            if use_requests:
+                log.info( "Using Requests for HTTP(S) connections" )
+            else:
+                log.info( "Using Httplib for HTTP(S) connections" )
 
         return result
 

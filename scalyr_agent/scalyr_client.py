@@ -87,6 +87,8 @@ class ScalyrClientSession(object):
         self.__use_requests = use_requests_lib
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
+        self.__quiet = quiet
+
         if not quiet:
             log.info('Using session_id=%s %s' % (self.__session_id, scalyr_util.get_pid_tid()))
 
@@ -179,7 +181,8 @@ class ScalyrClientSession(object):
             try:
                 if self.__connection is None:
                     self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
-                                                                       self.__ca_file, self.__standard_headers, self.__use_requests )
+                                                                      self.__ca_file, self.__standard_headers,
+                                                                      self.__use_requests, quiet=self.__quiet )
                     self.total_connections_created += 1
             except Exception, e:
                 return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
