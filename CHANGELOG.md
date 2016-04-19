@@ -1,13 +1,30 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.17 "Pugnacious Pig" - April 20, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 20, 2016 11:30 -0700
+--->
+
+Note, this release is under development.  Actual release date is TBD.
+
+Features:
+
+* Integration of new request library, allowing routing through target specified by ``proxy`` environment variable.  New library turned off by default for now.  To turn on, set ``use_requests_lib``.
+
+Bug fixes:
+
+* Fix ``windows_system_metrics`` monitor to no longer report disk usage on empty drives
+* Fix ``mysql_monitor`` to recreate connection to db on failures
+* Fix metrics names rather than throw errors when invalid metrics names are emitted by modules such as graphite.
+
+
 ## 2.0.16 "Operating Otter" - January 31, 2016
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 31, 2016 11:30 -0800
 --->
-
-Note, this release is under development.  Actual release date is TBD.
 
 Features:
 
