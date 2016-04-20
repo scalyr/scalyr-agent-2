@@ -4,10 +4,8 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.17 "Pugnacious Pig" - April 20, 2016
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 20, 2016 11:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 20, 2016 13:30 -0700
 --->
-
-Note, this release is under development.  Actual release date is TBD.
 
 Features:
 
