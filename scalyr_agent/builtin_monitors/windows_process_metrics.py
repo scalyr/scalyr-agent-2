@@ -101,9 +101,9 @@ CONFIG_OPTIONS = [
     ),
     dict(
         option_name='commandline',
-        option_description='A regular expression which will match the command line of the process you\'re interested '
-        'in, as shown in the output of ``ps``. (If multiple processes match the same command line pattern, '
-        'only one will be monitored.)',
+        option_description='A regular expression which will match the command line or name of the process you\'re '
+                           'interested in, as shown in the output of ``tasklist`` or ``wmic process list``. (If '
+                           'multiple processes match the same command line pattern, only one will be monitored.)',
         default=None,
         convert_to=str
     ),
@@ -514,7 +514,14 @@ def commandline_matcher(regex, flags=re.IGNORECASE):
         @param processes: an iterable list of process object interfaces
         @type interface
         """
-        return (process for process in processes if pattern.search(_cmdline(process)))
+        for process in processes:
+            try:
+                if pattern.search(process.name()) or pattern.search(_cmdline(process)):
+                    return process
+            except psutil.AccessDenied:
+                # Just skip this process if we don't have access to it.
+                continue
+        return None
 
     return _match_generator
 
@@ -548,8 +555,7 @@ class ProcessMonitor(ScalyrMonitor):
         process = None
         if 'commandline' in self._config:
             matcher = commandline_matcher(self._config['commandline'])
-            matching_process_iterator = matcher(psutil.process_iter())
-            process = matching_process_iterator.next()
+            process = matcher(psutil.process_iter())
         elif 'pid' in self._config:
             if '$$' == self._config.get('pid'):
                 pid = os.getpid()

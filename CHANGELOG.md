@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.18 "Quaint Quail" - June 24, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 20, 2016 13:30 -0700
+--->
+
+Note, this release is under development.  Actual release date is TBD.
+
+Bug fixes:
+
+* Fix ``windows_process_metrics`` bug when matching by commandline.
+
 ## 2.0.17 "Pugnacious Pig" - April 20, 2016
 
 <!---
