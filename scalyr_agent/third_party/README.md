@@ -16,6 +16,10 @@ The following libraries are included:
   * [uuid](#uuid)
   * [redis-py](#redis-py)
   * [Requests](#requests)
+  * [PySNMP](#pysnmp)
+  * [PyASN1](#pyasn1)
+  * [PySMI](#pysmi)
+  * [PLY](#ply)
 
 ## tcollector<a name="tcollector">
 
@@ -63,3 +67,26 @@ copy, but we may wish to fork it in the future.  The original library only suppo
 If there is enough customer demand to allow Requests to run with earlier versions of Python we may fork
 and invest the time to make the necessary modifications.
 
+## PySNMP<a name="pysnmp">
+
+A pure Python SNMP library used by scalyr_agent.builtin_monitors.snmp_monitor
+
+Currently this library is just a straight copy, and has support for Python 2.4 and later.
+
+## PyASN1<a name="pyasn1">
+
+A pure Python ASN.1 library.
+
+Used by PySNMP.
+
+## PySMI<a name="pysmi">
+
+A pure Python library for parsing and conversion of SNMP/SMI MIBs.
+
+Used by PySNMP
+
+##PLY<a name="ply">
+
+A pure Python implementation of lex and yacc.
+
+Used by PySMI.

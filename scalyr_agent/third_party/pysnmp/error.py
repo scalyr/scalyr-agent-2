@@ -1,0 +1,1 @@
+class PySnmpError(Exception): pass
