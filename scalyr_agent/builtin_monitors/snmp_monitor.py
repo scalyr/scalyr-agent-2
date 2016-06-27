@@ -9,12 +9,32 @@ import pysnmp
 from pysnmp.hlapi import CommunityData, ObjectIdentity, ObjectType, SnmpEngine, UdpTransportTarget, UsmUserData
 from pysnmp import hlapi
 
+from pysnmp.smi.error import MibNotFoundError
+
 __monitor__ = __name__
 
 define_config_option(__monitor__, 'module',
-                     'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
+                     'Always ``scalyr_agent.builtin_monitors.snmp_monitor``',
                      convert_to=str, required_option=True)
 
+define_config_option(__monitor__, 'error_repeat_interval',
+                     'Optional (defaults to 300). The number of seconds to wait before repeating an error message.',
+                     default=300, convert_to=int)
+
+define_config_option(__monitor__, 'mib_path',
+                     'Optional (defaults to None).  An absolute path to a location on disk that contains ASN1 MIB files',
+                     default=None, convert_to=str)
+
+define_config_option( __monitor__, 'oid_groups',
+                     'A JSON object that maps custom names to a list of OIDs/variables defined as strings such "group1" : ["IF-MIB::ifDescr",  "1.3.6.1.2.1.2.2.1.16.1"].',
+                     default=None )
+
+define_config_option( __monitor__, 'poll_targets',
+                     'A JSON array contain a list of target devices to poll.  Each element of the array is a JSON object that contains'
+                     'a list of target devices, and a list of "oid_groups" to query.  Each "target device" in the list is a JSON object containing'
+                     'variables that define the target (host, port, authentication details) and each "oid_group" is a string key from the'
+                     'previously defined "oid_groups" configuration option.',
+                     default=None )
 
 class SNMPMonitor( ScalyrMonitor ):
     """
@@ -23,9 +43,38 @@ class SNMPMonitor( ScalyrMonitor ):
 
     No MIBs are provided, and users are expected to provide any MIBs they are interested in.
 
-    The SNMP Monitor has the following configuration options:
+    A sample/test configuration is provided below.
 
-    mib_path - the full path on disk for any MIB files.
+    {
+        module: "scalyr_agent.builtin_monitors.snmp_monitor",
+        mib_path: "/usr/share/mibs/",
+        oid_groups: {
+            "group1" : [ "IF-MIB::ifInOctets", "1.3.6.1.2.1.2.2.1.16.1" ],
+            "group2" : [ "IF-MIB::ifDescr" ]
+        }
+
+        poll_targets: [
+            {
+                "targets": [ { "host": "demo.snmplabs.com" }, { "host": "demo.snmplabs.com", "port": 1161 } ],
+                "oids" : [ "group1", "group2" ]
+            },
+            {
+                "targets": [
+                    {
+                      "host": "demo.snmplabs.com",
+                      "port": 3161,
+                    },
+                ],
+                "oids" : [ "group2" ]
+            }
+        ]
+
+    }
+
+    A detailed description of each configuration option is as follows:
+
+    mib_path - the full path on disk for any MIB files.  In this example, it is assumed that /usr/share/mibs will
+               contain MIB files describing IF-MIB and its related MIBS.
 
     oid_groups - a JSON object mapping a name to a list of OIDs/variables, e.g.
         "oid_groups" : {
@@ -121,6 +170,9 @@ class SNMPMonitor( ScalyrMonitor ):
         #build a list of poll targets
         poll_targets = self._config.get( 'poll_targets' )
         self.__poll_targets = self.__build_poll_targets( poll_targets, groups )
+
+        #other config options
+        self.__error_repeat_interval = self._config.get( 'error_repeat_interval' )
 
     def __build_poll_targets( self, poll_targets, groups ):
         result = []
@@ -314,24 +366,29 @@ class SNMPMonitor( ScalyrMonitor ):
 
         # for each object in the queue
         for obj in queue:
-            # send the query
-            errorIndication, errorStatus, errorIndex, varBinds = cmd.send( obj )
+            try:
+                # send the query
+                errorIndication, errorStatus, errorIndex, varBinds = cmd.send( obj )
 
-            if errorIndication:
-                #error
-                self._logger.error( errorIndication )
-            elif errorStatus:
-                #error
-                self._logger.error( '%s at %s' % (
-                        errorStatus.prettyPrint(),
-                        errorIndex and varBinds[int(errorIndex)-1][0] or '?'
+                if errorIndication:
+                    #error
+                    self._logger.error( errorIndication )
+                elif errorStatus:
+                    #error
+                    self._logger.error( '%s at %s' % (
+                            errorStatus.prettyPrint(),
+                            errorIndex and varBinds[int(errorIndex)-1][0] or '?'
+                        )
                     )
-                )
-            else:
-                #success, emit the value to the log
-                for oid, value in varBinds:
-                    extra = { "oid" : oid.prettyPrint(), "value": value.prettyPrint() }
-                    self._logger.emit_value( 'poll-target', name, extra )
+                else:
+                    #success, emit the value to the log
+                    for oid, value in varBinds:
+                        extra = { "oid" : oid.prettyPrint(), "value": value.prettyPrint() }
+                        self._logger.emit_value( 'poll-target', name, extra )
+            except MibNotFoundError, e:
+                self._logger.error( 'Unable to locate MIBs: \'%s\'.  Please check that mib_path has been correctly configured in your agent.json file and that the path contains valid MIBs for all the variables and/or devices you are trying to query.' % str( e ), limit_once_per_x_secs=self.__error_repeat_interval, limit_key='invalid mibs')
+            except Exception, e:
+                self._logger.error( 'An unexpected error occurred: %s.  If you are querying MIBs, please make sure that mib_path has been set and that the path contains valid MIBs for all the variables and/or devices you are trying to query.' % str( e ), limit_once_per_x_secs=self.__error_repeat_interval, limit_key='invalid mibs')
 
     def run( self ):
         #create the SnmpEngine
