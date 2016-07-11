@@ -16,7 +16,8 @@
 # A ScalyrMonitor which executes a specified shell command and records the output.
 
 import re
-import os
+
+from subprocess import PIPE, Popen
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 
@@ -80,12 +81,8 @@ class ShellMonitor(ScalyrMonitor):
     def gather_sample(self):
         # Run the command
         command = self.command
-        stdin, stdout, stderr = os.popen3(command)
-        stdout_text = stdout.read()
-        stderr_text = stderr.read()
-        stdin.close()
-        stdout.close()
-        stderr.close()
+        p = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        (stdout_text, stderr_text) = p.communicate()
 
         output = stderr_text
         if len(stderr_text) > 0 and len(stdout_text) > 0:
