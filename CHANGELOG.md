@@ -1,17 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.18 "Quaint Quail" - June 24, 2016
+## 2.0.18 "Quaint Quail" - July 13, 2016
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 20, 2016 13:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 13, 2016 13:30 -0700
 --->
 
 Note, this release is under development.  Actual release date is TBD.
 
+Features:
+
+* Release of new ``snmp_monitor`` plugin, used to monitor SNMP devices
+ 
 Bug fixes:
 
 * Fix ``windows_process_metrics`` bug when matching by commandline.
+* Fix invalid character bug when parsing unicode characters with decimal value > 2^16
+* Fix bug in ``shell_monitor`` plugin resulting in defunct processes lingering
+
 
 ## 2.0.17 "Pugnacious Pig" - April 20, 2016
 
