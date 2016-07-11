@@ -188,6 +188,14 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
                 result.write('\\u%0.4x' % x_ord)
             else:
                 result.write(u'\\u%0.4x' % x_ord)
+        elif 65536 <= x_ord < 4294967296:
+            # Just try to do something sane if we see a UTF-32 character.  We just write it as two UTF-16 escaped chars.
+            high_order = x_ord >> 16
+            low_order = x_ord & (2**16-1)
+            if type_index == 0:
+                result.write('\\u%0.4x\\u%0.4x' % (high_order, low_order))
+            else:
+                result.write(u'\\u%0.4x\\u%0.4x' % (high_order, low_order))
         else:
             result.write(string_value[pos])
         pos += 1
