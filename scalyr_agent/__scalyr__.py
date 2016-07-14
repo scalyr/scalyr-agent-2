@@ -138,9 +138,10 @@ def get_install_root():
 def __add_scalyr_package_to_path():
     """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
     """
-    sys.path.append(os.path.dirname(get_package_root()))
-    # Also add in the third party directory
-    sys.path.append(os.path.join(get_package_root(), 'third_party'))
+    # prepend the third party directory first so it appears after the package root
+    sys.path.prepend(0, os.path.join(get_package_root(), 'third_party'))
+
+    sys.path.prepend(0, os.path.dirname(get_package_root()))
 
 
 def __determine_version():
