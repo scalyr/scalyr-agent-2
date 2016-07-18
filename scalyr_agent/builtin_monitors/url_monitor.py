@@ -109,16 +109,13 @@ class UrlMonitor(ScalyrMonitor):
             opener = urllib2.build_opener(NoRedirection, urllib2.HTTPCookieProcessor(cookielib.CookieJar()))
             response = opener.open(self.url, None, self.timeout)
         except urllib2.HTTPError, e:
-            self._logger.emit_value('response', 'failed',
-                                    extra_fields={'url': self.url, 'status': -1, 'length': -1, 'http_error': str(e)})
+            self._record_error(e, 'http_error')
             return
         except urllib2.URLError, e:
-            self._logger.emit_value('response', 'failed',
-                                    extra_fields={'url': self.url, 'status': -2, 'length': -1, 'url_error': str(e)})
+            self._record_error(e, 'url_error')
             return
         except Exception, e:
-            self._logger.emit_value('response', 'failed',
-                                    extra_fields={'url': self.url, 'status': -3, 'length': -1, 'unknown_error': str(e)})
+            self._record_error(e, 'unknown_error')
             return
 
         # Read the response, and apply any extraction pattern
@@ -126,12 +123,10 @@ class UrlMonitor(ScalyrMonitor):
             response_body = response.read()
             response.close()
         except httplib.IncompleteRead, e:
-            self._logger.emit_value('response', 'failed', extra_fields={'url': self.url, 'status': -4, 'length': -1,
-                                                                        'incomplete_read': str(e)})
+            self._record_error(e, 'incomplete_read')
             return
         except Exception, e:
-            self._logger.emit_value('response', 'failed',
-                                    extra_fields={'url': self.url, 'status': -5, 'length': -1, 'unknown_error': str(e)})
+            self._record_error(e, 'unknown_error')
             return
 
         if self.extractor is not None:
@@ -152,3 +147,19 @@ class UrlMonitor(ScalyrMonitor):
             s = s[:self.max_characters] + "..."
         self._logger.emit_value('response', s, extra_fields={'url': self.url, 'status': response.getcode(),
                                                              'length': len(response_body)})
+
+    def _record_error(self, e, error_type):
+        """Emits a value for the URL metric that reports an error.
+
+        Status code is set to zero and we included an extra field capturing a portion of the exception's name.
+        @param e: The exception that caused the problem.
+        @param error_type: The error type, used to make the fielld name to hold the exception name.
+        @type e: Exception
+        @type error_type: str
+        """
+        # Convert the exception to a string, truncated to 20 chars.
+        e_to_str = str(e)
+        if len(e_to_str) > 20:
+            e_to_str = e_to_str[0:20]
+        self._logger.emit_value('response', 'failed',
+                                extra_fields={'url': self.url, 'status': 0, 'length': 0, error_type: e_to_str})
