@@ -15,6 +15,7 @@
 #
 # A ScalyrMonitor which retrieves a specified URL and records the response status and body.
 
+import httplib
 import re
 import urllib2
 import cookielib
@@ -108,15 +109,31 @@ class UrlMonitor(ScalyrMonitor):
             opener = urllib2.build_opener(NoRedirection, urllib2.HTTPCookieProcessor(cookielib.CookieJar()))
             response = opener.open(self.url, None, self.timeout)
         except urllib2.HTTPError, e:
-            self._logger.error("HTTPError retrieving %s: %s" % (self.url, e))
+            self._logger.emit_value('response', 'failed',
+                                    extra_fields={'url': self.url, 'status': -1, 'length': -1, 'http_error': str(e)})
             return
         except urllib2.URLError, e:
-            self._logger.error("URLError retrieving %s: %s" % (self.url, e))
+            self._logger.emit_value('response', 'failed',
+                                    extra_fields={'url': self.url, 'status': -2, 'length': -1, 'url_error': str(e)})
+            return
+        except Exception, e:
+            self._logger.emit_value('response', 'failed',
+                                    extra_fields={'url': self.url, 'status': -3, 'length': -1, 'unknown_error': str(e)})
             return
 
         # Read the response, and apply any extraction pattern
-        response_body = response.read()
-        response.close()
+        try:
+            response_body = response.read()
+            response.close()
+        except httplib.IncompleteRead, e:
+            self._logger.emit_value('response', 'failed', extra_fields={'url': self.url, 'status': -4, 'length': -1,
+                                                                        'incomplete_read': str(e)})
+            return
+        except Exception, e:
+            self._logger.emit_value('response', 'failed',
+                                    extra_fields={'url': self.url, 'status': -5, 'length': -1, 'unknown_error': str(e)})
+            return
+
         if self.extractor is not None:
             match = self.extractor.search(response_body)
             if match is not None:

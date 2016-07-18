@@ -15,10 +15,10 @@ Features:
  
 Bug fixes:
 
-* Fix ``windows_process_metrics`` bug when matching by commandline.
+* Fix bug in ``windows_process_metrics`` when matching by commandline.
 * Fix invalid character bug when parsing unicode characters with decimal value > 2^16
 * Fix bug in ``shell_monitor`` plugin resulting in defunct processes lingering
-
+* Fix bug in ``url_monitor`` plugin resulting in not emitting metric in some failure cases
 
 ## 2.0.17 "Pugnacious Pig" - April 20, 2016
 
