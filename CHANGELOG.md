@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.18 "Quaint Quail" - July 13, 2016
+## 2.0.18 "Quaint Quail" - July 19, 2016
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 13, 2016 13:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 19, 2016 13:30 -0700
 --->
-
-Note, this release is under development.  Actual release date is TBD.
 
 Features:
 
