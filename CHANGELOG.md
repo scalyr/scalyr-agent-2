@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.19 "Underwater Urubu" - July 19, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 19, 2016 13:30 -0700
+--->
+
+Note, this release is under development and release date is TBD.
+
+Bug fixes:
+
+* Fix bug causing agent to fail startup due to ``'module' object has no attribute 'UUID'``.
+
 ## 2.0.18 "Quaint Quail" - July 19, 2016
 
 <!---
