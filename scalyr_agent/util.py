@@ -40,7 +40,7 @@ except ImportError:
     from sha import sha as sha1
 
 try:
-    import scalyr_agent.third_party.uuid.uuid as uuid
+    import scalyr_agent.third_party.uuid_tp.uuid as uuid
 except ImportError:
     uuid = None
 

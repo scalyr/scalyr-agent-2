@@ -39,7 +39,7 @@ import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 
-import scalyr_agent.third_party.uuid.uuid as uuid
+import scalyr_agent.third_party.uuid_tp.uuid as uuid
 
 from scalyr_agent.agent_status import LogMatcherStatus
 from scalyr_agent.agent_status import LogProcessorStatus
