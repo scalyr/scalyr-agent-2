@@ -2,7 +2,7 @@
 
 import re
 
-from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib import JsonObject
 
 import pysnmp
@@ -36,14 +36,28 @@ define_config_option( __monitor__, 'poll_targets',
                      'previously defined "oid_groups" configuration option.',
                      default=None )
 
+define_log_field(__monitor__, 'monitor', 'Always ``snmp_monitor``.')
+define_log_field(__monitor__, 'poll_target', 'The device that was queried to retrieve this value, e.g. ``demo.snpmlabs.com``')
+define_log_field(__monitor__, 'oid', 'The OID for the retrieved value, e.g. ``IF-MIB::ifDescr."1"``')
+define_log_field(__monitor__, 'value', 'The value reported by the device.')
+
+
 class SNMPMonitor( ScalyrMonitor ):
     """
-    The SNMP Monitor polls devices on a network for various values defined by OIDs or
-    by variable names if an appropriate MIB is available.
+    The SNMP Monitor polls SNMP-enabled devices on the network to collect values specified in the configuration
+    file.
 
-    No MIBs are provided, and users are expected to provide any MIBs they are interested in.
+    You can configure the monitor to collect values from one or more devices.  Each of these devices can be
+    configured to retrieve a different set of values, if desired.
 
-    A sample/test configuration is provided below.
+    Values can be retrieved using either OIDs or by variable names if you have installed an appropriate
+    MIBs file.
+
+    By default, no MIBs files are provided with the Scalyr Agent.  Users are expected to provide any MIBs they
+    are interested in.  There is documentation below describing how to configure the this monitor to use any installed
+    MIBs files.
+
+    A sample/test configuration is provided below, followed by an explanation of the critical fields.
 
     {
         module: "scalyr_agent.builtin_monitors.snmp_monitor",
@@ -71,7 +85,7 @@ class SNMPMonitor( ScalyrMonitor ):
 
     }
 
-    A detailed description of each configuration option is as follows:
+    Field descriptions:
 
     mib_path - the full path on disk for any MIB files.  In this example, it is assumed that /usr/share/mibs will
                contain MIB files describing IF-MIB and its related MIBS.
@@ -173,6 +187,9 @@ class SNMPMonitor( ScalyrMonitor ):
 
         #other config options
         self.__error_repeat_interval = self._config.get( 'error_repeat_interval' )
+
+        # for legacy
+        self.__use_legacy_format = self._config.get('use_legacy_format', default=False, convert_to=bool)
 
     def __build_poll_targets( self, poll_targets, groups ):
         result = []
@@ -383,8 +400,13 @@ class SNMPMonitor( ScalyrMonitor ):
                 else:
                     #success, emit the value to the log
                     for oid, value in varBinds:
-                        extra = { "oid" : oid.prettyPrint(), "value": value.prettyPrint() }
-                        self._logger.emit_value( 'poll-target', name, extra )
+                        if self.__use_legacy_format:
+                            extra = { "oid" : oid.prettyPrint(), "value": value.prettyPrint() }
+                            self._logger.emit_value( 'poll-target', name, extra )
+                        else:
+                            extra = { "oid" : oid.prettyPrint(), "poll_target": name }
+                            self._logger.emit_value( oid.prettyPrint(), value.prettyPrint(), extra )
+
             except MibNotFoundError, e:
                 self._logger.error( 'Unable to locate MIBs: \'%s\'.  Please check that mib_path has been correctly configured in your agent.json file and that the path contains valid MIBs for all the variables and/or devices you are trying to query.' % str( e ), limit_once_per_x_secs=self.__error_repeat_interval, limit_key='invalid mibs')
             except Exception, e:
