@@ -1,17 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.19 "Underwater Urubu" - July 19, 2016
+## 2.0.19 "Underwater Urubu" - July 29, 2016
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 19, 2016 13:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 29, 2016 11:30 -0700
 --->
-
-Note, this release is under development and release date is TBD.
 
 Bug fixes:
 
 * Fix bug causing agent to fail startup due to ``'module' object has no attribute 'UUID'``.
+* Improved log line format for ``snmp_monitor``.  You may disable using new format by setting the monitor config option ``use_legacy_format`` to true.
 
 ## 2.0.18 "Quaint Quail" - July 19, 2016
 
