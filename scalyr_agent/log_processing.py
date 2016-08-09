@@ -172,7 +172,8 @@ class LogFileIterator(object):
         self.page_reads = 0
 
         # cache modification time to avoid calling stat twice
-        self.__modification_time = datetime.datetime.now()
+        # This is in seconds since epoch
+        self.__modification_time_raw = time.time()
 
         # sequence id for this file
         self.__sequence_id = self.__get_unique_id()
@@ -498,7 +499,7 @@ class LogFileIterator(object):
         if self.__max_modification_duration:
             try:
                 current_datetime = datetime.datetime.now()
-                delta = current_datetime - self.__modification_time
+                delta = current_datetime - datetime.datetime.fromtimestamp(self.__modification_time_raw)
                 total_micros = delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10**6
                 if total_micros > self.__max_modification_duration * 10**6:
                     close_file = True
@@ -529,6 +530,17 @@ class LogFileIterator(object):
             return self.__pending_files[-1].position_end - self.__position
         else:
             return 0
+
+    @property
+    def last_modification_time(self):
+        """Returns the time that the file was last modified.
+
+        Note, you must call ``mark`` first to get the latest time.
+
+        @return:  The time in seconds since epoch.
+        @rtype: float
+        """
+        return self.__modification_time_raw
 
     def __determine_buffer_index(self, mark_position):
         """Returns the index of the specified position (relative to mark) in the buffer.
@@ -654,7 +666,7 @@ class LogFileIterator(object):
             stat_result = self.__file_system.stat(self.__path)
             latest_inode = stat_result.st_ino
             latest_size = stat_result.st_size
-            self.__modification_time = datetime.datetime.fromtimestamp(stat_result.st_mtime)
+            self.__modification_time_raw = stat_result.st_mtime
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
@@ -1163,13 +1175,16 @@ class LogFileProcessor(object):
     to be sent to the server after applying any sampling and redaction rules.
     """
 
-    def __init__(self, file_path, config, log_config, log_attributes=None, file_system=None, checkpoint=None):
+    def __init__(self, file_path, config, log_config, close_when_staleness_exceeds=None, log_attributes=None,
+                 file_system=None, checkpoint=None):
         """Initializes an instance.
 
         @param file_path: The path of the log file to process.
         @param config:  The configuration object containing parameters that govern how the logs will be processed
             such as ``max_line_length``.
         @param log_config: the log entry config for this specific log file
+        @param close_when_staleness_exceeds: If not None, the processor will close the file once the number of seconds
+            since the file was last modified exceeds the supplied value.
         @param log_attributes: The attributes to include on all lines copied from this log to the server.
             These are typically the file attributes from the configuration file and include such things as the
             parser for the log, etc.
@@ -1204,6 +1219,9 @@ class LogFileProcessor(object):
 
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
+
+        # The processor should be closed if the staleness of this file exceeds this number of seconds (if not None)
+        self.__close_when_staleness_exceeds = close_when_staleness_exceeds
 
         # The base event that will be used to insert all events from this log.
         self.__base_event = Event(thread_id=self.__thread_id, attrs=log_attributes)
@@ -1501,7 +1519,7 @@ class LogFileProcessor(object):
                         # Do a mark to cleanup any state in the iterator.  We know we won't have to roll back
                         # to before this point now.
                         self.__log_file_iterator.mark(final_position, current_time=current_time)
-                        if self.__log_file_iterator.at_end:
+                        if self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time):
                             self.__log_file_iterator.close()
                             self.__is_closed = True
                             return True
@@ -1535,6 +1553,22 @@ class LogFileProcessor(object):
             add_events_request.set_position(original_events_position)
 
             return None, False
+
+    def __should_close_because_stale(self, current_time):
+        """Returns true if the processor should be closed because the last time the file it is monitoring has been
+        modified exceeds the number of seconds in ``__close_when_staleness_exceeds``.
+
+        This will always return False if ``__close_when_staleness_exceeds`` is None.
+
+        @param current_time: The current time
+        @type current_time: float
+        @return:  True if it should be closed due to staleness.
+        @rtype: bool
+        """
+        if self.__close_when_staleness_exceeds is None:
+            return False
+
+        return (current_time - self.__log_file_iterator.last_modification_time) > self.__close_when_staleness_exceeds
 
     def skip_to_end(self, message, error_code, current_time=None):
         """Advances the iterator to the end of the log file due to some error.
@@ -1658,6 +1692,7 @@ class LogFileProcessor(object):
         LogFileProcessor.__thread_id_lock.release()
 
         return 'log_%d' % new_id
+
 
 class LogLineSampler(object):
     """Encapsulates all of the configured sampling rules to perform on lines from a single log file.
@@ -1861,19 +1896,39 @@ class LogMatcher(object):
     that log file.  Finally, it also includes attributes that should be included with each log line from that
     log when sent to the server.
     """
-    def __init__(self, overall_config, log_entry_config):
+    def __init__(self, overall_config, log_entry_config, file_system=None):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
             processed such as ``max_line_length``.
         @param log_entry_config: The configuration entry from the logs array in the agent configuration file,
             which specifies the path for the log file, as well as redaction rules, etc.
+        @param file_system: The object to use to read and write from the file system.  If None, just uses the
+            real file system.  This is used for testing.
 
         @type overall_config: scalyr_agent.Configuration
         @type log_entry_config: dict
+        @type file_system: FileSystem
         """
+        if file_system is None:
+            self.__file_system = FileSystem()
+        else:
+            self.__file_system = file_system
         self.__overall_config = overall_config
         self.__log_entry_config = log_entry_config
         self.log_path = self.__log_entry_config['path']
+
+        # Determine if we should be ignoring stale files (meaning we don't track them at all).
+        # If we should not be ignoring them, then self.__stale_threshold_secs will be set to a number.
+        if 'ignore_stale_files' in self.__log_entry_config and self.__log_entry_config['ignore_stale_files']:
+            if 'staleness_threshold_secs' in self.__log_entry_config:
+                self.__stale_threshold_secs = self.__log_entry_config['staleness_threshold_secs']
+            else:
+                self.__stale_threshold_secs = 300
+            log.log(scalyr_logging.DEBUG_LEVEL_3, 'Using a staleness threshold of %f for %s',
+                    self.__stale_threshold_secs, self.log_path)
+        else:
+            self.__stale_threshold_secs = None
+
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
         # This probably leads to false positives, but that's ok.
         self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
@@ -1954,7 +2009,9 @@ class LogMatcher(object):
         try:
             for matched_file in glob.glob(self.__log_entry_config['path']):
                 # Only process it if we have permission to read it and it is not already being processed.
-                if not matched_file in existing_processors and self.__can_read_file(matched_file):
+                # Also check if we should skip over it entirely because it is too stale.
+                if not matched_file in existing_processors and self.__can_read_file_and_not_stale(matched_file,
+                                                                                                  self.__last_check):
                     checkpoint_state = None
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:
@@ -1974,7 +2031,8 @@ class LogMatcher(object):
 
                     # Create the processor to handle this log.
                     new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config,
-                                                     log_attributes=log_attributes, checkpoint=checkpoint_state)
+                                                     log_attributes=log_attributes, checkpoint=checkpoint_state,
+                                                     close_when_staleness_exceeds=self.__stale_threshold_secs)
                     for rule in self.__log_entry_config['redaction_rules']:
                         new_processor.add_redacter(rule['match_expression'], rule['replacement'])
                     for rule in self.__log_entry_config['sampling_rules']:
@@ -1996,7 +2054,7 @@ class LogMatcher(object):
                 for new_processor in result:
                     new_processor.close()
 
-    def __can_read_file(self, file_path):
+    def __can_read_file_and_not_stale(self, file_path, current_time):
         """Determines if this process can read the file at the path.
 
         @param file_path: The file path
@@ -2004,14 +2062,13 @@ class LogMatcher(object):
         @return: True if it can be read.
         @rtype: bool
         """
-        try:
-            fp = open(file_path, 'r')
-            fp.close()
-        except IOError, error:
-            if error.errno == 13:
+        if self.__stale_threshold_secs is not None:
+            mod_time = self.__file_system.get_last_mod_time(file_path)
+            if mod_time is not None and (current_time - mod_time) > self.__stale_threshold_secs:
+                log.log(scalyr_logging.DEBUG_LEVEL_3, 'Ignoring "%s" because its last mod is too old', file_path)
                 return False
 
-        return True
+        return self.__file_system.can_read(file_path)
 
     def __removed_closed_processors(self):
         """Performs some internal clean up to remove any processors that are no longer active.
@@ -2104,7 +2161,6 @@ class FileSystem(object):
 
     def tell(self, file_object):
         """Returns the current position of the file object.
-
         @param file_object: The file.
         """
         return file_object.tell()
@@ -2148,3 +2204,40 @@ class FileSystem(object):
         finally:
             if original_position is not None:
                 file_object.seek(original_position)
+
+    def get_last_mod_time(self, file_path):
+        """Returns the last modification time in seconds since epoch for the specified file.
+
+        If the file exists, we should always be able to get the stat.  If there is an error, None is returned.
+
+        @param file_path:
+        @type file_path: str
+
+        @return: The number of seconds past epoch when the file was last modified.
+        @rtype: float or None
+        """
+        try:
+            return os.path.getmtime(file_path)
+        except OSError:
+            # We really shouldn't ever get errors since you don't need permissions.  So, only if the file doesn't
+            # exist will we get this error.
+            return None
+        except IOError:
+            return None
+
+    def can_read(self, file_path):
+        """Returns true if this process can read the given file.
+
+        @param file_path: The file path
+        @type file_path: str
+
+        @return: True if this process can read the specified file.
+        @rtype: bool
+        """
+        try:
+            fp = open(file_path, 'r')
+            fp.close()
+        except IOError, error:
+            if error.errno == 13:
+                return False
+        return True

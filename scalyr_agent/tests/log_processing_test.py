@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import time
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -26,7 +27,7 @@ import sys
 
 from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
-from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor
+from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor, LogMatcher
 from scalyr_agent.log_processing import FileSystem
 from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
@@ -691,6 +692,13 @@ class TestLogFileIterator(ScalyrTestCase):
         open_count = self.log_file.get_open_files_count()
         self.assertEquals( 0, open_count )
 
+    def test_last_modification_time(self):
+        known_time = time.time()
+        os.utime(self.__path, (known_time, known_time))
+        self.log_file.scan_for_new_bytes()
+        # The numbers might not be perfect because some file systems do not return a mod time with fractional secs.
+        self.assertTrue(abs(known_time - self.log_file.last_modification_time) < 1)
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'wb')
@@ -864,7 +872,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.__file_system = FileSystem()
         self.__path = os.path.join(self.__tempdir, 'text.txt')
         self.__fake_time = 10
+        self.log_processor = self._create_processor()
 
+    def _create_processor(self, close_when_staleness_exceeds=None):
         # Create the processor to test.  We have it do one scan of an empty
         # file so that when we next append lines to it, it will notice it.
         # For now, we create one that does not have any log attributes and only
@@ -872,11 +882,12 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.write_file(self.__path, '')
         log_config = { 'path' : self.__path }
         log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        self.log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
-                                              log_attributes={})
-        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+        log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
+                                         log_attributes={}, close_when_staleness_exceeds=close_when_staleness_exceeds)
+        (completion_callback, buffer_full) = log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        return log_processor
 
     def test_basic_usage(self):
         log_processor = self.log_processor
@@ -1286,6 +1297,29 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
+    def test_signals_deletion_due_to_staleness(self):
+        log_processor = self._create_processor(close_when_staleness_exceeds=300)
+
+        # Have to manually set the modification time to the fake time so we are comparing apples to apples.
+        os.utime( self.__path, (self.__fake_time, self.__fake_time) )
+
+        # The processor won't signal it is ready to be removed until 5 mins have passed.
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+        self.assertEquals(0, events.total_events())
+
+        self.__fake_time += 4 * 60
+        (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
+
+        self.__fake_time += 62
+        (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
+
+        self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
+
     def test_log_attributes(self):
         vals = { 'path' : self.__path, 'attributes' : JsonObject( { 'host' : 'scalyr-1' } ) }
         log_config = DEFAULT_CONFIG.parse_log_config( vals )
@@ -1487,6 +1521,65 @@ class TestLogFileProcessor(ScalyrTestCase):
             pass
 
 
+class TestLogMatcher(ScalyrTestCase):
+    def setUp(self):
+        self.__config = _create_configuration()
+
+        self.__tempdir = tempfile.mkdtemp()
+        self.__file_system = FileSystem()
+        self.__path_one = os.path.join(self.__tempdir, 'text.txt')
+        self.__path_two = os.path.join(self.__tempdir, 'text_two.txt')
+        self.__glob_one = os.path.join(self.__tempdir, '*.txt')
+        self.__glob_two = os.path.join(self.__tempdir, '*two.txt')
+
+        self._create_file(self.__path_one)
+        self._create_file(self.__path_two)
+
+        self.__fake_time = 10
+
+    def test_matches_glob(self):
+        matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one))
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 2)
+
+        self._close_processors(processors)
+
+    def test_matches_restricted_glob(self):
+        matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_two))
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
+
+        self._close_processors(processors)
+
+    def test_ignores_stale_file(self):
+        staleness_threshold = 300   # 5 mins
+        current_time = time.time()
+        stale_time = current_time - staleness_threshold - 10
+
+        self._set_mod_date(self.__path_one, current_time)
+        self._set_mod_date(self.__path_two, stale_time)
+
+        matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one, ignore_stale_files=True,
+                                                                    staleness_threshold_secs=staleness_threshold))
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
+
+        self._close_processors(processors)
+
+    def _close_processors(self, processors):
+        for x in processors:
+            x.close()
+
+    def _set_mod_date(self, file_path, mod_time):
+        os.utime(file_path, (mod_time, mod_time))
+
+    def _create_file(self, file_path):
+        fp = open(file_path, 'w')
+        fp.close()
+
+    def _create_log_config(self, path, ignore_stale_files=False, staleness_threshold_secs=None):
+        return dict(path=path, attributes=dict(), lineGroupers=[], redaction_rules=[], sampling_rules=[],
+                    ignore_stale_files=ignore_stale_files, staleness_threshold_secs=staleness_threshold_secs)
 
 def _create_configuration( extra=None ):
     """Creates a blank configuration file with default values for testing.

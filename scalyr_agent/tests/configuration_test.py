@@ -99,6 +99,8 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
         self.assertEquals(config.log_configs[0].get_json_array('redaction_rules'), JsonArray())
         self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
+        self.assertFalse(config.log_configs[0].get_bool('ignore_stale_files'))
+        self.assertEquals(config.log_configs[0].get_float('staleness_threshold_secs'), 300)
 
         self.assertEquals(len(config.monitor_configs), 0)
 
@@ -158,7 +160,7 @@ class TestConfiguration(ScalyrTestCase):
             copying_thread_profile_interval: 2,
             copying_thread_profile_output_path: "/tmp/some_profiles",
 
-            logs: [ { path: "/var/log/tomcat6/access.log"} ]
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
           }
         """)
         config = self.__create_test_configuration_instance()
@@ -210,6 +212,8 @@ class TestConfiguration(ScalyrTestCase):
         self.assertFalse(config.verify_server_certificate)
         self.assertTrue(config.debug_init)
         self.assertTrue(config.pidfile_advanced_reuse_guard)
+
+        self.assertTrue(config.log_configs[0].get_bool('ignore_stale_files'))
 
     def test_missing_api_key(self):
         self.__write_file_with_separator_conversion(""" {
