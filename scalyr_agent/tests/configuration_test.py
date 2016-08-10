@@ -83,6 +83,8 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.copy_staleness_threshold, 15 * 60)
         self.assertEquals(config.log_deletion_delay, 10 * 60)
 
+        self.assertEquals(config.max_new_log_detection_time, 1 * 60)
+
         self.assertEquals(config.copying_thread_profile_interval, 0)
         self.assertEquals(config.copying_thread_profile_output_path, '/tmp/copying_thread_profiles_')
 
@@ -157,6 +159,8 @@ class TestConfiguration(ScalyrTestCase):
             debug_init: true,
             pidfile_advanced_reuse_guard: true,
 
+            max_new_log_detection_time: 120,
+
             copying_thread_profile_interval: 2,
             copying_thread_profile_output_path: "/tmp/some_profiles",
 
@@ -201,6 +205,8 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.copying_thread_profile_interval, 2)
         self.assertEquals(config.copying_thread_profile_output_path, '/tmp/some_profiles')
+
+        self.assertEquals(config.max_new_log_detection_time, 2 * 60)
 
         self.assertEquals(config.pipeline_threshold, 0.5)
 

@@ -80,7 +80,6 @@ class Configuration(object):
         # Add documentation, verify, etc.
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
-        self.max_new_log_detection_time = 1 * 60
 
     def parse(self):
         self.__read_time = time.time()
@@ -362,6 +361,11 @@ class Configuration(object):
         return self.__get_config().get_float('high_water_request_spacing_adjustment')
 
     @property
+    def max_new_log_detection_time(self):
+        """Returns the configuration value for 'max_new_log_detection_time'."""
+        return self.__get_config().get_float('max_new_log_detection_time')
+
+    @property
     def failure_request_spacing_adjustment(self):
         """Returns the configuration value for 'failure_request_spacing_adjustment'."""
         return self.__get_config().get_float('failure_request_spacing_adjustment')
@@ -627,6 +631,8 @@ class Configuration(object):
 
         self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description)
         self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description)
+
+        self.__verify_or_set_optional_float(config, 'max_new_log_detection_time', 60.0, description)
 
         # These parameters are used in log_processing.py to govern how logs are copied.
 
