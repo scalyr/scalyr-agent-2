@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.20 "Vexing Viper" - August 10, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Aug 10, 2016 16:00 -0700
+--->
+
+Features:
+
+* Added feature to prevent tracking stale log files on a per-directory basis.  Reduces checkpoint size due to large directories.
+
+
 ## 2.0.19 "Underwater Urubu" - July 29, 2016
 
 <!---
