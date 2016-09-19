@@ -154,7 +154,7 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.start()
             win32event.WaitForSingleObject(self._stop_event, win32event.INFINITE)
         except Exception, e:
-            self.log('ERROR: {}'.format(e))
+            self.error('Error, causing Windows Service to exit early %s' % str(e))
             self.SvcStop()
 
     def start(self):

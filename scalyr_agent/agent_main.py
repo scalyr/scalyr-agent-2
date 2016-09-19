@@ -163,7 +163,11 @@ class ScalyrAgent(object):
             command = 'inner_run_with_checks'
         else:
             command = 'inner_run'
-        return ScalyrAgent(controller).main(config_file_path, command, my_options)
+        try:
+            return ScalyrAgent(controller).main(config_file_path, command, my_options)
+        except:
+            log.exception('Agent failed while running.  Will be shutting down.')
+            raise
 
     def main(self, config_file_path, command, command_options):
         """Run the Scalyr Agent.
