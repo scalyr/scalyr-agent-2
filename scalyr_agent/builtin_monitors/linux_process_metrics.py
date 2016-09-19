@@ -95,11 +95,52 @@ define_metric(__monitor__, 'app.disk.bytes',
 define_metric(__monitor__, 'app.disk.requests',
               'Total disk write requests.', extra_fields={'type': 'write'}, unit='bytes', cumulative=True)
 
+define_metric(__monitor__, 'app.io.fds',
+              'The number of open file descriptors help by process.', extra_fields={'type': 'open'})
+
 define_log_field(__monitor__, 'monitor', 'Always ``linux_process_metrics``.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration, e.g. ``tomcat``.')
 define_log_field(__monitor__, 'app', 'Same as ``instance``; provided for compatibility with the original Scalyr Agent.')
 define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "app.cpu".')
 define_log_field(__monitor__, 'value', 'The metric value.')
+
+
+class MetricPrinter:
+    """Helper class that emits metrics for the specified monitor.
+    """
+    def __init__(self, logger, monitor_id):
+        """Initializes the class.
+
+        @param logger: The logger instances to use to report metrics.
+        @param monitor_id: The id of the monitor instance, used to identify all metrics reported through the logger.
+        @type logger: scalyr_logging.AgentLogger
+        @type monitor_id: str
+        """
+        self.__logger = logger
+        self.__id = monitor_id
+
+    def print_sample(self, metric_name, metric_value, type_value=None):
+        """Record the specified metric.
+
+        @param metric_name: The name of the metric.  It should only contain alphanumeric characters,
+            periods, underscores.
+        @param metric_value: The value of the metric.
+        @param type_value: The type of the value.  This is emitted as an extra field for the metric.
+            This is often used to label different types of some resource, such as CPU (user CPU vs. system CPU), etc.
+
+        @type metric_name: str
+        @type metric_value: float
+        @type type_value: str
+        """
+        # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
+        # Java agent did this and it is important to some dashboards.
+        extra = {
+            'app': self.__id,
+            }
+        if type_value is not None:
+            extra['type'] = type_value
+
+        self.__logger.emit_value(metric_name, metric_value, extra)
 
 
 class BaseReader:
@@ -134,6 +175,7 @@ class BaseReader:
         # True if the reader failed for some unrecoverable error.
         self._failed = False
         self._logger = logger
+        self._metric_printer = MetricPrinter(logger, monitor_id)
 
     def run_single_cycle(self):
         """Runs a single cycle of the sample collection.
@@ -207,15 +249,7 @@ class BaseReader:
         @type metric_value: float
         @type type_value: str
         """
-        # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
-        # Java agent did this and it is important to some dashboards.
-        extra = {
-            'app': self._id,
-        }
-        if type_value is not None:
-            extra['type'] = type_value
-
-        self._logger.emit_value(metric_name, metric_value, extra)
+        self._metric_printer.print_sample(metric_name, metric_value, type_value=type_value)
 
 
 class StatReader(BaseReader):
@@ -521,6 +555,40 @@ class SockStatReader(BaseReader):
                                   m.group(1).lower())
 
 
+# Reads stats from /proc/$pid/fd.
+class FileDescriptorReader:
+    """Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
+
+    The recorded metrics are listed below.  They all also have an app=[id] field as well.
+      app.io.fds type=open:         the number of open file descriptors
+    """
+    def __init__(self, pid, monitor_id, logger):
+        """Initializes the reader.
+
+        @param pid: The id of the process
+        @param monitor_id: The id of the monitor instance
+        @param logger: The logger to use to record metrics
+
+        @type pid: int
+        @type monitor_id: str
+        @type logger: scalyr_agent.AgentLogger
+        """
+        self.__pid = pid
+        self.__monitor_id = monitor_id
+        self.__logger = logger
+        self.__metric_printer = MetricPrinter(logger, monitor_id)
+        self.__path = '/proc/%ld/fd' % pid
+
+    def run_single_cycle(self):
+        """
+
+        @return:
+        @rtype:
+        """
+        num_fds = len(os.listdir(self.__path))
+        self.__metric_printer.print_sample('app.io.fds', num_fds, 'count')
+
+
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
 
@@ -553,6 +621,7 @@ class ProcessMonitor(ScalyrMonitor):
       app.disk.requests type=read:      the number of disk requests.
       app.disk.bytes type=write:        the number of bytes written to disk
       app.disk.requests type=write:     the number of disk requests.
+      app.io.fds type=open:             the number of file descriptors held open by the process
 
     In additional to the fields listed above, each metric will also have a field 'app' set to the monitor id to specify
     which process the metric belongs to.
@@ -597,6 +666,7 @@ class ProcessMonitor(ScalyrMonitor):
             self.__gathers.append(StatReader(self.__pid, self.__id, self._logger))
             self.__gathers.append(StatusReader(self.__pid, self.__id, self._logger))
             self.__gathers.append(IoReader(self.__pid, self.__id, self._logger))
+            self.__gathers.append(FileDescriptorReader(self.__pid, self.__id, self._logger))
         # TODO: Re-enable these if we can find a way to get them to truly report
         # per-app statistics.
         #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
