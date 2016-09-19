@@ -39,7 +39,7 @@ class ConnectionFactory:
     to handle the connection.
     """
     @staticmethod
-    def connection( server, request_deadline, ca_file, headers, use_requests, quiet=False ):
+    def connection( server, request_deadline, ca_file, headers, use_requests, quiet=False, proxies=None):
         """ Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
@@ -49,6 +49,8 @@ class ConnectionFactory:
         @param headers: any headers to send with each request made on the connection
         @param use_requests: whether or not to use Requests for handling queries
         @param quiet:  Whether or not to emit non-error log messages.
+        @param proxies:  A dict describing the network proxies to use or None if there aren't any.  Only valid if
+            use_requests is True.
 
         @type server: str
         @type request_deadline: float
@@ -56,6 +58,7 @@ class ConnectionFactory:
         @type headers: dict
         @type use_requests: bool
         @type quiet: bool
+        @type proxies: dict
 
         @return: A new Connection object
         @rtype: Connection
@@ -65,13 +68,13 @@ class ConnectionFactory:
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
-                result = RequestsConnection( server, request_deadline, ca_file, headers )
+                result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
             except Exception, e:
                 log.warn( "Unable to load requests module.  Falling back to Httplib for connection handling" )
                 result = HttplibConnection( server, request_deadline, ca_file, headers )
                 use_requests = False
         else:
-            result = HttplibConnection( server, request_deadline, ca_file, headers )
+            result = HttplibConnection( server, request_deadline, ca_file, headers)
 
         if not quiet:
             if use_requests:

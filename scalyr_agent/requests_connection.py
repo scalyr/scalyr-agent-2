@@ -25,11 +25,12 @@ from scalyr_agent.connection import Connection
 class RequestsConnection( Connection ):
     """Class to handle http(s) queries using the Requests library"""
 
-    def __init__( self, server, request_deadline, ca_file, headers ):
+    def __init__( self, server, request_deadline, ca_file, headers, proxies):
 
         super( RequestsConnection, self ).__init__( server, request_deadline, ca_file, headers )
         self.__response = None
         self.__session = None
+        self.__proxies = proxies
 
     def __verify( self ):
         if self._ca_file:
@@ -39,6 +40,8 @@ class RequestsConnection( Connection ):
     def __check_session( self ):
         if not self.__session:
             self.__session = requests.Session()
+            if self.__proxies is not None:
+                self.__session.proxies = self.__proxies
             self.__session.headers.update( self._standard_headers )
 
     def _post( self, request_path, body ):

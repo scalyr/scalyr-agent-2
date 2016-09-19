@@ -396,6 +396,22 @@ class Configuration(object):
         return self.__get_config().get_bool('use_requests_lib')
 
     @property
+    def network_proxies(self):
+        """Returns the proxy map created by the 'https_proxy' and 'http_proxy' configuration variables, or
+        None if neither of those is set.
+        """
+        https_proxy = self.__get_config().get_string('https_proxy', none_if_missing=True)
+        http_proxy = self.__get_config().get_string('http_proxy', none_if_missing=True)
+        if https_proxy is None and http_proxy is None:
+            return None
+        result = {}
+        if https_proxy is not None:
+            result['https'] = https_proxy
+        if http_proxy is not None:
+            result['http'] = http_proxy
+        return result
+
+    @property
     def global_monitor_sample_interval(self):
         """Returns the configuration value for 'global_monitor_sample_interval'."""
         return self.__get_config().get_float('global_monitor_sample_interval')
@@ -700,6 +716,9 @@ class Configuration(object):
                                              description)
         self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description)
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description)
+        self.__verify_or_set_optional_string(config, 'http_proxy', None, description)
+        self.__verify_or_set_optional_string(config, 'https_proxy', None, description)
+
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.

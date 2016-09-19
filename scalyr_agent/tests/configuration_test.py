@@ -105,6 +105,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.log_configs[0].get_float('staleness_threshold_secs'), 300)
 
         self.assertEquals(len(config.monitor_configs), 0)
+        self.assertIsNone(config.network_proxies)
 
     def test_empty_config(self):
         self.__write_file_with_separator_conversion(""" {
@@ -164,6 +165,9 @@ class TestConfiguration(ScalyrTestCase):
             copying_thread_profile_interval: 2,
             copying_thread_profile_output_path: "/tmp/some_profiles",
 
+            http_proxy: "http://foo.com",
+            https_proxy: "https://bar.com",
+
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
           }
         """)
@@ -220,6 +224,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertTrue(config.pidfile_advanced_reuse_guard)
 
         self.assertTrue(config.log_configs[0].get_bool('ignore_stale_files'))
+        self.assertEqual(config.network_proxies, {"http": "http://foo.com", "https": "https://bar.com"})
 
     def test_missing_api_key(self):
         self.__write_file_with_separator_conversion(""" {
@@ -265,6 +270,26 @@ class TestConfiguration(ScalyrTestCase):
         """)
         config = self.__create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
+
+    def test_no_https_proxy(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            http_proxy: "http://bar.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual(config.network_proxies, {"http": "http://bar.com"})
+
+    def test_no_http_proxy(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            https_proxy: "https://bar.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
 
     def test_sampling_rules(self):
         self.__write_file_with_separator_conversion(""" {

@@ -49,7 +49,8 @@ class ScalyrClientSession(object):
     The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
     are monotonically increasing within a session.
     """
-    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False):
+    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
+                 proxies=None):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -61,6 +62,7 @@ class ScalyrClientSession(object):
         @param request_deadline: The maximum time to wait for all requests in seconds.
         @param ca_file: The path to the file containing the certificates for the trusted certificate authority roots.
             This is used for the SSL connections to verify the connection is to Scalyr.
+        @param proxies:  A dict describing the network proxies to use (such as a mapping for `https`) or None.
 
         @type server: str
         @type api_key: str
@@ -68,6 +70,7 @@ class ScalyrClientSession(object):
         @type quiet: bool
         @type request_deadline: float
         @type ca_file: str
+        @type proxies: dict
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
@@ -128,6 +131,7 @@ class ScalyrClientSession(object):
         # connection to Scalyr.  If this is None, then server certificate verification is disabled, and we are
         # susceptible to man-in-the-middle attacks.
         self.__ca_file = ca_file
+        self.__proxies = proxies
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -182,7 +186,8 @@ class ScalyrClientSession(object):
                 if self.__connection is None:
                     self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
                                                                       self.__ca_file, self.__standard_headers,
-                                                                      self.__use_requests, quiet=self.__quiet )
+                                                                      self.__use_requests, quiet=self.__quiet,
+                                                                      proxies=self.__proxies)
                     self.total_connections_created += 1
             except Exception, e:
                 return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
