@@ -20,6 +20,7 @@ The following libraries are included:
   * [PyASN1](#pyasn1)
   * [PySMI](#pysmi)
   * [PLY](#ply)
+  * [pg8000](#pg8000)
 
 ## tcollector<a name="tcollector">
 
@@ -90,3 +91,8 @@ Used by PySNMP
 A pure Python implementation of lex and yacc.
 
 Used by PySMI.
+
+## pg8000<a name="pg8000"
+
+A Pure-Python interface to the PostgreSQL database engine
+
