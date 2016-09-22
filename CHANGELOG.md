@@ -1,6 +1,26 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.21 "Querulous Quail" - Sept 26, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 26, 2016 16:00 -0700
+--->
+
+Note, this release is not finalized.  Actual release date is TBD.
+
+Features:
+
+* Added ability to set HTTP and HTTPS proxies via configuration file.  Use new configuration variables `http_proxy` and `https_proxy`.  You must also set `use_requests_lib` to true.
+* Report the number of open file descriptors held by a process for `linux_process_metrics`.  The metric name is `app.io.fds`.
+* The assigned the `scalyrAgentLog` parser to the agent log
+
+Bug fixes:
+
+* Added third-party library to fix issue with `postgres_monitor`.
+* Added extra logging to track issue reported with Windows agent of silent shutdown.
+
+
 ## 2.0.20 "Vexing Viper" - August 10, 2016
 
 <!---
