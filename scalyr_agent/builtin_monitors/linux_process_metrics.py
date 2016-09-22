@@ -586,7 +586,7 @@ class FileDescriptorReader:
         @rtype:
         """
         num_fds = len(os.listdir(self.__path))
-        self.__metric_printer.print_sample('app.io.fds', num_fds, 'count')
+        self.__metric_printer.print_sample('app.io.fds', num_fds, 'open')
 
 
 class ProcessMonitor(ScalyrMonitor):
