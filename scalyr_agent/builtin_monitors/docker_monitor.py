@@ -74,9 +74,6 @@ define_config_option( __monitor__, 'log_timestamps',
                      'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
                      convert_to=bool, default=False)
 
-define_metric(__monitor__, 'app.mem.bytes',
-              'Virtual memory usage, in bytes.', extra_fields={'type': 'vmsize'}, unit='bytes')
-
 define_metric( __monitor__, "docker.net.rx_bytes", "Total received bytes on the network interface", cumulative=True, unit="bytes" )
 define_metric( __monitor__, "docker.net.rx_dropped", "Total receive packets dropped on the network interface", cumulative=True )
 define_metric( __monitor__, "docker.net.rx_errors", "Total receive errors on the network interface", cumulative=True )
@@ -402,15 +399,13 @@ class DockerMonitor( ScalyrMonitor ):
         result = None
         name = self._config.get( 'container_name' )
 
-        if name and name.startswith( '$' ) and name[1:] in os.environ:
-            name = os.environ[name[1:]]
-
         if name:
             request = DockerRequest( socket_file ).get( "/containers/%s/json" % name )
 
             if request.response_code == 200:
                 json = json_lib.parse( request.response_body() )
                 result = json['Id']
+                name = json['Name'].lstrip( '/' )
 
             if not result:
                 raise Exception( "Unabled to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
@@ -729,7 +724,7 @@ class DockerMonitor( ScalyrMonitor ):
         for key, value in metrics.iteritems():
             if key == 'networks':
                 for interface, network_metrics in value.iteritems():
-                    self.__log_network_interface_metrics( self, container, network_metrics, interface )
+                    self.__log_network_interface_metrics( container, network_metrics, interface )
             elif key == 'network':
                 self.__log_network_interface_metrics( container, value )
             elif key == 'memory_stats':
