@@ -217,7 +217,10 @@ class LineGrouper( LineMatcher ):
 
             #read the next single line of input
             next_line, next_partial = LineMatcher._readline( self, file_like, max_length )
-            if next_line:
+            if next_line and max_length - len(next_line) <= 0:
+                line = start_line + next_line
+                partial = False
+            elif next_line:
 
                 #see if we are continuing the line
                 cont = self._continue_line( next_line )
@@ -225,12 +228,24 @@ class LineGrouper( LineMatcher ):
                     line = start_line
                     # build up a multiline string by looping over all lines for as long as 
                     # the multiline continues, there is still more input in the file and we still have space in our buffer
+                    line_max_reached = False
+
                     while cont and next_line and max_length > 0:
                         line += next_line
                         max_length -= len( next_line )
                         next_offset = file_like.tell()
-                        next_line, partial = LineMatcher._readline( self, file_like, max_length )
-                        cont = self._continue_line( next_line )
+                        if max_length > 0:
+                            next_line, partial = LineMatcher._readline( self, file_like, max_length )
+                            # Only check if this line is a continuation if we got the full line.
+                            cont = not partial and self._continue_line( next_line )
+                            line_max_reached = max_length - len(next_line) <= 0
+
+                    if line_max_reached:
+                        # Have to cover a very particular case.  If we reached line max, then no matter what, we add
+                        # in the partial line because returning a string with len equal to max_length signals to the
+                        # higher level code we hit the max.
+                        line += next_line
+                        next_offset = file_like.tell()
 
                     #the previous loop potentially needs to read one line past the end of a multi-line
                     #so reset the file position to the start of that line for future calls.
@@ -238,6 +253,7 @@ class LineGrouper( LineMatcher ):
 
                     # if we are here and cont is true, it means that we are in the middle of a multiline
                     # but there is no further input, so we have a partial line.
+                    # partial = not line_max_reached and (partial or cont)
                     partial = partial or cont
 
                 #first line matched, but the second line failed to continue the multiline

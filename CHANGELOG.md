@@ -19,6 +19,7 @@ Bug fixes:
 
 * Added third-party library to fix issue with `postgres_monitor`.
 * Added extra logging to track issue reported with Windows agent of silent shutdown.
+* Fixed issue with `haltBefore` line grouper that prevented logs from being uploaded for several minutes
 
 
 ## 2.0.20 "Vexing Viper" - August 10, 2016

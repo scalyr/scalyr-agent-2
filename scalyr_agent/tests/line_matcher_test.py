@@ -545,6 +545,20 @@ class HaltBeforeTestCase( unittest.TestCase ):
         actual = line.readline()
         self.assertEqual( remainder, actual )
 
+    def test_too_long_after_matching_partial_halt( self ):
+        expected = "--begin\nmultiline\nmulti\n--beginthis line "
+        remainder = "will be cut\n"
+        line = make_string( expected + remainder )
+
+        matcher = HaltBefore( self.start_pattern, self.continuation_pattern, max_line_length = 41 )
+        current_time = time.time()
+
+        actual = matcher.readline( line, current_time )
+        self.assertEqual( expected, actual )
+
+        actual = line.readline()
+        self.assertEqual( remainder, actual )
+
 class HaltWithTestCase( unittest.TestCase ):
 
     def setUp( self ):
