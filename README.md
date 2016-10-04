@@ -67,11 +67,11 @@ packaging systems.
 
 To build the RPM package, execute the following command in the root directory of this repository
 
-    python build_packages.py rpm
+    python build_package.py rpm
     
 To build the Debian package, execute the following command in the root directory of this repository
 
-    python build_packages.py deb
+    python build_package.py deb
   
 Contributing
 ============
