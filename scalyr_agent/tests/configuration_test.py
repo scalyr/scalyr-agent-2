@@ -78,7 +78,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
         self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
         self.assertEquals(config.max_sequence_number, 1024**4)
-        self.assertEquals(config.line_completion_wait_time, 5 * 60)
+        self.assertEquals(config.line_completion_wait_time, 5)
         self.assertEquals(config.read_page_size, 64 * 1024)
         self.assertEquals(config.copy_staleness_threshold, 15 * 60)
         self.assertEquals(config.log_deletion_delay, 10 * 60)

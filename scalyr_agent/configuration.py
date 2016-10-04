@@ -660,7 +660,7 @@ class Configuration(object):
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
         # not currently end in a new line (referred to as a partial line).  It could be that the full line just hasn't
         # made it all the way to disk yet.  After this time though, we will just return the bytes as a line
-        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5 * 60, description)
+        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5, description)
 
         # The maximum negative offset relative to the end of a previously unseen log the log file
         # iterator is allowed to become.  If bytes are not being read quickly enough, then

@@ -443,12 +443,12 @@ class TestLogFileIterator(ScalyrTestCase):
 
     def test_partial_line(self):
         self.append_file(self.__path, 'L001')
-        self.assertEquals(self.readline(), '')
+        self.assertEquals(self.readline(time_advance=1), '')
 
-        self.scan_for_new_bytes(time_advance=200)
-        self.assertEquals(self.readline(), '')
+        self.scan_for_new_bytes(time_advance=1)
+        self.assertEquals(self.readline(time_advance=1), '')
 
-        self.scan_for_new_bytes(time_advance=100)
+        self.scan_for_new_bytes(time_advance=4)
         self.assertEquals(self.readline(), 'L001')
 
     def test_set_position_with_valid_mark(self):
