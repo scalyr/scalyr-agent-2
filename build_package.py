@@ -885,7 +885,7 @@ def create_scriptlets():
     fp = open('preuninstall.sh', 'w')
     fp.write("""#!/bin/bash
 
-# We only need to take action if this is an uinstall of the package
+# We only need to tweak the rc config if this is an uninstall of the package
 # (rather than just removing this version because we are upgrading to
 # a new one).  An uninstall is indicated by $1 == 0 for
 # RPM and $1 == "remove" for Debian.
@@ -910,10 +910,10 @@ if [ "$1" == "0" -o "$1" == "remove" ]; then
       rm /etc/rc$x.d/S98scalyr-agent-2;
     done
   fi
-
-  # Remove the .pyc files
-  find /usr/share/scalyr-agent-2 -name *.pyc | rm -f
 fi
+
+# Always remove the .pyc files
+find /usr/share/scalyr-agent-2 -name *.pyc | rm -f
 
 exit 0;
 """)

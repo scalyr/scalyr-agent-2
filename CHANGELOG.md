@@ -21,6 +21,8 @@ Bug fixes:
 * Added extra logging to track issue reported with Windows agent of silent shutdown.
 * Fixed issue with `haltBefore` line grouper that prevented logs from being uploaded for several minutes.
 * Changed default for `line_completion_wait_time` from 300 secs to 5 secs.
+* Always delete the `*.pyc` files when doing an upgrade or uninstall
+
 
 ## 2.0.20 "Vexing Viper" - August 10, 2016
 
