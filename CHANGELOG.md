@@ -17,6 +17,7 @@ Features:
 
 Bug fixes:
 
+* Many bug fixes to the `docker_monitor`.  Major resolves issues include containers periodically being removed from the list of monitored containers.
 * Added third-party library to fix issue with `postgres_monitor`.
 * Added extra logging to track issue reported with Windows agent of silent shutdown.
 * Fixed issue with `haltBefore` line grouper that prevented logs from being uploaded for several minutes.
