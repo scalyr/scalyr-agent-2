@@ -890,7 +890,7 @@ def create_scriptlets():
 
 # Always remove the .pyc files.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.
-find /usr/share/scalyr-agent-2 -name *.pyc | rm -f
+find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
 
 exit 0;
 """)
@@ -927,7 +927,7 @@ if [ "$1" == "0" -o "$1" == "remove" ]; then
 fi
 
 # Always remove the .pyc files
-find /usr/share/scalyr-agent-2 -name *.pyc | rm -f
+find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
 
 exit 0;
 """)
