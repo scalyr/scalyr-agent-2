@@ -459,6 +459,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
                 '  --rpm-user root '
                 '  --rpm-group root '
                 '  --rpm-changelog changelog-rpm'
+                '  --before-install preinstall.sh '
                 '  --after-install postinstall.sh '
                 '  --before-remove preuninstall.sh '
                 '  --config-files /etc/scalyr-agent-2/agent.json '
@@ -878,10 +879,21 @@ def run_command(command_str, exit_on_fail=True, command_name=None):
 
 
 def create_scriptlets():
-    """Creates two scriptlets required by the RPM and Debian package in the current working directory.
+    """Creates three scriptlets required by the RPM and Debian package in the current working directory.
 
-    These are the preuninstall.sh and postuninstall.sh scripts.
+    These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
     """
+    fp = open('preinstall.sh', 'w')
+    fp.write("""#!/bin/bash
+
+# Always remove the .pyc files.  This covers problems for old packages that didn't have the remove in the
+# preuninstall.sh script.
+find /usr/share/scalyr-agent-2 -name *.pyc | rm -f
+
+exit 0;
+""")
+    fp.close()
+
     fp = open('preuninstall.sh', 'w')
     fp.write("""#!/bin/bash
 
