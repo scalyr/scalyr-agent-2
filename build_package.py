@@ -826,11 +826,13 @@ def parse_date(date_str):
 
 # TODO:  This code is shared with config_main.py.  We should move this into a common
 # utility location both commands can import it from.
-def run_command(command_str, exit_on_fail=True, command_name=None):
+def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name=None):
     """Executes the specified command string returning the exit status.
 
     @param command_str: The command to execute.
     @param exit_on_fail: If True, will exit this process with a non-zero status if the command fails.
+    @param fail_quietly:  If True, nothing will be emitted to stderr/stdout on failure.  If this is true,
+        exit_on_fail will be ignored.
     @param command_name: The name to use to identify the command in error output.
 
     @return: The exist status of the command.
@@ -854,7 +856,7 @@ def run_command(command_str, exit_on_fail=True, command_name=None):
         output_str = output_buffer.getvalue()
         output_buffer.close()
 
-        if return_code != 0:
+        if return_code != 0 and not fail_quietly:
             if command_name is not None:
                 print >>sys.stderr, 'Executing %s failed and returned a non-zero result of %d' % (command_name,
                                                                                                   return_code)
@@ -1231,7 +1233,9 @@ def get_build_info():
         # We need to execute the git command in the source root.
         os.chdir(__source_root__)
         # Add in the e-mail address of the user building it.
-        (_, packager_email) = run_command('git config user.email', exit_on_fail=True, command_name='git')
+        (rc, packager_email) = run_command('git config user.email', fail_quietly=True, command_name='git')
+        if rc != 0:
+            packager_email = 'unknown'
         print >>build_info_buffer, 'Packaged by: %s' % packager_email.strip()
 
         # Determine the last commit from the log.
