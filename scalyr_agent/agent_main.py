@@ -158,6 +158,7 @@ class ScalyrAgent(object):
         my_options.verbose = False
         my_options.no_fork = True
         my_options.no_change_user = True
+        my_options.no_check_remote = False
 
         if perform_config_check:
             command = 'inner_run_with_checks'
