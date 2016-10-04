@@ -1,4 +1,4 @@
-FROM ubuntu:14.04.2
+FROM ubuntu:16.04
 ENV DEBIAN_FRONTEND noninteractive
 MAINTAINER Scalyr Inc <support@scalyr.com>
 RUN apt-get update && apt-get install -y \
