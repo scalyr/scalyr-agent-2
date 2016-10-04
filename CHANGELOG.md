@@ -14,6 +14,7 @@ Features:
 * Added ability to set HTTP and HTTPS proxies via configuration file.  Use new configuration variables `http_proxy` and `https_proxy`.  You must also set `use_requests_lib` to true.
 * Report the number of open file descriptors held by a process for `linux_process_metrics`.  The metric name is `app.io.fds`.
 * The assigned the `scalyrAgentLog` parser to the agent log
+* Added ability to skip the Scalyr connectivity check at agent start up using `--no-check-remote-server`.
 
 Bug fixes:
 

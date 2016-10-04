@@ -185,6 +185,7 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         no_fork = command_options.no_fork
+        no_check_remote = command_options.no_check_remote
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == 'version':
@@ -212,15 +213,16 @@ class ScalyrAgent(object):
 
         self.__controller.consume_config(self.__config, config_file_path)
 
-        self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd(), command_options.no_change_user)
+        self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd(),
+                                           command_options.no_change_user)
 
         # noinspection PyBroadException
         try:
             # Execute the command.
             if command == 'start':
-                return self.__start(quiet, no_fork)
+                return self.__start(quiet, no_fork, no_check_remote)
             elif command == 'inner_run_with_checks':
-                self.__perform_config_checks()
+                self.__perform_config_checks(no_check_remote)
                 return self.__run(self.__controller)
             elif command == 'inner_run':
                 return self.__run(self.__controller)
@@ -236,9 +238,9 @@ class ScalyrAgent(object):
                     print >> sys.stderr, 'Assuming agent data path is \'%s\'' % agent_data_path
                 return self.__detailed_status(agent_data_path)
             elif command == 'restart':
-                return self.__restart(quiet, no_fork)
+                return self.__restart(quiet, no_fork, no_check_remote)
             elif command == 'condrestart':
-                return self.__condrestart(quiet, no_fork)
+                return self.__condrestart(quiet, no_fork, no_check_remote)
             else:
                 print >> sys.stderr, 'Unknown command given: "%s".' % command
                 return 1
@@ -322,7 +324,7 @@ class ScalyrAgent(object):
         return WorkerThread(self.__last_verify_config['config'], self.__last_verify_config['copying_manager'],
                             self.__last_verify_config['monitors_manager'])
 
-    def __perform_config_checks(self):
+    def __perform_config_checks(self, no_check_remote):
         """Perform checks for common configuration errors.  Raises an exception with a human-readable message
         if any of the checks fail.
 
@@ -342,29 +344,30 @@ class ScalyrAgent(object):
         self.__verify_can_write_to_logs_and_data(self.__config)
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
-        client = self.__create_client(quiet=True)
-        try:
-            ping_result = client.ping()
-            if ping_result != 'success':
-                if 'badClientClockSkew' in ping_result:
-                    # TODO:  The server does not yet send this error message, but it will in the future.
-                    raise Exception('Sending request to the server failed due to bad clock skew.  The system clock '
-                                    'on this host is too off from actual time.  Please fix the clock and try to '
-                                    'restart the agent.')
-                elif 'invalidApiKey' in ping_result:
-                    # TODO:  The server does not yet send this error message, but it will in the future.
-                    raise Exception('Sending request to the server failed due to an invalid API key.  This probably '
-                                    'means the \'api_key\' field in configuration file  \'%s\' is not correct.  '
-                                    'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
-                                    '\'api_key\' field in the configuration file' % self.__config.file_path)
-                else:
-                    raise Exception('Failed to send request to the server.  The server address could be wrong, there '
-                                    'maybe a network connectivity issue, or the provided api_token could be '
-                                    'incorrect.')
-        finally:
-            client.close()
+        if not no_check_remote:
+            client = self.__create_client(quiet=True)
+            try:
+                ping_result = client.ping()
+                if ping_result != 'success':
+                    if 'badClientClockSkew' in ping_result:
+                        # TODO:  The server does not yet send this error message, but it will in the future.
+                        raise Exception('Sending request to the server failed due to bad clock skew.  The system clock '
+                                        'on this host is too off from actual time.  Please fix the clock and try to '
+                                        'restart the agent.')
+                    elif 'invalidApiKey' in ping_result:
+                        # TODO:  The server does not yet send this error message, but it will in the future.
+                        raise Exception('Sending request to the server failed due to an invalid API key.  This probably '
+                                        'means the \'api_key\' field in configuration file  \'%s\' is not correct.  '
+                                        'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
+                                        '\'api_key\' field in the configuration file' % self.__config.file_path)
+                    else:
+                        raise Exception('Failed to send request to the server.  The server address could be wrong, '
+                                        'there maybe a network connectivity issue, or the provided api_token could be '
+                                        'incorrect.  You can disable this check with --no-check-remote-server.')
+            finally:
+                client.close()
 
-    def __start(self, quiet, no_fork):
+    def __start(self, quiet, no_fork, no_check_remote):
         """Executes the start command.
 
         This will perform some initial checks to see if the agent can be started, such as making sure it can
@@ -378,9 +381,12 @@ class ScalyrAgent(object):
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
-
+        @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
+            verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
+            the script exits with a failure.
         @type quiet: bool
         @type no_fork: bool
+        @type no_check_remote: bool
 
         @return:  The exit status code for the process.
         @rtype: int
@@ -394,7 +400,7 @@ class ScalyrAgent(object):
 
         # noinspection PyBroadException
         try:
-            self.__perform_config_checks()
+            self.__perform_config_checks(no_check_remote)
         except Exception, e:
             print >> sys.stderr
             print >> sys.stderr, '%s' % str(e)
@@ -548,15 +554,19 @@ class ScalyrAgent(object):
             print 'The agent does not appear to be running.'
             return 4
 
-    def __condrestart(self, quiet, no_fork):
+    def __condrestart(self, quiet, no_fork, no_check_remote):
         """Execute the 'condrestart' command which will only restart the agent if it is already running.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
+        @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
+            verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
+            the script exits with a failure.
 
         @type quiet: bool
         @type no_fork: bool
+        @type no_check_remote: bool
 
         @return: the exit status code
         @rtype: int
@@ -572,22 +582,26 @@ class ScalyrAgent(object):
                 print >>sys.stderr, 'Failed to stop the running agent.  Cannot restart until it is killed.'
                 return 1
 
-            return self.__start(quiet, no_fork)
+            return self.__start(quiet, no_fork, no_check_remote)
         elif not quiet:
             print 'Agent is not running, not restarting.'
             return 0
         else:
             return 0
 
-    def __restart(self, quiet, no_fork):
+    def __restart(self, quiet, no_fork, no_check_remote):
         """Execute the 'restart' which will start the agent, stopping the existing agent if it is running.
 
         @param quiet: True if output should be kept to a minimal and only record errors that occur.
         @param no_fork: True if this method should not fork a separate process to run the agent, but run it
             directly instead.  If it is False, then a daemon process will be forked and will run the agent.
+        @param no_check_remote:  True if this method should not try to contact the remote Scalyr servers to
+            verify connectivity.  If it does try to contact the remote servers and it cannot connect, then
+            the script exits with a failure.
 
         @type quiet: bool
         @type no_fork: bool
+        @type no_check_remote: bool
 
         @return: the exit status code, zero if it was successfully restarted, non-zero if it was not running or
             could not be started.
@@ -604,7 +618,7 @@ class ScalyrAgent(object):
                 print >>sys.stderr, 'Failed to stop the running agent.  Cannot restart until it is killed'
                 return 1
 
-        return self.__start(quiet, no_fork)
+        return self.__start(quiet, no_fork, no_check_remote)
 
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
@@ -784,7 +798,8 @@ class ScalyrAgent(object):
             ca_file = None
         use_requests_lib = self.__config.use_requests_lib
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
-                                   request_deadline=self.__config.request_deadline, ca_file=ca_file, use_requests_lib=use_requests_lib)
+                                   request_deadline=self.__config.request_deadline, ca_file=ca_file,
+                                   use_requests_lib=use_requests_lib)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
@@ -1079,7 +1094,11 @@ if __name__ == '__main__':
                       help="For status command, prints detailed information about running agent.")
     parser.add_option("", "--no-fork", action="store_true", dest="no_fork", default=False,
                       help="For the run command, does not fork the program to the background.")
-
+    parser.add_option("", "--no-check-remote-server", action="store_true", dest="no_check_remote", default=False,
+                      help="For the start command, does not perform the first check to see if the agent can "
+                           "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
+                           "the backgroudn until it is successful.  This is useful if the network is not immediately "
+                           "available when the agent starts.")
     my_controller.add_options(parser)
 
     (options, args) = parser.parse_args()
