@@ -20,6 +20,7 @@ import datetime
 import logging
 import os
 import re
+import random
 import socket
 import stat
 import struct
@@ -108,6 +109,9 @@ class DockerRequest( object ):
 
         return self.__request_stream.read_request()
 
+    def is_closed( self ):
+        return self.__request_stream.is_closed()
+
     def __read_headers( self ):
         """reads HTTP headers from the request stream, leaving the stream at the first line of data"""
         self.response_code = 400
@@ -178,37 +182,57 @@ class DockerLogger( object ):
         return result
 
     def process_request( self, run_state ):
-        request = DockerRequest( self.__socket_file )
-        request.get( '/containers/%s/logs?%s=1&follow=1&tail=%d&timestamps=1' % (self.cid, self.stream, self.__max_previous_lines) )
+        """This function makes a log request on the docker socket for a given container and continues
+        to read from the socket until the connection is closed
+        """
+
+        # random delay to prevent all requests from starting at the same time
+        delay = random.randint( 500, 5000 ) / 1000
+        run_state.sleep_but_awaken_if_stopped( delay )
 
         epoch = datetime.datetime.utcfromtimestamp( 0 )
-
         while run_state.is_running():
-            line = request.readline()
-            while line:
-                line = self.strip_docker_header( line )
-                dt, log_line = self.split_datetime_from_line( line )
-                if not dt:
-                    global_log.error( 'No timestamp found on line: \'%s\'', line )
-                else:
-                    timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
+            request = DockerRequest( self.__socket_file )
+            request.get( '/containers/%s/logs?%s=1&follow=1&tail=%d&timestamps=1' % (self.cid, self.stream, self.__max_previous_lines) )
 
-                    #see if we log the entire line including timestamps
-                    if self.__log_timestamps:
-                        log_line = line
-
-                    #check to make sure timestamp is >= to the last request
-                    #Note: we can safely read last_request here because we are the only writer
-                    if timestamp >= self.__last_request:
-                        self.__logger.info( log_line.strip() )
-
-                        #but we need to lock for writing
-                        self.__last_request_lock.acquire()
-                        self.__last_request = timestamp
-                        self.__last_request_lock.release()
-
+            while run_state.is_running():
+                #this loop will read all available lines
                 line = request.readline()
-            run_state.sleep_but_awaken_if_stopped( 0.1 )
+                while line:
+                    #strip any docker specific headers from the line
+                    if not self.tty:
+                        line = self.strip_docker_header( line )
+
+                    #split the docker timestamp from the frest of the line
+                    dt, log_line = self.split_datetime_from_line( line )
+                    if not dt:
+                        global_log.error( 'No timestamp found on line: \'%s\'', line )
+                    else:
+                        timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
+
+                        #see if we log the entire line including timestamps
+                        if self.__log_timestamps:
+                            log_line = line
+
+                        #check to make sure timestamp is >= to the last request
+                        #Note: we can safely read last_request here because we are the only writer
+                        if timestamp >= self.__last_request:
+                            self.__logger.info( log_line.strip() )
+
+                            #but we need to lock for writing
+                            self.__last_request_lock.acquire()
+                            self.__last_request = timestamp
+                            self.__last_request_lock.release()
+
+                    #get the next line
+                    line = request.readline()
+                run_state.sleep_but_awaken_if_stopped( 0.1 )
+
+                if request.is_closed():
+                    global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
+                    delay = random.randint( 500, 3000 ) / 1000
+                    run_state.sleep_but_awaken_if_stopped( delay )
+                    break
 
         # we are shutting down, so update our last request to be slightly later than it's current
         # value to prevent duplicate logs when starting up again.
