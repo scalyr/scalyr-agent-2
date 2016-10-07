@@ -391,6 +391,16 @@ class Configuration(object):
         return self.__get_config().get_string('ca_cert_path')
 
     @property
+    def compression_type(self):
+        """Returns the configuration value for 'compression_type'."""
+        return self.__get_config().get_string('compression_type', none_if_missing=True)
+
+    @property
+    def compression_level(self):
+        """Returns the configuration value for 'compression_level'."""
+        return self.__get_config().get_int('compression_level', default_value=9)
+
+    @property
     def use_requests_lib(self):
         """Returns the configuration value for 'use_requests_lib'."""
         return self.__get_config().get_bool('use_requests_lib')

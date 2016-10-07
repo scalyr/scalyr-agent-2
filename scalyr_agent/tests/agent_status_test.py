@@ -42,6 +42,7 @@ class TestOverallStats(ScalyrTestCase):
         a.total_requests_sent = 1
         a.total_requests_failed = 2
         a.total_request_bytes_sent = 3
+        a.total_compressed_request_bytes_sent = 1
         a.total_response_bytes_received = 4
         a.total_request_latency_secs = 5
         a.total_connections_created = 6
@@ -58,6 +59,7 @@ class TestOverallStats(ScalyrTestCase):
         b.total_requests_sent = 7
         b.total_requests_failed = 8
         b.total_request_bytes_sent = 9
+        b.total_compressed_request_bytes_sent = 4
         b.total_response_bytes_received = 10
         b.total_request_latency_secs = 11
         b.total_connections_created = 12
@@ -76,6 +78,7 @@ class TestOverallStats(ScalyrTestCase):
         self.assertEquals(c.total_requests_sent, 8)
         self.assertEquals(c.total_requests_failed, 10)
         self.assertEquals(c.total_request_bytes_sent, 12)
+        self.assertEquals(c.total_compressed_request_bytes_sent, 5)
         self.assertEquals(c.total_response_bytes_received, 14)
         self.assertEquals(c.total_request_latency_secs, 16)
         self.assertEquals(c.total_connections_created, 18)
