@@ -1,13 +1,12 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.21 "Querulous Quail" - Sept 26, 2016
+## 2.0.21 "Querulous Quail" - Oct 7, 2016
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 26, 2016 16:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 7, 2016 17:00 -0700
 --->
 
-Note, this release is not finalized.  Actual release date is TBD.
 
 Features:
 
@@ -18,7 +17,6 @@ Features:
 
 Bug fixes:
 
-* Many bug fixes to the `docker_monitor`.  Major resolves issues include containers periodically being removed from the list of monitored containers.
 * Added third-party library to fix issue with `postgres_monitor`.
 * Added extra logging to track issue reported with Windows agent of silent shutdown.
 * Fixed issue with `haltBefore` line grouper that prevented logs from being uploaded for several minutes.
