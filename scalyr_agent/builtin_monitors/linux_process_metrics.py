@@ -588,6 +588,9 @@ class FileDescriptorReader:
         num_fds = len(os.listdir(self.__path))
         self.__metric_printer.print_sample('app.io.fds', num_fds, 'open')
 
+    def close(self):
+        pass
+
 
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
