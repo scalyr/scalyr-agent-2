@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.22 "Wonderful Whale" - Oct 10, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 10, 2016 16:00 -0700
+--->
+
+Bug fixes:
+
+* Fixed bug in `linux_process_metrics` causing errors when monitored process disappears
+
+
 ## 2.0.21 "Querulous Quail" - Oct 7, 2016
 
 <!---
