@@ -21,6 +21,11 @@ The following libraries are included:
   * [PySMI](#pysmi)
   * [PLY](#ply)
   * [pg8000](#pg8000)
+  * [docker-py](#docker-py)
+  * [docker-pycreds](#docker-pycreds)
+  * [ipaddress](#ipaddress)
+  * [six](#six)
+  * [backports.ssl-match-hostname](#ssl-match-hostname)
 
 ## tcollector<a name="tcollector">
 
@@ -95,4 +100,28 @@ Used by PySMI.
 ## pg8000<a name="pg8000"
 
 A Pure-Python interface to the PostgreSQL database engine
+
+## docker-py<a name="docker-py">
+
+A docker client for Python.  For additional details, please visit the [docker-py github repository](https://github.com/docker/docker-py).
+
+The `docker_monitor` depends on this library.
+
+Currently this library is just a straight copy, but with references to the websocket-client module removed, due to being licensed under LGPL.
+
+## docker-pycreds<a name="docker-pycreds">
+
+Python bindings for the docker credentials store API.  A dependency of docker-py.  See project home [here](https://github.com/shin-/dockerpy-creds/).
+
+## ipaddress<a name="ipaddress">
+
+IPv4/IPv6 manipulation library.  A dependency of docker-py.  See project home [here](https://github.com/phihag/ipaddress).
+
+## six<a name="six">
+
+Python 2 and 3 compatibility utilities.  A dependency of docker-py.  See project home [here](http://pypi.python.org/pypi/six/).
+
+## backports.ssl-match-hostname<a name="ssl-match-hostname">
+
+The ssl.match_hostname() function from Python 3.5.  A dependency of docker-py.  See project home [here](http://bitbucket.org/brandon/backports.ssl_match_hostname).
 
