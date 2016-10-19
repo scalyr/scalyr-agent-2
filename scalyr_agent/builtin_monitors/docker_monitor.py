@@ -17,6 +17,7 @@
 __author__ = 'imron@imralsoftware.com'
 
 import datetime
+import docker
 import logging
 import os
 import re
@@ -42,6 +43,8 @@ from scalyr_agent.util import StoppableThread
 
 from scalyr_agent.util import RunState
 
+from requests.packages.urllib3.exceptions import ProtocolError
+
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
@@ -62,6 +65,10 @@ define_config_option( __monitor__, 'api_socket',
                      '\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...',
                      convert_to=str, default='/var/scalyr/docker.sock')
 
+define_config_option( __monitor__, 'docker_api_version',
+                     'Optional (defaults to \'auto\'). The version of the Docker API to use\n',
+                     convert_to=str, default='auto')
+
 define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
                      convert_to=str, default='docker')
@@ -75,83 +82,135 @@ define_config_option( __monitor__, 'log_timestamps',
                      'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
                      convert_to=bool, default=False)
 
-class DockerRequest( object ):
+define_metric( __monitor__, "docker.net.rx_bytes", "Total received bytes on the network interface", cumulative=True, unit="bytes" )
+define_metric( __monitor__, "docker.net.rx_dropped", "Total receive packets dropped on the network interface", cumulative=True )
+define_metric( __monitor__, "docker.net.rx_errors", "Total receive errors on the network interface", cumulative=True )
+define_metric( __monitor__, "docker.net.rx_packets", "Total received packets on the network interface", cumulative=True )
+define_metric( __monitor__, "docker.net.tx_bytes", "Total transmitted bytes on the network interface", cumulative=True, unit="bytes" )
+define_metric( __monitor__, "docker.net.tx_dropped", "Total transmitted packets dropped on the network interface", cumulative=True )
+define_metric( __monitor__, "docker.net.tx_errors", "Total transmission errors on the network interface", cumulative=True )
+define_metric( __monitor__, "docker.net.tx_packets", "Total packets transmitted on the network intervace", cumulative=True )
 
-    def __init__( self, sock_file, max_request_size=64*1024 ):
-        self.__socket = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
-        self.__socket.connect( sock_file )
-        self.__line_request = LineRequestParser( max_request_size, eof_as_eol=True )
-        self.__request_stream = RequestStream( self.__socket, self.__line_request.parse_request, max_request_size, max_request_size )
-        self.__headers = []
+define_metric( __monitor__, "docker.mem.stat.total_pgmajfault", "total_pgmajfault" )
+define_metric( __monitor__, "docker.mem.stat.cache", "cache" )
+define_metric( __monitor__, "docker.mem.stat.mapped_file", "mapped_file" )
+define_metric( __monitor__, "docker.mem.stat.total_inactive_file", "total_inactive_file" )
+define_metric( __monitor__, "docker.mem.stat.pgpgout", "pgpgout" )
+define_metric( __monitor__, "docker.mem.stat.rss", "rss" )
+define_metric( __monitor__, "docker.mem.stat.total_mapped_file", "total_mapped_file" )
+define_metric( __monitor__, "docker.mem.stat.writeback", "writeback" )
+define_metric( __monitor__, "docker.mem.stat.unevictable", "unevictable" )
+define_metric( __monitor__, "docker.mem.stat.pgpgin", "pgpgin" )
+define_metric( __monitor__, "docker.mem.stat.total_unevictable", "total_unevictable" )
+define_metric( __monitor__, "docker.mem.stat.pgmajfault", "pgmajfault" )
+define_metric( __monitor__, "docker.mem.stat.total_rss", "total_rss" )
+define_metric( __monitor__, "docker.mem.stat.total_rss_huge", "total_rss_huge" )
+define_metric( __monitor__, "docker.mem.stat.total_writeback", "total_writeback" )
+define_metric( __monitor__, "docker.mem.stat.total_inactive_anon", "total_inactive_anon" )
+define_metric( __monitor__, "docker.mem.stat.rss_huge", "rss_huge" )
+define_metric( __monitor__, "docker.mem.stat.hierarchical_memory_limit", "hierarchical_memory_limit" )
+define_metric( __monitor__, "docker.mem.stat.total_pgfault", "total_pgfault" )
+define_metric( __monitor__, "docker.mem.stat.total_active_file", "total_active_file" )
+define_metric( __monitor__, "docker.mem.stat.active_anon", "active_anon" )
+define_metric( __monitor__, "docker.mem.stat.total_active_anon", "total_active_anon" )
+define_metric( __monitor__, "docker.mem.stat.total_pgpgout", "total_pgpgout" )
+define_metric( __monitor__, "docker.mem.stat.total_cache", "total_cache" )
+define_metric( __monitor__, "docker.mem.stat.inactive_anon", "inactive_anon" )
+define_metric( __monitor__, "docker.mem.stat.active_file", "active_file" )
+define_metric( __monitor__, "docker.mem.stat.pgfault", "pgfault" )
+define_metric( __monitor__, "docker.mem.stat.inactive_file", "inactive_file" )
+define_metric( __monitor__, "docker.mem.stat.total_pgpgin", "total_pgpgin" )
 
-    def get( self, path ):
-        endpoint = "GET %s HTTP/1.0\r\n\r\n" % path
-        self.__socket.sendall( endpoint )
-        self.__read_headers()
-        return self
+define_metric( __monitor__, "docker.mem.max_usage", "max_usage" )
+define_metric( __monitor__, "docker.mem.usage", "usage" )
+define_metric( __monitor__, "docker.mem.fail_cnt", "fail_cnt" )
+define_metric( __monitor__, "docker.mem.limit", "limit" )
 
-    def response_body( self ):
+define_metric( __monitor__, "docker.cpu.usage", "usage" )
+define_metric( __monitor__, "docker.cpu.system_cpu_usage", "system_cpu_usage" )
+define_metric( __monitor__, "docker.cpu.usage_in_usermode", "usage_in_usermode" )
+define_metric( __monitor__, "docker.cpu.total_usage", "total_usage" )
+define_metric( __monitor__, "docker.cpu.usage_in_kernelmode", "usage_in_kernelmode" )
 
-        result = ""
-        while not self.__request_stream.at_end():
-            line = self.__request_stream.read_request()
-            if line != None:
-                result += line
+define_metric( __monitor__, "docker.cpu.throttling.periods", "periods" )
+define_metric( __monitor__, "docker.cpu.throttling.throttled_periods", "throttled_periods" )
+define_metric( __monitor__, "docker.cpu.throttling.throttled_time", "throttled_time" )
 
-        return result
+class WrappedStreamResponse( object ):
+    """ Wrapper for generator returned by docker.Client._stream_helper
+        that gives us access to the response, and therefore the socket, so that
+        we can shutdown the socket from another thread if needed
+    """
+    def __init__( self, client, response, decode ):
+        self.client = client
+        self.response = response
+        self.decode = self.decode
 
-    def readline( self ):
-        #Make sure the headers have been read - this might not be the case for some queries
-        #even if __read_headers() has already been called
-        if len( self.__headers ) == 0:
-            self.__read_headers()
-            return None
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._stream_helper( self.response, self.decode ):
+            yield item
 
-        return self.__request_stream.read_request()
+class WrappedRawResponse( object ):
+    """ Wrapper for generator returned by docker.Client._stream_raw_result
+        that gives us access to the response, and therefore the socket, so that
+        we can shutdown the socket from another thread if needed
+    """
+    def __init__( self, client, response ):
+        self.client = client
+        self.response = response
 
-    def is_closed( self ):
-        return self.__request_stream.is_closed()
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._stream_raw_result( self.response ):
+            yield item
 
-    def __read_headers( self ):
-        """reads HTTP headers from the request stream, leaving the stream at the first line of data"""
-        self.response_code = 400
-        self.response_message = "Bad request"
+class WrappedMultiplexedStreamResponse( object ):
+    """ Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
+        that gives us access to the response, and therefore the socket, so that
+        we can shutdown the socket from another thread if needed
+    """
+    def __init__( self, client, response ):
+        self.client = client
+        self.response = response
 
-        #first line is response code
-        line = self.__request_stream.read_request()
-        if not line:
-            return
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._multiplexed_response_stream_helper( self.response ):
+            yield item
 
-        match = re.match( '^(\S+) (\d+) (.*)$', line.strip() )
-        if not match:
-            return
+class DockerClient( docker.Client ):
+    """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
+        so that we can have access to the response object, which allows us to get the
+        socket in use, and shutdown the blocked socket from another thread (e.g. upon
+        shutdown
+    """
+    def _stream_helper( self, response, decode=False ):
+        return WrappedResponseGenerator( self, response, decode )
 
-        if match.group(1).startswith( 'HTTP' ):
-            self.response_code = int( match.group(2) )
-            self.response_message = match.group(3)
-            self.__headers = []
-            while not self.__request_stream.at_end():
-                line = self.__request_stream.read_request()
-                if line == None:
-                    break
-                else:
-                    cur_line = line.strip()
-                    if len( cur_line ) == 0:
-                        break
-                    else:
-                        self.__headers.append( cur_line )
+    def _stream_raw_result( self, response ):
+        return WrappedRawGenerator( self, response )
+
+    def _multiplexed_response_stream_helper( self, response ):
+        return WrappedMultiplexedStreamResponse( self, response )
+
 
 class DockerLogger( object ):
+    """Abstraction for logging either stdout or stderr from a given container
+
+    Logging is performed on a separate thread because each log is read from a continuous stream
+    over the docker socket.
+    """
     def __init__( self, socket_file, cid, name, stream, log_path, config, last_request=None, max_log_size=20*1024*1024, max_log_rotations=2 ):
         self.__socket_file = socket_file
         self.cid = cid
         self.name = name
+
+        #stderr or stdout
         self.stream = stream
         self.log_path = log_path
         self.stream_name = name + "-" + stream
 
         self.__max_previous_lines = config.get( 'max_previous_lines' )
         self.__log_timestamps = config.get( 'log_timestamps' )
+        self.__docker_api_version = config.get( 'docker_api_version' )
 
         self.__last_request_lock = threading.Lock()
 
@@ -167,12 +226,19 @@ class DockerLogger( object ):
         self.__logger.addHandler( self.__log_handler )
         self.__logger.setLevel( logging.INFO )
 
+        self.__client = None
+        self.__logs = None
+
         self.__thread = StoppableThread( target=self.process_request, name="Docker monitor logging thread for %s" % (name + '.' + stream) )
 
     def start( self ):
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
+        if self.__client and self.__logs:
+            sock = self.__client._get_raw_response_socket( self.__logs.response )
+            if sock:
+                sock.shutdown( socket.SHUT_RDWR )
         self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
     def last_request( self ):
@@ -190,19 +256,29 @@ class DockerLogger( object ):
         delay = random.randint( 500, 5000 ) / 1000
         run_state.sleep_but_awaken_if_stopped( delay )
 
+        self.__client = DockerClient( base_url=('unix:/%s' % self.__socket_file ), version=self.__docker_api_version )
+
         epoch = datetime.datetime.utcfromtimestamp( 0 )
         while run_state.is_running():
-            request = DockerRequest( self.__socket_file )
-            request.get( '/containers/%s/logs?%s=1&follow=1&tail=%d&timestamps=1' % (self.cid, self.stream, self.__max_previous_lines) )
+            sout=False
+            serr=False
+            if self.stream == 'stdout':
+                sout = True
+            else:
+                serr = True
 
-            while run_state.is_running():
-                #this loop will read all available lines
-                line = request.readline()
-                while line:
-                    #strip any docker specific headers from the line
-                    if not self.tty:
-                        line = self.strip_docker_header( line )
+            self.__logs = self.__client.logs(
+                container=self.cid,
+                stdout=sout,
+                stderr=serr,
+                stream=True,
+                timestamps=True,
+                tail=self.__max_previous_lines,
+                follow=True
+            )
 
+            try:
+                for line in self.__logs:
                     #split the docker timestamp from the frest of the line
                     dt, log_line = self.split_datetime_from_line( line )
                     if not dt:
@@ -224,15 +300,16 @@ class DockerLogger( object ):
                             self.__last_request = timestamp
                             self.__last_request_lock.release()
 
-                    #get the next line
-                    line = request.readline()
-                run_state.sleep_but_awaken_if_stopped( 0.1 )
+                    if not run_state.is_running():
+                        break;
+            except ProtocolError, e:
+                global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
 
-                if request.is_closed():
-                    global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
-                    delay = random.randint( 500, 3000 ) / 1000
-                    run_state.sleep_but_awaken_if_stopped( delay )
-                    break
+            if run_state.is_running():
+                global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
+                delay = random.randint( 500, 3000 ) / 1000
+                run_state.sleep_but_awaken_if_stopped( delay )
+
 
         # we are shutting down, so update our last request to be slightly later than it's current
         # value to prevent duplicate logs when starting up again.
@@ -243,37 +320,6 @@ class DockerLogger( object ):
         self.__last_request += 0.01
 
         self.__last_request_lock.release()
-
-    def strip_docker_header( self, line ):
-        """Docker prepends some lines with an 8 byte header.  The first 4 bytes a byte containg the stream id
-        0, 1 or 2 for stdin, stdout and stderr respectively, followed by 3 bytes of padding.
-
-        The next 4 bytes contain the size of the message.
-
-        This function checks for the existence of the the 8 byte header and if the length field matches the remaining
-        length of the line then it strips the first 8 bytes.
-
-        If the lengths don't match or if an expected stream type is not found then the line is left alone
-        """
-
-        # the docker header has a stream id, which is a single byte, followed by 3 bytes of padding
-        # and then a 4-byte int in big-endian (network) order
-        fmt = '>B3xI'
-        size = struct.calcsize( fmt )
-
-        # make sure the length of the line has as least as many bytes required by the header
-        if len( line ) >= size:
-            stream, length = struct.unpack( fmt, line[0:size] )
-
-            # We expect a value of 0, 1 or 2 for stream.  Anything else indicates we don't have
-            # a docker header
-            # We also expect length to be the length of the remaining line
-            if stream in [ 0, 1, 2 ] and len( line[size:] ) == length:
-                #We have a valid docker header, so strip it
-                line = line[size:]
-
-        return line
-
 
     def split_datetime_from_line( self, line ):
         """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
@@ -312,7 +358,7 @@ class DockerMonitor( ScalyrMonitor ):
 
         return api_socket
 
-    def __get_scalyr_container_id( self, socket_file ):
+    def __get_scalyr_container_id_and_name( self, client ):
         """Gets the container id of the scalyr-agent container
         If the config option container_name is empty, then it is assumed that the scalyr agent is running
         on the host and not in a container and None is returned.
@@ -321,37 +367,43 @@ class DockerMonitor( ScalyrMonitor ):
         name = self._config.get( 'container_name' )
 
         if name:
-            request = DockerRequest( socket_file ).get( "/containers/%s/json" % name )
-
-            if request.response_code == 200:
-                json = json_lib.parse( request.response_body() )
+            try:
+                response = client.inspect_container( name )
+                json = json_lib.parse( response )
                 result = json['Id']
+                name = json['Name'].lstrip( '/' )
+            except:
+                pass
 
             if not result:
-                raise Exception( "Unabled to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
+                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
 
         return result
 
-    def __get_running_containers( self, socket_file ):
+    def __get_running_containers( self, client, currently_running ):
         """Gets a dict of running containers that maps container id to container name
         """
-        request = DockerRequest( socket_file ).get( "/containers/json" )
 
         result = {}
-        if request.response_code == 200:
-            json = json_lib.parse( request.response_body() )
-            for container in json:
+        try:
+            response = client.containers( quiet=True )
+            for container in response:
                 cid = container['Id']
                 if not cid == self.container_id:
-                    try:
-                        containerRequest = DockerRequest( socket_file ).get( "/containers/%s/json" % cid )
-                        if containerRequest.response_code == 200:
-                            body = containerRequest.response_body()
-                            containerJson = json_lib.parse( body )
+                    if cid in currently_running:
+                        # don't requery containers that we already know about
+                        result[cid] = currently_running[cid]
+                    else:
+                        #query the container information
+                        try:
+                            info = client.inspect_container( cid )
+                            result[cid] = { 'name' : info['Name'].lstrip( '/' ) }
+                        except:
+                            global_log.warning( "Error querying docker API for %s" % (cid ), limit_once_per_x_secs=300, limit_key='docker-api-query-%s' % cid )
+        except: # container querying failed
+            global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
+            result = None
 
-                            result[cid] = containerJson['Name'].lstrip( '/' )
-                    except:
-                        result[cid] = cid
         return result
 
     def __create_log_config( self, parser, path, attributes ):
@@ -404,8 +456,12 @@ class DockerMonitor( ScalyrMonitor ):
         self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
 
         self.__socket_file = self.__get_socket_file()
+        self.__docker_api_version = self._config.get( 'docker_api_version' )
         self.__checkpoints = {}
-        self.container_id = self.__get_scalyr_container_id( self.__socket_file )
+
+        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+
+        self.container_id, self.container_name = self.__get_scalyr_container_id_and_name( self.__client )
         self.__log_watcher = None
         self.__start_time = time.time()
 
@@ -416,7 +472,7 @@ class DockerMonitor( ScalyrMonitor ):
 
     def __create_docker_logger( self, log ):
         cid = log['cid']
-        name = self.containers[cid]
+        name = self.containers[cid]['name']
         stream = log['stream']
         stream_name = name + '-' + stream
         last_request = self.__start_time
@@ -473,10 +529,98 @@ class DockerMonitor( ScalyrMonitor ):
             tmp_file = self.__checkpoint_file + '~'
             scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
 
+    def __build_metric_dict( self, prefix, names ):
+        result = {}
+        for name in names:
+            result["%s%s"%(prefix, name)] = name
+        return result
+
+    def __log_metrics( self, container, metrics_to_emit, metrics, extra=None ):
+        if not extra:
+            extra = {}
+
+        if container:
+            extra['container'] = container
+
+        for key, value in metrics_to_emit.iteritems():
+            if value in metrics:
+                self._logger.emit_value( key, metrics[value], extra )
+
+    def __log_network_interface_metrics( self, container, metrics, interface=None ):
+        extra = {}
+        if interface:
+            extra['interface'] = interface
+
+        self.__log_metrics( container, self.__network_metrics, metrics, extra )
+
+    def __log_memory_stats_metrics( self, container, metrics ):
+
+        if 'stats' in metrics:
+            self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'] )
+
+        self.__log_metrics( container, self.__mem_metrics, metrics )
+
+    def __log_cpu_stats_metrics( self, container, metrics ):
+
+        if 'cpu_usage' in metrics:
+            cpu_usage = metrics['cpu_usage']
+            if 'percpu_usage' in cpu_usage:
+                percpu = cpu_usage['percpu_usage']
+                count = 1
+                for usage in percpu:
+                    extra = { 'container' : container, 'cpu' : count }
+                    self._logger.emit_value( 'docker.cpu.usage', usage, extra )
+                    count += 1
+            self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage )
+
+        if 'system_cpu_usage' in metrics:
+            extra = { 'container' : container }
+            self._logger.emit_value( 'docker.cpu.system_cpu_usage', metrics['system_cpu_usage'], extra )
+
+        if 'throttling_data' in metrics:
+            self.__log_metrics( container, self.__cpu_throttling_metrics, metrics['throttling_data'] )
+
+    def __log_json_metrics( self, container, metrics ):
+
+        for key, value in metrics.iteritems():
+            if key == 'networks':
+                for interface, network_metrics in value.iteritems():
+                    self.__log_network_interface_metrics( container, network_metrics, interface )
+            elif key == 'network':
+                self.__log_network_interface_metrics( container, value )
+            elif key == 'memory_stats':
+                self.__log_memory_stats_metrics( container, value )
+            elif key == 'cpu_stats':
+                self.__log_cpu_stats_metrics( container, value )
+
+    def __gather_metrics_from_api_for_container( self, container ):
+        try:
+            result = self.__client.stats(
+                container=container,
+                stream=False
+            )
+            self.__log_json_metrics( container, result )
+        except:
+            self._logger.warning( "Error readings stats for '%s'" % (container), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
+
+    def __gather_metrics_from_api( self, containers ):
+
+        if self.container_name:
+            self.__gather_metrics_from_api_for_container( self.container_name )
+
+        for cid, info in containers.iteritems():
+            self.__gather_metrics_from_api_for_container( info['name'] )
+
     def gather_sample( self ):
         self.__update_checkpoints()
 
-        running_containers = self.__get_running_containers( self.__socket_file )
+        running_containers = self.__get_running_containers( self.__client, self.containers )
+
+        # if running_containers is None, that means querying the docker api failed.
+        # rather than resetting the list of running containers to empty
+        # continue using the previous list of containers
+        if running_containers == None:
+            running_containers = self.containers
 
         #get the containers that have started since the last sample
         starting = {}
@@ -503,10 +647,18 @@ class DockerMonitor( ScalyrMonitor ):
         #start the new ones
         self.__start_loggers( starting )
 
+        # gather metrics
+        # self.__gather_metrics_from_api( self.containers )
+
 
     def run( self ):
         self.__load_checkpoints()
-        self.containers = self.__get_running_containers( self.__socket_file )
+        self.containers = self.__get_running_containers( self.__client, {} )
+
+        # if querying the docker api fails, set the container list to empty
+        if self.containers == None:
+            self.containers = {}
+
         self.docker_logs = self.__get_docker_logs( self.containers )
         self.docker_loggers = []
 
