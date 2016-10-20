@@ -201,6 +201,12 @@ class DockerClient( docker.Client ):
     def _multiplexed_response_stream_helper( self, response ):
         return WrappedMultiplexedStreamResponse( self, response )
 
+    def _get_raw_response_socket(self, response):
+        if response.raw._fp.fp:
+            return super( DockerClient, self )._get_raw_response_socket( response )
+
+        return None
+
 class ContainerChecker( StoppableThread ):
     """
         Monitors containers to check when they start and stop running.
@@ -548,7 +554,7 @@ class DockerLogger( object ):
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
-        if self.__client and self.__logs:
+        if self.__client and self.__logs and self.__logs.response:
             sock = self.__client._get_raw_response_socket( self.__logs.response )
             if sock:
                 sock.shutdown( socket.SHUT_RDWR )

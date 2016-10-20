@@ -619,21 +619,21 @@ class Configuration(object):
 
         Throws an error if api_key is not empty
 
-        @return the api_key and file_path if the api_key field is found, else return api_key and api_config_file paramters
+        @return the api_key and file_path if the api_key field is found, else return None and None
 
         """
 
         description = 'configuration file "%s"' % file_path
 
-        if api_key:
-            raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
-                                   'been set in "%s".  Please ensure that the "api_key" value is set'
-                                   'only once' % (file_path, api_config_file),
-                                   'api_key', 'multipleApiKeys')
-
-        result_key = api_key
-        result_file = api_config_file
+        result_key = None
+        result_file = None
         if 'api_key' in config:
+            if api_key:
+                raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
+                                       'been set in "%s".  Please ensure that the "api_key" value is set'
+                                       'only once' % (file_path, api_config_file),
+                                       'api_key', 'multipleApiKeys')
+
             self.__verify_required_string( config, 'api_key', description )
             result_key = config.get_string('api_key' )
             result_file = file_path
