@@ -54,10 +54,20 @@ define_config_option(__monitor__, 'module',
                      convert_to=str, required_option=True)
 
 define_config_option( __monitor__, 'container_name',
-                     'Optional (defaults to scalyr-agent). Defines the name given to the container running the scalyr-agent\n'
-                     'You should make sure to specify this same name when creating the docker container running scalyr\n'
-                     'e.g. docker run --name scalyr-agent ...',
-                     convert_to=str, default='scalyr-agent')
+                     'Optional (defaults to None). Defines the name given to the container running the scalyr-agent\n'
+                     'If both this and container_name_regex are None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n'
+                     'Only one of container_name and container_name_regex can be specified',
+                     convert_to=str, default=None)
+
+define_config_option( __monitor__, 'container_name_regex',
+                     'Optional (defaults to None). Defines the name given to the container running the scalyr-agent\n'
+                     'If both this and container_name are None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n'
+                     'Only one of container_name and container_name_regex can be specified',
+                     convert_to=str, default=None)
+
+define_config_option( __monitor__, 'container_check_interval',
+                     'Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.',
+                     convert_to=int, default=5)
 
 define_config_option( __monitor__, 'api_socket',
                      'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with the docker API.\n'
@@ -191,6 +201,309 @@ class DockerClient( docker.Client ):
     def _multiplexed_response_stream_helper( self, response ):
         return WrappedMultiplexedStreamResponse( self, response )
 
+class ContainerChecker( StoppableThread ):
+    """
+        Monitors containers to check when they start and stop running.
+    """
+
+    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path ):
+
+        self._config = config
+        self._logger = logger
+
+        self.__delay = self._config.get( 'container_check_interval' )
+        self.__log_prefix = self._config.get( 'docker_log_prefix' )
+        name = self._config.get( 'container_name' )
+        name_regex = self._config.get( 'container_name_regex' )
+
+        self.__socket_file = socket_file
+        self.__docker_api_version = docker_api_version
+        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+
+        self.container_id = self.__get_scalyr_container_id( self.__client, name, name_regex )
+
+        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
+
+        self.__host_hostname = host_hostname
+
+        self.containers = {}
+        self.__checkpoints = {}
+
+        self.__log_watcher = None
+        self.__module = None
+        self.__start_time = time.time()
+        self.__thread = StoppableThread( target=self.check_containers, name="Container Checker" )
+
+    def start( self ):
+        self.__load_checkpoints()
+        self.containers = self.get_running_containers( self.__client )
+
+        # if querying the docker api fails, set the container list to empty
+        if self.containers == None:
+            self.containers = {}
+
+        self.docker_logs = self.__get_docker_logs( self.containers )
+        self.docker_loggers = []
+
+        #create and start the DockerLoggers
+        for log in self.docker_logs:
+            if self.__log_watcher:
+                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+            self.docker_loggers.append( self.__create_docker_logger( log ) )
+
+        self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
+        self.__thread.start()
+
+    def stop( self, wait_on_join=True, join_timeout=5 ):
+        self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
+
+        #stop the DockerLoggers
+        for logger in self.docker_loggers:
+            if self.__log_watcher:
+                self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+            logger.stop( wait_on_join, join_timeout )
+            self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
+
+        self.__update_checkpoints()
+
+    def check_containers( self, run_state ):
+
+        while run_state.is_running():
+            self.__update_checkpoints()
+
+            running_containers = self.get_running_containers( self.__client )
+
+            # if running_containers is None, that means querying the docker api failed.
+            # rather than resetting the list of running containers to empty
+            # continue using the previous list of containers
+            if running_containers == None:
+                running_containers = self.containers
+
+            #get the containers that have started since the last sample
+            starting = {}
+            for cid, info in running_containers.iteritems():
+                if cid not in self.containers:
+                    self._logger.info( "Starting logger for container '%s'" % info['name'] )
+                    starting[cid] = info
+
+            #get the containers that have stopped
+            stopping = {}
+            for cid, info in self.containers.iteritems():
+                if cid not in running_containers:
+                    self._logger.info( "Stopping logger for container '%s'" % info['name'] )
+                    stopping[cid] = info
+
+            #stop the old loggers
+            self.__stop_loggers( stopping )
+
+            #update the list of running containers
+            #do this before starting new ones, as starting up new ones
+            #will access self.containers
+            self.containers = running_containers
+
+            #start the new ones
+            self.__start_loggers( starting )
+
+            run_state.sleep_but_awaken_if_stopped( self.__delay )
+
+    def set_log_watcher( self, log_watcher, module ):
+        self.__log_watcher = log_watcher
+        self.__module = module
+
+    def __get_scalyr_container_id( self, client, name, name_regex ):
+        """Gets the container id of the scalyr-agent container
+        If the config option container_name is empty, then it is assumed that the scalyr agent is running
+        on the host and not in a container and None is returned.
+        """
+        result = None
+
+        # we can't have both name and name_regex set
+        if name and name_regex:
+            raise Exception( "Config file cannot specify both container_name and container_name_regex." )
+
+        regex = None
+        if name_regex:
+            regex = re.compile( name_regex )
+
+        # get all the containers
+        containers = client.containers()
+
+        for container in containers:
+
+            # see if we are checking on names
+            if name or name_regex:
+                # if so, loop over all container names for this container
+                # Note: containers should only have one name, but the 'Names' field
+                # is a list, so iterate over it just in case
+                for cname in container['Names']:
+                    cname = cname.lstrip( '/' )
+                    # check if the name matches
+                    if name and name == cname:
+                        result = container['Id']
+                        break
+                    # check if the regex matches
+                    elif regex:
+                        m = regex.match( cname )
+                        if m:
+                            result = container['Id']
+                            break
+            # not checking container name, so check the Command instead to see if it's the agent
+            else:
+                if container['Command'].startswith( '/usr/sbin/scalyr-agent-2' ):
+                    result = container['Id']
+
+            if result:
+                break;
+
+        if not result:
+            # only raise an exception if we were looking for a specific name but couldn't find it
+            name = name_regex if name is None else name
+            if name:
+                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a container matching the name '%s' is running." % (name, name) )
+
+        return result
+
+    def __update_checkpoints( self ):
+        """Update the checkpoints for when each docker logger logged a request, and save the checkpoints
+        to file.
+        """
+
+        for logger in self.docker_loggers:
+            last_request = logger.last_request()
+            self.__checkpoints[logger.stream_name] = last_request
+
+        # save to disk
+        if self.__checkpoints:
+            tmp_file = self.__checkpoint_file + '~'
+            scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
+
+    def __load_checkpoints( self ):
+        try:
+            checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
+        except:
+            self._logger.info( "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
+            checkpoints = {}
+
+        if checkpoints:
+            for name, last_request in checkpoints.iteritems():
+                self.__checkpoints[name] = last_request
+
+    def get_running_containers( self, client, ignore_self=True ):
+        """Gets a dict of running containers that maps container id to container name
+        """
+        result = {}
+        try:
+            response = client.containers()
+            for container in response:
+                cid = container['Id']
+
+                if ignore_self and cid == self.container_id:
+                    continue
+
+                if len( container['Names'] ) > 0:
+                    name = container['Names'][0].lstrip( '/' )
+                    result[cid] = { 'name' : name }
+                else:
+                    result[cid] = cid
+
+        except: # container querying failed
+            global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
+            result = None
+
+        return result
+
+    def __stop_loggers( self, stopping ):
+        """
+        Stops any DockerLoggers in the 'stopping' dict
+        @param: stopping - a dict of container ids => container names. Any running containers that have
+        the same container-id as a key in the dict will be stopped.
+        """
+        if stopping:
+            for logger in self.docker_loggers:
+                if logger.cid in stopping:
+                    logger.stop( wait_on_join=True, join_timeout=1 )
+                    if self.__log_watcher:
+                        self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+
+            self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
+            self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
+
+    def __start_loggers( self, starting ):
+        """
+        Starts a list of DockerLoggers
+        @param: starting - a list of DockerLoggers to start
+        """
+        if starting:
+            docker_logs = self.__get_docker_logs( starting )
+            for log in docker_logs:
+                if self.__log_watcher:
+                    log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                self.docker_loggers.append( self.__create_docker_logger( log ) )
+
+            self.docker_logs.extend( docker_logs )
+
+    def __create_log_config( self, parser, path, attributes ):
+        """Convenience function to create a log_config dict from the parameters"""
+
+        return { 'parser': parser,
+                 'path': path,
+                 'attributes': attributes
+               }
+
+    def __get_docker_logs( self, containers ):
+        """Returns a list of dicts containing the container id, stream, and a log_config
+        for each container in the 'containers' param.
+        """
+
+        result = []
+
+        attributes = None
+        try:
+            attributes = JsonObject( { "monitor": "agentDocker" } )
+            if self.__host_hostname:
+                attributes['serverHost'] = self.__host_hostname
+
+        except Exception, e:
+            self._logger.error( "Error setting monitor attribute in DockerMonitor" )
+            raise
+
+        prefix = self.__log_prefix + '-'
+
+        for cid, info in containers.iteritems():
+            container_attributes = attributes.copy()
+            container_attributes['containerName'] = info['name']
+            container_attributes['containerId'] = cid
+            path =  prefix + info['name'] + '-stdout.log'
+            log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=container_attributes )
+            result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
+
+            path = prefix + info['name'] + '-stderr.log'
+            log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes )
+            result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
+
+        return result
+
+    def __create_docker_logger( self, log ):
+        """Creates a new DockerLogger object, based on the parameters passed in in the 'log' param.
+
+        @param: log - a dict consisting of:
+                        cid - the container id
+                        stream - whether this is the stdout or stderr stream
+                        log_config - the log config used by the scalyr-agent for this log file
+        """
+        cid = log['cid']
+        name = self.containers[cid]['name']
+        stream = log['stream']
+        stream_name = name + '-' + stream
+        last_request = self.__start_time
+        if stream_name in self.__checkpoints:
+            last_request = self.__checkpoints[stream_name]
+
+        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
+        logger.start()
+        return logger
+
+
 
 class DockerLogger( object ):
     """Abstraction for logging either stdout or stderr from a given container
@@ -303,7 +616,8 @@ class DockerLogger( object ):
                     if not run_state.is_running():
                         break;
             except ProtocolError, e:
-                global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
+                if run_state.is_running():
+                    global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
 
             if run_state.is_running():
                 global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
@@ -358,176 +672,95 @@ class DockerMonitor( ScalyrMonitor ):
 
         return api_socket
 
-    def __get_scalyr_container_id_and_name( self, client ):
-        """Gets the container id of the scalyr-agent container
-        If the config option container_name is empty, then it is assumed that the scalyr agent is running
-        on the host and not in a container and None is returned.
-        """
-        result = None
-        name = self._config.get( 'container_name' )
-
-        if name:
-            try:
-                response = client.inspect_container( name )
-                json = json_lib.parse( response )
-                result = json['Id']
-                name = json['Name'].lstrip( '/' )
-            except:
-                pass
-
-            if not result:
-                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a container named '%s' is running." % (name, name) )
-
-        return result
-
-    def __get_running_containers( self, client, currently_running ):
-        """Gets a dict of running containers that maps container id to container name
-        """
-
-        result = {}
-        try:
-            response = client.containers( quiet=True )
-            for container in response:
-                cid = container['Id']
-                if not cid == self.container_id:
-                    if cid in currently_running:
-                        # don't requery containers that we already know about
-                        result[cid] = currently_running[cid]
-                    else:
-                        #query the container information
-                        try:
-                            info = client.inspect_container( cid )
-                            result[cid] = { 'name' : info['Name'].lstrip( '/' ) }
-                        except:
-                            global_log.warning( "Error querying docker API for %s" % (cid ), limit_once_per_x_secs=300, limit_key='docker-api-query-%s' % cid )
-        except: # container querying failed
-            global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
-            result = None
-
-        return result
-
-    def __create_log_config( self, parser, path, attributes ):
-
-        return { 'parser': parser,
-                 'path': path,
-                 'attributes': attributes
-               }
-
-    def __get_docker_logs( self, containers ):
-        result = []
-
-        attributes = None
-        try:
-            attributes = JsonObject( { "monitor": "agentDocker" } )
-            if self.__host_hostname:
-                attributes['serverHost'] = self.__host_hostname
-
-        except Exception, e:
-            self._logger.error( "Error setting monitor attribute in DockerMonitor" )
-            raise
-
-        prefix = self._config.get( 'docker_log_prefix' ) + '-'
-
-        for cid, name in containers.iteritems():
-            path =  prefix + name + '-stdout.log'
-            log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=attributes )
-            result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
-
-            path = prefix + name + '-stderr.log'
-            log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=attributes )
-            result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
-
-        return result
-
     def _initialize( self ):
         data_path = ""
-        self.__host_hostname = ""
+        host_hostname = ""
+
         if self._global_config:
             data_path = self._global_config.agent_data_path
 
             if self._global_config.server_attributes:
                 if 'serverHost' in self._global_config.server_attributes:
-                    self.__host_hostname = self._global_config.server_attributes['serverHost']
+                    host_hostname = self._global_config.server_attributes['serverHost']
                 else:
                     self._logger.info( "no server host in server attributes" )
             else:
                 self._logger.info( "no server attributes in global config" )
 
-        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
-
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-        self.__checkpoints = {}
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.container_id, self.container_name = self.__get_scalyr_container_id_and_name( self.__client )
-        self.__log_watcher = None
-        self.__start_time = time.time()
+        self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path )
+
+        self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
+            "rx_bytes",
+            "rx_dropped",
+            "rx_errors",
+            "rx_packets",
+            "tx_bytes",
+            "tx_dropped",
+            "tx_errors",
+            "tx_packets",
+        ])
+
+        self.__mem_stat_metrics = self.__build_metric_dict( 'docker.mem.stat.', [
+            "total_pgmajfault",
+            "cache",
+            "mapped_file",
+            "total_inactive_file",
+            "pgpgout",
+            "rss",
+            "total_mapped_file",
+            "writeback",
+            "unevictable",
+            "pgpgin",
+            "total_unevictable",
+            "pgmajfault",
+            "total_rss",
+            "total_rss_huge",
+            "total_writeback",
+            "total_inactive_anon",
+            "rss_huge",
+            "hierarchical_memory_limit",
+            "total_pgfault",
+            "total_active_file",
+            "active_anon",
+            "total_active_anon",
+            "total_pgpgout",
+            "total_cache",
+            "inactive_anon",
+            "active_file",
+            "pgfault",
+            "inactive_file",
+            "total_pgpgin"
+        ])
+
+        self.__mem_metrics = self.__build_metric_dict( 'docker.mem.', [
+            "max_usage",
+            "usage",
+            "fail_cnt",
+            "limit"
+        ])
+
+        self.__cpu_usage_metrics = self.__build_metric_dict( 'docker.cpu.', [
+            "usage_in_usermode",
+            "total_usage",
+            "usage_in_kernelmode"
+        ])
+
+        self.__cpu_throttling_metrics = self.__build_metric_dict( 'docker.cpu.throttling.', [
+            "periods",
+            "throttled_periods",
+            "throttled_time"
+        ])
+
 
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
-        self.__log_watcher = log_watcher
-
-    def __create_docker_logger( self, log ):
-        cid = log['cid']
-        name = self.containers[cid]['name']
-        stream = log['stream']
-        stream_name = name + '-' + stream
-        last_request = self.__start_time
-        if stream_name in self.__checkpoints:
-            last_request = self.__checkpoints[stream_name]
-
-        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
-        logger.start()
-        return logger
-
-    def __stop_loggers( self, stopping ):
-        if stopping:
-            for logger in self.docker_loggers:
-                if logger.cid in stopping:
-                    logger.stop( wait_on_join=True, join_timeout=1 )
-                    if self.__log_watcher:
-                        self.__log_watcher.remove_log_path( self, logger.log_path )
-
-            self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
-            self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
-
-    def __start_loggers( self, starting ):
-        if starting:
-            docker_logs = self.__get_docker_logs( starting )
-            for log in docker_logs:
-                if self.__log_watcher:
-                    log['log_config'] = self.__log_watcher.add_log_config( self, log['log_config'] )
-                self.docker_loggers.append( self.__create_docker_logger( log ) )
-
-            self.docker_logs.extend( docker_logs )
-
-    def __load_checkpoints( self ):
-        try:
-            checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
-        except:
-            self._logger.info( "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
-            checkpoints = {}
-
-        if checkpoints:
-            for name, last_request in checkpoints.iteritems():
-                self.__checkpoints[name] = last_request
-
-    def __update_checkpoints( self ):
-        """Update the checkpoints for when each docker logger logged a request, and save the checkpoints
-        to file.
-        """
-
-        for logger in self.docker_loggers:
-            last_request = logger.last_request()
-            self.__checkpoints[logger.stream_name] = last_request
-
-        # save to disk
-        if self.__checkpoints:
-            tmp_file = self.__checkpoint_file + '~'
-            scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
+        self.__container_checker.set_log_watcher( log_watcher, self )
 
     def __build_metric_dict( self, prefix, names ):
         result = {}
@@ -605,82 +838,29 @@ class DockerMonitor( ScalyrMonitor ):
 
     def __gather_metrics_from_api( self, containers ):
 
-        if self.container_name:
-            self.__gather_metrics_from_api_for_container( self.container_name )
-
         for cid, info in containers.iteritems():
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        self.__update_checkpoints()
-
-        running_containers = self.__get_running_containers( self.__client, self.containers )
-
-        # if running_containers is None, that means querying the docker api failed.
-        # rather than resetting the list of running containers to empty
-        # continue using the previous list of containers
-        if running_containers == None:
-            running_containers = self.containers
-
-        #get the containers that have started since the last sample
-        starting = {}
-        for cid, name in running_containers.iteritems():
-            if cid not in self.containers:
-                self._logger.info( "Starting logger for container '%s'" % name )
-                starting[cid] = name
-
-        #get the containers that have stopped
-        stopping = {}
-        for cid, name in self.containers.iteritems():
-            if cid not in running_containers:
-                self._logger.info( "Stopping logger for container '%s'" % name )
-                stopping[cid] = name
-
-        #stop the old loggers
-        self.__stop_loggers( stopping )
-
-        #update the list of running containers
-        #do this before starting new ones, as starting up new ones
-        #will access self.containers
-        self.containers = running_containers
-
-        #start the new ones
-        self.__start_loggers( starting )
+        containers = self.__container_checker.get_running_containers( self.__client, ignore_self=False )
 
         # gather metrics
-        # self.__gather_metrics_from_api( self.containers )
+        self.__gather_metrics_from_api( containers )
 
 
     def run( self ):
-        self.__load_checkpoints()
-        self.containers = self.__get_running_containers( self.__client, {} )
+        # workaround a multithread initialization problem with time.strptime
+        # see: http://code-trick.com/python-bug-attribute-error-_strptime/
+        # we can ignore the result
+        tm = time.strptime( "2016-08-29", "%Y-%m-%d" )
 
-        # if querying the docker api fails, set the container list to empty
-        if self.containers == None:
-            self.containers = {}
+        self.__container_checker.start()
 
-        self.docker_logs = self.__get_docker_logs( self.containers )
-        self.docker_loggers = []
-
-        #create and start the DockerLoggers
-        for log in self.docker_logs:
-            if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self, log['log_config'] )
-            self.docker_loggers.append( self.__create_docker_logger( log ) )
-
-        self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
-        #stop the DockerLoggers
-        for logger in self.docker_loggers:
-            if self.__log_watcher:
-                self.__log_watcher.remove_log_path( self, logger.log_path )
-            logger.stop( wait_on_join, join_timeout )
-            self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
-
-        self.__update_checkpoints()
+        self.__container_checker.stop( wait_on_join, join_timeout )
 
