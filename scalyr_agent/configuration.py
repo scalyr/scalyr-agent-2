@@ -98,6 +98,7 @@ class Configuration(object):
             self.__perform_substitutions()
 
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
+            api_key, api_config_file = self.__check_api_key( self.__config, self.__file_path, None, '' )
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
 
             # Now, look for any additional configuration in the config fragment directory.
@@ -105,18 +106,22 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_file_as_json(fp)
                 for k in content.keys():
-                    if k not in ('logs', 'monitors', 'server_attributes'):
+                    if k not in ('api_key', 'logs', 'monitors', 'server_attributes'):
                         self.__last_error = BadConfiguration(
                             'Configuration fragment file "%s" contains an invalid key "%s".  The config files in the '
-                            'configuration directory can only contain "logs", "monitors", and "server_attributes" '
+                            'configuration directory can only contain "api_key", "logs", "monitors", and "server_attributes" '
                             'entries.' % (fp, k), k, 'badFragmentKey')
                         raise self.__last_error
 
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
+                api_key, api_config_file = self.__check_api_key( content, fp, api_key, api_config_file )
                 self.__add_elements_from_array('logs', content, self.__config)
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
+
+
+            self.__set_api_key( self.__config, api_key )
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
@@ -588,6 +593,54 @@ class Configuration(object):
         for element in source_json.get_json_array(field):
             destination_array.add(element)
 
+    def __set_api_key( self, config, api_key ):
+        """
+        Sets the api_key of the config, and throws errors if there are any problems
+        """
+        if api_key:
+            config.put( 'api_key', api_key )
+
+        if not 'api_key' in config:
+            raise BadConfiguration('The configuration file is missing the required field "api_key" that '
+                                   'sets the authentication key to use when writing logs to Scalyr.  Please update '
+                                   'the config file with a Write Logs key from https://www.scalyr.com/keys',
+                                   'api_key', 'missingApiKey')
+
+        if config.get_string('api_key') == '':
+            raise BadConfiguration('The configuration file contains an empty string for the required field '
+                                   '"api_key" that sets the authentication key to use when writing logs to Scalyr. '
+                                   'Please update the config file with a Write Logs key from https://www.scalyr.com/keys',
+                                   'api_key', 'emptyApiKey')
+
+    def __check_api_key( self, config, file_path, api_key, api_config_file ):
+        """
+        Checks to see if the config contains an api_key value, and if so verifies and set it as a
+        member of dest_config.
+
+        Throws an error if api_key is not empty
+
+        @return the api_key and file_path if the api_key field is found, else return api_key and api_config_file paramters
+
+        """
+
+        description = 'configuration file "%s"' % file_path
+
+        if api_key:
+            raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
+                                   'been set in "%s".  Please ensure that the "api_key" value is set'
+                                   'only once' % (file_path, api_config_file),
+                                   'api_key', 'multipleApiKeys')
+
+        result_key = api_key
+        result_file = api_config_file
+        if 'api_key' in config:
+            self.__verify_required_string( config, 'api_key', description )
+            result_key = config.get_string('api_key' )
+            result_file = file_path
+
+        return result_key, result_file
+
+
     def __verify_main_config_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the configuration object and updates missing fields with defaults.
 
@@ -600,17 +653,6 @@ class Configuration(object):
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
     """
         description = 'configuration file "%s"' % file_path
-        if not 'api_key' in config:
-            raise BadConfiguration('The configuration file "%s" is missing the required field "api_key" that '
-                                   'sets the authentication key to use when writing logs to Scalyr.  Please update '
-                                   'file with a Write Logs key from https://www.scalyr.com/keys' % file_path,
-                                   'api_key', 'missingApiKey')
-        self.__verify_required_string(config, 'api_key', description)
-        if config.get_string('api_key') == '':
-            raise BadConfiguration('The configuration file "%s" contains an empty string for the required field '
-                                   '"api_key" that sets the authentication key to use when writing logs to Scalyr. '
-                                   'Please update file with a Write Logs key from https://www.scalyr.com/keys' %
-                                   file_path, 'api_key', 'emptyApiKey')
 
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
