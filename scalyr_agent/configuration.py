@@ -98,7 +98,7 @@ class Configuration(object):
             self.__perform_substitutions()
 
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
-            api_key, api_config_file = self.__check_api_key( self.__config, self.__file_path, None, '' )
+            api_key, api_config_file = self.__check_api_key( self.__config, self.__file_path )
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
 
             # Now, look for any additional configuration in the config fragment directory.
@@ -115,7 +115,18 @@ class Configuration(object):
 
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                api_key, api_config_file = self.__check_api_key( content, fp, api_key, api_config_file )
+                new_api_key, new_api_config_file = self.__check_api_key( content, fp )
+                if api_key:
+                    if new_api_key:
+                        raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
+                                               'been set in "%s".  Please ensure that the "api_key" value is set'
+                                               'only once' % (fp, api_config_file),
+                                               'api_key', 'multipleApiKeys')
+
+                else:
+                    api_key = new_api_key
+                    api_config_file = new_api_config_file
+
                 self.__add_elements_from_array('logs', content, self.__config)
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
@@ -612,12 +623,10 @@ class Configuration(object):
                                    'Please update the config file with a Write Logs key from https://www.scalyr.com/keys',
                                    'api_key', 'emptyApiKey')
 
-    def __check_api_key( self, config, file_path, api_key, api_config_file ):
+    def __check_api_key( self, config, file_path ):
         """
         Checks to see if the config contains an api_key value, and if so verifies and set it as a
         member of dest_config.
-
-        Throws an error if api_key is not empty
 
         @return the api_key and file_path if the api_key field is found, else return None and None
 
@@ -628,11 +637,6 @@ class Configuration(object):
         result_key = None
         result_file = None
         if 'api_key' in config:
-            if api_key:
-                raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
-                                       'been set in "%s".  Please ensure that the "api_key" value is set'
-                                       'only once' % (file_path, api_config_file),
-                                       'api_key', 'multipleApiKeys')
 
             self.__verify_required_string( config, 'api_key', description )
             result_key = config.get_string('api_key' )
