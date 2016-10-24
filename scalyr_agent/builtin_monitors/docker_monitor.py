@@ -88,9 +88,15 @@ define_config_option( __monitor__, 'max_previous_lines',
                      'when starting to log a containers stdout/stderr.',
                      convert_to=int, default=5000)
 
-define_config_option( __monitor__, 'log_timestamps',
-                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
-                     convert_to=bool, default=False)
+define_config_option( __monitor__, 'readback_buffer_size',
+                     'Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n'
+                     'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file.',
+                     convert_to=int, default=5*1024)
+
+# for now, always log timestamps to help prevent a race condition
+#define_config_option( __monitor__, 'log_timestamps',
+#                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
+#                     convert_to=bool, default=False)
 
 define_metric( __monitor__, "docker.net.rx_bytes", "Total received bytes on the network interface", cumulative=True, unit="bytes" )
 define_metric( __monitor__, "docker.net.rx_dropped", "Total receive packets dropped on the network interface", cumulative=True )
@@ -207,12 +213,25 @@ class DockerClient( docker.Client ):
 
         return None
 
+def _split_datetime_from_line( line ):
+    """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
+    being the timestamp.
+    """
+    log_line = line
+    dt = datetime.datetime.utcnow()
+    pos = line.find( ' ' )
+    if pos > 0:
+        dt = scalyr_util.rfc3339_to_datetime( line[0:pos] )
+        log_line = line[pos+1:]
+
+    return (dt, log_line)
+
 class ContainerChecker( StoppableThread ):
     """
         Monitors containers to check when they start and stop running.
     """
 
-    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path ):
+    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path ):
 
         self._config = config
         self._logger = logger
@@ -229,8 +248,11 @@ class ContainerChecker( StoppableThread ):
         self.container_id = self.__get_scalyr_container_id( self.__client, name, name_regex )
 
         self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
+        self.__log_path = log_path
 
         self.__host_hostname = host_hostname
+
+        self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
         self.containers = {}
         self.__checkpoints = {}
@@ -252,11 +274,7 @@ class ContainerChecker( StoppableThread ):
         self.docker_loggers = []
 
         #create and start the DockerLoggers
-        for log in self.docker_logs:
-            if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
-            self.docker_loggers.append( self.__create_docker_logger( log ) )
-
+        self.__start_docker_logs( self.docker_logs )
         self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
         self.__thread.start()
 
@@ -441,12 +459,47 @@ class ContainerChecker( StoppableThread ):
         """
         if starting:
             docker_logs = self.__get_docker_logs( starting )
-            for log in docker_logs:
-                if self.__log_watcher:
-                    log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
-                self.docker_loggers.append( self.__create_docker_logger( log ) )
-
+            self.__start_docker_logs( docker_logs )
             self.docker_logs.extend( docker_logs )
+
+    def __start_docker_logs( self, docker_logs ):
+        for log in self.docker_logs:
+            last_request = self.__get_last_request_for_log( log['log_config']['path'] )
+            if self.__log_watcher:
+                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+            self.docker_loggers.append( self.__create_docker_logger( log, last_request ) )
+
+    def __get_last_request_for_log( self, path ):
+        result = datetime.datetime.fromtimestamp( self.__start_time )
+
+        try:
+            full_path = os.path.join( self.__log_path, path )
+            fp = open( full_path, 'r', self.__readback_buffer_size )
+
+            # seek readback buffer bytes from the end of the file
+            fp.seek( 0, os.SEEK_END )
+            size = fp.tell()
+            if size < self.__readback_buffer_size:
+                fp.seek( 0, os.SEEK_SET )
+            else:
+                fp.seek( size - self.__readback_buffer_size, os.SEEK_SET )
+
+            first = True
+            for line in fp:
+                # ignore the first line because it likely started somewhere randomly
+                # in the line
+                if first:
+                    first = False
+                    continue
+
+                dt, _ = _split_datetime_from_line( line )
+                if dt:
+                    result = dt
+            fp.close()
+        except Exception, e:
+            global_log.info( "%s", str(e) )
+
+        return scalyr_util.seconds_since_epoch( result )
 
     def __create_log_config( self, parser, path, attributes ):
         """Convenience function to create a log_config dict from the parameters"""
@@ -489,7 +542,7 @@ class ContainerChecker( StoppableThread ):
 
         return result
 
-    def __create_docker_logger( self, log ):
+    def __create_docker_logger( self, log, last_request ):
         """Creates a new DockerLogger object, based on the parameters passed in in the 'log' param.
 
         @param: log - a dict consisting of:
@@ -501,9 +554,10 @@ class ContainerChecker( StoppableThread ):
         name = self.containers[cid]['name']
         stream = log['stream']
         stream_name = name + '-' + stream
-        last_request = self.__start_time
         if stream_name in self.__checkpoints:
-            last_request = self.__checkpoints[stream_name]
+            checkpoint = self.__checkpoints[stream_name]
+            if last_request < checkpoint:
+                last_request = checkpoint
 
         logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
         logger.start()
@@ -528,7 +582,7 @@ class DockerLogger( object ):
         self.stream_name = name + "-" + stream
 
         self.__max_previous_lines = config.get( 'max_previous_lines' )
-        self.__log_timestamps = config.get( 'log_timestamps' )
+        self.__log_timestamps = True # Note: always log timestamps for now.  config.get( 'log_timestamps' )
         self.__docker_api_version = config.get( 'docker_api_version' )
 
         self.__last_request_lock = threading.Lock()
@@ -599,7 +653,7 @@ class DockerLogger( object ):
             try:
                 for line in self.__logs:
                     #split the docker timestamp from the frest of the line
-                    dt, log_line = self.split_datetime_from_line( line )
+                    dt, log_line = _split_datetime_from_line( line )
                     if not dt:
                         global_log.error( 'No timestamp found on line: \'%s\'', line )
                     else:
@@ -641,18 +695,6 @@ class DockerLogger( object ):
 
         self.__last_request_lock.release()
 
-    def split_datetime_from_line( self, line ):
-        """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
-        being the timestamp.
-        """
-        log_line = line
-        dt = datetime.datetime.utcnow()
-        pos = line.find( ' ' )
-        if pos > 0:
-            dt = scalyr_util.rfc3339_to_datetime( line[0:pos] )
-            log_line = line[pos+1:]
-
-        return (dt, log_line)
 
 
 
@@ -680,10 +722,12 @@ class DockerMonitor( ScalyrMonitor ):
 
     def _initialize( self ):
         data_path = ""
+        log_path = ""
         host_hostname = ""
 
         if self._global_config:
             data_path = self._global_config.agent_data_path
+            log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
                 if 'serverHost' in self._global_config.server_attributes:
@@ -698,7 +742,7 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path )
+        self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
             "rx_bytes",
