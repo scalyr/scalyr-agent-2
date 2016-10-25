@@ -54,15 +54,9 @@ define_config_option(__monitor__, 'module',
                      convert_to=str, required_option=True)
 
 define_config_option( __monitor__, 'container_name',
-                     'Optional (defaults to None). Defines the name given to the container running the scalyr-agent\n'
-                     'If both this and container_name_regex are None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n'
-                     'Only one of container_name and container_name_regex can be specified',
-                     convert_to=str, default=None)
-
-define_config_option( __monitor__, 'container_name_regex',
-                     'Optional (defaults to None). Defines the name given to the container running the scalyr-agent\n'
-                     'If both this and container_name are None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n'
-                     'Only one of container_name and container_name_regex can be specified',
+                     'Optional (defaults to None). Defines a regular expression that matches the name given to the '
+                     'container running the scalyr-agent.\n'
+                     'If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n',
                      convert_to=str, default=None)
 
 define_config_option( __monitor__, 'container_check_interval',
@@ -85,12 +79,13 @@ define_config_option( __monitor__, 'docker_log_prefix',
 
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
-                     'when starting to log a containers stdout/stderr.',
+                     'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
                      convert_to=int, default=5000)
 
 define_config_option( __monitor__, 'readback_buffer_size',
                      'Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n'
-                     'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file.',
+                     'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file '
+                     'was sent to Scalyr.',
                      convert_to=int, default=5*1024)
 
 # for now, always log timestamps to help prevent a race condition
@@ -239,13 +234,12 @@ class ContainerChecker( StoppableThread ):
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
         name = self._config.get( 'container_name' )
-        name_regex = self._config.get( 'container_name_regex' )
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.container_id = self.__get_scalyr_container_id( self.__client, name, name_regex )
+        self.container_id = self.__get_scalyr_container_id( self.__client, name )
 
         self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
         self.__log_path = log_path
@@ -334,20 +328,16 @@ class ContainerChecker( StoppableThread ):
         self.__log_watcher = log_watcher
         self.__module = module
 
-    def __get_scalyr_container_id( self, client, name, name_regex ):
+    def __get_scalyr_container_id( self, client, name ):
         """Gets the container id of the scalyr-agent container
         If the config option container_name is empty, then it is assumed that the scalyr agent is running
         on the host and not in a container and None is returned.
         """
         result = None
 
-        # we can't have both name and name_regex set
-        if name and name_regex:
-            raise Exception( "Config file cannot specify both container_name and container_name_regex." )
-
         regex = None
-        if name_regex:
-            regex = re.compile( name_regex )
+        if name is not None:
+            regex = re.compile( name )
 
         # get all the containers
         containers = client.containers()
@@ -355,35 +345,30 @@ class ContainerChecker( StoppableThread ):
         for container in containers:
 
             # see if we are checking on names
-            if name or name_regex:
+            if name is not None:
                 # if so, loop over all container names for this container
                 # Note: containers should only have one name, but the 'Names' field
                 # is a list, so iterate over it just in case
                 for cname in container['Names']:
                     cname = cname.lstrip( '/' )
-                    # check if the name matches
-                    if name and name == cname:
+                    # check if the name regex matches
+                    m = regex.match( cname )
+                    if m:
                         result = container['Id']
                         break
-                    # check if the regex matches
-                    elif regex:
-                        m = regex.match( cname )
-                        if m:
-                            result = container['Id']
-                            break
             # not checking container name, so check the Command instead to see if it's the agent
             else:
                 if container['Command'].startswith( '/usr/sbin/scalyr-agent-2' ):
                     result = container['Id']
 
             if result:
-                break;
+                break
 
         if not result:
             # only raise an exception if we were looking for a specific name but couldn't find it
-            name = name_regex if name is None else name
-            if name:
-                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a container matching the name '%s' is running." % (name, name) )
+            if name is not None:
+                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a "
+                                 "container matching the regular expression '%s' is running." % (name, name) )
 
         return result
 
