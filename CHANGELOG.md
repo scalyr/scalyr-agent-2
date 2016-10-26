@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.23 "Xeric Xeme" - Oct 10, 2016
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 26, 2016 16:00 -0700
+--->
+
+Note:  This release is still under development.  Release is TBD.
+
+Bug fixes:
+
+* Fixed several bugs in `docker_monitor` preparing for big release.
+
 ## 2.0.22 "Wonderful Whale" - Oct 10, 2016
 
 <!---
