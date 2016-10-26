@@ -272,7 +272,7 @@ class ContainerChecker( StoppableThread ):
 
         #create and start the DockerLoggers
         self.__start_docker_logs( self.docker_logs )
-        self._logger.info( "Initialization complete.  Starting docker monitor for Scalyr" )
+        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting docker monitor for Scalyr" )
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
@@ -283,7 +283,7 @@ class ContainerChecker( StoppableThread ):
             if self.__log_watcher:
                 self.__log_watcher.remove_log_path( self.__module, logger.log_path )
             logger.stop( wait_on_join, join_timeout )
-            self._logger.info( "Stopping %s - %s" % (logger.name, logger.stream) )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
 
         self.__update_checkpoints()
 
@@ -292,26 +292,29 @@ class ContainerChecker( StoppableThread ):
         while run_state.is_running():
             self.__update_checkpoints()
 
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
             running_containers = self.get_running_containers( self.__client )
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
             # continue using the previous list of containers
             if running_containers == None:
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
                 running_containers = self.containers
 
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Found %d containers' % len(running_containers))
             #get the containers that have started since the last sample
             starting = {}
             for cid, info in running_containers.iteritems():
                 if cid not in self.containers:
-                    self._logger.info( "Starting logger for container '%s'" % info['name'] )
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Starting logger for container '%s'" % info['name'] )
                     starting[cid] = info
 
             #get the containers that have stopped
             stopping = {}
             for cid, info in self.containers.iteritems():
                 if cid not in running_containers:
-                    self._logger.info( "Stopping logger for container '%s'" % info['name'] )
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping logger for container '%s'" % info['name'] )
                     stopping[cid] = info
 
             #stop the old loggers
@@ -431,6 +434,7 @@ class ContainerChecker( StoppableThread ):
         the same container-id as a key in the dict will be stopped.
         """
         if stopping:
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Stopping all docker loggers')
             for logger in self.docker_loggers:
                 if logger.cid in stopping:
                     logger.stop( wait_on_join=True, join_timeout=1 )
@@ -446,6 +450,7 @@ class ContainerChecker( StoppableThread ):
         @param: starting - a list of DockerLoggers to start
         """
         if starting:
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Starting all docker loggers')
             docker_logs = self.__get_docker_logs( starting )
             self.__start_docker_logs( docker_logs )
             self.docker_logs.extend( docker_logs )
@@ -617,10 +622,12 @@ class DockerLogger( object ):
         delay = random.randint( 500, 5000 ) / 1000
         run_state.sleep_but_awaken_if_stopped( delay )
 
+        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Starting to retrieve logs for cid=%s' % str(self.cid))
         self.__client = DockerClient( base_url=('unix:/%s' % self.__socket_file ), version=self.__docker_api_version )
 
         epoch = datetime.datetime.utcfromtimestamp( 0 )
         while run_state.is_running():
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve logs for cid=%s' % str(self.cid))
             sout=False
             serr=False
             if self.stream == 'stdout':
@@ -638,6 +645,7 @@ class DockerLogger( object ):
                 follow=True
             )
 
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Found %d log lines for cid=%s' % (len(self.__logs), str(self.cid)))
             try:
                 for line in self.__logs:
                     #split the docker timestamp from the frest of the line
@@ -662,7 +670,8 @@ class DockerLogger( object ):
                             self.__last_request_lock.release()
 
                     if not run_state.is_running():
-                        break;
+                        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Exiting out of container log for cid=%s' % str(self.cid))
+                        break
             except ProtocolError, e:
                 if run_state.is_running():
                     global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
@@ -866,6 +875,7 @@ class DockerMonitor( ScalyrMonitor ):
 
     def __gather_metrics_from_api_for_container( self, container ):
         try:
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for cid=%s' % container)
             result = self.__client.stats(
                 container=container,
                 stream=False
@@ -882,6 +892,7 @@ class DockerMonitor( ScalyrMonitor ):
     def gather_sample( self ):
         containers = self.__container_checker.get_running_containers( self.__client, ignore_self=False )
 
+        self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
         self.__gather_metrics_from_api( containers )
 
