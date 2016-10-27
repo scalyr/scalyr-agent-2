@@ -1,11 +1,15 @@
-// Configuration for the Scalyr Agent. For help:
-// 
+// Configuration for the Scalyr Agent when running as a docker container.
+//
+// For general help on the configuration file, see:
 // https://www.scalyr.com/help/scalyr-agent-2
 
 {
-  // Enter a "Write Logs" api key for your account. These are available at https://www.scalyr.com/keys
-  api_key: "REPLACE_THIS",
+  // To ease the docker setup, we recommend you place the api_key in a separate config file in the `agent.d` directory,
+  // mapped from the docker command line.
+  // api_key: "REPLACE_THIS",
 
+  // Turn off the explicit monitoring of the "server" and the agent process.  Since we are already collecting the
+  // container metrics for this container, both of these monitors would be redundant.
   implicit_metric_monitor: false,
   implicit_agent_process_metrics_monitor: false,
 
@@ -25,8 +29,9 @@
   ],
 
   monitors: [
+   // Run the monitor that collects all docker information.
    {
-     module: "scalyr_agent.builtin_monitors.docker_monitor",
+     module: "scalyr_agent.builtin_monitors.docker_monitor"
    } 
   ]
 }
