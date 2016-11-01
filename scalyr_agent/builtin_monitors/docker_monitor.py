@@ -530,7 +530,7 @@ class ContainerChecker( StoppableThread ):
             result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
             path = prefix + info['name'] + '-stderr.log'
-            log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes )
+            log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes.copy() )
             result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
 
         return result
