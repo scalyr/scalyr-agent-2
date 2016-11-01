@@ -617,83 +617,84 @@ class DockerLogger( object ):
         """This function makes a log request on the docker socket for a given container and continues
         to read from the socket until the connection is closed
         """
+        try:
+            # random delay to prevent all requests from starting at the same time
+            delay = random.randint( 500, 5000 ) / 1000
+            run_state.sleep_but_awaken_if_stopped( delay )
 
-        # random delay to prevent all requests from starting at the same time
-        delay = random.randint( 500, 5000 ) / 1000
-        run_state.sleep_but_awaken_if_stopped( delay )
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Starting to retrieve logs for cid=%s' % str(self.cid))
+            self.__client = DockerClient( base_url=('unix:/%s' % self.__socket_file ), version=self.__docker_api_version )
 
-        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Starting to retrieve logs for cid=%s' % str(self.cid))
-        self.__client = DockerClient( base_url=('unix:/%s' % self.__socket_file ), version=self.__docker_api_version )
+            epoch = datetime.datetime.utcfromtimestamp( 0 )
+            while run_state.is_running():
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve logs for cid=%s' % str(self.cid))
+                sout=False
+                serr=False
+                if self.stream == 'stdout':
+                    sout = True
+                else:
+                    serr = True
 
-        epoch = datetime.datetime.utcfromtimestamp( 0 )
-        while run_state.is_running():
-            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve logs for cid=%s' % str(self.cid))
-            sout=False
-            serr=False
-            if self.stream == 'stdout':
-                sout = True
-            else:
-                serr = True
+                self.__logs = self.__client.logs(
+                    container=self.cid,
+                    stdout=sout,
+                    stderr=serr,
+                    stream=True,
+                    timestamps=True,
+                    tail=self.__max_previous_lines,
+                    follow=True
+                )
 
-            self.__logs = self.__client.logs(
-                container=self.cid,
-                stdout=sout,
-                stderr=serr,
-                stream=True,
-                timestamps=True,
-                tail=self.__max_previous_lines,
-                follow=True
-            )
+                # self.__logs is a generator so don't call len( self.__logs )
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Found log lines for cid=%s' % (str(self.cid)))
+                try:
+                    for line in self.__logs:
+                        #split the docker timestamp from the frest of the line
+                        dt, log_line = _split_datetime_from_line( line )
+                        if not dt:
+                            global_log.error( 'No timestamp found on line: \'%s\'', line )
+                        else:
+                            timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
 
-            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Found %d log lines for cid=%s' % (len(self.__logs), str(self.cid)))
-            try:
-                for line in self.__logs:
-                    #split the docker timestamp from the frest of the line
-                    dt, log_line = _split_datetime_from_line( line )
-                    if not dt:
-                        global_log.error( 'No timestamp found on line: \'%s\'', line )
-                    else:
-                        timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
+                            #see if we log the entire line including timestamps
+                            if self.__log_timestamps:
+                                log_line = line
 
-                        #see if we log the entire line including timestamps
-                        if self.__log_timestamps:
-                            log_line = line
+                            #check to make sure timestamp is >= to the last request
+                            #Note: we can safely read last_request here because we are the only writer
+                            if timestamp >= self.__last_request:
+                                self.__logger.info( log_line.strip() )
 
-                        #check to make sure timestamp is >= to the last request
-                        #Note: we can safely read last_request here because we are the only writer
-                        if timestamp >= self.__last_request:
-                            self.__logger.info( log_line.strip() )
+                                #but we need to lock for writing
+                                self.__last_request_lock.acquire()
+                                self.__last_request = timestamp
+                                self.__last_request_lock.release()
 
-                            #but we need to lock for writing
-                            self.__last_request_lock.acquire()
-                            self.__last_request = timestamp
-                            self.__last_request_lock.release()
+                        if not run_state.is_running():
+                            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Exiting out of container log for cid=%s' % str(self.cid))
+                            break
+                except ProtocolError, e:
+                    if run_state.is_running():
+                        global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
 
-                    if not run_state.is_running():
-                        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Exiting out of container log for cid=%s' % str(self.cid))
-                        break
-            except ProtocolError, e:
                 if run_state.is_running():
-                    global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
-
-            if run_state.is_running():
-                global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
-                delay = random.randint( 500, 3000 ) / 1000
-                run_state.sleep_but_awaken_if_stopped( delay )
+                    global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
+                    delay = random.randint( 500, 3000 ) / 1000
+                    run_state.sleep_but_awaken_if_stopped( delay )
 
 
-        # we are shutting down, so update our last request to be slightly later than it's current
-        # value to prevent duplicate logs when starting up again.
-        self.__last_request_lock.acquire()
+            # we are shutting down, so update our last request to be slightly later than it's current
+            # value to prevent duplicate logs when starting up again.
+            self.__last_request_lock.acquire()
 
-        #can't be any smaller than 0.01 because the time value is only saved to 2 decimal places
-        #on disk
-        self.__last_request += 0.01
+            #can't be any smaller than 0.01 because the time value is only saved to 2 decimal places
+            #on disk
+            self.__last_request += 0.01
 
-        self.__last_request_lock.release()
+            self.__last_request_lock.release()
 
-
-
+        except Exception, e:
+            global_log.warn('Unhandled exception in DockerLogger.process_request for %s:\n\t%s' % (self.name, str( e )))
 
 
 class DockerMonitor( ScalyrMonitor ):
