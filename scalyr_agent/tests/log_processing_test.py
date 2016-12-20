@@ -789,6 +789,12 @@ class TestLogLineRedactor(ScalyrTestCase):
 
         self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo secretoption=fake", True)
 
+    def test_multiple_redactions(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
+
+        self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo secretoption=fake", True)
+
     def test_customer_case(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule(
