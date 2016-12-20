@@ -617,8 +617,8 @@ class BaseFormatter(logging.Formatter):
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
         if hasattr(record, 'rate_limited_dropped_records') and record.rate_limited_dropped_records > 0:
-            result = '.... Warning, skipped writing %ld log lines due to log rate limit ...\n%s' % (
-                record.rate_limited_dropped_records, logging.Formatter.format(self, record))
+            result = '.... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s' % (
+                record.rate_limited_dropped_records, 'monitor_log_write_rate', logging.Formatter.format(self, record))
         else:
             result = logging.Formatter.format(self, record)
 
