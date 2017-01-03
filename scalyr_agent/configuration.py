@@ -818,6 +818,8 @@ class Configuration(object):
         if no_description_given:
             description = 'the entry for "%s" in the "logs" array in configuration file "%s"' % (path, config_file_path)
 
+        self.__verify_or_set_optional_array_of_strings( log_entry, 'exclude', description )
+
         # If a parser was specified, make sure it is a string.
         if 'parser' in log_entry:
             self.__verify_or_set_optional_string(log_entry, 'parser', 'ignored', description)
@@ -1068,6 +1070,35 @@ class Configuration(object):
                     raise BadConfiguration('The element at index=%i is not a json object as required in the array '
                                            'field "%s".  Error is in %s' % (index, field, config_description),
                                            field, 'notJsonObject')
+                index += 1
+        except JsonConversionException:
+            raise BadConfiguration('The value for the required field "%s" is not an array.  '
+                                   'Error is in %s' % (field, config_description), field, 'notJsonArray')
+
+    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description):
+        """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
+        to empty array.
+
+        Raises an exception if the existing field is not a json array or if any of its elements are not strings/unicode.
+
+        @param config_object: The JsonObject containing the configuration information.
+        @param field: The name of the field to check in config_object.
+        @param config_description: A description of where the configuration object was sourced from to be used in the
+            error reporting to the user.
+        """
+        try:
+            json_array = config_object.get_json_array(field, none_if_missing=True)
+
+            if json_array is None:
+                config_object.put(field, JsonArray())
+                return
+
+            index = 0
+            for x in json_array:
+                if not isinstance(x, basestring):
+                    raise BadConfiguration('The element at index=%i is not a string or unicode object as required in the array '
+                                           'field "%s".  Error is in %s' % (index, field, config_description),
+                                           field, 'notStringOrUnicode')
                 index += 1
         except JsonConversionException:
             raise BadConfiguration('The value for the required field "%s" is not an array.  '
