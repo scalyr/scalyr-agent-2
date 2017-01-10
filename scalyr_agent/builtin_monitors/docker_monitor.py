@@ -88,6 +88,11 @@ define_config_option( __monitor__, 'readback_buffer_size',
                      'was sent to Scalyr.',
                      convert_to=int, default=5*1024)
 
+define_config_option( __monitor__, 'metrics_only',
+                     'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
+                     'about running containers.\n',
+                     convert_to=bool, default=False)
+
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
@@ -224,6 +229,30 @@ def _split_datetime_from_line( line ):
 
     return (dt, log_line)
 
+def _get_running_containers( client, ignore_container ):
+    """Gets a dict of running containers that maps container id to container name
+    """
+    result = {}
+    try:
+        response = client.containers()
+        for container in response:
+            cid = container['Id']
+
+            if cid == ignore_container:
+                continue
+
+            if len( container['Names'] ) > 0:
+                name = container['Names'][0].lstrip( '/' )
+                result[cid] = { 'name' : name }
+            else:
+                result[cid] = cid
+
+    except Exception, e: # container querying failed
+        global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
+        result = None
+
+    return result
+
 class ContainerChecker( StoppableThread ):
     """
         Monitors containers to check when they start and stop running.
@@ -261,7 +290,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = self.get_running_containers( self.__client )
+        self.containers = _get_running_containers( self.__client, self.container_id )
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -293,7 +322,7 @@ class ContainerChecker( StoppableThread ):
             self.__update_checkpoints()
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
-            running_containers = self.get_running_containers( self.__client )
+            running_containers = _get_running_containers( self.__client, self.container_id )
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
@@ -402,30 +431,6 @@ class ContainerChecker( StoppableThread ):
         if checkpoints:
             for name, last_request in checkpoints.iteritems():
                 self.__checkpoints[name] = last_request
-
-    def get_running_containers( self, client, ignore_self=True ):
-        """Gets a dict of running containers that maps container id to container name
-        """
-        result = {}
-        try:
-            response = client.containers()
-            for container in response:
-                cid = container['Id']
-
-                if ignore_self and cid == self.container_id:
-                    continue
-
-                if len( container['Names'] ) > 0:
-                    name = container['Names'][0].lstrip( '/' )
-                    result[cid] = { 'name' : name }
-                else:
-                    result[cid] = cid
-
-        except: # container querying failed
-            global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
-            result = None
-
-        return result
 
     def __stop_loggers( self, stopping ):
         """
@@ -740,7 +745,9 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
+        self.__container_checker = None
+        if not self._config.get( 'metrics_only' ):
+            self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
             "rx_bytes",
@@ -808,7 +815,8 @@ class DockerMonitor( ScalyrMonitor ):
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
-        self.__container_checker.set_log_watcher( log_watcher, self )
+        if self.__container_checker:
+            self.__container_checker.set_log_watcher( log_watcher, self )
 
     def __build_metric_dict( self, prefix, names ):
         result = {}
@@ -882,8 +890,8 @@ class DockerMonitor( ScalyrMonitor ):
                 stream=False
             )
             self.__log_json_metrics( container, result )
-        except:
-            self._logger.warning( "Error readings stats for '%s'" % (container), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
+        except Exception, e:
+            self._logger.warning( "Error readings stats for '%s': %s" % (container, str(e)), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
 
     def __gather_metrics_from_api( self, containers ):
 
@@ -891,7 +899,7 @@ class DockerMonitor( ScalyrMonitor ):
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        containers = self.__container_checker.get_running_containers( self.__client, ignore_self=False )
+        containers = _get_running_containers( self.__client, ignore_container=None )
 
         self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
@@ -904,7 +912,8 @@ class DockerMonitor( ScalyrMonitor ):
         # we can ignore the result
         tm = time.strptime( "2016-08-29", "%Y-%m-%d" )
 
-        self.__container_checker.start()
+        if self.__container_checker:
+            self.__container_checker.start()
 
         ScalyrMonitor.run( self )
 
@@ -912,5 +921,6 @@ class DockerMonitor( ScalyrMonitor ):
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
-        self.__container_checker.stop( wait_on_join, join_timeout )
+        if self.__container_checker:
+            self.__container_checker.stop( wait_on_join, join_timeout )
 
