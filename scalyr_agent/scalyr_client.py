@@ -32,6 +32,16 @@ except Exception:
     __has_ssl__ = False
     ssl = None
 
+try:
+    import bz2
+except Exception:
+    bz2 = None
+
+try:
+    import zlib
+except Exception:
+    zlib = None
+
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -41,7 +51,6 @@ from cStringIO import StringIO
 
 log = scalyr_logging.getLogger(__name__)
 
-
 class ScalyrClientSession(object):
     """Encapsulates the connection between the agent and the Scalyr servers.
 
@@ -50,7 +59,7 @@ class ScalyrClientSession(object):
     are monotonically increasing within a session.
     """
     def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
-                 proxies=None):
+                 proxies=None, compression_type=None, compression_level=9 ):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -63,6 +72,9 @@ class ScalyrClientSession(object):
         @param ca_file: The path to the file containing the certificates for the trusted certificate authority roots.
             This is used for the SSL connections to verify the connection is to Scalyr.
         @param proxies:  A dict describing the network proxies to use (such as a mapping for `https`) or None.
+        @param compression_type:  A string containing the compression method to use.
+            Valid options are bz2, deflate or None.  Defaults to None.
+        @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
 
         @type server: str
         @type api_key: str
@@ -71,6 +83,8 @@ class ScalyrClientSession(object):
         @type request_deadline: float
         @type ca_file: str
         @type proxies: dict
+        @type compression_type: str
+        @type compression_level: int
         """
         if not quiet:
             log.info('Using "%s" as address for scalyr servers' % server)
@@ -110,7 +124,33 @@ class ScalyrClientSession(object):
             'User-Agent': ScalyrClientSession.__get_user_agent(agent_version)
         }
 
-        # The number of seconds to wait for a blocking operation on the connection before considering it to have
+        # Configure compression type
+        self.__compress = None
+        encoding = None
+
+        if compression_type:
+            if compression_type == 'deflate' and zlib:
+                self.__compress = zlib.compress
+                encoding = 'deflate'
+            elif compression_type == 'bz2' and bz2:
+                self.__compress = bz2.compress
+                encoding = 'bz2'
+
+            if not self.__compress:
+                log.warning("'%s' compression specified, but '%s' compression is not available.  No compression will be used." % (compression_type, compression_type) )
+
+        if encoding:
+            self.__standard_headers['Content-Encoding'] = encoding
+
+        # Configure compression level
+        if self.__compress:
+            if compression_level < 1 or compression_level > 9:
+                log.warning("Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression." % (compression_level) )
+                compression_level = 9
+
+        self.__compression_level = compression_level
+
+        # The number of sconds to wait for a blocking operation on the connection before considering it to have
         # timed out.
         self.__request_deadline = request_deadline
 
@@ -120,6 +160,8 @@ class ScalyrClientSession(object):
         self.total_requests_failed = 0
         # The total number of bytes sent over the network.
         self.total_request_bytes_sent = 0
+        # The total number of compressed bytes sent over the network
+        self.total_compressed_request_bytes_sent = 0
         # The total number of bytes received.
         self.total_response_bytes_received = 0
         # The total number of secs spent waiting for a responses (so average latency can be calculated by dividing
@@ -201,6 +243,11 @@ class ScalyrClientSession(object):
                 body_str = ""
 
             self.total_request_bytes_sent += len(body_str) + len(request_path)
+
+            if self.__compress:
+                body_str = self.__compress( body_str, self.__compression_level )
+
+            self.total_compressed_request_bytes_sent += len(body_str) + len(request_path)
 
             # noinspection PyBroadException
             try:

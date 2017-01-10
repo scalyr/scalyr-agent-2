@@ -460,7 +460,9 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False, 
 
         # Determine if a newer version is available
         client = ScalyrClientSession(config.scalyr_server, config.api_key, SCALYR_VERSION, quiet=True,
-                                     ca_file=config.ca_cert_path)
+                                     ca_file=config.ca_cert_path,
+                                     compression_type=self.__config.compression_type, compression_level=self.__config.compression_level )
+
         status, size, response = client.perform_agent_version_check(release_track)
 
         if status.lower() != 'success':

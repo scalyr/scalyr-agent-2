@@ -800,7 +800,8 @@ class ScalyrAgent(object):
         use_requests_lib = self.__config.use_requests_lib
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
                                    request_deadline=self.__config.request_deadline, ca_file=ca_file,
-                                   use_requests_lib=use_requests_lib)
+                                   use_requests_lib=use_requests_lib, compression_type=self.__config.compression_type,
+                                   compression_level=self.__config.compression_level)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
@@ -952,10 +953,11 @@ class ScalyrAgent(object):
         else:
             extra = ''
 
-        log.info('agent_requests requests_sent=%ld requests_failed=%ld bytes_sent=%ld bytes_received=%ld '
+        log.info('agent_requests requests_sent=%ld requests_failed=%ld bytes_sent=%ld compressed_bytes_sent=%ld bytes_received=%ld '
                  'request_latency_secs=%lf connections_created=%ld%s' % (stats.total_requests_sent,
                                                                          stats.total_requests_failed,
                                                                          stats.total_request_bytes_sent,
+                                                                         stats.total_compressed_request_bytes_sent,
                                                                          stats.total_response_bytes_received,
                                                                          stats.total_request_latency_secs,
                                                                          stats.total_connections_created, extra))
@@ -1006,6 +1008,7 @@ class ScalyrAgent(object):
         delta_stats.total_requests_sent = self.__scalyr_client.total_requests_sent
         delta_stats.total_requests_failed = self.__scalyr_client.total_requests_failed
         delta_stats.total_request_bytes_sent = self.__scalyr_client.total_request_bytes_sent
+        delta_stats.total_compressed_request_bytes_sent = self.__scalyr_client.total_compressed_request_bytes_sent
         delta_stats.total_response_bytes_received = self.__scalyr_client.total_response_bytes_received
         delta_stats.total_request_latency_secs = self.__scalyr_client.total_request_latency_secs
         delta_stats.total_connections_created = self.__scalyr_client.total_connections_created
