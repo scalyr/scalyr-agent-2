@@ -16,6 +16,7 @@
 # A ScalyrMonitor which executes a specified shell command and records the output.
 
 import re
+import sys
 
 from subprocess import PIPE, Popen
 
@@ -79,9 +80,16 @@ class ShellMonitor(ScalyrMonitor):
             self.extractor = None
 
     def gather_sample(self):
+
+        close_fds=True
+        if sys.platform == 'win32':
+            # on windows we can't both redirect stdin, stdout and stderr AND close_fds
+            # therefore we don't close fds for windows.
+            close_fds=False
+
         # Run the command
         command = self.command
-        p = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        p = Popen(command, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=close_fds)
         (stdout_text, stderr_text) = p.communicate()
 
         output = stderr_text
