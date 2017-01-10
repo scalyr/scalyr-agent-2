@@ -212,8 +212,14 @@ class BaseReader:
                     raise e
 
         if self._file is not None:
-            self._file.seek(0)
-            self.gather_sample(self._file)
+            try:
+                self._file.seek(0)
+                self.gather_sample(self._file)
+            except IOError, e:
+                self._logger.error( "Error gathering sample for file: '%s'\n\t%s" % (filename, str( e ) ) );
+
+                #close the file.  This will cause the file to be reopened next call to run_single_cycle
+                self.close()
 
     def gather_sample(self, my_file):
         """Reads the metrics from the file and records them.
@@ -227,7 +233,7 @@ class BaseReader:
         pass
 
     def close(self):
-        """Closes any files help open by this reader."""
+        """Closes any files held open by this reader."""
         try:
             self._failed = True
             if self._file is not None:
@@ -332,6 +338,7 @@ class StatReader(BaseReader):
         @param stat_file: The file to read.
         @type stat_file: FileIO
         """
+
         # The file format is just a single line of all the fields.
         line = stat_file.readlines()[0]
         # Chop off first part which is the pid and executable file. The
@@ -348,7 +355,6 @@ class StatReader(BaseReader):
         self.print_sample("app.uptime", process_uptime)
         self.print_sample("app.nice", float(fields[16]))
         self.print_sample("app.threads", int(fields[17]))
-
 
 class StatusReader(BaseReader):
     """Reads and records statistics from the /proc/$pid/status file.
@@ -707,14 +713,32 @@ class ProcessMonitor(ScalyrMonitor):
                                  shell=False, stdout=PIPE)
 
                 sub_proc.stdout.readline()
+                matching_pids = []
                 for line in sub_proc.stdout:
                     line = line.strip()
                     if line.find(' ') > 0:
                         pid = int(line[:line.find(' ')])
                         line = line[(line.find(' ') + 1):]
                         if re.search(self.__commandline_matcher, line) is not None:
-                            return pid
-                return None
+                            matching_pids.append( pid )
+
+                total_pids = len( matching_pids )
+                if total_pids == 0:
+                    return None
+                elif total_pids == 1:
+                    return matching_pids[0]
+
+                # if we are here then multiple command lines matched.  First check to
+                # see if self.__pid is in the list and if so return that.  Otherwise
+                # return the first element in the list
+                if self.__pid in matching_pids:
+                    self._logger.warning( "Multiple processes match the command '%s'.  Returning existing pid." % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-existing-pid' )
+                    return self.__pid
+
+                self._logger.warning( "Multiple processes match the command '%s'.  Returning the pid of the first matching process" % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-first-pid' )
+
+                return matching_pids[0]
+
             finally:
                 # Be sure to wait on the spawn process.
                 if sub_proc is not None:
