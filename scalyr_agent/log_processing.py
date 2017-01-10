@@ -27,6 +27,7 @@ __author__ = 'czerwin@scalyr.com'
 
 import datetime
 import errno
+import fnmatch
 import glob
 import os
 import random
@@ -2008,6 +2009,18 @@ class LogMatcher(object):
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
             for matched_file in glob.glob(self.__log_entry_config['path']):
+
+                skip = False
+                # check to see if this file matches any of the exclude globs
+                for exclude_glob in self.__log_entry_config['exclude']:
+                    if fnmatch.fnmatch( matched_file, exclude_glob ):
+                        skip = True
+                        break;
+
+                # if so, skip it.
+                if skip:
+                    continue
+
                 # Only process it if we have permission to read it and it is not already being processed.
                 # Also check if we should skip over it entirely because it is too stale.
                 if not matched_file in existing_processors and self.__can_read_file_and_not_stale(matched_file,
