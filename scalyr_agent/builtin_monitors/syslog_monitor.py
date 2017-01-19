@@ -17,7 +17,6 @@
 __author__ = 'imron@imralsoftware.com'
 
 import errno
-import docker
 import logging
 import logging.handlers
 import os
@@ -28,6 +27,7 @@ import socket
 import struct
 import SocketServer
 import time
+from string import Template
 from threading import Timer
 
 from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
@@ -93,16 +93,23 @@ define_config_option( __monitor__, 'log_flush_delay',
                      'the syslog messages.',
                      convert_to=float, default=1.0)
 
-define_config_option(__monitor__, 'docker_logging',
-                     'Optional (defaults to false). If true, the plugin will check for syslog messages coming from docker'
-                     'and split the messages in to files based on their containers',
-                     default=False, convert_to=bool)
+define_config_option(__monitor__, 'mode',
+                     'Optional (defaults to "syslog"). If set to "docker", the plugin will enable extra functionality '
+                     'to properly receive log lines sent via the `docker_monitor`.  In particular, the plugin will '
+                     'check for container ids in the tags of the incoming lines and create log files based on their '
+                     'container names.',
+                     default='syslog', convert_to=str)
 
 define_config_option( __monitor__, 'docker_regex',
-                     'Regular expression for parsing out docker logs from a syslog message.  The regular expression must '
-                     'contain two groups, the first being the container name and the second being the container id. '
-                     'If a message matches this regex then everything *after* the full matching expression will be logged '
-                     'to a file called syslog-docker-<container-name>.log',
+                     'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
+                     'only has the container id.  If a message matches this regex then everything *after* '
+                     'the full matching expression will be logged to a file called docker-<container-name>.log',
+                     convert_to=str, default='^.*docker/([a-z0-9]{12})\[\d+\]: ')
+
+define_config_option( __monitor__, 'docker_regex_full',
+                     'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
+                     'included both the container name and id.  If a message matches this regex then everything *after* '
+                     'the full matching expression will be logged to a file called docker-<container-name>.log',
                      convert_to=str, default='^.*docker/([^/]+)/([^[]+)\[\d+\]: ')
 
 define_config_option( __monitor__, 'docker_expire_log',
@@ -115,6 +122,37 @@ define_config_option( __monitor__, 'docker_accept_ips',
                      'Defaults to a list with the ip address of the default docker bridge gateway. '
                      'If accept_remote_connections is true, this option does nothing.')
 
+define_config_option(__monitor__, 'docker_api_socket',
+                     'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
+                     'the docker API. This is only used when `mode` is set to `docker` to look up container '
+                     'names by their ids.  WARNING, you must also set the `api_socket` configuration option in the '
+                     'docker monitor to this same value.\n'
+                     'Note:  You need to map the host\'s /run/docker.sock to the same value as specified here, using '
+                     'the -v parameter, e.g.\n'
+                     '\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...',
+                     convert_to=str, default='/var/scalyr/docker.sock')
+
+define_config_option(__monitor__, 'docker_api_version',
+                     'Optional (defaults to \'auto\'). The version of the Docker API to use when communicating to '
+                     'docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker '
+                     'monitor to this same value.', convert_to=str, default='auto')
+
+define_config_option(__monitor__, 'docker_logfile_template',
+                     'Optional (defaults to \'containers/${CNAME}.log\'). The template used to create the log '
+                     'file paths for save docker logs sent by other containers via syslog.  The variables $CNAME and '
+                     '$CID will be substituted with the name and id of the container that is emitting the logs.  If '
+                     'the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log '
+                     'directory.', convert_to=str, default='containers/${CNAME}.log')
+
+define_config_option(__monitor__, 'docker_cid_cache_lifetime_secs',
+                     'Optional (defaults to 300). Controls the docker id to container name cache expiration.  After '
+                     'this number of seconds of inactivity, the cache entry will be evicted.',
+                     convert_to=float, default=300.0)
+
+define_config_option(__monitor__, 'docker_cid_clean_time_secs',
+                     'Optional (defaults to 5.0). The number seconds to wait between cleaning the docker id to '
+                     'container name cache.',
+                     convert_to=float, default=5.0)
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
@@ -301,10 +339,23 @@ class SyslogHandler(object):
     """
     def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher ):
 
-        docker_logging = config.get( 'docker_logging' )
-        docker_regex = None
+        docker_logging = config.get('mode') == 'docker'
+        self.__docker_regex = None
+        self.__docker_regex_full = None
+        self.__docker_id_resolver = None
+        self.__docker_file_template = None
+
         if docker_logging:
-            docker_regex = re.compile( config.get( 'docker_regex' ) )
+            self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
+            self.__docker_regex = self.__get_regex(config, 'docker_regex')
+            self.__docker_file_template = Template(config.get('docker_logfile_template'))
+            from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
+            self.__docker_is_resolver = ContainerIdResolver(config.get('docker_api_socket'),
+                                                            config.get('docker_api_version'),
+                                                            global_log,
+                                                            cache_expiration_secs=config.get(
+                                                                'docker_cid_cache_lifetime_secs'),
+                                                            cache_clean_secs=config.get('docker_cid_clean_time_secs'))
 
         self.__log_path = log_path
         self.__server_host = server_host
@@ -314,7 +365,6 @@ class SyslogHandler(object):
         self.__logger = logger
         self.__line_reporter = line_reporter
         self.__docker_logging = docker_logging
-        self.__docker_regex = docker_regex
         self.__docker_loggers = {}
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
@@ -323,9 +373,17 @@ class SyslogHandler(object):
         self.__max_log_size = config.get( 'max_log_size' )
         self.__flush_delay = config.get('log_flush_delay')
 
+    def __get_regex(self, config, field_name):
+        value = config.get(field_name)
+        if len(value) > 0:
+            return re.compile(value)
+        else:
+            return None
+
     def __create_log_config( self, cname, cid ):
 
-        full_path = os.path.join( self.__log_path, 'syslog-docker-%s.log' % cname )
+        full_path = os.path.join( self.__log_path, self.__docker_file_template.safe_substitute(
+            {'CID': cid, 'CNAME': cname}))
         log_config = {
             'parser': 'agentSyslogDocker',
             'path': full_path
@@ -356,7 +414,7 @@ class SyslogHandler(object):
     def __create_log_file( self, cname, cid, log_config ):
         """create our own rotating logger which will log raw messages out to disk.
         """
-        name = 'syslog-docker-' + cname + '.log'
+        name = 'docker-' + cname + '.log'
         result = logging.getLogger( name )
 
         if len( result.handlers ) == 0:
@@ -377,6 +435,40 @@ class SyslogHandler(object):
 
         return result
 
+    def __extract_container_name_and_id(self, data):
+        """Attempts to extract the container id and container name from the log line received from Docker via
+        syslog.
+
+        First, attempts to extract container id using `__docker_regex` and look up the container name via Docker.
+        If that fails, attempts to extract the container id and container name using the `__docker_regex_full`.
+
+        @param data: The incoming line
+        @type data: str
+        @return: The container name, container id, and the rest of the line if extract was successful.  Otherwise,
+            None, None, None.
+        @rtype: str, str, str
+        """
+        if self.__docker_regex is not None:
+            m = self.__docker_regex.match(data)
+            if m is not None:
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
+                cid = m.group(1)
+                cname = self.__docker_is_resolver.lookup(cid)
+
+                if cid is not None and cname is not None:
+                    self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
+                    return cname, cid, data[m.end():]
+
+        if self.__docker_regex_full is not None:
+            m = self.__docker_regex_full.match(data)
+            if m is not None and m.lastindex == 2:
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
+                return m.group(1), m.group(2), data[m.end():]
+
+        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
+
+        return None, None, None
+
     def __handle_docker_logs( self, data ):
 
         watcher = None
@@ -385,48 +477,42 @@ class SyslogHandler(object):
         if self.__get_log_watcher:
             watcher, module = self.__get_log_watcher()
 
-        # see if this log line matches our regular expression
-        if self.__docker_regex:
-            m = self.__docker_regex.match( data )
-            if m and m.lastindex == 2:
-                # matches need two groups - the first is the container name
-                # and the second is the container id
-                cname = m.group(1)
-                cid = m.group(2)
+        (cname, cid, line_content) = self.__extract_container_name_and_id(data)
 
-                # check if we already have a logger for this container
-                # and if not, then create it
-                if cname not in self.__docker_loggers:
+        if cname is not None and cid is not None:
+            # check if we already have a logger for this container
+            # and if not, then create it
+            if cname not in self.__docker_loggers:
+                info = dict()
 
-                    info = {}
+                # get the config and set the attributes
+                info['log_config'] = self.__create_log_config( cname, cid )
+                info['cid'] = cid
+                attributes = self.__extra_attributes( cname, cid )
+                if attributes:
+                    info['log_config']['attributes'] = attributes
 
-                    # get the config and set the attributes
-                    info['log_config'] = self.__create_log_config( cname, cid )
-                    attributes = self.__extra_attributes( cname, cid )
-                    if attributes:
-                        info['log_config']['attributes'] = attributes
+                # create the physical log files
+                info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
+                info['last_seen'] = time.time()
 
-                    # create the physical log files
-                    info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
-                    info['last_seen'] = time.time()
+                # if we created the log file
+                if info['logger']:
+                    # add it to the main scalyr log watcher
+                    if watcher and module:
+                        info['log_config'] = watcher.add_log_config( module, info['log_config'] )
 
-                    # if we created the log file
-                    if info['logger']:
-                        # add it to the main scalyr log watcher
-                        if watcher and module:
-                            info['log_config'] = watcher.add_log_config( module, info['log_config'] )
+                    # and keep a record for ourselves
+                    self.__docker_loggers[cname] = info
+                else:
+                    self.__logger.warn( "Unable to create logger for %s." % cname )
+                    return
 
-                        # and keep a record for ourselves
-                        self.__docker_loggers[cname] = info
-                    else:
-                        self.__logger.warn( "Unable to create logger for %s." % cname )
-                        return
-
-                # at this point __docker_loggers will always contain
-                # a logger for this container name, so log the message
-                # and mark the time
-                self.__docker_loggers[cname]['logger'].info( data[m.end():] )
-                self.__docker_loggers[cname]['last_seen'] = time.time()
+            # at this point __docker_loggers will always contain
+            # a logger for this container name, so log the message
+            # and mark the time
+            self.__docker_loggers[cname]['logger'].info(line_content)
+            self.__docker_loggers[cname]['last_seen'] = time.time()
 
 
         # find out which if any of the loggers in __docker_loggers have
@@ -494,7 +580,7 @@ class SyslogServer(object):
 
         logger.log(scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str( accept_ips ) );
 
-        docker_logging = config.get( 'docker_logging' )
+        docker_logging = config.get( 'mode' ) == 'docker'
 
         verifier = RequestVerifier( accept_remote, accept_ips, docker_logging )
 

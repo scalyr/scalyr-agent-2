@@ -64,13 +64,17 @@ define_config_option( __monitor__, 'container_check_interval',
                      convert_to=int, default=5)
 
 define_config_option( __monitor__, 'api_socket',
-                     'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with the docker API.\n'
+                     'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
+                     'the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the '
+                     '`docker_api_socket` configuration option in the syslog monitor to this same value\n'
                      'Note:  You need to map the host\'s /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n'
                      '\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...',
                      convert_to=str, default='/var/scalyr/docker.sock')
 
 define_config_option( __monitor__, 'docker_api_version',
-                     'Optional (defaults to \'auto\'). The version of the Docker API to use\n',
+                     'Optional (defaults to \'auto\'). The version of the Docker API to use.  WARNING, if you have '
+                     '`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the '
+                     'syslog monitor to this same value\n',
                      convert_to=str, default='auto')
 
 define_config_option( __monitor__, 'docker_log_prefix',
@@ -87,6 +91,15 @@ define_config_option( __monitor__, 'readback_buffer_size',
                      'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file '
                      'was sent to Scalyr.',
                      convert_to=int, default=5*1024)
+
+define_config_option( __monitor__, 'log_mode',
+                     'Optional (defaults to "docker_api"). Determine which method is used to gather logs from the '
+                     'local containers. If "docker_api", then this agent will use the docker API to contact the local '
+                     'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
+                     'to push logs to this one using the syslog Docker log plugin.  Currently, "syslog" is the '
+                     'preferred method due to bugs/issues found with the docker API.  It is not the default to protect '
+                     'legacy behavior.\n',
+                     convert_to=str, default="docker_api")
 
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
@@ -229,26 +242,31 @@ def _split_datetime_from_line( line ):
 
     return (dt, log_line)
 
-def _get_running_containers( client, ignore_container ):
+def _get_running_containers(client, ignore_container=None, restrict_to_container=None, logger=None):
     """Gets a dict of running containers that maps container id to container name
     """
+    if logger is None:
+        logger = global_log
+
     result = {}
     try:
-        response = client.containers()
+        filters = {"id": restrict_to_container} if restrict_to_container is not None else None
+        response = client.containers(filters=filters)
         for container in response:
             cid = container['Id']
 
-            if cid == ignore_container:
+            if ignore_container is not None and cid == ignore_container:
                 continue
 
             if len( container['Names'] ) > 0:
-                name = container['Names'][0].lstrip( '/' )
-                result[cid] = { 'name' : name }
+                name = container['Names'][0].lstrip('/')
+                result[cid] = {'name': name}
             else:
-                result[cid] = cid
+                result[cid] = {'name': cid}
 
-    except Exception, e: # container querying failed
-        global_log.warning( "Error querying running containers", limit_once_per_x_secs=300, limit_key='docker-api-running-containers' )
+    except Exception, e:  # container querying failed
+        logger.error("Error querying running containers", limit_once_per_x_secs=300,
+                     limit_key='docker-api-running-containers' )
         result = None
 
     return result
@@ -290,7 +308,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_running_containers( self.__client, self.container_id )
+        self.containers = _get_running_containers(self.__client, ignore_container=self.container_id)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -322,12 +340,12 @@ class ContainerChecker( StoppableThread ):
             self.__update_checkpoints()
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
-            running_containers = _get_running_containers( self.__client, self.container_id )
+            running_containers = _get_running_containers(self.__client, ignore_container=self.container_id)
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
             # continue using the previous list of containers
-            if running_containers == None:
+            if running_containers is None:
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
                 running_containers = self.containers
 
@@ -702,11 +720,227 @@ class DockerLogger( object ):
             global_log.warn('Unhandled exception in DockerLogger.process_request for %s:\n\t%s' % (self.name, str( e )))
 
 
+class ContainerIdResolver():
+    """Abstraction that can be used to look up Docker container names based on their id.
+
+    This has a caching layer built in to minimize lookups to actual Docker and make this as efficient as possible.
+
+    This abstraction is thread-safe.
+    """
+    def __init__(self, docker_api_socket, docker_api_version, logger, cache_expiration_secs=300, cache_clean_secs=5):
+        """
+        Initializes one instance.
+
+        @param docker_api_socket: The path to the UNIX socket exporting the Docker API by the daemon.
+        @param docker_api_version: The API version to use, typically 'auto'.
+        @param cache_expiration_secs: The number of seconds to cache a mapping from container id to container name.  If
+            the mapping is not used for this number of seconds, the mapping will be evicted.  (The actual eviction
+            is performed lazily).
+        @param cache_clean_secs:  The number of seconds between sweeps to clean the cache.
+        @param logger: The logger to use.  This MUST be supplied.
+        @type docker_api_socket: str
+        @type docker_api_version: str
+        @type cache_expiration_secs: double
+        @type cache_clean_secs: double
+        @type logger: Logger
+        """
+        # Guards all variables except for __logger and __docker_client.
+        self.__lock = threading.Lock()
+        self.__cache = dict()
+        # The walltime of when the cache was last cleaned.
+        self.__last_cache_clean = time.time()
+        self.__cache_expiration_secs = cache_expiration_secs
+        self.__cache_clean_secs = cache_clean_secs
+        self.__docker_client = docker.Client(base_url=('unix:/%s' % docker_api_socket), version=docker_api_version)
+        # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.
+        self.__untouched_ids = dict()
+        self.__logger = logger
+
+    def lookup(self, container_id):
+        """Looks up the container name for the specified container id.
+
+        This does check the local cache first.
+
+        @param container_id: The container id
+        @type container_id: str
+        @return:  The container name or None if the container id could not be resolved, or if there was an error
+            accessing Docker.
+        @rtype: str or None
+        """
+        try:
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
+            current_time = time.time()
+
+            self.__lock.acquire()
+            try:
+                self._clean_cache_if_necessary(current_time)
+
+                # Check cache first and mark if it as recently used if found.
+                if container_id in self.__cache:
+                    entry = self.__cache[container_id]
+                    self._touch(entry, current_time)
+                    self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
+                                      entry.container_name)
+                    return entry.container_name
+            finally:
+                self.__lock.release()
+
+            container_name = self._fetch_id_from_docker(container_id)
+
+            if container_name is not None:
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
+                                  container_name)
+                self._insert_entry(container_id, container_name, current_time)
+                return container_name
+
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
+        except Exception, e:
+            self.__logger.error('Error seen while attempting resolving docker cid="%s"', container_id)
+
+        return None
+
+    def _clean_cache_if_necessary(self, current_time):
+        """Cleans the cache if it has been too long since the last cleaning.
+
+        You must be holding self.__lock.
+
+        @param current_time:  The current walltime.
+        @type current_time: double
+        """
+        if self.__last_cache_clean + self.__cache_clean_secs > current_time:
+            return
+
+        self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Cleaning cid cache. Before clean=%d:%d', len(self.__cache),
+                          len(self.__untouched_ids))
+        self.__last_cache_clean = current_time
+        # The last access time that will trigger expiration.
+        expire_threshold = current_time - self.__cache_expiration_secs
+
+        # For efficiency, just examine the ids that haven't been used since the last cleaning.
+        for key in self.__untouched_ids:
+            if self.__cache[key].last_access_time < expire_threshold:
+                del self.__cache[key]
+
+        # Reset the untouched_ids to contain all of the ids.
+        self.__untouched_ids = dict()
+        for key in self.__cache:
+            self.__untouched_ids[key] = True
+
+        self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'After clean=%d:%d', len(self.__cache),
+                          len(self.__untouched_ids))
+
+    def _touch(self, cache_entry, last_access_time):
+        """Mark the specified cache entry as being recently used.
+
+        @param cache_entry: The entry
+        @param last_access_time: The time it was accessed.
+        @type cache_entry: ContainerIdResolver.Entry
+        @type last_access_time: double
+        """
+        cid = cache_entry.container_id
+        if cid in self.__untouched_ids:
+            del self.__untouched_ids[cid]
+        cache_entry.touch(last_access_time)
+
+    def _fetch_id_from_docker(self, container_id):
+        """Fetch the container name for the specified container using the Docker API.
+
+        @param container_id: The id of the container.
+        @type container_id: str
+        @return: The container name or None if it was either not found or if there was an error.
+        @rtype: str or None
+        """
+        matches = _get_running_containers(self.__docker_client, restrict_to_container=container_id,
+                                          logger=self.__logger)
+        if len(matches) == 0:
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
+            return None
+
+        if len(matches) > 1:
+            self.__logger.warning("Container id matches %d containers for id='%s'." % (len(matches), container_id),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='docker_container_id_more_than_one')
+            return None
+
+        # Note, the cid used as the key for the returned matches is the long container id, not the short one that
+        # we were passed in as `container_id`.
+        return matches[matches.keys()[0]]['name']
+
+    def _insert_entry(self, container_id, container_name, last_access_time):
+        """Inserts a new cache entry mapping the specified id to the container name.
+
+        @param container_id: The id of the container.
+        @param container_name: The name of the container.
+        @param last_access_time: The time it this entry was last used.
+        @type container_id: str
+        @type container_name: str
+        @type last_access_time: double
+        """
+        self.__lock.acquire()
+        try:
+            self.__cache[container_id] = ContainerIdResolver.Entry(container_id, container_name, last_access_time)
+        finally:
+            self.__lock.release()
+
+    class Entry():
+        """Helper abstraction representing a single cache entry mapping a container id to its name.
+        """
+        def __init__(self, container_id, container_name, last_access_time):
+            """
+            @param container_id: The id of the container.
+            @param container_name: The name of the container.
+            @param last_access_time: The time the entry was last used.
+            @type container_id: str
+            @type container_name: str
+            @type last_access_time: double
+            """
+            self.__container_id = container_id
+            self.__container_name = container_name
+            self.__last_access_time = last_access_time
+
+        @property
+        def container_id(self):
+            """
+            @return:  The id of the container.
+            @rtype: str
+            """
+            return self.__container_id
+
+        @property
+        def container_name(self):
+            """
+            @return:  The name of the container.
+            @rtype: str
+            """
+            return self.__container_name
+
+        @property
+        def last_access_time(self):
+            """
+            @return:  The last time this entry was used, in seconds past epoch.
+            @rtype: double
+            """
+            return self.__last_access_time
+
+        def touch(self, access_time):
+            """Updates the last access time for this entry.
+
+            @param access_time: The time of the access.
+            @type access_time: double
+            """
+            self.__last_access_time = access_time
+
+
 class DockerMonitor( ScalyrMonitor ):
     """Monitor plugin for docker containers
 
-    This plugin accesses the Docker API to detect all containers running on a given host, and then logs messages from stdin and stdout
-    to Scalyr servers.
+    This plugin uses the Docker API to detect all containers running on the local host, retrieves metrics for each of
+    them, and logs them to the Scalyr servers.
+
+    It can also collect all log messages written to stdout and stderr by those containers, in conjunction with syslog.
+    See the online documentation for more details.
+
+    TODO:  Back fill the instructions here.
     """
 
     def __get_socket_file( self ):
@@ -746,7 +980,7 @@ class DockerMonitor( ScalyrMonitor ):
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
         self.__container_checker = None
-        if not self._config.get( 'metrics_only' ):
+        if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
@@ -825,6 +1059,9 @@ class DockerMonitor( ScalyrMonitor ):
         return result
 
     def __log_metrics( self, container, metrics_to_emit, metrics, extra=None ):
+        if metrics is None:
+            return
+
         if not extra:
             extra = {}
 
@@ -843,14 +1080,12 @@ class DockerMonitor( ScalyrMonitor ):
         self.__log_metrics( container, self.__network_metrics, metrics, extra )
 
     def __log_memory_stats_metrics( self, container, metrics ):
-
         if 'stats' in metrics:
             self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'] )
 
         self.__log_metrics( container, self.__mem_metrics, metrics )
 
     def __log_cpu_stats_metrics( self, container, metrics ):
-
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
             if 'percpu_usage' in cpu_usage:
@@ -870,8 +1105,10 @@ class DockerMonitor( ScalyrMonitor ):
             self.__log_metrics( container, self.__cpu_throttling_metrics, metrics['throttling_data'] )
 
     def __log_json_metrics( self, container, metrics ):
-
         for key, value in metrics.iteritems():
+            if value is None:
+                continue
+
             if key == 'networks':
                 for interface, network_metrics in value.iteritems():
                     self.__log_network_interface_metrics( container, network_metrics, interface )
@@ -889,9 +1126,10 @@ class DockerMonitor( ScalyrMonitor ):
                 container=container,
                 stream=False
             )
-            self.__log_json_metrics( container, result )
+            if result is not None:
+                self.__log_json_metrics( container, result )
         except Exception, e:
-            self._logger.warning( "Error readings stats for '%s': %s" % (container, str(e)), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
+            self._logger.error( "Error readings stats for '%s': %s" % (container, str(e)), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
 
     def __gather_metrics_from_api( self, containers ):
 
@@ -899,7 +1137,7 @@ class DockerMonitor( ScalyrMonitor ):
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        containers = _get_running_containers( self.__client, ignore_container=None )
+        containers = _get_running_containers(self.__client, ignore_container=None)
 
         self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
