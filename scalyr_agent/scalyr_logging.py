@@ -229,14 +229,16 @@ class AgentLogger(logging.Logger):
         if module_path.find('scalyr_agent') == 0 and not module_path.find('scalyr_agent.builtin_monitors.') == 0:
             self.component = 'core'
             self.monitor_name = None
+            self.monitor_name_base = None
         else:
             # Note, we only use the last part of the module name for the name we use in the logs.  We rely on the
             # monitor_id to make it unique.  This is calculated in configuration.py.  We need to make sure this
             # code is in sync with that file.
+            self.monitor_name_base = module_path.split('.')[-1]
             if self.__monitor_id is not None:
-                self.monitor_name = '%s(%s)' % (module_path.split('.')[-1], self.__monitor_id)
+                self.monitor_name = '%s(%s)' % (self.monitor_name_base, self.__monitor_id)
             else:
-                self.monitor_name = module_path.split('.')[-1]
+                self.monitor_name = self.monitor_name_base
 
             self.component = 'monitor:%s' % self.monitor_name
 
@@ -263,7 +265,7 @@ class AgentLogger(logging.Logger):
         # right level.
         __log_manager__.add_logger_instance(self)
 
-    def emit_value(self, metric_name, metric_value, extra_fields=None, monitor=None):
+    def emit_value(self, metric_name, metric_value, extra_fields=None, monitor=None, monitor_id_override=None):
         """Emits a metric and its value to the underlying log to be transmitted to Scalyr.
 
         Adds a new line to the metric log recording the specified value for the metric.  Additional fields
@@ -284,7 +286,8 @@ class AgentLogger(logging.Logger):
             are int, long, float, str, bool, and unicode.
         @param monitor: The ScalyrMonitor instance that is reporting the metric. Typically, this does not need to be
             supplied because it defaults to whatever monitor for each the logger was created.
-
+        @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
+            of reporting this one value.  The base monitor name will remain unchanged.
         @raise UnsupportedValueType: If the value type is not one of the supported types.
         """
         if monitor is None:
@@ -316,12 +319,12 @@ class AgentLogger(logging.Logger):
 
                 string_buffer.write(' %s=%s' % (field_name, json_lib.serialize(field_value)))
 
-        self.info(string_buffer.getvalue(), metric_log_for_monitor=monitor)
+        self.info(string_buffer.getvalue(), metric_log_for_monitor=monitor, monitor_id_override=monitor_id_override)
         string_buffer.close()
 
     def _log(self, level, msg, args, exc_info=None, extra=None, error_code=None, metric_log_for_monitor=None,
              error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None,
-             emit_to_metric_log=False):
+             emit_to_metric_log=False, monitor_id_override=None):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
         New arguments (beyond inherited arguments):
@@ -342,6 +345,8 @@ class AgentLogger(logging.Logger):
         @param current_time:  This is only used for testing.  It sets the value to use for the current time.
         @param emit_to_metric_log:  If True, then writes the record to the metric log handler for this logger.
             This must only be used if this logger was assigned to a specific monitor.
+        @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
+            of reporting this one value.  The base monitor name will remain unchanged.
         """
         if current_time is None:
             current_time = time.time()
@@ -369,6 +374,7 @@ class AgentLogger(logging.Logger):
         # to do our own hack.  We just stick it in a thread local variable and read it out in makeRecord.
         __thread_local__.last_error_code_seen = error_code
         __thread_local__.last_metric_log_for_monitor = metric_log_for_monitor
+        __thread_local__.last_monitor_id_override = monitor_id_override
 
         # Only associate an monitor with the error if it is in fact an error.
         if level >= logging.ERROR:
@@ -388,6 +394,8 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_error_code_seen = None
         __thread_local__.last_metric_log_for_monitor = None
         __thread_local__.last_error_for_monitor = None
+        __thread_local__.last_monitor_id_override = None
+
         return result
 
     def makeRecord(self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None):
@@ -407,6 +415,14 @@ class AgentLogger(logging.Logger):
 
         result.component = self.component
         result.monitor_name = self.monitor_name
+
+        # Override the id as a bit of a hack.  TODO:  If there is another monitor with that id, we still only
+        # update this monitor's log lines reported and error count.  We should probably increment that one.
+        monitor_id_override = __thread_local__.last_monitor_id_override
+
+        if monitor_id_override is not None:
+            result.monitor_name = '%s(%s)' % (self.monitor_name_base, monitor_id_override)
+            result.component = 'monitor:%s' % self.monitor_name
 
         # We also mark this record as being generated by a AgentLogger.  We use this in the root logger to
         # decide if it should be included in the agent.log output.

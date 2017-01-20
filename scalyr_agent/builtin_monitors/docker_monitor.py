@@ -1063,15 +1063,13 @@ class DockerMonitor( ScalyrMonitor ):
         if metrics is None:
             return
 
-        if not extra:
-            extra = {}
-
-        if container:
-            extra['container'] = container
-
         for key, value in metrics_to_emit.iteritems():
             if value in metrics:
-                self._logger.emit_value( key, metrics[value], extra )
+                # Note, we do a bit of a hack to pretend the monitor's name include the container's name.  We take this
+                # approach because the Scalyr servers already have some special logic to collect monitor names and ids
+                # to help auto generate dashboards.  So, we want a monitor name like `docker_monitor(foo_container)`
+                # for each running container.
+                self._logger.emit_value( key, metrics[value], extra, monitor_id_override=container )
 
     def __log_network_interface_metrics( self, container, metrics, interface=None ):
         extra = {}
@@ -1093,14 +1091,14 @@ class DockerMonitor( ScalyrMonitor ):
                 percpu = cpu_usage['percpu_usage']
                 count = 1
                 for usage in percpu:
-                    extra = { 'container' : container, 'cpu' : count }
-                    self._logger.emit_value( 'docker.cpu.usage', usage, extra )
+                    extra = { 'cpu' : count }
+                    self._logger.emit_value( 'docker.cpu.usage', usage, monitor_id_override=container )
                     count += 1
             self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage )
 
         if 'system_cpu_usage' in metrics:
-            extra = { 'container' : container }
-            self._logger.emit_value( 'docker.cpu.system_cpu_usage', metrics['system_cpu_usage'], extra )
+            self._logger.emit_value( 'docker.cpu.system_cpu_usage', metrics['system_cpu_usage'],
+                                     monitor_id_override=container )
 
         if 'throttling_data' in metrics:
             self.__log_metrics( container, self.__cpu_throttling_metrics, metrics['throttling_data'] )
