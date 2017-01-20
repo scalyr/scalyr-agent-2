@@ -242,7 +242,8 @@ def _split_datetime_from_line( line ):
 
     return (dt, log_line)
 
-def _get_running_containers(client, ignore_container=None, restrict_to_container=None, logger=None):
+def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
+                    only_running_containers=True):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -251,7 +252,7 @@ def _get_running_containers(client, ignore_container=None, restrict_to_container
     result = {}
     try:
         filters = {"id": restrict_to_container} if restrict_to_container is not None else None
-        response = client.containers(filters=filters)
+        response = client.containers(filters=filters, all=not only_running_containers)
         for container in response:
             cid = container['Id']
 
@@ -308,7 +309,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_running_containers(self.__client, ignore_container=self.container_id)
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -340,7 +341,7 @@ class ContainerChecker( StoppableThread ):
             self.__update_checkpoints()
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
-            running_containers = _get_running_containers(self.__client, ignore_container=self.container_id)
+            running_containers = _get_containers(self.__client, ignore_container=self.container_id)
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
@@ -850,8 +851,8 @@ class ContainerIdResolver():
         @return: The container name or None if it was either not found or if there was an error.
         @rtype: str or None
         """
-        matches = _get_running_containers(self.__docker_client, restrict_to_container=container_id,
-                                          logger=self.__logger)
+        matches = _get_containers(self.__docker_client, restrict_to_container=container_id,
+                                  logger=self.__logger, only_running_containers=False)
         if len(matches) == 0:
             self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
             return None
@@ -1137,7 +1138,7 @@ class DockerMonitor( ScalyrMonitor ):
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        containers = _get_running_containers(self.__client, ignore_container=None)
+        containers = _get_containers(self.__client, ignore_container=None)
 
         self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
