@@ -49,16 +49,19 @@ scalyr_init()
 __source_root__ = get_install_root()
 
 
-def build_package(package_type, variant):
+def build_package(package_type, variant, no_versioned_file_name):
     """Builds the scalyr-agent-2 package specified by the arguments.
 
     The package is left in the current working directory.  The file name of the
     package is returned by this function.
 
-    @param package_type: One of 'rpm', 'deb', 'docker', or 'tarball'. Determines which package type is built.
+    @param package_type: One of 'rpm', 'deb', 'docker', 'docker_tarball', or 'tarball'. Determines which package type is
+        built.
     @param variant: Adds the specified string into the package's iteration name. This may be None if no additional
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
+    @param no_versioned_file_name:  If True, will not embed a version number in the resulting artifact's file name.
+        This only has an affect if building one of the tarball formats.
 
     @return: The file name of the produced package.
     """
@@ -73,11 +76,13 @@ def build_package(package_type, variant):
         # Change to that directory and delegate to another method for the specific type.
         os.chdir(tmp_dir)
         if package_type == 'tarball':
-            artifact_file_name = build_tarball_package(variant, version)
+            artifact_file_name = build_tarball_package(variant, version, no_versioned_file_name)
         elif package_type == 'win32':
             artifact_file_name = build_win32_installer_package(variant, version)
         elif package_type == 'docker':
             artifact_file_name = build_docker_container(variant, version)
+        elif package_type == 'docker_tarball':
+            artifact_file_name = build_docker_tarball(variant, version, no_versioned_file_name)
         else:
             assert package_type in ('deb', 'rpm')
             artifact_file_name = build_rpm_or_deb_package(package_type == 'rpm', variant, version)
@@ -85,7 +90,8 @@ def build_package(package_type, variant):
         os.chdir(original_cwd)
 
         # Move the artifact (built package) to the original current working dir.
-        shutil.move(os.path.join(tmp_dir, artifact_file_name), artifact_file_name)
+        if package_type != 'docker':
+            shutil.move(os.path.join(tmp_dir, artifact_file_name), artifact_file_name)
         return artifact_file_name
     finally:
         # Be sure to delete the temporary directory.
@@ -98,41 +104,28 @@ def build_package(package_type, variant):
 # to be upgraded.
 _scalyr_guid_ = uuid.UUID('{0b52b8a0-22c7-4d50-92c1-8ea3b258984e}')
 
+
 def build_docker_container(variant, version):
-    """Creates a deb package of the source tree, and then builds a
-    docker container that contains the installed package
+    """Creates a docker image by creating the docker_tarball and invoking `docker` to build the image
+    via `docker/Dockerfile`.
     """
+    image_name = 'scalyr/scalyr-docker-agent:' + version
+    original_dir = os.getcwd()
 
-    #build the deb file
-    package_file = build_rpm_or_deb_package( False, variant, version )
+    os.chdir(make_path(__source_root__, 'docker'))
 
-    #create a Dockerfile from  Dockerfile.base, with {SCALYR_PKG}
-    #replaced by the package name
-    in_filename = make_path( __source_root__, 'Dockerfile.base' )
-    out_filename = 'Dockerfile'
-    lines = None
-    inf = open( in_filename, 'r' )
+    # Build the docker tarball
+    package_file = build_docker_tarball(variant, version, True)
+
     try:
-        lines = inf.readlines();
+        # Build the docker image
+        run_command('docker build -t %s .' % image_name, exit_on_fail=True, command_name='docker')
     finally:
-        inf.close()
+        os.unlink(package_file)
+        os.chdir(original_dir)
 
-    if lines:
-        outf = open( out_filename, 'w' )
-        try:
-            for line in lines:
-                line = line.replace( "{SCALYR_PKG}", package_file );
-                outf.write( line )
-        finally:
-            outf.close()
+    return image_name
 
-    #build the docker image
-    image_name = 'scalyr/scalyr-agent:' + version
-    run_command( 'docker build -t %s .' % image_name, exit_on_fail=True, command_name='docker' )
-
-    print 'Created Docker Image: %s' % image_name
-
-    return package_file
 
 def build_win32_installer_package(variant, version):
     """Builds an MSI that will install the agent on a win32 machine in the current working directory.
@@ -387,6 +380,81 @@ def expand_template(input_lines, dist_files):
     return result
 
 
+def build_common_docker_and_package_files(create_initd_link, use_docker_config=False):
+    """Builds the common `root` system used by Debian, RPM, and Docker tarball in the current working directory.
+
+    @param create_initd_link: Whether or not to create the link from initd to the scalyr agent binary.
+    @param use_docker_config: Whether or not to use the docker config.
+    @type create_initd_link: bool
+    @type use_docker_config: bool
+    """
+    original_dir = os.getcwd()
+
+    # Create the directory structure for where the RPM/Debian package will place files on the system.
+    make_directory('root/etc/init.d')
+    make_directory('root/var/log/scalyr-agent-2')
+    make_directory('root/var/lib/scalyr-agent-2')
+    make_directory('root/usr/share')
+    make_directory('root/usr/sbin')
+
+    # Place all of the import source in /usr/share/scalyr-agent-2.
+    os.chdir('root/usr/share')
+    build_base_files(use_docker_config=use_docker_config)
+
+    os.chdir('scalyr-agent-2')
+    # The build_base_files leaves the config directory in config, but we have to move it to its etc
+    # location.  We just rename it to the right directory.
+    shutil.move(convert_path('config'), make_path(original_dir, 'root/etc/scalyr-agent-2'))
+    if not use_docker_config:   # The default config directory doesn't have an agent.d dir, so create it.
+        make_directory('root/etc/scalyr-agent-2/agent.d')
+    os.chdir(original_dir)
+
+    # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
+    if create_initd_link:
+        make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2', 'root/etc/init.d/scalyr-agent-2')
+    make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2', 'root/usr/sbin/scalyr-agent-2')
+    make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config', 'root/usr/sbin/scalyr-agent-2-config')
+
+
+def build_docker_tarball(variant, version, no_versioned_file_name):
+    """Builds the scalyr-agent-2 tarball in the current working directory.
+
+    @param variant: If not None, will add the specified string into the final tarball name. This allows for different
+        tarballs to be built for the same type and same version.
+    @param version: The agent version.
+    @param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
+
+    @return: The file name of the built tarball.
+    """
+    build_common_docker_and_package_files(False, use_docker_config=True)
+
+    # Need to create some docker specific files
+    make_directory('root/var/log/scalyr-agent-2/containers')
+
+    if no_versioned_file_name:
+        embedded_version = ''
+    elif variant is None:
+        embedded_version = '-%s' % version
+    else:
+        embedded_version = '-%s.%s' % (version, variant)
+
+    output_name = 'scalyr-docker-agent%s.tar.gz' % embedded_version
+
+    # Tar it up.
+    tar = tarfile.open(output_name, 'w:gz')
+    original_dir = os.getcwd()
+
+    os.chdir('root')
+    for x in glob.glob("*"):
+        tar.add(x)
+
+    os.chdir(original_dir)
+
+    tar.close()
+
+    return output_name
+
+
 def build_rpm_or_deb_package(is_rpm, variant, version):
     """Builds either an RPM or Debian package in the current working directory.
 
@@ -397,33 +465,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
 
     @return: The file name of the built package.
     """
-    original_dir = os.getcwd()
-
-    # Create the directory structure for where the RPM/Debian package will place files on the sytem.
-    make_directory('root/etc/init.d')
-    make_directory('root/var/log/scalyr-agent-2')
-    make_directory('root/var/lib/scalyr-agent-2')
-    make_directory('root/etc/scalyr-agent-2')
-    make_directory('root/etc/scalyr-agent-2/agent.d')
-    make_directory('root/usr/share')
-    make_directory('root/usr/sbin')
-
-    # Place all of the import source in /usr/share/scalyr-agent-2.
-    os.chdir('root/usr/share')
-    build_base_files()
-
-    os.chdir('scalyr-agent-2')
-    # The build_base_files leaves the config directory in config/agent.json, but we have to move it to its etc
-    # location.
-    shutil.move(convert_path('config/agent.json'), make_path(original_dir, 'root/etc/scalyr-agent-2/agent.json'))
-    shutil.rmtree('config')
-
-    os.chdir(original_dir)
-
-    # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
-    make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2', 'root/etc/init.d/scalyr-agent-2')
-    make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2', 'root/usr/sbin/scalyr-agent-2')
-    make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config', 'root/usr/sbin/scalyr-agent-2-config')
+    build_common_docker_and_package_files(True)
 
     # Create the scriplets the RPM/Debian package invokes when uninstalling or upgrading.
     create_scriptlets()
@@ -483,12 +525,13 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
     return files[0]
 
 
-def build_tarball_package(variant, version):
+def build_tarball_package(variant, version, no_versioned_file_name):
     """Builds the scalyr-agent-2 tarball in the current working directory.
 
     @param variant: If not None, will add the specified string into the final tarball name. This allows for different
         tarballs to be built for the same type and same version.
     @param version: The agent version.
+    @param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
 
     @return: The file name of the built tarball.
     """
@@ -514,15 +557,16 @@ def build_tarball_package(variant, version):
 
     shutil.move('scalyr-agent-2', base_archive_name)
 
+    output_name = '%s.tar.gz' % base_archive_name if not no_versioned_file_name else 'scalyr-agent.tar.gz'
     # Tar it up.
-    tar = tarfile.open('%s.tar.gz' % base_archive_name, 'w:gz')
+    tar = tarfile.open(output_name, 'w:gz')
     tar.add(base_archive_name)
     tar.close()
 
-    return '%s.tar.gz' % base_archive_name
+    return output_name
 
 
-def build_base_files():
+def build_base_files(use_docker_config=False):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
     This creates scalyr-agent-2 in the current working directory and then populates it with the basic structure
@@ -540,6 +584,8 @@ def build_base_files():
         bin/scalyr-agent-2-config  -- Symlink to config_main.py to run the configuration tool
         build_info                 -- A file containing the commit id of the latest commit included in this package,
                                       the time it was built, and other information.
+
+    @param use_docker_config:  Whether or not to use the docker configuration files instead of default.
     """
     original_dir = os.getcwd()
     # This will return the parent directory of this file.  We will use that to determine the path
@@ -575,7 +621,10 @@ def build_base_files():
     os.chdir('..')
 
     # Copy the config
-    shutil.copytree(make_path(agent_source_root, 'config'), 'config')
+    if not use_docker_config:
+        shutil.copytree(make_path(agent_source_root, 'config'), 'config')
+    else:
+        shutil.copytree(make_path(agent_source_root, 'docker/config'), 'config')
 
     # Create the trusted CA root list.
     os.chdir('certs')
@@ -1284,7 +1333,7 @@ class BadChangeLogFormat(Exception):
     pass
 
 if __name__ == '__main__':
-    parser = OptionParser(usage='Usage: python build_package.py [options] rpm|tarball|deb|docker|win32')
+    parser = OptionParser(usage='Usage: python build_package.py [options] rpm|tarball|deb|docker|win32|docker_tarball')
     parser.add_option('-v', '--variant', dest='variant', default=None,
                       help='An optional string that is included in the package name to identify a variant '
                       'of the main release created by a different packager.  '
@@ -1294,6 +1343,10 @@ if __name__ == '__main__':
                       'with the --set-build-info option to create the build_info file on one host and then build the '
                       'rest of the package on another.  This is useful when the final host does not have full access '
                       'to git')
+
+    parser.add_option('', '--no-versioned-file-name', action='store_true', dest='no_versioned_file_name', default=False,
+                      help='If true, will not embed the version number in the artifact\'s file name.  This only '
+                           'applies to the `tarball` and `docker_tarball` builds.')
 
     parser.add_option('', '--set-build-info', dest='build_info', default=None,
                       help='The path to the build_info file to include in the final package.  If this is used, '
@@ -1309,14 +1362,14 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if len(args) < 1:
-        print >> sys.stderr, 'You must specify the package you wish to build, such as "rpm", "deb", "docker" or "tarball".'
+        print >> sys.stderr, 'You must specify the package you wish to build, such as "rpm", "deb", "docker", "docker_tarball", or "tarball".'
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
         print >> sys.stderr, 'You may only specify one package to build.'
         parser.print_help(sys.stderr)
         sys.exit(1)
-    elif args[0] not in ('rpm', 'deb', 'docker', 'tarball', 'win32'):
+    elif args[0] not in ('rpm', 'deb', 'docker', 'tarball', 'win32', 'docker_tarball'):
         print >> sys.stderr, 'Unknown package type given: "%s"' % args[0]
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -1324,6 +1377,6 @@ if __name__ == '__main__':
     if options.build_info is not None:
         set_build_info(options.build_info)
 
-    artifact = build_package(args[0], options.variant)
+    artifact = build_package(args[0], options.variant, options.no_versioned_file_name)
     print 'Built %s' % artifact
     sys.exit(0)

@@ -1,0 +1,16 @@
+// Configures the agent to run the syslog-based Docker integration.
+// This means the container running the Scalyr Agent will run a syslog
+// server that the other local containers can connect to to push their
+// logs into Scalyr.  Additionally, the Scalyr Agent will collect metrics
+// on all running containers.
+{
+ monitors: [
+   {
+    module: "scalyr_agent.builtin_monitors.syslog_monitor",
+    mode: "docker"
+   }, {
+    module: "scalyr_agent.builtin_monitors.docker_monitor",
+    log_mode: "syslog"
+   }
+  ]
+}
