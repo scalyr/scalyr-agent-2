@@ -447,6 +447,9 @@ class IoReader(BaseReader):
         # File format is single value per line with "fieldname:" prefix.
         for x in stat_file:
             fields = x.split()
+            if len( fields ) == 0:
+                continue
+
             if fields[0] == "rchar:":
                 self.print_sample("app.disk.bytes", int(fields[1]), "read")
             elif fields[0] == "syscr:":
