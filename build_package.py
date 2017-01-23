@@ -446,7 +446,12 @@ def build_docker_tarball(variant, version, no_versioned_file_name):
 
     os.chdir('root')
     for x in glob.glob("*"):
-        tar.add(x)
+        file_entry = tar.gettarinfo(x)
+        file_entry.uname = 'root'
+        file_entry.gname = 'root'
+        file_entry.uid = 0
+        file_entry.gid = 0
+        tar.addfile(file_entry)
 
     os.chdir(original_dir)
 
