@@ -855,6 +855,51 @@ def import_config(config_src, config_file_path, configuration):
         os.chdir(original_dir)
 
 
+def create_custom_dockerfile(tarball_path, config_file_path, configuration):
+    """Creates a gzipped tarball that, when unpacked, contains a Dockerfile that can be used to create a custom
+    Docker image that includes whatever configuration files this agent install currently has.
+
+    @param tarball_path: The path to write the gzipped tarball, or `-` if the tarball should written to stdout.
+    @param config_file_path: The path to the current configuration file (the `agent.json` file).
+    @param configuration: The configuration object itself.
+    @type tarball_path: str
+    @type config_file_path: str
+    @type configuration: Configuration
+    """
+    if tarball_path != '-':
+        out_tar = tarfile.open(tarball_path, mode='w:gz')
+    else:
+        out_tar = tarfile.open(fileobj=sys.stdout, mode='w|gz')
+
+    # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
+    # by this current agent install.  We want the version of this install in order to make sure the new docker image
+    # is as close to what is currently running as possible.
+    dockerfile_path = os.path.join(get_install_root(), 'misc', 'Dockerfile.custom_agent_config')
+    fp = open(dockerfile_path)
+    dockerfile_contents = fp.read().replace('/scalyr-docker-agent:latest', '/scalyr-docker-agent:%s' % SCALYR_VERSION)
+    fp.close()
+
+    dockerfile_fp = cStringIO.StringIO(dockerfile_contents)
+    # Use the original Dockerfile's attributes (permissions, owner) as a template for the attributes in the archive.
+    tarinfo = out_tar.gettarinfo(dockerfile_path)
+    tarinfo.size = len(dockerfile_contents)
+    tarinfo.name = 'Dockerfile'
+    out_tar.addfile(tarinfo, fileobj=dockerfile_fp)
+    dockerfile_fp.close()
+
+    # Now, generate a tarball containing the exported config for this agent and save it in the tar.
+    # Use a temporary file to save the config tarball in.
+    config_tarball_fd, config_tarball_path = tempfile.mkstemp()
+    config_tarball_fp = os.fdopen(config_tarball_fd, 'wb')
+
+    export_config(config_tarball_path, config_file_path, configuration)
+
+    out_tar.add(config_tarball_path, arcname='agent_config.tar.gz')
+    config_tarball_fp.close()
+
+    out_tar.close()
+
+
 if __name__ == '__main__':
     parser = OptionParser(usage='Usage: scalyr-agent-2-config [options]')
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -898,6 +943,13 @@ if __name__ == '__main__':
                       help="Creates a new gzipped tarball using the current agent configuration files stored in the "
                            "`agent.json` file and the `agent.d` directory.  Pass `-` to write the tarball to stdout. "
                            "Note, this only copies files that end in `.json`.")
+    parser.add_option("", "--docker-create-custom-dockerfile", dest="create_custom_dockerfile",
+                      help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
+                           "Docker image that includes the configuration from this agent installation and based off "
+                           "of the same Scalyr Agent version as this agent.  Essentially, it is a snapshot of this "
+                           "agent so that it's configuration can be more easily used again for other Docker "
+                           "containers.  The option value should either be a path to write the tarball or `-` to "
+                           "write it to stdout.")
 
     # TODO: These options are only available on Windows platforms
     if 'win32' == sys.platform:
@@ -1025,5 +1077,7 @@ if __name__ == '__main__':
     if options.import_config is not None:
         import_config(options.import_config, options.config_filename, config_file)
 
+    if options.create_custom_dockerfile is not None:
+        create_custom_dockerfile(options.create_custom_dockerfile, options.config_filename, config_file)
 
     sys.exit(0)
