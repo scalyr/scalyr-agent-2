@@ -1864,9 +1864,10 @@ class LogLineRedacter(object):
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
-            # Try again, but this time convert the line to utf-8
+            # Try again, but this time convert the line to utf-8, replacing any
+            # invalid characters with the unicode replacement character
             (result, matches) = redaction_rule.redaction_expression.subn(
-                redaction_rule.replacement_text, line.decode( 'utf-8' ))
+                redaction_rule.replacement_text, line.decode( 'utf-8', 'replace' ))
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
