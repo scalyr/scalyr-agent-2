@@ -72,10 +72,6 @@ class Configuration(object):
         # based on platform.
         self.__default_paths = default_paths
 
-        # Used to implement variable substitution in configuration file values.  This maps the variable name
-        # to the value to use in its place.
-        self.__substitutions = {}
-
         # FIX THESE:
         # Add documentation, verify, etc.
         self.max_retry_time = 15 * 60
@@ -94,11 +90,10 @@ class Configuration(object):
                 raise BadConfiguration(str(e), None, 'fileParseError')
 
             # Import any requested variables from the shell and use them for substitutions.
-            self.__import_shell_variables()
-            self.__perform_substitutions()
+            self.__perform_substitutions(self.__config)
 
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
-            api_key, api_config_file = self.__check_api_key( self.__config, self.__file_path )
+            api_key, api_config_file = self.__check_api_key(self.__config, self.__file_path)
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
 
             # Now, look for any additional configuration in the config fragment directory.
@@ -106,16 +101,17 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_file_as_json(fp)
                 for k in content.keys():
-                    if k not in ('api_key', 'logs', 'monitors', 'server_attributes'):
+                    if k not in ('import_vars', 'api_key', 'logs', 'monitors', 'server_attributes'):
                         self.__last_error = BadConfiguration(
                             'Configuration fragment file "%s" contains an invalid key "%s".  The config files in the '
                             'configuration directory can only contain "api_key", "logs", "monitors", and "server_attributes" '
                             'entries.' % (fp, k), k, 'badFragmentKey')
                         raise self.__last_error
 
+                self.__perform_substitutions(content)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                new_api_key, new_api_config_file = self.__check_api_key( content, fp )
+                new_api_key, new_api_config_file = self.__check_api_key(content, fp)
                 if api_key:
                     if new_api_key:
                         raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
@@ -1174,18 +1170,25 @@ class Configuration(object):
             raise BadConfiguration(self.__last_error, 'fake', 'fake')
         return self.__config
 
-    def __import_shell_variables(self):
-        """Imports the shell variables requested in 'import_vars' and adds them to self.__substitutions.
-        """
-        if 'import_vars' in self.__config:
-            for var_name in self.__config.get_json_array('import_vars'):
-                if var_name in os.environ:
-                    self.__substitutions[var_name] = os.environ[var_name]
-                else:
-                    self.__substitutions[var_name] = ''
+    def __perform_substitutions(self, source_config):
+        """Rewrites the content of the source_config to reflect the values in the `import_vars` array.
 
-    def __perform_substitutions(self):
-        """Rewrites self.__config to reflect any substitutions in self.__substitutions."""
+        @param source_config:  The configuration to rewrite, represented as key/value pairs.
+        @type source_config: JsonObject
+        """
+
+        def import_shell_variables():
+            """Creates a dict mapping variables listed in the `import_vars` field of `source_config` to their
+            values from the environment.
+            """
+            result = dict()
+            if 'import_vars' in source_config:
+                for var_name in source_config.get_json_array('import_vars'):
+                    if var_name in os.environ:
+                        result[var_name] = os.environ[var_name]
+                    else:
+                        result[var_name] = ''
+            return result
 
         def perform_generic_substitution(value):
             """Takes a given JSON value and performs the appropriate substitution.
@@ -1236,7 +1239,7 @@ class Configuration(object):
             @rtype: str or unicode
             """
             result = str_value
-            for (var_name, value) in self.__substitutions.iteritems():
+            for (var_name, value) in substitutions.iteritems():
                 result = result.replace('$%s' % var_name, value)
             return result
 
@@ -1252,7 +1255,9 @@ class Configuration(object):
                     array_value[i] = replace_value
 
         # Actually do the work.
-        perform_object_substitution(self.__config)
+        substitutions = import_shell_variables()
+        if len(substitutions) > 0:
+            perform_object_substitution(source_config)
 
 
 class BadConfiguration(Exception):

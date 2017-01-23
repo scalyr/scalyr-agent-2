@@ -669,6 +669,37 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.api_key, 'hi')
 
+    def test_import_vars_in_configuration_directory(self):
+        os.environ['TEST_VAR'] = 'bye'
+        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+            server_attributes: {  serverHost:"foo.com" }
+          }
+        """)
+
+        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+           import_vars: [ "TEST_VAR" ],
+           logs: [ { path: "/var/log/nginx/$TEST_VAR.log" } ],
+           server_attributes: { webServer:"true"}
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(len(config.additional_file_paths), 1)
+        additional_paths = list(config.additional_file_paths)
+        additional_paths.sort()
+        self.assertTrue(additional_paths[0].endswith('nginx.json'))
+
+        self.assertEquals(len(config.log_configs), 3)
+        self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
+        self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/nginx/bye.log')
+        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
+
+        self.assertEquals(config.server_attributes['webServer'], 'true')
+        self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
+
     def __convert_separators(self, contents):
         """Recursively converts all path values for fields in a JsonObject that end in 'path'.
 
