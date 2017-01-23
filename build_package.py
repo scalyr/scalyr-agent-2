@@ -445,13 +445,30 @@ def build_docker_tarball(variant, version, no_versioned_file_name):
     original_dir = os.getcwd()
 
     os.chdir('root')
-    for x in glob.glob("*"):
-        file_entry = tar.gettarinfo(x)
-        file_entry.uname = 'root'
-        file_entry.gname = 'root'
-        file_entry.uid = 0
-        file_entry.gid = 0
-        tar.addfile(file_entry)
+
+    # Do a manual walk over the contents of root so that we can use `addfile` to add the tarfile... which allows
+    # us to reset the owner/group to root.  This might not be that portable to Windows, but for now, Docker is mainly
+    # Posix.
+    for root, dirs, files in os.walk('.'):
+        to_copy = []
+        for name in dirs:
+            to_copy.append(os.path.join(root, name))
+        for name in files:
+            to_copy.append(os.path.join(root, name))
+
+        for x in to_copy:
+            file_entry = tar.gettarinfo(x)
+            file_entry.uname = 'root'
+            file_entry.gname = 'root'
+            file_entry.uid = 0
+            file_entry.gid = 0
+
+            if file_entry.isreg():
+                fp = open(file_entry.name, 'rb')
+                tar.addfile(file_entry, fp)
+                fp.close()
+            else:
+                tar.addfile(file_entry)
 
     os.chdir(original_dir)
 
@@ -602,6 +619,7 @@ def build_base_files(use_docker_config=False):
 
     make_directory('certs')
     make_directory('bin')
+    make_directory('misc')
 
     # Copy the version file.  We copy it both to the root and the package root.  The package copy is done down below.
     shutil.copy(make_path(agent_source_root, 'VERSION'), 'VERSION')
@@ -635,6 +653,13 @@ def build_base_files(use_docker_config=False):
     os.chdir('certs')
     cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'ca_certs.crt')
 
+    os.chdir('..')
+
+    # Misc extra files needed for some features.
+    os.chdir('misc')
+    # This docker file is needed by the `scalyr-agent-2-config --docker-create-custom-dockerfile` command.  We
+    # put it in all distributions (not just the docker_tarball) in case a customer creates an imagine using a package.
+    shutil.copy(make_path(agent_source_root, 'docker/Dockerfile.custom_agent_config'), 'Dockerfile.custom_agent_config')
     os.chdir('..')
 
     # Create symlinks for the two commands
