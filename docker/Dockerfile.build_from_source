@@ -6,10 +6,10 @@ RUN apt-get update && \
   apt-get clean
 RUN cd /usr/bin && mkdir -p /tmp/scalyr && \
   git config --global user.name "Scalyr" && git config --global user.email support@scalyr.com && \
-  git clone git://github.com/scalyr/scalyr-agent-2.git /tmp/scalyr && \
+  git clone -b release git://github.com/scalyr/scalyr-agent-2.git /tmp/scalyr && \
   cd /tmp/scalyr && \ 
   python build_package.py --no-versioned-file-name docker_tarball && \
-  tar -C / -zxf /tmp/scalyr/scalyr-docker-agent.tar.gz && \
+  tar --no-same-owner -C / -zxf /tmp/scalyr/scalyr-docker-agent.tar.gz && \
   cd / && \
   rm -rf /tmp/scalyr
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
