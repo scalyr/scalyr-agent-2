@@ -23,6 +23,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import cStringIO
+import glob
 import os
 import re
 import shutil
@@ -460,8 +461,7 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False, 
 
         # Determine if a newer version is available
         client = ScalyrClientSession(config.scalyr_server, config.api_key, SCALYR_VERSION, quiet=True,
-                                     ca_file=config.ca_cert_path,
-                                     compression_type=self.__config.compression_type, compression_level=self.__config.compression_level )
+                                     ca_file=config.ca_cert_path)
 
         status, size, response = client.perform_agent_version_check(release_track)
 
@@ -687,6 +687,174 @@ def restart_if_conditional_marker_exists(platform_controller, config):
         return False
 
 
+def real_absolute_path(path):
+    """Returns the specified path with both `os.path.abspath` and `os.path.realpath` applied to it.
+    @param path: The path
+    @type path: str
+    @return: The full path
+    @rtype: str
+    """
+    return os.path.realpath(os.path.abspath(path))
+
+
+def relative_path(base_directory, path):
+    """Return a version of a path relative to base_directory
+
+    This is based on `os.path.relpath`.  However, that method is not included in Python 2.4, so replicating
+    it here.
+    """
+
+    start_list = [x for x in base_directory.split(os.path.sep) if x]
+    path_list = [x for x in path.split(os.path.sep) if x]
+
+    # Work out how much of the filepath is shared by start and path.
+    i = len(os.path.commonprefix([start_list, path_list]))
+
+    rel_list = [os.path.pardir] * (len(start_list)-i) + path_list[i:]
+    if not rel_list:
+        return os.curdir
+    return os.path.join(*rel_list)
+
+
+def get_canonical_name(path):
+    """Returns the most canonical form of the path possible.
+
+    This is useful to see if two files (possibly using different symlinks and multiple uses of the parent
+    directory operator) are in fact the same file.
+
+    @param path: The path
+    @type path: str
+    @return: The canonical path for the file.
+    @rtype: str
+    """
+    return os.path.normcase(os.path.normpath(real_absolute_path(path)))
+
+
+def export_config(config_dest, config_file_path, configuration):
+    """Creates a tarball containing the configuration files for the agent (the `agent.json` file and all
+    `.json` files in the `agent.d` directory).
+
+    @param config_dest: The destination path to write the tarball containing the config.  This maybe `-` if
+        it should be written to stdout.
+    @param config_file_path: The path to the configuration file (`agent.json`).
+    @param configuration: The current configuration as read from the file.
+
+    @type config_dest: str
+    @type config_file_path: str
+    @type configuration: Configuration
+    """
+    original_dir = os.getcwd()
+
+    # Change working directory to base of agent configuration directory (usually /etc/scalyr-agent-2 on Linux).
+    config_dir = os.path.dirname(config_file_path)
+    os.chdir(config_dir)
+
+    try:
+        # Get the path to the configuration directory relative to this directory (usually `agent.d`).  Use the
+        # raw value for this configuration to avoid it making the path absolute when we want the relative.
+        fragment_dir = configuration.config_directory_raw
+
+        # If it was absolute, try to make it relative.
+        if os.path.isabs(fragment_dir):
+            fragment_dir = relative_path(real_absolute_path(config_dir), real_absolute_path(fragment_dir))
+
+        if config_dest != '-':
+            out_tar = tarfile.open(config_dest, mode='w:gz')
+        else:
+            out_tar = tarfile.open(fileobj=sys.stdout, mode='w|gz')
+        out_tar.add(os.path.basename(config_file_path))
+
+        for x in glob.glob(os.path.join(fragment_dir, "*.json")):
+            out_tar.add(x)
+
+        out_tar.close()
+    finally:
+        os.chdir(original_dir)
+
+
+def get_tarinfo(path):
+    """Gets the `TarInfo` object for the file at the specified path.
+
+    This contains useful information such as the owner and the group.
+
+    @param path: The path.
+    @type path: str
+    @return: The info for that path
+    @rtype: tarfile.TarInfo
+    """
+    # The `tarfile` library does not let us get this directly.  We need to actually open a tarfile for writing
+    # and have it look at the file path.  So, we create a temporary file to write it to.
+    fd, fn = tempfile.mkstemp()
+    file_obj = os.fdopen(fd, 'wb')
+
+    try:
+        tmp_tar = tarfile.open(fn, fileobj=file_obj, mode='w:gz')
+        result = tmp_tar.gettarinfo(path)
+        tmp_tar.close()
+
+        return result
+    finally:
+        file_obj.close()
+
+
+def import_config(config_src, config_file_path, configuration):
+    """Extracts the agent configuration files from a gzipped tarball and copies them into the real
+    configuration directory.
+
+    Any files in the agent's configuration directory that are not in the tarball will be removed as well.
+
+    All files in the tarball should be relative to the main configuration directory, such as `/etc/scalyr-agent-2`.
+
+    Note, the extracted files user and group ownership are changed to match those on the current configuration
+    file to avoid permission issues.
+
+    @param config_src: The path to the gzipped tarball, or `-` if the tarball should be read from stdin.
+    @param config_file_path: The path to the current configuration file (the `agent.json` file).
+    @param configuration: The configuration object itself.
+    @type config_src: str
+    @type config_file_path: str
+    @type configuration: Configuration
+    """
+    original_dir = os.getcwd()
+
+    # Change to the directory the configuration file is in because all files in the tarball should be relative to it.
+    config_dir = os.path.dirname(config_file_path)
+    os.chdir(config_dir)
+
+    # Get the owner/group information for the current configuration file.  We want this in TarInfo format so that it
+    # can be more easily used below.. and it gets around cross-platform compatibility problems.
+    existing_config_tarinfo = get_tarinfo(config_file_path)
+
+    try:
+        if config_src != '-':
+            in_tar = tarfile.open(config_src, 'r:gz')
+        else:
+            in_tar = tarfile.open(fileobj=sys.stdin, mode='r|gz')
+
+        # Track which files were in the tarball so that we can delete unused ones later.
+        used_files = dict()
+
+        # The order of operations is important here.  For streamed tarfiles, we need to extract the files first.
+        in_tar.extractall()
+
+        # Go back and mark the extract files as used and also chown the files to have the same owner/group as the
+        # current config.
+        for x in in_tar.getmembers():
+            used_files[get_canonical_name(x.name)] = True
+            in_tar.chown(existing_config_tarinfo, x.name)
+
+        in_tar.close()
+
+        # Delete any files in the config directory that are on disk but did not come from the tarball.
+        for x in glob.glob(os.path.join(configuration.config_directory, "*.json")):
+            cname = get_canonical_name(x)
+            if cname not in used_files:
+                os.unlink(cname)
+
+    finally:
+        os.chdir(original_dir)
+
+
 if __name__ == '__main__':
     parser = OptionParser(usage='Usage: scalyr-agent-2-config [options]')
     parser.add_option("-c", "--config-file", dest="config_filename",
@@ -719,6 +887,17 @@ if __name__ == '__main__':
     parser.add_option("", "--preserve-old-install", action="store_true", dest="preserve_old_install", default=False,
                       help="When performing a tarball upgrade, move the old install to a temporary directory "
                            "instead of deleting it.")
+    parser.add_option("", "--import-config", dest="import_config",
+                      help="Extracts the agent configuration files from the provided gzipped tarball, overwriting the"
+                           "current configuration files (stored in `agent.json` and the `agent.d` directory, and"
+                           "removing any files not present in tarball.  Pass `-` to read the tarball from stdin.  Note,"
+                           "it only affects files that end in `.json`.  Also, all the owner and group users for all "
+                           "extracted files are reset to be the same owner/group of the current configuration file to "
+                           "avoid permission problems.")
+    parser.add_option("", "--export-config", dest="export_config",
+                      help="Creates a new gzipped tarball using the current agent configuration files stored in the "
+                           "`agent.json` file and the `agent.d` directory.  Pass `-` to write the tarball to stdout. "
+                           "Note, this only copies files that end in `.json`.")
 
     # TODO: These options are only available on Windows platforms
     if 'win32' == sys.platform:
@@ -839,5 +1018,12 @@ if __name__ == '__main__':
 
     if 'win32' == sys.platform and options.upgrade_windows:
         sys.exit(upgrade_windows_install(config_file, options.release_track, use_ui=not options.upgrade_windows_no_ui))
-        
+
+    if options.export_config is not None:
+        export_config(options.export_config, options.config_filename, config_file)
+
+    if options.import_config is not None:
+        import_config(options.import_config, options.config_filename, config_file)
+
+
     sys.exit(0)

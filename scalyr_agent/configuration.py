@@ -332,6 +332,11 @@ class Configuration(object):
         return self.__resolve_absolute_path(config_directory, self.__get_parent_directory(self.__file_path))
 
     @property
+    def config_directory_raw(self):
+        """Returns the configuration value for 'config_directory', as recorded in the configuration file."""
+        return self.__get_config().get_string('config_directory')
+
+    @property
     def max_allowed_request_size(self):
         """Returns the configuration value for 'max_allowed_request_size'."""
         return self.__get_config().get_int('max_allowed_request_size')
