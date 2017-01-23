@@ -18,6 +18,7 @@ __author__ = 'imron@imralsoftware.com'
 
 import datetime
 import docker
+import fnmatch
 import logging
 import os
 import re
@@ -105,6 +106,11 @@ define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
                      'about running containers.\n',
                      convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'container_globs',
+                     'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
+                     'match one of the glob patterns will be monitored.',
+                      default=None)
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -243,7 +249,7 @@ def _split_datetime_from_line( line ):
     return (dt, log_line)
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True):
+                    only_running_containers=True, glob_list=None):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -261,7 +267,19 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
 
             if len( container['Names'] ) > 0:
                 name = container['Names'][0].lstrip('/')
-                result[cid] = {'name': name}
+
+                add_container = True
+
+                if glob_list:
+                    add_container = False
+                    for glob in glob_list:
+                        if fnmatch.fnmatch( name, glob ):
+                            add_container = True
+                            break;
+
+                if add_container:
+                    result[cid] = {'name': name}
+
             else:
                 result[cid] = {'name': cid}
 
@@ -299,6 +317,8 @@ class ContainerChecker( StoppableThread ):
 
         self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
+        self.__glob_list = config.get( 'container_globs' )
+
         self.containers = {}
         self.__checkpoints = {}
 
@@ -309,7 +329,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_containers(self.__client, ignore_container=self.container_id)
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -341,7 +361,7 @@ class ContainerChecker( StoppableThread ):
             self.__update_checkpoints()
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
-            running_containers = _get_containers(self.__client, ignore_container=self.container_id)
+            running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list)
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
@@ -980,6 +1000,8 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
+        self.__glob_list = self._config.get( 'container_globs' )
+
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
@@ -1136,7 +1158,7 @@ class DockerMonitor( ScalyrMonitor ):
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        containers = _get_containers(self.__client, ignore_container=None)
+        containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
 
         self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
