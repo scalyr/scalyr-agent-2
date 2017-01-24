@@ -405,9 +405,10 @@ def build_common_docker_and_package_files(create_initd_link, use_docker_config=F
     # The build_base_files leaves the config directory in config, but we have to move it to its etc
     # location.  We just rename it to the right directory.
     shutil.move(convert_path('config'), make_path(original_dir, 'root/etc/scalyr-agent-2'))
+    os.chdir(original_dir)
+
     if not use_docker_config:   # The default config directory doesn't have an agent.d dir, so create it.
         make_directory('root/etc/scalyr-agent-2/agent.d')
-    os.chdir(original_dir)
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
