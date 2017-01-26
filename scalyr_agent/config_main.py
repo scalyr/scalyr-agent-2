@@ -128,6 +128,19 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file.close()
 
 
+def set_scalyr_server(config, new_scalyr_server):
+    """Creates a new configuration file in the ``agent.d`` directory to set the `scalyr_server` field to
+    the specified value.
+
+    @param config: The Configuration object.
+    @type config: Configuration
+    @param new_scalyr_server: The new value
+    @type new_scalyr_server: str
+    """
+    write_config_fragment(config, 'scalyr_server.json', 'scalyr_server field',
+                          {"scalyr_server": new_scalyr_server})
+
+
 def set_server_host(config, new_server_host):
     """Creates a new configuration file in the ``agent.d`` directory to set the ``serverHost`` server attribute
     to the specified value.
@@ -135,8 +148,23 @@ def set_server_host(config, new_server_host):
     @param config: The Configuration object.
     @param new_server_host: The value for the ``serverHost`` server attribute.
     """
+    write_config_fragment(config, 'server_host.json', 'server host attribute',
+                          {'server_attributes': {'serverHost': new_server_host}})
 
-    host_path = os.path.join(config.config_directory, 'server_host.json')
+
+def write_config_fragment(config, file_name, field_description, config_json):
+    """Writes a file called `file_name` to the ``agent.d`` directory with the specified configuration.
+
+    @param config: The configuration for the agent, used to determine the location of the ``agent.d`` directory.
+    @param file_name: The name of the file, not the full path.
+    @param field_description: The description of what field is being set, used to emit errors and write comments in file.
+    @param config_json: The configuration to write.
+    @type config: Configuration
+    @type file_name: str
+    @type field_description: str
+    @type config_json: dict
+    """
+    host_path = os.path.join(config.config_directory, file_name)
     tmp_host_path = '%s.tmp' % host_path
 
     try:
@@ -144,16 +172,10 @@ def set_server_host(config, new_server_host):
             if os.path.isfile(tmp_host_path):
                 os.unlink(tmp_host_path)
 
-            config_json = {
-                'server_attributes': {
-                    'serverHost': new_server_host
-                }
-            }
-
             config_content = json_lib.serialize(config_json)
 
             tmp_file = open(tmp_host_path, 'w')
-            print >>tmp_file, '// Sets the server host attribute.'
+            print >>tmp_file, '// Sets the %s.' % field_description
             print >>tmp_file, config_content
             tmp_file.close()
 
@@ -164,14 +186,14 @@ def set_server_host(config, new_server_host):
         except IOError, error:
                 if error.errno == 13:
                     print >>sys.stderr, 'You do not have permission to write to the file and directory required '
-                    print >>sys.stderr, 'to set the server host.  Ensure you can write to the file at path'
+                    print >>sys.stderr, 'to set the %s.  Ensure you can write to the file at path' % field_description
                     print >>sys.stderr, '\'%s\' and create files in its parent directory.' % host_path
                 else:
-                    print >>sys.stderr, 'Error attempting to update the server host: %s' % str(error)
+                    print >>sys.stderr, 'Error attempting to update the %s: %s' % (field_description, str(error))
                     print >>sys.stderr, traceback.format_exc()
                 sys.exit(1)
         except Exception, err:
-            print >>sys.stderr, 'Error attempting to update the server host attribute: %s' % str(err)
+            print >>sys.stderr, 'Error attempting to update the %s: %s' % (field_description, str(err))
             print >> sys.stderr, traceback.format_exc()
             sys.exit(1)
     finally:
@@ -910,6 +932,10 @@ if __name__ == '__main__':
     parser.add_option("", "--set-key", dest="api_key",
                       help="Update the configuration file with the new API key."
                            "The API key is used to authenticate requests to the Scalyr servers for the account.")
+    parser.add_option("", "--set-scalyr-server", dest="scalyr_server",
+                      help="Updates the configuration to send all log uploads to the specified server.  This will "
+                           "create a configuration file fragment `scalyr_server.json` in the config directory.  It "
+                           "will overwrite any existing file at that path.")
     parser.add_option("", "--set-server-host", dest="server_host",
                       help="Adds a new configuration file in the ``agent.d`` directory to set the serverHost "
                            "server attribute.  Warning, if there are any other Scalyr configuration files that sets "
@@ -1049,6 +1075,9 @@ if __name__ == '__main__':
         set_api_key(config_file, options.config_filename, api_key)
     elif options.api_key is not None:
         set_api_key(config_file, options.config_filename, options.api_key)
+
+    if options.scalyr_server is not None:
+        set_scalyr_server(config_file, options.scalyr_server)
 
     if options.server_host is not None:
         set_server_host(config_file, options.server_host)
