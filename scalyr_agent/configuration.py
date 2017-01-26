@@ -15,8 +15,6 @@
 #
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-#
-# author: Steven Czerwinski <czerwin@scalyr.com>
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -93,7 +91,9 @@ class Configuration(object):
             self.__perform_substitutions(self.__config)
 
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
-            api_key, api_config_file = self.__check_api_key(self.__config, self.__file_path)
+            api_key, api_config_file = self.__check_field('api_key', self.__config, self.__file_path)
+            scalyr_server, scalyr_server_config_file = self.__check_field('scalyr_server', self.__config,
+                                                                          self.__file_path)
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
 
             # Now, look for any additional configuration in the config fragment directory.
@@ -101,34 +101,34 @@ class Configuration(object):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_file_as_json(fp)
                 for k in content.keys():
-                    if k not in ('import_vars', 'api_key', 'logs', 'monitors', 'server_attributes'):
+                    if k not in ('import_vars', 'api_key', 'logs', 'monitors', 'server_attributes', 'scalyr_server'):
                         self.__last_error = BadConfiguration(
                             'Configuration fragment file "%s" contains an invalid key "%s".  The config files in the '
-                            'configuration directory can only contain "api_key", "logs", "monitors", and "server_attributes" '
+                            'configuration directory can only contain "api_key", "logs", "monitors", "import_vars", '
+                            '"scalyr_server", and "server_attributes" '
                             'entries.' % (fp, k), k, 'badFragmentKey')
                         raise self.__last_error
 
                 self.__perform_substitutions(content)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                new_api_key, new_api_config_file = self.__check_api_key(content, fp)
-                if api_key:
-                    if new_api_key:
-                        raise BadConfiguration('The configuration file "%s" contains an "api_key" value, but an api_key has already '
-                                               'been set in "%s".  Please ensure that the "api_key" value is set'
-                                               'only once' % (fp, api_config_file),
-                                               'api_key', 'multipleApiKeys')
-
-                else:
-                    api_key = new_api_key
-                    api_config_file = new_api_config_file
+                api_key, api_config_file = self.__check_field(
+                    'api_key', content, fp, previous_value=api_key,
+                    previous_config_file=api_config_file, error_code='multipleApiKeys')
+                scalyr_server, scalyr_server_config_file = self.__check_field(
+                    'scalyr_server', content, fp, previous_value=scalyr_server,
+                    previous_config_file=scalyr_server_config_file,
+                    error_code='multipleScalyrServers')
 
                 self.__add_elements_from_array('logs', content, self.__config)
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
-
-            self.__set_api_key( self.__config, api_key )
+            self.__set_api_key(self.__config, api_key)
+            if scalyr_server is not None:
+                self.__config.put('scalyr_server', scalyr_server)
+            self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
+                                                 'configuration file %s' % self.__file_path)
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
@@ -634,26 +634,37 @@ class Configuration(object):
                                    'Please update the config file with a Write Logs key from https://www.scalyr.com/keys',
                                    'api_key', 'emptyApiKey')
 
-    def __check_api_key( self, config, file_path ):
+    def __check_field(self, field, config, file_path, previous_value=None, previous_config_file=None, error_code=None):
         """
-        Checks to see if the config contains an api_key value, and if so verifies and set it as a
-        member of dest_config.
+        Checks to see if the config contains a value for `field` , and if so verifies that it is a valid string.
 
-        @return the api_key and file_path if the api_key field is found, else return None and None
+        @param field:  The name of the field to check.
+        @param config:  The contents of the config.
+        @param file_path:  The file path to the config.
+        @param previous_value:  If this field has been already defined in another config, the value it was given.
+        @param previous_config_file:  If not None, the path to a config file that has already set this field.  If this
+            is not None and this config does define the field, a `BadConfiguration` exception is raised.
+        @param error_code:  The error code to return if it is detected the field has been set in multiple config files.
+        @return the field's value and file_path if the field is found, else return None and None
 
         """
 
         description = 'configuration file "%s"' % file_path
 
-        result_key = None
-        result_file = None
-        if 'api_key' in config:
-
-            self.__verify_required_string( config, 'api_key', description )
-            result_key = config.get_string('api_key' )
+        if field in config:
+            self.__verify_required_string(config, field, description)
+            result_key = config.get_string(field)
             result_file = file_path
 
-        return result_key, result_file
+            if previous_config_file is not None:
+                raise BadConfiguration(
+                    'The configuration file "%s" contains an "%s" value, but an api_key has already been set in '
+                    '"%s".  Please ensure that the "api_key" value is set only once' % (file_path, field,
+                                                                                        previous_config_file),
+                    field, error_code)
+
+            return result_key, result_file
+        return previous_value, previous_config_file
 
 
     def __verify_main_config_and_apply_defaults(self, config, file_path):
@@ -675,7 +686,6 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'agent_data_path',  self.__default_paths.agent_data_path,
                                              description)
         self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description)
-        self.__verify_or_set_optional_string(config, 'scalyr_server', 'https://agent.scalyr.com', description)
         self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description)
         self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description)
         self.__verify_or_set_optional_bool(config, 'implicit_metric_monitor', True, description)

@@ -463,6 +463,25 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
 
+    def test_api_key_and_scalyr_server_defined_in_config_directory(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+          }
+        """)
+
+        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+           api_key: "hi there",
+           scalyr_server: "foobar",
+           logs: [ { path: "/var/log/nginx/access.log" } ],
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.scalyr_server, 'foobar')
+        self.assertEquals(config.api_key, 'hi there')
+
     def test_bad_fields_in_configuration_directory(self):
         self.__write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }]
@@ -471,6 +490,21 @@ class TestConfiguration(ScalyrTestCase):
 
         self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            api_key: "should cause an error",
+           logs: [ { path: "/var/log/nginx/access.log" } ]
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
+
+    def test_multiple_scalyr_servers_in_configuration_directory(self):
+        self.__write_file_with_separator_conversion(""" { api_key: "hi there", scalyr_server: "test1",
+            logs: [ { path:"/var/log/tomcat6/access.log" }]
+          }
+        """)
+
+        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+           scalyr_server: "should cause an error",
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
         """)
