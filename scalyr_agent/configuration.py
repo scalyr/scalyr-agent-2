@@ -658,9 +658,9 @@ class Configuration(object):
 
             if previous_config_file is not None:
                 raise BadConfiguration(
-                    'The configuration file "%s" contains an "%s" value, but an api_key has already been set in '
-                    '"%s".  Please ensure that the "api_key" value is set only once' % (file_path, field,
-                                                                                        previous_config_file),
+                    'The configuration file "%s" contains an "%s" value, but that field has already been set in '
+                    '"%s".  Please ensure that the "%s" value is set only once' % (file_path, field,
+                                                                                   previous_config_file, field),
                     field, error_code)
 
             return result_key, result_file
