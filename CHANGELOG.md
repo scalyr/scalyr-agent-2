@@ -1,17 +1,37 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.23 "Xeric Xeme" - Oct 10, 2016
+## 2.0.23 "Xeric Xeme" - Jan 30, 2017
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 26, 2016 16:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 30, 2017 16:00 -0700
 --->
 
 Note:  This release is still under development.  Release is TBD.
 
+Major overhaul of Docker support:
+
+* New approach to improve stability across multiple versions of Docker
+* Relies on Docker's `syslog` logging plugin
+* Automatic collection of Docker metrics for all containers running on host
+* Improved Dockerfiles to ease creating images with custom Scalyr Agent configuration
+* Improved methods for configuring Scalyr Agent running within the container
+* Customize where container log files are written
+* See the [Docker installation documentation](https://www.scalyr.com/help/install-agent-docker) for more details.
+
+Additional features:
+
+* New `exclude` option for writing log matching rules.  When specifying which logs to collect using a glob pattern, you can exclude any of the matching logs using another glob.  The field value should be an array of glob patterns.
+* The `import_vars` feature has been extended to work in all files in the `agent.d` directory.  The variables imported by a file are only applied to that file.
+* Both the `api_key` and `scalyr_server` fields may now be set in any file in the `agent.d` directory.
+* Initial support for compressing upload payloads
+
 Bug fixes:
 
-* Fixed several bugs in `docker_monitor` preparing for big release.
+* Removed spurious exceptions in the `linux_process_metrics` module due to reading blank lines from `/prod/pid/io`
+* Prevent log upload being wedged when encountering invalid utf-8 characters
+* Prevent errors in Windows when file descriptors were attempted to be close
+* More diagnostic output and defensive code for the `linux_process_metrics` module to help investigate issue
 
 ## 2.0.22 "Wonderful Whale" - Oct 10, 2016
 
