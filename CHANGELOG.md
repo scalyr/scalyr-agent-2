@@ -1,13 +1,11 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.23 "Xeric Xeme" - Jan 30, 2017
+## 2.0.23 "Xeric Xeme" - Jan 27, 2017
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 30, 2017 16:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 27, 2017 14:00 -0700
 --->
-
-Note:  This release is still under development.  Release is TBD.
 
 Major overhaul of Docker support:
 
