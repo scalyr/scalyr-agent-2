@@ -15,7 +15,7 @@ Major overhaul of Docker support:
 * Improved Dockerfiles to ease creating images with custom Scalyr Agent configuration
 * Improved methods for configuring Scalyr Agent running within the container
 * Customize where container log files are written
-* See the [Docker installation documentation](https://www.scalyr.com/help/install-agent-docker) for more details.  (Note, updated documentation will be posted Jan 28th.)
+* See the [Docker installation documentation](https://www.scalyr.com/help/install-agent-docker) for more details.
 
 Additional features:
 
