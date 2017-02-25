@@ -28,6 +28,8 @@ import SocketServer
 import struct
 import time
 
+import scalyr_agent.scalyr_logging as scalyr_logging
+global_log = scalyr_logging.getLogger(__name__)
 
 class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     """Base class for simple servers that only need to accept incoming connections, perform some actions on
@@ -420,14 +422,23 @@ class RequestStream(object):
 
                 do_full_compaction = True
 
+
+                if self.__get_buffer_read_position() != 0:
+                    global_log.info( "**x** RequestStream: memory buffer processed, %d bytes remaining.", self.__get_buffer_write_position() - self.__get_buffer_read_position() )
+
+                if self.__max_buffer_size - self.__get_buffer_write_position() == 0:
+                    global_log.info( "**x** RequestStream: write_position == max_buffer - about to recv with 0 byte buffer " )
+
                 data = self.__socket.recv(self.__max_buffer_size - self.__get_buffer_write_position())
                 # If we get nothing back, then the connection has been closed.  If it is not closed and there is
                 # no data, then we would get a socket.timeout or socket.error which are handled below.
                 if not data:
+                    global_log.info( "**x** RequestStream: No data returned, flagging end of stream" )
                     self.__at_end = True
                     return None
 
                 # Add the new bytes to the buffer.
+                global_log.info( "**x** RequestStream: Read %d bytes", len(data) )
                 bytes_available_to_read += len(data)
                 self.__add_to_buffer(data)
 
@@ -503,6 +514,7 @@ class RequestStream(object):
             self.__buffer.seek(0, 2)
             self.__buffer.write(new_data)
             self.__current_buffer_size = self.__buffer.tell()
+            global_log.info( "**x** RequestStream.__add_to_buffer() - write position is now: %d bytes", self.__get_buffer_write_position() )
         finally:
             if original_position is not None:
                 self.__buffer.seek(original_position)

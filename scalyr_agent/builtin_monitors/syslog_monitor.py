@@ -280,10 +280,16 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                                        max_buffer_size=buffer_size,
                                        max_request_size=buffer_size,
                                        blocking=False)
+        global_log.info( "**x** TCP Server: created request_stream" )
         while self.server.is_running() and not request_stream.is_closed():
             data = request_stream.read_request()
             if data is not None:
                 self.server.syslog_handler.handle( data.strip() )
+            else:
+                # don't hog the CPU
+                thread.sleep( 0.01 )
+
+        global_log.info( "**x** TCP Server: request_stream closed" )
 
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
