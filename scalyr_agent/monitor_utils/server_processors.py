@@ -348,7 +348,7 @@ class RequestStream(object):
     This essentially puts a memory buffer in front of an incoming socket to efficiently read requests from
     the incoming stream and reset the read position when required by incomplete requests.
     """
-    def __init__(self, incoming_socket, request_parser, max_buffer_size=100*1024, max_request_size=100*1024):
+    def __init__(self, incoming_socket, request_parser, max_buffer_size=100*1024, max_request_size=100*1024, blocking=True):
         """Creates a new instance.
 
         @param incoming_socket: The incoming socket.
@@ -357,6 +357,8 @@ class RequestStream(object):
             specifying the number of bytes available in the buffer.
         @param max_buffer_size: The maximum buffer to use for buffering the incoming requests.
         @param max_request_size: The maximum allowed size for each request.
+        @param blocking: If True pause before reading from the socket to allow time for data to come int
+            if False read directly from the socket.
         """
         # We use non-blocking sockets so that we can response quicker when the agent is
         # shutting down.  It does mean there will be some delay between bytes showing up on the
@@ -366,6 +368,7 @@ class RequestStream(object):
         self.__request_parser = request_parser
         self.__max_buffer_size = max_buffer_size
         self.__max_request_size = max_request_size
+        self.__blocking = blocking
 
         if self.__max_buffer_size < self.__max_request_size:
             raise Exception('You cannot have a max buffer size smaller than your max request size (%d > %d)' % (
@@ -410,9 +413,10 @@ class RequestStream(object):
                         do_full_compaction = False
                         return parsed_request
 
-                # No data immediately available.  Wait a few milliseconds for some more to come in.
-                if not self.__sleep_until_timeout_or_stopped(timeout, run_state):
-                    return None
+                if self.__blocking:
+                    # No data immediately available.  Wait a few milliseconds for some more to come in.
+                    if not self.__sleep_until_timeout_or_stopped(timeout, run_state):
+                        return None
 
                 do_full_compaction = True
 

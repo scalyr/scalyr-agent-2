@@ -73,7 +73,7 @@ define_config_option( __monitor__, 'tcp_buffer_size',
                      'Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog message.  '
                      'Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
                      'support messages up to 8192 bytes long.',
-                     default=8192, min_value=2048, max_value=65536, convert_to=int)
+                     default=8192, min_value=2048, max_value=65536*1024, convert_to=int)
 
 define_config_option( __monitor__, 'max_log_size',
                      'Optional (defaults to 50 MB). How large the log file will grow before it is rotated. Set to zero '
@@ -278,13 +278,12 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
         parser = SyslogFrameParser( buffer_size )
         request_stream = RequestStream(self.request, parser.parse_request,
                                        max_buffer_size=buffer_size,
-                                       max_request_size=buffer_size)
+                                       max_request_size=buffer_size,
+                                       blocking=False)
         while self.server.is_running() and not request_stream.is_closed():
             data = request_stream.read_request()
             if data is not None:
                 self.server.syslog_handler.handle( data.strip() )
-            #don't hog the cpu
-            time.sleep( 0.01 )
 
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
