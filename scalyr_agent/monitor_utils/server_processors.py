@@ -414,6 +414,12 @@ class RequestStream(object):
                     if parsed_request is not None:
                         do_full_compaction = False
                         return parsed_request
+                    elif bytes_available_to_read >= self.__max_request_size:
+                        raise RequestSizeExceeded(bytes_available_to_read, bytes_available_to_read)
+                    elif self.__max_buffer_size == self.__get_buffer_write_position():
+                        # If there are pending bytes left in the buffer, then they didn't form a full request.  We
+                        # definitely need to read more bytes from the network, so do a full compaction if we have to.
+                        self.__full_compaction()
 
                 if self.__blocking:
                     # No data immediately available.  Wait a few milliseconds for some more to come in.
@@ -422,23 +428,18 @@ class RequestStream(object):
 
                 do_full_compaction = True
 
-
-                if self.__get_buffer_read_position() != 0:
-                    global_log.info( "**x** RequestStream: memory buffer processed, %d bytes remaining.", self.__get_buffer_write_position() - self.__get_buffer_read_position() )
-
                 if self.__max_buffer_size - self.__get_buffer_write_position() == 0:
-                    global_log.info( "**x** RequestStream: write_position == max_buffer - about to recv with 0 byte buffer " )
+                    global_log.warning( "RequestStream: write_position == max_buffer.  No room in recv buffer" )
 
                 data = self.__socket.recv(self.__max_buffer_size - self.__get_buffer_write_position())
                 # If we get nothing back, then the connection has been closed.  If it is not closed and there is
                 # no data, then we would get a socket.timeout or socket.error which are handled below.
                 if not data:
-                    global_log.info( "**x** RequestStream: No data returned, flagging end of stream" )
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "RequestStream.read_request: No data received, flagging end of stream" )
                     self.__at_end = True
                     return None
 
                 # Add the new bytes to the buffer.
-                global_log.info( "**x** RequestStream: Read %d bytes", len(data) )
                 bytes_available_to_read += len(data)
                 self.__add_to_buffer(data)
 
@@ -514,7 +515,6 @@ class RequestStream(object):
             self.__buffer.seek(0, 2)
             self.__buffer.write(new_data)
             self.__current_buffer_size = self.__buffer.tell()
-            global_log.info( "**x** RequestStream.__add_to_buffer() - write position is now: %d bytes", self.__get_buffer_write_position() )
         finally:
             if original_position is not None:
                 self.__buffer.seek(original_position)

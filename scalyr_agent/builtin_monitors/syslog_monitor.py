@@ -26,7 +26,9 @@ from socket import error as socket_error
 import socket
 import struct
 import SocketServer
+import threading
 import time
+import traceback
 from string import Template
 from threading import Timer
 
@@ -213,6 +215,7 @@ class SyslogFrameParser(object):
             if bytes_received > self.__max_request_size:
                 # We just consume these bytes if the line did exceeded the maximum.  To some degree, this
                 # typically does not matter since once we see any error on a connection, we close it down.
+                global_log.warning( "SyslogFrameParser - bytes received exceed buffer size.  Some logs may be lost." )
                 new_position = None
                 raise RequestSizeExceeded(bytes_received, self.__max_request_size)
 
@@ -274,22 +277,28 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     a protocol neutral handler
     """
     def handle( self ):
-        buffer_size = self.server.tcp_buffer_size
-        parser = SyslogFrameParser( buffer_size )
-        request_stream = RequestStream(self.request, parser.parse_request,
-                                       max_buffer_size=buffer_size,
-                                       max_request_size=buffer_size,
-                                       blocking=False)
-        global_log.info( "**x** TCP Server: created request_stream" )
-        while self.server.is_running() and not request_stream.is_closed():
-            data = request_stream.read_request()
-            if data is not None:
-                self.server.syslog_handler.handle( data.strip() )
-            else:
-                # don't hog the CPU
-                thread.sleep( 0.01 )
+        try:
+            buffer_size = self.server.tcp_buffer_size
+            parser = SyslogFrameParser( buffer_size )
+            request_stream = RequestStream(self.request, parser.parse_request,
+                                           max_buffer_size=buffer_size,
+                                           max_request_size=buffer_size,
+                                           blocking=False)
 
-        global_log.info( "**x** TCP Server: request_stream closed" )
+            global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - created request_stream. Thread: %d", threading.current_thread().ident )
+            while self.server.is_running() and not request_stream.is_closed():
+                data = request_stream.read_request()
+                if data is not None:
+                    self.server.syslog_handler.handle( data.strip() )
+                else:
+                    # don't hog the CPU
+                    time.sleep( 0.01 )
+
+        except Exception, e:
+            global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
+
+        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - closing request_stream. Thread: %d", threading.current_thread().ident )
+
 
 class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
     """Class that creates a UDP SocketServer on a specified port
@@ -371,6 +380,7 @@ class SyslogHandler(object):
         self.__line_reporter = line_reporter
         self.__docker_logging = docker_logging
         self.__docker_loggers = {}
+        self.__logger_lock = threading.Lock()
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
 
@@ -485,54 +495,67 @@ class SyslogHandler(object):
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
 
         if cname is not None and cid is not None:
-            # check if we already have a logger for this container
-            # and if not, then create it
-            if cname not in self.__docker_loggers:
-                info = dict()
+            logger = None
+            try:
+                self.__logger_lock.acquire()
 
-                # get the config and set the attributes
-                info['log_config'] = self.__create_log_config( cname, cid )
-                info['cid'] = cid
-                attributes = self.__extra_attributes( cname, cid )
-                if attributes:
-                    info['log_config']['attributes'] = attributes
+                # check if we already have a logger for this container
+                # and if not, then create it
+                if cname not in self.__docker_loggers:
+                    info = dict()
 
-                # create the physical log files
-                info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
-                info['last_seen'] = time.time()
+                    # get the config and set the attributes
+                    info['log_config'] = self.__create_log_config( cname, cid )
+                    info['cid'] = cid
+                    attributes = self.__extra_attributes( cname, cid )
+                    if attributes:
+                        info['log_config']['attributes'] = attributes
 
-                # if we created the log file
-                if info['logger']:
-                    # add it to the main scalyr log watcher
-                    if watcher and module:
-                        info['log_config'] = watcher.add_log_config( module, info['log_config'] )
+                    # create the physical log files
+                    info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
+                    info['last_seen'] = time.time()
 
-                    # and keep a record for ourselves
-                    self.__docker_loggers[cname] = info
-                else:
-                    self.__logger.warn( "Unable to create logger for %s." % cname )
-                    return
+                    # if we created the log file
+                    if info['logger']:
+                        # add it to the main scalyr log watcher
+                        if watcher and module:
+                            info['log_config'] = watcher.add_log_config( module, info['log_config'] )
 
-            # at this point __docker_loggers will always contain
-            # a logger for this container name, so log the message
-            # and mark the time
-            self.__docker_loggers[cname]['logger'].info(line_content)
-            self.__docker_loggers[cname]['last_seen'] = time.time()
+                        # and keep a record for ourselves
+                        self.__docker_loggers[cname] = info
+                    else:
+                        self.__logger.warn( "Unable to create logger for %s." % cname )
+                        return
 
+                # at this point __docker_loggers will always contain
+                # a logger for this container name, so log the message
+                # and mark the time
+                logger = self.__docker_loggers[cname]
+            finally:
+                self.__logger_lock.release()
+
+            if logger:
+                logger['logger'].info(line_content)
+                logger['last_seen'] = time.time()
 
         # find out which if any of the loggers in __docker_loggers have
         # expired
         expired = []
         currentTime = time.time()
-        for key, info in self.__docker_loggers.iteritems():
-            if currentTime - info['last_seen'] > self.__docker_expire_log:
-                expired.append( key )
 
-        # remove all the expired loggers
-        for key in expired:
-            info = self.__docker_loggers.pop( key, None )
-            if info and watcher and module:
-                watcher.remove_log_path( module, info['log_config']['path'] )
+        try:
+            self.__logger_lock.acquire()
+            for key, info in self.__docker_loggers.iteritems():
+                if currentTime - info['last_seen'] > self.__docker_expire_log:
+                    expired.append( key )
+
+            # remove all the expired loggers
+            for key in expired:
+                info = self.__docker_loggers.pop( key, None )
+                if info and watcher and module:
+                    watcher.remove_log_path( module, info['log_config']['path'] )
+        finally:
+            self.__logger_lock.release()
 
     def handle( self, data ):
         if self.__docker_logging:
