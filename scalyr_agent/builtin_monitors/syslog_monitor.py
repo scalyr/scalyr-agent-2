@@ -429,24 +429,16 @@ class SyslogHandler(object):
     def __create_log_file( self, cname, cid, log_config ):
         """create our own rotating logger which will log raw messages out to disk.
         """
-        name = 'docker-' + cname + '.log'
-        result = logging.getLogger( name )
+        result = None
+        try:
+            result = AutoFlushingRotatingFileHandler( filename = log_config['path'],
+                                                                  maxBytes = self.__max_log_size,
+                                                                  backupCount = self.__max_log_rotations,
+                                                                  flushDelay = self.__flush_delay)
 
-        if len( result.handlers ) == 0:
-            try:
-                log_handler = AutoFlushingRotatingFileHandler( filename = log_config['path'],
-                                                                      maxBytes = self.__max_log_size,
-                                                                      backupCount = self.__max_log_rotations,
-                                                                      flushDelay = self.__flush_delay)
-
-                formatter = logging.Formatter()
-                log_handler.setFormatter( formatter )
-                result.addHandler( log_handler )
-                result.setLevel( logging.INFO )
-                result.propagate = False
-            except Exception, e:
-                self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
-                result = None
+        except Exception, e:
+            self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+            result = None
 
         return result
 
@@ -535,7 +527,7 @@ class SyslogHandler(object):
                 self.__logger_lock.release()
 
             if logger:
-                logger['logger'].info(line_content)
+                logger['logger'].write(line_content)
                 logger['last_seen'] = time.time()
 
         # find out which if any of the loggers in __docker_loggers have
@@ -552,8 +544,10 @@ class SyslogHandler(object):
             # remove all the expired loggers
             for key in expired:
                 info = self.__docker_loggers.pop( key, None )
-                if info and watcher and module:
-                    watcher.remove_log_path( module, info['log_config']['path'] )
+                if info:
+                    info['logger'].close()
+                    if watcher and module:
+                        watcher.remove_log_path( module, info['log_config']['path'] )
         finally:
             self.__logger_lock.release()
 
