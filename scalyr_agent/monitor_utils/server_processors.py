@@ -409,6 +409,15 @@ class RequestStream(object):
                     if parsed_request is not None:
                         do_full_compaction = False
                         return parsed_request
+                    elif bytes_available_to_read >= self.__max_request_size:
+                        # The parser didn't return a request even though the maximum request size has been reached..
+                        # This should never happen (if parser is written correctly), so throw an error
+                        raise RequestSizeExceeded(bytes_available_to_read, bytes_available_to_read)
+                    elif self.__max_buffer_size == self.__get_buffer_write_position():
+                        # If there are pending bytes left in the buffer, then they did not form a full request.  We
+                        # definitely need to read more bytes from the network, so do a full compaction if there is
+                        # no space left in the buffer.
+                        self.__full_compaction()
 
                 # No data immediately available.  Wait a few milliseconds for some more to come in.
                 if not self.__sleep_until_timeout_or_stopped(timeout, run_state):
