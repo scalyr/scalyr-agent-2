@@ -2016,7 +2016,7 @@ class LogMatcher(object):
                 for exclude_glob in self.__log_entry_config['exclude']:
                     if fnmatch.fnmatch( matched_file, exclude_glob ):
                         skip = True
-                        break;
+                        break
 
                 # if so, skip it.
                 if skip:
