@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.24 "Yucky Yak" - Mar 3, 2017
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 3, 2017 14:00 -0700
+--->
+
+Note, this release is TBD.  Release date is not final.
+
+Bug fixes:
+
+* Syslog/Docker fix that caused dropped log lines when write rate exceeded certain threshold
+
+
 ## 2.0.23 "Xeric Xeme" - Jan 27, 2017
 
 <!---
