@@ -789,7 +789,7 @@ class ContainerIdResolver():
         @rtype: str or None
         """
         try:
-            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
             current_time = time.time()
 
             self.__lock.acquire()
@@ -800,8 +800,8 @@ class ContainerIdResolver():
                 if container_id in self.__cache:
                     entry = self.__cache[container_id]
                     self._touch(entry, current_time)
-                    self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
-                                      entry.container_name)
+                    #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
+                                      #entry.container_name)
                     return entry.container_name
             finally:
                 self.__lock.release()
@@ -809,12 +809,14 @@ class ContainerIdResolver():
             container_name = self._fetch_id_from_docker(container_id)
 
             if container_name is not None:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
-                                  container_name)
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
+                #                  container_name)
+
                 self._insert_entry(container_id, container_name, current_time)
                 return container_name
 
-            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
+
         except Exception, e:
             self.__logger.error('Error seen while attempting resolving docker cid="%s"', container_id)
 
@@ -831,8 +833,9 @@ class ContainerIdResolver():
         if self.__last_cache_clean + self.__cache_clean_secs > current_time:
             return
 
-        self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Cleaning cid cache. Before clean=%d:%d', len(self.__cache),
-                          len(self.__untouched_ids))
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Cleaning cid cache. Before clean=%d:%d', len(self.__cache),
+        #                  len(self.__untouched_ids))
+
         self.__last_cache_clean = current_time
         # The last access time that will trigger expiration.
         expire_threshold = current_time - self.__cache_expiration_secs
@@ -847,8 +850,8 @@ class ContainerIdResolver():
         for key in self.__cache:
             self.__untouched_ids[key] = True
 
-        self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'After clean=%d:%d', len(self.__cache),
-                          len(self.__untouched_ids))
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'After clean=%d:%d', len(self.__cache),
+        #                  len(self.__untouched_ids))
 
     def _touch(self, cache_entry, last_access_time):
         """Mark the specified cache entry as being recently used.
@@ -874,7 +877,7 @@ class ContainerIdResolver():
         matches = _get_containers(self.__docker_client, restrict_to_container=container_id,
                                   logger=self.__logger, only_running_containers=False)
         if len(matches) == 0:
-            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
             return None
 
         if len(matches) > 1:

@@ -38,6 +38,7 @@ from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVE
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 
@@ -208,7 +209,7 @@ class SyslogFrameParser(object):
         new_position = None
         try:
             new_position = input_buffer.tell()
-            buf = input_buffer.read(self.__max_request_size + 1)
+            buf = input_buffer.read( self.__max_request_size + 1)
 
             bytes_received = len(buf)
 
@@ -286,13 +287,26 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                                            blocking=False)
 
             global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - created request_stream. Thread: %d", threading.current_thread().ident )
-            while self.server.is_running() and not request_stream.is_closed():
+            count = 0
+            while not request_stream.is_closed():
+                check_running = False
+
                 data = request_stream.read_request()
                 if data is not None:
                     self.server.syslog_handler.handle( data.strip() )
+                    count += 1
+                    if count > 1000:
+                        check_running = True
+                        count = 0
                 else:
                     # don't hog the CPU
                     time.sleep( 0.01 )
+                    check_running = True
+
+                # limit the amount of times we check if the server is still running
+                # as this is a time consuming operation due to locking
+                if check_running and not self.server.is_running():
+                    break;
 
         except Exception, e:
             global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
@@ -380,6 +394,7 @@ class SyslogHandler(object):
         self.__line_reporter = line_reporter
         self.__docker_logging = docker_logging
         self.__docker_loggers = {}
+        self.__container_names = {}
         self.__logger_lock = threading.Lock()
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
@@ -431,10 +446,16 @@ class SyslogHandler(object):
         """
         result = None
         try:
+            """
             result = AutoFlushingRotatingFileHandler( filename = log_config['path'],
                                                                   maxBytes = self.__max_log_size,
                                                                   backupCount = self.__max_log_rotations,
                                                                   flushDelay = self.__flush_delay)
+            """
+            result = AutoFlushingRotatingFile( filename = log_config['path'],
+                                                                  max_bytes = self.__max_log_size,
+                                                                  backup_count = self.__max_log_rotations,
+                                                                  flush_delay = self.__flush_delay)
 
         except Exception, e:
             self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
@@ -458,21 +479,29 @@ class SyslogHandler(object):
         if self.__docker_regex is not None:
             m = self.__docker_regex.match(data)
             if m is not None:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
-                cname = self.__docker_is_resolver.lookup(cid)
+                #cname = self.__docker_is_resolver.lookup(cid)
+                cname = None
+                self.__logger_lock.acquire()
+                try:
+                    if cid not in self.__container_names:
+                        self.__container_names[cid] = self.__docker_is_resolver.lookup(cid)
+                    cname = self.__container_names[cid]
+                finally:
+                    self.__logger_lock.release()
 
                 if cid is not None and cname is not None:
-                    self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
+                    #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
                     return cname, cid, data[m.end():]
 
         if self.__docker_regex_full is not None:
             m = self.__docker_regex_full.match(data)
             if m is not None and m.lastindex == 2:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
                 return m.group(1), m.group(2), data[m.end():]
 
-        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None
 
@@ -486,11 +515,11 @@ class SyslogHandler(object):
 
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
 
-        if cname is not None and cid is not None:
+        current_time = time.time()
+        self.__logger_lock.acquire()
+        try:
             logger = None
-            try:
-                self.__logger_lock.acquire()
-
+            if cname is not None and cid is not None:
                 # check if we already have a logger for this container
                 # and if not, then create it
                 if cname not in self.__docker_loggers:
@@ -505,7 +534,7 @@ class SyslogHandler(object):
 
                     # create the physical log files
                     info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
-                    info['last_seen'] = time.time()
+                    info['last_seen'] = current_time
 
                     # if we created the log file
                     if info['logger']:
@@ -523,22 +552,17 @@ class SyslogHandler(object):
                 # a logger for this container name, so log the message
                 # and mark the time
                 logger = self.__docker_loggers[cname]
-            finally:
-                self.__logger_lock.release()
 
             if logger:
                 logger['logger'].write(line_content)
-                logger['last_seen'] = time.time()
+                logger['last_seen'] = current_time
 
-        # find out which if any of the loggers in __docker_loggers have
-        # expired
-        expired = []
-        currentTime = time.time()
+            # find out which if any of the loggers in __docker_loggers have
+            # expired
+            expired = []
 
-        try:
-            self.__logger_lock.acquire()
             for key, info in self.__docker_loggers.iteritems():
-                if currentTime - info['last_seen'] > self.__docker_expire_log:
+                if current_time - info['last_seen'] > self.__docker_expire_log:
                     expired.append( key )
 
             # remove all the expired loggers
