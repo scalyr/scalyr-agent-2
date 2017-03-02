@@ -47,6 +47,8 @@ global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
+RUN_EXPIRE_COUNT = 100
+
 define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
                      convert_to=str, required_option=True)
@@ -273,27 +275,116 @@ class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
     def handle( self ):
         self.server.syslog_handler.handle( self.request[0].strip() )
 
+class SyslogRequestParser( object ):
+    def __init__( self, socket, max_buffer_size ):
+        self._socket = socket
+        self._socket.setblocking( False )
+        self._remaining = None
+        self._max_buffer_size = max_buffer_size
+        self.is_closed = False
+
+    def read( self ):
+        """Reads self._max_buffer_size bytes from the buffer"""
+
+        data = None
+        try:
+            data = self._socket.recv( self._max_buffer_size )
+            if not data:
+                self.is_closed = True
+        except socket.timeout:
+            self._socket_error = True
+            return None
+        except socket.error, e:
+            if e.errno == errno.EAGAIN:
+                return None
+            else:
+                self._socket_error = True
+                raise e
+
+        return data
+
+    def process( self, data, handle_frame ):
+        """Processes data returned from a previous call to read
+        """
+        if not data:
+            return
+
+        # append data to what we had remaining from the previous call
+        if self._remaining:
+            self._remaining += data
+        else:
+            self._remaining = data
+            self._offset = 0
+
+        size = len( self._remaining )
+
+        # process the buffer until we are out of bytes
+        while self._offset < size:
+
+            # get the first byte to determine if framed or not
+            c = self._remaining[self._offset]
+            framed = (c >= '0' and c <= '9')
+
+            skip = 0 # do we need to skip any bytes at the end of the frame (e.g. newlines)
+
+            #if framed, read the frame size
+            if framed:
+                frame_end = -1
+                pos = self._remaining.find( " ", self._offset )
+                if pos != -1:
+                    frame_size = int( self._remaining[self._offset:pos] )
+                    message_offset = pos + 1
+                    if size - message_offset >= frame_size:
+                        self._offset = message_offset
+                        frame_end = self._offset + frame_size
+            else:
+                # not framed, find the first newline
+                frame_end = self._remaining.find( "\n", self._offset )
+                skip = 1
+
+
+            # if we couldn't find the end of a frame, then it's time
+            # to exit the loop and wait for more data
+            if frame_end == -1:
+
+                #if the remaining bytes exceed the maximum buffer size, issue a warning
+                #and dump existing contents to the handler
+                if size - self._offset >= self._max_buffer_size:
+                    global_log.warning( "Syslog frame exceeded maximum buffer size",
+                                         limit_once_per_x_secs=300,
+                                         limit_key='syslog-max-buffer-exceeded')
+                    handle_frame( self._remaining )
+                    # add a space to ensure the next frame won't start with a number
+                    # and be incorrectly interpreted as a framed message
+                    self._remaining = ' '
+                    self._offset = 0
+
+                break;
+
+            # output the frame
+            frame_length = frame_end - self._offset
+            handle_frame( self._remaining[self._offset:frame_end].strip() )
+            self._offset += frame_length + skip
+
+        self._remaining = self._remaining[self._offset:]
+        self._offset = 0
+
+
 class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     """Class that reads data from a TCP request and passes it to
     a protocol neutral handler
     """
     def handle( self ):
         try:
-            buffer_size = self.server.tcp_buffer_size
-            parser = SyslogFrameParser( buffer_size )
-            request_stream = RequestStream(self.request, parser.parse_request,
-                                           max_buffer_size=buffer_size,
-                                           max_request_size=buffer_size,
-                                           blocking=False)
-
+            request_stream = SyslogRequestParser( self.request, self.server.tcp_buffer_size )
             global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - created request_stream. Thread: %d", threading.current_thread().ident )
             count = 0
-            while not request_stream.is_closed():
+            while not request_stream.is_closed:
                 check_running = False
 
-                data = request_stream.read_request()
+                data = request_stream.read()
                 if data is not None:
-                    self.server.syslog_handler.handle( data.strip() )
+                    request_stream.process( data, self.server.syslog_handler.handle )
                     count += 1
                     if count > 1000:
                         check_running = True
@@ -395,6 +486,7 @@ class SyslogHandler(object):
         self.__docker_logging = docker_logging
         self.__docker_loggers = {}
         self.__container_names = {}
+        self.__expire_count = 0
         self.__logger_lock = threading.Lock()
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
@@ -552,28 +644,32 @@ class SyslogHandler(object):
                 # a logger for this container name, so log the message
                 # and mark the time
                 logger = self.__docker_loggers[cname]
-
-            if logger:
-                logger['logger'].write(line_content)
                 logger['last_seen'] = current_time
 
-            # find out which if any of the loggers in __docker_loggers have
-            # expired
-            expired = []
+            if self.__expire_count >= RUN_EXPIRE_COUNT:
+                self.__expire_count = 0
 
-            for key, info in self.__docker_loggers.iteritems():
-                if current_time - info['last_seen'] > self.__docker_expire_log:
-                    expired.append( key )
+                # find out which if any of the loggers in __docker_loggers have
+                # expired
+                expired = []
 
-            # remove all the expired loggers
-            for key in expired:
-                info = self.__docker_loggers.pop( key, None )
-                if info:
-                    info['logger'].close()
-                    if watcher and module:
-                        watcher.remove_log_path( module, info['log_config']['path'] )
+                for key, info in self.__docker_loggers.iteritems():
+                    if current_time - info['last_seen'] > self.__docker_expire_log:
+                        expired.append( key )
+
+                # remove all the expired loggers
+                for key in expired:
+                    info = self.__docker_loggers.pop( key, None )
+                    if info:
+                        info['logger'].close()
+                        if watcher and module:
+                            watcher.remove_log_path( module, info['log_config']['path'] )
+            self.__expire_count += 1
         finally:
             self.__logger_lock.release()
+
+        if logger:
+            logger['logger'].write(line_content)
 
     def handle( self, data ):
         if self.__docker_logging:

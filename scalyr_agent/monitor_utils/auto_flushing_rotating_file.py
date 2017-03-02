@@ -39,13 +39,17 @@ class AutoFlushingRotatingFile( object ):
         message = "%s\n" % message
         size = len( message )
 
-        if self.rotateRequired( size ):
-            self.rotateFile()
+        self._lock.acquire()
+        try:
+            if self.rotateRequired( size ):
+                self.rotateFile()
 
-        f = self._file
-        f.write( message )
-        f.flush()
-        self._totalSize += size
+            f = self._file
+            f.write( message )
+            f.flush()
+            self._totalSize += size
+        finally:
+            self._lock.release()
 
     def flush( self ):
         self._flush()
