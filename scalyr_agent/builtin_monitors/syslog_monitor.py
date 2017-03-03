@@ -278,7 +278,8 @@ class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
 class SyslogRequestParser( object ):
     def __init__( self, socket, max_buffer_size ):
         self._socket = socket
-        self._socket.setblocking( False )
+        if socket:
+            self._socket.setblocking( False )
         self._remaining = None
         self._max_buffer_size = max_buffer_size
         self.is_closed = False
@@ -341,7 +342,6 @@ class SyslogRequestParser( object ):
                 # not framed, find the first newline
                 frame_end = self._remaining.find( "\n", self._offset )
                 skip = 1
-
 
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data

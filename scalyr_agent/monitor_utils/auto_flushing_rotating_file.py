@@ -65,7 +65,7 @@ class AutoFlushingRotatingFile( object ):
             self._file = None
 
     def rotateRequired( self, size ):
-        return self._max_bytes > 0 and self._totalSize + size >= self._max_bytes
+        return self._max_bytes > 0 and self._totalSize + size > self._max_bytes
     
     def rotateFile( self ):
         self.close()
