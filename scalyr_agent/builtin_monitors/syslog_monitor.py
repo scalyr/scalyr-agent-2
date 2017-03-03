@@ -38,6 +38,7 @@ from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVE
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 
@@ -45,6 +46,8 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
+
+RUN_EXPIRE_COUNT = 100
 
 define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
@@ -208,7 +211,7 @@ class SyslogFrameParser(object):
         new_position = None
         try:
             new_position = input_buffer.tell()
-            buf = input_buffer.read(self.__max_request_size + 1)
+            buf = input_buffer.read( self.__max_request_size + 1)
 
             bytes_received = len(buf)
 
@@ -272,27 +275,129 @@ class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
     def handle( self ):
         self.server.syslog_handler.handle( self.request[0].strip() )
 
+class SyslogRequestParser( object ):
+    def __init__( self, socket, max_buffer_size ):
+        self._socket = socket
+        if socket:
+            self._socket.setblocking( False )
+        self._remaining = None
+        self._max_buffer_size = max_buffer_size
+        self.is_closed = False
+
+    def read( self ):
+        """Reads self._max_buffer_size bytes from the buffer"""
+
+        data = None
+        try:
+            data = self._socket.recv( self._max_buffer_size )
+            if not data:
+                self.is_closed = True
+        except socket.timeout:
+            self._socket_error = True
+            return None
+        except socket.error, e:
+            if e.errno == errno.EAGAIN:
+                return None
+            else:
+                self._socket_error = True
+                raise e
+
+        return data
+
+    def process( self, data, handle_frame ):
+        """Processes data returned from a previous call to read
+        """
+        if not data:
+            return
+
+        # append data to what we had remaining from the previous call
+        if self._remaining:
+            self._remaining += data
+        else:
+            self._remaining = data
+            self._offset = 0
+
+        size = len( self._remaining )
+
+        # process the buffer until we are out of bytes
+        while self._offset < size:
+
+            # get the first byte to determine if framed or not
+            c = self._remaining[self._offset]
+            framed = (c >= '0' and c <= '9')
+
+            skip = 0 # do we need to skip any bytes at the end of the frame (e.g. newlines)
+
+            #if framed, read the frame size
+            if framed:
+                frame_end = -1
+                pos = self._remaining.find( " ", self._offset )
+                if pos != -1:
+                    frame_size = int( self._remaining[self._offset:pos] )
+                    message_offset = pos + 1
+                    if size - message_offset >= frame_size:
+                        self._offset = message_offset
+                        frame_end = self._offset + frame_size
+            else:
+                # not framed, find the first newline
+                frame_end = self._remaining.find( "\n", self._offset )
+                skip = 1
+
+            # if we couldn't find the end of a frame, then it's time
+            # to exit the loop and wait for more data
+            if frame_end == -1:
+
+                #if the remaining bytes exceed the maximum buffer size, issue a warning
+                #and dump existing contents to the handler
+                if size - self._offset >= self._max_buffer_size:
+                    global_log.warning( "Syslog frame exceeded maximum buffer size",
+                                         limit_once_per_x_secs=300,
+                                         limit_key='syslog-max-buffer-exceeded')
+                    handle_frame( self._remaining )
+                    # add a space to ensure the next frame won't start with a number
+                    # and be incorrectly interpreted as a framed message
+                    self._remaining = ' '
+                    self._offset = 0
+
+                break;
+
+            # output the frame
+            frame_length = frame_end - self._offset
+            handle_frame( self._remaining[self._offset:frame_end].strip() )
+            self._offset += frame_length + skip
+
+        self._remaining = self._remaining[self._offset:]
+        self._offset = 0
+
+
 class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
     """Class that reads data from a TCP request and passes it to
     a protocol neutral handler
     """
     def handle( self ):
         try:
-            buffer_size = self.server.tcp_buffer_size
-            parser = SyslogFrameParser( buffer_size )
-            request_stream = RequestStream(self.request, parser.parse_request,
-                                           max_buffer_size=buffer_size,
-                                           max_request_size=buffer_size,
-                                           blocking=False)
-
+            request_stream = SyslogRequestParser( self.request, self.server.tcp_buffer_size )
             global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - created request_stream. Thread: %d", threading.current_thread().ident )
-            while self.server.is_running() and not request_stream.is_closed():
-                data = request_stream.read_request()
+            count = 0
+            while not request_stream.is_closed:
+                check_running = False
+
+                data = request_stream.read()
                 if data is not None:
-                    self.server.syslog_handler.handle( data.strip() )
+                    request_stream.process( data, self.server.syslog_handler.handle )
+                    count += 1
+                    if count > 1000:
+                        check_running = True
+                        count = 0
                 else:
                     # don't hog the CPU
                     time.sleep( 0.01 )
+                    check_running = True
+
+                # limit the amount of times we check if the server is still running
+                # as this is a time consuming operation due to locking
+                if check_running and not self.server.is_running():
+                    break;
 
         except Exception, e:
             global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
@@ -380,6 +485,8 @@ class SyslogHandler(object):
         self.__line_reporter = line_reporter
         self.__docker_logging = docker_logging
         self.__docker_loggers = {}
+        self.__container_names = {}
+        self.__expire_count = 0
         self.__logger_lock = threading.Lock()
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
@@ -429,24 +536,22 @@ class SyslogHandler(object):
     def __create_log_file( self, cname, cid, log_config ):
         """create our own rotating logger which will log raw messages out to disk.
         """
-        name = 'docker-' + cname + '.log'
-        result = logging.getLogger( name )
+        result = None
+        try:
+            """
+            result = AutoFlushingRotatingFileHandler( filename = log_config['path'],
+                                                                  maxBytes = self.__max_log_size,
+                                                                  backupCount = self.__max_log_rotations,
+                                                                  flushDelay = self.__flush_delay)
+            """
+            result = AutoFlushingRotatingFile( filename = log_config['path'],
+                                                                  max_bytes = self.__max_log_size,
+                                                                  backup_count = self.__max_log_rotations,
+                                                                  flush_delay = self.__flush_delay)
 
-        if len( result.handlers ) == 0:
-            try:
-                log_handler = AutoFlushingRotatingFileHandler( filename = log_config['path'],
-                                                                      maxBytes = self.__max_log_size,
-                                                                      backupCount = self.__max_log_rotations,
-                                                                      flushDelay = self.__flush_delay)
-
-                formatter = logging.Formatter()
-                log_handler.setFormatter( formatter )
-                result.addHandler( log_handler )
-                result.setLevel( logging.INFO )
-                result.propagate = False
-            except Exception, e:
-                self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
-                result = None
+        except Exception, e:
+            self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+            result = None
 
         return result
 
@@ -466,21 +571,29 @@ class SyslogHandler(object):
         if self.__docker_regex is not None:
             m = self.__docker_regex.match(data)
             if m is not None:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
-                cname = self.__docker_is_resolver.lookup(cid)
+                #cname = self.__docker_is_resolver.lookup(cid)
+                cname = None
+                self.__logger_lock.acquire()
+                try:
+                    if cid not in self.__container_names:
+                        self.__container_names[cid] = self.__docker_is_resolver.lookup(cid)
+                    cname = self.__container_names[cid]
+                finally:
+                    self.__logger_lock.release()
 
                 if cid is not None and cname is not None:
-                    self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
+                    #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
                     return cname, cid, data[m.end():]
 
         if self.__docker_regex_full is not None:
             m = self.__docker_regex_full.match(data)
             if m is not None and m.lastindex == 2:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
                 return m.group(1), m.group(2), data[m.end():]
 
-        self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None
 
@@ -494,11 +607,11 @@ class SyslogHandler(object):
 
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
 
-        if cname is not None and cid is not None:
+        current_time = time.time()
+        self.__logger_lock.acquire()
+        try:
             logger = None
-            try:
-                self.__logger_lock.acquire()
-
+            if cname is not None and cid is not None:
                 # check if we already have a logger for this container
                 # and if not, then create it
                 if cname not in self.__docker_loggers:
@@ -513,7 +626,7 @@ class SyslogHandler(object):
 
                     # create the physical log files
                     info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
-                    info['last_seen'] = time.time()
+                    info['last_seen'] = current_time
 
                     # if we created the log file
                     if info['logger']:
@@ -531,31 +644,34 @@ class SyslogHandler(object):
                 # a logger for this container name, so log the message
                 # and mark the time
                 logger = self.__docker_loggers[cname]
-            finally:
-                self.__logger_lock.release()
+                logger['last_seen'] = current_time
 
-            if logger:
-                logger['logger'].info(line_content)
-                logger['last_seen'] = time.time()
+            if self.__expire_count >= RUN_EXPIRE_COUNT:
+                self.__expire_count = 0
 
-        # find out which if any of the loggers in __docker_loggers have
-        # expired
-        expired = []
-        currentTime = time.time()
+                # find out which if any of the loggers in __docker_loggers have
+                # expired
+                expired = []
 
-        try:
-            self.__logger_lock.acquire()
-            for key, info in self.__docker_loggers.iteritems():
-                if currentTime - info['last_seen'] > self.__docker_expire_log:
-                    expired.append( key )
+                for key, info in self.__docker_loggers.iteritems():
+                    if current_time - info['last_seen'] > self.__docker_expire_log:
+                        expired.append( key )
 
-            # remove all the expired loggers
-            for key in expired:
-                info = self.__docker_loggers.pop( key, None )
-                if info and watcher and module:
-                    watcher.remove_log_path( module, info['log_config']['path'] )
+                # remove all the expired loggers
+                for key in expired:
+                    info = self.__docker_loggers.pop( key, None )
+                    if info:
+                        info['logger'].close()
+                        if watcher and module:
+                            watcher.remove_log_path( module, info['log_config']['path'] )
+            self.__expire_count += 1
         finally:
             self.__logger_lock.release()
+
+        if logger:
+            logger['logger'].write(line_content)
+        else:
+            self.__logger.info( data )
 
     def handle( self, data ):
         if self.__docker_logging:

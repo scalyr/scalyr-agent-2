@@ -24,6 +24,8 @@ The classes exported by this package are:
   Int32RequestParser        -- Used with ServerProcessor to implement servers whose commands are sent using the Int32
                                format (which each command is prefixed with a number indicating the number of bytes to
                                follow).
+  AutoFlushingRotatingFile  -- A file-like object that automatically rotates the file over a certain size.  Used instead
+                               of the usual logger version for performance reasons when a formatted log message is not needed
 """
 
 __author__ = 'Steven Czerwinski <czerwin@scalyr.com>'
@@ -31,5 +33,6 @@ __author__ = 'Steven Czerwinski <czerwin@scalyr.com>'
 from scalyr_agent.monitor_utils.server_processors import ServerProcessor
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import Int32RequestParser
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 
-__all__ = ['ServerProcessor', 'LineRequestParser', 'Int32RequestParser']
+__all__ = ['ServerProcessor', 'LineRequestParser', 'Int32RequestParser', 'AutoFlushingRotatingFile' ]
