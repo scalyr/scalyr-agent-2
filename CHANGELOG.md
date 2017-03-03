@@ -12,6 +12,7 @@ Note, this release is TBD.  Release date is not final.
 Bug fixes:
 
 * Syslog/Docker fix that caused dropped log lines when write rate exceeded certain threshold
+* Syslog CPU performance improvements
 
 
 ## 2.0.23 "Xeric Xeme" - Jan 27, 2017
