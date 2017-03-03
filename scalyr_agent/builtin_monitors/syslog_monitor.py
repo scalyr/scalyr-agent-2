@@ -670,6 +670,8 @@ class SyslogHandler(object):
 
         if logger:
             logger['logger'].write(line_content)
+        else:
+            self.__logger.info( data )
 
     def handle( self, data ):
         if self.__docker_logging:
