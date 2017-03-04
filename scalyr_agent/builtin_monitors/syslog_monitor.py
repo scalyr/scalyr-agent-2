@@ -780,6 +780,7 @@ class SyslogServer(object):
     def start( self, run_state ):
         self.__prepare_run_state( run_state )
         self.__server.serve_forever()
+        self.__server.socket.close()
 
     def start_threaded( self, run_state ):
         self.__prepare_run_state( run_state )
