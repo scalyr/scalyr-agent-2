@@ -19,6 +19,7 @@ __author__ = 'imron@imralsoftware.com'
 import datetime
 import docker
 import fnmatch
+import traceback
 import logging
 import os
 import re
@@ -1115,10 +1116,11 @@ class DockerMonitor( ScalyrMonitor ):
             if 'percpu_usage' in cpu_usage:
                 percpu = cpu_usage['percpu_usage']
                 count = 1
-                for usage in percpu:
-                    extra = { 'cpu' : count }
-                    self._logger.emit_value( 'docker.cpu.usage', usage, monitor_id_override=container )
-                    count += 1
+                if percpu:
+                    for usage in percpu:
+                        extra = { 'cpu' : count }
+                        self._logger.emit_value( 'docker.cpu.usage', usage, monitor_id_override=container )
+                        count += 1
             self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage )
 
         if 'system_cpu_usage' in metrics:
@@ -1153,7 +1155,7 @@ class DockerMonitor( ScalyrMonitor ):
             if result is not None:
                 self.__log_json_metrics( container, result )
         except Exception, e:
-            self._logger.error( "Error readings stats for '%s': %s" % (container, str(e)), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
+            self._logger.error( "Error readings stats for '%s': %s\n%s" % (container, str(e), traceback.format_exc()), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
 
     def __gather_metrics_from_api( self, containers ):
 
