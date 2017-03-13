@@ -33,6 +33,9 @@ __monitor__ = __name__
 
 # These are the metrics collected, broken up by tcollector controllor:
 # We use the original tcollector documentation here has much as possible.
+define_metric(__monitor__, 'cpu.count',
+              'The number of CPUs on the system', category='general')
+
 define_metric(__monitor__, 'proc.stat.cpu',
               'CPU counters in units of jiffies, where ``type`` can be one of ``user``, ``nice``, ``system``,  '
               '``iowait``, ``irq``, ``softirq``, ``steal``, ``guest``.  As a rate, they should add up to  '
