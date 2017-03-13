@@ -306,6 +306,11 @@ class ScalyrClientSession(object):
                 status_code = self.__connection.status_code()
                 response = self.__connection.response()
                 bytes_received = len(response)
+            except httplib.HTTPException, httpError:
+                log.error('Failed to receive response due to HTTPException \'%s\'. Closing connection, will re-attempt' % ( httpError.__class__.__name__ ),
+                                  error_code='requestFailed')
+                return 'requestFailed', len(body_str), response
+
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, 'errno') and error.errno is not None:
