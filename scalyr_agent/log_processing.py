@@ -32,6 +32,7 @@ import glob
 import os
 import random
 import re
+import string
 import threading
 import time
 import timeit
@@ -2036,12 +2037,17 @@ class LogMatcher(object):
                         # then create a checkpoint to represent that.
                         checkpoint_state = LogFileProcessor.create_checkpoint(0)
 
+                    renamed_log = self.__rename_log_file( matched_file, self.__log_entry_config )
+
                     # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
                     # if the field or legacy field is not present.  Maybe we should override this regardless because the
                     # user could get it wrong.. but for now, we just let them screw it up if they want to.
                     log_attributes = dict(self.__log_entry_config['attributes'])
                     if 'logfile' not in log_attributes and 'filename' not in log_attributes:
-                        log_attributes['logfile'] = matched_file
+                        log_attributes['logfile'] = renamed_log
+
+                    if 'original_file' not in log_attributes and renamed_log != matched_file:
+                        log_attributes['original_file'] = matched_file
 
                     # Create the processor to handle this log.
                     new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config,
@@ -2067,6 +2073,53 @@ class LogMatcher(object):
             if not reached_return:
                 for new_processor in result:
                     new_processor.close()
+
+    def __split_path( self, path ):
+        paths = []
+        while True:
+            prev = path
+            path, current = os.path.split( path )
+
+            if prev == path:
+                break;
+            elif current != "":
+                paths.append(current)
+            else:
+                if path != "":
+                    paths.append(path)
+
+                break
+
+        paths.reverse()
+        return paths
+
+    def __rename_log_file( self, matched_file, log_config ):
+        """Renames a log file based on the log_config's 'rename_logfile' field (if present)
+        """
+        result = matched_file
+        if 'rename_logfile' in log_config:
+            rename = log_config['rename_logfile']
+
+            if isinstance( rename, basestring ):
+                pattern = string.Template( rename )
+                try:
+                    values = {}
+                    sections = self.__split_path( matched_file )
+                    for index, section in enumerate(sections, 1):
+                        values["PATH%d"%index] = section
+
+                    basename = os.path.basename( matched_file )
+                    values['BASENAME'] = basename
+                    values['BASENAME_NO_EXT'] = os.path.splitext( basename )[0]
+                    result = pattern.substitute( values )
+                except Exception, e:
+                    log.warn( "Invalid substition pattern in 'rename_logfile'. %s" % str( e ) )
+            elif isinstance( rename, json_lib.JsonObject ):
+                if 'match' in rename and 'replacement' in rename:
+                    pattern = re.compile( rename['match'] )
+                    result = re.sub( pattern, rename['replacement'], matched_file )
+
+        return result
 
     def __can_read_file_and_not_stale(self, file_path, current_time):
         """Determines if this process can read the file at the path.
