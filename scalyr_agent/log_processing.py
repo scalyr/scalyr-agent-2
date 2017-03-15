@@ -2007,6 +2007,10 @@ class LogMatcher(object):
         # so we track if we got to the return statement down below or not.
         reached_return = False
 
+        copy_from_start = False
+        if 'copy_from_start' in self.__log_entry_config:
+            copy_from_start = self.__log_entry_config['copy_from_start']
+
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
             for matched_file in glob.glob(self.__log_entry_config['path']):
@@ -2031,7 +2035,7 @@ class LogMatcher(object):
                     if matched_file in previous_state:
                         checkpoint_state = previous_state[matched_file]
                         del previous_state[matched_file]
-                    elif copy_at_index_zero:
+                    elif copy_at_index_zero or copy_from_start:
                         # If we don't have a checkpoint and we are suppose to start copying the file at index zero,
                         # then create a checkpoint to represent that.
                         checkpoint_state = LogFileProcessor.create_checkpoint(0)
