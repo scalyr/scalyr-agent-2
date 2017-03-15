@@ -2116,8 +2116,15 @@ class LogMatcher(object):
                     log.warn( "Invalid substition pattern in 'rename_logfile'. %s" % str( e ) )
             elif isinstance( rename, json_lib.JsonObject ):
                 if 'match' in rename and 'replacement' in rename:
-                    pattern = re.compile( rename['match'] )
-                    result = re.sub( pattern, rename['replacement'], matched_file )
+                    try:
+                        pattern = re.compile( rename['match'] )
+                        result = re.sub( pattern, rename['replacement'], matched_file )
+                        if result == matched_file:
+                            log.warn( "Regex '%s' used to rename logfile '%s', but logfile name was not changed." % ( rename['match'], matched_file ),
+                                   limit_once_per_x_secs=600, limit_key=('rename-regex-same-%s' % matched_file))
+                    except Exception, e:
+                        log.warn( "Error matching regular expression '%s' and replacing with '%s'.  %s" % (rename['match'], rename['replacement'], str(e ) ),
+                                   limit_once_per_x_secs=600, limit_key=('rename-regex-error-%s' % matched_file))
 
         return result
 
