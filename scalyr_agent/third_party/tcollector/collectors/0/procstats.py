@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import socket
+import subprocess
 import re
 
 COLLECTION_INTERVAL = 30  # seconds
@@ -84,6 +85,17 @@ def print_numa_stats(numafiles):
         print ("sys.numa.interleave %d %s node=%d type=hit"
                % (ts, stats["interleave_hit"], node_id))
 
+# Scalyr - print number of cpus
+def print_cpu_stats():
+    ts = int(time.time())
+    nproc = subprocess.Popen(["nproc", "--all"], stdout=subprocess.PIPE)
+    stdout, _ = nproc.communicate()
+    if nproc.returncode == 0:
+        fields = stdout.split()
+        if fields[0].isdigit():
+            print ("sys.cpu.count %d %s" % (ts, fields[0] ) )
+    else:
+        print >> sys.stderr, "nproc --all returned %r" % df_proc.returncode
 
 def main():
     """procstats main loop"""
@@ -182,6 +194,8 @@ def main():
             print "proc.kernel.entropy_avail %d %s" % (ts, line.strip())
 
         print_numa_stats(numastats)
+
+        print_cpu_stats()
 
         sys.stdout.flush()
         time.sleep(COLLECTION_INTERVAL)
