@@ -1572,6 +1572,121 @@ class TestLogMatcher(ScalyrTestCase):
 
         self._close_processors(processors)
 
+    def test_rename_string_basename( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = "/scalyr/test/$BASENAME"
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( "/scalyr/test/text.txt", attrs['logfile'] )
+        self.assertEquals( self.__path_one, attrs['original_file'] )
+
+    def test_rename_string_basename_no_ext( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = "/scalyr/test/$BASENAME_NO_EXT.huzzah"
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( "/scalyr/test/text.huzzah", attrs['logfile'] )
+        self.assertEquals( self.__path_one, attrs['original_file'] )
+
+    def test_rename_string_path( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = "/scalyr/test/$PATH2/$PATH1/log.log"
+
+        path = self.__path_one.split( os.sep )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( "/scalyr/test/%s/%s/log.log" % (path[2], path[1]), attrs['logfile'] )
+        self.assertEquals( self.__path_one, attrs['original_file'] )
+
+    def test_rename_string_invalid_path( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = "/scalyr/test/$PATH2/$PATH10/log.log"
+
+        path = self.__path_one.split( os.sep )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( self.__path_one, attrs['logfile'] )
+        self.assertFalse( 'original_file' in attrs )
+
+    def test_rename_regex( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*)', 'replacement' : '/scalyr/test/\\1/\\2' } )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( "/scalyr/test/tmp/text.txt", attrs['logfile'] )
+        self.assertEquals( self.__path_one, attrs['original_file'] )
+
+    def test_rename_regex_invalid_match( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*[)', 'replacement' : '/scalyr/test/\\1/\\2' } )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( self.__path_one, attrs['logfile'] )
+        self.assertFalse( 'original_file' in attrs )
+
+    def test_rename_regex_invalid_replacement( self ):
+        config = self._create_log_config( self.__path_one )
+        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*)', 'replacement' : '/scalyr/test/\\3/\\2' } )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( self.__path_one, attrs['logfile'] )
+        self.assertFalse( 'original_file' in attrs )
+
+    def test_rename_regex_empty( self ):
+        config = self._create_log_config( self.__path_one )
+
+        matcher = LogMatcher( self.__config, config )
+
+        processors = matcher.find_matches( dict(), dict() )
+        self.assertEquals(len(processors), 1 )
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals( self.__path_one, attrs['logfile'] )
+        self.assertFalse( 'original_file' in attrs )
+
     def _close_processors(self, processors):
         for x in processors:
             x.close()
@@ -1585,7 +1700,7 @@ class TestLogMatcher(ScalyrTestCase):
 
     def _create_log_config(self, path, ignore_stale_files=False, staleness_threshold_secs=None):
         return dict(path=path, attributes=dict(), lineGroupers=[], redaction_rules=[], sampling_rules=[],
-                    ignore_stale_files=ignore_stale_files, staleness_threshold_secs=staleness_threshold_secs)
+                    exclude=[], ignore_stale_files=ignore_stale_files, staleness_threshold_secs=staleness_threshold_secs)
 
 def _create_configuration( extra=None ):
     """Creates a blank configuration file with default values for testing.
