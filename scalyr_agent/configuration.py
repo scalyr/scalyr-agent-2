@@ -849,6 +849,8 @@ class Configuration(object):
 
         self.__verify_or_set_optional_array( log_entry, 'lineGroupers', description )
 
+        self.__verify_or_set_optional_bool(log_entry, 'copy_from_start', False, description)
+
         self.__verify_or_set_optional_bool(log_entry, 'ignore_stale_files', False, description)
         self.__verify_or_set_optional_float(log_entry, 'staleness_threshold_secs', 5*60, description)
 
