@@ -1,16 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.24 "Yucky Yak" - Mar 3, 2017
+## 2.0.24 "Yucky Yak" - Mar 17, 2017
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 3, 2017 14:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 17, 2017 14:00 -0700
 --->
 
 Note, this release is TBD.  Release date is not final.
 
+New features:
+
+* New `rename_logfile` option to change the file name and path for a log file when uploading it to Scalyr.
+* New metric in `linux_system_metrics` to record number of CPUs used by a machine.  Metric name is `sys.cpu.count`.
+
 Bug fixes:
 
+* Syslog/Docker fix that generated a `port already in use` error when reading new configuration file
 * Syslog/Docker fix that caused dropped log lines when write rate exceeded certain threshold
 * Syslog CPU performance improvements
 
