@@ -32,7 +32,7 @@ class DummyLogger( object ):
     def emit_value( self, key, value, extra_fields ):
         self.command = extra_fields['command']
 
-    def warn( self, message ):
+    def warn( self, message, limit_once_per_x_secs=0, limit_key="" ):
         self.warning = message
 
 class RedisHostTestCase( unittest.TestCase ):
@@ -55,6 +55,7 @@ class RedisHostTestCase( unittest.TestCase ):
 
         self.entry['command'] = pack( '3sB13s', 'abc', 0xce, 'def' ).rstrip( '\0' )
 
+        self.host.utf8_warning_interval = 1
         self.host.log_entry( self.logger, self.entry )
         self.assertEquals( expected, self.logger.command )
         self.assertTrue( self.logger.warning.startswith( "Redis command contains invalid utf8" ) )
