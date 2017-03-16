@@ -12,6 +12,7 @@ Note, this release is TBD.  Release date is not final.
 New features:
 
 * New `rename_logfile` option to change the file name and path for a log file when uploading it to Scalyr.
+* New `copy_from_start` option to instruct the agent to copy a log file from its start when it first matches.
 * New metric in `linux_system_metrics` to record number of CPUs used by a machine.  Metric name is `sys.cpu.count`.
 
 Bug fixes:
