@@ -782,18 +782,18 @@ class TestLogLineRedactor(ScalyrTestCase):
         # go go go
         self.run_test_case( redacter, utf8_string, expected, True )
 
-    def test_multiple_redactions(self):
+    def test_multiple_redactions1(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
         redactor.add_redaction_rule('password=.* ', '')
 
         self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo secretoption=fake", True)
 
-    def test_multiple_redactions(self):
+    def test_multiple_redactions2(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
 
-        self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo secretoption=fake", True)
+        self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo password=steve secretoption=fake", True)
 
     def test_customer_case(self):
         redactor = LogLineRedacter('/var/fake_log')
