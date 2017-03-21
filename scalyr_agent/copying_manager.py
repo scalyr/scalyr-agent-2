@@ -839,7 +839,18 @@ class CopyingManager(StoppableThread, LogWatcher):
                 if not log_path in checkpoints:
                     checkpoints[log_path] = LogFileProcessor.create_checkpoint(logs_initial_positions[log_path])
 
-        for matcher in self.__log_matchers:
+
+        # make a shallow copy of log_matchers
+        log_matchers = []
+        self.__lock.acquire()
+        try:
+            log_matchers = self.__log_matchers[:]
+        finally:
+            self.__lock.release()
+
+        # iterate over the copy so we don't have to lock the list of log_matchers
+        # while we create the LogFileProcessors
+        for matcher in log_matchers:
             for new_processor in matcher.find_matches(self.__log_paths_being_processed, checkpoints,
                                                       copy_at_index_zero=copy_at_index_zero):
                 self.__log_processors.append(new_processor)
