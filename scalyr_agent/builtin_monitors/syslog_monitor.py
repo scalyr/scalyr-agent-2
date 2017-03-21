@@ -538,12 +538,6 @@ class SyslogHandler(object):
         """
         result = None
         try:
-            """
-            result = AutoFlushingRotatingFileHandler( filename = log_config['path'],
-                                                                  maxBytes = self.__max_log_size,
-                                                                  backupCount = self.__max_log_rotations,
-                                                                  flushDelay = self.__flush_delay)
-            """
             result = AutoFlushingRotatingFile( filename = log_config['path'],
                                                                   max_bytes = self.__max_log_size,
                                                                   backup_count = self.__max_log_rotations,

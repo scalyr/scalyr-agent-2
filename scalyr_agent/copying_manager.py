@@ -791,7 +791,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     keep_it = True
                 if keep_it:
                     self.__log_processors.append(processor)
-                    self.__log_paths_being_processed[processor.log_path] = True
+                    self.__log_paths_being_processed[processor.log_path] = processor
                 else:
                     processor.close()
 
@@ -854,7 +854,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             for new_processor in matcher.find_matches(self.__log_paths_being_processed, checkpoints,
                                                       copy_at_index_zero=copy_at_index_zero):
                 self.__log_processors.append(new_processor)
-                self.__log_paths_being_processed[new_processor.log_path] = True
+                self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
     def __scan_for_new_bytes(self, current_time=None):
         """For any existing LogProcessors, have them scan the file system to see if their underlying files have
