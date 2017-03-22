@@ -92,6 +92,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertTrue(config.verify_server_certificate)
         self.assertFalse(config.debug_init)
         self.assertFalse(config.pidfile_advanced_reuse_guard)
+        self.assertFalse(config.strip_domain_from_default_server_host)
 
         self.assertEquals(config.pipeline_threshold, 1.1)
 
@@ -148,7 +149,7 @@ class TestConfiguration(ScalyrTestCase):
             ca_cert_path: "/var/lib/foo.pem",
             verify_server_certificate: false,
             pipeline_threshold: 0.5,
-
+            strip_domain_from_default_server_host: true,
             max_line_size: 1024,
             max_log_offset_size: 1048576,
             max_existing_log_offset_size: 2097152,
@@ -211,6 +212,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.copying_thread_profile_output_path, '/tmp/some_profiles')
 
         self.assertEquals(config.max_new_log_detection_time, 2 * 60)
+        self.assertTrue(config.strip_domain_from_default_server_host)
 
         self.assertEquals(config.pipeline_threshold, 0.5)
 
