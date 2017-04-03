@@ -36,7 +36,13 @@ class SerializeTests(ScalyrTestCase):
     def test_4byte_utf8(self):
         actual = '\xF0\xAA\x9A\xA5'
         expected_fast = '"\xf0\xaa\\u009a\xa5"'
-        expected_slow = '"\\u2a6a5"'
+        expected_slow = '"\\U0002a6a5"'
+        self.assertEquals(serialize( actual, use_fast_encoding=True), expected_fast )
+        self.assertEquals(serialize( actual, use_fast_encoding=False), expected_slow )
+
+        actual = '\xF0\x9F\x98\xA2'
+        expected_fast = '"\xf0\\u009f\\u0098\xa2"'
+        expected_slow = '"\\U0001f622"'
         self.assertEquals(serialize( actual, use_fast_encoding=True), expected_fast )
         self.assertEquals(serialize( actual, use_fast_encoding=False), expected_slow )
 

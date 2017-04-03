@@ -193,9 +193,9 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
             high_order = x_ord >> 16
             low_order = x_ord & (2**16-1)
             if type_index == 0:
-                result.write('\\u%0.4x\\u%0.4x' % (high_order, low_order))
+                result.write('\\U%0.4x%0.4x' % (high_order, low_order))
             else:
-                result.write(u'\\u%0.4x\\u%0.4x' % (high_order, low_order))
+                result.write(u'\\U%0.4x%0.4x' % (high_order, low_order))
         else:
             result.write(string_value[pos])
         pos += 1
