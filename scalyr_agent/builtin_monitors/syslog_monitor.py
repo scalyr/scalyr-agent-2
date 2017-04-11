@@ -17,6 +17,7 @@
 __author__ = 'imron@imralsoftware.com'
 
 import errno
+import glob
 import logging
 import logging.handlers
 import os
@@ -158,6 +159,17 @@ define_config_option(__monitor__, 'docker_cid_clean_time_secs',
                      'Optional (defaults to 5.0). The number seconds to wait between cleaning the docker id to '
                      'container name cache.',
                      convert_to=float, default=5.0)
+
+define_config_option(__monitor__, 'docker_check_for_unused_logs_mins',
+                     'Optional (defaults to 60). The number of minutes to wait between checking to see if there are any '
+                     'log files matchings the docker_logfile_template that haven\'t been written to for a while and can '
+                     'be deleted',
+                     convert_to=int, default=60)
+
+define_config_option(__monitor__, 'docker_delete_unused_logs_hours',
+                     'Optional (defaults to 24). The number of hours to wait before deleting any '
+                     'log files matchings the docker_logfile_template',
+                     convert_to=int, default=24)
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
@@ -450,6 +462,59 @@ class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
 
         return False
 
+class LogDeleter( object ):
+    """Deletes unused log files that match a log_file_template"""
+
+    def __init__( self, check_interval_mins, delete_interval_hours, max_log_rotations, log_path, log_file_template ):
+        self._check_interval = check_interval_mins * 60
+        self._delete_interval = delete_interval_hours * 60 * 60
+        self._max_log_rotations = max_log_rotations
+        self._log_glob = os.path.join( log_path, log_file_template.safe_substitute( CID='*', CNAME='*' ) )
+
+        self._last_check = time.time()
+
+    def _get_old_logs_for_glob( self, current_time, glob_pattern, existing_logs ):
+
+        result = []
+
+        for matching_file in glob.glob( glob_pattern ):
+            try:
+                mtime = os.path.getmtime(matching_file)
+                if current_time - mtime > self._delete_interval and matching_file not in existing_logs:
+                    result.append( matching_file )
+            except OSError, e:
+                global_log.warn( "Unable to read modification time for file '%s', %s" % (matching_file, str(e)),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='mtime-%s'%matching_file)
+        return result
+
+    def check_for_old_logs( self, existing_logs ):
+
+        old_logs = []
+        current_time = time.time()
+        if current_time - self._last_check > self._check_interval:
+            old_logs += self._get_old_logs_for_glob( current_time, self._log_glob, existing_logs )
+
+            # get any rotated versions of the old log
+            rotated = []
+            for filename in old_logs:
+                rotate_glob = filename + (".[1-%d]" % self._max_log_rotations)
+                for matching_file in glob.glob( rotate_glob ):
+                    rotated.append( matching_file )
+
+            old_logs += rotated
+            self._last_check = current_time
+
+        for filename in old_logs:
+            try:
+                os.remove( filename )
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Deleted old log file '%s'" % filename )
+            except OSError, e:
+                global_log.warn( "Error deleting old log file '%s', %s" % (filename, str(e)),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='delete-%s'%filename)
+
+
 class SyslogHandler(object):
     """Protocol neutral class for handling messages that come in from a syslog server
 
@@ -463,11 +528,18 @@ class SyslogHandler(object):
         self.__docker_regex_full = None
         self.__docker_id_resolver = None
         self.__docker_file_template = None
+        self.__docker_log_deleter = None
 
         if docker_logging:
             self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
             self.__docker_regex = self.__get_regex(config, 'docker_regex')
             self.__docker_file_template = Template(config.get('docker_logfile_template'))
+            self.__docker_log_deleter = LogDeleter( config.get( 'docker_check_for_unused_logs_mins' ),
+                                                    config.get( 'docker_delete_unused_logs_hours' ),
+                                                    config.get( 'max_log_rotations' ),
+                                                    log_path,
+                                                    self.__docker_file_template )
+
             from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
             self.__docker_is_resolver = ContainerIdResolver(config.get('docker_api_socket'),
                                                             config.get('docker_api_version'),
@@ -602,6 +674,7 @@ class SyslogHandler(object):
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
 
         current_time = time.time()
+        current_log_files = []
         self.__logger_lock.acquire()
         try:
             logger = None
@@ -659,6 +732,9 @@ class SyslogHandler(object):
                         if watcher and module:
                             watcher.remove_log_path( module, info['log_config']['path'] )
             self.__expire_count += 1
+
+            for key, info in self.__docker_loggers.iteritems():
+                current_log_files.append( info['log_config']['path'] )
         finally:
             self.__logger_lock.release()
 
@@ -666,6 +742,9 @@ class SyslogHandler(object):
             logger['logger'].write(line_content)
         else:
             self.__logger.info( data )
+
+        if self.__docker_log_deleter:
+            self.__docker_log_deleter.check_for_old_logs( current_log_files )
 
     def handle( self, data ):
         if self.__docker_logging:
