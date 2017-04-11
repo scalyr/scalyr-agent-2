@@ -415,6 +415,8 @@ class RequestStream(object):
                         do_full_compaction = False
                         return parsed_request
                     elif bytes_available_to_read >= self.__max_request_size:
+                        # The parser didn't return a request even though the maximum request size has been reached..
+                        # This should never happen (if parser is written correctly), so throw an error
                         raise RequestSizeExceeded(bytes_available_to_read, bytes_available_to_read)
                     elif self.__max_buffer_size == self.__get_buffer_write_position():
                         # If there are pending bytes left in the buffer, then they didn't form a full request.  We
