@@ -1268,6 +1268,13 @@ class LogFileProcessor(object):
 
         self.__last_success = None
 
+    def add_missing_attributes( self, attributes ):
+        """ Adds items attributes to the base_event's attributes if the base_event doesn't
+        already have those attributes set
+        """
+        self.__base_event.add_missing_attributes( attributes )
+
+
     def set_max_log_offset_size( self, max_log_offset_size ):
         """Sets the max_log_offset_size.
 
@@ -1996,6 +2003,7 @@ class LogMatcher(object):
         @rtype: list of LogFileProcessor
         """
         if not self.__is_glob and self.log_path in existing_processors:
+            existing_processors[self.log_path].add_missing_attributes( self.__log_entry_config['attributes'] )
             return []
 
         self.__lock.acquire()
@@ -2027,10 +2035,10 @@ class LogMatcher(object):
                 if skip:
                     continue
 
+                already_exists = matched_file in existing_processors
                 # Only process it if we have permission to read it and it is not already being processed.
                 # Also check if we should skip over it entirely because it is too stale.
-                if not matched_file in existing_processors and self.__can_read_file_and_not_stale(matched_file,
-                                                                                                  self.__last_check):
+                if not already_exists and self.__can_read_file_and_not_stale(matched_file, self.__last_check):
                     checkpoint_state = None
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:

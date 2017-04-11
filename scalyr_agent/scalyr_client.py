@@ -1174,35 +1174,14 @@ class Event(object):
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception('Cannot use both attrs/thread_id and base')
 
+        self.__thread_id = None
         if base is not None:
             # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
             # the per-log file attributes.
             self.__serialization_base = base.__serialization_base
             self.__attrs = base.__attrs
         else:
-            # A new event.  We have to create the serialization base using provided information/
-            tmp_buffer = StringIO()
-            # Open base for the event object.
-            tmp_buffer.write('{')
-            if thread_id is not None:
-                tmp_buffer.write('thread:')
-                json_lib.serialize(thread_id, use_fast_encoding=True, output=tmp_buffer)
-                tmp_buffer.write(', ')
-            if attrs is not None:
-                # Serialize the attrs object, but we have to remove the closing brace because we want to
-                # insert more fields.
-                tmp_buffer.write('attrs:')
-                json_lib.serialize(attrs, use_fast_encoding=True, output=tmp_buffer)
-                _rewind_past_close_curly(tmp_buffer)
-                tmp_buffer.write(',')
-            else:
-                # Open brace for the attrs object.
-                tmp_buffer.write('attrs:{')
-
-            # Add the message field into the json object.
-            tmp_buffer.write('message:')
-
-            self.__serialization_base = tmp_buffer.getvalue()
+            self.__set_attributes( thread_id, attrs )
 
         # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
         # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
@@ -1219,10 +1198,55 @@ class Event(object):
         self.__has_non_optimal_fields = False
         self.__num_optimal_fields = 0
 
+
+    def __set_attributes( self, thread_id, attributes ):
+        self.__thread_id = thread_id
+        self.__attrs = attributes
+        # A new event.  We have to create the serialization base using provided information/
+        tmp_buffer = StringIO()
+        # Open base for the event object.
+        tmp_buffer.write('{')
+        if thread_id is not None:
+            tmp_buffer.write('thread:')
+            json_lib.serialize(thread_id, use_fast_encoding=True, output=tmp_buffer)
+            tmp_buffer.write(', ')
+        if attributes is not None:
+            # Serialize the attributes object, but we have to remove the closing brace because we want to
+            # insert more fields.
+            tmp_buffer.write('attrs:')
+            json_lib.serialize(attributes, use_fast_encoding=True, output=tmp_buffer)
+            _rewind_past_close_curly(tmp_buffer)
+            tmp_buffer.write(',')
+        else:
+            # Open brace for the attributes object.
+            tmp_buffer.write('attrs:{')
+
+        # Add the message field into the json object.
+        tmp_buffer.write('message:')
+
+        self.__serialization_base = tmp_buffer.getvalue()
+
+
+    def add_missing_attributes( self, attributes ):
+        """ Adds items attributes to the base_event's attributes if the base_event doesn't
+        already have those attributes set
+        """
+        if self.__attrs:
+            changed = False
+            new_attrs = dict( self.__attrs )
+            for key, value in attributes.iteritems():
+                if not key in new_attrs:
+                    changed = True
+                    new_attrs[key] = value
+
+            if changed:
+                self.__set_attributes( self.__thread_id, new_attrs )
+        else:
+            self.__set_attributes( self.__thread_id, attributes )
+
     @property
     def attrs(self):
-        """Only use for testing.
-
+        """
         @return: The attributes object as originally based into the constructor or the constructor of the base
             object that was to create this instance.
         @rtype: dict
