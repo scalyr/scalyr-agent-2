@@ -83,13 +83,22 @@ class TestPidfileManager(ScalyrTestCase):
         self._write_pidfile_contents('')
         self.assertIsNone(self.__test_manager.read_pid())
 
-    def test_read_pid_with_agent_running(self):
+    def test_read_pid_locked_format_with_agent_running(self):
         release_lock = self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=True)
         self.assertEquals(os.getpid(), self.__test_manager.read_pid())
         release_lock()
 
-    def test_read_pid_with_agent_gone_without_delete(self):
+    def test_read_pid_with_agent_running(self):
+        release_lock = self._write_pidfile_contents('%s\n' % os.getpid(), hold_lock=True)
+        self.assertEquals(os.getpid(), self.__test_manager.read_pid())
+        release_lock()
+
+    def test_read_pid_locked_format_with_agent_gone_without_delete(self):
         self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=False)
+        self.assertIsNone(self.__test_manager.read_pid())
+
+    def test_read_pid_with_agent_gone_without_delete(self):
+        self._write_pidfile_contents('%s\n' % os.getpid(), hold_lock=False)
         self.assertIsNone(self.__test_manager.read_pid())
 
     def test_read_pid_old_format_pid_not_running(self):
@@ -102,15 +111,25 @@ class TestPidfileManager(ScalyrTestCase):
 
     def test_write_pid_no_existing(self):
         self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
-        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+        self.assertEquals('1234\n', self._read_pidfile_contents())
 
-    def test_write_pid_with_existing_but_not_running(self):
+    def test_write_pid_lock_format_with_existing_but_not_running(self):
         self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=False)
         self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
-        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+        self.assertEquals('1234\n', self._read_pidfile_contents())
+
+    def test_write_pid_with_existing_but_not_running(self):
+        self._write_pidfile_contents('%s\n' % os.getpid(), hold_lock=False)
+        self.assertIsNotNone(self.__test_manager.create_writer().write_pid(pid=1234))
+        self.assertEquals('1234\n', self._read_pidfile_contents())
+
+    def test_write_pid_lock_format_while_already_running(self):
+        releaser = self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=True)
+        self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
+        releaser()
 
     def test_write_pid_while_already_running(self):
-        releaser = self._write_pidfile_contents('%s locked\n' % os.getpid(), hold_lock=True)
+        releaser = self._write_pidfile_contents('%s\n' % os.getpid(), hold_lock=True)
         self.assertIsNone(self.__test_manager.create_writer().write_pid(pid=1234))
         releaser()
 
@@ -136,7 +155,7 @@ class TestPidfileManager(ScalyrTestCase):
         release_lock = writer.write_pid(pid=1234)
         self.assertIsNotNone(release_lock)
 
-        self.assertEquals('1234 locked\n', self._read_pidfile_contents())
+        self.assertEquals('1234\n', self._read_pidfile_contents())
         release_lock()
 
     def test_logger(self):
