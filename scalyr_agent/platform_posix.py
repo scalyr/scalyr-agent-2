@@ -796,7 +796,15 @@ class PidfileManager(object):
             self._log('Checked pidfile: exists')
             return pid
 
-        # If we see 'locked' in the pidfile, then we know a new agent did write it, but it's no longer running
+        # If contents contains a single item (the pid), then we are using the latest version of the pidfile which
+        # only stores the pid, and which is locked for the duration of the agent process.
+        # If we are here, then the file is not locked, in which case the process is no longer running
+        # (since the file was not locked)
+        if len(contents) == 1:
+            self._log('Checked pidfile: missing-')
+            return None
+
+        # If we see 'locked' in the pidfile, then we know an older agent did write it, but it's no longer running
         # (since the file was not locked).
         if len(contents) == 2 and contents[1] == 'locked':
             self._log('Checked pidfile: missing-')
@@ -1005,7 +1013,7 @@ class PidfileManager(object):
             fp = self.__locked_fd
             fp.truncate()
             # Very important that we terminate this with a newline.
-            fp.write('%d locked\n' % pid)
+            fp.write('%d\n' % pid)
             self._log('Wrote pidfile')
 
             # make sure that all data is on disk
