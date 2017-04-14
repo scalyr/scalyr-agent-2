@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.25 "Zany Zebra" - Apr 13, 2017
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 13, 2017 14:45 -0700
+--->
+
+New features:
+
+* Docker integration:  Old docker log files will be deleted after unused for 1 day (by default).
+* Change to pidfile format in preparation for better `systemd` support
+
+Bug fixes:
+
+* Syslog/Docker fix that was causing logs being uploaded with default parser instead of user-specified parser
+* Minor fixes for BMP unicode
+
+
 ## 2.0.24 "Yucky Yak" - Mar 22, 2017
 
 <!---
