@@ -558,7 +558,7 @@ class LogFileIterator(object):
             current_time = time.time()
         self.__refresh_pending_files(current_time)
 
-    def prepare_for_inactivity(self):
+    def prepare_for_inactivity(self, current_time=None):
         """Can be called before times when this iterator instance will not be used for some period of
         time.
 
@@ -568,6 +568,10 @@ class LogFileIterator(object):
         No calls are necessary to bring it out of this mode.  The next invocation of any method on this
         instance will result in the instance no longer being considered inactive.
         """
+
+        if current_time is None:
+            current_time = time.time()
+
         # This is a pain, but Windows does not allow for anyone to delete a file or its parent directory while
         # someone has a file handle open to it.  So, to be nice, we should close ours.  However, it does limit
         # our ability to detect and more easily handle log rotates.  (Ok, it is not completely true that Windows does
@@ -581,10 +585,8 @@ class LogFileIterator(object):
         # a directory with many files in it.
         if self.__max_modification_duration:
             try:
-                current_datetime = datetime.datetime.now()
-                delta = current_datetime - datetime.datetime.fromtimestamp(self.__modification_time_raw)
-                total_micros = delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10**6
-                if total_micros > self.__max_modification_duration * 10**6:
+                delta = current_time - self.__modification_time_raw
+                if delta > self.__max_modification_duration:
                     close_file = True
 
             except OSError:
@@ -1578,7 +1580,7 @@ class LogFileProcessor(object):
 
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
             # do some clean up work until the next time we need it.
-            self.__log_file_iterator.prepare_for_inactivity()
+            self.__log_file_iterator.prepare_for_inactivity( current_time )
 
             # If we get here on what was a new file, then the file is now an existing file, so set the maximum log
             # offset size to use the size for existing files
