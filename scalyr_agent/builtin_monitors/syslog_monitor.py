@@ -634,9 +634,14 @@ class SyslogHandler(object):
             None, None, None.
         @rtype: str, str, str
         """
+        # The reason flags contains some information about the code path used when a container id is not found.
+        # We emit this to the log to help us debug customer issues.
+        reason_flags = ''
         if self.__docker_regex is not None:
+            reason_flags += '1'
             m = self.__docker_regex.match(data)
             if m is not None:
+                reason_flags += '2'
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
                 #cname = self.__docker_is_resolver.lookup(cid)
@@ -644,6 +649,7 @@ class SyslogHandler(object):
                 self.__logger_lock.acquire()
                 try:
                     if cid not in self.__container_names:
+                        reason_flags += '3'
                         self.__container_names[cid] = self.__docker_is_resolver.lookup(cid)
                     cname = self.__container_names[cid]
                 finally:
@@ -654,11 +660,18 @@ class SyslogHandler(object):
                     return cname, cid, data[m.end():]
 
         if self.__docker_regex_full is not None:
+            reason_flags += '4'
             m = self.__docker_regex_full.match(data)
+            if m is not None:
+                reason_flags += '5'
+
             if m is not None and m.lastindex == 2:
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
                 return m.group(1), m.group(2), data[m.end():]
 
+        self.__logger.warn('Could not determine container from following incoming data.  Container logs may be '
+                           'missing, performance could be impacted.  Data(%s): "%s"' % (reason_flags, data[70:]),
+                           limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
         #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None
