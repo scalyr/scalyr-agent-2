@@ -160,6 +160,13 @@ define_config_option(__monitor__, 'docker_cid_clean_time_secs',
                      'container name cache.',
                      convert_to=float, default=5.0)
 
+define_config_option(__monitor__, 'docker_use_daemon_to_resolve',
+                     'Optional (defaults to True). If True, will use the Docker daemon (via the docker_api_socket to '
+                     'resolve container ids to container names.  If you set this to False, you must be sure to add the '
+                     '--log-opt tag="/{{.Name}}/{{.ID}}" to your running containers to pass the container name in the '
+                     'log messages.',
+                     convert_to=bool, default=True)
+
 define_config_option(__monitor__, 'docker_check_for_unused_logs_mins',
                      'Optional (defaults to 60). The number of minutes to wait between checking to see if there are any '
                      'log files matchings the docker_logfile_template that haven\'t been written to for a while and can '
@@ -409,7 +416,7 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                 # limit the amount of times we check if the server is still running
                 # as this is a time consuming operation due to locking
                 if check_running and not self.server.is_running():
-                    break;
+                    break
 
         except Exception, e:
             global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
@@ -540,13 +547,15 @@ class SyslogHandler(object):
                                                     log_path,
                                                     self.__docker_file_template )
 
-            from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
-            self.__docker_is_resolver = ContainerIdResolver(config.get('docker_api_socket'),
-                                                            config.get('docker_api_version'),
-                                                            global_log,
-                                                            cache_expiration_secs=config.get(
-                                                                'docker_cid_cache_lifetime_secs'),
-                                                            cache_clean_secs=config.get('docker_cid_clean_time_secs'))
+            if config.get('docker_use_daemon_to_resolve'):
+                from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
+                self.__docker_id_resolver = ContainerIdResolver(config.get('docker_api_socket'),
+                                                                config.get('docker_api_version'),
+                                                                global_log,
+                                                                cache_expiration_secs=config.get(
+                                                                   'docker_cid_cache_lifetime_secs'),
+                                                                cache_clean_secs=config.get(
+                                                                    'docker_cid_clean_time_secs'))
 
         self.__log_path = log_path
         self.__server_host = server_host
@@ -637,20 +646,19 @@ class SyslogHandler(object):
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.
         reason_flags = ''
-        if self.__docker_regex is not None:
+        if self.__docker_regex is not None and self.__docker_id_resolver is not None:
             reason_flags += '1'
             m = self.__docker_regex.match(data)
             if m is not None:
                 reason_flags += '2'
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
-                #cname = self.__docker_is_resolver.lookup(cid)
                 cname = None
                 self.__logger_lock.acquire()
                 try:
                     if cid not in self.__container_names:
                         reason_flags += '3'
-                        self.__container_names[cid] = self.__docker_is_resolver.lookup(cid)
+                        self.__container_names[cid] = self.__docker_id_resolver.lookup(cid)
                     cname = self.__container_names[cid]
                 finally:
                     self.__logger_lock.release()
