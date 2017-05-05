@@ -674,7 +674,7 @@ class SyslogHandler(object):
 
         self.__logger.warn('Could not determine container from following incoming data.  Container logs may be '
                            'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
-                           'regex: "%s" or full regex: "%s"' % (reason_flags, data[70:], regex_str, regex_full_str),
+                           'regex: "%s" or full regex: "%s"' % (reason_flags, data[:70], regex_str, regex_full_str),
                            limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
         #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
