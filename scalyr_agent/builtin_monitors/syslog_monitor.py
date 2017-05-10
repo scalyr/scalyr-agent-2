@@ -110,13 +110,13 @@ define_config_option( __monitor__, 'docker_regex',
                      'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
                      'only has the container id.  If a message matches this regex then everything *after* '
                      'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([a-z0-9]{12})\[\d+\]: ')
+                     convert_to=str, default='^.*([a-z0-9]{12})\[\d+\]: ?')
 
 define_config_option( __monitor__, 'docker_regex_full',
                      'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
                      'included both the container name and id.  If a message matches this regex then everything *after* '
                      'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([^/]+)/([^[]+)\[\d+\]: ')
+                     convert_to=str, default='^.*([^/]+)/([^[]+)\[\d+\]: ?')
 
 define_config_option( __monitor__, 'docker_expire_log',
                      'Optional (defaults to 300).  The number of seconds of inactivity from a specific container before '
@@ -706,6 +706,9 @@ class SyslogHandler(object):
             watcher, module = self.__get_log_watcher()
 
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
+
+        if cname is None:
+            return
 
         current_time = time.time()
         current_log_files = []
