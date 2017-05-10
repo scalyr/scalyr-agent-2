@@ -82,17 +82,19 @@ define_config_option( __monitor__, 'tcp_buffer_size',
                      default=8192, min_value=2048, max_value=65536*1024, convert_to=int)
 
 define_config_option( __monitor__, 'max_log_size',
-                     'Optional (defaults to 50 MB). How large the log file will grow before it is rotated. Set to zero '
+                     'Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the '
+                     'default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero '
                      'for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing '
                      'disk space on the host running the agent. However, a very small limit could cause logs to be '
                      'dropped if there is a temporary network outage and the log overflows before it can be sent to '
                      'Scalyr',
-                     convert_to=int, default=50*1024*1024)
+                     convert_to=int, default=None)
 
 define_config_option( __monitor__, 'max_log_rotations',
-                     'Optional (defaults to 2). The maximum number of log rotations before older log files are '
-                     'deleted. Set to zero for infinite rotations.',
-                     convert_to=int, default=2)
+                     'Optional (defaults to None). The maximum number of log rotations before older log files are '
+                     'deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. '
+                     'Set to zero for infinite rotations.',
+                     convert_to=int, default=None)
 
 define_config_option( __monitor__, 'log_flush_delay',
                      'Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing '
@@ -528,7 +530,7 @@ class SyslogHandler(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher ):
+    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options ):
 
         docker_logging = config.get('mode') == 'docker'
         self.__docker_regex = None
@@ -537,13 +539,26 @@ class SyslogHandler(object):
         self.__docker_file_template = None
         self.__docker_log_deleter = None
 
+        if rotate_options is None:
+            rotate_options = (2, 20*1024*1024)
+
+        default_rotation_count, default_max_bytes = rotate_options
+
+        rotation_count = config.get( 'max_log_rotations' )
+        if rotation_count is None:
+            rotation_count = default_rotation_count
+
+        max_log_size = config.get( 'max_log_size' )
+        if max_log_size is None:
+            max_log_size = default_max_bytes
+
         if docker_logging:
             self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
             self.__docker_regex = self.__get_regex(config, 'docker_regex')
             self.__docker_file_template = Template(config.get('docker_logfile_template'))
             self.__docker_log_deleter = LogDeleter( config.get( 'docker_check_for_unused_logs_mins' ),
                                                     config.get( 'docker_delete_unused_logs_hours' ),
-                                                    config.get( 'max_log_rotations' ),
+                                                    rotation_count,
                                                     log_path,
                                                     self.__docker_file_template )
 
@@ -572,8 +587,8 @@ class SyslogHandler(object):
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
 
-        self.__max_log_rotations = config.get( 'max_log_rotations' )
-        self.__max_log_size = config.get( 'max_log_size' )
+        self.__max_log_rotations = rotation_count
+        self.__max_log_size = max_log_size
         self.__flush_delay = config.get('log_flush_delay')
 
     def __get_regex(self, config, field_name):
@@ -822,7 +837,7 @@ class SyslogServer(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None):
+    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None, rotate_options=None):
         server = None
 
         accept_ips = config.get( 'docker_accept_ips' )
@@ -859,7 +874,7 @@ class SyslogServer(object):
             raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
         #create the syslog handler, and add to the list of servers
-        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher )
+        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options )
         server.syslog_transport_protocol = protocol
         server.syslog_port = port
 
@@ -1023,8 +1038,15 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         except Exception, e:
             self._logger.error( "Error setting monitor attribute in SyslogMonitor" )
 
+        default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
+
         self.__max_log_size = self._config.get( 'max_log_size' )
+        if self.__max_log_size is None:
+            self.__max_log_size = default_max_bytes
+
         self.__max_log_rotations = self._config.get( 'max_log_rotations' )
+        if self.__max_log_rotations is None:
+            self.__max_log_rotations = default_rotation_count
 
 
     def __build_server_list( self, protocol_string ):
@@ -1121,6 +1143,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         def line_reporter(num_lines):
             self.increment_counter(reported_lines=num_lines)
 
+        rotate_options = self._get_log_rotation_configuration()
         try:
             if self.__disk_logger is None:
                 raise Exception( "No disk logger available for Syslog Monitor" )
@@ -1130,14 +1153,14 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
                                           line_reporter, accept_remote=self.__accept_remote_connections,
                                           server_host=self.__server_host, log_path=self.__log_path,
-                                          get_log_watcher=self.__get_log_watcher )
+                                          get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
                 server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
                                        line_reporter, accept_remote=self.__accept_remote_connections,
                                        server_host=self.__server_host, log_path=self.__log_path,
-                                       get_log_watcher=self.__get_log_watcher )
+                                       get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads

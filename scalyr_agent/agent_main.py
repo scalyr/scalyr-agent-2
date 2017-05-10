@@ -656,7 +656,9 @@ class ScalyrAgent(object):
             try:
                 self.__run_state = RunState()
                 self.__log_file_path = os.path.join(self.__config.agent_log_path, 'agent.log')
-                scalyr_logging.set_log_destination(use_disk=True, logs_directory=self.__config.agent_log_path,
+                scalyr_logging.set_log_destination(use_disk=True, max_bytes=self.__config.log_rotation_max_bytes,
+                                                   backup_count=self.__config.log_rotation_backup_count,
+                                                   logs_directory=self.__config.agent_log_path,
                                                    agent_log_file_path='agent.log')
 
                 self.__update_debug_log_level(self.__config.debug_level)

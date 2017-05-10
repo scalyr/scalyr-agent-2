@@ -263,11 +263,31 @@ class ScalyrMonitor(StoppableThread):
         """
         pass
 
+    def _get_log_rotation_configuration( self ):
+        """Gets the log rotation backup count and maximum byte settings from the monitor config,
+        and if not specified by the monitor config then from the global config
+        @return: A tuple containing the log_rotation_backup_count and the log_rotation_max_bytes
+                 for this monitor.
+        """
+
+        rotation_count = self._config.get( "log_rotation_backup_count" )
+        if rotation_count is None:
+            rotation_count = self._global_config.log_rotation_backup_count
+
+        max_bytes = self._config.get( "log_rotation_max_bytes" )
+        if max_bytes is None:
+            max_bytes = self._global_config.log_rotation_max_bytes
+
+        return (rotation_count, max_bytes)
+
     def open_metric_log(self):
         """Opens the logger for this monitor.
 
         This must be invoked before the monitor is started."""
-        self._logger.openMetricLogForMonitor(self.log_config['path'], self, max_write_burst=self._log_max_write_burst,
+        backup_count, max_bytes = self._get_log_rotation_configuration()
+
+        self._logger.openMetricLogForMonitor(self.log_config['path'], self, max_bytes=max_bytes, backup_count=backup_count,
+                                             max_write_burst=self._log_max_write_burst,
                                              log_write_rate=self._log_write_rate, flush_delay=self._log_flush_delay)
         self.__metric_log_open = True
         return True
