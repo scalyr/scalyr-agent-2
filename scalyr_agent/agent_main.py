@@ -801,7 +801,8 @@ class ScalyrAgent(object):
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
                                    request_deadline=self.__config.request_deadline, ca_file=ca_file,
                                    use_requests_lib=use_requests_lib, compression_type=self.__config.compression_type,
-                                   compression_level=self.__config.compression_level)
+                                   compression_level=self.__config.compression_level,
+                                   proxies=self.__config.network_proxies)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
