@@ -656,7 +656,9 @@ class ScalyrAgent(object):
             try:
                 self.__run_state = RunState()
                 self.__log_file_path = os.path.join(self.__config.agent_log_path, 'agent.log')
-                scalyr_logging.set_log_destination(use_disk=True, logs_directory=self.__config.agent_log_path,
+                scalyr_logging.set_log_destination(use_disk=True, max_bytes=self.__config.log_rotation_max_bytes,
+                                                   backup_count=self.__config.log_rotation_backup_count,
+                                                   logs_directory=self.__config.agent_log_path,
                                                    agent_log_file_path='agent.log')
 
                 self.__update_debug_log_level(self.__config.debug_level)
@@ -801,7 +803,8 @@ class ScalyrAgent(object):
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
                                    request_deadline=self.__config.request_deadline, ca_file=ca_file,
                                    use_requests_lib=use_requests_lib, compression_type=self.__config.compression_type,
-                                   compression_level=self.__config.compression_level)
+                                   compression_level=self.__config.compression_level,
+                                   proxies=self.__config.network_proxies)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.

@@ -82,17 +82,19 @@ define_config_option( __monitor__, 'tcp_buffer_size',
                      default=8192, min_value=2048, max_value=65536*1024, convert_to=int)
 
 define_config_option( __monitor__, 'max_log_size',
-                     'Optional (defaults to 50 MB). How large the log file will grow before it is rotated. Set to zero '
+                     'Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the '
+                     'default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero '
                      'for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing '
                      'disk space on the host running the agent. However, a very small limit could cause logs to be '
                      'dropped if there is a temporary network outage and the log overflows before it can be sent to '
                      'Scalyr',
-                     convert_to=int, default=50*1024*1024)
+                     convert_to=int, default=None)
 
 define_config_option( __monitor__, 'max_log_rotations',
-                     'Optional (defaults to 2). The maximum number of log rotations before older log files are '
-                     'deleted. Set to zero for infinite rotations.',
-                     convert_to=int, default=2)
+                     'Optional (defaults to None). The maximum number of log rotations before older log files are '
+                     'deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. '
+                     'Set to zero for infinite rotations.',
+                     convert_to=int, default=None)
 
 define_config_option( __monitor__, 'log_flush_delay',
                      'Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing '
@@ -110,13 +112,13 @@ define_config_option( __monitor__, 'docker_regex',
                      'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
                      'only has the container id.  If a message matches this regex then everything *after* '
                      'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([a-z0-9]{12})\[\d+\]: ')
+                     convert_to=str, default='^.*([a-z0-9]{12})\[\d+\]: ?')
 
 define_config_option( __monitor__, 'docker_regex_full',
                      'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
                      'included both the container name and id.  If a message matches this regex then everything *after* '
                      'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([^/]+)/([^[]+)\[\d+\]: ')
+                     convert_to=str, default='^.*([^/]+)/([^[]+)\[\d+\]: ?')
 
 define_config_option( __monitor__, 'docker_expire_log',
                      'Optional (defaults to 300).  The number of seconds of inactivity from a specific container before '
@@ -160,6 +162,13 @@ define_config_option(__monitor__, 'docker_cid_clean_time_secs',
                      'container name cache.',
                      convert_to=float, default=5.0)
 
+define_config_option(__monitor__, 'docker_use_daemon_to_resolve',
+                     'Optional (defaults to True). If True, will use the Docker daemon (via the docker_api_socket to '
+                     'resolve container ids to container names.  If you set this to False, you must be sure to add the '
+                     '--log-opt tag="/{{.Name}}/{{.ID}}" to your running containers to pass the container name in the '
+                     'log messages.',
+                     convert_to=bool, default=True)
+
 define_config_option(__monitor__, 'docker_check_for_unused_logs_mins',
                      'Optional (defaults to 60). The number of minutes to wait between checking to see if there are any '
                      'log files matchings the docker_logfile_template that haven\'t been written to for a while and can '
@@ -170,6 +179,13 @@ define_config_option(__monitor__, 'docker_delete_unused_logs_hours',
                      'Optional (defaults to 24). The number of hours to wait before deleting any '
                      'log files matchings the docker_logfile_template',
                      convert_to=int, default=24)
+
+define_config_option(__monitor__, 'docker_check_rotated_timestamps',
+                     'Optional (defaults to True). If True, will check timestamps of all file rotations to see if they '
+                     'should be individually deleted based on the the log deletion configuration options. '
+                     'If False, only the file modification time of the main log file is checked, and the rotated files '
+                     'will only be deleted when the main log file is deleted.',
+                     convert_to=bool, default=True)
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
@@ -409,7 +425,7 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                 # limit the amount of times we check if the server is still running
                 # as this is a time consuming operation due to locking
                 if check_running and not self.server.is_running():
-                    break;
+                    break
 
         except Exception, e:
             global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
@@ -465,23 +481,47 @@ class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
 class LogDeleter( object ):
     """Deletes unused log files that match a log_file_template"""
 
-    def __init__( self, check_interval_mins, delete_interval_hours, max_log_rotations, log_path, log_file_template ):
+    def __init__( self, check_interval_mins, delete_interval_hours, check_rotated_timestamps, max_log_rotations, log_path, log_file_template ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
+        self._check_rotated_timestamps = check_rotated_timestamps
         self._max_log_rotations = max_log_rotations
         self._log_glob = os.path.join( log_path, log_file_template.safe_substitute( CID='*', CNAME='*' ) )
 
         self._last_check = time.time()
 
-    def _get_old_logs_for_glob( self, current_time, glob_pattern, existing_logs ):
+    def _get_old_logs_for_glob( self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations ):
 
         result = []
 
         for matching_file in glob.glob( glob_pattern ):
             try:
+                added = False
                 mtime = os.path.getmtime(matching_file)
                 if current_time - mtime > self._delete_interval and matching_file not in existing_logs:
                     result.append( matching_file )
+                    added = True
+
+                for i in range( max_rotations, 0, -1 ):
+                    rotated_file = matching_file + ('.%d' % i)
+                    try:
+                        if not os.path.isfile( rotated_file ):
+                            continue
+
+                        if check_rotated:
+                            mtime = os.path.getmtime(rotated_file)
+                            if current_time - mtime > self._delete_interval:
+                                result.append( rotated_file )
+                        else:
+                            if added:
+                                result.append( rotated_file )
+
+                    except OSError, e:
+                        global_log.warn( "Unable to read modification time for file '%s', %s" % (rotated_file, str(e)),
+                                          limit_once_per_x_secs=300,
+                                          limit_key='mtime-%s'%rotated_file)
+
+
             except OSError, e:
                 global_log.warn( "Unable to read modification time for file '%s', %s" % (matching_file, str(e)),
                                   limit_once_per_x_secs=300,
@@ -493,16 +533,8 @@ class LogDeleter( object ):
         old_logs = []
         current_time = time.time()
         if current_time - self._last_check > self._check_interval:
-            old_logs += self._get_old_logs_for_glob( current_time, self._log_glob, existing_logs )
 
-            # get any rotated versions of the old log
-            rotated = []
-            for filename in old_logs:
-                rotate_glob = filename + (".[1-%d]" % self._max_log_rotations)
-                for matching_file in glob.glob( rotate_glob ):
-                    rotated.append( matching_file )
-
-            old_logs += rotated
+            old_logs = self._get_old_logs_for_glob( current_time, self._log_glob, existing_logs, self._check_rotated_timestamps, self._max_log_rotations )
             self._last_check = current_time
 
         for filename in old_logs:
@@ -521,7 +553,7 @@ class SyslogHandler(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher ):
+    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options ):
 
         docker_logging = config.get('mode') == 'docker'
         self.__docker_regex = None
@@ -530,23 +562,39 @@ class SyslogHandler(object):
         self.__docker_file_template = None
         self.__docker_log_deleter = None
 
+        if rotate_options is None:
+            rotate_options = (2, 20*1024*1024)
+
+        default_rotation_count, default_max_bytes = rotate_options
+
+        rotation_count = config.get( 'max_log_rotations' )
+        if rotation_count is None:
+            rotation_count = default_rotation_count
+
+        max_log_size = config.get( 'max_log_size' )
+        if max_log_size is None:
+            max_log_size = default_max_bytes
+
         if docker_logging:
             self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
             self.__docker_regex = self.__get_regex(config, 'docker_regex')
             self.__docker_file_template = Template(config.get('docker_logfile_template'))
             self.__docker_log_deleter = LogDeleter( config.get( 'docker_check_for_unused_logs_mins' ),
                                                     config.get( 'docker_delete_unused_logs_hours' ),
-                                                    config.get( 'max_log_rotations' ),
+                                                    config.get( 'docker_check_rotated_timestamps' ),
+                                                    rotation_count,
                                                     log_path,
                                                     self.__docker_file_template )
 
-            from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
-            self.__docker_is_resolver = ContainerIdResolver(config.get('docker_api_socket'),
-                                                            config.get('docker_api_version'),
-                                                            global_log,
-                                                            cache_expiration_secs=config.get(
-                                                                'docker_cid_cache_lifetime_secs'),
-                                                            cache_clean_secs=config.get('docker_cid_clean_time_secs'))
+            if config.get('docker_use_daemon_to_resolve'):
+                from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
+                self.__docker_id_resolver = ContainerIdResolver(config.get('docker_api_socket'),
+                                                                config.get('docker_api_version'),
+                                                                global_log,
+                                                                cache_expiration_secs=config.get(
+                                                                   'docker_cid_cache_lifetime_secs'),
+                                                                cache_clean_secs=config.get(
+                                                                    'docker_cid_clean_time_secs'))
 
         self.__log_path = log_path
         self.__server_host = server_host
@@ -563,8 +611,8 @@ class SyslogHandler(object):
 
         self.__docker_expire_log = config.get( 'docker_expire_log' )
 
-        self.__max_log_rotations = config.get( 'max_log_rotations' )
-        self.__max_log_size = config.get( 'max_log_size' )
+        self.__max_log_rotations = rotation_count
+        self.__max_log_size = max_log_size
         self.__flush_delay = config.get('log_flush_delay')
 
     def __get_regex(self, config, field_name):
@@ -637,20 +685,19 @@ class SyslogHandler(object):
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.
         reason_flags = ''
-        if self.__docker_regex is not None:
+        if self.__docker_regex is not None and self.__docker_id_resolver is not None:
             reason_flags += '1'
             m = self.__docker_regex.match(data)
             if m is not None:
                 reason_flags += '2'
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
-                #cname = self.__docker_is_resolver.lookup(cid)
                 cname = None
                 self.__logger_lock.acquire()
                 try:
                     if cid not in self.__container_names:
                         reason_flags += '3'
-                        self.__container_names[cid] = self.__docker_is_resolver.lookup(cid)
+                        self.__container_names[cid] = self.__docker_id_resolver.lookup(cid)
                     cname = self.__container_names[cid]
                 finally:
                     self.__logger_lock.release()
@@ -669,12 +716,25 @@ class SyslogHandler(object):
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
                 return m.group(1), m.group(2), data[m.end():]
 
+        regex_str = self.__get_pattern_str(self.__docker_regex)
+        regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
+
         self.__logger.warn('Could not determine container from following incoming data.  Container logs may be '
-                           'missing, performance could be impacted.  Data(%s): "%s"' % (reason_flags, data[70:]),
+                           'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
+                           'regex: "%s" or full regex: "%s"' % (reason_flags, data[:70], regex_str, regex_full_str),
                            limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
         #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None
+
+    def __get_pattern_str(self, regex_value):
+        """Helper method for getting the string version of a compiled regular expression.  Also handles if the regex
+        is None.
+        """
+        result = None
+        if regex_value is not None:
+            result = regex_value.pattern
+        return str(result)
 
     def __handle_docker_logs( self, data ):
 
@@ -685,6 +745,9 @@ class SyslogHandler(object):
             watcher, module = self.__get_log_watcher()
 
         (cname, cid, line_content) = self.__extract_container_name_and_id(data)
+
+        if cname is None:
+            return
 
         current_time = time.time()
         current_log_files = []
@@ -798,10 +861,10 @@ class SyslogServer(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None):
+    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None, rotate_options=None):
         server = None
 
-        accept_ips = config.get( 'docker_accept_ips' );
+        accept_ips = config.get( 'docker_accept_ips' )
         if accept_ips == None:
             accept_ips = []
             gateway_ip = _get_default_gateway()
@@ -835,7 +898,7 @@ class SyslogServer(object):
             raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
         #create the syslog handler, and add to the list of servers
-        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher )
+        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options )
         server.syslog_transport_protocol = protocol
         server.syslog_port = port
 
@@ -999,8 +1062,15 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         except Exception, e:
             self._logger.error( "Error setting monitor attribute in SyslogMonitor" )
 
+        default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
+
         self.__max_log_size = self._config.get( 'max_log_size' )
+        if self.__max_log_size is None:
+            self.__max_log_size = default_max_bytes
+
         self.__max_log_rotations = self._config.get( 'max_log_rotations' )
+        if self.__max_log_rotations is None:
+            self.__max_log_rotations = default_rotation_count
 
 
     def __build_server_list( self, protocol_string ):
@@ -1097,6 +1167,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         def line_reporter(num_lines):
             self.increment_counter(reported_lines=num_lines)
 
+        rotate_options = self._get_log_rotation_configuration()
         try:
             if self.__disk_logger is None:
                 raise Exception( "No disk logger available for Syslog Monitor" )
@@ -1106,14 +1177,14 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
                                           line_reporter, accept_remote=self.__accept_remote_connections,
                                           server_host=self.__server_host, log_path=self.__log_path,
-                                          get_log_watcher=self.__get_log_watcher )
+                                          get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
                 server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
                                        line_reporter, accept_remote=self.__accept_remote_connections,
                                        server_host=self.__server_host, log_path=self.__log_path,
-                                       get_log_watcher=self.__get_log_watcher )
+                                       get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads

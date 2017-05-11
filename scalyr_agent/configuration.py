@@ -494,6 +494,16 @@ class Configuration(object):
         return self.__get_config().get_float('log_deletion_delay')
 
     @property
+    def log_rotation_max_bytes(self):
+        """Returns the configuration value for 'log_rotation_max_bytes'."""
+        return self.__get_config().get_int('log_rotation_max_bytes')
+
+    @property
+    def log_rotation_backup_count(self):
+        """Returns the configuration value for 'log_rotation_backup_count'."""
+        return self.__get_config().get_int('log_rotation_backup_count')
+
+    @property
     def copy_staleness_threshold(self):
         """Returns the configuration value for 'copy_staleness_threshold'."""
         return self.__get_config().get_float('copy_staleness_threshold')
@@ -778,6 +788,12 @@ class Configuration(object):
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
         self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description)
+
+        # How many log rotations to do
+        self.__verify_or_set_optional_int(config, 'log_rotation_backup_count', 2, description)
+
+        # The size of each log rotation file
+        self.__verify_or_set_optional_int(config, 'log_rotation_max_bytes', 20 * 1024 * 1024, description)
 
         # The percentage of the maximum message size a message (max_allowed_request_size) has to be to trigger
         # pipelining the next add events request.  This intentionally set to 110% to prevent it from being used unless
