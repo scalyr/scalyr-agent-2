@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.26 "Anomine" - May 11, 2017
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 11, 2017 16:45 -0700
+--->
+
+New features:
+
+* Added feature to allow completely disabling the use of the Docker socket in certain Docker configurations.
+* New `max_log_size` and `max_log_rotations` configuration options that can be used to set the maximum length an agent-generated log file can grow before it is rotated and the maximum number of rotations to keep. 
+
+Bug fixes:
+
+* Fix bug preventing rotated Docker files from being deleted
+* Fix bug that resulted in `https_proxy` and ``http_proxy` configuration options being ignored.
+
+
 ## 2.0.25 "Zany Zebra" - Apr 13, 2017
 
 <!---
