@@ -542,8 +542,9 @@ class ProcessMonitor(ScalyrMonitor):
                                     'can be done with the following command:'
                                     '  pip install psutil')
 
-        sample_interval_secs = kw.get('sample_interval_secs', None)
-        super(ProcessMonitor, self).__init__(monitor_config, logger, sample_interval_secs)
+        sampling_rate = kw.get('sampling_interval_secs', 30)
+        global_config = kw.get('global_config')
+        super(ProcessMonitor, self).__init__(monitor_config, logger, sampling_rate, global_config=global_config)
         self.__process = None
 
     def _initialize(self):

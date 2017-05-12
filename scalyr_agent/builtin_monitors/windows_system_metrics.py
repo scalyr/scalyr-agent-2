@@ -584,8 +584,9 @@ class SystemMonitor(ScalyrMonitor):
                                     'You must install the python module "psutil" to use this module.  Typically, this'
                                     'can be done with the following command:'
                                     '  pip install psutil')
-        sampling_rate = kwargs.get('sampling_rate', 30)
-        super(SystemMonitor, self).__init__(config, logger, sampling_rate)
+        sampling_rate = kwargs.get('sampling_interval_secs', 30)
+        global_config = kwargs.get('global_config')
+        super(SystemMonitor, self).__init__(config, logger, sampling_rate, global_config=global_config)
 
     def gather_sample(self):
         """TODO: Fucntion documentation
