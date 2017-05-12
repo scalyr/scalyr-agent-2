@@ -272,11 +272,18 @@ class ScalyrMonitor(StoppableThread):
 
         rotation_count = self._config.get( "log_rotation_backup_count" )
         if rotation_count is None:
-            rotation_count = self._global_config.log_rotation_backup_count
+            # Sometimes global_config can be null if derived monitor did not pass one in.
+            if self._global_config is not None:
+                rotation_count = self._global_config.log_rotation_backup_count
+            else:
+                rotation_count = 2
 
         max_bytes = self._config.get( "log_rotation_max_bytes" )
         if max_bytes is None:
-            max_bytes = self._global_config.log_rotation_max_bytes
+            if self._global_config is not None:
+                max_bytes = self._global_config.log_rotation_max_bytes
+            else:
+                max_bytes = 20 * 1024 * 1024
 
         return (rotation_count, max_bytes)
 
