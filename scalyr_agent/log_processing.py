@@ -1619,8 +1619,8 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        self.__total_bytes_skipped += self.__log_file_iterator.bytes_between_positions(
-                            original_position, final_position) - bytes_read
+                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
+                        self.__total_bytes_skipped +=  bytes_between_positions - bytes_read
 
                         self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
                         self.__total_bytes_pending = self.__log_file_iterator.available
@@ -1631,7 +1631,10 @@ class LogFileProcessor(object):
 
                         # Do a mark to cleanup any state in the iterator.  We know we won't have to roll back
                         # to before this point now.
-                        self.__log_file_iterator.mark(final_position, current_time=current_time)
+                        # only mark files that have logged new bytes to prevent stat'ing unused files
+                        if bytes_between_positions > 0:
+                            self.__log_file_iterator.mark(final_position, current_time=current_time)
+
                         if self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time):
                             self.__log_file_iterator.close()
                             self.__is_closed = True
