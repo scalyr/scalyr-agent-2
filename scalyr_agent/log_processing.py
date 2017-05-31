@@ -1305,6 +1305,9 @@ class LogFileProcessor(object):
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
+        # Tracks whether the processor has recently logged data
+        self.__is_active = False
+
         # The processor should be closed if the staleness of this file exceeds this number of seconds (if not None)
         self.__close_when_staleness_exceeds = close_when_staleness_exceeds
 
@@ -1403,6 +1406,13 @@ class LogFileProcessor(object):
         result = self.__is_closed
         self.__lock.release()
         return result
+
+    @property
+    def is_active( self ):
+        return self.__is_active
+
+    def set_inactive( self ):
+        self.__is_active = False
 
     @property
     def log_path(self):
@@ -1561,6 +1571,9 @@ class LogFileProcessor(object):
                     total_redactions += 1L
                 bytes_copied += line_len
                 lines_copied += 1
+
+            if not self.__is_active:
+                self.__is_active = bytes_read > 0
 
             final_position = self.__log_file_iterator.tell()
 
