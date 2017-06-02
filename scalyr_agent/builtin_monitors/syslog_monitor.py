@@ -327,6 +327,8 @@ class SyslogRequestParser( object ):
             if e.errno == errno.EAGAIN:
                 return None
             else:
+                global_log.warning('Network error while reading from syslog: %s', str(e), limit_once_per_x_secs=300,
+                                   limit_key='syslog-network-error')
                 self._socket_error = True
                 raise e
 
@@ -336,6 +338,8 @@ class SyslogRequestParser( object ):
         """Processes data returned from a previous call to read
         """
         if not data:
+            global_log.warning('Syslog has seen an empty request, could be an indication of missing data',
+                               limit_once_per_x_secs=600, limit_key='syslog-empty-request')
             return
 
         # append data to what we had remaining from the previous call
@@ -348,6 +352,8 @@ class SyslogRequestParser( object ):
         size = len( self._remaining )
 
         # process the buffer until we are out of bytes
+        frames_handled = 0
+
         while self._offset < size:
 
             # get the first byte to determine if framed or not
@@ -382,17 +388,24 @@ class SyslogRequestParser( object ):
                                          limit_once_per_x_secs=300,
                                          limit_key='syslog-max-buffer-exceeded')
                     handle_frame( self._remaining )
+                    frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
                     self._remaining = ' '
                     self._offset = 0
 
-                break;
+                break
 
             # output the frame
             frame_length = frame_end - self._offset
             handle_frame( self._remaining[self._offset:frame_end].strip() )
+            frames_handled += 1
+
             self._offset += frame_length + skip
+
+        if frames_handled == 0:
+            global_log.info('No frames ready to be handled in syslog.. advisory notice',
+                            limit_once_per_x_secs=600, limit_key='syslog-no-frames')
 
         self._remaining = self._remaining[self._offset:]
         self._offset = 0
@@ -648,7 +661,7 @@ class SyslogHandler(object):
 
 
         except Exception, e:
-            self.__logger.error( "Error setting docker logger attribute in SyslogMonitor" )
+            global_log.error( "Error setting docker logger attribute in SyslogMonitor" )
             raise
 
         return attributes
@@ -664,7 +677,7 @@ class SyslogHandler(object):
                                                                   flush_delay = self.__flush_delay)
 
         except Exception, e:
-            self.__logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+            global_log.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
             result = None
 
         return result
@@ -690,7 +703,7 @@ class SyslogHandler(object):
             m = self.__docker_regex.match(data)
             if m is not None:
                 reason_flags += '2'
-                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
+                #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
                 cname = None
                 self.__logger_lock.acquire()
@@ -703,7 +716,7 @@ class SyslogHandler(object):
                     self.__logger_lock.release()
 
                 if cid is not None and cname is not None:
-                    #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
+                    #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
                     return cname, cid, data[m.end():]
 
         if self.__docker_regex_full is not None:
@@ -713,17 +726,17 @@ class SyslogHandler(object):
                 reason_flags += '5'
 
             if m is not None and m.lastindex == 2:
-                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
+                #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
                 return m.group(1), m.group(2), data[m.end():]
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
 
-        self.__logger.warn('Could not determine container from following incoming data.  Container logs may be '
-                           'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
-                           'regex: "%s" or full regex: "%s"' % (reason_flags, data[:70], regex_str, regex_full_str),
-                           limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
-        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
+        global_log.warn('Could not determine container from following incoming data.  Container logs may be '
+                        'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
+                        'regex: "%s" or full regex: "%s"' % (reason_flags, data[:70], regex_str, regex_full_str),
+                        limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
+        #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None
 
@@ -780,7 +793,7 @@ class SyslogHandler(object):
                         # and keep a record for ourselves
                         self.__docker_loggers[cname] = info
                     else:
-                        self.__logger.warn( "Unable to create logger for %s." % cname )
+                        global_log.warn( "Unable to create logger for %s." % cname )
                         return
 
                 # at this point __docker_loggers will always contain
@@ -817,6 +830,8 @@ class SyslogHandler(object):
         if logger:
             logger['logger'].write(line_content)
         else:
+            global_log.warning('Syslog writing docker logs to syslog file instead of container log',
+                               limit_once_per_x_secs=600, limit_key='syslog-docker-not-container-log')
             self.__logger.info( data )
 
         if self.__docker_log_deleter:
@@ -871,7 +886,7 @@ class SyslogServer(object):
             if gateway_ip:
                 accept_ips = [ gateway_ip ]
 
-        logger.log(scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str( accept_ips ) );
+        global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str( accept_ips ) );
 
         docker_logging = config.get( 'mode' ) == 'docker'
 
@@ -1060,7 +1075,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             attributes = JsonObject( { "monitor": "agentSyslog" } )
             self.log_config['attributes'] = attributes
         except Exception, e:
-            self._logger.error( "Error setting monitor attribute in SyslogMonitor" )
+            global_log.error( "Error setting monitor attribute in SyslogMonitor" )
 
         default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
 
@@ -1148,7 +1163,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 self.__disk_logger.propagate = False
                 success = True
             except Exception, e:
-                self._logger.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+                global_log.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
 
         return success
 
@@ -1195,7 +1210,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__server.start( self._run_state )
 
         except Exception, e:
-            self._logger.exception('Monitor died due to exception:', error_code='failedMonitor')
+            global_log.exception('Monitor died due to exception:', error_code='failedMonitor')
             raise
 
     def stop(self, wait_on_join=True, join_timeout=5):
