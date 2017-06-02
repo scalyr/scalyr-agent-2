@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.27 "Borg" - Jun 2, 2017
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 2, 2017 16:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 2, 2017 16:45 -0700
 --->
 
 New features:
@@ -14,6 +14,7 @@ New features:
 Bug fixes:
 
 * Fix recent breakage causing the `run_monitor` code to fail.
+* Fix error / warning logging in `syslog_monitor` to better capture issues with Docker support.
 
 ## 2.0.26 "Anomine" - May 11, 2017
 
