@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.27 "Borg" - Jun 2, 2017
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 2, 2017 16:45 -0700
+--->
+
+New features:
+
+* Added new option `report_container_metrics` to `docker_monitor` to allow disabling of gathering and reporting metrics for each Docker container.
+
 ## 2.0.26 "Anomine" - May 11, 2017
 
 <!---

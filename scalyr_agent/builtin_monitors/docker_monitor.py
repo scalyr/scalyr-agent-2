@@ -113,6 +113,10 @@ define_config_option( __monitor__, 'container_globs',
                      'match one of the glob patterns will be monitored.',
                       default=None)
 
+define_config_option( __monitor__, 'report_container_metrics',
+                      'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
+                      'to Scalyr.', convert_to=bool, default=True)
+
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
@@ -1006,6 +1010,8 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__glob_list = self._config.get( 'container_globs' )
 
+        self.__report_container_metrics = self._config.get('report_container_metrics')
+
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
@@ -1163,11 +1169,11 @@ class DockerMonitor( ScalyrMonitor ):
             self.__gather_metrics_from_api_for_container( info['name'] )
 
     def gather_sample( self ):
-        containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
-
-        self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
         # gather metrics
-        self.__gather_metrics_from_api( containers )
+        if self.__report_container_metrics:
+            containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
+            self.__gather_metrics_from_api( containers )
 
 
     def run( self ):
