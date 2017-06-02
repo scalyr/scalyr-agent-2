@@ -62,8 +62,9 @@ from scalyr_agent.platform_controller import PlatformController, DefaultPaths
 
 log = scalyr_logging.getLogger('scalyr_agent.run_monitor')
 
+
 def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, monitor_sample_interval,
-                           monitor_debug_level):
+                           monitor_debug_level, global_config_path):
     """Runs a single plugin monitor instance.
 
     @param monitor_module: The name of the python module implementing the monitor.
@@ -71,6 +72,8 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
     @param monitor_config: The monitor configuration object.
     @param monitor_sample_interval: The default to use for the sample interval.
     @param monitor_debug_level: The debug level to use for logging.
+    @param global_config_path:  The path to the agent.json global configuration file to use, or None if none was
+        supplied.
     """
     scalyr_logging.set_log_destination(use_stdout=True)
     scalyr_logging.set_log_level(monitor_debug_level)
@@ -97,11 +100,15 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
         signal.signal(sig, handle_shutdown_signal)
 
     try:
-        controller = PlatformController.new_platform()
-        paths = controller.default_paths
-        global_config = Configuration( paths.config_file_path, paths )
-        global_config.parse()
-        monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path, float(monitor_sample_interval), global_config )
+        if global_config_path is not None:
+            controller = PlatformController.new_platform()
+            paths = controller.default_paths
+            global_config = Configuration( global_config_path, paths )
+            global_config.parse()
+        else:
+            global_config = None
+        monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path, float(monitor_sample_interval),
+                                                global_config )
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Constructed monitor')
         monitor.open_metric_log()
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Starting monitor')
@@ -122,6 +129,11 @@ if __name__ == '__main__':
     parser.add_option("-c", "--monitor-config", dest="monitor_config",
                       help="The JSON object to use for the monitor configuration, excluding the 'module' field",
                       default="{}")
+    parser.add_option("-a", "--agent-config", dest="agent_config",
+                      help="The file path to the agent.json configuration file to use.  This is optional.  However, if "
+                           "you do not specify one, then your monitor's `_global_config` instance variable will be set "
+                           "to None.",
+                      default=None)
     parser.add_option("-d", "--debug-level", dest="debug_level",
                       help="The Scalyr debug level to use for emitting debug output.  This will be sent to stdout. "
                            "This should be a number between 0 and 5, corresponding to DEBUG_LEVEL_0 .. DEBUG_LEVEL_5 "
@@ -150,4 +162,5 @@ if __name__ == '__main__':
                     scalyr_logging.DEBUG_LEVEL_3, scalyr_logging.DEBUG_LEVEL_4, scalyr_logging.DEBUG_LEVEL_5]
 
     sys.exit(run_standalone_monitor(args[0], options.monitor_python_path, options.monitor_config,
-                                    options.monitor_sample_interval, debug_levels[my_debug_level]))
+                                    options.monitor_sample_interval, debug_levels[my_debug_level],
+                                    options.agent_config))

@@ -31,7 +31,7 @@ class RunMonitorTest(ScalyrTestCase):
                  }"""
 
         run_standalone_monitor("scalyr_agent.tests.empty_monitor", ".", config, float(0.5),
-                               scalyr_logging.DEBUG_LEVEL_0)
+                               scalyr_logging.DEBUG_LEVEL_0, None)
 
 
 

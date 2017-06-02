@@ -11,6 +11,10 @@ New features:
 
 * Added new option `report_container_metrics` to `docker_monitor` to allow disabling of gathering and reporting metrics for each Docker container.
 
+Bug fixes:
+
+* Fix recent breakage causing the `run_monitor` code to fail.
+
 ## 2.0.26 "Anomine" - May 11, 2017
 
 <!---
