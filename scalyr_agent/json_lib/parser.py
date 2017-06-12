@@ -145,6 +145,19 @@ class ByteScanner(object):
             return None
         return self.__buffer[index]
 
+    def advance_position(self, increment):
+        """Advances the scanner to the specified position, as long it is in the current buffer's range or the end of
+        the buffer.
+        @param increment: The amount to advance the position by.
+        @type increment: int
+        """
+        index = self.__pos + increment
+        if index < self.__start_pos or index > self.__max_pos:
+            raise IndexError(
+                "Index out of range for buffer (index %i, limit %i to %i)" %
+                (index, self.__start_pos, self.__max_pos))
+        self.__pos = index
+
     def __check_read_size(self, read_length):
         index = self.__pos + read_length - 1
         if index < self.__start_pos or index >= self.__max_pos:
@@ -196,7 +209,10 @@ class JsonParser(object):
             elif c == '[':
                 return self.__parse_array()
             elif c == '"':
-                return self.__parse_string_with_concatenation()
+                if self.__check_repeated_chars('"', offset=1, count=2):
+                    return self.__parse_triple_quoted_string()
+                else:
+                    return self.__parse_string_with_concatenation()
             elif c == 't':
                 self.__match("true", "unknown identifier")
                 return True
@@ -350,6 +366,40 @@ class JsonParser(object):
         num_bytes = struct.unpack('>i', encoded_num_bytes)[0]
         return self.__scanner.read_ubytes(num_bytes)
 
+    def __parse_triple_quoted_string(self):
+        """Parse a string literal that is triple quoted.  The scanner must be positioned at the first '"'.
+
+        With a triple quote, all input up until the next triple quote is consumed, regardless of newlines, quotes,
+        etc.
+
+        @return:  The string
+        @rtype: str
+        """
+        if not self.__consume_repeated_chars('"', count=3):
+            self.__error("string literal not begun with triple quote")
+
+        start_pos = self.__scanner.position
+        length = 0
+        while True:
+            if length >= self.__scanner.bytes_remaining:
+                self.__error("string literal not terminated")
+
+            c = self.__scanner.peek_next_ubyte(offset=length)
+            if c == '"' and self.__check_repeated_chars('"', count=2, offset=length+1):
+                break
+
+            length += 1
+
+            if c == '\\':
+                if length >= self.__scanner.bytes_remaining:
+                    self.__error("incomplete backslash sequence")
+                length += 1
+
+        result = self.__scanner.read_ubytes(length)
+
+        self.__consume_repeated_chars('"', count=3)
+
+        return self.__process_escapes(result.decode("utf8"), start_pos)
 
     def __parse_string_with_concatenation(self):
         """Parse a string literal. The scanner must be at the first '"'.
@@ -589,6 +639,47 @@ class JsonParser(object):
             else:
                 return False
         return False
+
+    def __check_repeated_chars(self, expected_character, count=2, offset=1):
+        """Returns true if the next `count` characters are equal to `expected_character`.
+
+        @param expected_character: The expected character.
+        @param count: The expected number of occurrences.
+        @param offset: The offset at which to begin looking for the repeated characters.
+
+        @type expected_character: char
+        @type count: int
+        @type offset: int
+
+        @return: True if characters from `offset` to `offset + count` are all equal to `expected_character`.  If there
+            are not enough characters in the stream, False is returned.
+        @rtype: bool
+        """
+        if offset + count > self.__scanner.bytes_remaining:
+            return False
+
+        for i in range(offset, offset + count):
+            if self.__scanner.peek_next_ubyte(offset=i) != expected_character:
+                return False
+        return True
+
+    def __consume_repeated_chars(self, expected_character, count=2):
+        """Consumes the next `count` characters in the stream, as long as they are all equal to `expected_character`.
+
+        @param expected_character: The expected character.
+        @param count:   The expected number of occurrences.
+
+        @type expected_character: char
+        @type count:  int
+
+        @return:  True if the characters are consumed.
+        @rtype: bool
+        """
+        if self.__check_repeated_chars(expected_character, count=count, offset=0):
+            self.__scanner.advance_position(count)
+            return True
+        else:
+            return False
 
     def __peek_next_non_whitespace(self):
         """Scan up to the next non-whitespace and return it.
