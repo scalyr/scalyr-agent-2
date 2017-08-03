@@ -1063,11 +1063,11 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         self.__module = None
 
         #configure the logger and path
-        message_log = self._config.get( 'message_log' )
+        self.__message_log = self._config.get( 'message_log' )
 
         self.log_config = {
             'parser': self._config.get( 'parser' ),
-            'path': message_log,
+            'path': self.__message_log,
         }
 
         self.__flush_delay = self._config.get('log_flush_delay')
@@ -1140,7 +1140,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         """Override open_metric_log to prevent a metric log from being created for the Syslog Monitor
         and instead create our own logger which will log raw messages out to disk.
         """
-        name = __name__ + '.syslog'
+        name = __name__ + '-' + self.__message_log + '.syslog'
         self.__disk_logger = logging.getLogger( name )
 
         #assume successful for when the logger handler has already been created
