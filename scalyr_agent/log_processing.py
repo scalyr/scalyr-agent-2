@@ -166,6 +166,9 @@ class LogFileIterator(object):
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
+        self.__parse_as_json = log_config['parse_lines_as_json']
+        self.__json_log_key = log_config['json_message_field']
+
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
                                                                config.line_completion_wait_time)
@@ -442,6 +445,19 @@ class LogFileIterator(object):
         #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
         #                                              expected_size, actual_size)
 
+        # check to see if we need to parse the line as json
+        if self.__parse_as_json:
+            try:
+                json = json_lib.parse( result )
+                if self.__json_log_key in json:
+                    result = json[self.__json_log_key]
+                else:
+                    log.warn("Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration" % (self.__json_log_key, self.__path),
+                              limit_once_per_x_secs=300, limit_key=('json-message-field-missing-%s' % self.__path))
+            except Exception, e:
+                # something went wrong. Return the full line and log a message
+                log.warn("Error parsing line as json.  Logging full line: %s\n%s" % (str(e), result),
+                         limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
         return result
 
     def advance_to_end(self, current_time=None):
