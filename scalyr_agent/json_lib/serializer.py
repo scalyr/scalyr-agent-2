@@ -149,7 +149,10 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
     if type(string_value) is unicode:
         type_index = 1
     elif not use_fast_encoding:
-        string_value = string_value.decode('utf8')
+        if not isinstance(string_value, str):
+            # it is possible to have the raw strings being passed through (UTF-8)
+            # in which case, the utf-8 decoding is not necessary and will throw
+            string_value = string_value.decode('utf8')
         type_index = 1
     elif not use_optimization:
         type_index = 0
