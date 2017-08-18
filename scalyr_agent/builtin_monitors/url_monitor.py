@@ -19,7 +19,6 @@ import httplib
 import re
 import urllib2
 import cookielib
-import json
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib.objects import JsonArray
