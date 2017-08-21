@@ -120,7 +120,7 @@ class UrlMonitor(ScalyrMonitor):
         @type url: str
         @type request_method: str
         @type request_data: str | None
-        @type headers: list (of tuples with header name, header value combination)
+        @type headers: JsonArray (of tuples with header name, header value combination)
         @type logger: logging.Logger or subtypes
         @return: Request object
         """
