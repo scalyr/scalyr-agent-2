@@ -64,13 +64,14 @@ class ConnectionFactory:
         @rtype: Connection
 
         """
+
         result = None
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
                 result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
             except Exception, e:
-                log.warn( "Unable to load requests module.  Falling back to Httplib for connection handling" )
+                log.warn( "Unable to load requests module '%s'.  Falling back to Httplib for connection handling" % str( e ) )
                 result = HttplibConnection( server, request_deadline, ca_file, headers )
                 use_requests = False
         else:

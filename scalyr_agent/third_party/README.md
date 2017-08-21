@@ -26,6 +26,7 @@ The following libraries are included:
   * [ipaddress](#ipaddress)
   * [six](#six)
   * [backports.ssl-match-hostname](#ssl-match-hostname)
+  * [PySocks](#PySocks)
 
 ## tcollector<a name="tcollector">
 
@@ -125,3 +126,6 @@ Python 2 and 3 compatibility utilities.  A dependency of docker-py.  See project
 
 The ssl.match_hostname() function from Python 3.5.  A dependency of docker-py.  See project home [here](http://bitbucket.org/brandon/backports.ssl_match_hostname).
 
+## PySocks<a name="PySocks">
+
+PySocks library.  Used to enable SOCKS support for Requests.
