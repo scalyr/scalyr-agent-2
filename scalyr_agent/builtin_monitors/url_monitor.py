@@ -131,9 +131,9 @@ class UrlMonitor(ScalyrMonitor):
                 logger.emit_value(
                     'URL Monitor has malformed optional headers: {}'.format(repr(headers))
                 )
-
-            for header in headers:
-                request.add_header(header["header"], header["value"])
+            else:
+                for header in headers:
+                    request.add_header(header["header"], header["value"])
 
         # seems awkward to override the GET method, but internally it flips
         # between GET and POST anyway based on the existence of request body
