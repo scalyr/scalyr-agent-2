@@ -8,7 +8,6 @@ For more information on the Scalyr Agent, please visit https://www.scalyr.com/he
 
 To learn more about Scalyr, visit https://www.scalyr.com.
 
-
 Features
 ========
 
