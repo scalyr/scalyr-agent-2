@@ -21,7 +21,6 @@ Key features:
   * Modular configuration files
   * Extensibility using monitor plugins
 
-
 Developing
 ==========
 
