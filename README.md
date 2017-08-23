@@ -1,7 +1,6 @@
 scalyr-agent-2
 ==============
 
-
 This repository holds the source code for the Scalyr Agent, a daemon that collects logs and metrics from
 customer machines and transmits them to Scalyr.
 
