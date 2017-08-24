@@ -1611,16 +1611,21 @@ class LogFileProcessor(object):
         self.__num_redaction_and_sampling_rules += 1
         self.__sampler.add_rule(match_expression, sampling_rate)
 
-    def add_redacter(self, match_expression, replacement):
+    def add_redacter(self, match_expression, replacement, hash_salt=''):
         """Adds a new redaction rule that will be applied after all previously added redaction rules.
 
         @param match_expression: The regular expression that must match the portion of the log line that will be
             redacted.
         @param replacement: The text to replace the matched expression with. You may use \1, \2, etc to use sub
             expressions from the match regular expression.
+        @param hash_salt: The salt used for hashing, only if hashing group replacement is used
+
+        @type hash_salt: str
         """
         self.__num_redaction_and_sampling_rules += 1
-        self.__redacter.add_redaction_rule(match_expression, replacement)
+        self.__redacter.add_redaction_rule(
+            match_expression, replacement, hash_salt
+        )
 
     def __create_events_object(self, event_message, sampling_rate):
         """Returns the events object that can be sent to the server for this log to insert the specified message.
@@ -1817,6 +1822,10 @@ class LogLineRedacter(object):
     Redaction rules can match each line multiple times.
     """
 
+    # Indicator in the replacement text[optional] to hash the group content.
+    # eg replacement string of foo\\1=\\H2 will replace the second group with its hashed content
+    HASH_GROUP_INDICATOR = "H"
+
     def __init__(self, log_file_path):
         """Initializes an instance for a single file.
 
@@ -1848,14 +1857,22 @@ class LogLineRedacter(object):
 
         return input_line, modified_it
 
-    def add_redaction_rule(self, redaction_expression, replacement_text):
+    def add_redaction_rule(self, redaction_expression, replacement_text, hash_salt=''):
         """Appends a new redaction rule to this instance.
 
         @param redaction_expression: The regular expression that must match some portion of the line.
         @param replacement_text: The text to replace the matched text with. May include \1 etc to use a portion of the
             matched text.
+        @param hash_salt: [optional] If hashing is set, then the cryptographic salt to be used
+
+        @type hash_salt: str
         """
-        self.__redaction_rules.append(RedactionRule(redaction_expression, replacement_text))
+
+        self.__redaction_rules.append(
+            RedactionRule(
+                redaction_expression, replacement_text, hash_salt=hash_salt
+            )
+        )
 
     def __apply_redaction_rule(self, line, redaction_rule):
         """Applies the specified redaction rule on line and returns the result.
@@ -1866,22 +1883,91 @@ class LogLineRedacter(object):
         @return: A sequence of two elements, the line with the redaction applied (if any) and True or False
             indicating if a redaction was applied.
         """
+
+        def __replace_groups_with_hashed_content(re_ex, replacement_ex, line):
+
+            _matches = re.finditer(re_ex, line)
+
+            if not _matches:
+                # if no matches, return the `line` as such
+                return line, None
+
+            replacement_matches = 0
+
+            # last_match_index captures the index of the last match position
+            # that will help us rebuild the original string with replaced pattern
+            last_match_index = 0
+            replaced_string = ""
+
+            for _match in _matches:
+                _groups = _match.groups()
+                # `replaced_group` will initially hold the replacement expression `replacement_ex`
+                # and the group expressions like \\1 or \\H2 etc. will be substituted with the actual
+                # group value or the hashed group value depending on whether the group needs hashing or not
+                # Once substituted, this can be used to replace the matched string portion
+                replaced_group = replacement_ex
+                for _group_index, _group in enumerate(_groups):
+                    # for each group in a match, replace the `replacement_ex` with either its `group` content, or
+                    # the hash of the `group` depending on the hash indicator \\1 vs \\H1 etc.
+                    group_hash_indicator = "\{}{}".format(
+                        LogLineRedacter.HASH_GROUP_INDICATOR,
+                        _group_index + 1
+                    )
+                    replacement_matches += 1
+                    if group_hash_indicator in replacement_ex:
+                        # the group needs to be hashed
+                        replaced_group = replaced_group.encode('utf8')
+                        replaced_group = replaced_group.replace(
+                            group_hash_indicator,
+                            scalyr_util.md5_digest(_group + redaction_rule.hash_salt),
+                            1
+                        )
+                    else:
+                        # the group does not need to be hashed
+                        replaced_group = replaced_group.replace("\{}".format(_group_index + 1), _group, 1)
+                # once we have formed the replacement expression, we just need to replace the matched
+                # portion of the `line` with the `replaced_group` that we just built
+                replaced_string = replaced_string + line[last_match_index: _match.start()]
+                replaced_string += replaced_group
+                # forward the last match index to the end of the match group
+                last_match_index = _match.end()
+            return replaced_string, replacement_matches
+
         try:
-            (result, matches) = redaction_rule.redaction_expression.subn(
-                redaction_rule.replacement_text, line)
+            if redaction_rule.hash_redacted_data:
+                # out of these matched groups,
+                (result, matches) = __replace_groups_with_hashed_content(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line
+                )
+            else:
+                (result, matches) = re.subn(
+                    redaction_rule.redaction_expression, redaction_rule.replacement_text, line
+                )
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
             # Try again, but this time convert the line to utf-8, replacing any
             # invalid characters with the unicode replacement character
-            (result, matches) = redaction_rule.redaction_expression.subn(
-                redaction_rule.replacement_text, line.decode( 'utf-8', 'replace' ))
+            if redaction_rule.hash_redacted_data:
+                (result, matches) = __replace_groups_with_hashed_content(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line.decode('utf-8', 'replace')
+                )
+            else:
+                (result, matches) = re.subn(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line.decode('utf-8', 'replace')
+                )
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
-            if type( result ) == unicode:
-                result = result.encode( 'utf-8' )
+            if type(result) == unicode:
+                result = result.encode('utf-8')
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
@@ -1891,11 +1977,16 @@ class LogLineRedacter(object):
 class RedactionRule(object):
     """Encapsulates all data for one redaction rule."""
 
-    def __init__(self, redaction_expression, replacement_text):
+    def __init__(self, redaction_expression, replacement_text, hash_salt=''):
         self.redaction_expression = re.compile(redaction_expression)
         self.replacement_text = replacement_text
+        self.hash_salt = hash_salt
         self.total_lines = 0
         self.total_redactions = 0
+
+    @property
+    def hash_redacted_data(self):
+        return "\{}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
 
 
 class LogMatcher(object):
@@ -2066,7 +2157,11 @@ class LogMatcher(object):
                                                      log_attributes=log_attributes, checkpoint=checkpoint_state,
                                                      close_when_staleness_exceeds=self.__stale_threshold_secs)
                     for rule in self.__log_entry_config['redaction_rules']:
-                        new_processor.add_redacter(rule['match_expression'], rule['replacement'])
+                        new_processor.add_redacter(
+                            rule['match_expression'],
+                            rule['replacement'],
+                            str(rule.get('hash_salt', default_value=''))
+                        )
                     for rule in self.__log_entry_config['sampling_rules']:
                         new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
                     result.append(new_processor)
