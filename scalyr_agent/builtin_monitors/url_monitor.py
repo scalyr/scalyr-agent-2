@@ -33,6 +33,15 @@ define_config_option(__monitor__, 'id',
                      'you to distinguish between values recorded by different monitors.')
 define_config_option(__monitor__, 'url',
                      'The URL to fetch. Must be an http or https URL.', required_option=True)
+define_config_option(__monitor__, 'request_method',
+                     'The request method to be used. Default is GET.', required_option=False, default='GET')
+define_config_option(__monitor__, 'request_data',
+                     'The request data(payload) to be passed. Not used for GET request method.',
+                     required_option=False, default=None)
+define_config_option(__monitor__, 'request_headers',
+                     'The HTTP headers to be passed when making a request. '
+                     'e.g. [{"header": "Accept-Encoding", "value": "gzip"}]',
+                     required_option=False, default=[])
 define_config_option(__monitor__, 'timeout',
                      'Optional (defaults to 10): the maximum amount of time, in seconds, to wait for the URL to load.',
                      default=10, convert_to=float, min_value=0, max_value=30)
@@ -87,12 +96,17 @@ class UrlMonitor(ScalyrMonitor):
         # external change (e.g. misconfigured DNS server) could then prevent the agent from
         # starting up.
         self.url = self._config.get("url")
-        self.request_method = self._config.get("request_method") or "GET"
-        self.request_data = self._config.get("request_data") or None
-        self.request_headers = self._config.get("request_headers") or []
+        self.request_method = self._config.get("request_method")
+        self.request_data = self._config.get("request_data")
+        self.request_headers = self._config.get("request_headers")
         self.timeout = self._config.get("timeout")
         self.max_characters = self._config.get("max_characters")
         self.log_all_lines = self._config.get("log_all_lines")
+        if self.request_headers and type(self.request_headers) != JsonArray:
+            self._logger.emit_value(
+                'URL Monitor has malformed optional headers: {}'.format(repr(self.request_headers))
+            )
+            self.request_headers = []  # we don't want to kill the monitor because of malformed headers?
 
         extract_expression = self._config.get("extract")
         if extract_expression:
@@ -107,61 +121,30 @@ class UrlMonitor(ScalyrMonitor):
         else:
             self.extractor = None
 
-    @staticmethod
-    def form_request(url, request_method, request_data, headers, logger):
+    def build_request(self):
         """
-        Forms the HTTP request based on the request URL, HTTP headers and method
-        @param url: HTTP request URL
-        @param request_method: HTTP request method
-        @param request_data: HTTP request payload data
-        @param headers: HTTP header
-        @param logger: The logger to use
-
-        @type url: str
-        @type request_method: str
-        @type request_data: str | None
-        @type headers: JsonArray (of tuples with header name, header value combination)
-        @type logger: logging.Logger or subtypes
+        Builds the HTTP request based on the request URL, HTTP headers and method
         @return: Request object
         """
 
-        request = urllib2.Request(url, data=request_data)
-        if headers:
-            if type(headers) != JsonArray:
-                logger.emit_value(
-                    'URL Monitor has malformed optional headers: {}'.format(repr(headers))
-                )
-            else:
-                for header in headers:
-                    request.add_header(header["header"], header["value"])
+        request = urllib2.Request(self.url, data=self.request_data)
+        if self.request_headers:
+            for header in self.request_headers:
+                request.add_header(header["header"], header["value"])
 
         # seems awkward to override the GET method, but internally it flips
         # between GET and POST anyway based on the existence of request body
-        request.get_method = lambda: request_method
+        request.get_method = lambda: self.request_method
         return request
 
-    def gather_sample(self, request_method='GET', request_data=None, headers=None):
-        """
-
-        @param request_method: The HTTP request method
-        @param request_data: The HTTP request data to be passed with the request. Only
-                    relevant for non-GET requests
-        @param headers: List of HTTP headers to be applied
-
-        @type request_method: str
-        @type request_data: str | None
-        @type headers: list (of dictionaries)
-             eg. [{"header": "Accept-Encoding", "value": "gzip"}] etc.
-        """
+    def gather_sample(self):
 
         # Query the URL
         try:
             opener = urllib2.build_opener(
                 NoRedirection, urllib2.HTTPCookieProcessor(cookielib.CookieJar())
             )
-            request = UrlMonitor.form_request(
-                self.url, self.request_method, self.request_data, self.request_headers, self._logger
-            )
+            request = self.build_request()
             response = opener.open(request, timeout=self.timeout)
         except urllib2.HTTPError, e:
             self._record_error(e, 'http_error')

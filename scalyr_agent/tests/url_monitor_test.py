@@ -20,6 +20,7 @@ __author__ = 'saurabh@scalyr.com'
 import unittest
 import mock
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
+from scalyr_agent.scalyr_monitor import MonitorConfig
 from scalyr_agent.json_lib.objects import JsonArray, JsonObject
 
 
@@ -32,26 +33,41 @@ class UrlMonitorTestRequest(unittest.TestCase):
         self.legit_headers = JsonArray()
         self.legit_headers.add(JsonObject({'header': 'header_foo', 'value': 'foo'}))
         self.legit_headers.add(JsonObject({'header': 'header_bar', 'value': 'bar'}))
+        self.module = 'scalyr_agent.builtin_monitors.url_monitor'
 
     def tearDown(self):
         pass
 
-    def testGetRequestNoHeaders(self):
+    def test_get_request_no_headers(self):
         mock_logger = mock.MagicMock()
-        actual_request = UrlMonitor.form_request('fooUrl', 'GET', None, [], mock_logger)
+        config_data = {
+            'url': 'fooUrl',
+            'request_method': 'GET',
+            'request_data': None,
+            'request_headers': [],
+            'module': self.module
+        }
+        config = MonitorConfig(content=config_data)
+        url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
+
+        actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), 'GET')
         self.assertFalse(actual_request.has_data())
         self.assertEqual(actual_request.header_items(), [])
 
-    def testGetRequestWithHeaders(self):
+    def test_get_request_with_headers(self):
         mock_logger = mock.MagicMock()
-        actual_request = UrlMonitor.form_request(
-            'fooUrl',
-            'GET',
-            None,
-            self.legit_headers,
-            mock_logger
-        )
+        config_data = {
+            'url': 'fooUrl',
+            'request_method': 'GET',
+            'request_data': None,
+            'request_headers': self.legit_headers,
+            'module': self.module
+        }
+        config = MonitorConfig(content=config_data)
+        url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
+
+        actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), 'GET')
         self.assertFalse(actual_request.has_data())
         self.assertEqual(
@@ -59,15 +75,19 @@ class UrlMonitorTestRequest(unittest.TestCase):
             [('Header_foo', 'foo'), ('Header_bar', 'bar')]
         )
 
-    def testPostRequestWithData(self):
+    def test_post_request_with_data(self):
         mock_logger = mock.MagicMock()
-        actual_request = UrlMonitor.form_request(
-            'fooUrl',
-            'POST',
-            '{fakejsonthatisnotlegit}',
-            self.legit_headers,
-            mock_logger
-        )
+        config_data = {
+            'url': 'fooUrl',
+            'request_method': 'POST',
+            'request_data': '{fakejsonthatisnotlegit}',
+            'request_headers': self.legit_headers,
+            'module': self.module
+        }
+
+        config = MonitorConfig(content=config_data)
+        url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
+        actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), 'POST')
         self.assertEqual(actual_request.data, '{fakejsonthatisnotlegit}')
         self.assertEqual(
@@ -75,13 +95,17 @@ class UrlMonitorTestRequest(unittest.TestCase):
             [('Header_foo', 'foo'), ('Header_bar', 'bar')]
         )
 
-    def testMalformedheaders(self):
+    def test_malformed_headers(self):
         mock_logger = mock.MagicMock()
-        UrlMonitor.form_request(
-            'fooUrl',
-            'POST',
-            '{fakejsonthatisnotlegit}',
-            'not legit header',
-            mock_logger
-        )
+        config_data = {
+            'url': 'fooUrl',
+            'request_method': 'POST',
+            'request_data': '{fakejsonthatisnotlegit}',
+            'request_headers': 'not legit headers',
+            'module': self.module
+        }
+
+        config = MonitorConfig(content=config_data)
+        url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
+        url_monitor.build_request()
         mock_logger.emit_value.assert_called()
