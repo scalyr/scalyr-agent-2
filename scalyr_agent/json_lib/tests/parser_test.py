@@ -173,6 +173,10 @@ class JsonParserTests(ScalyrTestCase):
         x = JsonParser.parse('`s\x00\x00\x00\x0cHowdy folks!')
         self.assertEquals('Howdy folks!', x)
 
+    def test_triple_quoted_strings(self):
+        x = JsonParser.parse('"""Howdy\n"folks"!"""')
+        self.assertEquals('Howdy\n"folks"!', x)
+
     def test_parsing_boolean(self):
         x = JsonParser.parse("true")
         self.assertEquals(x, True)

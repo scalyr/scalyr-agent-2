@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.28 "Changeling" - Aug 29, 2017
+
+<!---
+Packaged by Saurabh Jain <saurabh@scalyr.com> on Aug 29, 2017 13:45 -0700
+--->
+
+New features:
+
+* Upgraded `requests` library to support new proxy protocols such as `SOCK5`
+
+Bug fixes:
+
+* Fix bug preventing multiple instances of the `syslog_monitor` from logging to separate log files.
+
 ## 2.0.27 "Borg" - Jun 2, 2017
 
 <!---
