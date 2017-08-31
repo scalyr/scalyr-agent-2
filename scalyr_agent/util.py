@@ -39,6 +39,16 @@ try:
 except ImportError:
     from sha import sha as sha1
 
+
+try:
+    # For Python >= 2.5
+    from hashlib import md5
+    new_md5 = True
+except ImportError:
+    import md5
+    new_md5 = False
+
+
 try:
     import scalyr_agent.third_party.uuid_tp.uuid as uuid
 except ImportError:
@@ -124,6 +134,25 @@ def create_unique_id():
         base_value = str(time.time()) + base_value
     result = base64.urlsafe_b64encode(sha1(base_value).digest()) + method
     return result
+
+
+def md5_digest(data):
+    """
+    Returns the md5 digest of the input data
+    @param data: data to be digested(hashed)
+    @type data: str
+    @rtype: str
+    """
+
+    if not (data and isinstance(data, basestring)):
+        raise Exception('invalid data to be hashed: %s', repr(data))
+
+    if not new_md5:
+        m = md5.new()
+    else:
+        m = md5()
+    m.update(data)
+    return m.digest()
 
 
 def remove_newlines_and_truncate(input_string, char_limit):
