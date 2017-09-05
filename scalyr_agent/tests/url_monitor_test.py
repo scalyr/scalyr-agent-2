@@ -106,6 +106,5 @@ class UrlMonitorTestRequest(unittest.TestCase):
         }
 
         config = MonitorConfig(content=config_data)
-        url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
-        url_monitor.build_request()
-        mock_logger.emit_value.assert_called()
+        with self.assertRaises(Exception):
+            _ = UrlMonitor(monitor_config=config, logger=mock_logger)

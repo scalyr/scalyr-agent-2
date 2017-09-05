@@ -102,11 +102,11 @@ class UrlMonitor(ScalyrMonitor):
         self.timeout = self._config.get("timeout")
         self.max_characters = self._config.get("max_characters")
         self.log_all_lines = self._config.get("log_all_lines")
+
         if self.request_headers and type(self.request_headers) != JsonArray:
-            self._logger.emit_value(
+            raise Exception(
                 'URL Monitor has malformed optional headers: {}'.format(repr(self.request_headers))
             )
-            self.request_headers = []  # we don't want to kill the monitor because of malformed headers?
 
         extract_expression = self._config.get("extract")
         if extract_expression:
