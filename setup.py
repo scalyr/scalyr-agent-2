@@ -50,6 +50,11 @@ import shutil
 if path.isdir('source_root'):
     sys.path.append('source_root')
 
+# need to include third_party path here otherwise
+# we break win32 builds
+if path.isdir('source_root/scalyr_agent/third_party'):
+    sys.path.append('source_root/scalyr_agent/third_party')
+
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
 
 _file_version = SCALYR_VERSION

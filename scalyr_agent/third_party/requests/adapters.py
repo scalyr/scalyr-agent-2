@@ -38,9 +38,9 @@ from .auth import _basic_auth_str
 
 try:
     from .packages.urllib3.contrib.socks import SOCKSProxyManager
-except ImportError:
+except ImportError, e:
     def SOCKSProxyManager(*args, **kwargs):
-        raise InvalidSchema("Missing dependencies for SOCKS support.")
+        raise InvalidSchema("Missing dependencies for SOCKS support. %s", str( e ))
 
 DEFAULT_POOLBLOCK = False
 DEFAULT_POOLSIZE = 10
