@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.29 "Dyson Aliens" - TBD
+
+<!---
+Packaged by Saurabh Jain <saurabh@scalyr.com> on Sep 29, 2017 13:45 -0700
+--->
+
+Note, this release is still under development.  Release date TBD.
+
+Bug fixes:
+
+* Fix win32 build such that it correctly pulls packages from the third party repository.  This fixes a bug resulting in SOCK5 proxy support not working under Windows.
+
 ## 2.0.28 "Changeling" - Aug 29, 2017
 
 <!---
