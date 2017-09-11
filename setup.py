@@ -140,7 +140,7 @@ def _setup_requests_library():
             project_path = os.path.dirname(os.path.abspath(__file__))
             shutil.move(
                 os.path.join(project_path, 'scalyr_agent', 'third_party', 'requests'),
-                os.path.join(project_path, 'scalyr_agent', 'third_party', 'requests_deprecated'),
+                os.path.join(project_path, 'scalyr_agent', 'third_party', 'requests_deprecated')
             )
     except Exception as ex:
         pass
