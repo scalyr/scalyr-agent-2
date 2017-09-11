@@ -25,7 +25,7 @@ import threading
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator
+from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator, compare_versions
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.json_lib import JsonObject
 
@@ -458,6 +458,26 @@ class TestRedirectionService(ScalyrTestCase):
         self._server_sys.stdout.write('Test full')
         self._server.stop()
         self._client.stop()
+
+
+class TestCompareVersions(ScalyrTestCase):
+    def test_same_versions(self):
+        self.assertEqual(compare_versions("1.4.6", "1.4.6"), 0)
+
+    def test_almost_same_versions(self):
+        self.assertEqual(compare_versions("1.4.0", "1.4"), 1)
+
+    def test_almost_same_versions_2(self):
+        self.assertEqual(compare_versions("1.4", "1.4.0"), -1)
+
+    def test_greater_version(self):
+        self.assertEqual(compare_versions("1.4.7", "1.4.0"), 1)
+
+    def test_lesser_version(self):
+        self.assertEqual(compare_versions("1.4.0", "1.4.9"), -1)
+
+    def test_multidigit_subversion(self):
+        self.assertEqual(compare_versions("1.0000000001.0", "1.09"), -1)
 
 
 class FakeServerChannel(RedirectorServer.ServerChannel):
