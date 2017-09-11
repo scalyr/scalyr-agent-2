@@ -55,6 +55,7 @@ if path.isdir('source_root'):
 if path.isdir('source_root/scalyr_agent/third_party'):
     sys.path.append('source_root/scalyr_agent/third_party')
 
+
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
 
 _file_version = SCALYR_VERSION
@@ -123,13 +124,36 @@ service_config = Target(
 
 # Determine which of the two uses cases we are executing.. either we are on Windows building the
 # Windows installer using py2exe, or we are uploading the module to pypi.
+
+
 if 'win32' == sys.platform:
+
+    # check if the current system requests library has a version, greater than what we
+    # provide in the third_party/requests library, then rename the third_party/requests
+    #  to third_party/requests_deprecated so that the system requests library is used
+    def _setup_requests_library():
+        try:
+            import requests
+            if requests.__version__ > '2.15.1':  # what we package in third_party/requests/__version__.py
+                # rename the third_party/requests directory to third_party/requests_deprecated
+                project_path = os.path.dirname(os.path.abspath(__file__))
+                shutil.move(
+                    os.path.join(project_path, 'scalyr_agent', 'third_party', 'requests'),
+                    os.path.join(project_path, 'scalyr_agent', 'third_party', 'requests_deprecated'),
+                )
+        except Exception as ex:
+            pass
+
+
     my_data_files = [('', [path.join('source_root', 'VERSION')])]
     for my_license in os.listdir(path.join('data_files', 'licenses')):
         license_file = path.join('data_files', 'licenses', my_license)
         if os.path.isfile(license_file):
             x = 'third_party_licenses', [license_file]
             my_data_files.append(x)
+
+    _setup_requests_library()
+
     my_package_data = None
 else:
     my_data_files = []
