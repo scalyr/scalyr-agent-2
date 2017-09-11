@@ -155,6 +155,34 @@ def md5_digest(data):
     return m.digest()
 
 
+def compare_versions(version1, version2, delimiter='.'):
+    """
+    Compares 2 numeric versions delimited by a delimiter. Assumes numeric versioning scheme like
+    2.4.5, 3.5 etc.
+
+    :param version1:
+    :param version2:
+    :return: 1 if version1 > version2, -1 if version1 < version2, 0 otherwise
+    """
+
+    if version1 == version2:
+        return 0
+
+    version1 = version1.split(delimiter)
+    version2 = version2.split(delimiter)
+
+    for _i in range(max(len(version1), len(version2))):
+        if _i == len(version1):
+            return -1
+        if _i == len(version2):
+            return 1
+        if int(version1[_i]) == int(version2[_i]):
+            continue
+        if int(version1[_i]) > int(version2[_i]):
+            return 1
+        return -1
+
+
 def remove_newlines_and_truncate(input_string, char_limit):
     """Returns the input string but with all newlines removed and truncated.
 
