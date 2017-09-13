@@ -694,7 +694,7 @@ class TestConfiguration(ScalyrTestCase):
             api_key: "abcd1234",
           }
         """)
-        os.environ['api_key'] = ''
+        os.environ['scalyr_api_key'] = ''
 
         config = self.__create_test_configuration_instance()
         config.parse()
@@ -707,7 +707,7 @@ class TestConfiguration(ScalyrTestCase):
             api_key: "abcd1234",
           }
         """)
-        os.environ['api_key'] = "xyz"
+        os.environ['scalyr_api_key'] = "xyz"
 
         config = self.__create_test_configuration_instance()
         config.parse()

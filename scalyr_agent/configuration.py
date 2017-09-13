@@ -124,9 +124,9 @@ class Configuration(object):
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
-            # Check for api_key in the environment variable `api_key`. Sometimes, injecting a secret key like
+            # Check for api_key in the environment variable `scalyr_api_key`. Sometimes, injecting a secret key like
             # this is preferable via environment variables
-            api_key = os.environ.get('api_key') if os.environ.get('api_key') else api_key
+            api_key = os.environ.get('scalyr_api_key') if os.environ.get('scalyr_api_key') else api_key
 
             self.__set_api_key(self.__config, api_key)
             if scalyr_server is not None:
