@@ -676,6 +676,44 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.api_key, 'hibye')
 
+    def test_api_key_override_no_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'abcd1234')
+
+    def test_api_key_override_empty_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+        os.environ['api_key'] = ''
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'abcd1234')
+
+    def test_api_key_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+        os.environ['api_key'] = "xyz"
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'xyz')
+
     def test_json_array_substitution(self):
         self.__write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR", "DIR_VAR" ],
