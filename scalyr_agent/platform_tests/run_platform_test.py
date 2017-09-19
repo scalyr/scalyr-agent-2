@@ -47,3 +47,17 @@ class RunPlatformTests(unittest.TestCase):
             call(["pwd"])
             call(["docker", "build", "-t",  "scalyr:python_2-alpine", "."])
             call(["docker", "run", "scalyr:python_2-alpine", "python", "run_tests.py", "--verbose"])
+
+    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    def test_wheezy(self):
+        with cd("scalyr_agent/platform_tests/wheezy"):
+            call(["pwd"])
+            call(["docker", "build", "-t",  "scalyr:python_2-wheezy", "."])
+            call(["docker", "run", "scalyr:python_2-wheezy", "python", "run_tests.py", "--verbose"])
+
+    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    def test_jessie(self):
+        with cd("scalyr_agent/platform_tests/jessie"):
+            call(["pwd"])
+            call(["docker", "build", "-t",  "scalyr:python_2-jessie", "."])
+            call(["docker", "run", "scalyr:python_2-jessie", "python", "run_tests.py", "--verbose"])
