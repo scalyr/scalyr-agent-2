@@ -21,7 +21,12 @@ Packaged by Saurabh Jain <saurabh@scalyr.com> on Aug 29, 2017 13:45 -0700
 
 New features:
 
-* Upgraded `requests` library to support new proxy protocols such as `SOCK5`
+* Upgraded `requests` library to support new proxy protocols such as `SOCKS5`.  To use `SOCKS5`, you either the `socks5` or `socks5h` protocol when specifying the proxy address (`socks5` resolves DNS addresses locally, whereas `socks5h` resolves addresses at the `SOCKS5` server). 
+
+For example, to use a `SOCKS5` proxy to proxy traffic to Scalyr, you would add the following to your `agent.json` configuration file:
+
+    use_requests_lib: true,   // Proxy support requires use of the request library.
+    https_proxy: "socks5://yoursocksserver.company.com:8080”
 
 Bug fixes:
 
