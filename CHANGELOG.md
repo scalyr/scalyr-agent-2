@@ -25,7 +25,7 @@ New features:
 
 For example, to use a `SOCKS5` proxy to proxy traffic to Scalyr, you would add the following to your `agent.json` configuration file:
 
-    use_requests_lib: true,           // Proxy support requires use of the request library.
+    use_requests_lib: true,                                              // Proxy support requires use of the request library.
     https_proxy: "socks5://yoursocksserver.company.com:8080”             // Replace with your SOCKS5 address
 
 Bug fixes:
