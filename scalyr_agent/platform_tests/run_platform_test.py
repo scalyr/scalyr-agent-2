@@ -17,12 +17,26 @@
 
 __author__ = 'saurabh@scalyr.com'
 
+"""
+This module is used to run the tests under scalyr_agent/tests on different OS platforms 
+with different Python versions.
+
+We do this by:
+1) iterating over all the Dockerfiles under scalyr_agent/platform_tests
+2) for each Dockerfile:
+    i)   create a Docker Image
+    ii)  run a container
+    iii) run the tests.
+3) Once the tests have run, destroy the container and the images created.
+
+"""
+
 import unittest
 from subprocess import call
 import os
 
 
-class cd:
+class WorkingDirectory:
     """Context manager for changing the current working directory
     From: https://stackoverflow.com/questions/431684/how-do-i-cd-in-python
     """
@@ -43,7 +57,7 @@ class RunPlatformTests(unittest.TestCase):
     """
     @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_alpine(self):
-        with cd("scalyr_agent/platform_tests/alpine"):
+        with WorkingDirectory("scalyr_agent/platform_tests/alpine"):
             call(["docker", "build", "-t",  "scalyr:python_2-alpine", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_alpine", "scalyr:python_2-alpine",
@@ -52,7 +66,7 @@ class RunPlatformTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_wheezy(self):
-        with cd("scalyr_agent/platform_tests/wheezy"):
+        with WorkingDirectory("scalyr_agent/platform_tests/wheezy"):
             call(["docker", "build", "-t",  "scalyr:python_2-wheezy", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_wheezy", "scalyr:python_2-wheezy",
@@ -61,7 +75,7 @@ class RunPlatformTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_jessie(self):
-        with cd("scalyr_agent/platform_tests/jessie"):
+        with WorkingDirectory("scalyr_agent/platform_tests/jessie"):
             call(["docker", "build", "-t",  "scalyr:python_2-jessie", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_jessie", "scalyr:python_2-jessie",
