@@ -64,7 +64,7 @@ git clone -b release git://github.com/scalyr/scalyr-agent-2.git
 * Run the tests:
 
 ```
-cd scalyr-agent-2\scalyr_agent
+cd scalyr-agent-2
 
 python run_tests.py
 ```
