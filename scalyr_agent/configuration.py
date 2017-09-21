@@ -29,14 +29,6 @@ from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.util import JsonReadFileException
 
-import scalyr_agent.scalyr_logging as scalyr_logging
-
-# Set up the main logger.  We set it up initially to log to standard out,
-# but once we run fork off the daemon, we will use a rotating log file.
-log = scalyr_logging.getLogger('scalyr_agent')
-
-scalyr_logging.set_log_destination(use_stdout=True)
-
 from __scalyr__ import get_install_root
 
 
@@ -83,7 +75,7 @@ class Configuration(object):
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
 
-    def parse(self):
+    def parse(self, logger=None):
         self.__read_time = time.time()
 
         try:
@@ -138,10 +130,12 @@ class Configuration(object):
             env_api_key = os.environ.get('scalyr_api_key')
             if api_key and env_api_key and api_key != env_api_key:
                 # ignore and key in the env variable and warn the user
-                log.warn("You have different api keys in the config file and env variable `scalyr_api_key`."
-                         " Ignoring the env variable.")
+                if logger:
+                    logger.warn("You have different api keys in the config file and env variable `scalyr_api_key`."
+                             " Ignoring the env variable.")
             elif not api_key and env_api_key:
-                log.debug("Using the api key from the env variable `scalyr_api_key`")
+                if logger:
+                    logger.debug("Using the api key from the env variable `scalyr_api_key`")
                 api_key = env_api_key
 
             self.__set_api_key(self.__config, api_key)
