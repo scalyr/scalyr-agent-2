@@ -103,6 +103,42 @@ class TestUtil(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_datetime( s )
         self.assertEquals( expected, actual )
 
+    def test_rfc3339_to_nanoseconds_since_epoch( self ):
+        s = "2015-08-06T14:40:56.123456Z"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_nanoseconds_since_epoch_no_fractions( self ):
+        s = "2015-08-06T14:40:56"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56) ) * 1000
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_nanoseconds_since_epoch_some_fractions( self ):
+        s = "2015-08-06T14:40:56.123Z"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123000 ) ) * 1000
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_nanoseconds_since_epoch_many_fractions( self ):
+        s = "2015-08-06T14:40:56.123456789Z"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000 + 789
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_nanoseconds_since_epoch_too_many_fractions( self ):
+        s = "2015-08-06T14:40:56.123456789999Z"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000 + 789
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+
+    def test_rfc3339_to_nanoseconds_since_epoch_strange_value( self ):
+        s = "2017-09-20T20:44:00.6Z"
+        expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2017, 9, 20, 20, 44, 00, 123456 ) )
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
+        self.assertEquals( expected, actual )
+        
     def test_uuid(self):
         first = scalyr_util.create_unique_id()
         second = scalyr_util.create_unique_id()

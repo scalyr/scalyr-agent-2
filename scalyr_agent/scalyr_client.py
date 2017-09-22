@@ -730,7 +730,7 @@ class AddEventsRequest(object):
         It is illegal to invoke this method if 'get_payload' has already been invoked.
 
         @param event: The event object.
-        @param timestamp: The timestamp to use for the event. This should only be used for testing.
+        @param timestamp: The timestamp to use for the event. If None, will be the current time.time()
         @param sequence_id: A globally unique id, grouping a set of sequence_numbers
         @param sequence_number: A monotonically increasing sequence_number
 
@@ -747,8 +747,7 @@ class AddEventsRequest(object):
         if self.__events_added > 0:
             self.__buffer.write(',')
 
-        if timestamp is None:
-            timestamp = self.__get_timestamp()
+        timestamp = self.__get_timestamp( timestamp=timestamp )
 
         # get copy of event sequencer state in case the event wasn't actually added
         # and we need to restore it
@@ -868,18 +867,20 @@ class AddEventsRequest(object):
 
         return output_buffer.getvalue()
 
-    def __get_timestamp(self):
+    def __get_timestamp(self, timestamp=None):
         """
         @return: The next timestamp to use for events.  This is guaranteed to be monotonically increasing.
         @rtype: long
         """
         global __last_time_stamp__
 
-        base_timestamp = long(time.time() * 1000000000L)
-        if __last_time_stamp__ is not None and base_timestamp <= __last_time_stamp__:
-            base_timestamp = __last_time_stamp__ + 1L
-        __last_time_stamp__ = base_timestamp
-        return base_timestamp
+        if timestamp is None:
+            timestamp = long(time.time() * 1000000000L)
+
+        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
+            timestamp = __last_time_stamp__ + 1L
+        __last_time_stamp__ = timestamp
+        return timestamp
 
     @property
     def total_events(self):
