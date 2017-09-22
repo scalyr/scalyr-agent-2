@@ -171,16 +171,44 @@ class ScalyrLoggingTest(ScalyrTestCase):
 
         monitor_logger.closeMetricLog()
 
-    def test_rate_limit(self):
+    def test_rate_limit_throttle_write_rate(self):
+        """
+        Drop log messages with log size > max_write_burst and other following
+        log messages if log write rate is low.
+        """
         self.__log_path = tempfile.mktemp('.log')
-        scalyr_logging.set_log_destination(use_disk=True, logs_directory=os.path.dirname(self.__log_path),
-                                           agent_log_file_path=self.__log_path, max_write_burst=250, log_write_rate=0)
+        scalyr_logging.set_log_destination(
+            use_disk=True, logs_directory=os.path.dirname(self.__log_path),
+            agent_log_file_path=self.__log_path, max_write_burst=250, log_write_rate=0
+        )
+        self.__logger = scalyr_logging.getLogger('scalyr_agent.agent_main')
+
+        string_300 = 'a' * 300
+
+        self.__logger.info('First message')
+        self.assertTrue(self.__log_contains('First message'))
+
+        self.__logger.info('Dropped message %s', string_300)
+        self.assertFalse(self.__log_contains('Dropped message'))
+
+        self.__logger.info('Second message')
+        self.assertFalse(self.__log_contains('Second message'))
+
+    def test_rate_limit_no_write_rate(self):
+        """
+        Drop log messages with log size > max_write_burst but do not drop
+        following small log messages
+        """
+        self.__log_path = tempfile.mktemp('.log')
+        scalyr_logging.set_log_destination(
+            use_disk=True, logs_directory=os.path.dirname(self.__log_path),
+            agent_log_file_path=self.__log_path, max_write_burst=250, log_write_rate=20000
+        )
         self.__logger = scalyr_logging.getLogger('scalyr_agent.agent_main')
 
         string_300 = ''
 
-        for i in range(300):
-            string_300 = '%sa' % string_300
+        string_300 = 'a' * 300
 
         self.__logger.info('First message')
         self.assertTrue(self.__log_contains('First message'))
