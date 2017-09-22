@@ -293,7 +293,7 @@ class ScalyrAgent(object):
         @type config: scalyr_agent.Configuration
         """
         try:
-            config.parse()
+            config.parse(logger=log)
             monitors_manager = MonitorsManager(config, self.__controller)
             copying_manager = CopyingManager(config, monitors_manager.monitors)
             # To do the full verification, we have to create the managers.  However, this call does not need them,

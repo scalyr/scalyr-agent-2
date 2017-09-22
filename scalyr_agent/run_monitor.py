@@ -104,7 +104,7 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
             controller = PlatformController.new_platform()
             paths = controller.default_paths
             global_config = Configuration( global_config_path, paths )
-            global_config.parse()
+            global_config.parse(logger=log)
         else:
             global_config = None
         monitor = MonitorsManager.build_monitor(parsed_config, monitor_python_path, float(monitor_sample_interval),

@@ -75,7 +75,7 @@ class Configuration(object):
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
 
-    def parse(self):
+    def parse(self, logger=None):
         self.__read_time = time.time()
 
         try:
@@ -123,6 +123,20 @@ class Configuration(object):
                 self.__add_elements_from_array('logs', content, self.__config)
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
+
+            # Check for api_key in the environment variable `scalyr_api_key`. Sometimes, injecting a secret key like
+            # this is preferable via environment variables. However if the key is specified in the configuration
+            # file, it takes precedence. Key should only be specified in either the config file of env variable
+            env_api_key = os.environ.get('scalyr_api_key')
+            if api_key and env_api_key and api_key != env_api_key:
+                # ignore and key in the env variable and warn the user
+                if logger:
+                    logger.warn("You have different api keys in the config file and env variable `scalyr_api_key`."
+                             " Ignoring the env variable.")
+            elif not api_key and env_api_key:
+                if logger:
+                    logger.debug("Using the api key from the env variable `scalyr_api_key`")
+                api_key = env_api_key
 
             self.__set_api_key(self.__config, api_key)
             if scalyr_server is not None:
