@@ -189,7 +189,7 @@ define_config_option(__monitor__, 'docker_check_rotated_timestamps',
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
-    result = None
+    result = 'localhost'
     fh = None
     try:
         fh = open("/proc/net/route")
@@ -199,6 +199,8 @@ def _get_default_gateway():
                 continue
 
             result = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+    except IOError:
+        pass
     finally:
         if fh:
             fh.close()
@@ -296,12 +298,14 @@ class SyslogFrameParser(object):
 
         return result
 
+
 class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
     """Class that reads data from a UDP request and passes it to
     a protocol neutral handler
     """
     def handle( self ):
         self.server.syslog_handler.handle( self.request[0].strip() )
+
 
 class SyslogRequestParser( object ):
     def __init__( self, socket, max_buffer_size ):

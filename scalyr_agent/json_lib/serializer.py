@@ -127,7 +127,7 @@ ESCAPE_DCT_OPT.setdefault(chr(127), '\\u007f')
 
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 
-# Used for an optimization when escaping a string. This regexp matches a continious seqeuence of regular ascii
+# Used for an optimization when escaping a string. This regexp matches a continuous sequence of regular ascii
 # characters (from char 32 to 127).
 SIMPLE_MATCHER = re.compile('^[ -~]*')
 # Find the two characters " and \ that need to be escaped from the above regular ascii characters.
