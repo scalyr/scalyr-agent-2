@@ -200,14 +200,13 @@ class BaseReader:
                 # don't have permissions for it, then just don't collect this
                 # stat from now on.  If the user changes the configuration file
                 # we will try again to read the file then.
+                self._failed = True
                 if e.errno == 13:
                     self._logger.error("The agent does not have permission to read %s.  "
                                        "Maybe you should run it as root.", filename)
-                    self._failed = True
                 elif e.errno == 2:
                     self._logger.error("The agent cannot read %s.  Your system may not support that proc file type",
                                        filename)
-                    self._failed = True
                 else:
                     raise e
 
@@ -218,7 +217,7 @@ class BaseReader:
             except IOError, e:
                 self._logger.error( "Error gathering sample for file: '%s'\n\t%s" % (filename, str( e ) ) );
 
-                #close the file.  This will cause the file to be reopened next call to run_single_cycle
+                # close the file. This will cause the file to be reopened next call to run_single_cycle
                 self.close()
 
     def gather_sample(self, my_file):
@@ -268,6 +267,7 @@ class StatReader(BaseReader):
       app.threads:           the number of threads being used by the process
       app.nice:              the nice value for the process
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -279,6 +279,7 @@ class StatReader(BaseReader):
         @type monitor_id: str
         @type logger: scalyr_agent.AgentLogger
         """
+
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/stat")
         # Need the number of jiffies_per_sec for this server to calculate some times.
         self._jiffies_per_sec = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
@@ -295,6 +296,7 @@ class StatReader(BaseReader):
         @return: The number of centiseconds for the specified number of jiffies.
         @rtype: int
         """
+
         return int((jiffies * 100.0) / self._jiffies_per_sec)
 
     def calculate_time_ms(self, jiffies):
@@ -307,6 +309,7 @@ class StatReader(BaseReader):
         @return: The number of milliseconds for the specified number of jiffies.
         @rtype: int
         """
+
         return int((jiffies * 1000.0) / self._jiffies_per_sec)
 
     def __get_uptime_ms(self):
@@ -315,6 +318,7 @@ class StatReader(BaseReader):
         @return: The number of milliseconds the system has been up.
         @rtype: int
         """
+
         if self._boot_time_ms is None:
             # We read /proc/uptime once to get the current boot time.
             uptime_file = None
@@ -346,7 +350,7 @@ class StatReader(BaseReader):
         line = line[(line.find(") ")+2):]
         fields = line.split()
         # Then the fields we want are just at fixed field positions in the
-        # string.  Just grap them.
+        # string.  Just grab them.
         self.print_sample("app.cpu", self.__calculate_time_cs(int(fields[11])), "user")
         self.print_sample("app.cpu",  self.__calculate_time_cs(int(fields[12])), "system")
         # The uptime is calculated by reading the 'start_time from stat which is expressed as the
@@ -355,6 +359,7 @@ class StatReader(BaseReader):
         self.print_sample("app.uptime", process_uptime)
         self.print_sample("app.nice", float(fields[16]))
         self.print_sample("app.threads", int(fields[17]))
+
 
 class StatusReader(BaseReader):
     """Reads and records statistics from the /proc/$pid/status file.
@@ -365,6 +370,7 @@ class StatusReader(BaseReader):
       app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
       app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -679,6 +685,7 @@ class ProcessMonitor(ScalyrMonitor):
             self.__gathers.append(StatusReader(self.__pid, self.__id, self._logger))
             self.__gathers.append(IoReader(self.__pid, self.__id, self._logger))
             self.__gathers.append(FileDescriptorReader(self.__pid, self.__id, self._logger))
+
         # TODO: Re-enable these if we can find a way to get them to truly report
         # per-app statistics.
         #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
@@ -699,7 +706,7 @@ class ProcessMonitor(ScalyrMonitor):
             gather.run_single_cycle()
 
     def __select_process(self):
-        """Returns the proces id of a running process that fulfills the match criteria.
+        """Returns the process id of a running process that fulfills the match criteria.
 
         This will either use the commandline matcher or the target pid to find the process.
         If no process is matched, None is returned.
