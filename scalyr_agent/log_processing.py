@@ -79,17 +79,16 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
 
-class LogLine( object ):
+class LogLine(object):
     """A class representing a line from a log file.
     This object will always have a single field 'line' which contains the log line.
     It can also contain two other attributes 'timestamp' which is the timestamp of the
-    the log line (defaults to None), and 'attrs' which are optional attributes for the
-    line.
+    the log line in nanoseconds since the epoch (defaults to None, in which case the
+    current time.time() will be used), and 'attrs' which are optional attributes for the line.
     """
-    def __init__( self, line ):
+    def __init__(self, line):
         # line is a string
         self.line = line
-
 
         # timestamp is a long, counting nanoseconds since Epoch
         # or None to use current time
@@ -426,6 +425,26 @@ class LogFileIterator(object):
         then a line will be returned using the available bytes up to the max line size.  Second, if there are bytes
         available, and sufficient time has past without seeing a newline, then the available lines are returned.
 
+        If the 'parse_as_json' configuration item is True then this function will also attempt to process the line as json,
+        extracting a log message, a timestamp and any other remaining fields, all of which are returned as a LogLine object.
+
+        When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
+        the line will be returned unprocessed.
+
+        The configuration options 'json_message_field' and 'json_timestamp_field' are used to specify which field to use
+        as the log message, and which field to use for the timestamp.
+
+        'json_message_field' defaults to 'log' and if no field with this name is found, the function will return the
+        full line unprocessed.
+
+        'json_timestamp_field' defaults to 'time', and the value of this field is required to be in rfc3339 format
+        otherwise an error will occur.  If the field does not exist in the json object, then the agent will use
+        the current time instead.  Note, the value specified in the timestamp field might not be the final value uploaded
+        to the server, as the agent ensures that the timestamps of all messages are monotonically increasing.  For
+        this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
+
+        All other fields of the json object will be stored in the attrs dict of the LogLine object.
+
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float
         @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
@@ -451,7 +470,7 @@ class LogFileIterator(object):
 
         # read a complete line from our line_matcher
         next_line = self.__line_matcher.readline(self.__buffer, current_time)
-        result = LogLine( line=next_line )
+        result = LogLine(line=next_line)
 
         if len(result.line) == 0:
             return result
@@ -469,7 +488,7 @@ class LogFileIterator(object):
         # check to see if we need to parse the line as json
         if self.__parse_as_json:
             try:
-                json = json_lib.parse( result.line )
+                json = json_lib.parse(result.line)
 
                 line = None
                 attrs = {}
@@ -480,7 +499,10 @@ class LogFileIterator(object):
                     if key == self.__json_log_key:
                         line = value
                     elif key == self.__json_timestamp_key:
-                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch( value )
+                        # TODO: need to add support for multiple timestamp formats
+                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(value)
+                        if 'raw_timestamp' not in attrs:
+                            attrs['raw_timestamp'] = value
                     else:
                         attrs[key] = value
 

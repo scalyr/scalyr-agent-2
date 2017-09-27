@@ -730,7 +730,7 @@ class AddEventsRequest(object):
         It is illegal to invoke this method if 'get_payload' has already been invoked.
 
         @param event: The event object.
-        @param timestamp: The timestamp to use for the event. If None, will be the current time.time()
+        @param timestamp: The timestamp to use for the event, in nanoseconds since the Epoch. If None, will be the current time.time()
         @param sequence_id: A globally unique id, grouping a set of sequence_numbers
         @param sequence_number: A monotonically increasing sequence_number
 
@@ -747,7 +747,7 @@ class AddEventsRequest(object):
         if self.__events_added > 0:
             self.__buffer.write(',')
 
-        timestamp = self.__get_timestamp( timestamp=timestamp )
+        timestamp = self.__get_valid_timestamp(timestamp=timestamp)
 
         # get copy of event sequencer state in case the event wasn't actually added
         # and we need to restore it
@@ -867,8 +867,14 @@ class AddEventsRequest(object):
 
         return output_buffer.getvalue()
 
-    def __get_timestamp(self, timestamp=None):
+    def __get_valid_timestamp(self, timestamp=None):
         """
+        Gets a timestamp in nanoseconds since the Epoch, ensuring that the result is at least 1 nanosecond
+        greater than previously returned results.
+        @param timestamp: A timestamp to validate.  If it is greater than the result of a previous call the value will
+                          be returned with no changes.  If less than the result of a previous call the result will
+                          be 1 nanosecond greater than the previous result.
+                          If None, time.time() is used for the value of timestamp.
         @return: The next timestamp to use for events.  This is guaranteed to be monotonically increasing.
         @rtype: long
         """
@@ -1228,22 +1234,22 @@ class Event(object):
         self.__serialization_base = tmp_buffer.getvalue()
 
 
-    def add_missing_attributes( self, attributes ):
+    def add_missing_attributes(self, attributes):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
         already have those attributes set
         """
         if self.__attrs:
             changed = False
-            new_attrs = dict( self.__attrs )
+            new_attrs = dict(self.__attrs)
             for key, value in attributes.iteritems():
                 if not key in new_attrs:
                     changed = True
                     new_attrs[key] = value
 
             if changed:
-                self.__set_attributes( self.__thread_id, new_attrs )
+                self.__set_attributes(self.__thread_id, new_attrs)
         else:
-            self.__set_attributes( self.__thread_id, attributes )
+            self.__set_attributes(self.__thread_id, attributes)
 
     @property
     def attrs(self):
