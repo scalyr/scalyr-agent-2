@@ -105,10 +105,13 @@ define_log_field(__monitor__, 'app', 'Same as ``instance``; provided for compati
 define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "app.cpu".')
 define_log_field(__monitor__, 'value', 'The metric value.')
 
+Metric = namedtuple('Metric', ['name', 'type'])
+
 
 class MetricPrinter:
     """Helper class that emits metrics for the specified monitor.
     """
+
     def __init__(self, logger, monitor_id):
         """Initializes the class.
 
@@ -128,6 +131,7 @@ class BaseReader:
     that is being monitored.  This instance is created once and then used from
     then on until the monitored process terminates.
     """
+
     def __init__(self, pid, monitor_id, logger, file_pattern):
         """Initializes the base class.
 
@@ -198,10 +202,12 @@ class BaseReader:
         if self._file is not None:
             try:
                 self._file.seek(0)
+
                 return self.gather_sample(self._file, collector=collector)
+
             except IOError, e:
                 print e
-                self._logger.error( "Error gathering sample for file: '%s'\n\t%s" % (filename, str( e ) ) );
+                self._logger.error("Error gathering sample for file: '%s'\n\t%s" % (filename, str(e)));
 
                 # close the file. This will cause the file to be reopened next call to run_single_cycle
                 self.close()
@@ -325,7 +331,7 @@ class StatReader(BaseReader):
         line = stat_file.readlines()[0]
         # Chop off first part which is the pid and executable file. The
         # executable file is terminated with a paren so just search for that.
-        line = line[(line.find(") ")+2):]
+        line = line[(line.find(") ") + 2):]
         fields = line.split()
         # Then the fields we want are just at fixed field positions in the
         # string.  Just grab them.
@@ -333,11 +339,11 @@ class StatReader(BaseReader):
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(int(fields[19]))
 
         collector.update({
-            ('app.cpu', 'user'): self.__calculate_time_cs(int(fields[11])),
-            ('app.cpu', 'system'): self.__calculate_time_cs(int(fields[12])),
-            ('app.uptime', None): process_uptime,
-            ('app.nice', None): float(fields[16]),
-            ('app.threads', None): int(fields[17]),
+            Metric('app.cpu', 'user'): self.__calculate_time_cs(int(fields[11])),
+            Metric('app.cpu', 'system'): self.__calculate_time_cs(int(fields[12])),
+            Metric('app.uptime', None): process_uptime,
+            Metric('app.nice', None): float(fields[16]),
+            Metric('app.threads', None): int(fields[17]),
         })
         return collector
 
@@ -394,10 +400,10 @@ class StatusReader(BaseReader):
             #     self.print_sample("app.fd", int_value)
 
             collector.update({
-                ('app.mem.bytes', 'vmsize'): int_value * 1024,
-                ('app.mem.bytes', 'peak_vmsize'): int_value * 1024,
-                ('app.mem.bytes', 'resident'): int_value * 1024,
-                ('app.mem.bytes', 'peak_resident'): int_value * 1024
+                Metric('app.mem.bytes', 'vmsize'): int_value * 1024,
+                Metric('app.mem.bytes', 'peak_vmsize'): int_value * 1024,
+                Metric('app.mem.bytes', 'resident'): int_value * 1024,
+                Metric('app.mem.bytes', 'peak_resident'): int_value * 1024
             })
             return collector
 
@@ -413,6 +419,7 @@ class IoReader(BaseReader):
       app.disk.bytes type=write:        the number of bytes written to disk
       app.disk.requests type=write:     the number of disk requests.
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -441,18 +448,18 @@ class IoReader(BaseReader):
         # File format is single value per line with "fieldname:" prefix.
         for x in stat_file:
             fields = x.split()
-            if len( fields ) == 0:
+            if len(fields) == 0:
                 continue
             if not collector:
                 collector = {}
             if fields[0] == "rchar:":
-                collector.update({("app.disk.bytes", "read"): int(fields[1])})
+                collector.update({Metric("app.disk.bytes", "read"): int(fields[1])})
             elif fields[0] == "syscr:":
-                collector.update({("app.disk.requests", "read"): int(fields[1])})
+                collector.update({Metric("app.disk.requests", "read"): int(fields[1])})
             elif fields[0] == "wchar:":
-                collector.update({("app.disk.bytes", "write"): int(fields[1])})
+                collector.update({Metric("app.disk.bytes", "write"): int(fields[1])})
             elif fields[0] == "syscw:":
-                collector.update({("app.disk.requests", "write"): int(fields[1])})
+                collector.update({Metric("app.disk.requests", "write"): int(fields[1])})
         return collector
 
 
@@ -466,6 +473,7 @@ class NetStatReader(BaseReader):
       app.net.bytes type=out:  The number of bytes written to the network
       app.net.tcp_retransmits:  The number of retransmits
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -514,7 +522,7 @@ class NetStatReader(BaseReader):
         # won't report the stats.
         for i in range(0, len(all_lines) - 1):
             names_split = all_lines[i].split()
-            values_split = all_lines[i+1].split()
+            values_split = all_lines[i + 1].split()
             # Check the row names are the same.
             if names_split[0] == values_split[0] and len(names_split) == len(values_split):
                 field_names.extend(names_split)
@@ -526,9 +534,9 @@ class NetStatReader(BaseReader):
         # Now go back and look for the actual stats we care about.
         for i in range(0, len(field_names)):
             if field_names[i] == "InOctets":
-                collector.update({("app.net.bytes", "in"): field_values[i]})
+                collector.update({Metric("app.net.bytes", "in"): field_values[i]})
             elif field_names[i] == "OutOctets":
-                collector.update({("app.net.bytes", "out"): field_values[i]})
+                collector.update({Metric("app.net.bytes", "out"): field_values[i]})
             elif field_names[i] == "TCPRenoRecovery":
                 retransmits += int(field_values[i])
                 found_retransmit_metric = True
@@ -538,7 +546,7 @@ class NetStatReader(BaseReader):
 
         # If we found both forms of retransmit, add them up.
         if found_retransmit_metric:
-            collector.update({("app.net.tcp_retransmits", None): retransmits})
+            collector.update({Metric("app.net.tcp_retransmits", None): retransmits})
         return collector
 
 
@@ -550,6 +558,7 @@ class SockStatReader(BaseReader):
     The recorded metrics are listed below.  They all also have an app=[id] field as well.
       app.net.sockets_in_use type=*:  The number of sockets in use
     """
+
     def __init__(self, pid, monitor_id, logger):
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/net/sockstat")
 
@@ -570,7 +579,7 @@ class SockStatReader(BaseReader):
             # socket type along with the count.
             m = re.search('(\w+): inuse (\d+)', line)
             if m is not None:
-                collector.update({("app.net.sockets_in_use", m.group(1).lower()): int(m.group(2))})
+                collector.update({Metric("app.net.sockets_in_use", m.group(1).lower()): int(m.group(2))})
         return collector
 
 
@@ -581,6 +590,7 @@ class FileDescriptorReader:
     The recorded metrics are listed below.  They all also have an app=[id] field as well.
       app.io.fds type=open:         the number of open file descriptors
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -609,7 +619,7 @@ class FileDescriptorReader:
         if not collector:
             collector = {}
         collector.update({
-            ('app.io.fds', 'open'): num_fds
+            Metric('app.io.fds', 'open'): num_fds
         })
         return collector
 
@@ -699,9 +709,6 @@ class ProcessTracker(object):
         return collector
 
 
-Metric = namedtuple('Metric', ['name', 'type'])
-
-
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
 
@@ -781,19 +788,18 @@ class ProcessMonitor(ScalyrMonitor):
         @type metrics: dict
         :return: None
         """
-        for (_metric_name, _metric_type), _metric_value in metrics.items():
-            if not self.__metrics_history[pid].get((_metric_name, _metric_type)):
-                self.__metrics_history[pid][(_metric_name, _metric_type)] = []
-            self.__metrics_history[pid][(_metric_name, _metric_type)].append(_metric_value)
+        for _metric, _metric_value in metrics.items():
+            if not self.__metrics_history[pid].get(_metric):
+                self.__metrics_history[pid][_metric] = []
+            self.__metrics_history[pid][_metric].append(_metric_value)
             # only keep the last 2 running history for any metric
-            self.__metrics_history[pid][(_metric_name, _metric_type)] =\
-                self.__metrics_history[pid][(_metric_name, _metric_type)][-2:]
+            self.__metrics_history[pid][_metric] = self.__metrics_history[pid][_metric][-2:]
 
     def _reset_absolute_metrics(self):
         for pid, process_metrics in self.__metrics_history.items():
-            for (_metric_name, _metric_type), _metric_values in process_metrics.items():
-                if _metric_name not in ('app.cpu', ):
-                    self.__running_total_metrics[(_metric_name, _metric_type)] = 0
+            for _metric, _metric_values in process_metrics.items():
+                if _metric.name not in ('app.cpu',):
+                    self.__running_total_metrics[_metric] = 0
 
     def _calculate_running_total(self, running_pids):
         """
@@ -811,31 +817,27 @@ class ProcessMonitor(ScalyrMonitor):
         running_pids_set = set(running_pids)
 
         for pid, process_metrics in self.__metrics_history.items():
-            for (_metric_name, _metric_type), _metric_values in process_metrics.items():
-                if not self.__running_total_metrics.get((_metric_name, _metric_type)):
-                    self.__running_total_metrics[(_metric_name, _metric_type)] = 0
-                if _metric_name == 'app.cpu':
+            for _metric, _metric_values in process_metrics.items():
+                if not self.__running_total_metrics.get(_metric):
+                    self.__running_total_metrics[_metric] = 0
+                if _metric.name == 'app.cpu':
                     if pid in running_pids_set:
                         if len(_metric_values) < 2:
-                            self.__running_total_metrics[(_metric_name, _metric_type)] = 0
+                            self.__running_total_metrics[_metric] = 0
                         else:
-                            self.__running_total_metrics[(_metric_name, _metric_type)] += \
-                            (_metric_values[-1] - _metric_values[-2])
+                            self.__running_total_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
                     else:
                         # remove the contribution of the dead process id
                         if len(_metric_values) >= 2:
-                            self.__running_total_metrics[(_metric_name, _metric_type)] -= \
-                                (_metric_values[-1] - _metric_values[-2])
+                            self.__running_total_metrics[_metric] -= (_metric_values[-1] - _metric_values[-2])
                 else:
-                    self.__running_total_metrics[(_metric_name, _metric_type)] += _metric_values[-1]
+                    self.__running_total_metrics[_metric] += _metric_values[-1]
 
         # once this is done, for any dead process that has already been accounted for in the delta
         # calculation above, remove the entries for the process id
         all_pids = self.__metrics_history.keys()
         for _pid_to_remove in list(set(all_pids) - set(running_pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
-
-
             del self.__metrics_history[_pid_to_remove]
 
     def gather_sample(self):
