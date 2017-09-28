@@ -139,7 +139,7 @@ class MetricPrinter:
             }
         if type_value is not None:
             extra['type'] = type_value
-
+        print "Metric: ", metric_name, metric_value, extra
         self.__logger.emit_value(metric_name, metric_value, extra)
 
 
@@ -607,6 +607,83 @@ class FileDescriptorReader:
         pass
 
 
+class ProcessTracker(object):
+    """
+    This class is responsible for gathering the metrics for a process.
+    Given a process id, it procures and stores different metrics using
+    metric readers (deriving from BaseReader)
+
+    This tracker records the following metrics:
+      app.cpu type=user:                the number of 1/100ths seconds of user cpu time
+      app.cpu type=system:              the number of 1/100ths seconds of system cpu time
+      app.uptime:                       the number of milliseconds of uptime
+      app.threads:                      the number of threads being used by the process
+      app.nice:                         the nice value for the process
+      app.mem.bytes type=vmsize:        the number of bytes of virtual memory in use
+      app.mem.bytes type=resident:      the number of bytes of resident memory in use
+      app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
+      app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
+      app.disk.bytes type=read:         the number of bytes read from disk
+      app.disk.requests type=read:      the number of disk requests.
+      app.disk.bytes type=write:        the number of bytes written to disk
+      app.disk.requests type=write:     the number of disk requests.
+      app.io.fds type=open:             the number of file descriptors held open by the process
+    """
+
+    def __init__(self, pid, logger, monitor_id=None):
+        self.pid = pid
+        self.monitor_id = monitor_id
+        self._logger = logger
+        self.gathers = []
+
+    def set_gathers(self):
+        """
+        Sets the id of the process for which this monitor instance should record metrics.
+        """
+
+        for gather in self.gathers:
+            gather.close()
+
+        self.gathers.append(StatReader(self.pid, self.monitor_id, self._logger))
+        self.gathers.append(StatusReader(self.pid, self.monitor_id, self._logger))
+        self.gathers.append(IoReader(self.pid, self.monitor_id, self._logger))
+        self.gathers.append(FileDescriptorReader(self.pid, self.monitor_id, self._logger))
+
+        # TODO: Re-enable these if we can find a way to get them to truly report
+        # per-app statistics.
+        #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
+        #        self.gathers.append(SockStatReader(self.pid, self.id, self._logger))
+
+    def __is_running(self):
+        """Returns true if the current process is still running.
+
+        @return:  True if the monitored process is still running.
+        @rtype: bool
+        """
+        try:
+            # signal flag 0 does not actually try to kill the process but does an error
+            # check that is useful to see if a process is still running.
+            os.kill(self.pid, 0)
+            return True
+        except OSError, e:
+            # Errno #3 corresponds to the process not running.  We could get
+            # other errors like this process does not have permission to send
+            # a signal to self.pid.  But, if that error is returned to us, we
+            # know the process is running at least, so we ignore the error.
+            return e.errno != 3
+
+    def collect(self):
+        """
+        Collects the metrics from the gathers
+        """
+
+        print "\n\ncollecting metrics for pid: \n", self.pid
+
+        for gather in self.gathers:
+            # todo modify def print_sample to return a dictionary that can be aggregated
+            gather.run_single_cycle()
+
+
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
 
@@ -625,41 +702,31 @@ class ProcessMonitor(ScalyrMonitor):
     monitor.  However, since ids can change over time, it's better to use the commandline matcher.  The 'pid' field
     is mainly used the linux process monitor run to monitor the agent itself.
 
-    This monitor records the following metrics:
-      app.cpu type=user:                the number of 1/100ths seconds of user cpu time
-      app.cpu type=system:              the number of 1/100ths seconds of system cpu time
-      app.uptime:                       the number of milliseconds of uptime
-      app.threads:                      the number of threads being used by the process
-      app.nice:                         the nice value for the process
-      app.mem.bytes type=vmsize:        the number of bytes of virtual memory in use
-      app.mem.bytes type=resident:      the number of bytes of resident memory in use
-      app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
-      app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
-      app.disk.bytes type=read:         the number of bytes read from disk
-      app.disk.requests type=read:      the number of disk requests.
-      app.disk.bytes type=write:        the number of bytes written to disk
-      app.disk.requests type=write:     the number of disk requests.
-      app.io.fds type=open:             the number of file descriptors held open by the process
 
     In additional to the fields listed above, each metric will also have a field 'app' set to the monitor id to specify
     which process the metric belongs to.
 
     You can run multiple instances of this monitor per agent to monitor different processes.
     """
+
     def _initialize(self):
         """Performs monitor-specific initialization."""
         # The id of the process being monitored, if one has been matched.
         self.__pid = None
-        # The list of BaseReaders instantiated to gather metrics for the process.
-        self.__gathers = []
 
         self.__id = self._config.get('id', required_field=True, convert_to=str)
         self.__commandline_matcher = self._config.get('commandline', default=None, convert_to=str)
-        self.__target_pid = self._config.get('pid', default=None, convert_to=str)
+        self.__target_pids = self._config.get('pid', default=None, convert_to=str)
 
-        if self.__commandline_matcher is None and self.__target_pid is None:
-            raise BadMonitorConfiguration('At least one of the following fields must be provide: commandline or pid',
-                                          'commandline')
+        # convert target pid into a list. Target pids can be a single pid or a CSV of pids
+        self.__target_pids = [int(x.strip()) for x in self.__target_pids.split(',')] if self.__target_pids else []
+        self.__target_pids = set(self.__target_pids)
+
+        if not (self.__commandline_matcher or self.__target_pids):
+            raise BadMonitorConfiguration(
+                'At least one of the following fields must be provide: commandline or pid',
+                'commandline'
+            )
 
         # Make sure to set our configuration so that the proper parser is used.
         self.log_config = {
@@ -667,87 +734,56 @@ class ProcessMonitor(ScalyrMonitor):
             'path': 'linux_process_metrics.log',
         }
 
-    def __set_process(self, pid):
-        """Sets the id of the process for which this monitor instance should record metrics.
-
-        @param pid: The process id or None if there is no process to monitor.
-        @type pid: int or None
-        """
-        if self.__pid is not None:
-            for gather in self.__gathers:
-                gather.close()
-
-        self.__pid = pid
-        self.__gathers = []
-
-        if pid is not None:
-            self.__gathers.append(StatReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(StatusReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(IoReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(FileDescriptorReader(self.__pid, self.__id, self._logger))
-
-        # TODO: Re-enable these if we can find a way to get them to truly report
-        # per-app statistics.
-        #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
-        #        self.gathers.append(SockStatReader(self.pid, self.id, self._logger))
-
     def gather_sample(self):
-        """Collect the per-process metrics for the monitored process.
+        """Collect the per-process tracker for the monitored process(es).
 
-        If the process is no longer running, then attempts to match a new one.
+        For multiple processes, there are a few cases we need to poll for:
+
+        For `n` processes, if there are < n running processes at any given point,
+        we should see if there are any pids or matching expression that gives pids
+        that is currently not running, if so, get its tracker and run it.
+        It is possible that one or more processes ran its course, but we can't assume that
+        and we should keep polling for it.
         """
-        if self.__pid is not None and not self.__is_running():
-            self.__set_process(None)
 
-        if self.__pid is None:
-            self.__set_process(self.__select_process())
+        trackers = []
+        for _pid in list(self.__select_processes()):
+            trackers.append(ProcessTracker(_pid, self._logger, self.__id))
+        for _tracker in trackers:
+            _tracker.set_gathers()
+            _tracker.collect()
 
-        for gather in self.__gathers:
-            gather.run_single_cycle()
-
-    def __select_process(self):
-        """Returns the process id of a running process that fulfills the match criteria.
+    def __select_processes(self):
+        """Returns a set of the process ids of processes that fulfills the match criteria.
 
         This will either use the commandline matcher or the target pid to find the process.
-        If no process is matched, None is returned.
+        If no process is matched, an empty list is returned.
 
-        @return: The process id of the matching process, or None
-        @rtype: int or None
+        @return: The process ids of the matching process, or []
+        @rtype: [int] or []
         """
+
         sub_proc = None
-        if self.__commandline_matcher is not None:
+
+        if self.__commandline_matcher:
             try:
                 # Spawn a process to run ps and match on the command line.  We only output two
                 # fields from ps.. the pid and command.
                 sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
                                  shell=False, stdout=PIPE)
-
-                sub_proc.stdout.readline()
-                matching_pids = []
-                for line in sub_proc.stdout:
+                lines = sub_proc.stdout.readlines()
+                matching_pids = set()
+                for line in lines:
                     line = line.strip()
                     if line.find(' ') > 0:
-                        pid = int(line[:line.find(' ')])
+                        pid = line[:line.find(' ')]
+                        if pid.lower() == 'pid':
+                            continue
+                        pid = int(pid)
                         line = line[(line.find(' ') + 1):]
                         if re.search(self.__commandline_matcher, line) is not None:
-                            matching_pids.append( pid )
-
-                total_pids = len( matching_pids )
-                if total_pids == 0:
-                    return None
-                elif total_pids == 1:
-                    return matching_pids[0]
-
-                # if we are here then multiple command lines matched.  First check to
-                # see if self.__pid is in the list and if so return that.  Otherwise
-                # return the first element in the list
-                if self.__pid in matching_pids:
-                    self._logger.warning( "Multiple processes match the command '%s'.  Returning existing pid." % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-existing-pid' )
-                    return self.__pid
-
-                self._logger.warning( "Multiple processes match the command '%s'.  Returning the pid of the first matching process" % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-first-pid' )
-
-                return matching_pids[0]
+                            matching_pids.add(pid)
+                return matching_pids
 
             finally:
                 # Be sure to wait on the spawn process.
@@ -755,34 +791,12 @@ class ProcessMonitor(ScalyrMonitor):
                     sub_proc.wait()
         else:
             # See if the specified target pid is running.  If so, then return it.
-            try:
-                # Special case '$$' to mean this process.
-                if self.__target_pid == '$$':
-                    pid = os.getpid()
-                else:
-                    pid = int(self.__target_pid)
-                os.kill(pid, 0)
-                return pid
-            except OSError:
-                # If we get this, it means we tried to signal a process we do not have permission to signal.
-                # If this is the case, we won't have permission to read its stats files either, so we ignore it.
-                return None
-
-    def __is_running(self):
-        """Returns true if the current process is still running.
-
-        @return:  True if the monitored process is still running.
-        @rtype: bool
-        """
-        try:
-            os.kill(self.__pid, 0)
-            return True
-        except OSError, e:
-            # Errno #3 corresponds to the process not running.  We could get
-            # other errors like this process does not have permission to send
-            # a signal to self.pid.  But, if that error is returned to us, we
-            # know the process is running at least, so we ignore the error.
-            return e.errno != 3
+            # Special case '$$' to mean this process.
+            if self.__target_pids == '$$':
+                pids = {os.getpid()}
+            else:
+                pids = self.__target_pids
+            return pids
 
 
 __all__ = [ProcessMonitor]
