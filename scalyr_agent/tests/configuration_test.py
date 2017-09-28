@@ -35,6 +35,8 @@ class TestConfiguration(ScalyrTestCase):
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')
         self.__config_fragments_dir = os.path.join(self.__config_dir, 'agent.d')
         os.makedirs(self.__config_fragments_dir)
+        if os.environ.get('scalyr_api_key'):
+            del os.environ['scalyr_api_key']
 
     def test_basic_case(self):
         self.__write_file_with_separator_conversion(""" {
@@ -675,6 +677,56 @@ class TestConfiguration(ScalyrTestCase):
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
+
+    def test_api_key_override_no_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'abcd1234')
+
+    def test_api_key_override_empty_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+        os.environ['scalyr_api_key'] = ''
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'abcd1234')
+
+    def test_api_key_override_ignore_env(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+          }
+        """)
+        os.environ['scalyr_api_key'] = "xyz"
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'abcd1234')
+
+    def test_api_key_override_use_env(self):
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
+          }
+        """)
+        os.environ['scalyr_api_key'] = "xyz"
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'xyz')
 
     def test_json_array_substitution(self):
         self.__write_file_with_separator_conversion(""" {
