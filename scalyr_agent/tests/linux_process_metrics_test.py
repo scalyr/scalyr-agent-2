@@ -14,11 +14,9 @@
 # ------------------------------------------------------------------------
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
-import time
 
 __author__ = 'saurabh@scalyr.com'
 
-import os
 from collections import defaultdict
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor, Metric
 from scalyr_agent.test_base import ScalyrTestCase
@@ -26,7 +24,6 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 
 class TestProcessMonitorInitialize(ScalyrTestCase):
-
     def setUp(self):
         self.config_commandline = {
             "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
@@ -35,7 +32,7 @@ class TestProcessMonitorInitialize(ScalyrTestCase):
         }
 
     def test_initialize_monitor(self):
-        monitor = ProcessMonitor(self.config_commandline, scalyr_logging.getLogger( "syslog_monitor[test]" ))
+        monitor = ProcessMonitor(self.config_commandline, scalyr_logging.getLogger("syslog_monitor[test]"))
         self.assertEqual(monitor.metrics_history, defaultdict(dict))
         self.assertEqual(monitor.running_total_metrics, {})
 
@@ -288,45 +285,149 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             }
         )
 
-# class TestProcessMonitorResetAbsoluteMetrics(ScalyrTestCase):
-#     """
-#     Tests the reset of the absolute metrics like total memory used etc. at the beginning
-#     of each epoch.
-#     """
-#
-#     def setUp(self):
-#         self.config_commandline = {
-#             "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
-#             "id": "myapp",
-#             "commandline": ".foo.*",
-#         }
-#
-#         self.monitor = ProcessMonitor(self.config_commandline, scalyr_logging.getLogger("syslog_monitor[test]"))
-#
-#     def test_cumulative_metrics_no_op(self):
-#         """
-#         Cumulative metrics should be immune to the reset
-#         """
-#
-#         metric = Metric('app.cpu', 'user')
-#         self.monitor.record_metrics(2, {metric: 1.0})
-#         expected_history = {2: {metric: [1.0]}}
-#         self.assertEqual(self.monitor.metrics_history, expected_history)
-#         self.monitor._reset_absolute_metrics()
-#         self.assertEqual(self.monitor.metrics_history, expected_history)
-#
-#     def test_absolute_metrics_reset(self):
-#         """
-#         Absolite metrics should be reset
-#         """
-#
-#         metric = Metric('app.mem.bytes', 'system')
-#         self.monitor.record_metrics(2, {metric: 122234})
-#         expected_history = {2: {metric: [122234]}}
-#         self.assertEqual(self.monitor.metrics_history, expected_history)
-#         self.monitor._reset_absolute_metrics()
-#         self.assertEqual(self.monitor.metrics_history, expected_history)
+    def test_multiple_process_multiple_epochs_cumulative_metrics_one_process_death(self):
+        """
+        Same as test_multiple_process_multiple_epochs_cumulative_metrics
+        but one process dies after epoch 2
+        """
 
+        metric1 = Metric('app.cpu', 'system')
 
+        # epoch 1
+        metrics1 = {metric1: 21}
+        metrics2 = {metric1: 100.0}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
 
+        self.monitor._calculate_running_total([1, 2])
+        expected_history = {
+            1: {metric1: [21]},
+            2: {metric1: [100.0]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: 121.0
+            }
+        )
+        # epoch 2
+        # before epoch 2, the reset is called for absolute metrics
+        self.monitor._reset_absolute_metrics()
 
+        metrics1 = {metric1: 30.1}
+        metrics2 = {metric1: 100.2}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
+
+        self.monitor._calculate_running_total([1, 2])
+        expected_history = {
+            1: {metric1: [21, 30.1]},
+            2: {metric1: [100.0, 100.2]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: 30.1 + 100.2
+            }
+        )
+
+        # epoch 3
+        self.monitor._reset_absolute_metrics()
+
+        metrics1 = {metric1: 26.0}
+        metrics2 = {metric1: 103}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
+
+        # Process 1 dies.. boom
+        self.monitor._calculate_running_total([2])
+
+        # we only keep the last 2 historical values
+        expected_history = {
+            1: {metric1: [30.1, 26.0]},
+            2: {metric1: [100.2, 103]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: (100.2 + 30.1) + (103 - 100.2)
+            }
+        )
+
+    def test_multiple_process_multiple_epochs_cumulative_metrics_all_process_death(self):
+        """
+        Same as test_multiple_process_multiple_epochs_cumulative_metrics_one_process_death
+        but all processes die after epoch 2
+        """
+
+        metric1 = Metric('app.cpu', 'system')
+
+        # epoch 1
+        metrics1 = {metric1: 21}
+        metrics2 = {metric1: 100.0}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
+
+        self.monitor._calculate_running_total([1, 2])
+        expected_history = {
+            1: {metric1: [21]},
+            2: {metric1: [100.0]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: 121.0
+            }
+        )
+        # epoch 2
+        # before epoch 2, the reset is called for absolute metrics
+        self.monitor._reset_absolute_metrics()
+
+        metrics1 = {metric1: 30.1}
+        metrics2 = {metric1: 100.2}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
+
+        self.monitor._calculate_running_total([1, 2])
+        expected_history = {
+            1: {metric1: [21, 30.1]},
+            2: {metric1: [100.0, 100.2]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: 30.1 + 100.2
+            }
+        )
+
+        # epoch 3
+        self.monitor._reset_absolute_metrics()
+
+        metrics1 = {metric1: 26.0}
+        metrics2 = {metric1: 103}
+        self.monitor.record_metrics(1, metrics1)
+        self.monitor.record_metrics(2, metrics2)
+
+        # Process 1 and 2 die.. boom
+        # we should ensure the total running value for metric doesn't go down.
+        self.monitor._calculate_running_total([])
+
+        # we only keep the last 2 historical values
+        expected_history = {
+            1: {metric1: [30.1, 26.0]},
+            2: {metric1: [100.2, 103]}
+        }
+        self.assertEqual(self.monitor.metrics_history, expected_history)
+
+        self.assertEqual(
+            self.monitor.running_total_metrics,
+            {
+                metric1: (100.2 + 30.1)
+            }
+        )

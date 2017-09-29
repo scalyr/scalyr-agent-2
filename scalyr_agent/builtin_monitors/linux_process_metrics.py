@@ -841,10 +841,6 @@ class ProcessMonitor(ScalyrMonitor):
                             self.running_total_metrics[_metric] += (_metric_values[-1] if _metric_values else 0)
                         else:
                             self.running_total_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
-                    else:
-                        # remove the contribution of the dead process id
-                        if len(_metric_values) > 1:
-                            self.running_total_metrics[_metric] -= (_metric_values[-1] - _metric_values[-2])
                 else:
                     # absolute metric - accumulate the last reported value
                     self.running_total_metrics[_metric] += _metric_values[-1]
@@ -898,8 +894,6 @@ class ProcessMonitor(ScalyrMonitor):
             if _metric.type:
                 extra['type'] = _metric.type
             self._logger.emit_value(_metric.name, _metric_value, extra)
-            if _metric.name in ('app.cpu', 'app.mem.bytes'):
-                print _metric.name, _metric_value, extra
 
     def __select_processes(self):
         """Returns a set of the process ids of processes that fulfills the match criteria.
