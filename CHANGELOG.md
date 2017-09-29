@@ -4,10 +4,14 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.29 "Dyson Aliens" - TBD
 
 <!---
-Packaged by Saurabh Jain <saurabh@scalyr.com> on Sep 29, 2017 13:45 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 29, 2017 13:45 -0700
 --->
 
-Note, this release is still under development.  Release date TBD.
+Features:
+
+* Support to parse log lines written as a JSON object to extract line content before sending to Scalyr.  You may turn this on by setting `parse_lines_as_json` to `true` in your log configuration stanza for a particular file.  This is useful when uploading raw Docker logs.
+* Read the Scalyr api key from an environment variable
+* Add support for `PUT` requests to the `http_monitor`.
 
 Bug fixes:
 
@@ -21,12 +25,7 @@ Packaged by Saurabh Jain <saurabh@scalyr.com> on Aug 29, 2017 13:45 -0700
 
 New features:
 
-* Upgraded `requests` library to support new proxy protocols such as `SOCKS5`.  To use `SOCKS5`, use either the `socks5` or `socks5h` protocol when specifying the proxy address (`socks5` resolves DNS addresses locally, whereas `socks5h` resolves addresses at the `SOCKS5` server). 
-
-For example, to use a `SOCKS5` proxy to proxy traffic to Scalyr, you would add the following to your `agent.json` configuration file:
-
-    use_requests_lib: true,                                              // Proxy support requires use of the request library.
-    https_proxy: "socks5://yoursocksserver.company.com:8080”             // Replace with your SOCKS5 address
+* Upgraded `requests` library to support new proxy protocols such as `SOCKS5`.  To use `SOCKS5`, use either the `socks5` or `socks5h` protocol when specifying the proxy address (`socks5` resolves DNS addresses locally, whereas `socks5h` resolves addresses at the `SOCKS5` server).
 
 Bug fixes:
 
