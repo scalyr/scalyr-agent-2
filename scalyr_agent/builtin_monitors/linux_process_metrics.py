@@ -105,7 +105,13 @@ define_log_field(__monitor__, 'app', 'Same as ``instance``; provided for compati
 define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "app.cpu".')
 define_log_field(__monitor__, 'value', 'The metric value.')
 
-Metric = namedtuple('Metric', ['name', 'type'])
+
+class Metric(namedtuple('Metric', ['name', 'type'])):
+    __slots__ = ()
+
+    @property
+    def is_absolute(self):
+        return self.name not in ('app.cpu', 'app.uptime', )
 
 
 class MetricPrinter:
@@ -796,9 +802,16 @@ class ProcessMonitor(ScalyrMonitor):
             self.__metrics_history[pid][_metric] = self.__metrics_history[pid][_metric][-2:]
 
     def _reset_absolute_metrics(self):
+        """
+        At the beginnning of each process metric calculation, the absolute metrics
+        need to be overwritten to the combined process(es) result. Only the monotonically
+        increasing metrics need the previous value to calculate delta. We should set the
+        absolute metric to 0 in the beginning of this "epoch"
+        """
+
         for pid, process_metrics in self.__metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
-                if _metric.name not in ('app.cpu',):
+                if _metric.is_absolute:
                     self.__running_total_metrics[_metric] = 0
 
     def _calculate_running_total(self, running_pids):
@@ -820,7 +833,7 @@ class ProcessMonitor(ScalyrMonitor):
             for _metric, _metric_values in process_metrics.items():
                 if not self.__running_total_metrics.get(_metric):
                     self.__running_total_metrics[_metric] = 0
-                if _metric.name == 'app.cpu':
+                if not _metric.is_absolute:
                     if pid in running_pids_set:
                         if len(_metric_values) < 2:
                             self.__running_total_metrics[_metric] = 0
@@ -831,6 +844,7 @@ class ProcessMonitor(ScalyrMonitor):
                         if len(_metric_values) >= 2:
                             self.__running_total_metrics[_metric] -= (_metric_values[-1] - _metric_values[-2])
                 else:
+                    # absolute metric - accumulate the last reported value
                     self.__running_total_metrics[_metric] += _metric_values[-1]
 
         # once this is done, for any dead process that has already been accounted for in the delta
@@ -868,12 +882,12 @@ class ProcessMonitor(ScalyrMonitor):
         # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
         # Java agent did this and it is important to some dashboards.
 
-        for (_metric_name, _metric_type), _metric_value in self.__running_total_metrics.items():
-            print "emitting: \n", _metric_name, _metric_value, {'app': self.__id, 'type': _metric_type}
+        for _metric, _metric_value in self.__running_total_metrics.items():
+            print "emitting: \n", _metric.name, _metric_value, {'app': self.__id, 'type': _metric.type}
             extra = {'app': self.__id}
-            if _metric_type:
-                extra['type'] = _metric_type
-            self._logger.emit_value(_metric_name, _metric_value, extra)
+            if _metric.type:
+                extra['type'] = _metric.type
+            self._logger.emit_value(_metric.name, _metric_value, extra)
 
     def __select_processes(self):
         """Returns a set of the process ids of processes that fulfills the match criteria.
