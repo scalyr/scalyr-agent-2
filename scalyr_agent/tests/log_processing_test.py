@@ -32,6 +32,7 @@ from scalyr_agent.log_processing import FileSystem
 from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
+from scalyr_agent.util import md5_digest
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 
@@ -39,7 +40,6 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 
 class TestLogFileIterator(ScalyrTestCase):
-
     def setUp(self):
         self.__tempdir = tempfile.mkdtemp()
         self.__file_system = FileSystem()
@@ -48,8 +48,8 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.write_file(self.__path, '')
 
-        log_config = { 'path' : self.__path }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        log_config = {'path': self.__path}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
 
         self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
@@ -81,91 +81,93 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(result, 'L1\n')
 
-    def test_continue_through_matcher( self ):
+    def test_continue_through_matcher(self):
 
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
-        self.log_file.set_line_matcher( matcher )
-        self.log_file.set_parameters( 100, 100 )
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH)}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(100, 100)
 
         expected = "--multi\n--continue\n--some more\n"
         expected_next = "the end\n"
-        self.append_file( self.__path,
-                          expected,
-                          expected_next )
+        self.append_file(self.__path,
+                         expected,
+                         expected_next)
 
-        self.assertEquals( expected, self.readline() )
-        self.assertEquals( expected_next, self.readline() )
+        self.assertEquals(expected, self.readline())
+        self.assertEquals(expected_next, self.readline())
 
-    def test_continue_past_matcher( self ):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_PAST ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
-        self.log_file.set_line_matcher( matcher )
-        self.log_file.set_parameters( 100, 100 )
+    def test_continue_past_matcher(self):
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_PAST)}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(100, 100)
 
         expected = "--multi\\\n--continue\\\n--some more\n"
         expected_next = "the end\n"
-        self.append_file( self.__path,
-                          expected,
-                          expected_next )
+        self.append_file(self.__path,
+                         expected,
+                         expected_next)
 
-        self.assertEquals( expected, self.readline() )
-        self.assertEquals( expected_next, self.readline() )
+        self.assertEquals(expected, self.readline())
+        self.assertEquals(expected_next, self.readline())
 
-    def test_halt_before_matcher( self ):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_HALT_BEFORE ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
-        self.log_file.set_line_matcher( matcher )
-        self.log_file.set_parameters( 100, 100 )
+    def test_halt_before_matcher(self):
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_BEFORE)}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(100, 100)
 
         expected = "--begin\n--continue\n"
         expected_next = "the end\n"
-        self.append_file( self.__path,
-                          expected, "--end\n",
-                          expected_next )
+        self.append_file(self.__path,
+                         expected, "--end\n",
+                         expected_next)
 
-        self.assertEquals( expected, self.readline() )
-        self.assertEquals( "--end\n", self.readline() )
-        self.assertEquals( expected_next, self.readline() )
+        self.assertEquals(expected, self.readline())
+        self.assertEquals("--end\n", self.readline())
+        self.assertEquals(expected_next, self.readline())
 
-    def test_halt_with_matcher( self ):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_HALT_WITH ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
-        self.log_file.set_line_matcher( matcher )
-        self.log_file.set_parameters( 100, 100 )
+    def test_halt_with_matcher(self):
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_WITH)}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(100, 100)
 
         expected = "--start\n--continue\n--stop\n"
         expected_next = "the end\n"
-        self.append_file( self.__path,
-                          expected,
-                          expected_next )
+        self.append_file(self.__path,
+                         expected,
+                         expected_next)
 
-        self.assertEquals( expected, self.readline() )
-        self.assertEquals( expected_next, self.readline() )
+        self.assertEquals(expected, self.readline())
+        self.assertEquals(expected_next, self.readline())
 
-    def test_multiple_line_groupers( self ):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH, DEFAULT_CONTINUE_PAST, DEFAULT_HALT_BEFORE, DEFAULT_HALT_WITH ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
-        matcher = LineMatcher.create_line_matchers( log_config, 100, 60 )
-        self.log_file.set_line_matcher( matcher )
-        self.log_file.set_parameters( 200, 200 )
-        expected = [ "--multi\n--continue\n--some more\n",
-                     "single line\n",
-                     "multi\\\n--continue\\\n--some more\n",
-                     "single line\n",
-                     "--begin\n--continue\n",
-                     "--end\n",
-                     "--start\n--continue\n--stop\n",
-                     "the end\n"]
+    def test_multiple_line_groupers(self):
+        log_config = {'path': self.__path,
+                      'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH, DEFAULT_CONTINUE_PAST, DEFAULT_HALT_BEFORE,
+                                                DEFAULT_HALT_WITH)}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        self.log_file.set_line_matcher(matcher)
+        self.log_file.set_parameters(200, 200)
+        expected = ["--multi\n--continue\n--some more\n",
+                    "single line\n",
+                    "multi\\\n--continue\\\n--some more\n",
+                    "single line\n",
+                    "--begin\n--continue\n",
+                    "--end\n",
+                    "--start\n--continue\n--stop\n",
+                    "the end\n"]
 
-        self.append_file( self.__path, ''.join( expected ) )
+        self.append_file(self.__path, ''.join(expected))
 
         for line in expected:
-            self.assertEquals( line, self.readline() )
+            self.assertEquals(line, self.readline())
 
     def test_multiple_scans(self):
         self.append_file(self.__path,
@@ -215,7 +217,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), '')
 
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
     def test_deleted_file(self):
         # Since it cannot keep file handles open when they are deleted, win32 cannot handle this case:
@@ -237,9 +239,9 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertFalse(self.log_file.at_end)
 
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
-        self.scan_for_new_bytes(time_advance=60*11)
+        self.scan_for_new_bytes(time_advance=60 * 11)
         self.assertTrue(self.log_file.at_end)
 
     def test_losing_read_access(self):
@@ -259,7 +261,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), '')
         self.assertFalse(self.log_file.at_end)
 
-        self.scan_for_new_bytes(time_advance=60*11)
+        self.scan_for_new_bytes(time_advance=60 * 11)
         self.assertTrue(self.log_file.at_end)
         restore_access()
 
@@ -281,9 +283,9 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L003\n')
         self.assertEquals(self.readline(), '')
-        
+
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
     def test_rotating_log_file_with_move(self):
         # Since it cannot keep file handles open when they are deleted/moved, win32 cannot handle this case:
@@ -310,17 +312,17 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), 'L002\n')
 
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
         _, first_sequence_number = self.log_file.get_sequence()
         self.assertEquals(self.readline(), 'L003\n')
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
         _, first_sequence_number = self.log_file.get_sequence()
         self.assertEquals(self.readline(), 'L004\n')
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number > first_sequence_number )
+        self.assertTrue(second_sequence_number > first_sequence_number)
 
         self.assertEquals(self.readline(), 'L005\n')
         self.assertEquals(self.readline(), '')
@@ -421,7 +423,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.readline(), 'L003\n')
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number == first_sequence_number )
+        self.assertTrue(second_sequence_number == first_sequence_number)
 
         self.assertEquals(self.readline(), 'L004\n')
         self.assertEquals(self.readline(), 'L007\n')
@@ -465,7 +467,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.assertEquals(self.readline(), 'L001\n')
         self.assertEquals(self.readline(), 'L002\n')
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertTrue( second_sequence_number == first_sequence_number )
+        self.assertTrue(second_sequence_number == first_sequence_number)
 
     def test_reuse_position_object_with_tell(self):
         self.append_file(self.__path,
@@ -525,11 +527,11 @@ class TestLogFileIterator(ScalyrTestCase):
 
         saved_checkpoint = self.log_file.get_mark_checkpoint()
 
-        self.assertTrue( 'sequence_id' in saved_checkpoint )
-        self.assertTrue( 'sequence_number' in saved_checkpoint )
+        self.assertTrue('sequence_id' in saved_checkpoint)
+        self.assertTrue('sequence_number' in saved_checkpoint)
 
-        log_config = { 'path' : self.__path }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        log_config = {'path': self.__path}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
         self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                         checkpoint=saved_checkpoint)
         self.log_file.set_parameters(max_line_length=5, page_size=20)
@@ -546,8 +548,8 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L003\n',
                         'L004\n')
 
-        log_config = { 'path' : self.__path }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        log_config = {'path': self.__path}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
         self.log_file = LogFileIterator(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                         checkpoint=LogFileIterator.create_checkpoint(10))
         self.log_file.set_parameters(max_line_length=5, page_size=20)
@@ -594,7 +596,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.assertEquals(self.log_file.advance_to_end(), 30L)
         _, second_sequence_number = self.log_file.get_sequence()
-        self.assertEqual( 30L, second_sequence_number )
+        self.assertEqual(30L, second_sequence_number)
 
         self.append_file(self.__path,
                          'L007\n',
@@ -676,21 +678,21 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
         self.assertEquals(self.log_file.available, 40L)
 
-    def test_prepare_for_inactivity_closes_old_file_handles( self ):
-        self.append_file( self.__path, "some lines of text\n" )
+    def test_prepare_for_inactivity_closes_old_file_handles(self):
+        self.append_file(self.__path, "some lines of text\n")
 
         open_count = self.log_file.get_open_files_count()
-        self.assertEquals( 1, open_count )
+        self.assertEquals(1, open_count)
 
-        modification_time = os.path.getmtime( self.__path )
+        modification_time = os.path.getmtime(self.__path)
         modification_time -= DEFAULT_CONFIG.close_old_files_duration_in_seconds + 100
-        os.utime( self.__path, (modification_time, modification_time) )
+        os.utime(self.__path, (modification_time, modification_time))
 
         self.log_file.scan_for_new_bytes()
         self.log_file.prepare_for_inactivity()
 
         open_count = self.log_file.get_open_files_count()
-        self.assertEquals( 0, open_count )
+        self.assertEquals(0, open_count)
 
     def test_last_modification_time(self):
         known_time = time.time()
@@ -738,8 +740,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
 
 class TestLogLineRedactor(ScalyrTestCase):
-
-    def run_test_case(self, redactor, line, expected_line, expected_redaction):
+    def _run_case(self, redactor, line, expected_line, expected_redaction):
         (result_line, redacted) = redactor.process_line(line)
         self.assertEquals(result_line, expected_line)
         self.assertEquals(redacted, expected_redaction)
@@ -748,52 +749,48 @@ class TestLogLineRedactor(ScalyrTestCase):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('password', 'fake')
 
-        self.run_test_case(redactor, "auth=password", "auth=fake", True)
-        self.run_test_case(redactor, "another line password", "another line fake", True)
-        self.run_test_case(redactor, "do not touch", "do not touch", False)
+        self._run_case(redactor, "auth=password", "auth=fake", True)
+        self._run_case(redactor, "another line password", "another line fake", True)
+        self._run_case(redactor, "do not touch", "do not touch", False)
 
     def test_multiple_redactions_in_line(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('password', 'fake')
 
-        self.run_test_case(redactor, "auth=password foo=password", "auth=fake foo=fake", True)
+        self._run_case(redactor, "auth=password foo=password", "auth=fake foo=fake", True)
 
     def test_regular_expression_redaction(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('password=.*', 'password=fake')
 
-        self.run_test_case(redactor, "login attempt password=czerwin", "login attempt password=fake", True)
+        self._run_case(redactor, "login attempt password=czerwin", "login attempt password=fake", True)
 
     def test_regular_expression_with_capture_group(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
 
-        self.run_test_case(redactor, "foo secretoption=czerwin", "foo secretoption=fake", True)
+        self._run_case(redactor, "foo secretoption=czerwin", "foo secretoption=fake", True)
 
-    def test_unicode_redactions( self ):
-        redacter = LogLineRedacter( '/var/fake_log' )
+    def test_unicode_redactions(self):
+        redacter = LogLineRedacter('/var/fake_log')
         # redaction rules are created as unicode, to cause conflict with a utf-8 string
-        redacter.add_redaction_rule( u'(.*)', u'bb\\1bb' )
+        redacter.add_redaction_rule(u'(.*)', u'bb\\1bb')
 
         # build the utf8 string
-        utf8_string = unichr( 8230 ).encode( 'utf-8' )
+        utf8_string = unichr(8230).encode('utf-8')
         expected = 'bb' + utf8_string + 'bb'
 
         # go go go
-        self.run_test_case( redacter, utf8_string, expected, True )
-
-    def test_multiple_redactions1(self):
-        redactor = LogLineRedacter('/var/fake_log')
-        redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
-        redactor.add_redaction_rule('password=.* ', '')
-
-        self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo secretoption=fake", True)
+        self._run_case(redacter, utf8_string, expected, True)
 
     def test_multiple_redactions2(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*)=.*', 'secret\\1=fake')
 
-        self.run_test_case(redactor, "foo password=steve secretoption=czerwin", "foo password=steve secretoption=fake", True)
+        self._run_case(redactor, "foo password=steve secretoption=czerwin", "foo password=steve secretoption=fake",
+                       True)
+        self._run_case(redactor, "foo password=steve secretoption=czerwin", "foo password=steve secretoption=fake",
+                       True)
 
     def test_customer_case(self):
         redactor = LogLineRedacter('/var/fake_log')
@@ -802,15 +799,121 @@ class TestLogLineRedactor(ScalyrTestCase):
             "challengeAnswer|code|taxVat|password[0-9]?|pwd|newpwd[0-9]?Field|currentField|security_answer[0-9]|"
             "tinnumber)=[^&]*", "")
 
-        self.run_test_case(redactor, "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
-                           "access_token=E|foo&catId=10179&mode=basic HTTP/1.1\" 200 2045",
-                           "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
-                           "&catId=10179&mode=basic HTTP/1.1\" 200 2045", True)
+        self._run_case(redactor, "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
+                                 "access_token=E|foo&catId=10179&mode=basic HTTP/1.1\" 200 2045",
+                       "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
+                       "&catId=10179&mode=basic HTTP/1.1\" 200 2045", True)
 
-        self.run_test_case(redactor, "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
-                           "access_token=E|foo&newpwd5Field=10179&mode=basic HTTP/1.1\" 200 2045",
-                           "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?&&mode=basic"
-                           " HTTP/1.1\" 200 2045", True)
+        self._run_case(redactor, "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?"
+                                 "access_token=E|foo&newpwd5Field=10179&mode=basic HTTP/1.1\" 200 2045",
+                       "[11/May/2012:16:20:54 -0400] \"GET /api2/profiles/api_contractor?&&mode=basic"
+                       " HTTP/1.1\" 200 2045", True)
+
+    def test_basic_redaction_hash_no_salt(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('(password)', '\\H1')
+
+        self._run_case(redactor, "auth=password", "auth={}".format(md5_digest("password")), True)
+        self._run_case(
+            redactor, "another line password",
+            "another line {}".format(md5_digest("password")),
+            True
+        )
+
+    def test_basic_redaction_hash_with_salt(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('(password)', '\\H1', hash_salt="himalayan-salt")
+
+        self._run_case(
+            redactor,
+            "auth=password",
+            "auth={}".format(md5_digest("password" + "himalayan-salt")),
+            True
+        )
+        self._run_case(
+            redactor, "another line password",
+            "another line {}".format(md5_digest("password" + "himalayan-salt")),
+            True
+        )
+
+    def test_multiple_redactions_in_line_with_hash(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('(password)', '\\H1')
+
+        self._run_case(
+            redactor,
+            "auth=password foo=password", "auth={} foo={}".format(
+                md5_digest("password"), md5_digest("password")),
+            True
+        )
+
+    def test_single_regular_expression_redaction_with_hash(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret(.*)=([a-z]+).*', 'secret\\1=\\H2')
+        self._run_case(
+            redactor,
+            "sometext.... secretoption=czerwin",
+            "sometext.... secretoption={}".format(md5_digest("czerwin")),
+            True
+        )
+
+    def test_multiple_regular_expression_redaction_with_hash_single_group(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret(.*?)=([a-z]+\s?)', 'secret\\1=\\H2')
+        self._run_case(
+            redactor,
+            "sometext.... secretoption=czerwin moretextsecretbar=xxx andsecret123=saurabh",
+            "sometext.... secretoption=%smoretextsecretbar=%sandsecret123=%s" % (
+                md5_digest("czerwin "),
+                md5_digest("xxx "),
+                md5_digest("saurabh"),
+            ),
+            True
+        )
+
+    def test_multiple_regular_expression_redaction_with_hash_single_group_order_flipped(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret(.*?)=([a-z]+\s?)', 'secret\\2=\\H1')
+        self._run_case(
+            redactor,
+            "sometext.... secretoption=czerwin andsecret123=saurabh",
+            "sometext.... secretczerwin =%sandsecretsaurabh=%s" % (
+                md5_digest("option"),
+                md5_digest("123"),
+            ),
+            True
+        )
+
+    def test_single_regular_expression_redaction_with_hash_no_indicator(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule(
+            'secret(.*)=([a-z]+).*', 'secret\\1=\\2')
+        self._run_case(
+            redactor,
+            "sometext.... secretoption=czerwin",
+            "sometext.... secretoption=czerwin",
+            True
+        )
+
+    def test_basic_group_non_hash_case(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('userInfo=([^ ]+) [^ ]+', 'userInfo=\\1')
+        self._run_case(
+            redactor,
+            "userInfo=saurabh abcd1234 ",
+            "userInfo=saurabh ",
+            True
+        )
+
+    def test_basic_group_hash_case(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('userInfo=([^ ]+) [^ ]+', 'userInfo=\\H1')
+        self._run_case(
+            redactor,
+            "userInfo=saurabh abcd1234",
+            "userInfo={}".format(md5_digest("saurabh")),
+            True
+        )
 
 
 class TestLogLineSampler(ScalyrTestCase):
@@ -818,6 +921,7 @@ class TestLogLineSampler(ScalyrTestCase):
         """
         A subclass of LogLineSampler that allows us to fix the generated random numbers to help with testing.
         """
+
         def __init__(self):
             super(TestLogLineSampler.TestableLogLineSampler, self).__init__('/fakefile')
             self.__pending_numbers = []
@@ -872,7 +976,6 @@ class TestLogLineSampler(ScalyrTestCase):
 
 
 class TestLogFileProcessor(ScalyrTestCase):
-
     def setUp(self):
         self.__tempdir = tempfile.mkdtemp()
         self.__file_system = FileSystem()
@@ -886,8 +989,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         # For now, we create one that does not have any log attributes and only
         # counts the bytes of events messages as the cost.
         self.write_file(self.__path, '')
-        log_config = { 'path' : self.__path }
-        log_config = DEFAULT_CONFIG.parse_log_config( log_config )
+        log_config = {'path': self.__path}
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
         log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                          log_attributes={}, close_when_staleness_exceeds=close_when_staleness_exceeds)
         (completion_callback, buffer_full) = log_processor.perform_processing(
@@ -937,196 +1040,195 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(0L, status.total_bytes_pending)
         self.assertEquals(34L, status.total_bytes_copied)
 
-    def test_max_log_offset_size_within_max_log_offset_size_no_checkpoint( self ):
+    def test_max_log_offset_size_within_max_log_offset_size_no_checkpoint(self):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = { 'max_log_offset_size': 20,
-                  'max_existing_log_offset_size' : 10 }
+        extra = {'max_log_offset_size': 20,
+                 'max_existing_log_offset_size': 10}
 
-        config = _create_configuration( extra )
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
-        self._set_new_log_processor( config, log_config, None )
-        self.log_processor.set_max_log_offset_size( 20 )
+        log_config = {'path': self.__path}
+        self._set_new_log_processor(config, log_config, None)
+        self.log_processor.set_max_log_offset_size(20)
 
         expected = "a string of 20bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 1, events.total_events() )
-        self.assertEquals( expected, events.get_message( 0 ) )
+        self.assertEquals(1, events.total_events())
+        self.assertEquals(expected, events.get_message(0))
 
-    def test_max_log_offset_size_over_max_log_offset_size_no_checkpoint( self ):
+    def test_max_log_offset_size_over_max_log_offset_size_no_checkpoint(self):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance. This test checks we skip to the end of
         # the file if the max_log_offset_size is exceeded
-        extra = { 'max_log_offset_size': 20,
-                  'max_existing_log_offset_size': 30 }
-        config = _create_configuration( extra )
+        extra = {'max_log_offset_size': 20,
+                 'max_existing_log_offset_size': 30}
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
-        self._set_new_log_processor( config, log_config )
-        self.log_processor.set_max_log_offset_size( 20 )
+        log_config = {'path': self.__path}
+        self._set_new_log_processor(config, log_config)
+        self.log_processor.set_max_log_offset_size(20)
 
         expected = "a string of 21 bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 0, events.total_events() )
+        self.assertEquals(0, events.total_events())
 
-    def test_max_log_offset_size_within_max_log_offset_size_no_pending_files( self ):
+    def test_max_log_offset_size_within_max_log_offset_size_no_pending_files(self):
         # If a checkpoint doesn't contain any pending files, then we haven't seen
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
         # within that size
-        extra = { 'max_log_offset_size': 20,
-                  'max_existing_log_offset_size': 10 }
+        extra = {'max_log_offset_size': 20,
+                 'max_existing_log_offset_size': 10}
 
-        config = _create_configuration( extra )
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
+        log_config = {'path': self.__path}
 
-        checkpoint = { 'initial_position': 0 }
+        checkpoint = {'initial_position': 0}
 
-        self._set_new_log_processor( config, log_config, checkpoint )
-        self.log_processor.set_max_log_offset_size( 20 )
+        self._set_new_log_processor(config, log_config, checkpoint)
+        self.log_processor.set_max_log_offset_size(20)
 
         expected = "a string of 20bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 1, events.total_events() )
-        self.assertEquals( expected, events.get_message( 0 ) )
+        self.assertEquals(1, events.total_events())
+        self.assertEquals(expected, events.get_message(0))
 
-    def test_max_log_offset_size_over_max_log_offset_size_no_pending_files( self ):
+    def test_max_log_offset_size_over_max_log_offset_size_no_pending_files(self):
         # If a checkpoint doesn't contain any pending files, then we haven't seen
         # this file before and, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we skip to the end
         # of the file if max_log_offset_size is exceeded
-        extra = { 'max_log_offset_size': 20,
-                  'max_existing_log_offset_size': 30 }
-        config = _create_configuration( extra )
+        extra = {'max_log_offset_size': 20,
+                 'max_existing_log_offset_size': 30}
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
-        checkpoint = { 'initial_position': 0 }
-        self._set_new_log_processor( config, log_config, checkpoint )
-        self.log_processor.set_max_log_offset_size( 20 )
+        log_config = {'path': self.__path}
+        checkpoint = {'initial_position': 0}
+        self._set_new_log_processor(config, log_config, checkpoint)
+        self.log_processor.set_max_log_offset_size(20)
 
         expected = "a string of 21 bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 0, events.total_events() )
+        self.assertEquals(0, events.total_events())
 
-    def test_max_existing_log_offset_size_within_max_log_offset_size( self ):
+    def test_max_existing_log_offset_size_within_max_log_offset_size(self):
         # If a checkpoint contains pending files, then we have seen
         # this file before and, the LogFileProcessor should use max_existing_log_offset_size
         # as the maximum readback distance.  This test checks we log messages within
         # that size
-        self.append_file( self.__path, "some random bytes\n" )
+        self.append_file(self.__path, "some random bytes\n")
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
-        self.assertEquals( 1, events.total_events() )
+        self.assertEquals(1, events.total_events())
 
         checkpoint = self.log_processor.get_checkpoint()
 
-        extra = { 'max_log_offset_size' : 10, #set to low value so test will fail if this is used
-                  'max_existing_log_offset_size': 20 }
-        config = _create_configuration( extra )
+        extra = {'max_log_offset_size': 10,  # set to low value so test will fail if this is used
+                 'max_existing_log_offset_size': 20}
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
+        log_config = {'path': self.__path}
 
-        self._set_new_log_processor( config, log_config, checkpoint )
+        self._set_new_log_processor(config, log_config, checkpoint)
 
         expected = "a string of 20bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
         self.log_processor.scan_for_new_bytes()
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 1, events.total_events() )
-        self.assertEquals( expected, events.get_message( 0 ) )
+        self.assertEquals(1, events.total_events())
+        self.assertEquals(expected, events.get_message(0))
 
-    def test_max_existing_log_offset_size_over_max_existing_log_offset_size( self ):
+    def test_max_existing_log_offset_size_over_max_existing_log_offset_size(self):
         # If a checkpoint contains pending files, then we have seen
         # this file before and, the LogFileProcessor should use max_existing_log_offset_size
         # as the maximum readback distance.  This test checks we skip to the end
         # of the file if max_log_offset_size is exceeded
-        self.append_file( self.__path, "some random bytes\n" )
+        self.append_file(self.__path, "some random bytes\n")
         self.log_processor.scan_for_new_bytes()
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
-        self.assertEquals( 1, events.total_events() )
+        self.assertEquals(1, events.total_events())
 
         checkpoint = self.log_processor.get_checkpoint()
 
-        extra = { 'max_log_offset_size' : 100, #set to high value to test will fail if this is used
-                  'max_existing_log_offset_size': 20 }
-        config = _create_configuration( extra )
+        extra = {'max_log_offset_size': 100,  # set to high value to test will fail if this is used
+                 'max_existing_log_offset_size': 20}
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
+        log_config = {'path': self.__path}
 
-        self._set_new_log_processor( config, log_config, checkpoint )
+        self._set_new_log_processor(config, log_config, checkpoint)
 
         expected = "a string of 21 bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
         self.log_processor.scan_for_new_bytes()
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 0, events.total_events() )
+        self.assertEquals(0, events.total_events())
 
-    def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing( self ):
-        extra = { 'max_log_offset_size': 20,
-                  'max_existing_log_offset_size': 30 }
+    def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing(self):
+        extra = {'max_log_offset_size': 20,
+                 'max_existing_log_offset_size': 30}
 
-        config = _create_configuration( extra )
+        config = _create_configuration(extra)
 
-        log_config = { 'path' : self.__path }
-        self._set_new_log_processor( config, log_config, checkpoint=None )
-        self.log_processor.set_max_log_offset_size( 20 )
+        log_config = {'path': self.__path}
+        self._set_new_log_processor(config, log_config, checkpoint=None)
+        self.log_processor.set_max_log_offset_size(20)
 
         expected = "a string of 20bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
 
-        self.log_processor.set_max_log_offset_size( extra['max_log_offset_size'] )
+        self.log_processor.set_max_log_offset_size(extra['max_log_offset_size'])
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 1, events.total_events() )
-        self.assertEquals( expected, events.get_message( 0 ) )
+        self.assertEquals(1, events.total_events())
+        self.assertEquals(expected, events.get_message(0))
 
         expected = "a string of almost 30 bytes\n"
-        self.append_file( self.__path, expected )
+        self.append_file(self.__path, expected)
         self.log_processor.scan_for_new_bytes()
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals( 1, events.total_events() )
-        self.assertEquals( expected, events.get_message( 0 ) )
-
+        self.assertEquals(1, events.total_events())
+        self.assertEquals(expected, events.get_message(0))
 
     def test_fail_and_retry(self):
         log_processor = self.log_processor
@@ -1174,47 +1276,49 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(1, events.total_events())
         self.assertEquals(events.get_message(0), 'Third line\n')
 
-    def _set_new_log_processor(self, config, log_config, checkpoint=None ):
+    def _set_new_log_processor(self, config, log_config, checkpoint=None):
         # create a new log processer and do an initial scan, because we need a line grouper
-        log_config = config.parse_log_config( log_config )
-        self.log_processor = LogFileProcessor(self.__path, config, log_config, file_system=self.__file_system, log_attributes={}, checkpoint=checkpoint)
+        log_config = config.parse_log_config(log_config)
+        self.log_processor = LogFileProcessor(self.__path, config, log_config, file_system=self.__file_system,
+                                              log_attributes={}, checkpoint=checkpoint)
         self.write_file(self.__path, '')
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_grouping_rules(self):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
-        self._set_new_log_processor( DEFAULT_CONFIG, log_config )
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH)}
+        self._set_new_log_processor(DEFAULT_CONFIG, log_config)
         expected = "--multi\n--continue\n--some more\n"
         last_line = "the end\n"
 
-        self.append_file( self.__path, expected + last_line )
+        self.append_file(self.__path, expected + last_line)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
-        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events,
+                                                                                   current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals( expected, events.get_message(0) )
+        self.assertEquals(expected, events.get_message(0))
 
     def test_grouping_and_sampling_rules(self):
-        log_config = { 'path' : self.__path, 'lineGroupers' : JsonArray( DEFAULT_CONTINUE_THROUGH ) }
-        self._set_new_log_processor( DEFAULT_CONFIG, log_config )
+        log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH)}
+        self._set_new_log_processor(DEFAULT_CONFIG, log_config)
         expected = "--multi\n--continue\n--some more\n"
         last_line = "the end\n"
 
         # pass any line that has continue and drop any other lines
-        self.log_processor.add_sampler( 'continue', 1 )
-        self.log_processor.add_sampler( '.*', 0 )
+        self.log_processor.add_sampler('continue', 1)
+        self.log_processor.add_sampler('.*', 0)
 
-        self.append_file( self.__path, expected + last_line )
+        self.append_file(self.__path, expected + last_line)
 
         events = TestLogFileProcessor.TestAddEventsRequest()
-        (completion_callback, buffer_full) = self.log_processor.perform_processing(events, current_time=self.__fake_time)
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(events,
+                                                                                   current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals( expected, events.get_message(0) )
-
+        self.assertEquals(expected, events.get_message(0))
 
     def test_sampling_rule(self):
         log_processor = self.log_processor
@@ -1241,33 +1345,33 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
         self.assertEquals(events.get_message(0), 'GET /foo&password=foo&start=true\n')
 
-    def test_redacting_utf8( self ):
+    def test_redacting_utf8(self):
 
-        #build this manually following a similar process to the main agent, because this will create
-        #redaction rules that are unicode strings
+        # build this manually following a similar process to the main agent, because this will create
+        # redaction rules that are unicode strings
         path = self.__path
-        extra = { 'logs' : [
-                            {
-                                'path' : path,
-                                'redaction_rules' : [ { 'match_expression' : 'aa(.*)aa', 'replacement': 'bb\\1bb' } ]
-                            }
-                           ]
-                }
+        extra = {'logs': [
+            {
+                'path': path,
+                'redaction_rules': [{'match_expression': 'aa(.*)aa', 'replacement': 'bb\\1bb'}]
+            }
+        ]
+        }
 
-        config = _create_configuration( extra )
+        config = _create_configuration(extra)
         log_config = {}
         for entry in config.log_configs:
             if entry['path'] == path:
                 log_config = entry.copy()
 
-        log_config = config.parse_log_config( log_config )
+        log_config = config.parse_log_config(log_config)
         log_processor = LogFileProcessor(path, config, log_config, file_system=self.__file_system)
         for rule in log_config['redaction_rules']:
             log_processor.add_redacter(rule['match_expression'], rule['replacement'])
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
 
         # create a utf8 string that will cause conflict when matched/replaced against a unicode string
-        utf8_string = (u'aa' + unichr( 8230 ) + u'aa').encode( "utf-8")
+        utf8_string = (u'aa' + unichr(8230) + u'aa').encode("utf-8")
         self.append_file(self.__path, utf8_string + "\n")
 
         # read the log
@@ -1275,10 +1379,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         # make sure everything is good
-        expected = ('bb' + unichr( 8230 ) + 'bb\n').encode( "utf-8" )
+        expected = ('bb' + unichr(8230) + 'bb\n').encode("utf-8")
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.get_message(0), expected )
-
+        self.assertEquals(events.get_message(0), expected)
 
     def test_signals_deletion(self):
         log_processor = self.log_processor
@@ -1307,7 +1410,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         log_processor = self._create_processor(close_when_staleness_exceeds=300)
 
         # Have to manually set the modification time to the fake time so we are comparing apples to apples.
-        os.utime( self.__path, (self.__fake_time, self.__fake_time) )
+        os.utime(self.__path, (self.__fake_time, self.__fake_time))
 
         # The processor won't signal it is ready to be removed until 5 mins have passed.
         events = TestLogFileProcessor.TestAddEventsRequest()
@@ -1327,8 +1430,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_log_attributes(self):
-        vals = { 'path' : self.__path, 'attributes' : JsonObject( { 'host' : 'scalyr-1' } ) }
-        log_config = DEFAULT_CONFIG.parse_log_config( vals )
+        vals = {'path': self.__path, 'attributes': JsonObject({'host': 'scalyr-1'})}
+        log_config = DEFAULT_CONFIG.parse_log_config(vals)
         log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
                                          log_attributes=vals['attributes'])
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
@@ -1376,7 +1479,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(events.get_message(1), 'Second line\n')
         self.assertEquals(len(events.threads), 1)
 
-    def test_sequence_id_and_number( self ):
+    def test_sequence_id_and_number(self):
         log_processor = self.log_processor
         self.append_file(self.__path, 'First line\n')
 
@@ -1388,14 +1491,14 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(1, events.total_events())
         first_sid, first_sn, sd = events.get_sequence(0)
 
-        self.assertTrue( first_sid != None )
-        self.assertTrue( first_sn != None )
-        self.assertEquals( None, sd )
+        self.assertTrue(first_sid != None)
+        self.assertTrue(first_sn != None)
+        self.assertEquals(None, sd)
 
-    def test_sequence_delta( self ):
+    def test_sequence_delta(self):
         log_processor = self.log_processor
         second_line = 'second line\n'
-        expected_delta = len( second_line )
+        expected_delta = len(second_line)
         self.append_file(self.__path, 'First line\n')
         self.append_file(self.__path, second_line)
 
@@ -1408,17 +1511,18 @@ class TestLogFileProcessor(ScalyrTestCase):
         first_sid, first_sn, sd = events.get_sequence(0)
 
         second_sid, second_sn, sd = events.get_sequence(1)
-        self.assertEquals( None, second_sid )
-        self.assertEquals( None, second_sn )
-        self.assertEquals( expected_delta, sd )
+        self.assertEquals(None, second_sid)
+        self.assertEquals(None, second_sn)
+        self.assertEquals(expected_delta, sd)
 
-    def test_sequence_reset( self ):
-        config = _create_configuration( { 'max_sequence_number' : 20 } )
+    def test_sequence_reset(self):
+        config = _create_configuration({'max_sequence_number': 20})
 
-        log_config = { 'path' : self.__path }
-        log_config = config.parse_log_config( log_config )
+        log_config = {'path': self.__path}
+        log_config = config.parse_log_config(log_config)
 
-        log_processor = LogFileProcessor(self.__path, config, log_config, file_system=self.__file_system, log_attributes={})
+        log_processor = LogFileProcessor(self.__path, config, log_config, file_system=self.__file_system,
+                                         log_attributes={})
         self.write_file(self.__path, '')
         (completion_callback, buffer_full) = log_processor.perform_processing(
             TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
@@ -1427,7 +1531,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         first_line = 'the first line\n'
         second_line = 'second line\n'
 
-        self.append_file(self.__path, first_line )
+        self.append_file(self.__path, first_line)
         self.append_file(self.__path, second_line)
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = log_processor.perform_processing(
@@ -1452,12 +1556,12 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         third_sid, third_sn, third_sd = events.get_sequence(0)
 
-        self.assertNotEqual( first_sid, third_sid )
-        self.assertNotEqual( None, third_sid )
-        self.assertNotEqual( None, third_sn )
-        self.assertEqual( None, third_sd )
+        self.assertNotEqual(first_sid, third_sid)
+        self.assertNotEqual(None, third_sid)
+        self.assertNotEqual(None, third_sn)
+        self.assertEqual(None, third_sd)
 
-    def test_sequence_id_is_string( self ):
+    def test_sequence_id_is_string(self):
         # test if UUID is a string, to make sure it can be handled by json
         log_processor = self.log_processor
         self.append_file(self.__path, 'First line\n')
@@ -1469,7 +1573,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         self.assertEquals(1, events.total_events())
         first_sid, _, _ = events.get_sequence(0)
-        self.assertTrue( isinstance( first_sid, basestring ) )
+        self.assertTrue(isinstance(first_sid, basestring))
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
@@ -1493,7 +1597,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         def add_event(self, event, sequence_id=None, sequence_number=None):
             if len(self.events) < self.__limit:
-                self.__event_sequencer.add_sequence_fields( event, sequence_id, sequence_number )
+                self.__event_sequencer.add_sequence_fields(event, sequence_id, sequence_number)
                 self.events.append(event)
                 return True
             else:
@@ -1516,7 +1620,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             """Returns the message field from an events object."""
             return self.events[index].message
 
-        def get_sequence( self, index ):
+        def get_sequence(self, index):
             return (self.events[index].sequence_id, self.events[index].sequence_number,
                     self.events[index].sequence_number_delta)
 
@@ -1558,7 +1662,7 @@ class TestLogMatcher(ScalyrTestCase):
         self._close_processors(processors)
 
     def test_ignores_stale_file(self):
-        staleness_threshold = 300   # 5 mins
+        staleness_threshold = 300  # 5 mins
         current_time = time.time()
         stale_time = current_time - staleness_threshold - 10
 
@@ -1572,120 +1676,136 @@ class TestLogMatcher(ScalyrTestCase):
 
         self._close_processors(processors)
 
-    def test_rename_string_basename( self ):
-        config = self._create_log_config( self.__path_one )
+    def test_rename_string_basename(self):
+        config = self._create_log_config(self.__path_one)
         config['rename_logfile'] = "/scalyr/test/$BASENAME"
 
-        matcher = LogMatcher( self.__config, config )
+        matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( "/scalyr/test/text.txt", attrs['logfile'] )
-        self.assertEquals( self.__path_one, attrs['original_file'] )
+        self.assertEquals("/scalyr/test/text.txt", attrs['logfile'])
+        self.assertEquals(self.__path_one, attrs['original_file'])
 
-    def test_rename_string_basename_no_ext( self ):
-        config = self._create_log_config( self.__path_one )
+    def test_rename_string_basename_no_ext(self):
+        config = self._create_log_config(self.__path_one)
         config['rename_logfile'] = "/scalyr/test/$BASENAME_NO_EXT.huzzah"
 
-        matcher = LogMatcher( self.__config, config )
+        matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( "/scalyr/test/text.huzzah", attrs['logfile'] )
-        self.assertEquals( self.__path_one, attrs['original_file'] )
+        self.assertEquals("/scalyr/test/text.huzzah", attrs['logfile'])
+        self.assertEquals(self.__path_one, attrs['original_file'])
 
-    def test_rename_string_path( self ):
-        config = self._create_log_config( self.__path_one )
+    def test_rename_string_path(self):
+        config = self._create_log_config(self.__path_one)
         config['rename_logfile'] = "/scalyr/test/$PATH2/$PATH1/log.log"
 
-        path = self.__path_one.split( os.sep )
+        path = self.__path_one.split(os.sep)
 
-        matcher = LogMatcher( self.__config, config )
+        matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( "/scalyr/test/%s/%s/log.log" % (path[2], path[1]), attrs['logfile'] )
-        self.assertEquals( self.__path_one, attrs['original_file'] )
+        self.assertEquals("/scalyr/test/%s/%s/log.log" % (path[2], path[1]), attrs['logfile'])
+        self.assertEquals(self.__path_one, attrs['original_file'])
 
-    def test_rename_string_invalid_path( self ):
-        config = self._create_log_config( self.__path_one )
+    def test_rename_string_invalid_path(self):
+        config = self._create_log_config(self.__path_one)
         config['rename_logfile'] = "/scalyr/test/$PATH2/$PATH10/log.log"
 
-        path = self.__path_one.split( os.sep )
+        path = self.__path_one.split(os.sep)
 
-        matcher = LogMatcher( self.__config, config )
+        matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
-
-        attrs = processors[0]._LogFileProcessor__base_event.attrs
-
-        self.assertEquals( self.__path_one, attrs['logfile'] )
-        self.assertFalse( 'original_file' in attrs )
-
-    def test_rename_regex( self ):
-        config = self._create_log_config( self.__path_one )
-        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*)', 'replacement' : '/scalyr/test/\\1/\\2' } )
-
-        matcher = LogMatcher( self.__config, config )
-
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( "/scalyr/test/tmp/text.txt", attrs['logfile'] )
-        self.assertEquals( self.__path_one, attrs['original_file'] )
+        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertFalse('original_file' in attrs)
 
-    def test_rename_regex_invalid_match( self ):
-        config = self._create_log_config( self.__path_one )
-        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*[)', 'replacement' : '/scalyr/test/\\1/\\2' } )
+    def test_rename_regex(self):
+        config = self._create_log_config(self.__path_one)
+        config['rename_logfile'] = JsonObject(
+            {
+                'match': '/(.*)/.*/(.*)',
+                'replacement': '/scalyr/test/\\1/\\2'
+            }
+        )
 
-        matcher = LogMatcher( self.__config, config )
+        matcher = LogMatcher(self.__config, config)
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
-
-        attrs = processors[0]._LogFileProcessor__base_event.attrs
-
-        self.assertEquals( self.__path_one, attrs['logfile'] )
-        self.assertFalse( 'original_file' in attrs )
-
-    def test_rename_regex_invalid_replacement( self ):
-        config = self._create_log_config( self.__path_one )
-        config['rename_logfile'] = JsonObject( { 'match' : '/(.*)/.*/(.*)', 'replacement' : '/scalyr/test/\\3/\\2' } )
-
-        matcher = LogMatcher( self.__config, config )
-
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( self.__path_one, attrs['logfile'] )
-        self.assertFalse( 'original_file' in attrs )
+        # the temp directory is auto-generated, so it's not possible to
+        # assert the actual path, we can however match the pre-folder and file name
 
-    def test_rename_regex_empty( self ):
-        config = self._create_log_config( self.__path_one )
+        self.assertEquals(
+            "text.txt", attrs['logfile'].split("/")[-1]
+        )
 
-        matcher = LogMatcher( self.__config, config )
+        self.assertEqual(
+            ["scalyr", "test"],
+            attrs['logfile'].split("/")[1:3]
+        )
 
-        processors = matcher.find_matches( dict(), dict() )
-        self.assertEquals(len(processors), 1 )
+        self.assertEquals(self.__path_one, attrs['original_file'])
+
+    def test_rename_regex_invalid_match(self):
+        config = self._create_log_config(self.__path_one)
+        config['rename_logfile'] = JsonObject({'match': '/(.*)/.*/(.*[)', 'replacement': '/scalyr/test/\\1/\\2'})
+
+        matcher = LogMatcher(self.__config, config)
+
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals( self.__path_one, attrs['logfile'] )
-        self.assertFalse( 'original_file' in attrs )
+        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertFalse('original_file' in attrs)
+
+    def test_rename_regex_invalid_replacement(self):
+        config = self._create_log_config(self.__path_one)
+        config['rename_logfile'] = JsonObject({'match': '/(.*)/.*/(.*)', 'replacement': '/scalyr/test/\\3/\\2'})
+
+        matcher = LogMatcher(self.__config, config)
+
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertFalse('original_file' in attrs)
+
+    def test_rename_regex_empty(self):
+        config = self._create_log_config(self.__path_one)
+
+        matcher = LogMatcher(self.__config, config)
+
+        processors = matcher.find_matches(dict(), dict())
+        self.assertEquals(len(processors), 1)
+
+        attrs = processors[0]._LogFileProcessor__base_event.attrs
+
+        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertFalse('original_file' in attrs)
 
     def _close_processors(self, processors):
         for x in processors:
@@ -1699,10 +1819,14 @@ class TestLogMatcher(ScalyrTestCase):
         fp.close()
 
     def _create_log_config(self, path, ignore_stale_files=False, staleness_threshold_secs=None):
-        return dict(path=path, attributes=dict(), lineGroupers=[], redaction_rules=[], sampling_rules=[],
-                    exclude=[], ignore_stale_files=ignore_stale_files, staleness_threshold_secs=staleness_threshold_secs)
+        return dict(
+            path=path, attributes=dict(), lineGroupers=[], redaction_rules=[], sampling_rules=[],
+            exclude=[], ignore_stale_files=ignore_stale_files,
+            staleness_threshold_secs=staleness_threshold_secs
+        )
 
-def _create_configuration( extra=None ):
+
+def _create_configuration(extra=None):
     """Creates a blank configuration file with default values for testing.
 
     @return: The configuration object
@@ -1714,7 +1838,7 @@ def _create_configuration( extra=None ):
     os.makedirs(config_fragments_dir)
 
     fp = open(config_file, 'w')
-    fp.write(json_lib.serialize(JsonObject( extra, api_key='fake')))
+    fp.write(json_lib.serialize(JsonObject(extra, api_key='fake')))
     fp.close()
 
     default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
@@ -1723,24 +1847,25 @@ def _create_configuration( extra=None ):
     config = Configuration(config_file, default_paths)
     config.parse()
 
-    #we need to delete the config dir when done
-    atexit.register( shutil.rmtree, config_dir)
+    # we need to delete the config dir when done
+    atexit.register(shutil.rmtree, config_dir)
 
     return config
 
+
 DEFAULT_CONFIG = _create_configuration()
 
-DEFAULT_CONTINUE_THROUGH = JsonObject( {'start': '^--multi',
-                              'continueThrough': "^--"
-                           } )
-DEFAULT_CONTINUE_PAST = JsonObject( {'start': r'\\$',
-                         'continuePast': r"\\$"
-                           } )
-DEFAULT_HALT_BEFORE = JsonObject( {'start': "^--begin",
-                       'haltBefore': "^--end"
-                           } )
-DEFAULT_HALT_WITH = JsonObject( {'start': "^--start",
-                     'haltWith': "^--stop"
-                           } )
+DEFAULT_CONTINUE_THROUGH = JsonObject({'start': '^--multi',
+                                       'continueThrough': "^--"
+                                       })
+DEFAULT_CONTINUE_PAST = JsonObject({'start': r'\\$',
+                                    'continuePast': r"\\$"
+                                    })
+DEFAULT_HALT_BEFORE = JsonObject({'start': "^--begin",
+                                  'haltBefore': "^--end"
+                                  })
+DEFAULT_HALT_WITH = JsonObject({'start': "^--start",
+                                'haltWith': "^--stop"
+                                })
 if __name__ == '__main__':
     unittest.main()

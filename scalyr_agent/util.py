@@ -23,6 +23,7 @@ import thread
 __author__ = 'czerwin@scalyr.com'
 
 import base64
+import calendar
 import datetime
 import os
 import random
@@ -38,6 +39,16 @@ try:
     from hashlib import sha1
 except ImportError:
     from sha import sha as sha1
+
+
+try:
+    # For Python >= 2.5
+    from hashlib import md5
+    new_md5 = True
+except ImportError:
+    import md5
+    new_md5 = False
+
 
 try:
     import scalyr_agent.third_party.uuid_tp.uuid as uuid
@@ -126,6 +137,25 @@ def create_unique_id():
     return result
 
 
+def md5_digest(data):
+    """
+    Returns the md5 digest of the input data
+    @param data: data to be digested(hashed)
+    @type data: str
+    @rtype: str
+    """
+
+    if not (data and isinstance(data, basestring)):
+        raise Exception('invalid data to be hashed: %s', repr(data))
+
+    if not new_md5:
+        m = md5.new()
+    else:
+        m = md5()
+    m.update(data)
+    return m.digest()
+
+
 def remove_newlines_and_truncate(input_string, char_limit):
     """Returns the input string but with all newlines removed and truncated.
 
@@ -208,6 +238,44 @@ def rfc3339_to_datetime( string ):
     micro = int( int( fractions ) * 10**to_micros )
 
     return dt.replace( microsecond=micro )
+
+def rfc3339_to_nanoseconds_since_epoch( string ):
+    """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
+
+    We have to do some tricksy things to support python 2.4, which doesn't support
+    datetime.strptime or the fractional component %f in format strings
+
+    This doesn't do any complex testing and assumes the string is well formed
+    and in UTC (e.g. uses Z at the end rather than a time offset)
+
+    @param string: a date/time in rfc3339 format, e.g. 2015-08-03T09:12:43.143757463Z
+
+    @rtype long
+    """
+    # split the string in to main time and fractional component
+    parts = string.split(".")
+
+    #create a datetime object
+    try:
+        tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
+    except ValueError, e:
+        return None
+
+    nano_seconds = long( calendar.timegm( tm[0:6] ) ) * 1000000000L
+    nanos = 0
+
+    #now add the fractional part
+    if len( parts ) > 1:
+        fractions = parts[1]
+        if not fractions.endswith( 'Z' ):
+            return nano_seconds
+
+        fractions = fractions[:-1]
+        to_nanos = 9 - len(fractions)
+        nanos = long( long( fractions ) * 10**to_nanos )
+
+    return nano_seconds + nanos
+
 
 def format_time(time_value):
     """Returns the time converted to a string in the common format used throughout the agent and in UTC.

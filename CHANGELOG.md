@@ -1,6 +1,22 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.29 "Dyson Aliens" - TBD
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 29, 2017 13:45 -0700
+--->
+
+Features:
+
+* Support to parse log lines written as a JSON object to extract line content before sending to Scalyr.  You may turn this on by setting `parse_lines_as_json` to `true` in your log configuration stanza for a particular file.  This is useful when uploading raw Docker logs.
+* Read the Scalyr api key from an environment variable
+* Add support for `PUT` requests to the `http_monitor`.
+
+Bug fixes:
+
+* Fix win32 build such that it correctly pulls packages from the third party repository.  This fixes a bug resulting in SOCK5 proxy support not working under Windows.
+
 ## 2.0.28 "Changeling" - Aug 29, 2017
 
 <!---
@@ -9,7 +25,7 @@ Packaged by Saurabh Jain <saurabh@scalyr.com> on Aug 29, 2017 13:45 -0700
 
 New features:
 
-* Upgraded `requests` library to support new proxy protocols such as `SOCK5`
+* Upgraded `requests` library to support new proxy protocols such as `SOCKS5`.  To use `SOCKS5`, use either the `socks5` or `socks5h` protocol when specifying the proxy address (`socks5` resolves DNS addresses locally, whereas `socks5h` resolves addresses at the `SOCKS5` server).
 
 Bug fixes:
 

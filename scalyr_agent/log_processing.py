@@ -79,6 +79,23 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
 
+class LogLine(object):
+    """A class representing a line from a log file.
+    This object will always have a single field 'line' which contains the log line.
+    It can also contain two other attributes 'timestamp' which is the timestamp of the
+    the log line in nanoseconds since the epoch (defaults to None, in which case the
+    current time.time() will be used), and 'attrs' which are optional attributes for the line.
+    """
+    def __init__(self, line):
+        # line is a string
+        self.line = line
+
+        # timestamp is a long, counting nanoseconds since Epoch
+        # or None to use current time
+        self.timestamp = None
+
+        # attrs is a dict of optional attributes to attach to the log message
+        self.attrs = None
 
 class LogFileIterator(object):
     """Reads the bytes from a log file at a particular path, returning the lines.
@@ -165,6 +182,10 @@ class LogFileIterator(object):
         self.__line_completion_wait_time = config.line_completion_wait_time  # Defaults to 5 * 60
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
+
+        self.__parse_as_json = log_config['parse_lines_as_json']
+        self.__json_log_key = log_config['json_message_field']
+        self.__json_timestamp_key = log_config['json_timestamp_field']
 
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
@@ -404,10 +425,30 @@ class LogFileIterator(object):
         then a line will be returned using the available bytes up to the max line size.  Second, if there are bytes
         available, and sufficient time has past without seeing a newline, then the available lines are returned.
 
+        If the 'parse_as_json' configuration item is True then this function will also attempt to process the line as json,
+        extracting a log message, a timestamp and any other remaining fields, all of which are returned as a LogLine object.
+
+        When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
+        the line will be returned unprocessed.
+
+        The configuration options 'json_message_field' and 'json_timestamp_field' are used to specify which field to use
+        as the log message, and which field to use for the timestamp.
+
+        'json_message_field' defaults to 'log' and if no field with this name is found, the function will return the
+        full line unprocessed.
+
+        'json_timestamp_field' defaults to 'time', and the value of this field is required to be in rfc3339 format
+        otherwise an error will occur.  If the field does not exist in the json object, then the agent will use
+        the current time instead.  Note, the value specified in the timestamp field might not be the final value uploaded
+        to the server, as the agent ensures that the timestamps of all messages are monotonically increasing.  For
+        this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
+
+        All other fields of the json object will be stored in the attrs dict of the LogLine object.
+
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float
-        @return: The line or an empty string if none is available
-        @rtype: str
+        @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
+        @rtype: LogLine
         """
         if current_time is None:
             current_time = time.time()
@@ -428,8 +469,10 @@ class LogFileIterator(object):
         #            expected_buffer_index, original_buffer_index)
 
         # read a complete line from our line_matcher
-        result = self.__line_matcher.readline(self.__buffer, current_time)
-        if len(result) == 0:
+        next_line = self.__line_matcher.readline(self.__buffer, current_time)
+        result = LogLine(line=next_line)
+
+        if len(result.line) == 0:
             return result
 
         self.__position = self.__determine_mark_position(self.__buffer.tell())
@@ -442,6 +485,44 @@ class LogFileIterator(object):
         #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
         #                                              expected_size, actual_size)
 
+        # check to see if we need to parse the line as json
+        if self.__parse_as_json:
+            try:
+                json = json_lib.parse(result.line)
+
+                line = None
+                attrs = {}
+                timestamp = None
+                # go over all json key/values, adding non-message values to a attr dict
+                # and the message value to the line variable
+                for key, value in json.iteritems():
+                    if key == self.__json_log_key:
+                        line = value
+                    elif key == self.__json_timestamp_key:
+                        # TODO: need to add support for multiple timestamp formats
+                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(value)
+                        if 'raw_timestamp' not in attrs:
+                            attrs['raw_timestamp'] = value
+                    else:
+                        attrs[key] = value
+
+                # if we didn't find a valid line key/value pair
+                # throw a warning and treat it as a normal line
+                if line is None:
+                    log.warn("Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration" %
+                        (self.__json_log_key, self.__path), limit_once_per_x_secs=300, limit_key=('json-message-field-missing-%s' % self.__path))
+                else:
+                    # we found a key match for the message field, so use that for the log line
+                    # and store any other fields in the attr dict
+                    result.line = line
+                    result.timestamp = timestamp
+                    if attrs:
+                        result.attrs = attrs
+
+            except Exception, e:
+                # something went wrong. Return the full line and log a message
+                log.warn("Error parsing line as json.  Logging full line: %s\n%s" % (str(e), result.line),
+                         limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
         return result
 
     def advance_to_end(self, current_time=None):
@@ -1413,8 +1494,8 @@ class LogFileProcessor(object):
                 position = self.__log_file_iterator.tell(dest=position)
 
                 #time_spent_reading -= fast_get_time()
-                line = self.__log_file_iterator.readline(current_time=current_time)
-                line_len = len(line)
+                line_object = self.__log_file_iterator.readline(current_time=current_time)
+                line_len = len(line_object.line)
                 #time_spent_reading += fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
@@ -1426,14 +1507,14 @@ class LogFileProcessor(object):
                 lines_read += 1L
 
                 if self.__num_redaction_and_sampling_rules > 0:
-                    sample_result = self.__sampler.process_line(line)
+                    sample_result = self.__sampler.process_line(line_object.line)
                     if sample_result is None:
                         lines_dropped_by_sampling += 1L
                         bytes_dropped_by_sampling += line_len
                         continue
 
-                    (line, redacted) = self.__redacter.process_line(line)
-                    line_len = len(line)
+                    (line_object.line, redacted) = self.__redacter.process_line(line_object.line)
+                    line_len = len(line_object.line)
                 else:
                     sample_result = 1.0
                     redacted = False
@@ -1444,8 +1525,8 @@ class LogFileProcessor(object):
                     sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
 
                     #time_spent_serializing += fast_get_time()
-                    event = self.__create_events_object(line, sample_result)
-                    if not add_events_request.add_event(event, sequence_id=sequence_id, sequence_number=sequence_number):
+                    event = self.__create_events_object(line_object, sample_result)
+                    if not add_events_request.add_event(event, timestamp=line_object.timestamp, sequence_id=sequence_id, sequence_number=sequence_number):
                         #time_spent_serializing -= fast_get_time()
 
                         self.__log_file_iterator.seek(position)
@@ -1611,21 +1692,26 @@ class LogFileProcessor(object):
         self.__num_redaction_and_sampling_rules += 1
         self.__sampler.add_rule(match_expression, sampling_rate)
 
-    def add_redacter(self, match_expression, replacement):
+    def add_redacter(self, match_expression, replacement, hash_salt=''):
         """Adds a new redaction rule that will be applied after all previously added redaction rules.
 
         @param match_expression: The regular expression that must match the portion of the log line that will be
             redacted.
         @param replacement: The text to replace the matched expression with. You may use \1, \2, etc to use sub
             expressions from the match regular expression.
+        @param hash_salt: The salt used for hashing, only if hashing group replacement is used
+
+        @type hash_salt: str
         """
         self.__num_redaction_and_sampling_rules += 1
-        self.__redacter.add_redaction_rule(match_expression, replacement)
+        self.__redacter.add_redaction_rule(
+            match_expression, replacement, hash_salt
+        )
 
-    def __create_events_object(self, event_message, sampling_rate):
+    def __create_events_object(self, line_object, sampling_rate):
         """Returns the events object that can be sent to the server for this log to insert the specified message.
 
-        @param event_message: The contents of the event, to be placed in attrs.message.
+        @param line_object: A LogLine containing a message, to be placed in attrs.message, plus an optional timestamp and attrs dict.
         @param sampling_rate:  The sampling rate that had been used to decide if the event_message should be
             sent to the server.
 
@@ -1636,7 +1722,9 @@ class LogFileProcessor(object):
             JSON containing all of the log attributes for this log as well as a 'message' field containing event_message.
         """
         result = Event(base=self.__base_event)
-        result.set_message(event_message)
+        if line_object.attrs:
+            result.add_missing_attributes( line_object.attrs )
+        result.set_message(line_object.line)
         if sampling_rate != 1.0:
             result.set_sampling_rate(sampling_rate)
         return result
@@ -1817,6 +1905,10 @@ class LogLineRedacter(object):
     Redaction rules can match each line multiple times.
     """
 
+    # Indicator in the replacement text[optional] to hash the group content.
+    # eg replacement string of foo\\1=\\H2 will replace the second group with its hashed content
+    HASH_GROUP_INDICATOR = "H"
+
     def __init__(self, log_file_path):
         """Initializes an instance for a single file.
 
@@ -1848,14 +1940,22 @@ class LogLineRedacter(object):
 
         return input_line, modified_it
 
-    def add_redaction_rule(self, redaction_expression, replacement_text):
+    def add_redaction_rule(self, redaction_expression, replacement_text, hash_salt=''):
         """Appends a new redaction rule to this instance.
 
         @param redaction_expression: The regular expression that must match some portion of the line.
         @param replacement_text: The text to replace the matched text with. May include \1 etc to use a portion of the
             matched text.
+        @param hash_salt: [optional] If hashing is set, then the cryptographic salt to be used
+
+        @type hash_salt: str
         """
-        self.__redaction_rules.append(RedactionRule(redaction_expression, replacement_text))
+
+        self.__redaction_rules.append(
+            RedactionRule(
+                redaction_expression, replacement_text, hash_salt=hash_salt
+            )
+        )
 
     def __apply_redaction_rule(self, line, redaction_rule):
         """Applies the specified redaction rule on line and returns the result.
@@ -1866,22 +1966,91 @@ class LogLineRedacter(object):
         @return: A sequence of two elements, the line with the redaction applied (if any) and True or False
             indicating if a redaction was applied.
         """
+
+        def __replace_groups_with_hashed_content(re_ex, replacement_ex, line):
+
+            _matches = re.finditer(re_ex, line)
+
+            if not _matches:
+                # if no matches, return the `line` as such
+                return line, None
+
+            replacement_matches = 0
+
+            # last_match_index captures the index of the last match position
+            # that will help us rebuild the original string with replaced pattern
+            last_match_index = 0
+            replaced_string = ""
+
+            for _match in _matches:
+                _groups = _match.groups()
+                # `replaced_group` will initially hold the replacement expression `replacement_ex`
+                # and the group expressions like \\1 or \\H2 etc. will be substituted with the actual
+                # group value or the hashed group value depending on whether the group needs hashing or not
+                # Once substituted, this can be used to replace the matched string portion
+                replaced_group = replacement_ex
+                for _group_index, _group in enumerate(_groups):
+                    # for each group in a match, replace the `replacement_ex` with either its `group` content, or
+                    # the hash of the `group` depending on the hash indicator \\1 vs \\H1 etc.
+                    group_hash_indicator = "\{}{}".format(
+                        LogLineRedacter.HASH_GROUP_INDICATOR,
+                        _group_index + 1
+                    )
+                    replacement_matches += 1
+                    if group_hash_indicator in replacement_ex:
+                        # the group needs to be hashed
+                        replaced_group = replaced_group.encode('utf8')
+                        replaced_group = replaced_group.replace(
+                            group_hash_indicator,
+                            scalyr_util.md5_digest(_group + redaction_rule.hash_salt),
+                            1
+                        )
+                    else:
+                        # the group does not need to be hashed
+                        replaced_group = replaced_group.replace("\{}".format(_group_index + 1), _group, 1)
+                # once we have formed the replacement expression, we just need to replace the matched
+                # portion of the `line` with the `replaced_group` that we just built
+                replaced_string = replaced_string + line[last_match_index: _match.start()]
+                replaced_string += replaced_group
+                # forward the last match index to the end of the match group
+                last_match_index = _match.end()
+            return replaced_string, replacement_matches
+
         try:
-            (result, matches) = redaction_rule.redaction_expression.subn(
-                redaction_rule.replacement_text, line)
+            if redaction_rule.hash_redacted_data:
+                # out of these matched groups,
+                (result, matches) = __replace_groups_with_hashed_content(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line
+                )
+            else:
+                (result, matches) = re.subn(
+                    redaction_rule.redaction_expression, redaction_rule.replacement_text, line
+                )
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
             # Try again, but this time convert the line to utf-8, replacing any
             # invalid characters with the unicode replacement character
-            (result, matches) = redaction_rule.redaction_expression.subn(
-                redaction_rule.replacement_text, line.decode( 'utf-8', 'replace' ))
+            if redaction_rule.hash_redacted_data:
+                (result, matches) = __replace_groups_with_hashed_content(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line.decode('utf-8', 'replace')
+                )
+            else:
+                (result, matches) = re.subn(
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line.decode('utf-8', 'replace')
+                )
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
-            if type( result ) == unicode:
-                result = result.encode( 'utf-8' )
+            if type(result) == unicode:
+                result = result.encode('utf-8')
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
@@ -1891,11 +2060,16 @@ class LogLineRedacter(object):
 class RedactionRule(object):
     """Encapsulates all data for one redaction rule."""
 
-    def __init__(self, redaction_expression, replacement_text):
+    def __init__(self, redaction_expression, replacement_text, hash_salt=''):
         self.redaction_expression = re.compile(redaction_expression)
         self.replacement_text = replacement_text
+        self.hash_salt = hash_salt
         self.total_lines = 0
         self.total_redactions = 0
+
+    @property
+    def hash_redacted_data(self):
+        return "\{}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
 
 
 class LogMatcher(object):
@@ -2066,7 +2240,11 @@ class LogMatcher(object):
                                                      log_attributes=log_attributes, checkpoint=checkpoint_state,
                                                      close_when_staleness_exceeds=self.__stale_threshold_secs)
                     for rule in self.__log_entry_config['redaction_rules']:
-                        new_processor.add_redacter(rule['match_expression'], rule['replacement'])
+                        new_processor.add_redacter(
+                            rule['match_expression'],
+                            rule['replacement'],
+                            str(rule.get('hash_salt', default_value=''))
+                        )
                     for rule in self.__log_entry_config['sampling_rules']:
                         new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
                     result.append(new_processor)
