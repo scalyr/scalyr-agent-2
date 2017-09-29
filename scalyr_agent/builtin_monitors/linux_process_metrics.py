@@ -110,8 +110,8 @@ class Metric(namedtuple('Metric', ['name', 'type'])):
     __slots__ = ()
 
     @property
-    def is_absolute(self):
-        return self.name not in ('app.cpu', 'app.uptime', )
+    def is_cumulative(self):
+        return self.name in ('app.cpu', 'app.uptime', 'app.disk.bytes', 'app.disk.requests')
 
 
 class MetricPrinter:
@@ -343,7 +343,9 @@ class StatReader(BaseReader):
         # string.  Just grab them.
 
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(int(fields[19]))
-
+        print "app.cpu user reported by kernel: ", int(fields[11])
+        print "app.cpu system reported by kernel: ", int(fields[12])
+        print "app.uptime reported by kernel: ", process_uptime, self.__get_uptime_ms()
         collector.update({
             Metric('app.cpu', 'user'): self.__calculate_time_cs(int(fields[11])),
             Metric('app.cpu', 'system'): self.__calculate_time_cs(int(fields[12])),
@@ -754,9 +756,9 @@ class ProcessMonitor(ScalyrMonitor):
         self.__target_pids = set(self.__target_pids)
 
         # history of all metrics
-        self.__metrics_history = defaultdict(dict)
+        self.metrics_history = defaultdict(dict)
         # running total of metric values
-        self.__running_total_metrics = {}
+        self.running_total_metrics = {}
 
         if not (self.__commandline_matcher or self.__target_pids):
             raise BadMonitorConfiguration(
@@ -770,7 +772,7 @@ class ProcessMonitor(ScalyrMonitor):
             'path': 'linux_process_metrics.log',
         }
 
-    def _record_metrics(self, pid, metrics):
+    def record_metrics(self, pid, metrics):
         """
         For a process, record the metrics in a historical metrics collector
         Collects the historical result of each metric per process in __metrics_history
@@ -795,24 +797,24 @@ class ProcessMonitor(ScalyrMonitor):
         :return: None
         """
         for _metric, _metric_value in metrics.items():
-            if not self.__metrics_history[pid].get(_metric):
-                self.__metrics_history[pid][_metric] = []
-            self.__metrics_history[pid][_metric].append(_metric_value)
+            if not self.metrics_history[pid].get(_metric):
+                self.metrics_history[pid][_metric] = []
+            self.metrics_history[pid][_metric].append(_metric_value)
             # only keep the last 2 running history for any metric
-            self.__metrics_history[pid][_metric] = self.__metrics_history[pid][_metric][-2:]
+            self.metrics_history[pid][_metric] = self.metrics_history[pid][_metric][-2:]
 
     def _reset_absolute_metrics(self):
         """
-        At the beginnning of each process metric calculation, the absolute metrics
-        need to be overwritten to the combined process(es) result. Only the monotonically
-        increasing metrics need the previous value to calculate delta. We should set the
+        At the beginning of each process metric calculation, the absolute metrics
+        need to be overwritten to the combined process(es) result. Only the cumulative
+        metrics need the previous value to calculate delta. We should set the
         absolute metric to 0 in the beginning of this "epoch"
         """
 
-        for pid, process_metrics in self.__metrics_history.items():
+        for pid, process_metrics in self.metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
-                if _metric.is_absolute:
-                    self.__running_total_metrics[_metric] = 0
+                if not _metric.is_cumulative:
+                    self.running_total_metrics[_metric] = 0
 
     def _calculate_running_total(self, running_pids):
         """
@@ -824,35 +826,39 @@ class ProcessMonitor(ScalyrMonitor):
 
         # using the historical values, calculate the running total
         # there are two kinds of metrics:
-        # a) monotonically increasing metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
+        # a) cumulative metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
         # b) absolute metrics - the last absolute value is used
 
         running_pids_set = set(running_pids)
 
-        for pid, process_metrics in self.__metrics_history.items():
+        for pid, process_metrics in self.metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
-                if not self.__running_total_metrics.get(_metric):
-                    self.__running_total_metrics[_metric] = 0
-                if not _metric.is_absolute:
+                if not self.running_total_metrics.get(_metric):
+                    self.running_total_metrics[_metric] = 0
+                if _metric.is_cumulative:
                     if pid in running_pids_set:
-                        if len(_metric_values) < 2:
-                            self.__running_total_metrics[_metric] = 0
+                        if len(_metric_values) <= 1:
+                            self.running_total_metrics[_metric] += (_metric_values[-1] if _metric_values else 0)
                         else:
-                            self.__running_total_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
+                            self.running_total_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
                     else:
                         # remove the contribution of the dead process id
-                        if len(_metric_values) >= 2:
-                            self.__running_total_metrics[_metric] -= (_metric_values[-1] - _metric_values[-2])
+                        if len(_metric_values) > 1:
+                            self.running_total_metrics[_metric] -= (_metric_values[-1] - _metric_values[-2])
                 else:
                     # absolute metric - accumulate the last reported value
-                    self.__running_total_metrics[_metric] += _metric_values[-1]
+                    self.running_total_metrics[_metric] += _metric_values[-1]
 
-        # once this is done, for any dead process that has already been accounted for in the delta
-        # calculation above, remove the entries for the process id
-        all_pids = self.__metrics_history.keys()
+    def _remove_dead_processes(self, running_pids):
+        # once the _calculate_running_total has calculated the running total of the
+        # metrics for the current epoch, remove the entries for the process id in the history
+        # NOTE: the removal of the contributions (if applicable) should already be done so
+        # removing the entry from the history is safe.
+
+        all_pids = self.metrics_history.keys()
         for _pid_to_remove in list(set(all_pids) - set(running_pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
-            del self.__metrics_history[_pid_to_remove]
+            del self.metrics_history[_pid_to_remove]
 
     def gather_sample(self):
         """Collect the per-process tracker for the monitored process(es).
@@ -869,25 +875,31 @@ class ProcessMonitor(ScalyrMonitor):
         trackers = []
         for _pid in list(self.__select_processes()):
             trackers.append(ProcessTracker(_pid, self._logger, self.__id))
+
+        self._reset_absolute_metrics()
+
         for _tracker in trackers:
             _tracker.set_gathers()
             _metrics = _tracker.collect()
-            self._record_metrics(_tracker.pid, _metrics)
+            self.record_metrics(_tracker.pid, _metrics)
 
-        self._reset_absolute_metrics()
-        self._calculate_running_total([x.pid for x in trackers])
+        running_pids = [x.pid for x in trackers]
+        self._calculate_running_total(running_pids)
+        self._remove_dead_processes(running_pids)
+
         self.print_metrics()
 
     def print_metrics(self):
         # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
         # Java agent did this and it is important to some dashboards.
 
-        for _metric, _metric_value in self.__running_total_metrics.items():
-            print "emitting: \n", _metric.name, _metric_value, {'app': self.__id, 'type': _metric.type}
+        for _metric, _metric_value in self.running_total_metrics.items():
             extra = {'app': self.__id}
             if _metric.type:
                 extra['type'] = _metric.type
             self._logger.emit_value(_metric.name, _metric_value, extra)
+            if _metric.name in ('app.cpu', 'app.mem.bytes'):
+                print _metric.name, _metric_value, extra
 
     def __select_processes(self):
         """Returns a set of the process ids of processes that fulfills the match criteria.
@@ -895,8 +907,8 @@ class ProcessMonitor(ScalyrMonitor):
         This will either use the commandline matcher or the target pid to find the process.
         If no process is matched, an empty list is returned.
 
-        @return: The process ids of the matching process, or []
-        @rtype: [int] or []
+        @return: The set of process id(s) of the matching process, or set()
+        @rtype: set()
         """
 
         sub_proc = None
