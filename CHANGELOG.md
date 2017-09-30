@@ -12,6 +12,7 @@ Features:
 * Support to parse log lines written as a JSON object to extract line content before sending to Scalyr.  You may turn this on by setting `parse_lines_as_json` to `true` in your log configuration stanza for a particular file.  This is useful when uploading raw Docker logs.
 * Read the Scalyr api key from an environment variable
 * Add support for `PUT` requests to the `http_monitor`.
+* Add support for replacing redacted values with a hash of the actual value.  See [the redaction documentation](https://www.scalyr.com/help/scalyr-agent#redaction) for more details.
 
 Bug fixes:
 
