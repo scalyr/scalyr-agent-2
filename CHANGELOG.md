@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.29 "Dyson Aliens" - TBD
+## 2.0.29 "Dyson Aliens" - Sep 29, 2017
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 29, 2017 13:45 -0700
