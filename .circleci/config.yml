@@ -13,6 +13,7 @@ jobs:
 
     steps:
       - checkout
+      - run: pip install --user -r dev-requirements.txt
       - run: python run_tests.py
 
       - store_artifacts:
