@@ -40,12 +40,11 @@ jobs:
           key: v1-dependencies-{{ checksum "requirements.txt" }}
 
       # run tests!
-      - run:
-          name: run tests
-          command: |
-            . venv/bin/activate
-            python run_tests.py
-
+#      - run:
+#          name: run tests
+#          command: |
+#            . venv/bin/activate
+#            python run_tests.py
       - test:
           override:
             . venv/bin/activate
