@@ -58,7 +58,7 @@ test:
     - checkout
 
   override:
-    -  . venv/bin/activate; pip install -r dev-requirements.txt
+    -  python run_tests.py
 
   - store_artifacts:
       path: test-reports
