@@ -343,9 +343,6 @@ class StatReader(BaseReader):
         # string.  Just grab them.
 
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(int(fields[19]))
-        print "app.cpu user reported by kernel: ", int(fields[11])
-        print "app.cpu system reported by kernel: ", int(fields[12])
-        print "app.uptime reported by kernel: ", process_uptime, self.__get_uptime_ms()
         collector.update({
             Metric('app.cpu', 'user'): self.__calculate_time_cs(int(fields[11])),
             Metric('app.cpu', 'system'): self.__calculate_time_cs(int(fields[12])),
