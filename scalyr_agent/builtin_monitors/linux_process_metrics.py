@@ -856,6 +856,10 @@ class ProcessMonitor(ScalyrMonitor):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
             del self.metrics_history[_pid_to_remove]
 
+        # if no processes are running, there is no reason to report the running metric data
+        if not running_pids:
+            self.running_total_metrics = {}
+
     def gather_sample(self):
         """Collect the per-process tracker for the monitored process(es).
 
