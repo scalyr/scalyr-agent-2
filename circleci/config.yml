@@ -32,10 +32,12 @@ jobs:
           command: |
             python -m venv venv
             . venv/bin/activate
+            pip install -r dev-requirements.txt
 
       - save_cache:
           paths:
             - ./venv
+          key: v1-dependencies-{{ checksum "requirements.txt" }}
 
       # run tests!
       - run:
