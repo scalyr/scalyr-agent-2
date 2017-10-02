@@ -2,5 +2,9 @@
 # These dependencies are not needed to run the Scalyr Agent, but mainly used for
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 mock==2.0.0
+nose==1.3.7
+pysnmp
+requests==2.18.4
+redis==2.10.6
 webapp2==2.5.2
 WebTest==2.0.28
