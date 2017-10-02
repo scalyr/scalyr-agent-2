@@ -39,16 +39,9 @@ jobs:
             - ./venv
           key: v1-dependencies-{{ checksum "requirements.txt" }}
 
-      # run tests!
-#      - run:
-#          name: run tests
-#          command: |
-#            . venv/bin/activate
-#            python run_tests.py
-      - test:
-          override:
-            . venv/bin/activate
-            python run_tests.py
+      test:
+        override:
+          - python run_tests.py
 
       - store_artifacts:
           path: test-reports
