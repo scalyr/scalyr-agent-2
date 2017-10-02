@@ -1,0 +1,30 @@
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2
+jobs:
+  test:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+
+    working_directory: ~/scalyr-agent-2
+
+    steps:
+      - checkout
+      - run: python run_tests.py
+
+      - store_artifacts:
+          path: test-results.xml
+          prefix: tests
+
+      - store_artifacts:
+          path: coverage
+          prefix: coverage
+
+workflows:
+  version: 2
+  unittest:
+    jobs:
+      - test
