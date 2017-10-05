@@ -12,5 +12,6 @@ requests==2.18.4
 redis==2.10.6
 Twisted==17.9.0
 unittest2==1.1.0
+virtualenv==15.1.0
 webapp2==2.5.2
 WebTest==2.0.28

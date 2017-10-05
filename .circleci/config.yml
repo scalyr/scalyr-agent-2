@@ -17,16 +17,16 @@ jobs:
           key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
-            python -m venv venv
-            . venv/bin/activate
+            virtualenv venv
+            source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
       - run:
           command: |
-            . venv/bin/activate
+            source venv/bin/activate
             nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml
 
       - store_artifacts:
