@@ -33,7 +33,7 @@ jobs:
           path: xunit.xml
 
       - store_artifacts:
-          path: cover/index.html
+          path: cover/
 
 workflows:
   version: 2

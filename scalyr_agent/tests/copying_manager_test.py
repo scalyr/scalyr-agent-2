@@ -72,12 +72,12 @@ class CopyingParamsTest(ScalyrTestCase):
 
     def test_small_events_being_sent(self):
         self.test_params.current_sleep_interval = 1
-        self.run_test_case('success', 10 * 1024, [1.5, ONE_MB], [2.25, ONE_MB], [3.375, ONE_MB], [5, ONE_MB])
+        self._run('success', 10 * 1024, [1.5, ONE_MB], [2.25, ONE_MB], [3.375, ONE_MB], [5, ONE_MB])
 
     def test_too_many_events_being_sent(self):
         self.test_params.current_sleep_interval = 5
 
-        self.run_test_case('success', 200 * 1024, [3.0, ONE_MB], [1.8, ONE_MB], [1.08, ONE_MB], [1, ONE_MB])
+        self._run('success', 200 * 1024, [3.0, ONE_MB], [1.8, ONE_MB], [1.08, ONE_MB], [1, ONE_MB])
 
     def test_request_too_big(self):
         self.test_params.current_sleep_interval = 1
@@ -90,10 +90,10 @@ class CopyingParamsTest(ScalyrTestCase):
 
     def test_error_back_off(self):
         self.test_params.current_sleep_interval = 3
-        self.run_test_case('error', 200 * 1024, [4.5, ONE_MB], [6.75, ONE_MB], [10.125, ONE_MB], [15.1875, ONE_MB],
+        self._run('error', 200 * 1024, [4.5, ONE_MB], [6.75, ONE_MB], [10.125, ONE_MB], [15.1875, ONE_MB],
                            [22.78125, ONE_MB], [30, ONE_MB])
 
-    def run_test_case(self, status, bytes_sent, *expected_sleep_interval_allowed_bytes):
+    def _run(self, status, bytes_sent, *expected_sleep_interval_allowed_bytes):
         """Verifies that when test_params is updated with the specified status and bytes sent the current sleep
         interval and allowed bytes is updated to the given values.
 
