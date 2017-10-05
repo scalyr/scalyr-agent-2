@@ -14,14 +14,15 @@ jobs:
     steps:
       - checkout
       - run: pip install --user -r dev-requirements.txt
-      - run: python run_tests.py
+#      - run: python run_tests.py
+      - run: nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml
 
       - store_artifacts:
-          path: test-results.xml
+          path: xunit.xml
           prefix: tests
 
       - store_artifacts:
-          path: coverage
+          path: cover/index.html
           prefix: coverage
 
 workflows:

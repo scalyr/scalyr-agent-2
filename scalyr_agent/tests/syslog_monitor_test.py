@@ -308,7 +308,6 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         time.sleep(1)
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
-
         f = open('agent_syslog.log')
         actual = f.read().strip()
         self.assertTrue(
