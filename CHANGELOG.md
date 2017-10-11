@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.30 "" - Oct 17, 2017
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 17, 2017 13:45 -0700
+--->
+
+Note, this release is under development so release date is actually TBD.
+
+Features:
+
+* Changed default for `max_line_size` to 9900 to match new larger `message` field support on the server.
+
 ## 2.0.29 "Dyson Aliens" - Sep 29, 2017
 
 <!---

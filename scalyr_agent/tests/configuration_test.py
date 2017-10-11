@@ -76,7 +76,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
 
-        self.assertEquals(config.max_line_size, 3400)
+        self.assertEquals(config.max_line_size, 9900)
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
         self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
         self.assertEquals(config.max_sequence_number, 1024**4)
