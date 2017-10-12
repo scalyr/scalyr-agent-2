@@ -1,0 +1,42 @@
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2
+jobs:
+  test:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+
+    working_directory: ~/scalyr-agent-2
+
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+      - run:
+          command: |
+            source venv/bin/activate
+            nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml
+
+      - store_artifacts:
+          path: xunit.xml
+
+      - store_artifacts:
+          path: cover/
+
+workflows:
+  version: 2
+  unittest:
+    jobs:
+      - test
