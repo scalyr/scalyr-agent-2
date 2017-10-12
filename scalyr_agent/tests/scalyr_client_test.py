@@ -34,15 +34,14 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
 
         self.assertEquals(request.total_events, 0)
+
         self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1L))
         self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2L))
-        # get the next timestamp and assert for previous two
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
+
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"%s"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"%s"}]"""
-            """, threads: [], client_time: 1 }""" % (next_timestamp - 2, next_timestamp - 1)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            """, threads: [], client_time: 1 }""")
         self.assertEquals(request.total_events, 2)
         request.close()
 
@@ -66,26 +65,25 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(request.add_thread('t1', 'n1'))
         self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2L))
         self.assertTrue(request.add_thread('t2', 'n2'))
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
+
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"%s"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"%s"}]"""
-            """, threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""" % (next_timestamp - 2, next_timestamp - 1)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            """, threads: [{"id":"t1","name":"n1"},{"id":"t2","name":"n2"}], client_time: 1 }""")
 
         self.assertEquals(request.total_events, 2)
         request.close()
 
     def test_maximum_bytes_exceeded(self):
-        request = AddEventsRequest(self.__body, max_size=133)
+        request = AddEventsRequest(self.__body, max_size=103)
         request.set_client_time(1)
+
         self.assertTrue(request.add_event(Event().set_message('eventOne'), timestamp=1L))
         self.assertFalse(request.add_event(Event().set_message('eventTwo'), timestamp=2L))
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
+
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"%s"}], threads: [], client_time: 1 }""" % (next_timestamp - 2)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], threads: [], client_time: 1 }""")
         request.close()
 
     def test_maximum_bytes_exceeded_from_threads(self):
@@ -110,11 +108,10 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.set_position(position)
         self.assertTrue(request.add_event(Event().set_message('eventThree'), timestamp=3L))
-        # get the next timestamp and assert for previous two
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
+
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"%s"}], threads: [], client_time: 1 }""" % (next_timestamp - 1))
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], threads: [], client_time: 1 }""")
 
         request.close()
 
@@ -129,14 +126,11 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_position(position)
         self.assertTrue(request.add_thread('log2', 'Log two'))
         self.assertTrue(request.add_event(Event().set_message('eventThree'), timestamp=3L))
-        # get the next timestamp and assert for previous two
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"%s"}], """
-            """threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""" % (next_timestamp - 1)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\neventThree},ts:"3"}], """
+            """threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""")
 
         request.close()
 
@@ -146,20 +140,17 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertTrue(request.add_event(Event().set_message('eventOne'), timestamp=1L))
         self.assertTrue(request.add_event(Event().set_message('eventTwo'), timestamp=2L))
-        # get the next timestamp and assert for previous two
-        next_timestamp = request._AddEventsRequest__get_valid_timestamp(1L)
+
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"%s"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"%s"}]"""
-            """, threads: [], client_time: 100 }""" % (next_timestamp - 2, next_timestamp - 1)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            """, threads: [], client_time: 100 }""")
 
         request.set_client_time(2)
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"%s"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"%s"}]"""
-            """, threads: [], client_time: 2 }""" % (next_timestamp - 2, next_timestamp - 1)
-        )
+            """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"},{attrs:{message:`s\x00\x00\x00\x08eventTwo},ts:"2"}]"""
+            """, threads: [], client_time: 2 }""")
         request.close()
 
     def test_sequence_id_but_no_number( self ):
@@ -250,7 +241,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         first_number = 1234
         second_number = 4321
         expected_delta = 10
-        request = AddEventsRequest(self.__body, max_size=210)
+        request = AddEventsRequest(self.__body, max_size=180)
         request.set_client_time(1)
         self.assertTrue(request.add_event(Event().set_message('eventOne'), timestamp=1L, sequence_id=first_id, sequence_number=first_number))
         self.assertFalse(request.add_event(Event(attrs={'name': 'eventTwo', 'long': 'some really long text'}).set_message('eventTwo'), timestamp=2L, sequence_id=second_id, sequence_number=second_number))
