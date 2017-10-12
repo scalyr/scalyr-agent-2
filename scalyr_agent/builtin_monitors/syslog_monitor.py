@@ -199,8 +199,9 @@ def _get_default_gateway():
                 continue
 
             result = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
-    except IOError:
-        pass
+    except IOError, e:
+        global_log.error('Error while getting the default gateway: %s', str(e), limit_once_per_x_secs=300,
+                           limit_key='_get_default_gateway_error')
     finally:
         if fh:
             fh.close()
