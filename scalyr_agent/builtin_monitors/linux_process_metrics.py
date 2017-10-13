@@ -922,9 +922,8 @@ class ProcessMonitor(ScalyrMonitor):
                     else:
                         all_pids.append(pid)
         finally:
-            if not subprocesses:
-                if sub_proc is not None:
-                    sub_proc.wait()
+            if sub_proc is not None:
+                sub_proc.wait()
         return all_pids
 
     def get_active_matched_pids(self, check_poll=True):
@@ -943,7 +942,6 @@ class ProcessMonitor(ScalyrMonitor):
                 return self.__pids
 
         matching_pids = self.get_pids_from_ps()
-
         if self.__include_child_processes:
             for matching_pid in matching_pids:
                 matching_pids.extend(
