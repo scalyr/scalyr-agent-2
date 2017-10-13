@@ -33,8 +33,8 @@ class TestProcessMonitorInitialize(ScalyrTestCase):
 
     def test_initialize_monitor(self):
         monitor = ProcessMonitor(self.config_commandline, scalyr_logging.getLogger("syslog_monitor[test]"))
-        self.assertEqual(monitor.__metrics_history, defaultdict(dict))
-        self.assertEqual(monitor.__running_total_metrics, {})
+        self.assertEqual(monitor._ProcessMonitor__metrics_history, defaultdict(dict))
+        self.assertEqual(monitor._ProcessMonitor__aggregated_metrics, {})
 
 
 class TestProcessMonitorRecordMetrics(ScalyrTestCase):
@@ -53,7 +53,7 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
 
     def test_empty_metrics(self):
         self.monitor.record_metrics(666, {})
-        self.assertEqual(self.monitor.__metrics_history, defaultdict(dict))
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, defaultdict(dict))
 
     def test_single_process_single_epoch(self):
         metric = Metric('fakemetric', 'faketype')
@@ -64,8 +64,8 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
         expected_history = {
             555: {metric: [21]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
     def test_single_process_multiple_epochs(self):
         metric = Metric('fakemetric', 'faketype')
@@ -75,16 +75,16 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
         expected_history = {
             777: {metric: [1.2]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
         # epoch 2
         self.monitor.record_metrics(777, {metric: 1.9})
         expected_history = {
             777: {metric: [1.2, 1.9]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
     def test_multi_process_single_epoch(self):
         metric1 = Metric('fakemetric1', 'faketype1')
@@ -96,8 +96,8 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
             111: {metric1: [1.2]},
             222: {metric2: [2.87]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
     def test_multi_process_multi_epochs(self):
         metric1 = Metric('fakemetric1', 'faketype1')
@@ -110,8 +110,8 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
             111: {metric1: [1.2]},
             222: {metric2: [2.87]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
         # epoch 2
         self.monitor.record_metrics(111, {metric1: 1.6})
@@ -120,8 +120,8 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
             111: {metric1: [1.2, 1.6]},
             222: {metric2: [2.87, 2.92]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
 
 class TestProcessMonitorRunningTotal(ScalyrTestCase):
@@ -138,7 +138,7 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         self.monitor = ProcessMonitor(self.config_commandline, scalyr_logging.getLogger("syslog_monitor[test]"))
 
     def test_no_history(self):
-        self.assertEqual(self.monitor.__running_total_metrics, {})
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
 
     def test_single_process_single_epoch(self):
         metric = Metric('fakemetric', 'faketype')
@@ -150,8 +150,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         expected_history = {
             555: {metric: [21]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {metric: 21})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {metric: 21})
 
     def test_single_process_multiple_epoch(self):
         metric = Metric('fakemetric', 'faketype')
@@ -161,8 +161,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         self.monitor.record_metrics(555, metrics)
         self.monitor._calculate_aggregated_metrics([555])
         expected_history = {555: {metric: [21]}}
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {metric: 21})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {metric: 21})
 
         # epoch 2
         # before epoch 2, the reset is called for absolute metrics
@@ -172,8 +172,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         self.monitor.record_metrics(555, metrics)
         self.monitor._calculate_aggregated_metrics([555])
         expected_history = {555: {metric: [21, 21.5]}}
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
-        self.assertEqual(self.monitor.__running_total_metrics, {metric: 21.5})
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {metric: 21.5})
 
     def test_multiple_process_multiple_epochs(self):
         metric1 = Metric('fakemetric1', 'faketype1')
@@ -190,9 +190,9 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             1: {metric1: [21]},
             2: {metric2: [100.0]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
                 metric1: 21,
                 metric2: 100.0
@@ -212,9 +212,9 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             1: {metric1: [21, 21.11]},
             2: {metric2: [100.0, 100.11]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
                 metric1: 21.11,
                 metric2: 100.11
@@ -225,63 +225,63 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metric1 = Metric('app.cpu', 'system')
 
         # epoch 1
-        metrics1 = {metric1: 21}
-        metrics2 = {metric1: 100.0}
+        metrics1 = {metric1: 20}
+        metrics2 = {metric1: 40}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
 
         self.monitor._calculate_aggregated_metrics([1, 2])
         expected_history = {
-            1: {metric1: [21]},
-            2: {metric1: [100.0]}
+            1: {metric1: [20]},
+            2: {metric1: [40]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 121.0
+                metric1: 0
             }
         )
         # epoch 2
         # before epoch 2, the reset is called for absolute metrics
         self.monitor._reset_absolute_metrics()
 
-        metrics1 = {metric1: 30.1}
-        metrics2 = {metric1: 100.2}
+        metrics1 = {metric1: 22}
+        metrics2 = {metric1: 44}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
 
         self.monitor._calculate_aggregated_metrics([1, 2])
         expected_history = {
-            1: {metric1: [21, 30.1]},
-            2: {metric1: [100.0, 100.2]}
+            1: {metric1: [20, 22]},
+            2: {metric1: [40, 44]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 30.1 + 100.2
+                metric1: (22 - 20) + (44 - 40)
             }
         )
 
         # epoch 3
         self.monitor._reset_absolute_metrics()
 
-        metrics1 = {metric1: 26.0}
-        metrics2 = {metric1: 103}
+        metrics1 = {metric1: 25}
+        metrics2 = {metric1: 48}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
         self.monitor._calculate_aggregated_metrics([1, 2])
         # we only keep the last 2 historical values
         expected_history = {
-            1: {metric1: [30.1, 26.0]},
-            2: {metric1: [100.2, 103]}
+            1: {metric1: [22, 25]},
+            2: {metric1: [44, 48]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: (26.0 + 103)
+                metric1: (22 - 20) + (44 - 40) + (25 - 22) + (48 - 44)
             }
         )
 
@@ -304,11 +304,11 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             1: {metric1: [21]},
             2: {metric1: [100.0]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 121.0
+                metric1: 0
             }
         )
         # epoch 2
@@ -325,11 +325,11 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             1: {metric1: [21, 30.1]},
             2: {metric1: [100.0, 100.2]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 30.1 + 100.2
+                metric1: (30.1 - 21) + (100.2 - 100.0)
             }
         )
 
@@ -349,12 +349,12 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             1: {metric1: [30.1, 26.0]},
             2: {metric1: [100.2, 103]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
 
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: (100.2 + 30.1) + (103 - 100.2)
+                metric1: (30.1 - 21) + (100.2 - 100.0) + (103 - 100.2)
             }
         )
 
@@ -367,50 +367,50 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metric1 = Metric('app.cpu', 'system')
 
         # epoch 1
-        metrics1 = {metric1: 21}
-        metrics2 = {metric1: 100.0}
+        metrics1 = {metric1: 20}
+        metrics2 = {metric1: 40}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
 
         self.monitor._calculate_aggregated_metrics([1, 2])
         expected_history = {
-            1: {metric1: [21]},
-            2: {metric1: [100.0]}
+            1: {metric1: [20]},
+            2: {metric1: [40]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 121.0
+                metric1: 0
             }
         )
         # epoch 2
         # before epoch 2, the reset is called for absolute metrics
         self.monitor._reset_absolute_metrics()
 
-        metrics1 = {metric1: 30.1}
-        metrics2 = {metric1: 100.2}
+        metrics1 = {metric1: 25}
+        metrics2 = {metric1: 46}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
 
         self.monitor._calculate_aggregated_metrics([1, 2])
         expected_history = {
-            1: {metric1: [21, 30.1]},
-            2: {metric1: [100.0, 100.2]}
+            1: {metric1: [20, 25]},
+            2: {metric1: [40, 46]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: 30.1 + 100.2
+                metric1: (25 - 20) + (46 - 40)
             }
         )
 
         # epoch 3
         self.monitor._reset_absolute_metrics()
 
-        metrics1 = {metric1: 26.0}
-        metrics2 = {metric1: 103}
+        metrics1 = {metric1: 23}
+        metrics2 = {metric1: 43}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
 
@@ -420,14 +420,14 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
 
         # we only keep the last 2 historical values
         expected_history = {
-            1: {metric1: [30.1, 26.0]},
-            2: {metric1: [100.2, 103]}
+            1: {metric1: [25, 23]},
+            2: {metric1: [46, 43]}
         }
-        self.assertEqual(self.monitor.__metrics_history, expected_history)
+        self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
 
         self.assertEqual(
-            self.monitor.__running_total_metrics,
+            self.monitor._ProcessMonitor__aggregated_metrics,
             {
-                metric1: (100.2 + 30.1)
+                metric1: (25 - 20) + (46 - 40)
             }
         )

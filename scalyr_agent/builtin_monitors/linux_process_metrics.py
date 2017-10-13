@@ -866,6 +866,8 @@ class ProcessMonitor(ScalyrMonitor):
                         if len(_metric_values) > 1:
                             # only report the cumulative metrics for more than one sample
                             self.__aggregated_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
+                        else:
+                            self.__aggregated_metrics[_metric] = 0
                 else:
                     if pid in running_pids_set:
                         # absolute metric - accumulate the last reported value
@@ -886,22 +888,23 @@ class ProcessMonitor(ScalyrMonitor):
         if not running_pids:
             self.__aggregated_metrics = {}
 
-    def get_pids_from_ps(self, cmd, match_process=True):
+    def get_pids_from_ps(self, subprocesses=False, ppid=None):
         """
-        Get the list of pids from given subprocess command
-        :param cmd: linux command to list the processes eg ['ps', 'ax', '-o', 'pid,command']
-        :param match_process: should use the commandline matcher to match the processes?
-        :type cmd: list
-        :type match_process: bool
+        Get the list of pids running, or get the list of child processes given a parent process id
+        :param subprocesses: Get subprocesses?
+        :param ppid: parent process id, only if subprocesses is True
+        :type subprocesses: bool
+        :type ppid: int
         :return: list of process ids
         """
 
-        sub_proc = None
+        cmd = ['ps', 'ax', '-o', 'pid,command']
+        if subprocesses:
+            cmd = ["ps", "--ppid", str(ppid), "-o", "pid,command"]
+        sub_proc = Popen(cmd, shell=False, stdout=PIPE)
+        lines = sub_proc.stdout.readlines()
+        all_pids = []
         try:
-            sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
-                             shell=False, stdout=PIPE)
-            lines = sub_proc.stdout.readlines()
-            all_pids = []
             for line in lines:
                 line = line.strip()
                 if line.find(' ') > 0:
@@ -910,15 +913,15 @@ class ProcessMonitor(ScalyrMonitor):
                         continue
                     pid = int(pid)
                     line = line[(line.find(' ') + 1):]
-                    if match_process:
+                    if not subprocesses:
                         if re.search(self.__commandline_matcher, line) is not None:
                             all_pids.append(pid)
                     else:
                         all_pids.append(pid)
         finally:
-            if sub_proc is not None:
-                sub_proc.wait()
-
+            if not subprocesses:
+                if sub_proc is not None:
+                    sub_proc.wait()
         return all_pids
 
     def get_active_matched_pids(self, check_poll=True):
@@ -936,13 +939,14 @@ class ProcessMonitor(ScalyrMonitor):
             if not self.should_poll_for_processes():
                 return self.__pids
 
-        matching_pids = self.get_pids_from_ps(['ps', 'ax', '-o', 'pid,command'])
+        matching_pids = self.get_pids_from_ps()
 
         if self.__include_child_processes:
             for matching_pid in matching_pids:
-
-                matching_pids.extend(self.get_pids_from_ps(["ps", "--ppid", str(matching_pid)]))
-
+                matching_pids.extend(
+                    self.get_pids_from_ps(subprocesses=True, ppid=matching_pid)
+                )
+        matching_pids = list(set(matching_pids))
         return matching_pids
 
     def should_poll_for_processes(self):
@@ -1022,8 +1026,8 @@ class ProcessMonitor(ScalyrMonitor):
             extra = {'app': self.__id}
             if _metric.type:
                 extra['type'] = _metric.type
+            print _metric.name, _metric_value, extra
             self._logger.emit_value(_metric.name, _metric_value, extra)
-        print self.__metrics_history.keys()
 
     def __select_processes(self):
         """Returns a set of the process ids of processes that fulfills the match criteria.
