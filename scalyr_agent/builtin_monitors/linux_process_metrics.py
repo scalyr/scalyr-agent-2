@@ -107,8 +107,6 @@ define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.
 define_log_field(__monitor__, 'value', 'The metric value.')
 
 
-
-
 class Metric(namedtuple('Metric', ['name', 'type'])):
     """
     This class is an abstraction for a linux metric that contains the
@@ -187,7 +185,12 @@ class BaseReader:
         Runs a single cycle of the sample collection.
 
         It should read the monitored file and extract all metrics.
-        :param collector: Optional - a dictionary to collect the metric values
+        :param collector: Optional - a dictionary to collect the metric values.
+                          The collector has key as Metric, and value as the actual observed scalar.
+                          eg: {
+                                ("app.net.bytes", "in"): 12222,
+                                ("app.net.bytes", "out"): 20,
+                              }
                           Note: a new collector will be instantiated if None is passed in.
         :return: None or the optional collector with collected metric values
         """
