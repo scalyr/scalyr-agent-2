@@ -28,12 +28,13 @@ __author__ = 'czerwin@scalyr.com'
 
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 
 from collections import defaultdict, namedtuple
 import os
 import re
 import time
+from datetime import datetime, timedelta
 
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
@@ -106,11 +107,27 @@ define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.
 define_log_field(__monitor__, 'value', 'The metric value.')
 
 
+
+
 class Metric(namedtuple('Metric', ['name', 'type'])):
+    """
+    This class is an abstraction for a linux metric that contains the
+    metric name eg. CPU and type eg. system/user etc. A combination of the
+    two make the metric unique.
+    """
+
     __slots__ = ()
 
     @property
     def is_cumulative(self):
+        """
+        A cumulative metric is one that needs a prior value to calculate the next value.
+        i.e. only the deltas for the current observed values are reported.
+
+        A non-cumulative metric is one where the absolute observed value is reported every time.
+
+        :return:
+        """
         return self.name in ('app.cpu', 'app.uptime', 'app.disk.bytes', 'app.disk.requests')
 
 
@@ -171,6 +188,7 @@ class BaseReader:
 
         It should read the monitored file and extract all metrics.
         :param collector: Optional - a dictionary to collect the metric values
+                          Note: a new collector will be instantiated if None is passed in.
         :return: None or the optional collector with collected metric values
         """
 
@@ -190,7 +208,6 @@ class BaseReader:
             try:
                 self._file = open(filename, "r")
             except IOError, e:
-                print e
                 # We take a simple approach.  If we don't find the file or
                 # don't have permissions for it, then just don't collect this
                 # stat from now on.  If the user changes the configuration file
@@ -212,7 +229,6 @@ class BaseReader:
                 return self.gather_sample(self._file, collector=collector)
 
             except IOError, e:
-                print e
                 self._logger.error("Error gathering sample for file: '%s'\n\t%s" % (filename, str(e)));
 
                 # close the file. This will cause the file to be reopened next call to run_single_cycle
@@ -659,25 +675,17 @@ class ProcessTracker(object):
         self.pid = pid
         self.monitor_id = monitor_id
         self._logger = logger
-        self.gathers = []
-
-    def set_gathers(self):
-        """
-        Sets the id of the process for which this monitor instance should record metrics.
-        """
-
-        for gather in self.gathers:
-            gather.close()
-
-        self.gathers.append(StatReader(self.pid, self.monitor_id, self._logger))
-        self.gathers.append(StatusReader(self.pid, self.monitor_id, self._logger))
-        self.gathers.append(IoReader(self.pid, self.monitor_id, self._logger))
-        self.gathers.append(FileDescriptorReader(self.pid, self.monitor_id, self._logger))
+        self.gathers = [
+            StatReader(self.pid, self.monitor_id, self._logger),
+            StatusReader(self.pid, self.monitor_id, self._logger),
+            IoReader(self.pid, self.monitor_id, self._logger),
+            FileDescriptorReader(self.pid, self.monitor_id, self._logger)
+        ]
 
         # TODO: Re-enable these if we can find a way to get them to truly report
         # per-app statistics.
-        #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
-        #        self.gathers.append(SockStatReader(self.pid, self.id, self._logger))
+        #        NetStatReader(self.pid, self.id, self._logger)
+        #        SockStatReader(self.pid, self.id, self._logger)
 
     def __is_running(self):
         """Returns true if the current process is still running.
@@ -739,23 +747,57 @@ class ProcessMonitor(ScalyrMonitor):
     You can run multiple instances of this monitor per agent to monitor different processes.
     """
 
+    # poll interval (in seconds) for matching processes when we are monitoring multiple processes
+    # Needs to be initialized as a class variable, not an instance variable so that it is
+    # alive for all epochs of the monitor.
+    LAST_POLLED = {}
+
     def _initialize(self):
         """Performs monitor-specific initialization."""
-        # The id of the process being monitored, if one has been matched.
-        self.__pid = None
+        # The ids of the processes being monitored, if one has been matched.
+        self.__pids = None
 
         self.__id = self._config.get('id', required_field=True, convert_to=str)
         self.__commandline_matcher = self._config.get('commandline', default=None, convert_to=str)
-        self.__target_pids = self._config.get('pid', default=None, convert_to=str)
+        self.__aggregate_multiple_processes = self._config.get(
+            'aggregate_multiple_processes', default=False, convert_to=bool
+        )
+        self.__include_child_processes = self._config.get(
+            'include_child_processes', default=False, convert_to=bool
+        )
+
+        self.__poll_interval = self._config.get('poll_interval', default=120, convert_to=int)
+        self.__datetime_format = "%Y-%m-%d %H:%M:%S"
+        self.__last_polled_env_key = '%s_linux_process_monitor_last_polled' % self.__id
+
+        __target_pids = self._config.get('pid', default=None, convert_to=str)
+        self.__target_pids = []
 
         # convert target pid into a list. Target pids can be a single pid or a CSV of pids
-        self.__target_pids = [int(x.strip()) for x in self.__target_pids.split(',')] if self.__target_pids else []
-        self.__target_pids = set(self.__target_pids)
+        if __target_pids:
+            for _t in __target_pids.split(','):
+                if _t:
+                    if _t != '$$':
+                        self.__target_pids.append(int(_t))
+                    else:
+                        self.__target_pids.append(int(os.getpid()))
 
-        # history of all metrics
-        self.metrics_history = defaultdict(dict)
+        # history of all metrics which has form:
+        # {
+        #   '<process id>: {
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 }
+
+        #   '<process id>: {
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 }
+        # }
+
+        self.__metrics_history = defaultdict(dict)
         # running total of metric values
-        self.running_total_metrics = {}
+        self.__aggregated_metrics = {}
 
         if not (self.__commandline_matcher or self.__target_pids):
             raise BadMonitorConfiguration(
@@ -773,19 +815,6 @@ class ProcessMonitor(ScalyrMonitor):
         """
         For a process, record the metrics in a historical metrics collector
         Collects the historical result of each metric per process in __metrics_history
-        which has form:
-
-        {
-          '<process id>: {
-                        <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-                        <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-                        }
-
-          '<process id>: {
-                        <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-                        <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-                        }
-        }
 
         @param pid: Process ID
         @param metrics: Collected metrics of the process
@@ -794,68 +823,166 @@ class ProcessMonitor(ScalyrMonitor):
         :return: None
         """
         for _metric, _metric_value in metrics.items():
-            if not self.metrics_history[pid].get(_metric):
-                self.metrics_history[pid][_metric] = []
-            self.metrics_history[pid][_metric].append(_metric_value)
+            if not self.__metrics_history[pid].get(_metric):
+                self.__metrics_history[pid][_metric] = []
+            self.__metrics_history[pid][_metric].append(_metric_value)
             # only keep the last 2 running history for any metric
-            self.metrics_history[pid][_metric] = self.metrics_history[pid][_metric][-2:]
+            self.__metrics_history[pid][_metric] = self.__metrics_history[pid][_metric][-2:]
 
     def _reset_absolute_metrics(self):
         """
-        At the beginning of each process metric calculation, the absolute metrics
+        At the beginning of each process metric calculation, the absolute (non-cumulative) metrics
         need to be overwritten to the combined process(es) result. Only the cumulative
         metrics need the previous value to calculate delta. We should set the
         absolute metric to 0 in the beginning of this "epoch"
         """
 
-        for pid, process_metrics in self.metrics_history.items():
+        for pid, process_metrics in self.__metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
                 if not _metric.is_cumulative:
-                    self.running_total_metrics[_metric] = 0
+                    self.__aggregated_metrics[_metric] = 0
 
-    def _calculate_running_total(self, running_pids):
+    def _calculate_aggregated_metrics(self, running_pids):
         """
-        Calculates the running total metric values based on the current running processes
+        Calculates the aggregated metric values based on the current running processes
         and the historical metric record
         @param running_pids: list of running process ids
         @type running_pids: list
         """
 
-        # using the historical values, calculate the running total
+        # using the historical values, calculate the aggregate
         # there are two kinds of metrics:
         # a) cumulative metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
         # b) absolute metrics - the last absolute value is used
 
         running_pids_set = set(running_pids)
 
-        for pid, process_metrics in self.metrics_history.items():
+        for pid, process_metrics in self.__metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
-                if not self.running_total_metrics.get(_metric):
-                    self.running_total_metrics[_metric] = 0
+                if not self.__aggregated_metrics.get(_metric):
+                    self.__aggregated_metrics[_metric] = 0
                 if _metric.is_cumulative:
                     if pid in running_pids_set:
-                        if len(_metric_values) <= 1:
-                            self.running_total_metrics[_metric] += (_metric_values[-1] if _metric_values else 0)
-                        else:
-                            self.running_total_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
+                        if len(_metric_values) > 1:
+                            # only report the cumulative metrics for more than one sample
+                            self.__aggregated_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
                 else:
-                    # absolute metric - accumulate the last reported value
-                    self.running_total_metrics[_metric] += _metric_values[-1]
+                    if pid in running_pids_set:
+                        # absolute metric - accumulate the last reported value
+                        self.__aggregated_metrics[_metric] += _metric_values[-1]
 
     def _remove_dead_processes(self, running_pids):
-        # once the _calculate_running_total has calculated the running total of the
+        # once the _calculate_aggregated_metrics has calculated the running total of the
         # metrics for the current epoch, remove the entries for the process id in the history
         # NOTE: the removal of the contributions (if applicable) should already be done so
         # removing the entry from the history is safe.
 
-        all_pids = self.metrics_history.keys()
+        all_pids = self.__metrics_history.keys()
         for _pid_to_remove in list(set(all_pids) - set(running_pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
-            del self.metrics_history[_pid_to_remove]
+            del self.__metrics_history[_pid_to_remove]
 
         # if no processes are running, there is no reason to report the running metric data
         if not running_pids:
-            self.running_total_metrics = {}
+            self.__aggregated_metrics = {}
+
+    def get_pids_from_ps(self, cmd, match_process=True):
+        """
+        Get the list of pids from given subprocess command
+        :param cmd: linux command to list the processes eg ['ps', 'ax', '-o', 'pid,command']
+        :param match_process: should use the commandline matcher to match the processes?
+        :type cmd: list
+        :type match_process: bool
+        :return: list of process ids
+        """
+
+        sub_proc = None
+        try:
+            sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
+                             shell=False, stdout=PIPE)
+            lines = sub_proc.stdout.readlines()
+            all_pids = []
+            for line in lines:
+                line = line.strip()
+                if line.find(' ') > 0:
+                    pid = line[:line.find(' ')]
+                    if pid.lower() == 'pid':
+                        continue
+                    pid = int(pid)
+                    line = line[(line.find(' ') + 1):]
+                    if match_process:
+                        if re.search(self.__commandline_matcher, line) is not None:
+                            all_pids.append(pid)
+                    else:
+                        all_pids.append(pid)
+        finally:
+            if sub_proc is not None:
+                sub_proc.wait()
+
+        return all_pids
+
+    def get_active_matched_pids(self, check_poll=True):
+        """
+        Get the active pids that match the commandline match expression.
+        If there is no need to poll, then return the currently monitored pids
+        @:param check_poll: Should check for new matched processes?
+        @:param include_child_processes: Should include child processes of matching processes?
+        @:type check_poll: bool
+        @:type inclyde_child_processes: bool
+        :return: List of running process IDs
+        """
+
+        if check_poll:
+            if not self.should_poll_for_processes():
+                return self.__pids
+
+        matching_pids = self.get_pids_from_ps(['ps', 'ax', '-o', 'pid,command'])
+
+        if self.__include_child_processes:
+            for matching_pid in matching_pids:
+
+                matching_pids.extend(self.get_pids_from_ps(["ps", "--ppid", str(matching_pid)]))
+
+        return matching_pids
+
+    def should_poll_for_processes(self):
+        """
+        We should poll for new processes in the following case:
+
+        * We do not currently have a process that we matched.
+        * This is a single process case, and the old process died.
+        * This is a multi-process case, and at least one process is alive and a certain time has expired.
+        :return: True if there is a need to poll, False otherwise
+        """
+
+        if not self.__pids:
+            # no processes are currently being monitored, poll again
+            return True
+
+        if not self.__aggregate_multiple_processes:
+            # single process case
+            active_matched_pids = self.get_active_matched_pids(check_poll=False)
+            if not active_matched_pids:
+                # no matched processes, try again after sometime
+                return False
+            if active_matched_pids[0] not in self.__pids:
+                # matched process, but not running, old process maybe died
+                return True
+        else:
+            # multi-process case, poll every couple of minutes to see if there are
+            # more processes to match
+
+            if (
+                    not self.LAST_POLLED.get(self.__last_polled_env_key) or
+                    (
+                        datetime.strptime(self.LAST_POLLED.get(self.__last_polled_env_key), self.__datetime_format) +
+                        timedelta(seconds=self.__poll_interval)
+                    ) < datetime.now()
+            ):
+                self.LAST_POLLED[self.__last_polled_env_key] = datetime.now().strftime(self.__datetime_format)
+                return True
+
+        return False
 
     def gather_sample(self):
         """Collect the per-process tracker for the monitored process(es).
@@ -876,12 +1003,14 @@ class ProcessMonitor(ScalyrMonitor):
         self._reset_absolute_metrics()
 
         for _tracker in trackers:
-            _tracker.set_gathers()
             _metrics = _tracker.collect()
             self.record_metrics(_tracker.pid, _metrics)
 
-        running_pids = [x.pid for x in trackers]
-        self._calculate_running_total(running_pids)
+        running_pids = []
+        for _tracker in trackers:
+            running_pids.append(_tracker.pid)
+
+        self._calculate_aggregated_metrics(running_pids)
         self._remove_dead_processes(running_pids)
 
         self.print_metrics()
@@ -889,12 +1018,12 @@ class ProcessMonitor(ScalyrMonitor):
     def print_metrics(self):
         # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
         # Java agent did this and it is important to some dashboards.
-
-        for _metric, _metric_value in self.running_total_metrics.items():
+        for _metric, _metric_value in self.__aggregated_metrics.items():
             extra = {'app': self.__id}
             if _metric.type:
                 extra['type'] = _metric.type
             self._logger.emit_value(_metric.name, _metric_value, extra)
+        print self.__metrics_history.keys()
 
     def __select_processes(self):
         """Returns a set of the process ids of processes that fulfills the match criteria.
@@ -906,39 +1035,32 @@ class ProcessMonitor(ScalyrMonitor):
         @rtype: set()
         """
 
-        sub_proc = None
-
         if self.__commandline_matcher:
-            try:
-                # Spawn a process to run ps and match on the command line.  We only output two
-                # fields from ps.. the pid and command.
-                sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
-                                 shell=False, stdout=PIPE)
-                lines = sub_proc.stdout.readlines()
-                matching_pids = set()
-                for line in lines:
-                    line = line.strip()
-                    if line.find(' ') > 0:
-                        pid = line[:line.find(' ')]
-                        if pid.lower() == 'pid':
-                            continue
-                        pid = int(pid)
-                        line = line[(line.find(' ') + 1):]
-                        if re.search(self.__commandline_matcher, line) is not None:
-                            matching_pids.add(pid)
-                return matching_pids
+            # Spawn a process to run ps and match on the command line.  We only output two
+            # fields from ps.. the pid and command.
 
-            finally:
-                # Be sure to wait on the spawn process.
-                if sub_proc is not None:
-                    sub_proc.wait()
+            self.__pids = self.get_active_matched_pids()
+            if not self.__aggregate_multiple_processes:
+                # old behaviour where multiple processes were not supported for aggregation
+                if len(self.__pids) > 1:
+                    self._logger.warning(
+                        "Multiple processes match the command '%s'.  Returning existing pid. "
+                        "You can turn on the multi process aggregation support by adding the "
+                        "aggregate_multiple_processes configuration to true"
+                        % self.__commandline_matcher, limit_once_per_x_secs=300,
+                        limit_key='linux-process-monitor-existing-pid'
+                    )
+                return {self.__pids[0]}
+
+            # multiple processes are allowed for aggregation
+            return set(self.__pids)
         else:
             # See if the specified target pid is running.  If so, then return it.
             # Special case '$$' to mean this process.
             if self.__target_pids == '$$':
                 pids = {os.getpid()}
             else:
-                pids = self.__target_pids
+                pids = set(self.__target_pids)
             return pids
 
 
