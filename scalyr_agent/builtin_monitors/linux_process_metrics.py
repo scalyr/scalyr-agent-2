@@ -933,7 +933,7 @@ class ProcessMonitor(ScalyrMonitor):
         @:param check_poll: Should check for new matched processes?
         @:param include_child_processes: Should include child processes of matching processes?
         @:type check_poll: bool
-        @:type inclyde_child_processes: bool
+        @:type include_child_processes: bool
         :return: List of running process IDs
         """
 
@@ -1027,7 +1027,6 @@ class ProcessMonitor(ScalyrMonitor):
             extra = {'app': self.__id}
             if _metric.type:
                 extra['type'] = _metric.type
-            print _metric.name, _metric_value, extra
             self._logger.emit_value(_metric.name, _metric_value, extra)
 
     def __select_processes(self):
@@ -1039,6 +1038,8 @@ class ProcessMonitor(ScalyrMonitor):
         @return: The set of process id(s) of the matching process, or set()
         @rtype: set()
         """
+
+        selected_pids = []
 
         if self.__commandline_matcher:
             # Spawn a process to run ps and match on the command line.  We only output two
@@ -1055,18 +1056,23 @@ class ProcessMonitor(ScalyrMonitor):
                         % self.__commandline_matcher, limit_once_per_x_secs=300,
                         limit_key='linux-process-monitor-existing-pid'
                     )
-                return {self.__pids[0]}
-
-            # multiple processes are allowed for aggregation
-            return set(self.__pids)
+                selected_pids.append(self.__pids[0])
+            else:
+                # multiple processes are allowed for aggregation
+                selected_pids = self.__pids
         else:
             # See if the specified target pid is running.  If so, then return it.
             # Special case '$$' to mean this process.
             if self.__target_pids == '$$':
-                pids = {os.getpid()}
+                selected_pids = [os.getpid()]
             else:
-                pids = set(self.__target_pids)
-            return pids
+                selected_pids = self.__target_pids
+
+        # include children processes, if applicable
+        if self.__include_child_processes:
+            for pid in selected_pids:
+                selected_pids.extend(self.get_pids_from_ps(subprocesses=True, ppid=pid))
+        return set(selected_pids)
 
 
 __all__ = [ProcessMonitor]
