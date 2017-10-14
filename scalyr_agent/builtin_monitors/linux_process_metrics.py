@@ -26,16 +26,14 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-
-from subprocess import Popen, PIPE, call
-
-from collections import defaultdict, namedtuple
 import os
 import re
 import time
+from collections import defaultdict, namedtuple
 from datetime import datetime, timedelta
+from subprocess import Popen, PIPE
 
+from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
 __monitor__ = __name__
@@ -825,6 +823,7 @@ class ProcessMonitor(ScalyrMonitor):
         @type metrics: dict
         :return: None
         """
+
         for _metric, _metric_value in metrics.items():
             if not self.__metrics_history[pid].get(_metric):
                 self.__metrics_history[pid][_metric] = []
@@ -974,9 +973,8 @@ class ProcessMonitor(ScalyrMonitor):
                 # matched process, but not running, old process maybe died
                 return True
         else:
-            # multi-process case, poll every couple of minutes to see if there are
-            # more processes to match
-
+            # multi-process case, poll every `poll_interval` seconds to
+            # see if there are more processes to match
             if (
                     not self.LAST_POLLED.get(self.__last_polled_env_key) or
                     (
