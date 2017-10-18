@@ -607,10 +607,10 @@ class SockStatReader(BaseReader):
 
 # Reads stats from /proc/$pid/fd.
 class FileDescriptorReader:
-    """Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
-sub_proc = Popen(cmd, shell=False, stdout=PIPE)
+    """
+    Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
     The recorded metrics are listed below.  They all also have an app=[id] field as well.
-      app.io.fds type=open:         the number of open file descriptors
+    app.io.fds type=open:         the number of open file descriptors
     """
 
     def __init__(self, pid, monitor_id, logger):
