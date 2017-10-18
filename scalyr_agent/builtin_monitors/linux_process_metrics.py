@@ -122,7 +122,7 @@ class Metric(namedtuple('Metric', ['name', 'type'])):
 
         A non-cumulative metric is one where the absolute observed value is reported every time.
 
-        :return:
+        @return: True if the metric is cumulative, False otherwise
         """
         return self.name in ('app.cpu', 'app.uptime', 'app.disk.bytes', 'app.disk.requests')
 
@@ -183,14 +183,14 @@ class BaseReader:
         Runs a single cycle of the sample collection.
 
         It should read the monitored file and extract all metrics.
-        :param collector: Optional - a dictionary to collect the metric values.
+        @param collector: Optional - a dictionary to collect the metric values.
                           The collector has key as Metric, and value as the actual observed scalar.
                           eg: {
                                 ("app.net.bytes", "in"): 12222,
                                 ("app.net.bytes", "out"): 20,
                               }
                           Note: a new collector will be instantiated if None is passed in.
-        :return: None or the optional collector with collected metric values
+        @return: None or the optional collector with collected metric values
         """
 
         self._timestamp = int(time.time())
@@ -608,7 +608,7 @@ class SockStatReader(BaseReader):
 # Reads stats from /proc/$pid/fd.
 class FileDescriptorReader:
     """Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
-
+sub_proc = Popen(cmd, shell=False, stdout=PIPE)
     The recorded metrics are listed below.  They all also have an app=[id] field as well.
       app.io.fds type=open:         the number of open file descriptors
     """
@@ -723,6 +723,79 @@ class ProcessTracker(object):
         return collector
 
 
+class ProcessList(object):
+    """
+    Class that encapsulates the listing of process(es) based on IDs, regular expressions etc.
+    """
+
+    def __init__(self):
+        # list of {'pid': processid, 'ppid': parentprocessid,  'cmd': command }
+        self.processes = []
+        # key -> parent process id, value -> [child process ids...]
+        self.parent_to_children_map = defaultdict(list)
+
+        cmd = ['ps', 'axo', 'pid,ppid,command']
+        sub_proc = Popen(cmd, shell=False, stdout=PIPE)
+        regex = r"\s+(\d+)\s+(\d+)\s+(.*)"
+        lines = sub_proc.stdout.readlines()
+        for line in lines:
+            match = re.search(regex, line)
+            if match:
+                _pid, _ppid, _cmd = match.groups()
+                self.processes.append({'pid': int(_pid), 'ppid': int(_ppid), 'cmd': _cmd})
+
+        self._init_parent_to_child_map()
+
+    def _init_parent_to_child_map(self):
+        for _process in self.processes:
+            self.parent_to_children_map[_process['ppid']].append(_process['pid'])
+
+    def get_matches_commandline(self, match_pattern):
+        """
+        Given a string, match the processes on the name
+        @param match_pattern: process command match pattern
+        @return: List of Process IDs
+        """
+
+        matches = []
+        for _process in self.processes:
+            if re.search(match_pattern, _process['cmd']):
+                matches.append(_process['pid'])
+        return matches
+
+    def get_child_processes(self, ppid):
+        """
+        Given a process pid, get the children pids
+        @param ppid: parent process id
+        @return: list of children process IDs
+        """
+
+        all_children = []
+        children_to_explore = []
+        for _pid in self.parent_to_children_map[ppid]:
+            all_children.append(_pid)
+            children_to_explore.append(_pid)
+
+        # get the children 'recursively'
+        while children_to_explore:  # the invariant
+            child_to_explore = children_to_explore.pop()
+            all_children.extend(self.parent_to_children_map[child_to_explore])
+        return list(set(all_children))
+
+    def get_matches_commandline_with_children(self, match_pattern):
+        """
+        Like get_matches_commandline method, given a string, match the processes on the name
+        but also returns the matched processes' children
+        @param match_pattern: process command match pattern
+        @return: List of Process IDs
+        """
+
+        matched_pids = self.get_matches_commandline(match_pattern)
+        for matched_pid in matched_pids:
+            matched_pids.extend(self.get_child_processes(matched_pid))
+        return list(set(matched_pids))
+
+
 class ProcessMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records metrics about a running process.
 
@@ -748,11 +821,6 @@ class ProcessMonitor(ScalyrMonitor):
     You can run multiple instances of this monitor per agent to monitor different processes.
     """
 
-    # poll interval (in seconds) for matching processes when we are monitoring multiple processes
-    # Needs to be initialized as a class variable, not an instance variable so that it is
-    # alive for all epochs of the monitor.
-    LAST_POLLED = {}
-
     def _initialize(self):
         """Performs monitor-specific initialization."""
         # The ids of the processes being monitored, if one has been matched.
@@ -766,9 +834,14 @@ class ProcessMonitor(ScalyrMonitor):
         self.__include_child_processes = self._config.get(
             'include_child_processes', default=False, convert_to=bool
         )
-
-        self.__poll_interval = self._config.get('poll_interval', default=120, convert_to=int)
+        if not getattr(self, 'last_discovered', False):
+            # poll interval (in seconds) for matching processes when we are monitoring multiple processes
+            # alive for all epochs of the monitor.
+            self.__last_discovered = {}
+        self.__process_discovery_interval = self._config.get('process_discovery_interval', default=120, convert_to=int)
         self.__datetime_format = "%Y-%m-%d %H:%M:%S"
+
+        # this is the key to the dictionary self.__last_discovered which denotes the key to the monitor process
         self.__last_polled_env_key = '%s_linux_process_monitor_last_polled' % self.__id
 
         __target_pids = self._config.get('pid', default=None, convert_to=str)
@@ -783,21 +856,21 @@ class ProcessMonitor(ScalyrMonitor):
                     else:
                         self.__target_pids.append(int(os.getpid()))
 
-        # history of all metrics which has form:
+        # Last 2 values of all metrics which has form:
         # {
         #   '<process id>: {
-        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
         #                 }
 
         #   '<process id>: {
-        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
-        #                 <metric name>: [<metric at time 0>, <metric at time 1>.... ],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
         #                 }
         # }
-
         self.__metrics_history = defaultdict(dict)
-        # running total of metric values
+
+        # running total of metric values, both for cumulative and non-cumulative metrics
         self.__aggregated_metrics = {}
 
         if not (self.__commandline_matcher or self.__target_pids):
@@ -821,7 +894,7 @@ class ProcessMonitor(ScalyrMonitor):
         @param metrics: Collected metrics of the process
         @type pid: int
         @type metrics: dict
-        :return: None
+        @return: None
         """
 
         for _metric, _metric_value in metrics.items():
@@ -868,8 +941,6 @@ class ProcessMonitor(ScalyrMonitor):
                         if len(_metric_values) > 1:
                             # only report the cumulative metrics for more than one sample
                             self.__aggregated_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
-                        else:
-                            self.__aggregated_metrics[_metric] = 0
                 else:
                     if pid in running_pids_set:
                         # absolute metric - accumulate the last reported value
@@ -890,102 +961,28 @@ class ProcessMonitor(ScalyrMonitor):
         if not running_pids:
             self.__aggregated_metrics = {}
 
-    def get_pids_from_ps(self, subprocesses=False, ppid=None):
-        """
-        Get the list of pids running, or get the list of child processes given a parent process id
-        :param subprocesses: Get subprocesses?
-        :param ppid: parent process id, only if subprocesses is True
-        :type subprocesses: bool
-        :type ppid: int
-        :return: list of process ids
-        """
-
-        cmd = ['ps', 'ax', '-o', 'pid,command']
-        if subprocesses:
-            cmd = ["ps", "--ppid", str(ppid), "-o", "pid,command"]
-        sub_proc = Popen(cmd, shell=False, stdout=PIPE)
-        lines = sub_proc.stdout.readlines()
-        all_pids = []
-        try:
-            for line in lines:
-                line = line.strip()
-                if line.find(' ') > 0:
-                    pid = line[:line.find(' ')]
-                    if pid.lower() == 'pid':
-                        continue
-                    pid = int(pid)
-                    line = line[(line.find(' ') + 1):]
-                    if not subprocesses:
-                        if re.search(self.__commandline_matcher, line) is not None:
-                            all_pids.append(pid)
-                    else:
-                        all_pids.append(pid)
-        finally:
-            if sub_proc is not None:
-                sub_proc.wait()
-        return all_pids
-
-    def get_active_matched_pids(self, check_poll=True):
+    def get_active_matched_pids(self):
         """
         Get the active pids that match the commandline match expression.
         If there is no need to poll, then return the currently monitored pids
-        @:param check_poll: Should check for new matched processes?
-        @:param include_child_processes: Should include child processes of matching processes?
-        @:type check_poll: bool
-        @:type include_child_processes: bool
-        :return: List of running process IDs
+        @return: List of running process IDs
         """
 
-        if check_poll:
-            if not self.should_poll_for_processes():
-                return self.__pids
-
-        matching_pids = self.get_pids_from_ps()
-        if self.__include_child_processes:
-            for matching_pid in matching_pids:
-                matching_pids.extend(
-                    self.get_pids_from_ps(subprocesses=True, ppid=matching_pid)
-                )
-        matching_pids = list(set(matching_pids))
-        return matching_pids
-
-    def should_poll_for_processes(self):
-        """
-        We should poll for new processes in the following case:
-
-        * We do not currently have a process that we matched.
-        * This is a single process case, and the old process died.
-        * This is a multi-process case, and at least one process is alive and a certain time has expired.
-        :return: True if there is a need to poll, False otherwise
-        """
-
-        if not self.__pids:
-            # no processes are currently being monitored, poll again
-            return True
-
-        if not self.__aggregate_multiple_processes:
-            # single process case
-            active_matched_pids = self.get_active_matched_pids(check_poll=False)
-            if not active_matched_pids:
-                # no matched processes, try again after sometime
-                return False
-            if active_matched_pids[0] not in self.__pids:
-                # matched process, but not running, old process maybe died
-                return True
-        else:
+        if self.__aggregate_multiple_processes and self.__last_discovered.get(self.__last_polled_env_key):
             # multi-process case, poll every `poll_interval` seconds to
             # see if there are more processes to match
-            if (
-                    not self.LAST_POLLED.get(self.__last_polled_env_key) or
-                    (
-                        datetime.strptime(self.LAST_POLLED.get(self.__last_polled_env_key), self.__datetime_format) +
-                        timedelta(seconds=self.__poll_interval)
-                    ) < datetime.now()
-            ):
-                self.LAST_POLLED[self.__last_polled_env_key] = datetime.now().strftime(self.__datetime_format)
-                return True
+            _last_time_checked =  datetime.strptime(
+                self.__last_discovered.get(self.__last_polled_env_key), self.__datetime_format
+            )
+            if _last_time_checked + timedelta(seconds=self.__process_discovery_interval) > datetime.now():
+                return self.__pids
 
-        return False
+        # get the processes that matched
+        ps = ProcessList()
+        self.__last_discovered[self.__last_polled_env_key] = datetime.now().strftime(self.__datetime_format)
+        if self.__include_child_processes:
+            return ps.get_matches_commandline_with_children(self.__commandline_matcher)
+        return ps.get_matches_commandline(self.__commandline_matcher)
 
     def gather_sample(self):
         """Collect the per-process tracker for the monitored process(es).
@@ -1065,11 +1062,6 @@ class ProcessMonitor(ScalyrMonitor):
                 selected_pids = [os.getpid()]
             else:
                 selected_pids = self.__target_pids
-
-        # include children processes, if applicable
-        if self.__include_child_processes:
-            for pid in selected_pids:
-                selected_pids.extend(self.get_pids_from_ps(subprocesses=True, ppid=pid))
         return set(selected_pids)
 
 

@@ -18,7 +18,7 @@
 __author__ = 'saurabh@scalyr.com'
 
 from collections import defaultdict
-from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor, Metric
+from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor, Metric, ProcessList
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -122,6 +122,84 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
         }
         self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {})
+
+
+class TestProcessListUtility(ScalyrTestCase):
+    def setUp(self):
+        self.ps = ProcessList()
+
+    def test_no_process(self):
+        # override
+        self.ps.parent_to_children_map = defaultdict(list)
+        self.ps.processes = []
+        
+        self.assertEqual(self.ps.get_child_processes('bad pid'), [])
+        self.assertEqual(self.ps.get_matches_commandline('.*'), [])
+        self.assertEqual(self.ps.get_matches_commandline_with_children('.*'), [])
+
+    def test_single_process_no_children(self):
+        # override
+        # process id 0 is basically no process. PID 1 is the main process of a terminal
+        self.ps.processes = [
+            {'pid': 2, 'ppid': 1, 'cmd': 'python hello.py'},
+            {'pid': 1, 'ppid': 0, 'cmd': '/bin/bash'}
+        ]
+        self.ps.parent_to_children_map = defaultdict(list)
+        self.ps.parent_to_children_map[1] = [2]
+        self.ps.parent_to_children_map[0] = [1]
+
+        self.assertEqual(self.ps.get_child_processes('bad pid'), [])
+        self.assertEqual(self.ps.get_child_processes(1), [2])
+        # positive match
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2})
+        self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
+        self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2})
+
+    def test_single_process_with_children(self):
+        # override
+        # process id 0 is basically no process. PID 1 is the main process of a terminal
+        self.ps.processes = [
+            {'pid': 2, 'ppid': 1, 'cmd': 'python hello.py'},
+            {'pid': 3, 'ppid': 2, 'cmd': 'sleep 2'},
+            {'pid': 1, 'ppid': 0, 'cmd': '/bin/bash'}
+        ]
+        self.ps.parent_to_children_map = defaultdict(list)
+        self.ps.parent_to_children_map[1] = [2]
+        self.ps.parent_to_children_map[2] = [3]
+        self.ps.parent_to_children_map[0] = [1]
+
+        self.assertEqual(self.ps.get_child_processes('bad pid'), [])
+        self.assertEqual(set(self.ps.get_child_processes(1)), {2, 3})
+        self.assertEqual(self.ps.get_child_processes(2), [3])
+        # positive match
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2, 3})
+        self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
+        self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2, 3})
+
+    def test_multiple_processes_with_children(self):
+        # override
+        # process id 0 is basically no process. PID 1 is the main process of a terminal
+        self.ps.processes = [
+            {'pid': 2, 'ppid': 1, 'cmd': 'python hello.py'},
+            {'pid': 3, 'ppid': 2, 'cmd': 'sleep 2'},
+            {'pid': 1, 'ppid': 0, 'cmd': '/bin/bash'},
+            {'pid': 4, 'ppid': 0, 'cmd': 'sleep 10000'}
+        ]
+        self.ps.parent_to_children_map = defaultdict(list)
+        self.ps.parent_to_children_map[1] = [2]
+        self.ps.parent_to_children_map[2] = [3]
+        self.ps.parent_to_children_map[0] = [1, 4]
+
+        self.assertEqual(self.ps.get_child_processes('bad pid'), [])
+        self.assertEqual(set(self.ps.get_child_processes(1)), {2, 3})
+        self.assertEqual(self.ps.get_child_processes(2), [3])
+        # positive match
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2, 3, 4})
+        self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
+        self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2, 3, 4})
 
 
 class TestProcessMonitorRunningTotal(ScalyrTestCase):
