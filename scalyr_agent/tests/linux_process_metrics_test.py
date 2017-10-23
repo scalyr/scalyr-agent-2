@@ -224,7 +224,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
             metric: 21
         }
         self.monitor.record_metrics(555, metrics)
-        self.monitor._calculate_aggregated_metrics([555])
+        self.monitor._ProcessMonitor__running_pids = [555]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             555: {metric: [21]}
         }
@@ -237,7 +238,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         # epoch 1
         metrics = {metric: 21}
         self.monitor.record_metrics(555, metrics)
-        self.monitor._calculate_aggregated_metrics([555])
+        self.monitor._ProcessMonitor__running_pids = [555]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {555: {metric: [21]}}
         self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {metric: 21})
@@ -248,7 +250,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
 
         metrics = {metric: 21.5}
         self.monitor.record_metrics(555, metrics)
-        self.monitor._calculate_aggregated_metrics([555])
+        self.monitor._ProcessMonitor__running_pids = [555]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {555: {metric: [21, 21.5]}}
         self.assertEqual(self.monitor._ProcessMonitor__metrics_history, expected_history)
         self.assertEqual(self.monitor._ProcessMonitor__aggregated_metrics, {metric: 21.5})
@@ -262,8 +265,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric2: 100.0}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [21]},
             2: {metric2: [100.0]}
@@ -284,8 +287,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric2: 100.11}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [21, 21.11]},
             2: {metric2: [100.0, 100.11]}
@@ -307,8 +310,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 40}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [20]},
             2: {metric1: [40]}
@@ -328,8 +331,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 44}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [20, 22]},
             2: {metric1: [40, 44]}
@@ -349,7 +352,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 48}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         # we only keep the last 2 historical values
         expected_history = {
             1: {metric1: [22, 25]},
@@ -376,8 +380,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 100.0}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [21]},
             2: {metric1: [100.0]}
@@ -397,8 +401,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 100.2}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [21, 30.1]},
             2: {metric1: [100.0, 100.2]}
@@ -420,7 +424,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         self.monitor.record_metrics(2, metrics2)
 
         # Process 1 dies.. boom
-        self.monitor._calculate_aggregated_metrics([2])
+        self.monitor._ProcessMonitor__running_pids = [2]
+        self.monitor._calculate_aggregated_metrics()
 
         # we only keep the last 2 historical values
         expected_history = {
@@ -449,8 +454,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 40}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1,2 ]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [20]},
             2: {metric1: [40]}
@@ -470,8 +475,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
         metrics2 = {metric1: 46}
         self.monitor.record_metrics(1, metrics1)
         self.monitor.record_metrics(2, metrics2)
-
-        self.monitor._calculate_aggregated_metrics([1, 2])
+        self.monitor._ProcessMonitor__running_pids = [1, 2]
+        self.monitor._calculate_aggregated_metrics()
         expected_history = {
             1: {metric1: [20, 25]},
             2: {metric1: [40, 46]}
@@ -494,7 +499,8 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
 
         # Process 1 and 2 die.. boom
         # we should ensure the total running value for metric doesn't go down.
-        self.monitor._calculate_aggregated_metrics([])
+        self.monitor._ProcessMonitor__running_pids = []
+        self.monitor._calculate_aggregated_metrics()
 
         # we only keep the last 2 historical values
         expected_history = {
