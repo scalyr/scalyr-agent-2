@@ -688,24 +688,6 @@ class ProcessTracker(object):
         #        NetStatReader(self.pid, self.id, self._logger)
         #        SockStatReader(self.pid, self.id, self._logger)
 
-    def __is_running(self):
-        """Returns true if the current process is still running.
-
-        @return:  True if the monitored process is still running.
-        @rtype: bool
-        """
-        try:
-            # signal flag 0 does not actually try to kill the process but does an error
-            # check that is useful to see if a process is still running.
-            os.kill(self.pid, 0)
-            return True
-        except OSError, e:
-            # Errno #3 corresponds to the process not running.  We could get
-            # other errors like this process does not have permission to send
-            # a signal to self.pid.  But, if that error is returned to us, we
-            # know the process is running at least, so we ignore the error.
-            return e.errno != 3
-
     def collect(self):
         """
         Collects the metrics from the gathers
@@ -738,7 +720,7 @@ class ProcessList(object):
         sub_proc = Popen(cmd, shell=False, stdout=PIPE)
         # regex intended to capture pid, ppid and the command eg:
         # 593     0 /bin/bash
-        regex = r"\s+(\d+)\s+(\d+)\s+(.*)"
+        regex = r"\s*(\d+)\s+(\d+)\s+(.*)"
         lines = sub_proc.stdout.readlines()
         for line in lines:
             match = re.search(regex, line)
@@ -765,6 +747,12 @@ class ProcessList(object):
         return matches
 
     def get_child_processes(self, ppid):
+        """
+        Given a process id, return all children processes (recursively)
+        :param ppid: parent process id
+        :return: list of all children process ids
+        """
+
         all_children = []
         children_to_explore = set()
         for _pid in self.parent_to_children_map[ppid]:
@@ -781,6 +769,16 @@ class ProcessList(object):
                 children_to_explore.add(node)
                 all_children.append(node)
         return list(set(all_children))
+
+    def get_running_processes(self):
+        """
+        Returns a list of all running process ids
+        """
+
+        all_processes = []
+        for _process in self.processes:
+            all_processes.append(_process['pid'])
+        return all_processes
 
     def get_matches_commandline_with_children(self, match_pattern):
         """
@@ -824,7 +822,7 @@ class ProcessMonitor(ScalyrMonitor):
     def _initialize(self):
         """Performs monitor-specific initialization."""
         # The ids of the processes being monitored, if one has been matched.
-        self.__pids = None
+        self.__pids = []
 
         self.__id = self._config.get('id', required_field=True, convert_to=str)
         self.__commandline_matcher = self._config.get('commandline', default=None, convert_to=str)
@@ -835,7 +833,7 @@ class ProcessMonitor(ScalyrMonitor):
             'include_child_processes', default=False, convert_to=bool
         )
 
-        self.__trackers = []
+        self.__trackers = {}  # key -> process id, value -> ProcessTracker object
         if not getattr(self, 'last_discovered', None):
             # poll interval (in seconds) for matching processes when we are monitoring multiple processes
             # alive for all epochs of the monitor.
@@ -844,6 +842,8 @@ class ProcessMonitor(ScalyrMonitor):
 
         __target_pids = self._config.get('pid', default=None, convert_to=str)
         self.__target_pids = []
+
+        self.__running_pids = []  # list of all process ids that are currently running
 
         # convert target pid into a list. Target pids can be a single pid or a CSV of pids
         if __target_pids:
@@ -915,12 +915,10 @@ class ProcessMonitor(ScalyrMonitor):
                 if not _metric.is_cumulative:
                     self.__aggregated_metrics[_metric] = 0
 
-    def _calculate_aggregated_metrics(self, running_pids):
+    def _calculate_aggregated_metrics(self):
         """
         Calculates the aggregated metric values based on the current running processes
         and the historical metric record
-        @param running_pids: list of running process ids
-        @type running_pids: list
         """
 
         # using the historical values, calculate the aggregate
@@ -928,7 +926,7 @@ class ProcessMonitor(ScalyrMonitor):
         # a) cumulative metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
         # b) absolute metrics - the last absolute value is used
 
-        running_pids_set = set(running_pids)
+        running_pids_set = set(self.__running_pids)
 
         for pid, process_metrics in self.__metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
@@ -944,40 +942,23 @@ class ProcessMonitor(ScalyrMonitor):
                         # absolute metric - accumulate the last reported value
                         self.__aggregated_metrics[_metric] += _metric_values[-1]
 
-    def _remove_dead_processes(self, running_pids):
+    def _remove_dead_processes(self):
         # once the _calculate_aggregated_metrics has calculated the running total of the
         # metrics for the current epoch, remove the entries for the process id in the history
         # NOTE: the removal of the contributions (if applicable) should already be done so
         # removing the entry from the history is safe.
 
         all_pids = self.__metrics_history.keys()
-        for _pid_to_remove in list(set(all_pids) - set(running_pids)):
+        for _pid_to_remove in list(set(all_pids) - set(self.__running_pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
             del self.__metrics_history[_pid_to_remove]
+            # remove it from the tracker
+            if _pid_to_remove in self.__trackers:
+                del self.__trackers[_pid_to_remove]
 
         # if no processes are running, there is no reason to report the running metric data
-        if not running_pids:
+        if not self.__running_pids:
             self.__aggregated_metrics = {}
-
-    def get_active_matched_pids(self):
-        """
-        Get the active pids that match the commandline match expression.
-        If there is no need to poll, then return the currently monitored pids
-        @return: List of running monitored process IDs
-        """
-
-        if self.__aggregate_multiple_processes and self.__last_discovered:
-            # multi-process case, poll every `poll_interval` seconds to
-            # see if there are more processes to match
-            if time.time() * 1000 - self.__last_discovered < self.__process_discovery_interval * 1000:
-                return self.__pids
-
-        # get the processes that matched
-        ps = ProcessList()
-        self.__last_discovered = time.time() * 1000
-        if self.__include_child_processes:
-            return ps.get_matches_commandline_with_children(self.__commandline_matcher)
-        return ps.get_matches_commandline(self.__commandline_matcher)
 
     def gather_sample(self):
         """Collect the per-process tracker for the monitored process(es).
@@ -991,22 +972,18 @@ class ProcessMonitor(ScalyrMonitor):
         and we should keep polling for it.
         """
 
-        if not self.__trackers:
-            for _pid in list(self.__select_processes()):
-                self.__trackers.append(ProcessTracker(_pid, self._logger, self.__id))
+        for _pid in self.__select_processes():
+            if not self.__trackers.get(_pid):
+                self.__trackers[_pid] = ProcessTracker(_pid, self._logger, self.__id)
 
         self._reset_absolute_metrics()
 
-        for _tracker in self.__trackers:
+        for _tracker in self.__trackers.values():
             _metrics = _tracker.collect()
             self.record_metrics(_tracker.pid, _metrics)
 
-        running_pids = []
-        for _tracker in self.__trackers:
-            running_pids.append(_tracker.pid)
-
-        self._calculate_aggregated_metrics(running_pids)
-        self._remove_dead_processes(running_pids)
+        self._calculate_aggregated_metrics()
+        self._remove_dead_processes()
 
         self.print_metrics()
 
@@ -1019,45 +996,82 @@ class ProcessMonitor(ScalyrMonitor):
                 extra['type'] = _metric.type
             self._logger.emit_value(_metric.name, _metric_value, extra)
 
+    @staticmethod
+    def __is_running(pid):
+        """Returns true if the current process is still running.
+
+        @return:  True if the monitored process is still running.
+        @rtype: bool
+        """
+        try:
+            # signal flag 0 does not actually try to kill the process but does an error
+            # check that is useful to see if a process is still running.
+            os.kill(pid, 0)
+            return True
+        except OSError, e:
+            # Errno #3 corresponds to the process not running.  We could get
+            # other errors like this process does not have permission to send
+            # a signal to self.pid.  But, if that error is returned to us, we
+            # know the process is running at least, so we ignore the error.
+            return e.errno != 3
+
     def __select_processes(self):
-        """Returns a set of the process ids of processes that fulfills the match criteria.
+        """Returns a list of the process ids of processes that fulfills the match criteria.
 
         This will either use the commandline matcher or the target pid to find the process.
         If no process is matched, an empty list is returned.
 
-        @return: The set of process id(s) of the matching process, or set()
-        @rtype: set()
+        @return: The list of process id(s) of the matching process, or set()
+        @rtype: list
         """
 
-        selected_pids = []
+        # check if at least one process is running
+        is_running = False
+        for pid in self.__pids:
+            if ProcessMonitor.__is_running(pid):
+                is_running = True
+                break  # at least one process is running
+
+        if is_running:
+            if not self.__aggregate_multiple_processes:
+                return self.__pids
+
+            # aggregate metrics, check the last discovered time
+            if (
+                self.__last_discovered and
+                time.time() * 1000 - self.__last_discovered < self.__process_discovery_interval * 1000
+            ):
+                return self.__pids
+
+        ps = ProcessList()
+        self.__running_pids = ps.get_running_processes()
 
         if self.__commandline_matcher:
-            # Spawn a process to run ps and match on the command line.  We only output two
-            # fields from ps.. the pid and command.
-
-            self.__pids = self.get_active_matched_pids()
-            if not self.__aggregate_multiple_processes:
-                # old behaviour where multiple processes were not supported for aggregation
-                if len(self.__pids) > 1:
-                    self._logger.warning(
-                        "Multiple processes match the command '%s'.  Returning existing pid. "
-                        "You can turn on the multi process aggregation support by adding the "
-                        "aggregate_multiple_processes configuration to true"
-                        % self.__commandline_matcher, limit_once_per_x_secs=300,
-                        limit_key='linux-process-monitor-existing-pid'
-                    )
-                selected_pids.append(self.__pids[0])
+            self.__last_discovered = time.time() * 1000
+            if self.__include_child_processes:
+                matched_processes = ps.get_matches_commandline_with_children(self.__commandline_matcher)
             else:
-                # multiple processes are allowed for aggregation
-                selected_pids = self.__pids
+                matched_processes = ps.get_matches_commandline(self.__commandline_matcher)
+            self.__pids = matched_processes
+
+            if not self.__aggregate_multiple_processes and len(self.__pids) > 1:
+                # old behaviour where multiple processes were not supported for aggregation
+                self._logger.warning(
+                    "Multiple processes match the command '%s'.  Returning existing pid. "
+                    "You can turn on the multi process aggregation support by adding the "
+                    "aggregate_multiple_processes configuration to true"
+                    % self.__commandline_matcher, limit_once_per_x_secs=300,
+                    limit_key='linux-process-monitor-existing-pid'
+                )
+                self.__pids = [self.__pids[0]]
         else:
             # See if the specified target pid is running.  If so, then return it.
             # Special case '$$' to mean this process.
             if self.__target_pids == '$$':
-                selected_pids = [os.getpid()]
+                self.__pids = [os.getpid()]
             else:
-                selected_pids = self.__target_pids
-        return set(selected_pids)
+                self.__pids = self.__target_pids
+        return self.__pids
 
 
 __all__ = [ProcessMonitor]
