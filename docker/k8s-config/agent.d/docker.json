@@ -1,0 +1,9 @@
+{
+  "monitors":[
+    {
+      "module": "scalyr_agent.builtin_monitors.docker_monitor",
+      "docker_raw_logs": true
+    }
+  ]
+}
+

@@ -103,6 +103,12 @@ define_config_option( __monitor__, 'log_mode',
                      'legacy behavior.\n',
                      convert_to=str, default="docker_api")
 
+define_config_option( __monitor__, 'docker_raw_logs',
+                     'Optional (defaults to False). If True, the docker monitor will use the raw log files on disk to read logs.'
+                     'If false, the logs will be streamed over the Docker API.',
+                     convert_to=bool,
+                     default=False)
+
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
                      'about running containers.\n',
@@ -254,7 +260,7 @@ def _split_datetime_from_line( line ):
     return (dt, log_line)
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, glob_list=None):
+                    only_running_containers=True, glob_list=None, include_log_path=False):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -283,10 +289,18 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                             break;
 
                 if add_container:
-                    result[cid] = {'name': name}
+                    log_path = None
+                    if include_log_path:
+                        try:
+                            info = client.inspect_container( cid )
+                            log_path = info['LogPath'] if 'LogPath' in info else None
+                        except Exception, e:
+                          logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
+
+                    result[cid] = {'name': name, 'log_path': log_path }
 
             else:
-                result[cid] = {'name': cid}
+                result[cid] = {'name': cid, 'log_path': None}
 
     except Exception, e:  # container querying failed
         logger.error("Error querying running containers", limit_once_per_x_secs=300,
@@ -304,6 +318,8 @@ class ContainerChecker( StoppableThread ):
 
         self._config = config
         self._logger = logger
+
+        self._use_raw_logs = config.get('docker_raw_logs')
 
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
@@ -334,7 +350,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list)
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -342,6 +358,7 @@ class ContainerChecker( StoppableThread ):
 
         self.docker_logs = self.__get_docker_logs( self.containers )
         self.docker_loggers = []
+        self.raw_logs = []
 
         #create and start the DockerLoggers
         self.__start_docker_logs( self.docker_logs )
@@ -352,13 +369,23 @@ class ContainerChecker( StoppableThread ):
         self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
         #stop the DockerLoggers
-        for logger in self.docker_loggers:
-            if self.__log_watcher:
-                self.__log_watcher.remove_log_path( self.__module, logger.log_path )
-            logger.stop( wait_on_join, join_timeout )
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
+        if self._use_raw_logs:
+            for logger in self.raw_logs:
+                path = logger['log_config']['path']
+                if self.__log_watcher:
+                    self.__log_watcher.remove_log_path( self.__module, path )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
+        else:
+            for logger in self.docker_loggers:
+                if self.__log_watcher:
+                    self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+                logger.stop( wait_on_join, join_timeout )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
 
         self.__update_checkpoints()
+
+        self.docker_loggers = []
+        self.raw_logs = []
 
     def check_containers( self, run_state ):
 
@@ -366,7 +393,7 @@ class ContainerChecker( StoppableThread ):
             self.__update_checkpoints()
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers')
-            running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list)
+            running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs)
 
             # if running_containers is None, that means querying the docker api failed.
             # rather than resetting the list of running containers to empty
@@ -456,6 +483,9 @@ class ContainerChecker( StoppableThread ):
         to file.
         """
 
+        if self._use_raw_logs:
+            return
+
         for logger in self.docker_loggers:
             last_request = logger.last_request()
             self.__checkpoints[logger.stream_name] = last_request
@@ -484,13 +514,23 @@ class ContainerChecker( StoppableThread ):
         """
         if stopping:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Stopping all docker loggers')
-            for logger in self.docker_loggers:
-                if logger.cid in stopping:
-                    logger.stop( wait_on_join=True, join_timeout=1 )
-                    if self.__log_watcher:
-                        self.__log_watcher.remove_log_path( self.__module, logger.log_path )
 
-            self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
+            if self._use_raw_logs:
+                for logger in self.raw_logs:
+                    path = logger['log_config']['path']
+                    if self.__log_watcher:
+                        self.__log_watcher.remove_log_path( self.__module, path )
+
+                self.raw_logs[:] = [l for l in self.raw_logs if l.cid not in stopping]
+            else:
+                for logger in self.docker_loggers:
+                    if logger.cid in stopping:
+                        logger.stop( wait_on_join=True, join_timeout=1 )
+                        if self.__log_watcher:
+                            self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+
+                self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
+
             self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
 
     def __start_loggers( self, starting ):
@@ -506,10 +546,14 @@ class ContainerChecker( StoppableThread ):
 
     def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
-            last_request = self.__get_last_request_for_log( log['log_config']['path'] )
             if self.__log_watcher:
                 log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
-            self.docker_loggers.append( self.__create_docker_logger( log, last_request ) )
+
+            if self._use_raw_logs:
+                self.raw_logs.append( log )
+            else:
+                last_request = self.__get_last_request_for_log( log['log_config']['path'] )
+                self.docker_loggers.append( self.__create_docker_logger( log, last_request ) )
 
     def __get_last_request_for_log( self, path ):
         result = datetime.datetime.fromtimestamp( self.__start_time )
@@ -543,11 +587,12 @@ class ContainerChecker( StoppableThread ):
 
         return scalyr_util.seconds_since_epoch( result )
 
-    def __create_log_config( self, parser, path, attributes ):
+    def __create_log_config( self, parser, path, attributes, parse_as_json=False ):
         """Convenience function to create a log_config dict from the parameters"""
 
         return { 'parser': parser,
                  'path': path,
+                 'parse_lines_as_json' : parse_as_json,
                  'attributes': attributes
                }
 
@@ -574,13 +619,19 @@ class ContainerChecker( StoppableThread ):
             container_attributes = attributes.copy()
             container_attributes['containerName'] = info['name']
             container_attributes['containerId'] = cid
-            path =  prefix + info['name'] + '-stdout.log'
-            log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=container_attributes )
-            result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
-            path = prefix + info['name'] + '-stderr.log'
-            log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes.copy() )
-            result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
+            if self._use_raw_logs and 'log_path' in info and info['log_path']:
+                log_config = self.__create_log_config( parser='docker', path=info['log_path'], attributes=container_attributes, parse_as_json=True )
+                log_config['rename_logfile'] = '/docker/%s.log' % info['name']
+                result.append( { 'cid': cid, 'stream': 'raw', 'log_config': log_config } )
+            else:
+                path =  prefix + info['name'] + '-stdout.log'
+                log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=container_attributes )
+                result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
+
+                path = prefix + info['name'] + '-stderr.log'
+                log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes.copy() )
+                result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
 
         return result
 
