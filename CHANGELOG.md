@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.30 "" - Oct 25, 2017
+## 2.0.30 "Ewok" - Oct 25, 2017
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 25, 2017 13:45 -0700
