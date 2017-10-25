@@ -83,6 +83,7 @@ class RunPlatformTests(unittest.TestCase):
             )
 
     @classmethod
+    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def tearDownClass(cls):
         call(["docker", "stop", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])
         call(["docker", "rm", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])

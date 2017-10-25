@@ -9,6 +9,7 @@ __pycache__/
 env/
 bin/
 build/
+cover/
 develop-eggs/
 dist/
 eggs/
@@ -53,7 +54,7 @@ coverage.xml
 
 # PyCharm
 *.idea
-
+xunit.xml
 # Sphinx documentation
 docs/_build/
 

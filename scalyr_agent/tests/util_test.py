@@ -94,7 +94,7 @@ class TestUtil(ScalyrTestCase):
         expected = None
         actual = scalyr_util.rfc3339_to_datetime( s )
         self.assertEquals( expected, actual )
-        
+
     def test_rfc3339_to_datetime_bad_format_has_timezone( self ):
         # currently this function only handles UTC.  Remove this test if
         # updated to be more flexible
@@ -138,7 +138,7 @@ class TestUtil(ScalyrTestCase):
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2017, 9, 20, 20, 44, 00, 123456 ) )
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
         self.assertEquals( expected, actual )
-        
+
     def test_uuid(self):
         first = scalyr_util.create_unique_id()
         second = scalyr_util.create_unique_id()
@@ -273,21 +273,21 @@ class TestStoppableThread(ScalyrTestCase):
 
 class TestScriptEscalator(ScalyrTestCase):
     def test_is_user_change_required(self):
-        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'steve')
+        (test_instance, controller) = self.create_instance('czerwin', 'fileA', 'steve')
         self.assertTrue(test_instance.is_user_change_required())
 
-        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'czerwin')
+        (test_instance, controller) = self.create_instance('czerwin', 'fileA', 'czerwin')
         self.assertFalse(test_instance.is_user_change_required())
 
     def test_change_user_and_rerun_script(self):
-        (test_instance, controller) = self.create_test_instance('czerwin', 'fileA', 'steve')
+        (test_instance, controller) = self.create_instance('czerwin', 'fileA', 'steve')
         self.assertEquals(test_instance.change_user_and_rerun_script('random'), 0)
 
         self.assertEquals(controller.call_count, 1)
         self.assertEquals(controller.last_call['user'], 'steve')
         self.assertIsNotNone(controller.last_call['script_file'])
 
-    def create_test_instance(self, current_user, config_file, config_owner):
+    def create_instance(self, current_user, config_file, config_owner):
         controller = TestScriptEscalator.ControllerMock(current_user, config_file, config_owner)
         # noinspection PyTypeChecker
         return ScriptEscalator(controller, config_file, os.getcwd() ), controller

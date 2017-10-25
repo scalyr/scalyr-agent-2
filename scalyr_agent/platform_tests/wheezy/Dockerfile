@@ -7,7 +7,7 @@ WORKDIR /tmp
 
 RUN git init && \
   git config --local user.name "Scalyr" && git config --local user.email support@scalyr.com && \
-  git clone -b release git://github.com/scalyr/scalyr-agent-2.git
+  git clone -b master git://github.com/scalyr/scalyr-agent-2.git
 
 RUN pip install mock==2.0.0
 RUN chmod -R +x scalyr-agent-2

@@ -206,8 +206,6 @@ class ScalyrLoggingTest(ScalyrTestCase):
         )
         self.__logger = scalyr_logging.getLogger('scalyr_agent.agent_main')
 
-        string_300 = ''
-
         string_300 = 'a' * 300
 
         self.__logger.info('First message')
