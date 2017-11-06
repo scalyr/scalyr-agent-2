@@ -749,8 +749,8 @@ class ProcessList(object):
     def get_child_processes(self, ppid):
         """
         Given a process id, return all children processes (recursively)
-        :param ppid: parent process id
-        :return: list of all children process ids
+        @param ppid: parent process id
+        @return: list of all children process ids
         """
 
         all_children = []
@@ -766,8 +766,9 @@ class ProcessList(object):
                 continue
             unvisited = self.parent_to_children_map[child_to_explore]
             for node in unvisited:
-                children_to_explore.add(node)
-                all_children.append(node)
+                if node not in all_children:
+                    children_to_explore.add(node)
+                    all_children.append(node)
         return list(set(all_children))
 
     def get_running_processes(self):
@@ -834,16 +835,15 @@ class ProcessMonitor(ScalyrMonitor):
         )
 
         self.__trackers = {}  # key -> process id, value -> ProcessTracker object
-        if not getattr(self, 'last_discovered', None):
-            # poll interval (in seconds) for matching processes when we are monitoring multiple processes
-            # alive for all epochs of the monitor.
-            self.__last_discovered = None
+
+        # poll interval (in seconds) for matching processes when we are monitoring multiple processes
+        # alive for all epochs of the monitor.
+        self.__last_discovered = None
+
         self.__process_discovery_interval = self._config.get('process_discovery_interval', default=120, convert_to=int)
 
         __target_pids = self._config.get('pid', default=None, convert_to=str)
         self.__target_pids = []
-
-        self.__running_pids = []  # list of all process ids that are currently running
 
         # convert target pid into a list. Target pids can be a single pid or a CSV of pids
         if __target_pids:
@@ -926,7 +926,7 @@ class ProcessMonitor(ScalyrMonitor):
         # a) cumulative metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
         # b) absolute metrics - the last absolute value is used
 
-        running_pids_set = set(self.__running_pids)
+        running_pids_set = set(self.__pids)
 
         for pid, process_metrics in self.__metrics_history.items():
             for _metric, _metric_values in process_metrics.items():
@@ -949,7 +949,7 @@ class ProcessMonitor(ScalyrMonitor):
         # removing the entry from the history is safe.
 
         all_pids = self.__metrics_history.keys()
-        for _pid_to_remove in list(set(all_pids) - set(self.__running_pids)):
+        for _pid_to_remove in list(set(all_pids) - set(self.__pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
             del self.__metrics_history[_pid_to_remove]
             # remove it from the tracker
@@ -957,7 +957,7 @@ class ProcessMonitor(ScalyrMonitor):
                 del self.__trackers[_pid_to_remove]
 
         # if no processes are running, there is no reason to report the running metric data
-        if not self.__running_pids:
+        if not self.__pids:
             self.__aggregated_metrics = {}
 
     def gather_sample(self):
@@ -1044,8 +1044,6 @@ class ProcessMonitor(ScalyrMonitor):
                 return self.__pids
 
         ps = ProcessList()
-        self.__running_pids = ps.get_running_processes()
-
         if self.__commandline_matcher:
             self.__last_discovered = time.time() * 1000
             if self.__include_child_processes:
