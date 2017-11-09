@@ -368,8 +368,6 @@ class ScalyrAgent(object):
             finally:
                 client.close()
 
-            print "Server connection verified."
-
     def __start(self, quiet, no_fork, no_check_remote):
         """Executes the start command.
 
@@ -415,7 +413,10 @@ class ScalyrAgent(object):
             self.__fail_if_already_running()
 
             if not quiet:
-                print "Starting agent in background."
+                if no_check_remote:
+                    print "Configuration verified, starting agent in background."
+                else:
+                    print "Configuration and server connection verified, starting agent in background."
             self.__controller.start_agent_service(self.__run, quiet, fork=True)
         else:
             self.__controller.start_agent_service(self.__run, quiet, fork=False)
@@ -850,8 +851,6 @@ class ScalyrAgent(object):
 
         if not os.access(config.agent_data_path, os.W_OK):
             raise Exception('User cannot write to agent data directory \'%s\'.' % config.agent_data_path)
-
-        print "Configuration verified."
 
     def __start_or_stop_unsafe_debugging(self):
         """Starts or stops the debugging tool.
