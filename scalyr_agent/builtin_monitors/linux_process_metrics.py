@@ -26,14 +26,14 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
-
-from subprocess import Popen, PIPE
-
 import os
 import re
 import time
+from collections import defaultdict, namedtuple
+from datetime import datetime, timedelta
+from subprocess import Popen, PIPE
 
+from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
 __monitor__ = __name__
@@ -105,9 +105,32 @@ define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.
 define_log_field(__monitor__, 'value', 'The metric value.')
 
 
+class Metric(namedtuple('Metric', ['name', 'type'])):
+    """
+    This class is an abstraction for a linux metric that contains the
+    metric name eg. CPU and type eg. system/user etc. A combination of the
+    two make the metric unique.
+    """
+
+    __slots__ = ()
+
+    @property
+    def is_cumulative(self):
+        """
+        A cumulative metric is one that needs a prior value to calculate the next value.
+        i.e. only the deltas for the current observed values are reported.
+
+        A non-cumulative metric is one where the absolute observed value is reported every time.
+
+        @return: True if the metric is cumulative, False otherwise
+        """
+        return self.name in ('app.cpu', 'app.uptime', 'app.disk.bytes', 'app.disk.requests')
+
+
 class MetricPrinter:
     """Helper class that emits metrics for the specified monitor.
     """
+
     def __init__(self, logger, monitor_id):
         """Initializes the class.
 
@@ -119,29 +142,6 @@ class MetricPrinter:
         self.__logger = logger
         self.__id = monitor_id
 
-    def print_sample(self, metric_name, metric_value, type_value=None):
-        """Record the specified metric.
-
-        @param metric_name: The name of the metric.  It should only contain alphanumeric characters,
-            periods, underscores.
-        @param metric_value: The value of the metric.
-        @param type_value: The type of the value.  This is emitted as an extra field for the metric.
-            This is often used to label different types of some resource, such as CPU (user CPU vs. system CPU), etc.
-
-        @type metric_name: str
-        @type metric_value: float
-        @type type_value: str
-        """
-        # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
-        # Java agent did this and it is important to some dashboards.
-        extra = {
-            'app': self.__id,
-            }
-        if type_value is not None:
-            extra['type'] = type_value
-
-        self.__logger.emit_value(metric_name, metric_value, extra)
-
 
 class BaseReader:
     """The base class for all readers.  Each derived reader class is responsible for
@@ -150,6 +150,7 @@ class BaseReader:
     that is being monitored.  This instance is created once and then used from
     then on until the monitored process terminates.
     """
+
     def __init__(self, pid, monitor_id, logger, file_pattern):
         """Initializes the base class.
 
@@ -177,11 +178,21 @@ class BaseReader:
         self._logger = logger
         self._metric_printer = MetricPrinter(logger, monitor_id)
 
-    def run_single_cycle(self):
-        """Runs a single cycle of the sample collection.
+    def run_single_cycle(self, collector=None):
+        """
+        Runs a single cycle of the sample collection.
 
         It should read the monitored file and extract all metrics.
+        @param collector: Optional - a dictionary to collect the metric values.
+                          The collector has key as Metric, and value as the actual observed scalar.
+                          eg: {
+                                ("app.net.bytes", "in"): 12222,
+                                ("app.net.bytes", "out"): 20,
+                              }
+                          Note: a new collector will be instantiated if None is passed in.
+        @return: None or the optional collector with collected metric values
         """
+
         self._timestamp = int(time.time())
 
         # There are certain error conditions, such as the system not supporting
@@ -192,6 +203,8 @@ class BaseReader:
 
         filename = self._file_pattern % self._pid
 
+        if not collector:
+            collector = {}
         if self._file is None:
             try:
                 self._file = open(filename, "r")
@@ -200,28 +213,30 @@ class BaseReader:
                 # don't have permissions for it, then just don't collect this
                 # stat from now on.  If the user changes the configuration file
                 # we will try again to read the file then.
+                self._failed = True
                 if e.errno == 13:
                     self._logger.error("The agent does not have permission to read %s.  "
                                        "Maybe you should run it as root.", filename)
-                    self._failed = True
                 elif e.errno == 2:
                     self._logger.error("The agent cannot read %s.  Your system may not support that proc file type",
                                        filename)
-                    self._failed = True
                 else:
                     raise e
 
         if self._file is not None:
             try:
                 self._file.seek(0)
-                self.gather_sample(self._file)
+
+                return self.gather_sample(self._file, collector=collector)
+
             except IOError, e:
-                self._logger.error( "Error gathering sample for file: '%s'\n\t%s" % (filename, str( e ) ) );
+                self._logger.error("Error gathering sample for file: '%s'\n\t%s" % (filename, str(e)));
 
-                #close the file.  This will cause the file to be reopened next call to run_single_cycle
+                # close the file. This will cause the file to be reopened next call to run_single_cycle
                 self.close()
+        return collector
 
-    def gather_sample(self, my_file):
+    def gather_sample(self, my_file, collector=None):
         """Reads the metrics from the file and records them.
 
         Derived classes must override this method to perform the actual work of
@@ -229,7 +244,10 @@ class BaseReader:
 
         @param my_file: The file to read.
         @type my_file: FileIO
+        @param collector: The optional collector dictionary
+        @type collector: None or dict
         """
+
         pass
 
     def close(self):
@@ -242,21 +260,6 @@ class BaseReader:
         finally:
             self._file = None
 
-    def print_sample(self, metric_name, metric_value, type_value=None):
-        """Record the specified metric.
-
-        @param metric_name: The name of the metric.  It should only contain alphanumeric characters,
-            periods, underscores.
-        @param metric_value: The value of the metric.
-        @param type_value: The type of the value.  This is emitted as an extra field for the metric.
-            This is often used to label different types of some resource, such as CPU (user CPU vs. system CPU), etc.
-
-        @type metric_name: str
-        @type metric_value: float
-        @type type_value: str
-        """
-        self._metric_printer.print_sample(metric_name, metric_value, type_value=type_value)
-
 
 class StatReader(BaseReader):
     """Reads and records statistics from the /proc/$pid/stat file.
@@ -268,6 +271,7 @@ class StatReader(BaseReader):
       app.threads:           the number of threads being used by the process
       app.nice:              the nice value for the process
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -279,6 +283,7 @@ class StatReader(BaseReader):
         @type monitor_id: str
         @type logger: scalyr_agent.AgentLogger
         """
+
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/stat")
         # Need the number of jiffies_per_sec for this server to calculate some times.
         self._jiffies_per_sec = os.sysconf(os.sysconf_names['SC_CLK_TCK'])
@@ -295,6 +300,7 @@ class StatReader(BaseReader):
         @return: The number of centiseconds for the specified number of jiffies.
         @rtype: int
         """
+
         return int((jiffies * 100.0) / self._jiffies_per_sec)
 
     def calculate_time_ms(self, jiffies):
@@ -307,6 +313,7 @@ class StatReader(BaseReader):
         @return: The number of milliseconds for the specified number of jiffies.
         @rtype: int
         """
+
         return int((jiffies * 1000.0) / self._jiffies_per_sec)
 
     def __get_uptime_ms(self):
@@ -315,6 +322,7 @@ class StatReader(BaseReader):
         @return: The number of milliseconds the system has been up.
         @rtype: int
         """
+
         if self._boot_time_ms is None:
             # We read /proc/uptime once to get the current boot time.
             uptime_file = None
@@ -332,29 +340,35 @@ class StatReader(BaseReader):
         # the boot time.
         return int(time.time()) * 1000 - self._boot_time_ms
 
-    def gather_sample(self, stat_file):
+    def gather_sample(self, stat_file, collector=None):
         """Gathers the metrics from the stat file.
 
         @param stat_file: The file to read.
         @type stat_file: FileIO
+        @param collector: Optional collector dictionary
+        @type collector: None or dict
         """
-
+        if not collector:
+            collector = {}
         # The file format is just a single line of all the fields.
         line = stat_file.readlines()[0]
         # Chop off first part which is the pid and executable file. The
         # executable file is terminated with a paren so just search for that.
-        line = line[(line.find(") ")+2):]
+        line = line[(line.find(") ") + 2):]
         fields = line.split()
         # Then the fields we want are just at fixed field positions in the
-        # string.  Just grap them.
-        self.print_sample("app.cpu", self.__calculate_time_cs(int(fields[11])), "user")
-        self.print_sample("app.cpu",  self.__calculate_time_cs(int(fields[12])), "system")
-        # The uptime is calculated by reading the 'start_time from stat which is expressed as the
-        # number of jiffies after boot time when this process started.  So, convert away.
+        # string.  Just grab them.
+
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(int(fields[19]))
-        self.print_sample("app.uptime", process_uptime)
-        self.print_sample("app.nice", float(fields[16]))
-        self.print_sample("app.threads", int(fields[17]))
+        collector.update({
+            Metric('app.cpu', 'user'): self.__calculate_time_cs(int(fields[11])),
+            Metric('app.cpu', 'system'): self.__calculate_time_cs(int(fields[12])),
+            Metric('app.uptime', None): process_uptime,
+            Metric('app.nice', None): float(fields[16]),
+            Metric('app.threads', None): int(fields[17]),
+        })
+        return collector
+
 
 class StatusReader(BaseReader):
     """Reads and records statistics from the /proc/$pid/status file.
@@ -365,6 +379,7 @@ class StatusReader(BaseReader):
       app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
       app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -378,12 +393,18 @@ class StatusReader(BaseReader):
         """
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/status")
 
-    def gather_sample(self, stat_file):
+    def gather_sample(self, stat_file, collector=None):
         """Gathers the metrics from the status file.
 
         @param stat_file: The file to read.
         @type stat_file: FileIO
+        @param collector: Optional collector dictionary
+        @type collector: None or dict
         """
+
+        if not collector:
+            collector = {}
+
         for line in stat_file:
             # Each line has a format of:
             # Tag: Value
@@ -399,22 +420,17 @@ class StatusReader(BaseReader):
             # for now.
             # if field_name == "FDSize":
             #     self.print_sample("app.fd", int_value)
-            if field_name == "VmSize":
-                self.print_sample("app.mem.bytes", int_value * 1024,
-                                  "vmsize")
-            elif field_name == "VmPeak":
-                self.print_sample("app.mem.bytes", int_value * 1024,
-                                  "peak_vmsize")
-            elif field_name == "VmRSS":
-                self.print_sample("app.mem.bytes", int_value * 1024,
-                                  "resident")
-            elif field_name == "VmHWM":
-                self.print_sample("app.mem.bytes", int_value * 1024,
-                                  "peak_resident")
+
+            collector.update({
+                Metric('app.mem.bytes', 'vmsize'): int_value * 1024,
+                Metric('app.mem.bytes', 'peak_vmsize'): int_value * 1024,
+                Metric('app.mem.bytes', 'resident'): int_value * 1024,
+                Metric('app.mem.bytes', 'peak_resident'): int_value * 1024
+            })
+            return collector
 
 
 # Reads stats from /proc/$pid/io.
-
 class IoReader(BaseReader):
     """Reads and records statistics from the /proc/$pid/io file.  Note, this io file is only supported on
     kernels 2.6.20 and beyond, but that kernel has been around since 2007.
@@ -425,6 +441,7 @@ class IoReader(BaseReader):
       app.disk.bytes type=write:        the number of bytes written to disk
       app.disk.requests type=write:     the number of disk requests.
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -438,26 +455,34 @@ class IoReader(BaseReader):
         """
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/io")
 
-    def gather_sample(self, stat_file):
+    def gather_sample(self, stat_file, collector=None):
         """Gathers the metrics from the io file.
 
         @param stat_file: The file to read.
         @type stat_file: FileIO
+        @param collector: Optional collector dictionary
+        @type collector: None or dict
         """
+
+        if not collector:
+            collector = {}
+
         # File format is single value per line with "fieldname:" prefix.
         for x in stat_file:
             fields = x.split()
-            if len( fields ) == 0:
+            if len(fields) == 0:
                 continue
-
+            if not collector:
+                collector = {}
             if fields[0] == "rchar:":
-                self.print_sample("app.disk.bytes", int(fields[1]), "read")
+                collector.update({Metric("app.disk.bytes", "read"): int(fields[1])})
             elif fields[0] == "syscr:":
-                self.print_sample("app.disk.requests", int(fields[1]), "read")
+                collector.update({Metric("app.disk.requests", "read"): int(fields[1])})
             elif fields[0] == "wchar:":
-                self.print_sample("app.disk.bytes", int(fields[1]), "write")
+                collector.update({Metric("app.disk.bytes", "write"): int(fields[1])})
             elif fields[0] == "syscw:":
-                self.print_sample("app.disk.requests", int(fields[1]), "write")
+                collector.update({Metric("app.disk.requests", "write"): int(fields[1])})
+        return collector
 
 
 class NetStatReader(BaseReader):
@@ -470,6 +495,7 @@ class NetStatReader(BaseReader):
       app.net.bytes type=out:  The number of bytes written to the network
       app.net.tcp_retransmits:  The number of retransmits
     """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -481,14 +507,18 @@ class NetStatReader(BaseReader):
         @type monitor_id: str
         @type logger: scalyr_agent.AgentLogger
         """
+
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/net/netstat")
 
-    def gather_sample(self, stat_file):
+    def gather_sample(self, stat_file, collector=None):
         """Gathers the metrics from the netstate file.
 
         @param stat_file: The file to read.
         @type stat_file: FileIO
+        @param collector: Optional collector dictionary
+        @type collector: None or dict
         """
+
         # This file format is weird.  Each set of stats is outputted in two
         # lines.  First, a header line that list the field names.  Then a
         # a value line where each value is specified in the appropriate column.
@@ -514,18 +544,21 @@ class NetStatReader(BaseReader):
         # won't report the stats.
         for i in range(0, len(all_lines) - 1):
             names_split = all_lines[i].split()
-            values_split = all_lines[i+1].split()
+            values_split = all_lines[i + 1].split()
             # Check the row names are the same.
             if names_split[0] == values_split[0] and len(names_split) == len(values_split):
                 field_names.extend(names_split)
                 field_values.extend(values_split)
 
+        if not collector:
+            collector = {}
+
         # Now go back and look for the actual stats we care about.
         for i in range(0, len(field_names)):
             if field_names[i] == "InOctets":
-                self.print_sample("app.net.bytes", field_values[i], "in")
+                collector.update({Metric("app.net.bytes", "in"): field_values[i]})
             elif field_names[i] == "OutOctets":
-                self.print_sample("app.net.bytes", field_values[i], "out")
+                collector.update({Metric("app.net.bytes", "out"): field_values[i]})
             elif field_names[i] == "TCPRenoRecovery":
                 retransmits += int(field_values[i])
                 found_retransmit_metric = True
@@ -535,7 +568,8 @@ class NetStatReader(BaseReader):
 
         # If we found both forms of retransmit, add them up.
         if found_retransmit_metric:
-            self.print_sample("app.net.tcp_retransmits", retransmits)
+            collector.update({Metric("app.net.tcp_retransmits", None): retransmits})
+        return collector
 
 
 class SockStatReader(BaseReader):
@@ -546,31 +580,39 @@ class SockStatReader(BaseReader):
     The recorded metrics are listed below.  They all also have an app=[id] field as well.
       app.net.sockets_in_use type=*:  The number of sockets in use
     """
+
     def __init__(self, pid, monitor_id, logger):
         BaseReader.__init__(self, pid, monitor_id, logger, "/proc/%ld/net/sockstat")
 
-    def gather_sample(self, stat_file):
+    def gather_sample(self, stat_file, collector=None):
         """Gathers the metrics from the sockstat file.
 
         @param stat_file: The file to read.
         @type stat_file: FileIO
+        @param collector: Optional collector dictionary
+        @type collector: None or dict
         """
+
+        if not collector:
+            collector = {}
+
         for line in stat_file:
             # We just look for the different "inuse" lines and output their
             # socket type along with the count.
             m = re.search('(\w+): inuse (\d+)', line)
             if m is not None:
-                self.print_sample("app.net.sockets_in_use", int(m.group(2)),
-                                  m.group(1).lower())
+                collector.update({Metric("app.net.sockets_in_use", m.group(1).lower()): int(m.group(2))})
+        return collector
 
 
 # Reads stats from /proc/$pid/fd.
 class FileDescriptorReader:
-    """Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
-
-    The recorded metrics are listed below.  They all also have an app=[id] field as well.
-      app.io.fds type=open:         the number of open file descriptors
     """
+    Reads and records statistics from the /proc/$pid/fd directory.  Essentially it just counts the number of entries.
+    The recorded metrics are listed below.  They all also have an app=[id] field as well.
+    app.io.fds type=open:         the number of open file descriptors
+    """
+
     def __init__(self, pid, monitor_id, logger):
         """Initializes the reader.
 
@@ -588,17 +630,169 @@ class FileDescriptorReader:
         self.__metric_printer = MetricPrinter(logger, monitor_id)
         self.__path = '/proc/%ld/fd' % pid
 
-    def run_single_cycle(self):
+    def run_single_cycle(self, collector=None):
         """
 
         @return:
         @rtype:
         """
+
         num_fds = len(os.listdir(self.__path))
-        self.__metric_printer.print_sample('app.io.fds', num_fds, 'open')
+        if not collector:
+            collector = {}
+        collector.update({
+            Metric('app.io.fds', 'open'): num_fds
+        })
+        return collector
 
     def close(self):
         pass
+
+
+class ProcessTracker(object):
+    """
+    This class is responsible for gathering the metrics for a process.
+    Given a process id, it procures and stores different metrics using
+    metric readers (deriving from BaseReader)
+
+    This tracker records the following metrics:
+      app.cpu type=user:                the number of 1/100ths seconds of user cpu time
+      app.cpu type=system:              the number of 1/100ths seconds of system cpu time
+      app.uptime:                       the number of milliseconds of uptime
+      app.threads:                      the number of threads being used by the process
+      app.nice:                         the nice value for the process
+      app.mem.bytes type=vmsize:        the number of bytes of virtual memory in use
+      app.mem.bytes type=resident:      the number of bytes of resident memory in use
+      app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
+      app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
+      app.disk.bytes type=read:         the number of bytes read from disk
+      app.disk.requests type=read:      the number of disk requests.
+      app.disk.bytes type=write:        the number of bytes written to disk
+      app.disk.requests type=write:     the number of disk requests.
+      app.io.fds type=open:             the number of file descriptors held open by the process
+    """
+
+    def __init__(self, pid, logger, monitor_id=None):
+        self.pid = pid
+        self.monitor_id = monitor_id
+        self._logger = logger
+        self.gathers = [
+            StatReader(self.pid, self.monitor_id, self._logger),
+            StatusReader(self.pid, self.monitor_id, self._logger),
+            IoReader(self.pid, self.monitor_id, self._logger),
+            FileDescriptorReader(self.pid, self.monitor_id, self._logger)
+        ]
+
+        # TODO: Re-enable these if we can find a way to get them to truly report
+        # per-app statistics.
+        #        NetStatReader(self.pid, self.id, self._logger)
+        #        SockStatReader(self.pid, self.id, self._logger)
+
+    def collect(self):
+        """
+        Collects the metrics from the gathers
+        """
+
+        collector = {}
+        for gather in self.gathers:
+            try:
+                collector.update(gather.run_single_cycle(collector=collector))
+            except Exception as ex:
+                self._logger.exception(
+                    'Exception while collecting metrics for PID: %s of type: %s. Details: %s',
+                    self.pid, type(gather), repr(ex)
+                )
+        return collector
+
+
+class ProcessList(object):
+    """
+    Class that encapsulates the listing of process(es) based on IDs, regular expressions etc.
+    """
+
+    def __init__(self):
+        # list of {'pid': processid, 'ppid': parentprocessid,  'cmd': command }
+        self.processes = []
+        # key -> parent process id, value -> [child process ids...]
+        self.parent_to_children_map = defaultdict(list)
+
+        cmd = ['ps', 'axo', 'pid,ppid,command']
+        sub_proc = Popen(cmd, shell=False, stdout=PIPE)
+        # regex intended to capture pid, ppid and the command eg:
+        # 593     0 /bin/bash
+        regex = r"\s*(\d+)\s+(\d+)\s+(.*)"
+        lines = sub_proc.stdout.readlines()
+        for line in lines:
+            match = re.search(regex, line)
+            if match:
+                _pid, _ppid, _cmd = match.groups()
+                self.processes.append({'pid': int(_pid), 'ppid': int(_ppid), 'cmd': _cmd})
+        for _process in self.processes:
+            ppid = _process['ppid']
+            pid = _process['pid']
+            if ppid != pid:
+                self.parent_to_children_map[ppid].append(pid)
+
+    def get_matches_commandline(self, match_pattern):
+        """
+        Given a string, match the processes on the name
+        @param match_pattern: process command match pattern
+        @return: List of Process IDs
+        """
+
+        matches = []
+        for _process in self.processes:
+            if re.search(match_pattern, _process['cmd']):
+                matches.append(_process['pid'])
+        return matches
+
+    def get_child_processes(self, ppid):
+        """
+        Given a process id, return all children processes (recursively)
+        @param ppid: parent process id
+        @return: list of all children process ids
+        """
+
+        all_children = []
+        children_to_explore = set()
+        for _pid in self.parent_to_children_map[ppid]:
+            all_children.append(_pid)
+            children_to_explore.add(_pid)
+
+        # get the children 'recursively'
+        while children_to_explore:  # the invariant
+            child_to_explore = children_to_explore.pop()
+            if not self.parent_to_children_map.get(child_to_explore):
+                continue
+            unvisited = self.parent_to_children_map[child_to_explore]
+            for node in unvisited:
+                if node not in all_children:
+                    children_to_explore.add(node)
+                    all_children.append(node)
+        return list(set(all_children))
+
+    def get_running_processes(self):
+        """
+        Returns a list of all running process ids
+        """
+
+        all_processes = []
+        for _process in self.processes:
+            all_processes.append(_process['pid'])
+        return all_processes
+
+    def get_matches_commandline_with_children(self, match_pattern):
+        """
+        Like get_matches_commandline method, given a string, match the processes on the name
+        but also returns the matched processes' children
+        @param match_pattern: process command match pattern
+        @return: List of Process IDs
+        """
+
+        matched_pids = self.get_matches_commandline(match_pattern)
+        for matched_pid in matched_pids:
+            matched_pids.extend(self.get_child_processes(matched_pid))
+        return list(set(matched_pids))
 
 
 class ProcessMonitor(ScalyrMonitor):
@@ -619,41 +813,69 @@ class ProcessMonitor(ScalyrMonitor):
     monitor.  However, since ids can change over time, it's better to use the commandline matcher.  The 'pid' field
     is mainly used the linux process monitor run to monitor the agent itself.
 
-    This monitor records the following metrics:
-      app.cpu type=user:                the number of 1/100ths seconds of user cpu time
-      app.cpu type=system:              the number of 1/100ths seconds of system cpu time
-      app.uptime:                       the number of milliseconds of uptime
-      app.threads:                      the number of threads being used by the process
-      app.nice:                         the nice value for the process
-      app.mem.bytes type=vmsize:        the number of bytes of virtual memory in use
-      app.mem.bytes type=resident:      the number of bytes of resident memory in use
-      app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
-      app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
-      app.disk.bytes type=read:         the number of bytes read from disk
-      app.disk.requests type=read:      the number of disk requests.
-      app.disk.bytes type=write:        the number of bytes written to disk
-      app.disk.requests type=write:     the number of disk requests.
-      app.io.fds type=open:             the number of file descriptors held open by the process
 
     In additional to the fields listed above, each metric will also have a field 'app' set to the monitor id to specify
     which process the metric belongs to.
 
     You can run multiple instances of this monitor per agent to monitor different processes.
     """
+
     def _initialize(self):
         """Performs monitor-specific initialization."""
-        # The id of the process being monitored, if one has been matched.
-        self.__pid = None
-        # The list of BaseReaders instantiated to gather metrics for the process.
-        self.__gathers = []
+        # The ids of the processes being monitored, if one has been matched.
+        self.__pids = []
 
         self.__id = self._config.get('id', required_field=True, convert_to=str)
         self.__commandline_matcher = self._config.get('commandline', default=None, convert_to=str)
-        self.__target_pid = self._config.get('pid', default=None, convert_to=str)
+        self.__aggregate_multiple_processes = self._config.get(
+            'aggregate_multiple_processes', default=False, convert_to=bool
+        )
+        self.__include_child_processes = self._config.get(
+            'include_child_processes', default=False, convert_to=bool
+        )
 
-        if self.__commandline_matcher is None and self.__target_pid is None:
-            raise BadMonitorConfiguration('At least one of the following fields must be provide: commandline or pid',
-                                          'commandline')
+        self.__trackers = {}  # key -> process id, value -> ProcessTracker object
+
+        # poll interval (in seconds) for matching processes when we are monitoring multiple processes
+        # alive for all epochs of the monitor.
+        self.__last_discovered = None
+
+        self.__process_discovery_interval = self._config.get('process_discovery_interval', default=120, convert_to=int)
+
+        __target_pids = self._config.get('pid', default=None, convert_to=str)
+        self.__target_pids = []
+
+        # convert target pid into a list. Target pids can be a single pid or a CSV of pids
+        if __target_pids:
+            for _t in __target_pids.split(','):
+                if _t:
+                    if _t != '$$':
+                        self.__target_pids.append(int(_t))
+                    else:
+                        self.__target_pids.append(int(os.getpid()))
+
+        # Last 2 values of all metrics which has form:
+        # {
+        #   '<process id>: {
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 }
+
+        #   '<process id>: {
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 <metric name>: [<metric at time 0>, <metric at time 1>],
+        #                 }
+        # }
+        self.__metrics_history = defaultdict(dict)
+
+        # running total of metric values, both for cumulative and non-cumulative metrics
+        self.__aggregated_metrics = {}
+
+        if not (self.__commandline_matcher or self.__target_pids):
+            raise BadMonitorConfiguration(
+                'At least one of the following fields must be provide: commandline or pid',
+                'commandline'
+            )
 
         # Make sure to set our configuration so that the proper parser is used.
         self.log_config = {
@@ -661,114 +883,130 @@ class ProcessMonitor(ScalyrMonitor):
             'path': 'linux_process_metrics.log',
         }
 
-    def __set_process(self, pid):
-        """Sets the id of the process for which this monitor instance should record metrics.
-
-        @param pid: The process id or None if there is no process to monitor.
-        @type pid: int or None
+    def record_metrics(self, pid, metrics):
         """
-        if self.__pid is not None:
-            for gather in self.__gathers:
-                gather.close()
+        For a process, record the metrics in a historical metrics collector
+        Collects the historical result of each metric per process in __metrics_history
 
-        self.__pid = pid
-        self.__gathers = []
+        @param pid: Process ID
+        @param metrics: Collected metrics of the process
+        @type pid: int
+        @type metrics: dict
+        @return: None
+        """
 
-        if pid is not None:
-            self.__gathers.append(StatReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(StatusReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(IoReader(self.__pid, self.__id, self._logger))
-            self.__gathers.append(FileDescriptorReader(self.__pid, self.__id, self._logger))
-        # TODO: Re-enable these if we can find a way to get them to truly report
-        # per-app statistics.
-        #        self.gathers.append(NetStatReader(self.pid, self.id, self._logger))
-        #        self.gathers.append(SockStatReader(self.pid, self.id, self._logger))
+        for _metric, _metric_value in metrics.items():
+            if not self.__metrics_history[pid].get(_metric):
+                self.__metrics_history[pid][_metric] = []
+            self.__metrics_history[pid][_metric].append(_metric_value)
+            # only keep the last 2 running history for any metric
+            self.__metrics_history[pid][_metric] = self.__metrics_history[pid][_metric][-2:]
+
+    def _reset_absolute_metrics(self):
+        """
+        At the beginning of each process metric calculation, the absolute (non-cumulative) metrics
+        need to be overwritten to the combined process(es) result. Only the cumulative
+        metrics need the previous value to calculate delta. We should set the
+        absolute metric to 0 in the beginning of this "epoch"
+        """
+
+        for pid, process_metrics in self.__metrics_history.items():
+            for _metric, _metric_values in process_metrics.items():
+                if not _metric.is_cumulative:
+                    self.__aggregated_metrics[_metric] = 0
+
+    def _calculate_aggregated_metrics(self):
+        """
+        Calculates the aggregated metric values based on the current running processes
+        and the historical metric record
+        """
+
+        # using the historical values, calculate the aggregate
+        # there are two kinds of metrics:
+        # a) cumulative metrics - only the delta of the last 2 recorded values is used (eg cpu cycles)
+        # b) absolute metrics - the last absolute value is used
+
+        running_pids_set = set(self.__pids)
+
+        for pid, process_metrics in self.__metrics_history.items():
+            for _metric, _metric_values in process_metrics.items():
+                if not self.__aggregated_metrics.get(_metric):
+                    self.__aggregated_metrics[_metric] = 0
+                if _metric.is_cumulative:
+                    if pid in running_pids_set:
+                        if len(_metric_values) > 1:
+                            # only report the cumulative metrics for more than one sample
+                            self.__aggregated_metrics[_metric] += (_metric_values[-1] - _metric_values[-2])
+                else:
+                    if pid in running_pids_set:
+                        # absolute metric - accumulate the last reported value
+                        self.__aggregated_metrics[_metric] += _metric_values[-1]
+
+    def _remove_dead_processes(self):
+        # once the _calculate_aggregated_metrics has calculated the running total of the
+        # metrics for the current epoch, remove the entries for the process id in the history
+        # NOTE: the removal of the contributions (if applicable) should already be done so
+        # removing the entry from the history is safe.
+
+        all_pids = self.__metrics_history.keys()
+        for _pid_to_remove in list(set(all_pids) - set(self.__pids)):
+            # for all the absolute metrics, decrease the count that the dead processes accounted for
+            del self.__metrics_history[_pid_to_remove]
+            # remove it from the tracker
+            if _pid_to_remove in self.__trackers:
+                del self.__trackers[_pid_to_remove]
+
+        # if no processes are running, there is no reason to report the running metric data
+        if not self.__pids:
+            self.__aggregated_metrics = {}
 
     def gather_sample(self):
-        """Collect the per-process metrics for the monitored process.
+        """Collect the per-process tracker for the monitored process(es).
 
-        If the process is no longer running, then attempts to match a new one.
+        For multiple processes, there are a few cases we need to poll for:
+
+        For `n` processes, if there are < n running processes at any given point,
+        we should see if there are any pids or matching expression that gives pids
+        that is currently not running, if so, get its tracker and run it.
+        It is possible that one or more processes ran its course, but we can't assume that
+        and we should keep polling for it.
         """
-        if self.__pid is not None and not self.__is_running():
-            self.__set_process(None)
 
-        if self.__pid is None:
-            self.__set_process(self.__select_process())
+        for _pid in self.__select_processes():
+            if not self.__trackers.get(_pid):
+                self.__trackers[_pid] = ProcessTracker(_pid, self._logger, self.__id)
 
-        for gather in self.__gathers:
-            gather.run_single_cycle()
+        self._reset_absolute_metrics()
 
-    def __select_process(self):
-        """Returns the proces id of a running process that fulfills the match criteria.
+        for _tracker in self.__trackers.values():
+            _metrics = _tracker.collect()
+            self.record_metrics(_tracker.pid, _metrics)
 
-        This will either use the commandline matcher or the target pid to find the process.
-        If no process is matched, None is returned.
+        self._calculate_aggregated_metrics()
+        self._remove_dead_processes()
 
-        @return: The process id of the matching process, or None
-        @rtype: int or None
-        """
-        sub_proc = None
-        if self.__commandline_matcher is not None:
-            try:
-                # Spawn a process to run ps and match on the command line.  We only output two
-                # fields from ps.. the pid and command.
-                sub_proc = Popen(['ps', 'ax', '-o', 'pid,command'],
-                                 shell=False, stdout=PIPE)
+        self.print_metrics()
 
-                sub_proc.stdout.readline()
-                matching_pids = []
-                for line in sub_proc.stdout:
-                    line = line.strip()
-                    if line.find(' ') > 0:
-                        pid = int(line[:line.find(' ')])
-                        line = line[(line.find(' ') + 1):]
-                        if re.search(self.__commandline_matcher, line) is not None:
-                            matching_pids.append( pid )
+    def print_metrics(self):
+        # For backward compatibility, we also publish the monitor id as 'app' in all reported stats.  The old
+        # Java agent did this and it is important to some dashboards.
+        for _metric, _metric_value in self.__aggregated_metrics.items():
+            extra = {'app': self.__id}
+            if _metric.type:
+                extra['type'] = _metric.type
+            self._logger.emit_value(_metric.name, _metric_value, extra)
 
-                total_pids = len( matching_pids )
-                if total_pids == 0:
-                    return None
-                elif total_pids == 1:
-                    return matching_pids[0]
-
-                # if we are here then multiple command lines matched.  First check to
-                # see if self.__pid is in the list and if so return that.  Otherwise
-                # return the first element in the list
-                if self.__pid in matching_pids:
-                    self._logger.warning( "Multiple processes match the command '%s'.  Returning existing pid." % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-existing-pid' )
-                    return self.__pid
-
-                self._logger.warning( "Multiple processes match the command '%s'.  Returning the pid of the first matching process" % self.__commandline_matcher, limit_once_per_x_secs=300, limit_key='linux-process-monitor-first-pid' )
-
-                return matching_pids[0]
-
-            finally:
-                # Be sure to wait on the spawn process.
-                if sub_proc is not None:
-                    sub_proc.wait()
-        else:
-            # See if the specified target pid is running.  If so, then return it.
-            try:
-                # Special case '$$' to mean this process.
-                if self.__target_pid == '$$':
-                    pid = os.getpid()
-                else:
-                    pid = int(self.__target_pid)
-                os.kill(pid, 0)
-                return pid
-            except OSError:
-                # If we get this, it means we tried to signal a process we do not have permission to signal.
-                # If this is the case, we won't have permission to read its stats files either, so we ignore it.
-                return None
-
-    def __is_running(self):
+    @staticmethod
+    def __is_running(pid):
         """Returns true if the current process is still running.
 
         @return:  True if the monitored process is still running.
         @rtype: bool
         """
         try:
-            os.kill(self.__pid, 0)
+            # signal flag 0 does not actually try to kill the process but does an error
+            # check that is useful to see if a process is still running.
+            os.kill(pid, 0)
             return True
         except OSError, e:
             # Errno #3 corresponds to the process not running.  We could get
@@ -776,6 +1014,62 @@ class ProcessMonitor(ScalyrMonitor):
             # a signal to self.pid.  But, if that error is returned to us, we
             # know the process is running at least, so we ignore the error.
             return e.errno != 3
+
+    def __select_processes(self):
+        """Returns a list of the process ids of processes that fulfills the match criteria.
+
+        This will either use the commandline matcher or the target pid to find the process.
+        If no process is matched, an empty list is returned.
+
+        @return: The list of process id(s) of the matching process, or set()
+        @rtype: list
+        """
+
+        # check if at least one process is running
+        is_running = False
+        for pid in self.__pids:
+            if ProcessMonitor.__is_running(pid):
+                is_running = True
+                break  # at least one process is running
+
+        if is_running:
+            if not self.__aggregate_multiple_processes:
+                return self.__pids
+
+            # aggregate metrics, check the last discovered time
+            if (
+                self.__last_discovered and
+                time.time() * 1000 - self.__last_discovered < self.__process_discovery_interval * 1000
+            ):
+                return self.__pids
+
+        ps = ProcessList()
+        if self.__commandline_matcher:
+            self.__last_discovered = time.time() * 1000
+            if self.__include_child_processes:
+                matched_processes = ps.get_matches_commandline_with_children(self.__commandline_matcher)
+            else:
+                matched_processes = ps.get_matches_commandline(self.__commandline_matcher)
+            self.__pids = matched_processes
+
+            if not self.__aggregate_multiple_processes and len(self.__pids) > 1:
+                # old behaviour where multiple processes were not supported for aggregation
+                self._logger.warning(
+                    "Multiple processes match the command '%s'.  Returning existing pid. "
+                    "You can turn on the multi process aggregation support by adding the "
+                    "aggregate_multiple_processes configuration to true"
+                    % self.__commandline_matcher, limit_once_per_x_secs=300,
+                    limit_key='linux-process-monitor-existing-pid'
+                )
+                self.__pids = [self.__pids[0]]
+        else:
+            # See if the specified target pid is running.  If so, then return it.
+            # Special case '$$' to mean this process.
+            if self.__target_pids == '$$':
+                self.__pids = [os.getpid()]
+            else:
+                self.__pids = self.__target_pids
+        return self.__pids
 
 
 __all__ = [ProcessMonitor]
