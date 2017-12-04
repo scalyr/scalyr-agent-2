@@ -661,6 +661,7 @@ def build_base_files(use_docker_config=False):
     # This docker file is needed by the `scalyr-agent-2-config --docker-create-custom-dockerfile` command.  We
     # put it in all distributions (not just the docker_tarball) in case a customer creates an imagine using a package.
     shutil.copy(make_path(agent_source_root, 'docker/Dockerfile.custom_agent_config'), 'Dockerfile.custom_agent_config')
+    shutil.copy(make_path(agent_source_root, 'docker/Dockerfile.custom_k8s_config'), 'Dockerfile.custom_k8s_config')
     os.chdir('..')
 
     # Create symlinks for the two commands
