@@ -19,7 +19,7 @@ kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key="<you
 2. Launch the Daemonset
 
     ```
-kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/k8s/scalyr-agent-2.yaml
+kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/k8s_preview/k8s/scalyr-agent-2.yaml
     ```
 
 ## That's It!
@@ -38,13 +38,13 @@ For more details on creating custom images with your configuration files, modify
 
 The default Kubernetes configuration file for the Scalyr Agent does the following:
 
-* Creates a Daemonset running the `scalyr/scalyr-k8s-agent:latest` container image (this image is available on Dockerhub).  This image differs from our standard docker container `scalyr-docker-agent` in that it has been configured to read the raw container logs from the Kubernetes node rather than relying on syslog or the Docker API.
+* Creates a Daemonset running the `scalyr/scalyr-k8s-preview-agent:latest` container image (this image is available on Dockerhub).  This image differs from our standard docker container `scalyr-docker-agent` in that it has been configured to read the raw container logs from the Kubernetes node rather than relying on syslog or the Docker API.
 
-* Maps `/var/lib/docker/containers` of the node to `/var/lib/docker/containers` on the scalyr-k8s-agent container.  This gives the container access to the raw logs from other pods and containers running on that node.
+* Maps `/var/lib/docker/containers` of the node to `/var/lib/docker/containers` on the scalyr-k8s-preview-agent container.  This gives the container access to the raw logs from other pods and containers running on that node.
 
-* Exposes your Scalyr API key to the container in the environment variable `SCALYR_API_KEY`.  This is required by the default scalyr configuration file of the scalyr-k8s-agent image.
+* Exposes your Scalyr API key to the container in the environment variable `SCALYR_API_KEY`.  This is required by the default scalyr configuration file of the scalyr-k8s-preview-agent image.
 
-You can see the full configuration file [here](https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/k8s/scalyr-agent-2.yaml).
+You can see the full configuration file [here](https://raw.githubusercontent.com/scalyr/scalyr-agent-2/k8s_preview/k8s/scalyr-agent-2.yaml).
 
 ### Creating custom Scalyr Agent Docker images
 
@@ -52,16 +52,16 @@ You can turn on several useful features in the Scalyr Agent by modifying its con
 
 You can create a test a configuration on a single Docker container and once it is working to your satisfaction you can use these tools to export the configuration along with a Dockerfile that will build a custom image that uses your custom configuration.
 
-Assuming you have created and tested your configuration changes on a standalone docker container called 'scalyr-k8s-agent' (based off the `scalyr/scalyr-k8s-agent:latest` image) you can create a custom Docker image based on that configuration by executing the following commands on the currently running container:
+Assuming you have created and tested your configuration changes on a standalone docker container called 'scalyr-agent' (based off the `scalyr/scalyr-k8s-preview-agent:latest` image) you can create a custom Docker image based on that configuration by executing the following commands on the currently running container:
 
 ```
-mkdir /tmp/scalyr-k8s-agent
-cd /tmp/scalyr-k8s-agent
-docker exec -i scalyr-k8s-agent scalyr-agent-2-config --k8s-create-custom-dockerfile - | tar -xz
-docker build -t customized-scalyr-k8s-agent .
+mkdir /tmp/scalyr-agent
+cd /tmp/scalyr-agent
+docker exec -i scalyr-agent scalyr-agent-2-config --k8s-create-custom-dockerfile - | tar -xz
+docker build -t customized-scalyr-k8s-preview-agent .
 ```
 
-This will leave a new Docker image on your local Docker instance with the repository tag `customized-scalyr-k8s-agent`. You can change the name using the docker tag command. From there, you can use any of the standard methods to make this container available to your Kubernetes cluster.
+This will leave a new Docker image on your local Docker instance with the repository tag `customized-scalyr-k8s-preview-agent`. You can change the name using the docker tag command. From there, you can use any of the standard methods to make this container available to your Kubernetes cluster.
 
 You can launch a Daemonset that uses the new Scalyr Agent container by changing the `image` specified in your Kubernetes config file:
 
@@ -72,7 +72,7 @@ spec:
       spec:
         containers:
         - name: scalyr-agent
-          image: customized-scalyr-k8s-agent
+          image: customized-scalyr-k8s-preview-agent
 ...
 ```
 
@@ -88,10 +88,10 @@ Before deploying a custom Scalyr Agent image to your cluster, it's a good idea t
 
 ```
 docker run -ti -e SCALYR_API_KEY="$SCALYR_API_KEY" \
-  --name scalyr-k8s-agent \
+  --name scalyr-k8s-preview-agent \
   -v /var/lib/docker/containers:/var/lib/docker/containers \
   -v /var/run/docker.sock:/var/scalyr/docker.sock \
-  customized-scalyr-k8s-agent /bin/bash
+  customized-scalyr-k8s-preview-agent /bin/bash
 ```
 
 Which will launch a single container based on your customized image and drop you in to a bash shell.
@@ -110,22 +110,22 @@ Once you can confirm that the scalyr-agent runs correctly and is uploading logs 
 
 If you want to modify the configuration of the Scalyr Agent on the fly, you need to create and enable a [Config Map](https://kubernetes.io/docs/tasks/configure-pod-container/configmap/#understanding-configmaps).
 
-You can create a Config Map based on an existing Scalyr Agent's configuration.  For example, if you had a test container called `scalyr-k8s-agent` running on Docker as a standalone container you can run the following commands to export its configuration files:
+You can create a Config Map based on an existing Scalyr Agent's configuration.  For example, if you had a test container called `scalyr-k8s-preview-agent` running on Docker as a standalone container you can run the following commands to export its configuration files:
 
 ```
 mkdir /tmp/scalyr-agent-config
 cd /tmp/scalyr-agent-config
-docker exec -i scalyr-k8s-agent scalyr-agent-2-config --export-config - | tar -xz
+docker exec -i scalyr-k8s-preview-agent scalyr-agent-2-config --export-config - | tar -xz
 ```
 
 After these commands finish, your current directory will have one file agent.json and a directory agent.d. The agent.json file is a copy of the running Scalyr Agent's /etc/scalyr-agent-2/agent.json configuration file. Likewise, the agent.d directory is a copy of the /etc/scalyr-agent-2/agent.d directory.
 
-**Note:** It's important to run this command on a container based off the scalyr/scalyr-k8s-agent rather than the scalyr/scalyr-docker-agent in order to have the correct default configuration.
+**Note:** It's important to run this command on a container based off the scalyr/scalyr-k8s-preview-agent rather than the scalyr/scalyr-docker-agent in order to have the correct default configuration.
 
 You can then edit those files to make whatever changes you need and write the changes back to the container for further testing, with this command:
 
 ```
-tar -zc agent.json agent.d/* | docker exec -i scalyr-k8s-agent scalyr-agent-2-config --import-config -
+tar -zc agent.json agent.d/* | docker exec -i scalyr-k8s-preview-agent scalyr-agent-2-config --import-config -
 ```
 
 There is no need to restart the Scalyr Agent after writing the configuration files. The running Scalyr Agent should notice the new configuration files and read them within 30 seconds.

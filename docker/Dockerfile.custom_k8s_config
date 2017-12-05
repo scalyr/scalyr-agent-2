@@ -10,9 +10,9 @@
 #
 # Warning, the string `scalyr-k8s-agent:latest` is hard-coded in the `scalyr-agent-2-config` command to
 # help when executing the `--k8s-create-custom-dockerfile` command.
-FROM scalyr/scalyr-k8s-agent:latest
+FROM scalyr/scalyr-docker-agent-k8s-preview:latest
 COPY agent_config.tar.gz /tmp/
 RUN tar --no-same-owner -C /etc/scalyr-agent-2 -zxf /tmp/agent_config.tar.gz && \
   rm /tmp/agent_config.tar.gz
 
-CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
+CMD ["/usr/sbin/scalyr-agent-å2", "--no-fork", "--no-change-user", "start"]
