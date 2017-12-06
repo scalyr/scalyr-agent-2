@@ -12,15 +12,15 @@ To create and launch the Scalyr Agent Daemonset, please do the following:
 
 1. Configure a secret that contains your Scalyr API key
 
-   ```
+```
 kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key="<your scalyr api key>"
-   ```
+```
 
 2. Launch the Daemonset
 
-    ```
+```
 kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/k8s_preview/k8s/scalyr-agent-2.yaml
-    ```
+```
 
 ## That's It!
 
