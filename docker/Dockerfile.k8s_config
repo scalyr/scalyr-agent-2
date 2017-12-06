@@ -1,6 +1,5 @@
 # Dockerfile for building an image of scalyr/scalyr-k8s-agent with custom configuration
 # files for the Scalyr Agent.
-# TODO change this to scalyr dockerhub once we have the credentials
-FROM codesauce/scalyr-docker-agent-k8s-preview:latest
+FROM scalyr/scalyr-docker-agent-k8s-preview:latest
 COPY k8s-config/agent.d/* /etc/scalyr-agent-2/agent.d/
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]

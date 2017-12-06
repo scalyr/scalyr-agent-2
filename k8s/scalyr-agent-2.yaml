@@ -10,8 +10,7 @@ spec:
     spec:
       containers:
       - name: scalyr-agent
-#        TODO change this to sclayr dockerhub once we have the credentials
-        image: codesauce/scalyr-docker-agent-k8s-preview
+        image: scalyr/scalyr-docker-agent-k8s-preview
         imagePullPolicy: Always
         env:
           - name: SCALYR_API_KEY
