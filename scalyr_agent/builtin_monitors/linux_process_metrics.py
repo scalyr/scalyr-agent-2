@@ -1063,7 +1063,7 @@ class ProcessMonitor(ScalyrMonitor):
             if self.__target_pids:
                 for t_pid in self.__target_pids:
                     if t_pid == "$$":
-                        t_pid = os.getpid()
+                        t_pid = int(os.getpid())
                     else:
                         t_pid = int(t_pid)
                     pids.append(t_pid)
