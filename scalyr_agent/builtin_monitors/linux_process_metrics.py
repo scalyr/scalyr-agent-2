@@ -842,17 +842,11 @@ class ProcessMonitor(ScalyrMonitor):
 
         self.__process_discovery_interval = self._config.get('process_discovery_interval', default=120, convert_to=int)
 
-        __target_pids = self._config.get('pid', default=None, convert_to=str)
-        self.__target_pids = []
-
-        # convert target pid into a list. Target pids can be a single pid or a CSV of pids
-        if __target_pids:
-            for _t in __target_pids.split(','):
-                if _t:
-                    if _t != '$$':
-                        self.__target_pids.append(int(_t))
-                    else:
-                        self.__target_pids.append(int(os.getpid()))
+        self.__target_pids = self._config.get('pid', default=None, convert_to=str)
+        if self.__target_pids:
+            self.__target_pids = self.__target_pids.split(",")
+        else:
+            self.__target_pids = []
 
         # Last 2 values of all metrics which has form:
         # {
@@ -1065,10 +1059,15 @@ class ProcessMonitor(ScalyrMonitor):
         else:
             # See if the specified target pid is running.  If so, then return it.
             # Special case '$$' to mean this process.
-            if self.__target_pids == '$$':
-                self.__pids = [os.getpid()]
-            else:
-                self.__pids = self.__target_pids
+            pids = []
+            if self.__target_pids:
+                for t_pid in self.__target_pids:
+                    if t_pid == "$$":
+                        t_pid = int(os.getpid())
+                    else:
+                        t_pid = int(t_pid)
+                    pids.append(t_pid)
+            self.__pids = pids
         return self.__pids
 
 
