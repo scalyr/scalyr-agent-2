@@ -846,13 +846,13 @@ class ProcessMonitor(ScalyrMonitor):
         self.__target_pids = []
 
         # convert target pid into a list. Target pids can be a single pid or a CSV of pids
-        if __target_pids:
+        if __target_pids == "$$":
+            # do not resolve $$ to current process id in case the current process forks and changes pid
+            self.__target_pids = "$$"
+        elif __target_pids:
             for _t in __target_pids.split(','):
                 if _t:
-                    if _t != '$$':
-                        self.__target_pids.append(int(_t))
-                    else:
-                        self.__target_pids.append(int(os.getpid()))
+                    self.__target_pids.append(int(os.getpid()))
 
         # Last 2 values of all metrics which has form:
         # {
