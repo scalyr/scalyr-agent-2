@@ -420,14 +420,15 @@ class StatusReader(BaseReader):
             # for now.
             # if field_name == "FDSize":
             #     self.print_sample("app.fd", int_value)
-
-            collector.update({
-                Metric('app.mem.bytes', 'vmsize'): int_value * 1024,
-                Metric('app.mem.bytes', 'peak_vmsize'): int_value * 1024,
-                Metric('app.mem.bytes', 'resident'): int_value * 1024,
-                Metric('app.mem.bytes', 'peak_resident'): int_value * 1024
-            })
-            return collector
+            if field_name == "VmSize":
+                collector.update({Metric('app.mem.bytes', 'vmsize'): int_value * 1024})
+            elif field_name == "VmPeak":
+                collector.update({Metric('app.mem.bytes', 'peak_vmsize'): int_value * 1024})
+            elif field_name == "VmRSS":
+                collector.update({Metric('app.mem.bytes', 'resident'): int_value * 1024})
+            elif field_name == "VmHWM":
+                collector.update({Metric('app.mem.bytes', 'peak_resident'): int_value * 1024})
+        return collector
 
 
 # Reads stats from /proc/$pid/io.
