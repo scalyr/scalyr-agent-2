@@ -325,9 +325,16 @@ class ScalyrClientSession(object):
             log.log(scalyr_logging.DEBUG_LEVEL_5, 'Response was received with body \"%s\"', response)
 
             if status_code == 429:
-                log.error('Received "too busy" response from server.  Will re-attempt',
+                log.warning('Received "too busy" response from server.  Will re-attempt',
                           error_code='serverTooBusy')
                 return 'serverTooBusy', len(body_str), response
+
+            # "Server unavailable" errors mean the servers are busy, so we should retry as if
+            # we got an explicit "too busy" response.
+            if response == 'Internal error: backend server unavailable. Scalyr staff will investigate.':
+                log.warning('Received "server unavailable" response from server. Will re-attempt',
+                        error_code='internalError')
+                return 'internalError', len(body_str), response
 
             # If we got back an empty result, that often means the connection has been closed or reset.
             if len(response) == 0:
