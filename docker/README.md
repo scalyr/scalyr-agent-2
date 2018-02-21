@@ -1,4 +1,4 @@
-Scalyr Agent Docker Intergraion
+Scalyr Agent Docker Integration
 ===============================
 
 This directory holds the configuration files and Docker build file used to
