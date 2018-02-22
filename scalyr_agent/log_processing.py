@@ -521,7 +521,7 @@ class LogFileIterator(object):
 
             except Exception, e:
                 # something went wrong. Return the full line and log a message
-                log.warn("Error parsing line as json.  Logging full line: %s\n%s" % (str(e), result.line),
+                log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line),
                          limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
         return result
 
