@@ -41,7 +41,7 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
-from scalyr_agent.monitor_utils.k8s import Kubernetes
+from scalyr_agent.monitor_utils.k8s import KubernetesApi
 
 from scalyr_agent.util import StoppableThread
 
@@ -309,12 +309,12 @@ class PodInfo( object ):
     """
         A collection class that stores label and other information about a kubernetes pod
     """
-    def __init__( self, name='', namespace='', uid='', nodeName='', labels={}, containers=[] ):
+    def __init__( self, name='', namespace='', uid='', node_name='', labels={}, containers=[] ):
 
         self.name = name
         self.namespace = namespace
         self.uid = uid
-        self.nodeName = nodeName
+        self.node_name = node_name
         self.labels = labels
         self.containers = containers
 
@@ -324,7 +324,7 @@ class PodInfo( object ):
         md5.update( name )
         md5.update( namespace )
         md5.update( uid )
-        md5.update( nodeName )
+        md5.update( node_name )
 
         # flatten the labels dict in to a single string
         flattened = []
@@ -367,7 +367,7 @@ class ContainerChecker( StoppableThread ):
 
         self.containers = {}
 
-        self.__k8s = Kubernetes()
+        self.__k8s = KubernetesApi()
 
         self.__log_watcher = None
         self.__module = None
@@ -408,6 +408,11 @@ class ContainerChecker( StoppableThread ):
         """ Iterates over all namespaces on this node and then queries
         every pod in every namespace.
 
+        Once queried, the resulting JSON is processed to retrieve the relevant
+        information that we are going to upload to the server (see the PodInfo object),
+        including the pod name, node name, any labels, and any containers that are
+        running on that pod.
+
         @param namespaces: The JSON object returned as a response from querying
             all namespaces from the k8s API
 
@@ -422,8 +427,11 @@ class ContainerChecker( StoppableThread ):
         for namespace in items:
             metadata = namespace.get( 'metadata', {} )
             if 'name' in metadata:
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_3, "Processing namespace: %s" % metadata['name'] )
                 pods = self.__k8s.query_pods( metadata['name'] )
                 self._process_pods( pods, containers )
+            else:
+                self._logger.error( "Namespace name not found in namespace metadata ", limit_once_per_x_secs=300, limit_key='k8s_no_namespace_name' )
 
         return containers
 
@@ -445,10 +453,13 @@ class ContainerChecker( StoppableThread ):
         for pod in items:
             info = self._process_pod( pod )
 
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_3, "Processing pod: %s" % info.name )
+
             # The JSON object indicates that a Pod can have multiple
             # containers, so make sure to key each container with this
             # PodInfo
             for container in info.containers:
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_3, "Pod '%s' is running in container %s" % (info.name, container[:8]) )
                 containers[container] = info
 
     def _process_pod( self, pod ):
@@ -475,6 +486,7 @@ class ContainerChecker( StoppableThread ):
         prefix = 'docker://'
         for container in containerStatuses:
             if 'containerID' not in container:
+                self._logger.error( "containerID not found in containerStatuses", limit_once_per_x_secs=300, limit_key='k8s_no_container_status' )
                 continue
 
             containerID = container['containerID']
@@ -487,7 +499,7 @@ class ContainerChecker( StoppableThread ):
         result = PodInfo( name=metadata.get( "name", '' ),
                           namespace=metadata.get( "namespace", '' ),
                           uid=metadata.get( "uid", '' ),
-                          nodeName=spec.get( "nodeName", '' ),
+                          node_name=spec.get( "nodeName", '' ),
                           labels=labels,
                           containers=containers )
         return result
@@ -504,7 +516,7 @@ class ContainerChecker( StoppableThread ):
             result = self._process_namespaces( namespaces )
         except Exception, e:
             global_log.warn( "Failed to get k8s data: %s\n%s" % (str(e), traceback.format_exc() ),
-                         limit_once_per_x_secs=600, limit_key='get_k8s_data' )
+                         limit_once_per_x_secs=300, limit_key='get_k8s_data' )
         return result
 
     def check_containers( self, run_state ):
@@ -583,7 +595,7 @@ class ContainerChecker( StoppableThread ):
                         if logger['cid'] in changed:
                             info = changed[logger['cid']]
                             new_config = self.__get_log_config_for_container( logger['cid'], info, k8s_data, base_attributes )
-                            self.__log_watcher.update_log_config( self.__module, new_config )
+                            self.__log_watcher.update_log_config( self.__module.module_name, new_config )
 
             except Exception, e:
                 self._logger.warn( "Exception occurred when checking containers %s\n%s" % (str( e ), traceback.format_exc()) )
@@ -741,10 +753,10 @@ class ContainerChecker( StoppableThread ):
         if cid in k8s_data:
             pod = k8s_data[cid]
 
-            container_attributes['podName'] = pod.name
+            container_attributes['pod_name'] = pod.name
             container_attributes['namespace'] = pod.namespace
-            container_attributes['podUid'] = pod.uid
-            container_attributes['nodeName'] = pod.nodeName
+            container_attributes['pod_uid'] = pod.uid
+            container_attributes['node_name'] = pod.node_name
             for label, value in pod.labels.iteritems():
                 container_attributes[label] = value
 

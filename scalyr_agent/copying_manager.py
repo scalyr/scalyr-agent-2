@@ -277,17 +277,17 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return log_config
 
-    def update_log_config( self, monitor, log_config ):
+    def update_log_config( self, monitor_name, log_config ):
         """ Updates the log config of the log matcher that has the same
         path as the one specified in the log_config param
         """
-        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Updating log entry requested by module "%s"' % monitor.module_name).copy()
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Updating log entry requested by module "%s"' % monitor_name).copy()
         try:
             self.__lock.acquire()
 
             log_path = log_config['path']
             if log_path in self.__all_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Updating config for log file \'%s\' for monitor \'%s\'' % (log_path, monitor.module_name ) )
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Updating config for log file \'%s\' for monitor \'%s\'' % (log_path, monitor_name ) )
                 # update by removing the old entry and adding a new one
                 self.__log_matchers[:] = [m for m in self.__log_matchers if m.log_path != log_path]
                 matcher = LogMatcher( self.__config, log_config )

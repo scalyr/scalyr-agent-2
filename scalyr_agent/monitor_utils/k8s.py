@@ -3,8 +3,18 @@ import scalyr_agent.third_party.requests as requests
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
+import logging
+import scalyr_agent.scalyr_logging as scalyr_logging
 
-class Kubernetes( object ):
+global_log = scalyr_logging.getLogger(__name__)
+
+class K8sApiException( Exception ):
+    """A wrapper around Exception that makes it easier to catch k8s specific
+    exceptions
+    """
+    pass
+
+class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
     """
 
@@ -28,6 +38,8 @@ class Kubernetes( object ):
             'Accept': 'application/json',
         }
 
+        # The k8s API requires us to pass in an authentication token
+        # which we can obtain from a token file in a 'well known' location
         token = ''
 
         try:
@@ -61,7 +73,9 @@ class Kubernetes( object ):
         url = self._http_host + path + '?pretty=%d' % (pretty)
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         if response.status_code != 200:
-            raise Exception( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
+            global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
+            raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
         return json_lib.parse( response.text )
 
     def query_pod( self, namespace, pod ):

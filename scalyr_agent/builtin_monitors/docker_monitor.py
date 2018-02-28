@@ -493,7 +493,7 @@ class ContainerChecker( StoppableThread ):
 
         # checkpoints are only used for querying from the API, so ignore
         # them if we are using raw logs
-        if !self._use_raw_logs:
+        if not self._use_raw_logs:
             for logger in self.docker_loggers:
                 last_request = logger.last_request()
                 self.__checkpoints[logger.stream_name] = last_request
