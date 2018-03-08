@@ -34,3 +34,7 @@ spec:
       - name: dockersock
         hostPath:
           path: /var/run/docker.sock
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
