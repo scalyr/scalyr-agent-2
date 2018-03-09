@@ -34,6 +34,7 @@ spec:
       - name: dockersock
         hostPath:
           path: /var/run/docker.sock
+      # comment this section if you do not want to run on the master
       tolerations:
       - key: "node-role.kubernetes.io/master"
         operator: "Exists"
