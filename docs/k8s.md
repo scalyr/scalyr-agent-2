@@ -6,7 +6,14 @@ These instructions are for installing the Scalyr Agent as a Daemonset on your Ku
 
 The Scalyr Agent is a daemon that uploads logs and system metrics to the Scalyr servers. This page provides streamlined instructions to get you up and running quickly in a Kubernetes environment.
 
-In our recommended architecture, you will run the Scalyr Agent as a Daemonset on your cluster. The Daemonset runs a Scalyr Agent pod on each node in your cluster that will collect logs and metrics from all other pods running on the same node.
+In our recommended architecture, you will run the Scalyr Agent as a Daemonset on your cluster. The Daemonset runs a Scalyr Agent pod on each node in your cluster that will collect logs and metrics from all other pods running on the same node. Note that this will run the agent on the master node; if you do not want to run the agent on the master, comment the following in https://github.com/scalyr/scalyr-agent-2/blob/k8s_preview/k8s/scalyr-agent-2.yaml:
+
+```
+tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+```
 
 To create and launch the Scalyr Agent Daemonset, please do the following:
 
