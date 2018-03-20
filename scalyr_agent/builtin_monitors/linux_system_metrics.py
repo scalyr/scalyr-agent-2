@@ -234,7 +234,14 @@ define_log_field(__monitor__, 'value', 'The metric value.')
 define_config_option(__monitor__, 'network_interface_prefixes',
                      'The prefixes for the network interfaces to gather statistics for.  This is either a string '
                      'or a list of strings.  The prefix must be the entire string starting after ``/dev/`` and to the'
-                     'first numeric digit.  For example, ``eth`` matches all devices starting with ``/dev/eth``.')
+                     'regex defined by network_interface_suffix, which defaults to \d+ (multiple numeric digits).  '
+                     'For example, ``eth`` matches all devices starting with ``/dev/eth`` that end in a digit, '
+                     'that is eth0, eth1 and so on.')
+define_config_option(__monitor__, 'network_interface_suffix',
+                     'The suffix for network interfaces to gather statistics for.  This is a single regex that '
+                     'defaults to \d+ - multiple digits in a row.  This is appended to each of the network_interface_prefixes '
+                     'to create the full interface name when interating over network interfaces in /dev'
+                     )
 
 class TcollectorOptions(object):
     """Bare minimum implementation of an object to represent the tcollector options.
@@ -249,6 +256,9 @@ class TcollectorOptions(object):
         self.no_fatal_on_error = True
         # A list of the prefixes for network interfaces to report.  Usually defaults to ["eth"]
         self.network_interface_prefixes = None
+
+        # A regex applied as a suffix to the network_interface_prefixes.  Defaults to '\d+'
+        self.network_interface_suffix = None
 
 
 class WriterThread(StoppableThread):
@@ -383,6 +393,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         if isinstance(self.options.network_interface_prefixes, basestring):
             self.options.network_interface_prefixes = [self.options.network_interface_prefixes]
 
+        self.options.network_interface_suffix = self._config.get('network_interface_suffix', default='\d+')
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags
 
