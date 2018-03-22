@@ -476,6 +476,9 @@ class ContainerChecker( StoppableThread ):
         spec = pod.get( 'spec', {} )
         labels = metadata.get( 'labels', {} )
 
+        pod_name = metadata.get( "name", '' )
+        namespace = metadata.get( "namespace", '' )
+
         status = pod.get( 'status', {} )
         containerStatuses = status.get( 'containerStatuses', [] )
 
@@ -485,8 +488,11 @@ class ContainerChecker( StoppableThread ):
         # strip docker:// from the front of each one
         prefix = 'docker://'
         for container in containerStatuses:
+            container_name = container.get( 'name', '' )
+            key = '%s:%s:%s' % (namespace, pod_name, container_name)
             if 'containerID' not in container:
-                self._logger.error( "containerID not found in containerStatuses", limit_once_per_x_secs=300, limit_key='k8s_no_container_status' )
+                self._logger.error( "containerID not found in containerStatuses for %s" % (key), limit_once_per_x_secs=300, limit_key='k8s_no_container_status_%s' % key )
+                self._logger.info( "JSON for %s: %s" % (pod_name, json_lib.serialize( pod )), limit_once_per_x_secs=300, limit_key='k8s_pod_json_%s' % key )
                 continue
 
             containerID = container['containerID']
@@ -496,8 +502,8 @@ class ContainerChecker( StoppableThread ):
             containers.append( containerID)
 
         # create the PodInfo
-        result = PodInfo( name=metadata.get( "name", '' ),
-                          namespace=metadata.get( "namespace", '' ),
+        result = PodInfo( name=pod_name,
+                          namespace=namespace,
                           uid=metadata.get( "uid", '' ),
                           node_name=spec.get( "nodeName", '' ),
                           labels=labels,
