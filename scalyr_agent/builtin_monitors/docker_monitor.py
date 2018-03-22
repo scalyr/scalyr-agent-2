@@ -106,7 +106,7 @@ define_config_option( __monitor__, 'log_mode',
 define_config_option( __monitor__, 'docker_raw_logs',
                      'Optional (defaults to False). If True, the docker monitor will use the raw log files on disk to read logs.'
                      'The location of the raw log file is obtained by querying the path from the Docker API. '
-                     'If false, the logs will be streamed over the Docker API.'
+                     'If false, the logs will be streamed over the Docker API.',
                      convert_to=bool,
                      default=False)
 
