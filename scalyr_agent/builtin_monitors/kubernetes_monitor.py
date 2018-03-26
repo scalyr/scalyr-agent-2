@@ -256,7 +256,7 @@ def _split_datetime_from_line( line ):
     return (dt, log_line)
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, glob_list=None, include_log_path=False):
+                    only_running_containers=True, glob_list=None, include_log_path=False, include_k8s_info=False):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -286,14 +286,42 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
 
                 if add_container:
                     log_path = None
-                    if include_log_path:
+                    k8s_info = None
+                    status = None
+                    if include_log_path or include_k8s_info:
                         try:
                             info = client.inspect_container( cid )
-                            log_path = info['LogPath'] if 'LogPath' in info else None
+                            log_path = info['LogPath'] if include_log_path and 'LogPath' in info else None
+
+                            if not only_running_containers:
+                                status = info['State']['Status']
+
+                            if include_k8s_info:
+                                config = info.get('Config', {} )
+                                labels = config.get( 'Labels', {} )
+
+                                pod_uid = labels.get( 'io.kubernetes.pod.uid', None )
+                                pod_name = labels.get( 'io.kubernetes.pod.name', None )
+                                pod_namespace = labels.get( 'io.kubernetes.pod.namespace', None )
+
+                                if pod_uid and pod_name and pod_namespace:
+                                   k8s_info = { 'pod_name': pod_name,
+                                                'pod_uid': pod_uid,
+                                                'pod_namespace': pod_namespace }
+                                else:
+                                    short_cid = cid[:8]
+                                    logger.error( "Error getting kubernetes labels for container %s", short_cid, limit_once_per_x_secs=300,limit_key="docker-inspect-k8s-%s" % short_cid)
                         except Exception, e:
                           logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
 
+
                     result[cid] = {'name': name, 'log_path': log_path }
+
+                    if status:
+                        result[cid]['status'] = status
+
+                    if k8s_info:
+                        result[cid]['k8s_info'] = k8s_info
 
             else:
                 result[cid] = {'name': cid, 'log_path': None}
@@ -309,14 +337,13 @@ class PodInfo( object ):
     """
         A collection class that stores label and other information about a kubernetes pod
     """
-    def __init__( self, name='', namespace='', uid='', node_name='', labels={}, containers=[] ):
+    def __init__( self, name='', namespace='', uid='', node_name='', labels={} ):
 
         self.name = name
         self.namespace = namespace
         self.uid = uid
         self.node_name = node_name
         self.labels = labels
-        self.containers = containers
 
         # generate a hash we can use to compare whether or not
         # any of the pod info has changed
@@ -376,13 +403,13 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
 
-        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True)
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
             self.containers = {}
 
-        k8s_data = self._get_k8s_data()
+        k8s_data = self.get_k8s_data()
         self.docker_logs = self.__get_docker_logs( self.containers, k8s_data )
         self.raw_logs = []
 
@@ -416,7 +443,7 @@ class ContainerChecker( StoppableThread ):
         @param namespaces: The JSON object returned as a response from querying
             all namespaces from the k8s API
 
-        @return A dict of PodInfo objects, keyed on docker container ID
+        @return A dict of PodInfo objects, keyed on pod_uid
         """
         # get the list of namespaces
         items = namespaces.get( 'items', [] )
@@ -437,7 +464,7 @@ class ContainerChecker( StoppableThread ):
 
     def _process_pods( self, pods, containers ):
         """ Iterates over every pod, storing PodInfo in the containers dict, hashed by
-            docker container id.
+            pod_uid
 
             @param pods: The JSON object returned as a response from quering all pods
                 in a specific namespace
@@ -449,18 +476,11 @@ class ContainerChecker( StoppableThread ):
         items = pods.get( 'items', [] )
 
         # iterate over all pods, getting PodInfo and storing it in the container
-        # dict, hashed by container ID
+        # dict, hashed by pod uid
         for pod in items:
             info = self._process_pod( pod )
-
             self._logger.log( scalyr_logging.DEBUG_LEVEL_3, "Processing pod: %s" % info.name )
-
-            # The JSON object indicates that a Pod can have multiple
-            # containers, so make sure to key each container with this
-            # PodInfo
-            for container in info.containers:
-                self._logger.log( scalyr_logging.DEBUG_LEVEL_3, "Pod '%s' is running in container %s" % (info.name, container[:8]) )
-                containers[container] = info
+            containers[info.uid] = info
 
     def _process_pod( self, pod ):
         """ Generate a PodInfo object from a JSON object
@@ -479,42 +499,19 @@ class ContainerChecker( StoppableThread ):
         pod_name = metadata.get( "name", '' )
         namespace = metadata.get( "namespace", '' )
 
-        status = pod.get( 'status', {} )
-        containerStatuses = status.get( 'containerStatuses', [] )
-
-        containers = []
-
-        # build list of container ids used by this pod, making sure to
-        # strip docker:// from the front of each one
-        prefix = 'docker://'
-        for container in containerStatuses:
-            container_name = container.get( 'name', '' )
-            key = '%s:%s:%s' % (namespace, pod_name, container_name)
-            if 'containerID' not in container:
-                self._logger.error( "containerID not found in containerStatuses for %s" % (key), limit_once_per_x_secs=300, limit_key='k8s_no_container_status_%s' % key )
-                self._logger.info( "JSON for %s: %s" % (pod_name, json_lib.serialize( pod )), limit_once_per_x_secs=300, limit_key='k8s_pod_json_%s' % key )
-                continue
-
-            containerID = container['containerID']
-
-            if containerID.startswith( prefix ):
-                containerID = containerID[len(prefix):]
-            containers.append( containerID)
-
         # create the PodInfo
         result = PodInfo( name=pod_name,
                           namespace=namespace,
                           uid=metadata.get( "uid", '' ),
                           node_name=spec.get( "nodeName", '' ),
-                          labels=labels,
-                          containers=containers )
+                          labels=labels)
         return result
 
-    def _get_k8s_data( self ):
+    def get_k8s_data( self ):
         """ Convenience wrapper to query and process all namespaces
             and pods retreived by the k8s API for the current node
             and return them in a dict of PodInfo objects keyed by
-            the container id that runs the pod.
+            the pod_uid of the pod.
         """
         result = {}
         try:
@@ -538,10 +535,10 @@ class ContainerChecker( StoppableThread ):
             try:
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve k8s data' )
-                k8s_data = self._get_k8s_data()
+                k8s_data = self.get_k8s_data()
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True)
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty
@@ -558,8 +555,9 @@ class ContainerChecker( StoppableThread ):
 
                 for cid, info in running_containers.iteritems():
                     pod = None
-                    if cid in k8s_data:
-                        pod = k8s_data[cid]
+                    if 'k8s_info' in info:
+                        pod_uid = info['k8s_info'].get( 'pod_uid', 'invalid_key' )
+                        pod = k8s_data.get( pod_uid, None )
 
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
@@ -568,7 +566,7 @@ class ContainerChecker( StoppableThread ):
                     elif cid in prev_digests:
                         # container was running and it exists in the previous digest dict, so see if
                         # it has changed
-                        if prev_digests[cid] != pod.digest:
+                        if pod and prev_digests[cid] != pod.digest:
                             changed[cid] = info
 
                     # store the digest from this iteration of the loop
@@ -754,20 +752,30 @@ class ContainerChecker( StoppableThread ):
         container_attributes = base_attributes.copy()
         container_attributes['containerName'] = info['name']
         container_attributes['containerId'] = cid
-
         parser = 'docker'
-        if cid in k8s_data:
-            pod = k8s_data[cid]
 
-            container_attributes['pod_name'] = pod.name
-            container_attributes['namespace'] = pod.namespace
-            container_attributes['pod_uid'] = pod.uid
-            container_attributes['node_name'] = pod.node_name
-            for label, value in pod.labels.iteritems():
-                container_attributes[label] = value
+        k8s_info = info.get( 'k8s_info', {} )
 
-            if 'parser' in pod.labels:
-                parser = pod.labels['parser']
+        if k8s_info:
+            pod_uid = k8s_info.get('pod_uid', 'invalid-key')
+            self._logger.info( "got k8s info for container %s, %s" % (cid[:8], pod_uid) )
+            pod = k8s_data.get(pod_uid, None)
+            if pod:
+                container_attributes['pod_name'] = pod.name
+                container_attributes['namespace'] = pod.namespace
+                container_attributes['pod_uid'] = pod.uid
+                container_attributes['node_name'] = pod.node_name
+                for label, value in pod.labels.iteritems():
+                    container_attributes[label] = value
+
+                if 'parser' in pod.labels:
+                    parser = pod.labels['parser']
+            else:
+                self._logger.error( "Couldn't map container '%s' to pod '%s'" % ( cid[:8], pod_uid ),
+                                    limit_once_per_x_secs=300,
+                                    limit_key='k8s-docker-mapping-%s' % cid)
+        else:
+            self._logger.info( "no k8s info for container %s" % cid[:8] )
 
         if 'log_path' in info and info['log_path']:
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=True )
@@ -1059,6 +1067,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__glob_list = self._config.get( 'container_globs' )
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
+        self.__report_k8s_info = True
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
@@ -1222,6 +1231,27 @@ class KubernetesMonitor( ScalyrMonitor ):
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
             self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
             self.__gather_metrics_from_api( containers )
+
+        if self.__report_k8s_info:
+            containers = _get_containers( self.__client, only_running_containers=False, include_k8s_info=True )
+            for cid, info in containers.iteritems():
+                try:
+                    extra = info['k8s_info']
+                    extra['status'] = info['status']
+                    self._logger.emit_value( 'docker.container_name', info['name'], extra, monitor_id_override="namespace:%s" % extra['pod_namespace'] )
+                except Exception, e:
+                    self._logger.error( "Error logging container information for %s: %s" % (cid[:8], str( e )) )
+
+            if self.__container_checker:
+                pods = self.__container_checker.get_k8s_data()
+                for uid, pod in pods.iteritems():
+                    try:
+                        extra = { 'pod_uid': pod.uid,
+                                  'pod_namespace': pod.namespace,
+                                  'node_name': pod.node_name }
+                        self._logger.emit_value( 'k8s.pod', pod.name, extra, monitor_id_override="namespace:%s" % pod.namespace )
+                    except Exception, e:
+                        self._logger.error( "Error logging pod information for %s: %s" % (pod.name, str( e )) )
 
 
     def run( self ):
