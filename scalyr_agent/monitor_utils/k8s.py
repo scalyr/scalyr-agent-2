@@ -1,10 +1,13 @@
 
+import os
 import scalyr_agent.third_party.requests as requests
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 import logging
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+import urllib
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -25,7 +28,13 @@ class KubernetesApi( object ):
         # fixed well known location for authentication token required to
         # query the API
         token_file="/var/run/secrets/kubernetes.io/serviceaccount/token"
+
+        # fixed well known location for namespace file
+        namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
         self._http_host="https://kubernetes.default"
+
+        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host )
         self._timeout = 10.0
 
         self._session = None
@@ -50,6 +59,16 @@ class KubernetesApi( object ):
         except IOError, e:
             pass
 
+        #get the namespace this pod is running on
+        self.namespace = 'default'
+        try:
+            # using with is ok here, because we need to be running
+            # a recent version of python for various 3rd party libs
+            with open( namespace_file, 'r' ) as f:
+                self.namespace = f.read()
+        except IOError, e:
+            pass
+
         self._standard_headers["Authorization"] = "Bearer %s" % (token)
 
     def _verify_connection( self ):
@@ -66,11 +85,31 @@ class KubernetesApi( object ):
             self._session = requests.Session()
             self._session.headers.update( self._standard_headers )
 
+    def get_pod_name( self ):
+        """ Gets the pod name of the pod running the scalyr-agent """
+        return os.environ.get( 'SCALYR_K8S_POD_NAME' ) or os.environ.get( 'HOSTNAME' )
+
+
+    def get_node_name( self, pod_name ):
+        """ Gets the node name of the node running the agent """
+        node = os.environ.get( 'SCALYR_K8S_NODE_NAME' )
+        if not node:
+            pod = self.query_pod( self.namespace, pod_name )
+            spec = pod.get( 'spec', {} )
+            node = spec.get( 'nodeName' )
+        return node
+
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
         self._ensure_session()
-        url = self._http_host + path + '?pretty=%d' % (pretty)
+        pretty='pretty=%d' % pretty
+        if "?" in path:
+            pretty = '&%s' % pretty
+        else:
+            pretty = '?%s' % pretty
+
+        url = self._http_host + path + pretty
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
@@ -80,12 +119,24 @@ class KubernetesApi( object ):
 
     def query_pod( self, namespace, pod ):
         """Wrapper to query a pod in a namespace"""
-        return self.query_api( '/api/v1/namespaces/%s/pods/%s' % (namespace, pod) )
+        if not pod or not namespace:
+            return JsonObject()
 
-    def query_pods( self, namespace ):
-        """Wrapper to query all pods in a namespace"""
-        return self.query_api( '/api/v1/namespaces/%s/pods' % (namespace) )
+        query = '/api/v1/namespaces/%s/pods/%s' % (namespace, pod)
+        return self.query_api( query )
+
+    def query_pods( self, namespace=None, filter=None ):
+        """Wrapper to query all pods in a namespace, or across the entire cluster"""
+        query = '/api/v1/pods'
+        if namespace:
+            query = '/api/v1/namespaces/%s/pods' % (namespace)
+
+        if filter:
+            query = "%s?fieldSelector=%s" % (query, urllib.quote( filter ))
+
+        return self.query_api( query )
 
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
         return self.query_api( '/api/v1/namespaces' )
+
