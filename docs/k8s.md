@@ -20,7 +20,7 @@ To create and launch the Scalyr Agent Daemonset, please do the following:
 1. Configure a secret that contains your Scalyr API key
 
 ```
-kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key="<your scalyr api key>"
+kubectl create secret generic scalyr-api-key --namespace=kube-system --from-literal=scalyr-api-key="<your scalyr api key>"
 ```
 
 2. Launch the Daemonset
