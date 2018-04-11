@@ -234,12 +234,12 @@ define_log_field(__monitor__, 'value', 'The metric value.')
 define_config_option(__monitor__, 'network_interface_prefixes',
                      'The prefixes for the network interfaces to gather statistics for.  This is either a string '
                      'or a list of strings.  The prefix must be the entire string starting after ``/dev/`` and to the'
-                     'regex defined by network_interface_suffix, which defaults to \d+ (multiple numeric digits).  '
-                     'For example, ``eth`` matches all devices starting with ``/dev/eth`` that end in a digit, '
-                     'that is eth0, eth1 and so on.')
+                     'regex defined by network_interface_suffix, which defaults to [0-9A-Z]+ (multiple digits or uppercase letters).  '
+                     'For example, ``eth`` matches all devices starting with ``/dev/eth`` that end in a digit or an uppercase letter, '
+                     'that is eth0, eth1, ethA, ethB and so on.')
 define_config_option(__monitor__, 'network_interface_suffix',
                      'The suffix for network interfaces to gather statistics for.  This is a single regex that '
-                     'defaults to \d+ - multiple digits in a row.  This is appended to each of the network_interface_prefixes '
+                     'defaults to [0-9A-Z]+ - multiple digits or uppercase letters in a row.  This is appended to each of the network_interface_prefixes '
                      'to create the full interface name when interating over network interfaces in /dev'
                      )
 
@@ -257,7 +257,7 @@ class TcollectorOptions(object):
         # A list of the prefixes for network interfaces to report.  Usually defaults to ["eth"]
         self.network_interface_prefixes = None
 
-        # A regex applied as a suffix to the network_interface_prefixes.  Defaults to '\d+'
+        # A regex applied as a suffix to the network_interface_prefixes.  Defaults to '[0-9A-Z]+'
         self.network_interface_suffix = None
 
 
@@ -393,7 +393,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         if isinstance(self.options.network_interface_prefixes, basestring):
             self.options.network_interface_prefixes = [self.options.network_interface_prefixes]
 
-        self.options.network_interface_suffix = self._config.get('network_interface_suffix', default='\d+')
+        self.options.network_interface_suffix = self._config.get('network_interface_suffix', default='[0-9A-Z]+')
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags
 
