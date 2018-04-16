@@ -277,6 +277,27 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return log_config
 
+    def update_log_config( self, monitor_name, log_config ):
+        """ Updates the log config of the log matcher that has the same
+        path as the one specified in the log_config param
+        """
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Updating log entry requested by module "%s"' % monitor_name).copy()
+        try:
+            self.__lock.acquire()
+
+            log_path = log_config['path']
+            if log_path in self.__all_paths:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Updating config for log file \'%s\' for monitor \'%s\'' % (log_path, monitor_name ) )
+                # update by removing the old entry and adding a new one
+                self.__log_matchers[:] = [m for m in self.__log_matchers if m.log_path != log_path]
+                matcher = LogMatcher( self.__config, log_config )
+                self.__log_matchers.append(matcher)
+            else:
+                log.warn( "Trying to update log config for nonexistent log: %s" % log_path, 
+                           limit_once_per_x_secs=600, limit_key='update-log-config-%s' % log_path )
+        finally:
+            self.__lock.release()
+
     def remove_log_path( self, monitor, log_path ):
         """Remove the log_path from the list of paths being watched
         params: log_path - a string containing the path to the file no longer being watched
