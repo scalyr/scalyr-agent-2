@@ -812,6 +812,7 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
     os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = str(sample_interval_secs)
     # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
     os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(options.network_interface_prefixes)
+    os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():

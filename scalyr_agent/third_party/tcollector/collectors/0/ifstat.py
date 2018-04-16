@@ -50,6 +50,13 @@ try:
 except ValueError:
     pass
 
+# Scalyr edit:  Check environment variable for for additional network interface suffix.
+NETWORK_INTERFACE_SUFFIX = '\d+'
+try:
+    if "TCOLLECTOR_INTERFACE_SUFFIX" in os.environ:
+        NETWORK_INTERFACE_SUFFIX = os.environ["TCOLLECTOR_INTERFACE_SUFFIX"]
+except ValueError:
+    pass
 
 def main():
     """ifstat main loop"""
@@ -76,7 +83,7 @@ def main():
         for line in f_netdev:
             # Scalyr edit
             for interface in network_interface_prefixes:
-                m = re.match("\s+(%s\d+):(.*)" % interface, line)
+                m = re.match("\s+(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line)
                 if m:
                     break
             if not m:
