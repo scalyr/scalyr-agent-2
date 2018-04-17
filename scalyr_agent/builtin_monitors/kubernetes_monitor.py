@@ -260,6 +260,22 @@ def _split_datetime_from_line( line ):
 
     return (dt, log_line)
 
+def _get_short_cid( container_id ):
+    """returns a shortened container id.  Useful for logging, where using a full length container id
+       is not necessary and would just add noise to the log.
+       The shortened container id will contain enough information to uniquely
+       identify the container for most situations.  Note:  the returned value
+       should never be used as a key in a dict for containers because there is
+       always the remote possibility of a conflict (given a large enough number
+       of containers).
+    """
+    # return the first 8 chars of the container id.
+    # we don't need to check for length because even if len( container_id ) < 8
+    # it's still valid to slice beyond the end of a string.  See:
+    # https://docs.python.org/2/reference/expressions.html#slicings
+    return container_id[:8]
+
+
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
                     only_running_containers=True, glob_list=None, include_log_path=False, include_k8s_info=False):
     """Gets a dict of running containers that maps container id to container name
@@ -280,7 +296,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         response = client.containers(filters=filters, all=not only_running_containers)
         for container in response:
             cid = container['Id']
-            short_cid = cid[:8]
+            short_cid = _get_short_cid( cid )
 
             if ignore_container is not None and cid == ignore_container:
                 continue
@@ -589,7 +605,7 @@ class ContainerChecker( StoppableThread ):
                         pod = k8s_data.get( pod_namespace, {} ).get( pod_name, None )
 
                         if not pod:
-                            self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (cid[:8], pod_namespace, pod_name),
+                            self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                                                   limit_once_per_x_secs=300,
                                                   limit_key='check-container-pod-info-%s' % cid)
 
@@ -793,7 +809,7 @@ class ContainerChecker( StoppableThread ):
         if k8s_info:
             pod_name = k8s_info.get('pod_name', 'invalid_pod')
             pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (cid[:8], pod_namespace, pod_name) )
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name) )
             pod = k8s_data.get(pod_namespace, {}).get(pod_name, None)
             if pod:
                 container_attributes['pod_name'] = pod.name
@@ -806,7 +822,7 @@ class ContainerChecker( StoppableThread ):
                 if 'parser' in pod.labels:
                     parser = pod.labels['parser']
             else:
-                self._logger.warning( "Couldn't map container '%s' to pod '%s/%s'. Logging limited metadata from docker container labels instead." % ( cid[:8], pod_namespace, pod_name ),
+                self._logger.warning( "Couldn't map container '%s' to pod '%s/%s'. Logging limited metadata from docker container labels instead." % ( _get_short_cid( cid ), pod_namespace, pod_name ),
                                     limit_once_per_x_secs=300,
                                     limit_key='k8s-docker-mapping-%s' % cid)
                 container_attributes['pod_name'] = pod_name
@@ -814,7 +830,7 @@ class ContainerChecker( StoppableThread ):
                 container_attributes['pod_uid'] = k8s_info.get('pod_uid', 'invalid_uid')
                 container_attributes['k8s_container_name'] = k8s_info.get('k8s_container_name', 'invalid_container_name')
         else:
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % cid[:8] )
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % _get_short_cid( cid ) )
 
         if 'log_path' in info and info['log_path']:
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=True )
@@ -1280,7 +1296,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     namespace = extra.get( 'pod_namespace', 'invalid-namespace' )
                     self._logger.emit_value( 'docker.container_name', info['name'], extra, monitor_id_override="namespace:%s" % namespace )
                 except Exception, e:
-                    self._logger.error( "Error logging container information for %s: %s" % (cid[:8], str( e )) )
+                    self._logger.error( "Error logging container information for %s: %s" % (_get_short_cid( cid ), str( e )) )
 
             if self.__container_checker:
                 namespaces = self.__container_checker.get_k8s_data()
