@@ -413,7 +413,10 @@ class ScalyrAgent(object):
             self.__fail_if_already_running()
 
             if not quiet:
-                print "Configuration and server connection verified, starting agent in background."
+                if no_check_remote:
+                    print "Configuration verified, starting agent in background."
+                else:
+                    print "Configuration and server connection verified, starting agent in background."
             self.__controller.start_agent_service(self.__run, quiet, fork=True)
         else:
             self.__controller.start_agent_service(self.__run, quiet, fork=False)

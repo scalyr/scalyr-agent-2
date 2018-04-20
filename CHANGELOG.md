@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.31 "Fallers" - Apr 19, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 19, 2018 11:00 -0700
+--->
+
+Features:
+
+* Added kubernetes support with introduction of new kubernetes monitor along with kubernete image published on dockerhub.com under scalyr/scalyr-k8s-agent.  See online documentation for more information.
+* Added `network_interface_suffix` option to `linux_system_metrics` monitor to control regular expression used to validate interfaces names.  Additionally, widened existing rule to accept letters at the end of the interface name.
+* Added `aggregate_multiple_processes` to `linux_process_metrics` which allows multiple processes to be matched by process matching rule.  The reported metrics will include the statistics from all matching processed.
+* Added `include_child_processes` to `linux_process_metrics` to include all child processes from the matched process in the reported metrics.
+
 ## 2.0.30 "Ewok" - Oct 25, 2017
 
 <!---

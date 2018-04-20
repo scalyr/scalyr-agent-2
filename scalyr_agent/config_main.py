@@ -877,13 +877,15 @@ def import_config(config_src, config_file_path, configuration):
         os.chdir(original_dir)
 
 
-def create_custom_dockerfile(tarball_path, config_file_path, configuration):
+def create_custom_dockerfile(tarball_path, config_file_path, configuration, label='-docker', docker_config_name='.custom_agent_config'):
     """Creates a gzipped tarball that, when unpacked, contains a Dockerfile that can be used to create a custom
     Docker image that includes whatever configuration files this agent install currently has.
 
     @param tarball_path: The path to write the gzipped tarball, or `-` if the tarball should written to stdout.
     @param config_file_path: The path to the current configuration file (the `agent.json` file).
     @param configuration: The configuration object itself.
+    @param label: A label to apply between 'scalyr' and 'agent' of the image label.
+    @param config_name: Which Dockerfile configuration to use as the base configuration
     @type tarball_path: str
     @type config_file_path: str
     @type configuration: Configuration
@@ -896,9 +898,9 @@ def create_custom_dockerfile(tarball_path, config_file_path, configuration):
     # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
     # by this current agent install.  We want the version of this install in order to make sure the new docker image
     # is as close to what is currently running as possible.
-    dockerfile_path = os.path.join(get_install_root(), 'misc', 'Dockerfile.custom_agent_config')
+    dockerfile_path = os.path.join(get_install_root(), 'misc', 'Dockerfile%s' % docker_config_name)
     fp = open(dockerfile_path)
-    dockerfile_contents = fp.read().replace('/scalyr-docker-agent:latest', '/scalyr-docker-agent:%s' % SCALYR_VERSION)
+    dockerfile_contents = fp.read().replace('/scalyr%s-agent:latest' % label, '/scalyr%s-agent:%s' % (label, SCALYR_VERSION))
     fp.close()
 
     dockerfile_fp = cStringIO.StringIO(dockerfile_contents)
@@ -973,8 +975,16 @@ if __name__ == '__main__':
                       help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
                            "Docker image that includes the configuration from this agent installation and based off "
                            "of the same Scalyr Agent version as this agent.  Essentially, it is a snapshot of this "
-                           "agent so that it's configuration can be more easily used again for other Docker "
+                           "agent so that its configuration can be more easily used again for other Docker "
                            "containers.  The option value should either be a path to write the tarball or `-` to "
+                           "write it to stdout.")
+    parser.add_option("", "--k8s-create-custom-dockerfile", dest="create_custom_k8s_dockerfile",
+                      help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
+                           "Docker image that includes the configuration from this agent installation and based off "
+                           "of the same Scalyr Agent version as this agent, and suitable for running on a Kubernetes "
+                           "cluster.  Essentially, it is a snapshot of this agent so that its configuration can be "
+                           "more easily used again when running as a Kubernetes Daemonset."
+                           "The option value should either be a path to write the tarball or `-` to "
                            "write it to stdout.")
 
     # TODO: These options are only available on Windows platforms
@@ -1108,5 +1118,8 @@ if __name__ == '__main__':
 
     if options.create_custom_dockerfile is not None:
         create_custom_dockerfile(options.create_custom_dockerfile, options.config_filename, config_file)
+
+    if options.create_custom_k8s_dockerfile is not None:
+        create_custom_dockerfile(options.create_custom_k8s_dockerfile, options.config_filename, config_file, label="-k8s", docker_config_name=".custom_k8s_config")
 
     sys.exit(0)

@@ -27,7 +27,7 @@ jobs:
       - run:
           command: |
             source venv/bin/activate
-            nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml
+            nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml --ignore-files=.*log_processing_test.*
 
       - store_artifacts:
           path: xunit.xml
