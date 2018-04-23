@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: scalyr-agent
-        image: scalyr/scalyr-docker-agent-k8s-preview
+        image: scalyr/scalyr-k8s-agent
         imagePullPolicy: Always
         env:
           - name: SCALYR_API_KEY
