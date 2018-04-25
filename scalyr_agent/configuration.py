@@ -233,6 +233,34 @@ class Configuration(object):
 
         return monitor_config
 
+    # Debug leak flags
+    @property
+    def disable_send_requests(self):
+        return self.__get_config().get_bool('disable_leak_send_requests')
+
+    @property
+    def disable_monitor_threads(self):
+        return self.__get_config().get_bool('disable_leak_monitor_threads')
+
+    @property
+    def disable_monitors_creation(self):
+        return self.__get_config().get_bool('disable_leak_monitors_creation')
+
+    @property
+    def disable_new_file_matches(self):
+        return self.__get_config().get_bool('disable_leak_new_file_matches')
+
+    @property
+    def disable_scan_for_new_bytes(self):
+        return self.__get_config().get_bool('disable_leak_scan_for_new_bytes')
+
+    @property
+    def disable_processing_new_bytes(self):
+        return self.__get_config().get_bool('disable_leak_processing_new_bytes')
+
+    @property
+    def disable_copying_thread(self):
+        return self.__get_config().get_bool('disable_leak_copying_thread')
 
     @property
     def config_change_check_interval(self):
@@ -844,6 +872,14 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description)
 
+        #Debug leak flags
+        self.__verify_or_set_optional_bool(config, 'disable_leak_send_requests', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_monitors_creation', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_new_file_matches', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_scan_for_new_bytes', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_processing_new_bytes', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_copying_thread', False, description)
         self.__verify_or_set_optional_int(config, 'config_change_check_interval', 30, description)
 
 

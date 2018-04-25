@@ -246,6 +246,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         for monitor in monitors:
             monitor.set_log_watcher( self )
 
+        # debug leaks
+        self.__disable_new_file_matches = configuration.disable_new_file_matches
+        self.__disable_scan_for_new_bytes = configuration.disable_scan_for_new_bytes
+        self.__disable_copying_thread = configuration.disable_copying_thread
+
     @property
     def log_matchers(self):
         """Returns the list of log matchers that were created based on the configuration and passed in monitors.
@@ -386,6 +391,16 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         This method will not terminate until the thread has been stopped.
         """
+        # Debug leak
+        if self.__disable_copying_thread:
+            log.log( scalyr_logging.DEBUG_LEVEL_0, "Copying thread disabled.  No log copying will occur" )
+            self.__copying_semaphore.release()
+            # sit here and do nothing
+            while self._run_state.is_running():
+                self._sleep_but_awaken_if_stopped( 1 )
+            # early return
+            return
+
         # So the scanning.. every scan:
         #   - See if any of the loggers have new files that are being matched
         #   - Update the file length counts of all current scanners:
@@ -843,6 +858,13 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type copy_at_index_zero: bool
         @type current_time: float
         """
+
+        # Debug leak, if not the initial request, and disable_leak flag is true, then don't scan
+        # for new logs
+        if logs_initial_positions is None and self.__disable_new_file_matches:
+            log.log(scalyr_logging.DEBUG_LEVEL_0, "Scanning for new file matches disabled" )
+            return
+
         if current_time is None:
             current_time = time.time()
 
@@ -886,6 +908,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         This is mainly used to just update the statistics about the files for reporting purposes (i.e., the number
         of pending bytes, etc).
         """
+        if self.__disable_scan_for_new_bytes:
+            log.log( scalyr_logging.DEBUG_LEVEL_0, "Scanning for new bytes disabled." )
+            return
+
         if current_time is None:
             current_time = time.time()
         for processor in self.__log_processors:

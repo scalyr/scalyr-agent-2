@@ -59,7 +59,7 @@ class ScalyrClientSession(object):
     are monotonically increasing within a session.
     """
     def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
-                 proxies=None, compression_type=None, compression_level=9 ):
+                 proxies=None, compression_type=None, compression_level=9, disable_send_requests=False ):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -175,6 +175,9 @@ class ScalyrClientSession(object):
         self.__ca_file = ca_file
         self.__proxies = proxies
 
+        # debug flag to disable send requests
+        self.__disable_send_requests = disable_send_requests
+
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
 
@@ -251,12 +254,15 @@ class ScalyrClientSession(object):
 
             # noinspection PyBroadException
             try:
-                if is_post:
-                    log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
-                    self.__connection.post( request_path, body=body_str )
+                if self.__disable_send_requests:
+                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Send requests disabled.  %d bytes dropped" % self.total_request_bytes_sent )
                 else:
-                    log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
-                    self.__connection.get( request_path )
+                    if is_post:
+                        log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
+                        self.__connection.post( request_path, body=body_str )
+                    else:
+                        log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
+                        self.__connection.get( request_path )
 
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
@@ -303,8 +309,12 @@ class ScalyrClientSession(object):
 
         try:
             try:
-                status_code = self.__connection.status_code()
-                response = self.__connection.response()
+                if self.__disable_send_requests:
+                    response = '{ "status":"success" }'
+                    status_code = 200
+                else:
+                    status_code = self.__connection.status_code()
+                    response = self.__connection.response()
                 bytes_received = len(response)
             except httplib.HTTPException, httpError:
                 log.error('Failed to receive response due to HTTPException \'%s\'. Closing connection, will re-attempt' % ( httpError.__class__.__name__ ),
