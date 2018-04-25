@@ -233,6 +233,12 @@ class Configuration(object):
 
         return monitor_config
 
+
+    @property
+    def config_change_check_interval(self):
+        return self.__get_config().get_int('config_change_check_interval')
+    # end Debug leak flags
+
     @property
     def read_time(self):
         """Returns the time this configuration file was read."""
@@ -837,6 +843,8 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description)
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description)
+
+        self.__verify_or_set_optional_int(config, 'config_change_check_interval', 30, description)
 
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
