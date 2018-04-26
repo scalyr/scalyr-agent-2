@@ -688,7 +688,9 @@ class ScalyrAgent(object):
                 self.__copying_manager = worker_thread.copying_manager
                 self.__monitors_manager = worker_thread.monitors_manager
 
-                while not self.__run_state.sleep_but_awaken_if_stopped(30):
+                config_change_check_interval = self.__config.config_change_check_interval
+
+                while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
                     current_time = time.time()
                     self.__last_config_check_time = current_time
 
@@ -757,6 +759,7 @@ class ScalyrAgent(object):
                     self.__monitors_manager = worker_thread.monitors_manager
 
                     self.__current_bad_config = None
+                    config_change_check_interval = self.__config.config_change_check_interval
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
@@ -807,7 +810,8 @@ class ScalyrAgent(object):
                                    request_deadline=self.__config.request_deadline, ca_file=ca_file,
                                    use_requests_lib=use_requests_lib, compression_type=self.__config.compression_type,
                                    compression_level=self.__config.compression_level,
-                                   proxies=self.__config.network_proxies)
+                                   proxies=self.__config.network_proxies,
+                                   disable_send_requests=self.__config.disable_send_requests)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.

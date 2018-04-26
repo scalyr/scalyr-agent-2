@@ -41,7 +41,13 @@ class MonitorsManager(object):
         @type configuration: scalyr_agent.Configuration
         @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
-        self.__monitors = MonitorsManager.__create_monitors(configuration, platform_controller)
+        if configuration.disable_monitors_creation:
+            log.log( scalyr_logging.DEBUG_LEVEL_0, "Creation of Scalyr Monitors disabled.  No monitors created." )
+            self.__monitors = []
+        else:
+            self.__monitors = MonitorsManager.__create_monitors(configuration, platform_controller)
+
+        self.__disable_monitor_threads = configuration.disable_monitor_threads
 
         # This lock protects __running_monitors.
         self.__lock = threading.Lock()
@@ -80,10 +86,15 @@ class MonitorsManager(object):
         Each monitor will run in its own thread.  This method will return after all of the monitor threads
         have been started.
         """
+
         # TODO:  Move this try statement out of here.  Let higher layers catch it.
         # noinspection PyBroadException
         try:
             for monitor in self.__monitors:
+                # Debug Leaks
+                if self.__disable_monitor_threads:
+                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name )
+                    continue
                 # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead
                 # fail.
                 if monitor.open_metric_log():

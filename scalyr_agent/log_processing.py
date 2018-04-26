@@ -1349,6 +1349,8 @@ class LogFileProcessor(object):
 
         self.__last_success = None
 
+        self.__disable_processing_new_bytes = config.disable_processing_new_bytes
+
     def add_missing_attributes( self, attributes ):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
         already have those attributes set
@@ -1491,6 +1493,12 @@ class LogFileProcessor(object):
 
             # Keep looping, add more events until there are no more or there is no more room.
             while True:
+                # debug leak
+                if self.__disable_processing_new_bytes:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Processing new bytes disabled for %s' % self.__path,
+                                   limit_once_per_x_secs=60, limit_key=('disable-processing-%s' % self.__path))
+                    break
+
                 position = self.__log_file_iterator.tell(dest=position)
 
                 #time_spent_reading -= fast_get_time()
