@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.32 "Goauld" - Apr 27, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 27, 2018 13:00 -0700
+--->
+
+Bug fixes:
+
+* Added various options to help investigate memory leak
+
 ## 2.0.31 "Fallers" - Apr 19, 2018
 
 <!---
