@@ -220,6 +220,9 @@ def rfc3339_to_datetime( string ):
     # split the string in to main time and fractional component
     parts = string.split(".")
 
+    if parts[0].endswith( 'Z' ):
+        parts[0] = parts[0][:-1]
+
     #create a datetime object
     try:
         tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
@@ -229,15 +232,17 @@ def rfc3339_to_datetime( string ):
     dt = datetime.datetime( *(tm[0:6]) )
 
     #now add the fractional part
-    fractions = parts[1]
-    if not fractions.endswith( 'Z' ):
-        return None
+    if len( parts ) > 1:
+        fractions = parts[1]
+        if not fractions.endswith( 'Z' ):
+            return dt
 
-    fractions = fractions[:-1]
-    to_micros = 6 - len(fractions)
-    micro = int( int( fractions ) * 10**to_micros )
+        fractions = fractions[:-1]
+        to_micros = 6 - len(fractions)
+        micro = int( int( fractions ) * 10**to_micros )
+        dt = dt.replace( microsecond=micro )
 
-    return dt.replace( microsecond=micro )
+    return dt
 
 def rfc3339_to_nanoseconds_since_epoch( string ):
     """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
@@ -254,6 +259,9 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     """
     # split the string in to main time and fractional component
     parts = string.split(".")
+
+    if parts[0].endswith( 'Z' ):
+        parts[0] = parts[0][:-1]
 
     #create a datetime object
     try:
@@ -275,7 +283,6 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
         nanos = long( long( fractions ) * 10**to_nanos )
 
     return nano_seconds + nanos
-
 
 def format_time(time_value):
     """Returns the time converted to a string in the common format used throughout the agent and in UTC.
