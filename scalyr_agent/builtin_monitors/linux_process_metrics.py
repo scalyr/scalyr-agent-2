@@ -27,6 +27,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import os
+import errno
 import re
 import time
 from collections import defaultdict, namedtuple
@@ -190,7 +191,7 @@ class BaseReader:
                                 ("app.net.bytes", "out"): 20,
                               }
                           Note: a new collector will be instantiated if None is passed in.
-        @return: None or the optional collector with collected metric values
+        @return: An empty dict or the optional collector with collected metric values
         """
 
         self._timestamp = int(time.time())
@@ -199,7 +200,7 @@ class BaseReader:
         # a particular proc file type, that we will never recover from.  So,
         # just always early exit.
         if self._failed:
-            return
+            return {}
 
         filename = self._file_pattern % self._pid
 
@@ -214,10 +215,10 @@ class BaseReader:
                 # stat from now on.  If the user changes the configuration file
                 # we will try again to read the file then.
                 self._failed = True
-                if e.errno == 13:
+                if e.errno == errno.EACCES:
                     self._logger.error("The agent does not have permission to read %s.  "
                                        "Maybe you should run it as root.", filename)
-                elif e.errno == 2:
+                elif e.errno == errno.ENOENT:
                     self._logger.error("The agent cannot read %s.  Your system may not support that proc file type",
                                        filename)
                 else:
@@ -638,7 +639,18 @@ class FileDescriptorReader:
         @rtype:
         """
 
-        num_fds = len(os.listdir(self.__path))
+        num_fds = 0
+        try:
+            num_fds = len(os.listdir(self.__path))
+        except OSError, e:
+            if e.errno == errno.ENOENT:
+                # ignore file not found, it just means the process
+                # is dead so log a warning, but still continue
+                self._logger.warn( "Path '%s' not found.  This likely means that process '%ld' is no longer running" % (self.__path, self.__pid ) )
+            else:
+                # some other error, so still raise it
+                raise e
+
         if not collector:
             collector = {}
         collector.update({
@@ -697,7 +709,9 @@ class ProcessTracker(object):
         collector = {}
         for gather in self.gathers:
             try:
-                collector.update(gather.run_single_cycle(collector=collector))
+                stats = gather.run_single_cycle(collector=collector)
+                if stats:
+                    collector.update( stats )
             except Exception as ex:
                 self._logger.exception(
                     'Exception while collecting metrics for PID: %s of type: %s. Details: %s',
@@ -1008,7 +1022,7 @@ class ProcessMonitor(ScalyrMonitor):
             # other errors like this process does not have permission to send
             # a signal to self.pid.  But, if that error is returned to us, we
             # know the process is running at least, so we ignore the error.
-            return e.errno != 3
+            return e.errno != errno.ESRCH
 
     def __select_processes(self):
         """Returns a list of the process ids of processes that fulfills the match criteria.
