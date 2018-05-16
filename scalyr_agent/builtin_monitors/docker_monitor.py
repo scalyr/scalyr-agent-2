@@ -112,7 +112,7 @@ define_config_option( __monitor__, 'docker_raw_logs',
 
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
-                     'about running containers.\n',
+                     'about running containers.  If set to true, this value overrides the config item \'report_container_metrics\'\n',
                      convert_to=bool, default=False)
 
 define_config_option( __monitor__, 'container_globs',
@@ -1072,8 +1072,14 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
 
+        metrics_only = self._config.get('metrics_only')
+
+        # always force reporting of container metrics if metrics_only is True
+        if metrics_only:
+            self.__report_container_metrics = True
+
         self.__container_checker = None
-        if self._config.get('log_mode') != 'syslog':
+        if not metrics_only and self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
