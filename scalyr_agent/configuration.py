@@ -263,8 +263,40 @@ class Configuration(object):
         return self.__get_config().get_bool('disable_leak_copying_thread')
 
     @property
+    def disable_overall_stats(self):
+        return self.__get_config().get_bool('disable_leak_overall_stats')
+
+    @property
+    def disable_bandwidth_stats(self):
+        return self.__get_config().get_bool('disable_leak_bandwidth_stats')
+
+    @property
+    def disable_update_debug_log_level(self):
+        return self.__get_config().get_bool('disable_leak_update_debug_log_level')
+
+    @property
+    def disable_all_config_updates(self):
+        return self.__get_config().get_int('disable_leak_all_config_updates', none_if_missing=True)
+
+    @property
+    def disable_verify_config(self):
+        return self.__get_config().get_int('disable_leak_verify_config', none_if_missing=True)
+
+    @property
+    def disable_config_equivalence_check(self):
+        return self.__get_config().get_int('disable_leak_config_equivalence_check', none_if_missing=True)
+
+    @property
+    def disable_verify_can_write_to_logs(self):
+        return self.__get_config().get_int('disable_leak_verify_can_write_to_logs', none_if_missing=True)
+
+    @property
+    def disable_config_reload(self):
+        return self.__get_config().get_int('disable_leak_config_reload', none_if_missing=True)
+
+    @property
     def config_change_check_interval(self):
-        return self.__get_config().get_int('config_change_check_interval')
+        return self.__get_config().get_float('config_change_check_interval')
     # end Debug leak flags
 
     @property
@@ -880,7 +912,17 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'disable_leak_scan_for_new_bytes', False, description)
         self.__verify_or_set_optional_bool(config, 'disable_leak_processing_new_bytes', False, description)
         self.__verify_or_set_optional_bool(config, 'disable_leak_copying_thread', False, description)
-        self.__verify_or_set_optional_int(config, 'config_change_check_interval', 30, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_overall_stats', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_bandwidth_stats', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_update_debug_log_level', False, description)
+
+        self.__verify_or_set_optional_int(config, 'disable_leak_all_config_updates', None, description)
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_config', None, description)
+        self.__verify_or_set_optional_int(config, 'disable_leak_config_equivalence_check', None, description)
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_can_write_to_logs', None, description)
+        self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description)
+
+        self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description)
 
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):

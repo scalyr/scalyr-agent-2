@@ -687,6 +687,34 @@ class ScalyrAgent(object):
 
                 self.__copying_manager = worker_thread.copying_manager
                 self.__monitors_manager = worker_thread.monitors_manager
+                current_time = time.time()
+
+                disable_all_config_updates_until = current_time
+                disable_verify_config_until = current_time
+                disable_config_equivalence_check_until = current_time
+                disable_verify_can_write_to_logs_until = current_time
+                disable_config_reload_until = current_time
+
+                if self.__config.disable_all_config_updates is not None:
+                    disable_all_config_updates_until += self.__config.disable_all_config_updates
+
+                if self.__config.disable_verify_config is not None:
+                    disable_verify_config_until += self.__config.disable_verify_config
+
+                if self.__config.disable_config_equivalence_check is not None:
+                    disable_config_equivalence_check_until += self.__config.disable_config_equivalence_check
+
+                if self.__config.disable_verify_can_write_to_logs is not None:
+                    disable_verify_can_write_to_logs_until += self.__config.disable_verify_can_write_to_logs
+
+                if self.__config.disable_config_reload is not None:
+                    disable_config_reload_until += self.__config.disable_config_reload
+
+                def check_disabled( current_time, other_time, message ):
+                    result = (current_time < other_time)
+                    if result:
+                        log.log( scalyr_logging.DEBUG_LEVEL_0, "%s disabled for %d more seconds" % (message, other_time - current_time) )
+                    return result
 
                 config_change_check_interval = self.__config.config_change_check_interval
 
@@ -694,19 +722,28 @@ class ScalyrAgent(object):
                     current_time = time.time()
                     self.__last_config_check_time = current_time
 
-                    # Log the overall stats once every 10 mins.
-                    if current_time > last_overall_stats_report_time + 600:
-                        self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
-                        last_overall_stats_report_time = current_time
+                    if self.__config.disable_overall_stats:
+                        log.log( scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled" )
+                    else:
+                        # Log the overall stats once every 10 mins.
+                        if current_time > last_overall_stats_report_time + 600:
+                            self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
+                            last_overall_stats_report_time = current_time
 
-                    # Log the bandwidth-related stats once every minute:
-                    if current_time > last_bw_stats_report_time + 60:
-                        self.__log_bandwidth_stats(self.__calculate_overall_stats(base_overall_stats))
-                        last_bw_stats_report_time = current_time
+                    if self.__config.disable_bandwidth_stats:
+                        log.log( scalyr_logging.DEBUG_LEVEL_0, "bandwidth stats disabled" )
+                    else:
+                        # Log the bandwidth-related stats once every minute:
+                        if current_time > last_bw_stats_report_time + 60:
+                            self.__log_bandwidth_stats(self.__calculate_overall_stats(base_overall_stats))
+                            last_bw_stats_report_time = current_time
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Checking for any changes to config file')
                     new_config = None
                     try:
+                        if check_disabled( current_time, disable_all_config_updates_until, "all config updates" ):
+                            continue
+
                         new_config = self.__read_config(self.__config_file_path)
                         # TODO:  By parsing the configuration file, we are doing a lot of work just to have it thrown
                         # out in a few seconds when we discover it is equivalent to the previous one.  Maybe we should
@@ -714,14 +751,26 @@ class ScalyrAgent(object):
                         # we need to parse the main configuration file to at least get the fragment directory.  For
                         # now, we will just wait this work.  We only do it once every 30 secs anyway.
 
+                        if check_disabled( current_time, disable_verify_config_until, "verify config" ):
+                            continue
+
                         self.__verify_config(new_config)
 
-                        # Update the debug_level based on the new config.. we always update it.
-                        self.__update_debug_log_level(new_config.debug_level)
+                        if self.__config.disable_update_debug_log_level:
+                            log.log( scalyr_logging.DEBUG_LEVEL_0, "update debug_log_level disabled" )
+                        else:
+                            # Update the debug_level based on the new config.. we always update it.
+                            self.__update_debug_log_level(new_config.debug_level)
+
+                        if check_disabled( current_time, disable_config_equivalence_check_until, "config equivalence check" ):
+                            continue
 
                         if self.__current_bad_config is None and new_config.equivalent(self.__config,
                                                                                        exclude_debug_level=True):
                             log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was not different than previous')
+                            continue
+
+                        if check_disabled( current_time, disable_verify_can_write_to_logs_until, "verify check for writing to logs and data" ):
                             continue
 
                         self.__verify_can_write_to_logs_and_data(new_config)
@@ -733,6 +782,9 @@ class ScalyrAgent(object):
                                 'Exception was "%s"', str(e), error_code='badConfigFile')
                         self.__current_bad_config = new_config
                         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config could not be read or parsed')
+                        continue
+
+                    if check_disabled( current_time, disable_config_reload_until, "config reload" ):
                         continue
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was different than previous.  Reloading.')
@@ -760,6 +812,21 @@ class ScalyrAgent(object):
 
                     self.__current_bad_config = None
                     config_change_check_interval = self.__config.config_change_check_interval
+
+                    if self.__config.disable_all_config_updates is not None:
+                        disable_all_config_updates_until = current_time + self.__config.disable_all_config_updates
+
+                    if self.__config.disable_verify_config is not None:
+                        disable_verify_config_until = current_time + self.__config.disable_verify_config
+
+                    if self.__config.disable_config_equivalence_check is not None:
+                        disable_config_equivalence_check_until = current_time + self.__config.disable_config_equivalence_check
+
+                    if self.__config.disable_verify_can_write_to_logs is not None:
+                        disable_verify_can_write_to_logs_until = current_time + self.__config.disable_verify_can_write_to_logs
+
+                    if self.__config.disable_config_reload is not None:
+                        disable_config_reload_until = current_time + self.__config.disable_config_reload
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
