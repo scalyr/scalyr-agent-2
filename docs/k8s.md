@@ -17,7 +17,7 @@ tolerations:
 
 To create and launch the Scalyr Agent Daemonset, please do the following:
 
-1. Configure a secret that contains your Scalyr API key
+1. Configure a secret that contains your "Write Logs" Scalyr API key
 
 ```
 kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key="<your scalyr api key>"
@@ -49,7 +49,7 @@ The default Kubernetes configuration file for the Scalyr Agent does the followin
 
 * Maps `/var/lib/docker/containers` of the node to `/var/lib/docker/containers` on the scalyr-k8s-preview-agent container.  This gives the container access to the raw logs from other pods and containers running on that node.
 
-* Exposes your Scalyr API key to the container in the environment variable `SCALYR_API_KEY`.  This is required by the default scalyr configuration file of the scalyr-k8s-agent image.
+* Exposes your "Write Logs" Scalyr API key to the container in the environment variable `SCALYR_API_KEY`.  This is required by the default scalyr configuration file of the scalyr-k8s-agent image.
 
 You can see the full configuration file [here](https://raw.githubusercontent.com/scalyr/scalyr-agent-2/master/k8s/scalyr-agent-2.yaml).
 
@@ -103,7 +103,7 @@ docker run -ti -e SCALYR_API_KEY="$SCALYR_API_KEY" \
 
 Which will launch a single container based on your customized image and drop you in to a bash shell.
 
-Make sure to replace `$SCALYR_API_KEY` with your scalyr api key (or export it to an environment variable called `$SCALYR_API_KEY` before running the above command in order to expose your api key to the container.
+Make sure to replace `$SCALYR_API_KEY` with your "Write Logs" Scalyr API key (or export it to an environment variable called `$SCALYR_API_KEY` before running the above command in order to expose your API key to the container.
 
 Then from the shell prompt you can manually launch the Scalyr agent by executing:
 
