@@ -766,7 +766,8 @@ class Configuration(object):
 
         @param config: The main JsonObject configuration object.
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
-        @param apply_defaults: fields will be ignored if they don't exist in the config file.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
     """
         description = 'configuration file "%s"' % file_path
 
@@ -1066,6 +1067,8 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_string(field, none_if_missing=True)
@@ -1091,6 +1094,8 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_int(field, none_if_missing=True)
@@ -1116,6 +1121,8 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_float(field, none_if_missing=True)
@@ -1141,6 +1148,8 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_object = config_object.get_json_object(field, none_if_missing=True)
@@ -1172,6 +1181,8 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_bool(field, none_if_missing=True)
@@ -1195,6 +1206,8 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_array = config_object.get_json_array(field, none_if_missing=True)
@@ -1225,6 +1238,8 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_array = config_object.get_json_array(field, none_if_missing=True)
