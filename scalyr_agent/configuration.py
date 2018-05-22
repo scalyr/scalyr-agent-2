@@ -90,35 +90,43 @@ class Configuration(object):
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
 
+            # get initial list of already seen config keys (we need to do this before
+            # defaults have been applied)
+            already_seen = {}
+            for k in self.__config.keys():
+                already_seen[k] = self.__file_path
+
             self.__verify_main_config_and_apply_defaults(self.__config, self.__file_path)
             api_key, api_config_file = self.__check_field('api_key', self.__config, self.__file_path)
             scalyr_server, scalyr_server_config_file = self.__check_field('scalyr_server', self.__config,
                                                                           self.__file_path)
             self.__verify_logs_and_monitors_configs_and_apply_defaults(self.__config, self.__file_path)
 
+            # these variables are allowed to appear in multiple files
+            allowed_multiple_keys = ('import_vars', 'logs', 'monitors', 'server_attributes')
+
             # Now, look for any additional configuration in the config fragment directory.
             for fp in self.__list_files(self.config_directory):
                 self.__additional_paths.append(fp)
                 content = scalyr_util.read_file_as_json(fp)
                 for k in content.keys():
-                    if k not in ('import_vars', 'api_key', 'logs', 'monitors', 'server_attributes', 'scalyr_server'):
-                        self.__last_error = BadConfiguration(
-                            'Configuration fragment file "%s" contains an invalid key "%s".  The config files in the '
-                            'configuration directory can only contain "api_key", "logs", "monitors", "import_vars", '
-                            '"scalyr_server", and "server_attributes" '
-                            'entries.' % (fp, k), k, 'badFragmentKey')
-                        raise self.__last_error
+                    if k not in allowed_multiple_keys:
+                        if k in already_seen:
+                            self.__last_error = BadConfiguration(
+                                'Configuration fragment file "%s" redefines the config key "%s", first seen in "%s". '
+                                'The only config items that can be defined in multiple config files are: %s.'
+                                % (fp, k, already_seen[k], allowed_multiple_keys), k, 'multipleKeys')
+                            raise self.__last_error
+                        else:
+                            already_seen[k] = fp
 
                 self.__perform_substitutions(content)
+                self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                api_key, api_config_file = self.__check_field(
-                    'api_key', content, fp, previous_value=api_key,
-                    previous_config_file=api_config_file, error_code='multipleApiKeys')
-                scalyr_server, scalyr_server_config_file = self.__check_field(
-                    'scalyr_server', content, fp, previous_value=scalyr_server,
-                    previous_config_file=scalyr_server_config_file,
-                    error_code='multipleScalyrServers')
+                for (key, value) in content.iteritems():
+                    if key not in allowed_multiple_keys:
+                        self.__config.put(key, value)
 
                 self.__add_elements_from_array('logs', content, self.__config)
                 self.__add_elements_from_array('monitors', content, self.__config)
@@ -777,7 +785,10 @@ class Configuration(object):
         return previous_value, previous_config_file
 
 
-    def __verify_main_config_and_apply_defaults(self, config, file_path):
+    def __verify_main_config(self, config, file_path):
+        self.__verify_main_config_and_apply_defaults( config, file_path, apply_defaults=False)
+
+    def __verify_main_config_and_apply_defaults(self, config, file_path, apply_defaults=True):
         """Verifies the contents of the configuration object and updates missing fields with defaults.
 
         This will verify and possibly update all the fields in the configuration file except for
@@ -787,64 +798,66 @@ class Configuration(object):
 
         @param config: The main JsonObject configuration object.
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
     """
         description = 'configuration file "%s"' % file_path
 
-        self.__verify_or_set_optional_attributes(config, 'server_attributes', description)
+        self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
-                                             description)
+                                             description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_data_path',  self.__default_paths.agent_data_path,
-                                             description)
-        self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description)
-        self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description)
-        self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description)
-        self.__verify_or_set_optional_bool(config, 'implicit_metric_monitor', True, description)
-        self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description)
+                                             description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'implicit_metric_monitor', True, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description, apply_defaults)
 
-        self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description)
+        self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description)
+        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'copying_thread_profile_output_path',
-                                             '/tmp/copying_thread_profiles_', description)
+                                             '/tmp/copying_thread_profiles_', description, apply_defaults)
 
-        self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description)
-        self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description)
+        self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description)
-        self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description)
-        self.__verify_or_set_optional_float(config, 'min_request_spacing_interval', 1.0, description)
-        self.__verify_or_set_optional_float(config, 'max_request_spacing_interval', 5.0, description)
-        self.__verify_or_set_optional_float(config, 'max_error_request_spacing_interval', 30.0, description)
+        self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'min_request_spacing_interval', 1.0, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'max_request_spacing_interval', 5.0, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'max_error_request_spacing_interval', 30.0, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'low_water_bytes_sent', 20*1024, description)
-        self.__verify_or_set_optional_float(config, 'low_water_request_spacing_adjustment', 1.5, description)
+        self.__verify_or_set_optional_int(config, 'low_water_bytes_sent', 20*1024, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'low_water_request_spacing_adjustment', 1.5, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'high_water_bytes_sent', 100*1024, description)
-        self.__verify_or_set_optional_float(config, 'high_water_request_spacing_adjustment', 0.6, description)
+        self.__verify_or_set_optional_int(config, 'high_water_bytes_sent', 100*1024, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'high_water_request_spacing_adjustment', 0.6, description, apply_defaults)
 
-        self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description)
-        self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description)
+        self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description, apply_defaults)
 
-        self.__verify_or_set_optional_float(config, 'max_new_log_detection_time', 60.0, description)
+        self.__verify_or_set_optional_float(config, 'max_new_log_detection_time', 60.0, description, apply_defaults)
 
         # These parameters are used in log_processing.py to govern how logs are copied.
 
         # The maximum allowed size for a line when reading from a log file.
         # We do not strictly enforce this -- some lines returned by LogFileIterator may be
         # longer than this due to some edge cases.
-        self.__verify_or_set_optional_int(config, 'max_line_size', 9900, description)
+        self.__verify_or_set_optional_int(config, 'max_line_size', 9900, description, apply_defaults)
 
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
         # not currently end in a new line (referred to as a partial line).  It could be that the full line just hasn't
         # made it all the way to disk yet.  After this time though, we will just return the bytes as a line
-        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5, description)
+        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5, description, apply_defaults)
 
         # The maximum negative offset relative to the end of a previously unseen log the log file
         # iterator is allowed to become.  If bytes are not being read quickly enough, then
         # the iterator will automatically advance so that it is no more than this length
         # to the end of the file.  This is essentially the maximum bytes a new log file
         # is allowed to be caught up when used in copying logs to Scalyr.
-        self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description)
+        self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description, apply_defaults)
 
 
         # The maximum negative offset relative to the end of an existing log the log file
@@ -852,77 +865,77 @@ class Configuration(object):
         # the iterator will automatically advance so that it is no more than this length
         # to the end of the file.  This is essentially the maximum bytes an existing log file
         # is allowed to be caught up when used in copying logs to Scalyr.
-        self.__verify_or_set_optional_int(config, 'max_existing_log_offset_size', 100 * 1024 * 1024, description)
+        self.__verify_or_set_optional_int(config, 'max_existing_log_offset_size', 100 * 1024 * 1024, description, apply_defaults)
 
         # The maximum sequence number for a given sequence
         # The sequence number is typically the total number of bytes read from a given file
         # (across restarts and log rotations), and it resets to zero (and begins a new sequence)
         # for each file once the current sequence_number exceeds this value
         # defaults to 1 TB
-        self.__verify_or_set_optional_int( config, 'max_sequence_number', 1024**4, description )
+        self.__verify_or_set_optional_int( config, 'max_sequence_number', 1024**4, description, apply_defaults )
 
         # The number of bytes to read from a file at a time into the buffer.  This must
         # always be greater than the MAX_LINE_SIZE
-        self.__verify_or_set_optional_int(config, 'read_page_size', 64 * 1024, description)
+        self.__verify_or_set_optional_int(config, 'read_page_size', 64 * 1024, description, apply_defaults)
 
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
-        self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description)
+        self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description, apply_defaults)
 
         # How many log rotations to do
-        self.__verify_or_set_optional_int(config, 'log_rotation_backup_count', 2, description)
+        self.__verify_or_set_optional_int(config, 'log_rotation_backup_count', 2, description, apply_defaults)
 
         # The size of each log rotation file
-        self.__verify_or_set_optional_int(config, 'log_rotation_max_bytes', 20 * 1024 * 1024, description)
+        self.__verify_or_set_optional_int(config, 'log_rotation_max_bytes', 20 * 1024 * 1024, description, apply_defaults)
 
         # The percentage of the maximum message size a message (max_allowed_request_size) has to be to trigger
         # pipelining the next add events request.  This intentionally set to 110% to prevent it from being used unless
         # explicitly requested.
-        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description)
+        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description, apply_defaults)
 
         # If we have noticed that new bytes have appeared in a file but we do not read them before this threshold
         # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the
         # freshest bytes.
-        self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description)
+        self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description, apply_defaults)
 
-        self.__verify_or_set_optional_bool(config, 'debug_init', False, description)
+        self.__verify_or_set_optional_bool(config, 'debug_init', False, description, apply_defaults)
 
-        self.__verify_or_set_optional_bool(config, 'pidfile_advanced_reuse_guard', False, description)
+        self.__verify_or_set_optional_bool(config, 'pidfile_advanced_reuse_guard', False, description, apply_defaults)
 
-        self.__verify_or_set_optional_bool(config, 'strip_domain_from_default_server_host', False, description)
+        self.__verify_or_set_optional_bool(config, 'strip_domain_from_default_server_host', False, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'debug_level', 0, description)
-        debug_level = config.get_int('debug_level')
+        self.__verify_or_set_optional_int(config, 'debug_level', 0, description, apply_defaults)
+        debug_level = config.get_int('debug_level', apply_defaults)
         if debug_level < 0 or debug_level > 5:
             raise BadConfiguration('The debug level must be between 0 and 5 inclusive', 'debug_level', 'badDebugLevel')
-        self.__verify_or_set_optional_float(config, 'request_deadline', 60.0, description)
+        self.__verify_or_set_optional_float(config, 'request_deadline', 60.0, description, apply_defaults)
 
         self.__verify_or_set_optional_string(config, 'ca_cert_path', Configuration.default_ca_cert_path(),
-                                             description)
-        self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description)
-        self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description)
-        self.__verify_or_set_optional_string(config, 'http_proxy', None, description)
-        self.__verify_or_set_optional_string(config, 'https_proxy', None, description)
+                                             description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults)
 
         #Debug leak flags
-        self.__verify_or_set_optional_bool(config, 'disable_leak_send_requests', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_monitors_creation', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_new_file_matches', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_scan_for_new_bytes', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_processing_new_bytes', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_copying_thread', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_overall_stats', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_bandwidth_stats', False, description)
-        self.__verify_or_set_optional_bool(config, 'disable_leak_update_debug_log_level', False, description)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_send_requests', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_monitors_creation', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_new_file_matches', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_scan_for_new_bytes', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_processing_new_bytes', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_copying_thread', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_overall_stats', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_bandwidth_stats', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_update_debug_log_level', False, description, apply_defaults)
 
-        self.__verify_or_set_optional_int(config, 'disable_leak_all_config_updates', None, description)
-        self.__verify_or_set_optional_int(config, 'disable_leak_verify_config', None, description)
-        self.__verify_or_set_optional_int(config, 'disable_leak_config_equivalence_check', None, description)
-        self.__verify_or_set_optional_int(config, 'disable_leak_verify_can_write_to_logs', None, description)
-        self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description)
+        self.__verify_or_set_optional_int(config, 'disable_leak_all_config_updates', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_config', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'disable_leak_config_equivalence_check', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_can_write_to_logs', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description, apply_defaults)
 
-        self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description)
+        self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults)
 
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
@@ -1086,7 +1099,7 @@ class Configuration(object):
             raise BadConfiguration('The required field "%s" is missing.  Error is in %s' % (field, config_description),
                                    field, 'missingRequired')
 
-    def __verify_or_set_optional_string(self, config_object, field, default_value, config_description):
+    def __verify_or_set_optional_string(self, config_object, field, default_value, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
         Raises an exception if the existing field cannot be converted to a string.
@@ -1096,12 +1109,15 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_string(field, none_if_missing=True)
 
             if value is None:
-                config_object.put(field, default_value)
+                if apply_defaults:
+                    config_object.put(field, default_value)
                 return
 
         except JsonConversionException:
@@ -1109,7 +1125,7 @@ class Configuration(object):
                                                                                                   config_description),
                                    field, 'notString')
 
-    def __verify_or_set_optional_int(self, config_object, field, default_value, config_description):
+    def __verify_or_set_optional_int(self, config_object, field, default_value, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
 
@@ -1120,12 +1136,15 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_int(field, none_if_missing=True)
 
             if value is None:
-                config_object.put(field, default_value)
+                if apply_defaults:
+                    config_object.put(field, default_value)
                 return
 
         except JsonConversionException:
@@ -1133,7 +1152,7 @@ class Configuration(object):
                                                                                                 config_description),
                                    field, 'notInt')
 
-    def __verify_or_set_optional_float(self, config_object, field, default_value, config_description):
+    def __verify_or_set_optional_float(self, config_object, field, default_value, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object can be converted to a float if present, otherwise
         sets default.
 
@@ -1144,12 +1163,15 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_float(field, none_if_missing=True)
 
             if value is None:
-                config_object.put(field, default_value)
+                if apply_defaults:
+                    config_object.put(field, default_value)
                 return
 
         except JsonConversionException:
@@ -1157,7 +1179,7 @@ class Configuration(object):
                                                                                                   config_description),
                                    field, 'notFloat')
 
-    def __verify_or_set_optional_attributes(self, config_object, field, config_description):
+    def __verify_or_set_optional_attributes(self, config_object, field, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
         object.
 
@@ -1168,12 +1190,15 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_object = config_object.get_json_object(field, none_if_missing=True)
 
             if json_object is None:
-                config_object.put(field, JsonObject())
+                if apply_defaults:
+                    config_object.put(field, JsonObject())
                 return
 
             for key in json_object.keys():
@@ -1188,7 +1213,7 @@ class Configuration(object):
             raise BadConfiguration('The value for the field "%s" is not a json object.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonObject')
 
-    def __verify_or_set_optional_bool(self, config_object, field, default_value, config_description):
+    def __verify_or_set_optional_bool(self, config_object, field, default_value, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is a boolean if present, otherwise sets default.
 
         Raises an exception if the existing field cannot be converted to a boolean.
@@ -1198,19 +1223,22 @@ class Configuration(object):
         @param default_value: The value to set in config_object for field if it currently has no value.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             value = config_object.get_bool(field, none_if_missing=True)
 
             if value is None:
-                config_object.put(field, default_value)
+                if apply_defaults:
+                    config_object.put(field, default_value)
                 return
 
         except JsonConversionException:
             raise BadConfiguration('The value for the required field "%s" is not a boolean.  '
                                    'Error is in %s' % (field, config_description), field, 'notBoolean')
 
-    def __verify_or_set_optional_array(self, config_object, field, config_description):
+    def __verify_or_set_optional_array(self, config_object, field, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is an array of json objects if present, otherwise sets
         to empty array.
 
@@ -1220,12 +1248,15 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_array = config_object.get_json_array(field, none_if_missing=True)
 
             if json_array is None:
-                config_object.put(field, JsonArray())
+                if apply_defaults:
+                    config_object.put(field, JsonArray())
                 return
 
             index = 0
@@ -1239,7 +1270,7 @@ class Configuration(object):
             raise BadConfiguration('The value for the required field "%s" is not an array.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonArray')
 
-    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description):
+    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
 
@@ -1249,12 +1280,15 @@ class Configuration(object):
         @param field: The name of the field to check in config_object.
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
+        @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
+            for any fields missing from the config.
         """
         try:
             json_array = config_object.get_json_array(field, none_if_missing=True)
 
             if json_array is None:
-                config_object.put(field, JsonArray())
+                if apply_defaults:
+                    config_object.put(field, JsonArray())
                 return
 
             index = 0
