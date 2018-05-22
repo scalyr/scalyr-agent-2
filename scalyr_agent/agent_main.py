@@ -75,6 +75,12 @@ from scalyr_agent.platform_controller import AgentNotRunning
 STATUS_FILE = 'last_status'
 
 
+def _update_disabled_until( config_value, current_time ):
+    if config_value is not None:
+        return config_value + current_time
+    else:
+        return current_time
+
 class ScalyrAgent(object):
     """Encapsulates the entire Scalyr Agent 2 application.
     """
@@ -689,26 +695,11 @@ class ScalyrAgent(object):
                 self.__monitors_manager = worker_thread.monitors_manager
                 current_time = time.time()
 
-                disable_all_config_updates_until = current_time
-                disable_verify_config_until = current_time
-                disable_config_equivalence_check_until = current_time
-                disable_verify_can_write_to_logs_until = current_time
-                disable_config_reload_until = current_time
-
-                if self.__config.disable_all_config_updates is not None:
-                    disable_all_config_updates_until += self.__config.disable_all_config_updates
-
-                if self.__config.disable_verify_config is not None:
-                    disable_verify_config_until += self.__config.disable_verify_config
-
-                if self.__config.disable_config_equivalence_check is not None:
-                    disable_config_equivalence_check_until += self.__config.disable_config_equivalence_check
-
-                if self.__config.disable_verify_can_write_to_logs is not None:
-                    disable_verify_can_write_to_logs_until += self.__config.disable_verify_can_write_to_logs
-
-                if self.__config.disable_config_reload is not None:
-                    disable_config_reload_until += self.__config.disable_config_reload
+                disable_all_config_updates_until = _update_disabled_until( self.__config.disable_all_config_updates, current_time )
+                disable_verify_config_until = _update_disabled_until( self.__config.disable_verify_config, current_time )
+                disable_config_equivalence_check_until = _update_disabled_until( self.__config.disable_config_equivalence_check, current_time )
+                disable_verify_can_write_to_logs_until = _update_disabled_until( self.__config.disable_verify_can_write_to_logs, current_time )
+                disable_config_reload_until = _update_disabled_until( self.__config.disable_config_reload, current_time )
 
                 def check_disabled( current_time, other_time, message ):
                     result = (current_time < other_time)
@@ -813,20 +804,11 @@ class ScalyrAgent(object):
                     self.__current_bad_config = None
                     config_change_check_interval = self.__config.config_change_check_interval
 
-                    if self.__config.disable_all_config_updates is not None:
-                        disable_all_config_updates_until = current_time + self.__config.disable_all_config_updates
-
-                    if self.__config.disable_verify_config is not None:
-                        disable_verify_config_until = current_time + self.__config.disable_verify_config
-
-                    if self.__config.disable_config_equivalence_check is not None:
-                        disable_config_equivalence_check_until = current_time + self.__config.disable_config_equivalence_check
-
-                    if self.__config.disable_verify_can_write_to_logs is not None:
-                        disable_verify_can_write_to_logs_until = current_time + self.__config.disable_verify_can_write_to_logs
-
-                    if self.__config.disable_config_reload is not None:
-                        disable_config_reload_until = current_time + self.__config.disable_config_reload
+                    disable_all_config_updates_until = _update_disabled_until( self.__config.disable_all_config_updates, current_time )
+                    disable_verify_config_until = _update_disabled_until( self.__config.disable_verify_config, current_time )
+                    disable_config_equivalence_check_until = _update_disabled_until( self.__config.disable_config_equivalence_check, current_time )
+                    disable_verify_can_write_to_logs_until = _update_disabled_until( self.__config.disable_verify_can_write_to_logs, current_time )
+                    disable_config_reload_until = _update_disabled_until( self.__config.disable_config_reload, current_time )
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
