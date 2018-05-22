@@ -86,9 +86,9 @@ define_config_option( __monitor__, 'docker_log_prefix',
                      convert_to=str, default='docker')
 
 define_config_option( __monitor__, 'docker_short_lived_interval',
-                     'Optional (defaults to None). If not None, include logs from any containers that were created at least this recently (in seconds). '
+                     'Optional (defaults to 30 seconds). If not None, include logs from any containers that were created at least this recently (in seconds). '
                      'Set to a value greater than the \'container_check_interval\' to catch short-lived containers.',
-                     convert_to=int, default=None)
+                     convert_to=int, default=30)
 
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
@@ -281,8 +281,17 @@ def _get_short_cid( container_id ):
     return container_id[:8]
 
 def _ignore_old_dead_container( container, threshold ):
+    """
+        Returns True or False to determine whether we should ignore the
+        logs for a dead container, depending on whether the create time
+        of the container is before a certain threshold time (specified in
+        seconds since the epoch).
 
-    result = False
+        If the container was created before the threshold time, then the
+          container logs will be ignored.
+        Otherwise the logs of the dead container will be uploaded.
+    """
+
     # check for recently finished containers
     if threshold is not None:
         state = container.get( 'State', {} )
@@ -291,13 +300,24 @@ def _ignore_old_dead_container( container, threshold ):
         if state != 'running':
             created = container.get( 'Created', 0 ) # default to a long time ago
             if created < threshold:
-                result = True
+                return True
 
-    return result
+    return False
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, running_or_finished_since=None, glob_list=None, include_log_path=False, include_k8s_info=False):
-    """Gets a dict of running containers that maps container id to container name
+                    only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, include_k8s_info=False):
+    """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
+        @param client: A docker.Client object
+        @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
+        @param restrict_to_container: String, a single continer id that will be the only returned result
+        @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
+            logger is used.
+        @param only_running_containers: Boolean.  If true, will only return currently running containers
+        @param running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
+            dead containers that were created after the specified time.  Used to pick up short-lived containers.
+        @param glob_list: String.  A glob string that limit results to containers whose container names match the glob
+        @param include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
+        @param include_k8s_info: Boolean.  If true include k8s information (if it exists) as part of the extra info mapped to the container id
     """
     if logger is None:
         logger = global_log
@@ -309,7 +329,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         'k8s_container_name': 'io.kubernetes.container.name'
     }
 
-    if running_or_finished_since is not None:
+    if running_or_created_after is not None:
         only_running_containers=False
 
     result = {}
@@ -323,7 +343,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             if ignore_container is not None and cid == ignore_container:
                 continue
 
-            if _ignore_old_dead_container( container, running_or_finished_since ):
+            if _ignore_old_dead_container( container, running_or_created_after ):
                 continue
 
             if len( container['Names'] ) > 0:
@@ -609,11 +629,11 @@ class ContainerChecker( StoppableThread ):
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-                running_or_finished_since = None
+                running_or_created_after = None
                 if self.__short_lived_seconds is not None:
-                    running_or_finished_since = time.time() - self.__short_lived_seconds
+                    running_or_created_after = time.time() - self.__short_lived_seconds
 
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_finished_since=running_or_finished_since, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=running_or_created_after, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty

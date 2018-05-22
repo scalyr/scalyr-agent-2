@@ -220,6 +220,11 @@ def rfc3339_to_datetime( string ):
     # split the string in to main time and fractional component
     parts = string.split(".")
 
+    # it's possible that the time does not have a fractional component
+    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
+    # single element that should end in Z.  Strip the Z if it exists
+    # so we can use the same format string for processing the main
+    # date+time regardless of whether the time has a fractional component.
     if parts[0].endswith( 'Z' ):
         parts[0] = parts[0][:-1]
 
@@ -234,9 +239,11 @@ def rfc3339_to_datetime( string ):
     #now add the fractional part
     if len( parts ) > 1:
         fractions = parts[1]
+        #if we had a fractional component it should terminate in a Z
         if not fractions.endswith( 'Z' ):
             return dt
 
+        # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
         micro = int( int( fractions ) * 10**to_micros )
@@ -260,6 +267,11 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     # split the string in to main time and fractional component
     parts = string.split(".")
 
+    # it's possible that the time does not have a fractional component
+    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
+    # single element that should end in Z.  Strip the Z if it exists
+    # so we can use the same format string for processing the main
+    # date+time regardless of whether the time has a fractional component.
     if parts[0].endswith( 'Z' ):
         parts[0] = parts[0][:-1]
 
@@ -275,9 +287,12 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     #now add the fractional part
     if len( parts ) > 1:
         fractions = parts[1]
+        # if the fractional part doesn't end in Z we likely have a
+        # malformed time, so just return the current value
         if not fractions.endswith( 'Z' ):
             return nano_seconds
 
+        # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
         nanos = long( long( fractions ) * 10**to_nanos )
