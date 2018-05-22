@@ -643,12 +643,10 @@ class FileDescriptorReader:
         try:
             num_fds = len(os.listdir(self.__path))
         except OSError, e:
-            if e.errno == errno.ENOENT:
-                # ignore file not found, it just means the process
-                # is dead so log a warning, but still continue
-                self._logger.warn( "Path '%s' not found.  This likely means that process '%ld' is no longer running" % (self.__path, self.__pid ) )
-            else:
-                # some other error, so still raise it
+            # ignore file not found errors, it just means the process
+            # is dead so just continue but return
+            # 0 open fds.  Rethrow all other exceptions
+            if e.errno != errno.ENOENT:
                 raise e
 
         if not collector:
