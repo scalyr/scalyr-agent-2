@@ -728,6 +728,58 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.api_key, 'xyz')
 
+    def test_duplicate_api_key(self):
+        self.__write_file_with_separator_conversion("""{
+            api_key: "abcd1234",
+        }
+        """)
+
+        self.__write_config_fragment_file_with_separator_conversion("apikey.json", """{
+            api_key: "abcd1234",
+        }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
+
+    def test_global_options_in_fragments(self):
+        self.__write_config_fragment_file_with_separator_conversion("fragment.json", """{
+            api_key: "abcdefg",
+            agent_log_path: "/var/silly1",
+            http_proxy: "http://foo.com",
+            https_proxy: "https://bar.com",
+        }
+        """)
+
+        self.__write_file_with_separator_conversion("""{
+        }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals( config.api_key, "abcdefg" )
+        self.assertEquals( config.agent_log_path, "/var/silly1" )
+        self.assertEqual(config.network_proxies, {"http": "http://foo.com", 'https': 'https://bar.com'})
+
+    def test_global_duplicate_options_in_fragments(self):
+        self.__write_config_fragment_file_with_separator_conversion("fragment.json", """{
+            api_key: "abcdefg",
+            agent_log_path: "/var/silly1",
+            http_proxy: "http://foo.com",
+            https_proxy: "https://bar.com",
+        }
+        """)
+
+        self.__write_file_with_separator_conversion("""{
+            agent_log_path: "/var/silly1",
+        }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        self.assertRaises( BadConfiguration, config.parse )
+
+
     def test_json_array_substitution(self):
         self.__write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR", "DIR_VAR" ],
