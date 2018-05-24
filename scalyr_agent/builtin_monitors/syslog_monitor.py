@@ -824,7 +824,7 @@ class SyslogHandler(object):
                     if info:
                         info['logger'].close()
                         if watcher and module:
-                            watcher.remove_log_path( module, info['log_config']['path'] )
+                            watcher.remove_log_path( module.module_name, info['log_config']['path'] )
             self.__expire_count += 1
 
             for key, info in self.__docker_loggers.iteritems():

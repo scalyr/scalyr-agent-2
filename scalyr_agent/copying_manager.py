@@ -203,6 +203,15 @@ class CopyingManager(StoppableThread, LogWatcher):
         # but they are all just writing to the same monitor file.
         self.__all_paths = {}
 
+        # a dict of log paths pending removal once their bytes pending count reaches 0
+        # keyed on the log path, with a value of True or False depending on whether the
+        # log file has been processed yet
+        self.__logs_pending_removal = {}
+
+
+        # a list of dynamically added log_matchers that have not been processed yet
+        self.__pending_log_matchers = []
+
         # The list of LogMatcher objects that are watching for new files to appear.
         self.__log_matchers = self.__create_log_matches(configuration, monitors )
 
@@ -268,15 +277,18 @@ class CopyingManager(StoppableThread, LogWatcher):
         returns: an updated log_config object
         """
         log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+        self.__lock.acquire()
         try:
-            self.__lock.acquire()
-
             if log_config['path'] not in self.__all_paths:
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
-                self.__log_matchers.append( LogMatcher(self.__config, log_config) )
+                self.__pending_log_matchers.append( LogMatcher( self.__config, log_config ) )
                 self.__all_paths[log_config['path']] = 1
             else:
                 self.__all_paths[log_config['path']] += 1
+
+            # if the log was previously pending removal, cancel the pending removal
+            self.__logs_pending_removal.pop( log_config['path'], None )
+
         finally:
             self.__lock.release()
 
@@ -303,24 +315,38 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def remove_log_path( self, monitor, log_path ):
+    def remove_log_path( self, monitor_name, log_path ):
         """Remove the log_path from the list of paths being watched
         params: log_path - a string containing the path to the file no longer being watched
         """
         #get the list of paths with 0 reference counts
+        self.__lock.acquire()
         try:
-            self.__lock.acquire()
             if log_path in self.__all_paths:
                 self.__all_paths[log_path] -= 1
 
                 #paths with 0 reference counts need removing
                 if self.__all_paths[log_path] <= 0:
-                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for monitor \'%s\'' % (log_path, monitor.module_name ) )
+                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for \'%s\'' % (log_path, monitor_name ) )
                     #do the removals
                     self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
+                    self.__logs_pending_removal.pop( log_path, None )
 
             else:
                 log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor.module_name, log_path) )
+        finally:
+            self.__lock.release()
+
+    def schedule_log_path_for_removal( self, monitor_name, log_path ):
+        """
+            Schedules a log path for removal.  The logger will only
+            be removed once the number of pending bytes reaches 0
+        """
+        self.__lock.acquire()
+        try:
+            if log_path not in self.__logs_pending_removal:
+                self.__logs_pending_removal[log_path] = False
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'log path \'%s\' for monitor \'%s\' is pending removal' % (log_path, monitor_name ) )
         finally:
             self.__lock.release()
 
@@ -563,6 +589,9 @@ class CopyingManager(StoppableThread, LogWatcher):
                         if result == 'success':
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
+
+                        self.__scan_for_pending_log_files()
+                        self.__remove_logs_scheduled_for_deletion()
 
                         if profiler is not None:
                             seconds_past_epoch = int(time.time())
@@ -840,6 +869,133 @@ class CopyingManager(StoppableThread, LogWatcher):
                                                                           add_events_request.get_timing_data()))
         return AddEventsTask(add_events_request, handle_completed_callback)
 
+    def __remove_logs_scheduled_for_deletion( self ):
+        """
+            Removes any logs scheduled for deletion, if there are 0 bytes left to copy and
+            the log file has been matched/processed at least once
+        """
+
+        # make a shallow copy of logs_pending_removal
+        # so we can iterate without a lock (remove_log_path also acquires the lock so best
+        # not to do that while the lock is already aquired
+        self.__lock.acquire()
+        try:
+            pending_removal = self.__logs_pending_removal.copy()
+        finally:
+            self.__lock.release()
+
+        # check to see if any of the pending logs have 0 bytes remaining
+        # and remove the ones that do
+        for path, processed in pending_removal.iteritems():
+            log.log( scalyr_logging.DEBUG_LEVEL_1, "Checking for removal of log_path %s" % path )
+            if processed:
+                log.log( scalyr_logging.DEBUG_LEVEL_1, "%s has been processed at least once" % path )
+
+                if path in self.__log_paths_being_processed:
+                    log.log( scalyr_logging.DEBUG_LEVEL_1, "found %s in processed paths, %d bytes pending" % (path, self.__log_paths_being_processed[path].total_bytes_pending) )
+
+                    if self.__log_paths_being_processed[path].total_bytes_pending == 0:
+                        self.remove_log_path( "scheduled-deletion", path )
+                else:
+
+                    # the log file is schedule for removal and the pending list indicates that it
+                    # has been processed, but we can not find it in the list of processors
+                    # so remove it from the pending list and log a warning.
+                    self.__lock.acquire()
+                    try:
+                        self.__logs_pending_removal.pop( path, None )
+                    finally:
+                        self.__lock.release()
+                    log.warn( "Log scheduled for removal is not being monitored: %s" % path )
+
+    def __scan_for_pending_log_files( self ):
+        """
+        Creates log processors for any recent, dynamically added log matchers
+        """
+
+        # make a shallow copy of pending log_matchers
+        log_matchers = []
+        self.__lock.acquire()
+        try:
+            log_matchers = self.__pending_log_matchers[:]
+        finally:
+            self.__lock.release()
+
+        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints={}, copy_at_index_zero=True )
+
+        self.__lock.acquire()
+        try:
+            self.__log_matchers.extend( log_matchers )
+            self.__pending_log_matchers = [lm for lm in self.__pending_log_matchers if lm not in log_matchers]
+        finally:
+            self.__lock.release()
+
+    def __create_log_processors_for_log_matchers( self, log_matchers, checkpoints=None, copy_at_index_zero=False ):
+        """
+        Creates log processors for any files on disk that match any file matching the
+        passed in log_matchers
+
+        @param log_matchers: A list of log_matchers to check against.  Note:  No locking is done on the log_matchers
+          passed in, so the caller needs to ensure that the list is thread-safe and only accessed from the main
+          loop.
+        @param checkpoints: A dict mapping file paths to the checkpoint to use for them to determine where copying
+            should begin.
+        @param copy_at_index_zero: If True, then any new file that doesn't have a checkpoint or an initial position,
+            will begin being copied from the start of the file rather than the current end.
+        """
+
+        # make a shallow copy of logs pending removal so we don't need to hold the lock
+        # while iterating
+        pending_removal = {}
+        self.__lock.acquire()
+        try:
+            pending_removal = self.__logs_pending_removal.copy()
+        finally:
+            self.__lock.release()
+
+        # check if any pending removal have already been processed
+        # and update the processed status
+        for path in pending_removal.keys():
+            if path in self.__log_paths_being_processed:
+                pending_removal[path] = True
+
+        # iterate over the log_matchers while we create the LogFileProcessors
+        for matcher in log_matchers:
+            for new_processor in matcher.find_matches(self.__log_paths_being_processed, checkpoints,
+                                                      copy_at_index_zero=copy_at_index_zero):
+                self.__log_processors.append(new_processor)
+                self.__log_paths_being_processed[new_processor.log_path] = new_processor
+
+                # if the log file pending removal, mark that it has now been processed
+                if new_processor.log_path in pending_removal:
+                    pending_removal[new_processor.log_path] = True
+
+            # check to see if no matches were found for pending removal
+            # if none were found, this is indicative that the log file has already been
+            # removed
+            if matcher.config['path'] in pending_removal and not pending_removal[matcher.config['path']]:
+                log.warn( "No log matches were found for %s.  This is likely indicative that the log file no longer exists.\n", matcher.config['path'] )
+
+                # remove it anyway, otherwise the logs_`pending_removal list will just
+                # grow and grow
+                pending_removal[matcher.config['path']] = True
+
+
+        # require the lock to update the pending removal dict to
+        # mark which logs have been matched.
+        # This is so we can catch short lived log files that are added but then removed
+        # before any log matching takes place
+        self.__lock.acquire()
+        try:
+            # go over all items in pending_removal, and update the master
+            # logs_pending_removal list
+            for path, processed in pending_removal.iteritems():
+                if path in self.__logs_pending_removal:
+                    self.__logs_pending_removal[path] = processed
+        finally:
+            self.__lock.release()
+
+
     def __scan_for_new_logs_if_necessary(self, current_time=None, checkpoints=None, logs_initial_positions=None,
                                          copy_at_index_zero=False):
         """If it has been sufficient time since we last checked, scan the file system for new files that match the
@@ -891,13 +1047,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-        # iterate over the copy so we don't have to lock the list of log_matchers
-        # while we create the LogFileProcessors
-        for matcher in log_matchers:
-            for new_processor in matcher.find_matches(self.__log_paths_being_processed, checkpoints,
-                                                      copy_at_index_zero=copy_at_index_zero):
-                self.__log_processors.append(new_processor)
-                self.__log_paths_being_processed[new_processor.log_path] = new_processor
+        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero )
+
 
     def __scan_for_new_bytes(self, current_time=None):
         """For any existing LogProcessors, have them scan the file system to see if their underlying files have

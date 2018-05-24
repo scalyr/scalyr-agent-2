@@ -85,11 +85,6 @@ define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
                      convert_to=str, default='docker')
 
-define_config_option( __monitor__, 'docker_short_lived_interval',
-                     'Optional (defaults to 30 seconds). If not None, include logs from any containers that were created at least this recently (in seconds). '
-                     'Set to a value greater than the \'container_check_interval\' to catch short-lived containers.',
-                     convert_to=int, default=30)
-
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
                      'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
@@ -280,7 +275,7 @@ def _get_short_cid( container_id ):
     # https://docs.python.org/2/reference/expressions.html#slicings
     return container_id[:8]
 
-def _ignore_old_dead_container( container, threshold ):
+def _ignore_old_dead_container( container, created_before=None ):
     """
         Returns True or False to determine whether we should ignore the
         logs for a dead container, depending on whether the create time
@@ -293,13 +288,13 @@ def _ignore_old_dead_container( container, threshold ):
     """
 
     # check for recently finished containers
-    if threshold is not None:
+    if created_before is not None:
         state = container.get( 'State', {} )
 
         #ignore any that are finished and that are also too old
         if state != 'running':
             created = container.get( 'Created', 0 ) # default to a long time ago
-            if created < threshold:
+            if created < created_before:
                 return True
 
     return False
@@ -343,7 +338,10 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             if ignore_container is not None and cid == ignore_container:
                 continue
 
-            if _ignore_old_dead_container( container, running_or_created_after ):
+            # Note we need to *include* results that were created after the 'running_or_created_after' time.
+            # that means we need to *ignore* any containers created before that
+            # hence the reason 'create_before' is assigned to a value named '...created_after'
+            if _ignore_old_dead_container( container, created_before=running_or_created_after ):
                 continue
 
             if len( container['Names'] ) > 0:
@@ -477,7 +475,6 @@ class ContainerChecker( StoppableThread ):
         self.__log_watcher = None
         self.__module = None
         self.__start_time = time.time()
-        self.__short_lived_seconds = config.get( 'docker_short_lived_interval' )
         self.__thread = StoppableThread( target=self.check_containers, name="Container Checker" )
 
     def start( self ):
@@ -515,7 +512,7 @@ class ContainerChecker( StoppableThread ):
         for logger in self.raw_logs:
             path = logger['log_config']['path']
             if self.__log_watcher:
-                self.__log_watcher.remove_log_path( self.__module, path )
+                self.__log_watcher.remove_log_path( self.__module.module_name, path )
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
 
         self.raw_logs = []
@@ -620,6 +617,7 @@ class ContainerChecker( StoppableThread ):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
+        previous_time = time.time()
 
         while run_state.is_running():
             try:
@@ -629,11 +627,8 @@ class ContainerChecker( StoppableThread ):
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-                running_or_created_after = None
-                if self.__short_lived_seconds is not None:
-                    running_or_created_after = time.time() - self.__short_lived_seconds
-
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=running_or_created_after, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=previous_time, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+                previous_time = time.time() - 1
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty
@@ -770,7 +765,7 @@ class ContainerChecker( StoppableThread ):
                 if logger['cid'] in stopping:
                     path = logger['log_config']['path']
                     if self.__log_watcher:
-                        self.__log_watcher.remove_log_path( self.__module, path )
+                        self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, path )
 
             self.raw_logs[:] = [l for l in self.raw_logs if l['cid'] not in stopping]
             self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
