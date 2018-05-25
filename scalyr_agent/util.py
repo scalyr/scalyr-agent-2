@@ -220,6 +220,14 @@ def rfc3339_to_datetime( string ):
     # split the string in to main time and fractional component
     parts = string.split(".")
 
+    # it's possible that the time does not have a fractional component
+    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
+    # single element that should end in Z.  Strip the Z if it exists
+    # so we can use the same format string for processing the main
+    # date+time regardless of whether the time has a fractional component.
+    if parts[0].endswith( 'Z' ):
+        parts[0] = parts[0][:-1]
+
     #create a datetime object
     try:
         tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
@@ -229,15 +237,19 @@ def rfc3339_to_datetime( string ):
     dt = datetime.datetime( *(tm[0:6]) )
 
     #now add the fractional part
-    fractions = parts[1]
-    if not fractions.endswith( 'Z' ):
-        return None
+    if len( parts ) > 1:
+        fractions = parts[1]
+        #if we had a fractional component it should terminate in a Z
+        if not fractions.endswith( 'Z' ):
+            return dt
 
-    fractions = fractions[:-1]
-    to_micros = 6 - len(fractions)
-    micro = int( int( fractions ) * 10**to_micros )
+        # remove the Z and just process the fraction.
+        fractions = fractions[:-1]
+        to_micros = 6 - len(fractions)
+        micro = int( int( fractions ) * 10**to_micros )
+        dt = dt.replace( microsecond=micro )
 
-    return dt.replace( microsecond=micro )
+    return dt
 
 def rfc3339_to_nanoseconds_since_epoch( string ):
     """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
@@ -255,6 +267,14 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     # split the string in to main time and fractional component
     parts = string.split(".")
 
+    # it's possible that the time does not have a fractional component
+    # e.g 2015-08-03T09:12:43Z, in this case 'parts' will only have a
+    # single element that should end in Z.  Strip the Z if it exists
+    # so we can use the same format string for processing the main
+    # date+time regardless of whether the time has a fractional component.
+    if parts[0].endswith( 'Z' ):
+        parts[0] = parts[0][:-1]
+
     #create a datetime object
     try:
         tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
@@ -267,15 +287,17 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     #now add the fractional part
     if len( parts ) > 1:
         fractions = parts[1]
+        # if the fractional part doesn't end in Z we likely have a
+        # malformed time, so just return the current value
         if not fractions.endswith( 'Z' ):
             return nano_seconds
 
+        # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
         nanos = long( long( fractions ) * 10**to_nanos )
 
     return nano_seconds + nanos
-
 
 def format_time(time_value):
     """Returns the time converted to a string in the common format used throughout the agent and in UTC.

@@ -112,7 +112,7 @@ define_config_option( __monitor__, 'docker_raw_logs',
 
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
-                     'about running containers.\n',
+                     'about running containers.  If set to true, this value overrides the config item \'report_container_metrics\'\n',
                      convert_to=bool, default=False)
 
 define_config_option( __monitor__, 'container_globs',
@@ -375,12 +375,12 @@ class ContainerChecker( StoppableThread ):
             for logger in self.raw_logs:
                 path = logger['log_config']['path']
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path( self.__module, path )
+                    self.__log_watcher.remove_log_path( self.__module.module_name, path )
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
         else:
             for logger in self.docker_loggers:
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+                    self.__log_watcher.remove_log_path( self.__module.module_name, logger.log_path )
                 logger.stop( wait_on_join, join_timeout )
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
 
@@ -528,7 +528,7 @@ class ContainerChecker( StoppableThread ):
                     if logger['cid'] in stopping:
                         path = logger['log_config']['path']
                         if self.__log_watcher:
-                            self.__log_watcher.remove_log_path( self.__module, path )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, path )
 
                 self.raw_logs[:] = [l for l in self.raw_logs if l['cid'] not in stopping]
             else:
@@ -536,7 +536,7 @@ class ContainerChecker( StoppableThread ):
                     if logger.cid in stopping:
                         logger.stop( wait_on_join=True, join_timeout=1 )
                         if self.__log_watcher:
-                            self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, logger.log_path )
 
                 self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
 
@@ -1072,8 +1072,14 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
 
+        metrics_only = self._config.get('metrics_only')
+
+        # always force reporting of container metrics if metrics_only is True
+        if metrics_only:
+            self.__report_container_metrics = True
+
         self.__container_checker = None
-        if self._config.get('log_mode') != 'syslog':
+        if not metrics_only and self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [

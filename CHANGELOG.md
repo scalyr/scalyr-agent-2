@@ -1,6 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.33 "Horta" - May 25, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 25, 2018 16:00 -0700
+--->
+
+Features:
+
+* Relaxed configuration rules to allow for any config option to be specified in a configuration fragment in the `agent.d` directory.
+
+Bug fixes:
+
+* Fixed bug in `linux_process_metrics` that would generate errors when a monitored process died
+* Fixed issue in the docker and kubernetes monitors that would prevent the agent from sending logs from short lived containers
+* Fixed issue in the docker and kubernetes monitors that could cause the tail end of a containers logs to not be uploaded after it exits
+* Fixed issue in docker monitor where the `metrics_only` config option was not being obeyed.
+* Added various options to help investigate memory leak
+
 ## 2.0.32 "Goauld" - Apr 27, 2018
 
 <!---
