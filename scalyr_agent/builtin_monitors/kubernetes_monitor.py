@@ -275,10 +275,44 @@ def _get_short_cid( container_id ):
     # https://docs.python.org/2/reference/expressions.html#slicings
     return container_id[:8]
 
+def _ignore_old_dead_container( container, created_before=None ):
+    """
+        Returns True or False to determine whether we should ignore the
+        logs for a dead container, depending on whether the create time
+        of the container is before a certain threshold time (specified in
+        seconds since the epoch).
+
+        If the container was created before the threshold time, then the
+          container logs will be ignored.
+        Otherwise the logs of the dead container will be uploaded.
+    """
+
+    # check for recently finished containers
+    if created_before is not None:
+        state = container.get( 'State', {} )
+
+        #ignore any that are finished and that are also too old
+        if state != 'running':
+            created = container.get( 'Created', 0 ) # default to a long time ago
+            if created < created_before:
+                return True
+
+    return False
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, glob_list=None, include_log_path=False, include_k8s_info=False):
-    """Gets a dict of running containers that maps container id to container name
+                    only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, include_k8s_info=False):
+    """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
+        @param client: A docker.Client object
+        @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
+        @param restrict_to_container: String, a single continer id that will be the only returned result
+        @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
+            logger is used.
+        @param only_running_containers: Boolean.  If true, will only return currently running containers
+        @param running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
+            dead containers that were created after the specified time.  Used to pick up short-lived containers.
+        @param glob_list: String.  A glob string that limit results to containers whose container names match the glob
+        @param include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
+        @param include_k8s_info: Boolean.  If true include k8s information (if it exists) as part of the extra info mapped to the container id
     """
     if logger is None:
         logger = global_log
@@ -290,6 +324,9 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         'k8s_container_name': 'io.kubernetes.container.name'
     }
 
+    if running_or_created_after is not None:
+        only_running_containers=False
+
     result = {}
     try:
         filters = {"id": restrict_to_container} if restrict_to_container is not None else None
@@ -299,6 +336,12 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             short_cid = _get_short_cid( cid )
 
             if ignore_container is not None and cid == ignore_container:
+                continue
+
+            # Note we need to *include* results that were created after the 'running_or_created_after' time.
+            # that means we need to *ignore* any containers created before that
+            # hence the reason 'create_before' is assigned to a value named '...created_after'
+            if _ignore_old_dead_container( container, created_before=running_or_created_after ):
                 continue
 
             if len( container['Names'] ) > 0:
@@ -469,7 +512,7 @@ class ContainerChecker( StoppableThread ):
         for logger in self.raw_logs:
             path = logger['log_config']['path']
             if self.__log_watcher:
-                self.__log_watcher.remove_log_path( self.__module, path )
+                self.__log_watcher.remove_log_path( self.__module.module_name, path )
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
 
         self.raw_logs = []
@@ -574,6 +617,7 @@ class ContainerChecker( StoppableThread ):
         # if any pod information has changed
         prev_digests = {}
         base_attributes = self.__get_base_attributes()
+        previous_time = time.time()
 
         while run_state.is_running():
             try:
@@ -582,7 +626,9 @@ class ContainerChecker( StoppableThread ):
                 k8s_data = self.get_k8s_data()
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=previous_time, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+                previous_time = time.time() - 1
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty
@@ -719,7 +765,7 @@ class ContainerChecker( StoppableThread ):
                 if logger['cid'] in stopping:
                     path = logger['log_config']['path']
                     if self.__log_watcher:
-                        self.__log_watcher.remove_log_path( self.__module, path )
+                        self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, path )
 
             self.raw_logs[:] = [l for l in self.raw_logs if l['cid'] not in stopping]
             self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]

@@ -375,12 +375,12 @@ class ContainerChecker( StoppableThread ):
             for logger in self.raw_logs:
                 path = logger['log_config']['path']
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path( self.__module, path )
+                    self.__log_watcher.remove_log_path( self.__module.module_name, path )
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
         else:
             for logger in self.docker_loggers:
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+                    self.__log_watcher.remove_log_path( self.__module.module_name, logger.log_path )
                 logger.stop( wait_on_join, join_timeout )
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
 
@@ -528,7 +528,7 @@ class ContainerChecker( StoppableThread ):
                     if logger['cid'] in stopping:
                         path = logger['log_config']['path']
                         if self.__log_watcher:
-                            self.__log_watcher.remove_log_path( self.__module, path )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, path )
 
                 self.raw_logs[:] = [l for l in self.raw_logs if l['cid'] not in stopping]
             else:
@@ -536,7 +536,7 @@ class ContainerChecker( StoppableThread ):
                     if logger.cid in stopping:
                         logger.stop( wait_on_join=True, join_timeout=1 )
                         if self.__log_watcher:
-                            self.__log_watcher.remove_log_path( self.__module, logger.log_path )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, logger.log_path )
 
                 self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
 

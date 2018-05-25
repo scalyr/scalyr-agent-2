@@ -1756,6 +1756,14 @@ class LogFileProcessor(object):
         self.__total_bytes_pending = self.__log_file_iterator.available
         self.__lock.release()
 
+    @property
+    def total_bytes_pending( self ):
+        result = 0
+        self.__lock.acquire()
+        result = self.__total_bytes_pending
+        self.__lock.release()
+        return result
+
     def close(self):
         """Closes the processor, closing all underlying file handles.
 
