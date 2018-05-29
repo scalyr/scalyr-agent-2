@@ -119,6 +119,11 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
                       'to Scalyr.', convert_to=bool, default=True)
 
+define_config_option( __monitor__, 'verify_k8s_api_queries',
+                      'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
+                      'the ca.crt certificate found in the service account directory. If false, no verification will be performed ',
+                      convert_to=bool, default=True)
+
 define_config_option( __monitor__, 'gather_k8s_pod_info',
                       'Optional (defaults to False). If true, then every gather_sample interval, metrics will be collected '
                       'from the docker and k8s APIs showing all discovered containers and pods. This is mostly a debugging aid '
@@ -469,7 +474,11 @@ class ContainerChecker( StoppableThread ):
 
         self.containers = {}
 
-        self.__k8s = KubernetesApi()
+        if self._config.get( 'verify_k8s_api_queries' ):
+            self.__k8s = KubernetesApi()
+        else:
+            self.__k8s = KubernetesApi( ca_file=None )
+
         self.__k8s_filter = None
 
         self.__log_watcher = None
