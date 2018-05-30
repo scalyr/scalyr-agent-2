@@ -16,6 +16,7 @@
 
 __author__ = 'imron@scalyr.com'
 
+import datetime
 import os
 import re
 import select
@@ -77,6 +78,10 @@ define_config_option( __monitor__, 'checkpoint_name',
                       'saved for each monitor.',
                       convert_to=str, default=None )
 
+define_config_option( __monitor__, 'staleness_threshold_secs',
+                      'When loading the journal events from a checkpoint, if the logs are older than this threshold, then skip to the end.',
+                      convert_to=int, default=10*60 )
+
 class JournaldMonitor(ScalyrMonitor):
 
     "Read logs from journalctl and emit to scalyr"
@@ -96,6 +101,8 @@ class JournaldMonitor(ScalyrMonitor):
             data_path = self._global_config.agent_data_path
 
         self._checkpoint_file = os.path.join( data_path, "journald-checkpoints.json" )
+
+        self._staleness_threshold_secs = self._config.get( 'staleness_threshold_secs' )
 
         self._journal = None
         self._poll = None
@@ -152,15 +159,31 @@ class JournaldMonitor(ScalyrMonitor):
         # load the checkpoint cursor if it exists
         cursor = self._checkpoint.get_checkpoint( self._checkpoint_name )
 
-        # if we don't have a checkpoint
-        if cursor is None:
+        skip_to_end = True
+
+        # if we have a checkpoint see if it's current
+        if cursor is not None:
+            try:
+                self._journal.seek_cursor( cursor )
+                entry = self._journal.get_next()
+
+                timestamp = entry.get( '__REALTIME_TIMESTAMP', None )
+                if timestamp:
+                    current_time = datetime.datetime.utcnow()
+                    delta = current_time - timestamp
+                    if delta.total_seconds() < self._staleness_threshold_secs:
+                        skip_to_end = False
+                    else:
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Checkpoint is older than %d seconds, skipping to end" % self._staleness_threshold_secs )
+            except Exception, e:
+                global_log.warn( "Error loading checkpoint: %s. Skipping to end." % str(e) )
+
+        if skip_to_end:
             # seek to the end of the log
             # NOTE: we need to back up a single item, otherwise journald returns
             # random entries
             self._journal.seek_tail()
             self._journal.get_previous()
-        else:
-            self._journal.seek_cursor( cursor )
 
         # configure polling of the journal file
         self._poll = select.poll()
