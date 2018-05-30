@@ -121,7 +121,8 @@ define_config_option( __monitor__, 'report_container_metrics',
 
 define_config_option( __monitor__, 'verify_k8s_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
-                      'the ca.crt certificate found in the service account directory. If false, no verification will be performed ',
+                      'the ca.crt certificate found in the service account directory. If false, no verification will be performed. '
+                      'This is useful for older k8s clusters where certificate verification can fail.',
                       convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'gather_k8s_pod_info',
