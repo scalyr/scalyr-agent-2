@@ -896,6 +896,7 @@ class AddEventsRequest(object):
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
             timestamp = __last_time_stamp__ + 1L
         __last_time_stamp__ = timestamp
+
         return timestamp
 
     @property
@@ -1504,6 +1505,13 @@ def _rewind_past_close_curly(output_buffer):
 # The last timestamp used for any event uploaded to the server.  We need to guarantee that this is monotonically
 # increasing so we track it in a global var.
 __last_time_stamp__ = None
+
+def _set_last_timestamp( val ):
+    """
+    exposed for testing
+    """
+    global __last_time_stamp__
+    __last_time_stamp__ = val
 
 
 class HTTPConnectionWithTimeout(httplib.HTTPConnection):
