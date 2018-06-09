@@ -221,7 +221,9 @@ class BaseReader:
                 elif e.errno == errno.ENOENT:
                     self._logger.error("The agent cannot read %s.  Your system may not support that proc file type",
                                        filename)
-                else:
+                # Ignore 'process not found' errors (likely caused because the process exited
+                # but re-raise the exception for all other errors
+                elif e.errno != errno.ESRCH:
                     raise e
 
         if self._file is not None:
@@ -231,7 +233,10 @@ class BaseReader:
                 return self.gather_sample(self._file, collector=collector)
 
             except IOError, e:
-                self._logger.error("Error gathering sample for file: '%s'\n\t%s" % (filename, str(e)));
+                # log the error if the errno isn't 'process not found'. Process not found likely means the
+                # process exited, so we ignore that because it's within the realm of expected behaviour
+                if e.errno != errno.ESRCH:
+                    self._logger.error("Error gathering sample for file: '%s'\n\t%s" % (filename, str(e)));
 
                 # close the file. This will cause the file to be reopened next call to run_single_cycle
                 self.close()
