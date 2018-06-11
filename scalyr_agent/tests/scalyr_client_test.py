@@ -19,6 +19,7 @@ __author__ = 'czerwin@scalyr.com'
 
 from cStringIO import StringIO
 
+from scalyr_agent import scalyr_client
 from scalyr_agent.scalyr_client import AddEventsRequest, PostFixBuffer, EventSequencer, Event
 from scalyr_agent import json_lib
 from scalyr_agent.test_base import ScalyrTestCase
@@ -30,8 +31,8 @@ class AddEventsRequestTest(ScalyrTestCase):
     def setUp(self):
         self.__body = {'token': 'fakeToken'}
 
-    @unittest.skip("Imron needs to fix this")
     def test_basic_case(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
@@ -47,7 +48,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 2)
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_multiple_calls_to_get_payload(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
@@ -58,7 +58,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.get_payload(), request.get_payload())
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_add_thread(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
@@ -78,8 +77,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 2)
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_maximum_bytes_exceeded(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body, max_size=103)
         request.set_client_time(1)
 
@@ -91,8 +90,8 @@ class AddEventsRequestTest(ScalyrTestCase):
             """{"token":"fakeToken", events: [{attrs:{message:`s\x00\x00\x00\x08eventOne},ts:"1"}], threads: [], client_time: 1 }""")
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_maximum_bytes_exceeded_from_threads(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body, max_size=100)
         request.set_client_time(1)
 
@@ -105,8 +104,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_position(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
         position = request.position()
@@ -122,8 +121,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_position_with_thread(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
         position = request.position()
@@ -142,8 +141,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_client_time(self):
+        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
 
@@ -162,7 +161,6 @@ class AddEventsRequestTest(ScalyrTestCase):
             """, threads: [], client_time: 2 }""")
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_id_but_no_number( self ):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
@@ -177,7 +175,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse( 'sd' in event )
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_number_but_no_id( self ):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
@@ -192,7 +189,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse( 'sd' in event )
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_id_and_number( self ):
         expected_id = '1234'
         expected_number = 1234
@@ -209,7 +205,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse( 'sd' in event )
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_same_sequence_id( self ):
         expected_id = '1234'
         expected_number = 1234
@@ -228,7 +223,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals( expected_delta, event['sd'] )
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_different_sequence_id( self ):
         first_id = '1234'
         second_id = '1235'
@@ -249,7 +243,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse('sd' in event)
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_exceeds_size_doesnt_effect_sequence( self ):
         first_id = '1234'
         second_id = '1235'
@@ -271,7 +264,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse('sn' in event)
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_position_resets_sequence_compression( self ):
         first_id = '1234'
         second_id = '1235'
@@ -294,7 +286,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertFalse('sd' in event)
         request.close()
 
-    @unittest.skip("Imron needs to fix this")
     def test_timing_data(self):
         request = AddEventsRequest(self.__body)
         request.increment_timing_data(foo=1, bar=2)
@@ -307,7 +298,6 @@ class EventTest(ScalyrTestCase):
     def setUp(self):
         pass
 
-    @unittest.skip("Imron needs to fix this")
     def test_all_fields(self):
         x = Event(thread_id='foo', attrs={"parser": "bar"})
         x.set_message("my_message")
@@ -328,7 +318,6 @@ class EventTest(ScalyrTestCase):
                                 attrs=json_lib.JsonObject(parser="bar", message="my_message", sample_rate=0.5)),
             json_lib.parse(output_buffer.getvalue()))
 
-    @unittest.skip("Imron needs to fix this")
     def test_fast_path_fields(self):
         x = Event(thread_id='foo', attrs={"parser": "bar"})
         x.set_message("my_message")
@@ -342,7 +331,6 @@ class EventTest(ScalyrTestCase):
             '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
             output_buffer.getvalue())
 
-    @unittest.skip("Imron needs to fix this")
     def test_individual_fields(self):
         # snd
         x = Event(thread_id='foo', attrs={"parser": "bar"})
@@ -404,7 +392,6 @@ class EventTest(ScalyrTestCase):
             '{thread:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
             output_buffer.getvalue())
 
-    @unittest.skip("Imron needs to fix this")
     def test_only_message(self):
         x = Event()
         x.set_message("my_message")
@@ -417,7 +404,6 @@ class EventTest(ScalyrTestCase):
             '{attrs:{message:`s\x00\x00\x00\nmy_message}}',
             output_buffer.getvalue())
 
-    @unittest.skip("Imron needs to fix this")
     def test_no_thread_id(self):
         x = Event(attrs={"parser": "bar"})
         x.set_message("my_message")
@@ -434,7 +420,6 @@ class EventTest(ScalyrTestCase):
             '{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
 
-    @unittest.skip("Imron needs to fix this")
     def test_no_attrs(self):
         x = Event(thread_id="biz")
         x.set_message("my_message")
@@ -451,7 +436,6 @@ class EventTest(ScalyrTestCase):
             '{thread:"biz", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue())
 
-    @unittest.skip("Imron needs to fix this")
     def test_create_from_template(self):
         x = Event(thread_id='foo', attrs={"parser": "bar"})
         x = Event(base=x)
@@ -474,7 +458,6 @@ class EventSequencerTest(ScalyrTestCase):
     def setUp( self ):
         self.event_sequencer = EventSequencer()
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_id_but_no_number( self ):
 
         event = Event()
@@ -484,7 +467,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertIsNone( event.sequence_number_delta )
 
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_number_but_no_id( self ):
         event = Event()
         self.event_sequencer.add_sequence_fields( event, None, 1234 )
@@ -493,7 +475,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertIsNone( event.sequence_number)
         self.assertIsNone( event.sequence_number_delta )
 
-    @unittest.skip("Imron needs to fix this")
     def test_sequence_id_and_number( self ):
         expected_id = '1234'
         expected_number = 1234
@@ -504,7 +485,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertEquals( expected_number, event.sequence_number )
         self.assertIsNone( event.sequence_number_delta )
 
-    @unittest.skip("Imron needs to fix this")
     def test_same_sequence_id( self ):
         expected_id = '1234'
         expected_number = 1234
@@ -520,7 +500,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertIsNone( event.sequence_number)
         self.assertEqual( expected_delta, event.sequence_number_delta )
 
-    @unittest.skip("Imron needs to fix this")
     def test_different_sequence_id( self ):
         first_id = '1234'
         second_id = '1235'
@@ -540,7 +519,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertEquals( second_number, event.sequence_number )
         self.assertIsNone( event.sequence_number_delta )
 
-    @unittest.skip("Imron needs to fix this")
     def test_memento( self ):
         first_id = '1234'
         second_id = '1235'
@@ -566,7 +544,6 @@ class EventSequencerTest(ScalyrTestCase):
         self.assertIsNone( event.sequence_number)
         self.assertIsNotNone( event.sequence_number_delta )
 
-    @unittest.skip("Imron needs to fix this")
     def test_reset( self ):
         expected_id = '1234'
         expected_number = 1234
@@ -588,7 +565,6 @@ class PostFixBufferTest(ScalyrTestCase):
     def setUp(self):
         self.__format = '], threads: THREADS, client_time: TIMESTAMP }'
 
-    @unittest.skip("Imron needs to fix this")
     def test_basic_case(self):
         test_buffer = PostFixBuffer(self.__format)
         test_buffer.set_client_timestamp(1)
@@ -597,7 +573,6 @@ class PostFixBufferTest(ScalyrTestCase):
         self.assertEquals(test_buffer.content(),
                           """], threads: [{"id":"log_5","name":"histogram_builder"}], client_time: 1 }""")
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_client_time(self):
         test_buffer = PostFixBuffer(self.__format)
         test_buffer.set_client_timestamp(1)
@@ -610,7 +585,6 @@ class PostFixBufferTest(ScalyrTestCase):
         self.assertEquals(content, '], threads: [], client_time: 433423 }')
         self.assertEquals(expected_length, len(content))
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_client_time_fail(self):
         test_buffer = PostFixBuffer(self.__format)
         self.assertTrue(test_buffer.set_client_timestamp(1, fail_if_buffer_exceeds=1000000))
@@ -623,7 +597,6 @@ class PostFixBufferTest(ScalyrTestCase):
         self.assertEquals(content, '], threads: [], client_time: 1 }')
         self.assertEquals(expected_length, len(content))
 
-    @unittest.skip("Imron needs to fix this")
     def test_add_thread(self):
         test_buffer = PostFixBuffer(self.__format)
         test_buffer.set_client_timestamp(1)
@@ -641,7 +614,6 @@ class PostFixBufferTest(ScalyrTestCase):
                                                  """{"id":"log_12","name":"ok_builder"},"""
                                                  """{"id":"log","name":"histogram_builder_foo"}], client_time: 1 }""")
 
-    @unittest.skip("Imron needs to fix this")
     def test_add_thread_fail(self):
         test_buffer = PostFixBuffer(self.__format)
         test_buffer.set_client_timestamp(1)
@@ -656,7 +628,6 @@ class PostFixBufferTest(ScalyrTestCase):
         self.assertEquals(test_buffer.content(), """], threads: [{"id":"log_5","name":"histogram_builder"}], """
                                                  """client_time: 1 }""")
 
-    @unittest.skip("Imron needs to fix this")
     def test_set_position(self):
         test_buffer = PostFixBuffer(self.__format)
         test_buffer.set_client_timestamp(1)
