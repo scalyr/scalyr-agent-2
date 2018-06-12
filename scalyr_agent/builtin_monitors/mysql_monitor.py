@@ -24,6 +24,10 @@ import errno
 
 from scalyr_agent import ScalyrMonitor, UnsupportedSystem, define_config_option, define_metric, define_log_field
 
+import scalyr_agent.scalyr_logging as scalyr_logging
+
+global_log = scalyr_logging.getLogger(__name__)
+
 # We must require 2.6 or greater right now because PyMySQL requires it.  We are considering
 # forking PyMySQL and adding in support if there is enough customer demand.
 if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6):
@@ -779,27 +783,52 @@ class MysqlMonitor(ScalyrMonitor):
             self._database_password = self._config["database_password"]
         else:
             raise Exception("database_username and database_password must be specified in the configuration.")
-            
-        if self._database_connect_type == "socket":
-            self._db = MysqlDB (type = self._database_connect_type,
-                                sockfile = self._database_socket,
-                                host = None,
-                                port = None,
-                                username = self._database_user,
-                                password = self._database_password,
-                                logger = self._logger)
-        else:
-            self._db = MysqlDB (type = self._database_connect_type,
-                                sockfile = None,
-                                host = self._database_host,
-                                port = self._database_port,
-                                username = self._database_user,
-                                password = self._database_password,
-                                logger = self._logger)
+        self._db = None
+
+    def _connect_to_db( self ):
+        """
+        Connect to the database if the database isn't already connected
+        """
+        # if we are already connected, don't do anything
+        if self._db is not None:
+            return
+
+        try:
+            if self._database_connect_type == "socket":
+                self._db = MysqlDB (type = self._database_connect_type,
+                                    sockfile = self._database_socket,
+                                    host = None,
+                                    port = None,
+                                    username = self._database_user,
+                                    password = self._database_password,
+                                    logger = self._logger)
+            else:
+                self._db = MysqlDB (type = self._database_connect_type,
+                                    sockfile = None,
+                                    host = self._database_host,
+                                    port = self._database_port,
+                                    username = self._database_user,
+                                    password = self._database_password,
+                                    logger = self._logger)
+        except Exception, e:
+            self._db = None
+            global_log.warning("Error establishing database connection: %s" % (str(e)),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='mysql_connect_to_db')
 
     def gather_sample(self):
         """Invoked once per sample interval to gather a statistic.
         """
+
+        #make sure we have a database connection
+        if self._db is None:
+            self._connect_to_db()
+
+        # if we still don't have one wait until the next gather sample
+        # to try again
+        if self._db is None:
+            return
+
         def get_value_as_str(value):
             if type(value) is int:
                 return "%d" % value
