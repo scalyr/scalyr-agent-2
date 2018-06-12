@@ -51,12 +51,10 @@ define_config_option( __monitor__, 'journal_path',
                      'Optional (defaults to /var/log/journal). Location on the filesystem of the journald logs.',
                      convert_to=str, default='/var/log/journal')
 
-define_config_option( __monitor__, 'journal_poll_timeout',
-                     'Optional (defaults to 0). The number of seconds to wait for data while polling the journal file. '
-                     'Fractional values are supported up to millisecond accuracy. '
-                     'Note: you are better off setting the sample_interval monitor option if the timeout is longer than '
-                     'one second.  For a detailed explanation, please see the journald monitor documentation section on polling.',
-                     convert_to=float, default=0)
+define_config_option( __monitor__, 'journal_poll_interval',
+                     'Optional (defaults to 5). The number of seconds to wait for data while polling the journal file. '
+                     'Fractional values are supported. Note: This values overrides the sample_interval of the monitor',
+                     convert_to=float, default=5)
 
 define_config_option( __monitor__, 'journal_fields',
                      'Optional dict containing a list of journal fields to include with each message, as well as a field name to map them to.\n'
@@ -220,7 +218,8 @@ class JournaldMonitor(ScalyrMonitor):
 
         self._journal = None
         self._poll = None
-        self._poll_timeout = self._config.get( 'journal_poll_timeout' ) * 1000
+        #override the sample_interval
+        self.set_sample_interval( self._config.get( 'journal_poll_interval' ) )
         self.log_config['parser'] = 'journald'
 
         self._extra_fields = self._config.get( 'journal_fields' )
@@ -328,7 +327,10 @@ class JournaldMonitor(ScalyrMonitor):
         """
 
         # do nothing if there is nothing ready to poll
-        if not self._poll.poll( self._poll_timeout ):
+        # Note: we poll for 0 seconds, and therefore never block
+        # the main monitor will block at the end of its
+        # gather_sample method
+        if not self._poll.poll( 0 ):
             return False
 
         # see if there are any entries to process

@@ -3,7 +3,7 @@
 
 A Scalyr agent monitor that imports log entries from journald.
 
-The journald monitor polls systemd journal files every ``sample_interval`` seconds
+The journald monitor polls systemd journal files every ``journal_poll_interval`` seconds
 and uploads any new entries to the Scalyr servers.
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
@@ -61,11 +61,8 @@ config the journald monitor:
 |||# Option                        ||| Usage
 |||# ``module``                    ||| Always ``scalyr_agent.builtin_monitors.journald_monitor``
 |||# ``journal_path``              ||| Optional (defaults to ``/var/log/journal``). Location on the filesystem of the journald logs.
-|||# ``journal_poll_timeout``      ||| Optional (defaults to ``0``). The number of seconds to wait for data while polling \
-                                       the journal file. Fractional values are supported up to millisecond accuracy. \
-                                       Note: you are better off setting the sample_interval monitor option if the \
-                                       timeout is longer than one second. For a detailed explanation, please see the \
-                                       documentation section on polling.
+|||# ``journal_poll_interval``      ||| Optional (defaults to ``5``). The number of seconds to wait for data while polling \
+                                       the journal file. Fractional values are supported.
 |||# ``journal_fields``            ||| Optional dict containing journal fields to upload with each message, \
                                        as well as a field name to map them to on the Scalyr website. \
                                        Note: Not all fields need to exist in every message and only fields that exist will be included. \
@@ -89,14 +86,8 @@ config the journald monitor:
 
 ## Polling the Journal File
 
-The journald monitor polls the journal file every ``sample_interval`` seconds to check for new logs.  It does this by
+The journald monitor polls the journal file every ``journal_poll_interval`` seconds to check for new logs.  It does this by
 creating a polling object (https://docs.python.org/2/library/select.html#poll-objects) and calling the ``poll`` method
-of that object.  The ``poll`` method takes a timeout parameter that blocks the calling thread until there is data
-available on the polling object or until the timeout expires.  This timeout parameter can be configured using the
-``journal_poll_timeout`` configuration option.  By default, this option is 0, meaning that the calling thread never
-blocks when polling the journal.  Instead the monitor only blocks at the end of its ``gather_sample`` method.
-
-Setting the ``journal_poll_timeout`` option to a value greater than 0 means that the polling call will block inside the
-``gather_sample`` method (and again at the end of the ``gather_sample``).  This may be useful in some situations, but
-if the ``journal_poll_timeout`` is greater than 1 second, it is generally more useful to leave it at 0 and use the
-``sample_interval`` configuration option instead.
+of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
+After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
+seconds and then polls again.
