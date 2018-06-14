@@ -32,17 +32,22 @@ define_config_option(__monitor__, 'module',
                      convert_to=str, required_option=True)
 
 define_config_option(__monitor__, 'max_type_dump',
-                     'Optional (defaults to 20). The maximum number of unreclaimable types to output each gather_sample',
+                     'Optional (defaults to 20). The maximum number of unreachable types to output each gather_sample',
                      default=20, convert_to=int)
 
 define_config_option(__monitor__, 'max_object_dump',
-                     'Optional (defaults to 0). The maximum number of unreclaimable objects to dump for each type on the ``object_dump_types`` list. '
+                     'Optional (defaults to 0). The maximum number of unreachable objects to dump for each type on the ``object_dump_types`` list. '
                      'Set to -1 to include all objects',
                      default=0, convert_to=int)
 
+define_config_option(__monitor__, 'monitor_all_unreachable_objects',
+                     'Optional (defaults to False).  If True, monitors all unreachable objects, not just ones that have circular __del__ dependencies. '
+                     'See the python gc documentation for details: https://docs.python.org/2/library/gc.html#gc.garbage',
+                     default=False, convert_to=bool)
+
 define_config_option( __monitor__, 'object_dump_types',
                      'Optional.  A list of type names as strings.  For all types on this list, the garbage_monitor '
-                     'will dump a string representation of unreclaimable objects of this type, up to ``max_object_dump`` objects. '
+                     'will dump a string representation of unreachable objects of this type, up to ``max_object_dump`` objects. '
                      'The strings should match the type names printed out in the normal output of the garbage_monitor.'
                      )
 
@@ -59,11 +64,11 @@ For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 By default it outputs a list of types and a count of objects of that type that cannot be reclaimed
 by the garbage collector.
 
-It can also be configured to dump a string representation of unreclaimable objects of specific types.
+It can also be configured to dump a string representation of unreachable objects of specific types.
 
 ## Sample Configuration
 
-This sample will configure the garbage monitor to output the top 10 types with the most unreclaimed objects.
+This sample will configure the garbage monitor to output the top 10 types with the most unreachable objects.
 
     monitors: [
       {
@@ -72,7 +77,7 @@ This sample will configure the garbage monitor to output the top 10 types with t
       }
     ]
 
-This sample will configure the garbage monitor to output the top 10 types with the most unreclaimed objects,
+This sample will configure the garbage monitor to output the top 10 types with the most unreachable objects,
 along with dumping up to 20 objects of the types 'list' and 'dict'.
 
     monitors: [
@@ -103,6 +108,8 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         # original debug flags of the gc
         self._old_debug_flags = None
 
+        self._monitor_all_unreachable = self._config.get( 'monitor_all_unreachable_objects' )
+
         self._max_type_dump = self._config.get( 'max_type_dump' )
         self._max_object_dump = self._config.get( 'max_object_dump' )
 
@@ -111,8 +118,9 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         # get the current debug flags
         self._old_debug_flags = gc.get_debug()
 
-        # and set the new ones we are interested in
-        gc.set_debug( gc.DEBUG_SAVEALL )
+        if self._monitor_all_unreachable:
+            # and set the new ones we are interested in
+            gc.set_debug( gc.DEBUG_SAVEALL )
 
         # Output some log information here so we can tell from the logs when the garbage monitor has been reloaded
         self._logger.info( "Starting garbage monitor. Outputting max %d types" % self._max_type_dump )
@@ -124,7 +132,9 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         ScalyrMonitor.run( self )
 
     def _dump_string( self, rubbish ):
-        if type(rubbish).__name__ == list.__name__:
+        if hasattr(rubbish, '__name__'):
+            if rubbish.__name__ == "function":
+                return rubbish.__name__
             return str( rubbish )
         else:
             return str( rubbish )
@@ -156,9 +166,16 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
             if self._object_dump_types:
                 for rubbish_name, rubbish in sorted_rubbish:
                     if rubbish_name in self._object_dump_types:
-                        self._logger.info( "Objects for %s" % (rubbish_name))
-                        for r in rubbish[:self._max_object_dump]:
-                            self._logger.info( "\t\t%s" % (self._dump_string(r)) )
+                        objects = rubbish
+                        if self._max_object_dump > 0:
+                            objects = objects[:self._max_object_dump]
+
+                        if self._max_object_dump == 0:
+                            self._logger.info( "No objects to print for '%s'- set `max_object_dump` to a value > 0" % rubbish_name )
+                        else:
+                            self._logger.info( "Objects for %s" % (rubbish_name))
+                            for r in rubbish[:self._max_object_dump]:
+                                self._logger.info( "\t\t%s" % (self._dump_string(r)) )
         except Exception, e:
             global_log.info( "error gathering sample %s", traceback.format_exc() )
 
@@ -168,7 +185,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         self._logger.info( "Garbage Monitor shutting down" )
 
         #restore the original debug flags
-        if self._old_debug_flags is not None:
+        if self._monitor_all_unreachable and self._old_debug_flags is not None:
             gc.set_debug( self._old_debug_flags )
 
         #stop the main server
