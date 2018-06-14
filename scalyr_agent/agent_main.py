@@ -81,6 +81,12 @@ def _update_disabled_until( config_value, current_time ):
     else:
         return current_time
 
+def _check_disabled( current_time, other_time, message ):
+    result = (current_time < other_time)
+    if result:
+        log.log( scalyr_logging.DEBUG_LEVEL_0, "%s disabled for %d more seconds" % (message, other_time - current_time) )
+    return result
+
 class ScalyrAgent(object):
     """Encapsulates the entire Scalyr Agent 2 application.
     """
@@ -291,20 +297,41 @@ class ScalyrAgent(object):
         """
         return Configuration(config_file_path, self.__default_paths)
 
-    def __verify_config(self, config):
+    def __verify_config(self, config, disable_create_monitors_manager=False,
+                                      disable_create_copying_manager=False,
+                                      disable_cache_config=False):
         """Verifies the passed in configuration object is valid, including the referenced monitors exist and have
         valid configuration.
 
         @param config: The configuration object.
         @type config: scalyr_agent.Configuration
+        @return: A boolean value indicating whether or not the configuration was fully verified
         """
         try:
             config.parse(logger=log)
+
+            if disable_create_monitors_manager:
+                log.info( "verify_config - creation of monitors manager disabled" )
+                return False
+
             monitors_manager = MonitorsManager(config, self.__controller)
+
+            if disable_create_copying_manager:
+                log.info( "verify_config - creation of copying manager disabled" )
+                return False
+
             copying_manager = CopyingManager(config, monitors_manager.monitors)
             # To do the full verification, we have to create the managers.  However, this call does not need them,
             # but it is very likely the caller of this method will invoke ``__create_worker_thread`` next, so let's
             # save them for that call.  This helps us avoid having to read and instantiate the monitors multiple times.
+            if disable_cache_config:
+                log.info( "verify_config - not caching verify_config results" )
+                self.__last_verify_config = None
+                # return true here because config is verified, just not cached
+                # this means the rest of the loop will continue but the config
+                # will be verified again when the worker thread is created
+                return True
+
             self.__last_verify_config = {
                 'config': config,
                 'monitors_manager': monitors_manager,
@@ -315,6 +342,7 @@ class ScalyrAgent(object):
             raise Exception('Configuration file uses a monitor that is not supported on this system Monitor \'%s\' '
                             'cannot be used due to: %s.  If you require support for this monitor for your system, '
                             'please e-mail contact@scalyr.com' % (e.monitor_name, str(e)))
+        return True
 
     def __create_worker_thread(self, config):
         """Creates the worker thread that will run the copying and monitor managers for the specified configuration.
@@ -700,16 +728,13 @@ class ScalyrAgent(object):
                 disable_config_equivalence_check_until = _update_disabled_until( self.__config.disable_config_equivalence_check, current_time )
                 disable_verify_can_write_to_logs_until = _update_disabled_until( self.__config.disable_verify_can_write_to_logs, current_time )
                 disable_config_reload_until = _update_disabled_until( self.__config.disable_config_reload, current_time )
-
-                def check_disabled( current_time, other_time, message ):
-                    result = (current_time < other_time)
-                    if result:
-                        log.log( scalyr_logging.DEBUG_LEVEL_0, "%s disabled for %d more seconds" % (message, other_time - current_time) )
-                    return result
+                disable_verify_config_create_monitors_manager_until = _update_disabled_until( self.__config.disable_verify_config_create_monitors_manager, current_time )
+                disable_verify_config_create_copying_manager_until = _update_disabled_until( self.__config.disable_verify_config_create_copying_manager, current_time )
 
                 config_change_check_interval = self.__config.config_change_check_interval
 
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
+
                     current_time = time.time()
                     self.__last_config_check_time = current_time
 
@@ -732,7 +757,7 @@ class ScalyrAgent(object):
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Checking for any changes to config file')
                     new_config = None
                     try:
-                        if check_disabled( current_time, disable_all_config_updates_until, "all config updates" ):
+                        if _check_disabled( current_time, disable_all_config_updates_until, "all config updates" ):
                             continue
 
                         new_config = self.__read_config(self.__config_file_path)
@@ -742,10 +767,22 @@ class ScalyrAgent(object):
                         # we need to parse the main configuration file to at least get the fragment directory.  For
                         # now, we will just wait this work.  We only do it once every 30 secs anyway.
 
-                        if check_disabled( current_time, disable_verify_config_until, "verify config" ):
+                        if _check_disabled( current_time, disable_verify_config_until, "verify config" ):
                             continue
 
-                        self.__verify_config(new_config)
+                        disable_create_monitors_manager=_check_disabled( current_time, disable_verify_config_create_monitors_manager_until, "verify config create monitors manager" )
+                        disable_create_copying_manager=_check_disabled( current_time, disable_verify_config_create_copying_manager_until, "verify config create copying manager" )
+                        disable_cache_config=self.__config.disable_verify_config_cache_config
+                        verified = self.__verify_config(new_config,
+                                                        disable_create_monitors_manager=disable_create_monitors_manager,
+                                                        disable_create_copying_manager=disable_create_copying_manager,
+                                                        disable_cache_config=disable_cache_config
+                                                       )
+
+                        # Skip the rest of the loop if the config wasn't fully verified because
+                        # later code relies on the config being fully validated
+                        if not verified:
+                            continue
 
                         if self.__config.disable_update_debug_log_level:
                             log.log( scalyr_logging.DEBUG_LEVEL_0, "update debug_log_level disabled" )
@@ -753,7 +790,7 @@ class ScalyrAgent(object):
                             # Update the debug_level based on the new config.. we always update it.
                             self.__update_debug_log_level(new_config.debug_level)
 
-                        if check_disabled( current_time, disable_config_equivalence_check_until, "config equivalence check" ):
+                        if _check_disabled( current_time, disable_config_equivalence_check_until, "config equivalence check" ):
                             continue
 
                         if self.__current_bad_config is None and new_config.equivalent(self.__config,
@@ -761,7 +798,7 @@ class ScalyrAgent(object):
                             log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was not different than previous')
                             continue
 
-                        if check_disabled( current_time, disable_verify_can_write_to_logs_until, "verify check for writing to logs and data" ):
+                        if _check_disabled( current_time, disable_verify_can_write_to_logs_until, "verify check for writing to logs and data" ):
                             continue
 
                         self.__verify_can_write_to_logs_and_data(new_config)
@@ -775,7 +812,7 @@ class ScalyrAgent(object):
                         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config could not be read or parsed')
                         continue
 
-                    if check_disabled( current_time, disable_config_reload_until, "config reload" ):
+                    if _check_disabled( current_time, disable_config_reload_until, "config reload" ):
                         continue
 
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'Config was different than previous.  Reloading.')
@@ -809,6 +846,8 @@ class ScalyrAgent(object):
                     disable_config_equivalence_check_until = _update_disabled_until( self.__config.disable_config_equivalence_check, current_time )
                     disable_verify_can_write_to_logs_until = _update_disabled_until( self.__config.disable_verify_can_write_to_logs, current_time )
                     disable_config_reload_until = _update_disabled_until( self.__config.disable_config_reload, current_time )
+                    disable_verify_config_create_monitors_manager_until = _update_disabled_until( self.__config.disable_verify_config_create_monitors_manager, current_time )
+                    disable_verify_config_create_copying_manager_until = _update_disabled_until( self.__config.disable_verify_config_create_copying_manager, current_time )
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(self.__calculate_overall_stats(base_overall_stats))
