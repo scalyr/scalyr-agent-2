@@ -305,6 +305,19 @@ class Configuration(object):
     @property
     def config_change_check_interval(self):
         return self.__get_config().get_float('config_change_check_interval')
+
+    @property
+    def disable_verify_config_create_monitors_manager(self):
+        return self.__get_config().get_int('disable_leak_verify_config_create_monitors_manager', none_if_missing=True)
+
+    @property
+    def disable_verify_config_create_copying_manager(self):
+        return self.__get_config().get_int('disable_leak_verify_config_create_copying_manager', none_if_missing=True)
+
+    @property
+    def disable_verify_config_cache_config(self):
+        return self.__get_config().get_bool('disable_leak_verify_config_cache_config')
+
     # end Debug leak flags
 
     @property
@@ -937,6 +950,9 @@ class Configuration(object):
 
         self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults)
 
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_monitors_manager', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_copying_manager', None, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_leak_verify_config_cache_config', False, description, apply_defaults)
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.

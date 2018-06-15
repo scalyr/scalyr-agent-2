@@ -183,9 +183,9 @@ class LogFileIterator(object):
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
-        self.__parse_as_json = log_config['parse_lines_as_json']
-        self.__json_log_key = log_config['json_message_field']
-        self.__json_timestamp_key = log_config['json_timestamp_field']
+        self.__parse_as_json = log_config.get('parse_lines_as_json', False)
+        self.__json_log_key = log_config.get('json_message_field', 'log' )
+        self.__json_timestamp_key = log_config.get('json_timestamp_field', 'time')
 
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,

@@ -241,6 +241,9 @@ def rfc3339_to_datetime( string ):
         fractions = parts[1]
         #if we had a fractional component it should terminate in a Z
         if not fractions.endswith( 'Z' ):
+            #we don't handle non UTC timezones yet
+            if any(c in fractions for c in '+-'):
+                return None
             return dt
 
         # remove the Z and just process the fraction.
@@ -290,6 +293,10 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
         # if the fractional part doesn't end in Z we likely have a
         # malformed time, so just return the current value
         if not fractions.endswith( 'Z' ):
+            #we don't handle non UTC timezones yet
+            if any(c in fractions for c in '+-'):
+                return None
+
             return nano_seconds
 
         # strip the final 'Z' and use the final number for processing
