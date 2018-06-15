@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.34 "" - Jun 15, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jun 15, 2018 11:00 -0700
+--->
+
+Features:
+
+* Added `journald_monitor` for collecting logs from a local `journald` service.  Requires installation of the Python `systemd` library.
+* Added `garbage_monitor` for debugging memory consumption issues in the agent.
+* Added `verify_k8s_api_queries` option to the `kubernetes_monitor` to allow disabling SSL verification on local API calls.
+
+Bug fixes:
+
+* Fixed issues causing the `linux_process_metrics_monitor` to throw exceptions when the monitored process dies.
+* Additional debug flags to aide in investigating memory issues with the agent.
+
 ## 2.0.33 "Horta" - May 25, 2018
 
 <!---
