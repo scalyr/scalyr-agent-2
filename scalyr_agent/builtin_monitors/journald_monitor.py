@@ -199,7 +199,7 @@ class JournaldMonitor(ScalyrMonitor):
     def _initialize(self):
         self._journal_path = self._config.get( 'journal_path' )
         if not os.path.exists( self._journal_path ):
-            raise BadMonitorConfiguration( "journal_path '%s' does not exist or is not a directory" % self._journal_path )
+            raise BadMonitorConfiguration( "journal_path '%s' does not exist or is not a directory" % self._journal_path, 'journal_path' )
 
         self._id = self._config.get( 'id' )
         self._checkpoint_name = self.module_name
