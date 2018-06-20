@@ -31,6 +31,14 @@ define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.garbage_monitor``',
                      convert_to=str, required_option=True)
 
+define_config_option(__monitor__, 'disable_garbage_collection_before_dump',
+                     'Optional (defaults to False). By default the garbage_monitor will perform a garbage collection before it '
+                     'dumps the list of unreachable objects to ensure that objects are actually leaking.  If this flag is set to '
+                     'True then then garbage monitor will not perform this collection.  This is useful when trying to find objects '
+                     'with cyclic references that are not being readily collected by the garbage collector, but that would eventually '
+                     'be collected.',
+                     default=False, convert_to=bool)
+
 define_config_option(__monitor__, 'max_type_dump',
                      'Optional (defaults to 20). The maximum number of unreachable types to output each gather_sample',
                      default=20, convert_to=int)
@@ -142,7 +150,8 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
     def gather_sample( self ):
         try:
             # collect everything that can be collected
-            gc.collect()
+            if not self._config.get('disable_garbage_collection_before_dump'):
+                gc.collect()
 
             garbage = gc.garbage
             self._logger.info( "*** Garbage Detector *** %d garbage items found" % len( garbage ) )
