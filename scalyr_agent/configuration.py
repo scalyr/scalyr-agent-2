@@ -307,6 +307,10 @@ class Configuration(object):
         return self.__get_config().get_float('config_change_check_interval')
 
     @property
+    def garbage_collect_interval(self):
+        return self.__get_config().get_int('garbage_collect_interval')
+
+    @property
     def disable_verify_config_create_monitors_manager(self):
         return self.__get_config().get_int('disable_leak_verify_config_create_monitors_manager', none_if_missing=True)
 
@@ -949,6 +953,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description, apply_defaults)
 
         self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'garbage_collect_interval', 300, description, apply_defaults)
 
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_monitors_manager', None, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_copying_manager', None, description, apply_defaults)
