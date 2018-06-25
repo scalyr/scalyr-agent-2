@@ -48,6 +48,14 @@ define_config_option(__monitor__, 'max_object_dump',
                      'Set to -1 to include all objects',
                      default=0, convert_to=int)
 
+define_config_option(__monitor__, 'monitor_garbage_objects',
+                     'Optional (defaults to True).  If False, garbage objects are not dumped.',
+                     default=True, convert_to=bool)
+
+define_config_option(__monitor__, 'monitor_live_objects',
+                     'Optional (defaults to False).  If True, monitors live objects - i.e. those still in use and not read for garbage collection.',
+                     default=False, convert_to=bool)
+
 define_config_option(__monitor__, 'monitor_all_unreachable_objects',
                      'Optional (defaults to False).  If True, monitors all unreachable objects, not just ones that have circular __del__ dependencies. '
                      'See the python gc documentation for details: https://docs.python.org/2/library/gc.html#gc.garbage',
@@ -120,9 +128,10 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
 
         self._max_type_dump = self._config.get( 'max_type_dump' )
         self._max_object_dump = self._config.get( 'max_object_dump' )
+        self._monitor_garbage = self._config.get( 'monitor_garbage_objects' )
+        self._monitor_live = self._config.get( 'monitor_live_objects' )
 
     def run( self ):
-
         # get the current debug flags
         self._old_debug_flags = gc.get_debug()
 
@@ -147,44 +156,65 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         else:
             return str( rubbish )
 
+    def _dump_objects( self, all_objects, object_dump_types, max_type_dump, max_object_dump, dump_kind  ):
+        self._logger.info( "*** Garbage Detector *** %d %s objects found" % (len( all_objects ), dump_kind) )
+
+        # get the names and object counts of objects
+        type_count = {}
+        for item in all_objects:
+            object_type = type( item ).__name__
+            if object_type not in type_count:
+                type_count[object_type] = []
+            type_count[object_type].append( item )
+
+        # get the top objects, sorted by descending object count
+        sorted_objects = sorted( type_count.items(), key=lambda (k,v):len(v), reverse=True)[:max_type_dump]
+
+        #print the overview
+        for type_name, object_list in sorted_objects:
+            self._logger.info( "\t\t%s=%d" % (type_name, len(object_list)) )
+
+        #print the objects
+        if object_dump_types:
+            for type_name, object_list in sorted_objects:
+                if type_name in object_dump_types:
+                    objects = object_list
+                    if max_object_dump > 0:
+                        objects = objects[:max_object_dump]
+
+                    if max_object_dump == 0:
+                        self._logger.info( "No objects to print for '%s'- set `max_object_dump` to a value > 0" % type_name )
+                    else:
+                        self._logger.info( "Objects for %s" % (type_name))
+                        for r in object_list[:max_object_dump]:
+                            self._logger.info( "\t\t%s" % (self._dump_string(r)) )
+
     def gather_sample( self ):
         try:
             # collect everything that can be collected
             if not self._config.get('disable_garbage_collection_before_dump'):
                 gc.collect()
 
-            garbage = gc.garbage
-            self._logger.info( "*** Garbage Detector *** %d garbage items found" % len( garbage ) )
+            # dump garbage objects
+            if self._monitor_garbage:
+                garbage = gc.garbage
+                self._dump_objects( all_objects=garbage,
+                                    object_dump_types=self._object_dump_types,
+                                    max_type_dump=self._max_type_dump,
+                                    max_object_dump=self._max_object_dump,
+                                    dump_kind="garbage"
+                                  )
 
-            # get the names and object counts of objects that can't be collected
-            type_count = {}
-            for rubbish in garbage:
-                rubbish_type = type( rubbish ).__name__
-                if rubbish_type not in type_count:
-                    type_count[rubbish_type] = []
-                type_count[rubbish_type].append( rubbish )
+            # dump live objects
+            if self._monitor_live:
+                objects = gc.get_objects()
+                self._dump_objects( all_objects=objects,
+                                    object_dump_types=self._object_dump_types,
+                                    max_type_dump=self._max_type_dump,
+                                    max_object_dump=self._max_object_dump,
+                                    dump_kind="live"
+                                  )
 
-            # get the top bits of rubbish, sorted by descending object count
-            sorted_rubbish = sorted( type_count.items(), key=lambda (k,v):len(v), reverse=True)[:self._max_type_dump]
-
-            #print the overview
-            for rubbish_name, rubbish in sorted_rubbish:
-                self._logger.info( "\t\t%s=%d" % (rubbish_name, len(rubbish)) )
-
-            #print the objects
-            if self._object_dump_types:
-                for rubbish_name, rubbish in sorted_rubbish:
-                    if rubbish_name in self._object_dump_types:
-                        objects = rubbish
-                        if self._max_object_dump > 0:
-                            objects = objects[:self._max_object_dump]
-
-                        if self._max_object_dump == 0:
-                            self._logger.info( "No objects to print for '%s'- set `max_object_dump` to a value > 0" % rubbish_name )
-                        else:
-                            self._logger.info( "Objects for %s" % (rubbish_name))
-                            for r in rubbish[:self._max_object_dump]:
-                                self._logger.info( "\t\t%s" % (self._dump_string(r)) )
         except Exception, e:
             global_log.info( "error gathering sample %s", traceback.format_exc() )
 
