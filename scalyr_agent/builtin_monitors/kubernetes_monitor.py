@@ -111,7 +111,12 @@ define_config_option( __monitor__, 'metrics_only',
                      convert_to=bool, default=False)
 
 define_config_option( __monitor__, 'container_globs',
-                     'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
+                     'Optional (defaults to None). If true, a list of glob patterns for container names. Only containers whose names '
+                     'match one of the glob patterns will be monitored.',
+                      default=None)
+
+define_config_option( __monitor__, 'namespace_globs',
+                     'Optional (defaults to None). If true, a list of glob patterns for namespace names. Only containers whose namespace names '
                      'match one of the glob patterns will be monitored.',
                       default=None)
 
@@ -305,8 +310,8 @@ def _ignore_old_dead_container( container, created_before=None ):
 
     return False
 
-def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, include_k8s_info=False):
+def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None, only_running_containers=True, 
+                    running_or_created_after=None, glob_list=None, namespace_glob_list=None, include_log_path=False, include_k8s_info=False):
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
         @param client: A docker.Client object
         @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
@@ -317,6 +322,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         @param running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
             dead containers that were created after the specified time.  Used to pick up short-lived containers.
         @param glob_list: String.  A glob string that limit results to containers whose container names match the glob
+        @param namespace_glob_list: String.  A glob string that limit results to containers whose namespace names match the glob
         @param include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
         @param include_k8s_info: Boolean.  If true include k8s information (if it exists) as part of the extra info mapped to the container id
     """
@@ -353,16 +359,24 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             if len( container['Names'] ) > 0:
                 name = container['Names'][0].lstrip('/')
 
-                add_container = True
+                add_container_name = True
+                add_container_namespace = True
 
                 if glob_list:
-                    add_container = False
+                    add_container_name = False
                     for glob in glob_list:
                         if fnmatch.fnmatch( name, glob ):
-                            add_container = True
+                            add_container_name = True
                             break;
 
-                if add_container:
+                if namespace_glob_list:
+                    add_container_namespace = False
+                    for glob in namespace_glob_list:
+                        if fnmatch.fnmatch( container['Labels'][k8s_labels['pod_namespace']], glob ):
+                            add_container_namespace = True
+                            break;
+
+                if add_container_name and add_container_namespace:
                     log_path = None
                     k8s_info = None
                     status = None
@@ -472,6 +486,7 @@ class ContainerChecker( StoppableThread ):
         self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
         self.__glob_list = config.get( 'container_globs' )
+        self.__namespace_glob_list = config.get( 'namespace_globs' )
 
         self.containers = {}
 
@@ -494,7 +509,7 @@ class ContainerChecker( StoppableThread ):
 
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s filter for pod '%s' is '%s'" % (self.__k8s.get_pod_name(), self.__k8s_filter) )
 
-            self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+            self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, namespace_glob_list=self.__namespace_glob_list, include_log_path=True, include_k8s_info=True)
 
             # if querying the docker api fails, set the container list to empty
             if self.containers == None:
@@ -637,7 +652,7 @@ class ContainerChecker( StoppableThread ):
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=previous_time, glob_list=self.__glob_list, include_log_path=True, include_k8s_info=True)
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, running_or_created_after=previous_time, glob_list=self.__glob_list, namespace_glob_list=self.__namespace_glob_list, include_log_path=True, include_k8s_info=True)
                 previous_time = time.time() - 1
 
                 # if running_containers is None, that means querying the docker api failed.
@@ -1176,6 +1191,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
         self.__glob_list = self._config.get( 'container_globs' )
+        self.__namespace_glob_list = self._config.get( 'namespace_globs' )
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
         self.__gather_k8s_pod_info = self._config.get('gather_k8s_pod_info')
@@ -1339,7 +1355,7 @@ class KubernetesMonitor( ScalyrMonitor ):
     def gather_sample( self ):
         # gather metrics
         if self.__report_container_metrics:
-            containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
+            containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list, namespace_glob_list=self.__namespace_glob_list )
             self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
             self.__gather_metrics_from_api( containers )
 
