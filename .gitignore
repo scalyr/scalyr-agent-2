@@ -58,3 +58,4 @@ xunit.xml
 # Sphinx documentation
 docs/_build/
 
+docker/root
