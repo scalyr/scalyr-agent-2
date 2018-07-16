@@ -34,6 +34,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import errno
+import gc
 import os
 import sys
 import time
@@ -733,6 +734,9 @@ class ScalyrAgent(object):
 
                 config_change_check_interval = self.__config.config_change_check_interval
 
+                gc_interval = self.__config.garbage_collect_interval
+                last_gc_time = current_time
+
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
 
                     current_time = time.time()
@@ -790,6 +794,11 @@ class ScalyrAgent(object):
                             # Update the debug_level based on the new config.. we always update it.
                             self.__update_debug_log_level(new_config.debug_level)
 
+                        # see if we need to perform a garbage collection
+                        if gc_interval > 0 and current_time > (last_gc_time + gc_interval):
+                            gc.collect()
+                            last_gc_time = current_time
+
                         if _check_disabled( current_time, disable_config_equivalence_check_until, "config equivalence check" ):
                             continue
 
@@ -840,6 +849,7 @@ class ScalyrAgent(object):
 
                     self.__current_bad_config = None
                     config_change_check_interval = self.__config.config_change_check_interval
+                    gc_interval = self.__config.garbage_collect_interval
 
                     disable_all_config_updates_until = _update_disabled_until( self.__config.disable_all_config_updates, current_time )
                     disable_verify_config_until = _update_disabled_until( self.__config.disable_verify_config, current_time )
