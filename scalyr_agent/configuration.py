@@ -390,6 +390,11 @@ class Configuration(object):
         return self.__get_config().get_string('scalyr_server')
 
     @property
+    def check_remote_if_no_tty(self):
+        """Returns the configuration value for `check_remote_if_no_tty`"""
+        return self.__get_config().get_bool('check_remote_if_no_tty')
+
+    @property
     def server_attributes(self):
         """Returns the configuration value for 'server_attributes'."""
         return self.__get_config().get_json_object('server_attributes')
@@ -820,6 +825,7 @@ class Configuration(object):
     """
         description = 'configuration file "%s"' % file_path
 
+        self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
                                              description, apply_defaults)

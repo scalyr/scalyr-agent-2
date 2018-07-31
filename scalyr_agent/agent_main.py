@@ -214,6 +214,10 @@ class ScalyrAgent(object):
 
         try:
             self.__config = self.__read_and_verify_config(config_file_path)
+
+            # check if not a tty and override the no check remote variable
+            if not sys.stdout.isatty():
+                no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception, e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
