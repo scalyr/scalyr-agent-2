@@ -199,7 +199,7 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         no_fork = command_options.no_fork
-        no_check_remote = command_options.no_check_remote
+        no_check_remote = False
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == 'version':
@@ -214,6 +214,10 @@ class ScalyrAgent(object):
 
         try:
             self.__config = self.__read_and_verify_config(config_file_path)
+
+            # check if not a tty and override the no check remote variable
+            if not sys.stdout.isatty():
+                no_check_remote = not self.__config.check_remote_if_no_tty
         except Exception, e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
@@ -229,6 +233,9 @@ class ScalyrAgent(object):
 
         self.__escalator = ScriptEscalator(self.__controller, config_file_path, os.getcwd(),
                                            command_options.no_change_user)
+
+        if command_options.no_check_remote is not None:
+            no_check_remote = True
 
         # noinspection PyBroadException
         try:
@@ -1206,7 +1213,7 @@ if __name__ == '__main__':
                       help="For status command, prints detailed information about running agent.")
     parser.add_option("", "--no-fork", action="store_true", dest="no_fork", default=False,
                       help="For the run command, does not fork the program to the background.")
-    parser.add_option("", "--no-check-remote-server", action="store_true", dest="no_check_remote", default=False,
+    parser.add_option("", "--no-check-remote-server", action="store_true", dest="no_check_remote",
                       help="For the start command, does not perform the first check to see if the agent can "
                            "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
                            "the backgroudn until it is successful.  This is useful if the network is not immediately "
