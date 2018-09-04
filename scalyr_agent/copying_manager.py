@@ -208,6 +208,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         # log file has been processed yet
         self.__logs_pending_removal = {}
 
+        # a list of log_matches for logs with configs that need to be reloaded
+        self.__logs_pending_reload = []
 
         # a list of dynamically added log_matchers that have not been processed yet
         self.__pending_log_matchers = []
@@ -277,6 +279,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         returns: an updated log_config object
         """
         log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+
         self.__lock.acquire()
         try:
             if log_config['path'] not in self.__all_paths:
@@ -307,10 +310,19 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'Updating config for log file \'%s\' for monitor \'%s\'' % (log_path, monitor_name ) )
                 # update by removing the old entry and adding a new one
                 self.__log_matchers[:] = [m for m in self.__log_matchers if m.log_path != log_path]
+
+                # add to the pending matches rather than adding directly, so processors will be updated
+                # correctly in the main loop
                 matcher = LogMatcher( self.__config, log_config )
-                self.__log_matchers.append(matcher)
+                self.__pending_log_matchers.append( matcher )
+
+                # also add to the pending reload list so any old processors for this file will be removed
+                # next time through the main loop
+                # We keep track of these separately to distinguish between pending new additions (from add_log_config)
+                # and pending reloads (from this method)
+                self.__logs_pending_reload.append(matcher)
             else:
-                log.warn( "Trying to update log config for nonexistent log: %s" % log_path, 
+                log.warn( "Trying to update log config for nonexistent log: %s" % log_path,
                            limit_once_per_x_secs=600, limit_key='update-log-config-%s' % log_path )
         finally:
             self.__lock.release()
@@ -345,6 +357,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__lock.acquire()
         try:
             if log_path not in self.__logs_pending_removal:
+                # set to False to signify that we don't know if these log has been processed at least once
                 self.__logs_pending_removal[log_path] = False
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'log path \'%s\' for monitor \'%s\' is pending removal' % (log_path, monitor_name ) )
         finally:
@@ -913,15 +926,41 @@ class CopyingManager(StoppableThread, LogWatcher):
         Creates log processors for any recent, dynamically added log matchers
         """
 
-        # make a shallow copy of pending log_matchers
+        # make a shallow copy of pending log_matchers, and pending reloads
         log_matchers = []
+        pending_reload = []
         self.__lock.acquire()
         try:
             log_matchers = self.__pending_log_matchers[:]
+
+            # get any logs that need reloading and reset the pending reload list
+            pending_reload = self.__logs_pending_reload
+            self.__logs_pending_reload = []
         finally:
             self.__lock.release()
 
-        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints={}, copy_at_index_zero=True )
+        checkpoints={}
+
+        # remove any log processors from the pending_reload list, so they get recreated
+        for matcher in pending_reload:
+            log.log( scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % matcher.log_path )
+            self.__log_paths_being_processed.pop( matcher.log_path, None )
+            # iterate over full list of processors to see if we need to remove any.
+            # We manually iterate so that we can close the processors if necessary
+            # and also so we can get checkpoints so files aren't copied from the beginning
+            # note:  manually calculate the len each loop iteration as it changes if items
+            # are removed
+            i = 0
+            while i < len( self.__log_processors ):
+                p = self.__log_processors[i]
+                if p.log_path == matcher.log_path:
+                    checkpoints[p.log_path] = p.get_checkpoint()
+                    p.close()
+                    del self.__log_processors[i]
+                else:
+                    i += 1
+
+        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints=checkpoints, copy_at_index_zero=True )
 
         self.__lock.acquire()
         try:

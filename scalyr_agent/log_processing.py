@@ -2262,7 +2262,7 @@ class LogMatcher(object):
                             str(rule.get('hash_salt', default_value=''))
                         )
                     for rule in self.__log_entry_config['sampling_rules']:
-                        new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
+                        new_processor.add_sampler(rule['match_expression'], rule.get_float('sampling_rate', 1.0))
                     result.append(new_processor)
 
             self.__lock.acquire()
