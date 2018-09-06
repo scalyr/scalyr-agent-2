@@ -39,9 +39,9 @@ class TestAnnotationConfig(ScalyrTestCase):
                 
     def test_annotation_object( self ):
         annotations = {
-            "config.agent.scalyr.com/item1" : "item1",
-            "config.agent.scalyr.com/item2" : "item2",
-            "config.agent.scalyr.com/item3" : "item3"
+            "log.config.scalyr.com/item1" : "item1",
+            "log.config.scalyr.com/item2" : "item2",
+            "log.config.scalyr.com/item3" : "item3"
         }
 
         result = process_annotations( annotations )
@@ -52,13 +52,13 @@ class TestAnnotationConfig(ScalyrTestCase):
 
     def test_annotation_nested_object( self ):
         annotations = {
-            "config.agent.scalyr.com/item1.nest1" : "item1 nest1",
-            "config.agent.scalyr.com/item1.nest2" : "item1 nest2",
-            "config.agent.scalyr.com/item1.nest3" : "item1 nest3",
-            "config.agent.scalyr.com/item2.nest1" : "item2 nest1",
-            "config.agent.scalyr.com/item2.nest2" : "item2 nest2",
-            "config.agent.scalyr.com/item2.nest3" : "item2 nest3",
-            "config.agent.scalyr.com/item2.nest4" : "item2 nest4"
+            "log.config.scalyr.com/item1.nest1" : "item1 nest1",
+            "log.config.scalyr.com/item1.nest2" : "item1 nest2",
+            "log.config.scalyr.com/item1.nest3" : "item1 nest3",
+            "log.config.scalyr.com/item2.nest1" : "item2 nest1",
+            "log.config.scalyr.com/item2.nest2" : "item2 nest2",
+            "log.config.scalyr.com/item2.nest3" : "item2 nest3",
+            "log.config.scalyr.com/item2.nest4" : "item2 nest4"
         }
 
         result = process_annotations( annotations )
@@ -77,13 +77,13 @@ class TestAnnotationConfig(ScalyrTestCase):
         
     def test_annotation_array( self ):
         annotations = {
-            "config.agent.scalyr.com/item1.20" : "item1 element 2",
-            "config.agent.scalyr.com/item1.0" : "item1 element 0",
-            "config.agent.scalyr.com/item1.10" : "item1 element 1",
-            "config.agent.scalyr.com/item2.0" : "item2 element 0",
-            "config.agent.scalyr.com/item2.1" : "item2 element 1",
-            "config.agent.scalyr.com/item2.2" : "item2 element 2",
-            "config.agent.scalyr.com/item2.3" : "item2 element 3",
+            "log.config.scalyr.com/item1.20" : "item1 element 2",
+            "log.config.scalyr.com/item1.0" : "item1 element 0",
+            "log.config.scalyr.com/item1.10" : "item1 element 1",
+            "log.config.scalyr.com/item2.0" : "item2 element 0",
+            "log.config.scalyr.com/item2.1" : "item2 element 1",
+            "log.config.scalyr.com/item2.2" : "item2 element 2",
+            "log.config.scalyr.com/item2.3" : "item2 element 3",
         }
 
         result = process_annotations( annotations )

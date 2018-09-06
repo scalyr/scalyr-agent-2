@@ -29,9 +29,9 @@ class TestAnnotationConfig(ScalyrTestCase):
 
     def test_plain_values(self):
         annotations = {
-            "config.agent.scalyr.com/someKey": "someValue",
-            "config.agent.scalyr.com/log_path": "/var/log/access.log",
-            "config.agent.scalyr.com/important_field": "important_value",
+            "log.config.scalyr.com/someKey": "someValue",
+            "log.config.scalyr.com/log_path": "/var/log/access.log",
+            "log.config.scalyr.com/important_field": "important_value",
         }
 
         result = annotation_config.process_annotations( annotations )
@@ -48,11 +48,11 @@ class TestAnnotationConfig(ScalyrTestCase):
 
     def test_dict_values(self):
         annotations = {
-            "config.agent.scalyr.com/attributes.parser": "accessLog",
-            "config.agent.scalyr.com/attributes.container": "my-container",
-            "config.agent.scalyr.com/attributes.amazing": "yes it is",
-            "config.agent.scalyr.com/rename_logfile.match": "/var/log/(.*).log",
-            "config.agent.scalyr.com/rename_logfile.replacement": "/scalyr/\\1.log",
+            "log.config.scalyr.com/attributes.parser": "accessLog",
+            "log.config.scalyr.com/attributes.container": "my-container",
+            "log.config.scalyr.com/attributes.amazing": "yes it is",
+            "log.config.scalyr.com/rename_logfile.match": "/var/log/(.*).log",
+            "log.config.scalyr.com/rename_logfile.replacement": "/scalyr/\\1.log",
         }
 
         result = annotation_config.process_annotations( annotations )
@@ -75,9 +75,9 @@ class TestAnnotationConfig(ScalyrTestCase):
     
     def test_list_value(self):
         annotations = {
-            "config.agent.scalyr.com/3": "three",
-            "config.agent.scalyr.com/2": "two",
-            "config.agent.scalyr.com/1": "one",
+            "log.config.scalyr.com/3": "three",
+            "log.config.scalyr.com/2": "two",
+            "log.config.scalyr.com/1": "one",
         }
 
         result = annotation_config.process_annotations( annotations )
@@ -92,14 +92,14 @@ class TestAnnotationConfig(ScalyrTestCase):
     def test_list_of_dicts(self):
 
         annotations = {
-            "config.agent.scalyr.com/10.match_expression": "fourth",
-            "config.agent.scalyr.com/10.sampling_rate": 4,
-            "config.agent.scalyr.com/2.match_expression": "third",
-            "config.agent.scalyr.com/2.sampling_rate": 3,
-            "config.agent.scalyr.com/0.match_expression": "first",
-            "config.agent.scalyr.com/0.sampling_rate": 1,
-            "config.agent.scalyr.com/1.match_expression": "second",
-            "config.agent.scalyr.com/1.sampling_rate": 2
+            "log.config.scalyr.com/10.match_expression": "fourth",
+            "log.config.scalyr.com/10.sampling_rate": 4,
+            "log.config.scalyr.com/2.match_expression": "third",
+            "log.config.scalyr.com/2.sampling_rate": 3,
+            "log.config.scalyr.com/0.match_expression": "first",
+            "log.config.scalyr.com/0.sampling_rate": 1,
+            "log.config.scalyr.com/1.match_expression": "second",
+            "log.config.scalyr.com/1.sampling_rate": 2
         }
 
         result = annotation_config.process_annotations( annotations )
@@ -122,14 +122,14 @@ class TestAnnotationConfig(ScalyrTestCase):
     def test_dict_with_list(self):
 
         annotations = {
-            "config.agent.scalyr.com/rules.10.match_expression": "fourth",
-            "config.agent.scalyr.com/rules.10.sampling_rate": 4,
-            "config.agent.scalyr.com/rules.2.match_expression": "third",
-            "config.agent.scalyr.com/rules.2.sampling_rate": 3,
-            "config.agent.scalyr.com/rules.0.match_expression": "first",
-            "config.agent.scalyr.com/rules.0.sampling_rate": 1,
-            "config.agent.scalyr.com/rules.1.match_expression": "second",
-            "config.agent.scalyr.com/rules.1.sampling_rate": 2
+            "log.config.scalyr.com/rules.10.match_expression": "fourth",
+            "log.config.scalyr.com/rules.10.sampling_rate": 4,
+            "log.config.scalyr.com/rules.2.match_expression": "third",
+            "log.config.scalyr.com/rules.2.sampling_rate": 3,
+            "log.config.scalyr.com/rules.0.match_expression": "first",
+            "log.config.scalyr.com/rules.0.sampling_rate": 1,
+            "log.config.scalyr.com/rules.1.match_expression": "second",
+            "log.config.scalyr.com/rules.1.sampling_rate": 2
         }
 
         result = annotation_config.process_annotations( annotations )
@@ -156,14 +156,14 @@ class TestAnnotationConfig(ScalyrTestCase):
     def test_list_of_lists(self):
 
         annotations = {
-            "config.agent.scalyr.com/2.10.match_expression": "fourth",
-            "config.agent.scalyr.com/2.10.sampling_rate": 4,
-            "config.agent.scalyr.com/2.2.match_expression": "third",
-            "config.agent.scalyr.com/2.2.sampling_rate": 3,
-            "config.agent.scalyr.com/1.0.match_expression": "first",
-            "config.agent.scalyr.com/1.0.sampling_rate": 1,
-            "config.agent.scalyr.com/1.1.match_expression": "second",
-            "config.agent.scalyr.com/1.1.sampling_rate": 2
+            "log.config.scalyr.com/2.10.match_expression": "fourth",
+            "log.config.scalyr.com/2.10.sampling_rate": 4,
+            "log.config.scalyr.com/2.2.match_expression": "third",
+            "log.config.scalyr.com/2.2.sampling_rate": 3,
+            "log.config.scalyr.com/1.0.match_expression": "first",
+            "log.config.scalyr.com/1.0.sampling_rate": 1,
+            "log.config.scalyr.com/1.1.match_expression": "second",
+            "log.config.scalyr.com/1.1.sampling_rate": 2
         }
 
         #import pdb; pdb.set_trace()
@@ -193,44 +193,44 @@ class TestAnnotationConfig(ScalyrTestCase):
    
     def test_mixed_list_and_dict_key(self):
         annotations = {
-            "config.agent.scalyr.com/test.2.match_expression": "third",
-            "config.agent.scalyr.com/test.2.sampling_rate": 3,
-            "config.agent.scalyr.com/test.bad.match_expression": "first",
-            "config.agent.scalyr.com/test.bad.sampling_rate": 1,
-            "config.agent.scalyr.com/test.1.match_expression": "second",
-            "config.agent.scalyr.com/test.1.sampling_rate": 2
+            "log.config.scalyr.com/test.2.match_expression": "third",
+            "log.config.scalyr.com/test.2.sampling_rate": 3,
+            "log.config.scalyr.com/test.bad.match_expression": "first",
+            "log.config.scalyr.com/test.bad.sampling_rate": 1,
+            "log.config.scalyr.com/test.1.match_expression": "second",
+            "log.config.scalyr.com/test.1.sampling_rate": 2
         }
 
         self.assertRaises(annotation_config.BadAnnotationConfig, lambda: annotation_config.process_annotations( annotations ) )
         
     def test_full_config(self):
         annotations = {
-            "config.agent.scalyr.com/path": "/some/path.log",
-            "config.agent.scalyr.com/attributes.parser": "accessLog",
-            "config.agent.scalyr.com/attributes.service": "memcache",
-            "config.agent.scalyr.com/sampling_rules.10.match_expression": "10-INFO",
-            "config.agent.scalyr.com/sampling_rules.10.sampling_rate": 10,
-            "config.agent.scalyr.com/sampling_rules.2.match_expression": "2-INFO",
-            "config.agent.scalyr.com/sampling_rules.2.sampling_rate": 2,
-            "config.agent.scalyr.com/line_groupers.4.start": "start4",
-            "config.agent.scalyr.com/line_groupers.4.continueThrough": "continueThrough",
-            "config.agent.scalyr.com/line_groupers.3.start": "start3",
-            "config.agent.scalyr.com/line_groupers.3.continuePast": "continuePast",
-            "config.agent.scalyr.com/line_groupers.2.start": "start2",
-            "config.agent.scalyr.com/line_groupers.2.haltBefore": "haltBefore",
-            "config.agent.scalyr.com/line_groupers.1.start": "start1",
-            "config.agent.scalyr.com/line_groupers.1.haltWith": "haltWith",
-            "config.agent.scalyr.com/exclude.1": "exclude1",
-            "config.agent.scalyr.com/exclude.2": "exclude2",
-            "config.agent.scalyr.com/exclude.3": "exclude3",
-            "config.agent.scalyr.com/rename_logfile.match": "rename",
-            "config.agent.scalyr.com/rename_logfile.replacement": "renamed",
-            "config.agent.scalyr.com/redaction_rules.1.match_expression": "redacted1",
-            "config.agent.scalyr.com/redaction_rules.2.match_expression": "redacted2",
-            "config.agent.scalyr.com/redaction_rules.2.replacement": "replaced2",
-            "config.agent.scalyr.com/redaction_rules.3.match_expression": "redacted3",
-            "config.agent.scalyr.com/redaction_rules.3.replacement": "replaced3",
-            "config.agent.scalyr.com/redaction_rules.3.hash_salt": "salt3",
+            "log.config.scalyr.com/path": "/some/path.log",
+            "log.config.scalyr.com/attributes.parser": "accessLog",
+            "log.config.scalyr.com/attributes.service": "memcache",
+            "log.config.scalyr.com/sampling_rules.10.match_expression": "10-INFO",
+            "log.config.scalyr.com/sampling_rules.10.sampling_rate": 10,
+            "log.config.scalyr.com/sampling_rules.2.match_expression": "2-INFO",
+            "log.config.scalyr.com/sampling_rules.2.sampling_rate": 2,
+            "log.config.scalyr.com/line_groupers.4.start": "start4",
+            "log.config.scalyr.com/line_groupers.4.continueThrough": "continueThrough",
+            "log.config.scalyr.com/line_groupers.3.start": "start3",
+            "log.config.scalyr.com/line_groupers.3.continuePast": "continuePast",
+            "log.config.scalyr.com/line_groupers.2.start": "start2",
+            "log.config.scalyr.com/line_groupers.2.haltBefore": "haltBefore",
+            "log.config.scalyr.com/line_groupers.1.start": "start1",
+            "log.config.scalyr.com/line_groupers.1.haltWith": "haltWith",
+            "log.config.scalyr.com/exclude.1": "exclude1",
+            "log.config.scalyr.com/exclude.2": "exclude2",
+            "log.config.scalyr.com/exclude.3": "exclude3",
+            "log.config.scalyr.com/rename_logfile.match": "rename",
+            "log.config.scalyr.com/rename_logfile.replacement": "renamed",
+            "log.config.scalyr.com/redaction_rules.1.match_expression": "redacted1",
+            "log.config.scalyr.com/redaction_rules.2.match_expression": "redacted2",
+            "log.config.scalyr.com/redaction_rules.2.replacement": "replaced2",
+            "log.config.scalyr.com/redaction_rules.3.match_expression": "redacted3",
+            "log.config.scalyr.com/redaction_rules.3.replacement": "replaced3",
+            "log.config.scalyr.com/redaction_rules.3.hash_salt": "salt3",
 
         }
 

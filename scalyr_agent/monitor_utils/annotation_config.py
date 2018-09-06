@@ -24,7 +24,7 @@ from scalyr_agent.json_lib import JsonArray
 
 global_log = scalyr_logging.getLogger(__name__)
 
-SCALYR_LOG_ANNOTATION_RE = re.compile( '^(config\.agent\.scalyr\.com/)(.+)' )
+SCALYR_LOG_ANNOTATION_RE = re.compile( '^(log\.config\.scalyr\.com/)(.+)' )
 SCALYR_ANNOTATION_ELEMENT_RE = re.compile( '([^.]+)\.(.+)' )
 
 class BadAnnotationConfig( Exception ):
@@ -33,13 +33,13 @@ class BadAnnotationConfig( Exception ):
 
 def process_annotations( annotations ):
     """
-    Process the annotations, extracting config.agent.scalyr.com/* entries
+    Process the annotations, extracting log.config.scalyr.com/* entries
     and mapping them to a dict corresponding to the same names as the log_config
     entries.
     Items separated by a period are mapped to dict keys e.g. if the annotation was
     specified as:
 
-      config.agent.scalyr.com/attributes.parser: accessLog
+      log.config.scalyr.com/attributes.parser: accessLog
 
     it would be mapped to a dict
 
@@ -51,10 +51,10 @@ def process_annotations( annotations ):
 
     Arrays can be specified by using one or more digits as the key, e.g. if the annotation was
 
-      config.agent.scalyr.com/sampling_rules.0.match_expression: INFO
-      config.agent.scalyr.com/sampling_rules.0.sampling_rate: 0.1
-      config.agent.scalyr.com/sampling_rules.1.match_expression: FINE
-      config.agent.scalyr.com/sampling_rules.1.sampling_rate: 0
+      log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+      log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
+      log.config.scalyr.com/sampling_rules.1.match_expression: FINE
+      log.config.scalyr.com/sampling_rules.1.sampling_rate: 0
 
     This will be mapped to the following structure:
 
@@ -76,10 +76,10 @@ def process_annotations( annotations ):
     seen sub-key, then the previous value of the sub-key is overwritten, For example the
     annotations
 
-      config.agent.scalyr.com/sampling_rules.0.match_expression: INFO
-      config.agent.scalyr.com/sampling_rules.0.sampling_rate: 0.1
-      config.agent.scalyr.com/sampling_rules.0.match_expression: FINE
-      config.agent.scalyr.com/sampling_rules.0.sampling_rate: 0
+      log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+      log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
+      log.config.scalyr.com/sampling_rules.0.match_expression: FINE
+      log.config.scalyr.com/sampling_rules.0.sampling_rate: 0
 
     Would produce the following result
 
@@ -93,10 +93,10 @@ def process_annotations( annotations ):
     There is no guarantee about the order of processing for items with the same numeric array
     key, so:
 
-      config.agent.scalyr.com/sampling_rules.0.match_expression: INFO
-      config.agent.scalyr.com/sampling_rules.0.sampling_rate: 0.1
-      config.agent.scalyr.com/sampling_rules.0.match_expression: FINE
-      config.agent.scalyr.com/sampling_rules.0.sampling_rate: 0
+      log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+      log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
+      log.config.scalyr.com/sampling_rules.0.match_expression: FINE
+      log.config.scalyr.com/sampling_rules.0.sampling_rate: 0
 
     might produce:
 
