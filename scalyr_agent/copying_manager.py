@@ -217,6 +217,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
+
         # A dict from file path to the LogFileProcessor that is processing it.
         self.__log_paths_being_processed = {}
         # A lock that protects the status variables and the __log_matchers variable, the only variables that
@@ -447,11 +448,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             profiler = None
             profile_dump_interval = 0
 
+        current_time = time.time()
+
         try:
             # noinspection PyBroadException
             try:
                 # Try to read the checkpoint state from disk.
-                current_time = time.time()
                 checkpoints_state = self.__read_checkpoint_state()
                 if checkpoints_state is None:
                     log.info(
@@ -477,8 +479,12 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # attempts.
                 copying_params = CopyingParameters(self.__config)
 
+                current_time = time.time()
+
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
-                last_success = time.time()
+                last_success = current_time
+
+                last_full_checkpoint_write = current_time
 
                 pipeline_byte_threshold = self.__config.pipeline_threshold * float(self.__config.max_allowed_request_size)
 
@@ -567,7 +573,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                                     # could.  We have seen some bugs where we did not throw away the request because
                                     # an exception was thrown during the callback.
                                     self.__pending_add_events_task = next_add_events_task
-                                    self.__write_checkpoint_state()
+                                    self.__write_active_checkpoint_state( current_time )
 
                             if result == 'success':
                                 last_success = current_time
@@ -609,6 +615,10 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__total_errors += 1
                         self.__lock.release()
 
+                    if current_time - last_full_checkpoint_write > self.__config.full_checkpoint_interval:
+                        self.__write_full_checkpoint_state( current_time )
+                        last_full_checkpoint_write = current_time
+
                     if pipeline_time < copying_params.current_sleep_interval:
                         self._sleep_but_awaken_if_stopped(copying_params.current_sleep_interval - pipeline_time)
             except Exception:
@@ -616,6 +626,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.exception('Log copying failed due to exception')
                 sys.exit(1)
         finally:
+            self.__write_full_checkpoint_state( current_time )
             for processor in self.__log_processors:
                 processor.close()
             if profiler is not None:
@@ -722,21 +733,37 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return:  The checkpoint state
         @rtype: dict
         """
-        file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
+        full_checkpoint_file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
 
-        if not os.path.isfile(file_path):
-            log.info('The log copying checkpoint file "%s" does not exist, skipping.' % file_path)
+        if not os.path.isfile(full_checkpoint_file_path):
+            log.info('The log copying checkpoint file "%s" does not exist, skipping.' % full_checkpoint_file_path)
             return None
 
         # noinspection PyBroadException
         try:
-            return scalyr_util.read_file_as_json(file_path)
+            full_checkpoints = scalyr_util.read_file_as_json(full_checkpoint_file_path)
+            active_checkpoint_file_path = os.path.join(self.__config.agent_data_path, 'active-checkpoints.json')
+
+            if not os.path.isfile(active_checkpoint_file_path):
+                return full_checkpoints
+
+            # if the active checkpoint file is newer, overwrite any checkpoint values with the
+            # updated full checkpoint
+            active_checkpoints = scalyr_util.read_file_as_json(active_checkpoint_file_path)
+
+            if active_checkpoints['time'] > full_checkpoints['time']:
+                full_checkpoints['time'] = active_checkpoints['time']
+                for path, checkpoint in active_checkpoints['checkpoints'].iteritems():
+                    full_checkpoints[path] = checkpoint
+
+            return full_checkpoints
+
         except Exception:
             # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
             log.exception('Could not read checkpoint file due to error.', error_code='failedCheckpointRead')
             return None
 
-    def __write_checkpoint_state(self):
+    def __write_checkpoint_state(self, log_processors, base_file, current_time, full_checkpoint ):
         """Writes the current checkpoint state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -746,18 +773,38 @@ class CopyingManager(StoppableThread, LogWatcher):
         # and then an entry for each file path.
         checkpoints = {}
         state = {
-            'time': time.time(),
+            'time': current_time,
             'checkpoints': checkpoints,
         }
 
-        for processor in self.__log_processors:
-            checkpoints[processor.log_path] = processor.get_checkpoint()
+        for processor in log_processors:
+            if full_checkpoint or processor.is_active:
+                checkpoints[processor.log_path] = processor.get_checkpoint()
+
+            if full_checkpoint:
+                processor.set_inactive()
 
         # We write to a temporary file and then rename it to the real file name to make the write more atomic.
         # We have had problems in the past with corrupted checkpoint files due to failures during the write.
-        file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
-        tmp_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json~')
+        file_path = os.path.join(self.__config.agent_data_path, base_file)
+        tmp_path = os.path.join(self.__config.agent_data_path, base_file + '~')
         scalyr_util.atomic_write_dict_as_json_file( file_path, tmp_path, state )
+
+    def __write_full_checkpoint_state( self, current_time ):
+        """Writes the full checkpont state to disk.
+
+        This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
+        from where we left off copying each file.
+
+        """
+        self.__write_checkpoint_state( self.__log_processors, 'checkpoints.json', current_time, full_checkpoint=True )
+        self.__active_log_processors = {}
+        self.__write_active_checkpoint_state( current_time )
+
+    def __write_active_checkpoint_state( self, current_time ):
+        """Writes checkpoints only for logs that have been active since the last full checkpoint write
+        """
+        self.__write_checkpoint_state( self.__log_processors, 'active-checkpoints.json', current_time, full_checkpoint=False )
 
     def __get_next_add_events_task(self, bytes_allowed_to_send, for_pipelining=False):
         """Returns a new AddEventsTask getting all of the pending bytes from the log files that need to be copied.
