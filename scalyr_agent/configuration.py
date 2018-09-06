@@ -568,6 +568,11 @@ class Configuration(object):
         return self.__get_config().get_int('full_checkpoint_interval_in_seconds' )
 
     @property
+    def minimum_scan_interval(self):
+        """Returns the configuration value for 'minimum_scan_interval'."""
+        return self.__get_config().get_int('minimum_scan_interval', none_if_missing=True )
+
+    @property
     def close_old_files_duration_in_seconds(self):
         """Returns the configuration value for 'close_old_files_duration_in_seconds'."""
         return self.__get_config().get_int('close_old_files_duration_in_seconds')
@@ -856,6 +861,7 @@ class Configuration(object):
         self.__verify_or_set_optional_float(config, 'min_request_spacing_interval', 1.0, description, apply_defaults)
         self.__verify_or_set_optional_float(config, 'max_request_spacing_interval', 5.0, description, apply_defaults)
         self.__verify_or_set_optional_float(config, 'max_error_request_spacing_interval', 30.0, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'minimum_scan_interval', None, description, apply_defaults)
 
         self.__verify_or_set_optional_int(config, 'low_water_bytes_sent', 20*1024, description, apply_defaults)
         self.__verify_or_set_optional_float(config, 'low_water_request_spacing_adjustment', 1.5, description, apply_defaults)
@@ -1047,6 +1053,8 @@ class Configuration(object):
 
         self.__verify_or_set_optional_bool(log_entry, 'ignore_stale_files', False, description)
         self.__verify_or_set_optional_float(log_entry, 'staleness_threshold_secs', 5*60, description)
+
+        self.__verify_or_set_optional_int(log_entry, 'minimum_scan_interval', None, description)
 
         # Verify that if it has a sampling_rules array, then it is an array of json objects.
         self.__verify_or_set_optional_array(log_entry, 'sampling_rules', description)
