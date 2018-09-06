@@ -119,6 +119,11 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
                       'to Scalyr.', convert_to=bool, default=True)
 
+define_config_option( __monitor__, 'k8s_parse_json',
+                      'Optional (defaults to True). If True, the log files will be parsed as json before uploading to the server '
+                      'to extract log and timestamp fields.  If False, the raw json will be uploaded to Scalyr.',
+                      convert_to=bool, default=True)
+
 define_config_option( __monitor__, 'verify_k8s_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
                       'the ca.crt certificate found in the service account directory. If false, no verification will be performed. '
@@ -457,6 +462,8 @@ class ContainerChecker( StoppableThread ):
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
         name = self._config.get( 'container_name' )
+
+        self.__parse_json = self._config.get( 'k8s_parse_json' )
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
@@ -889,7 +896,7 @@ class ContainerChecker( StoppableThread ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % _get_short_cid( cid ) )
 
         if 'log_path' in info and info['log_path']:
-            result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=True )
+            result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=self.__parse_json )
             result['rename_logfile'] = '/docker/%s.log' % info['name']
 
         return result
