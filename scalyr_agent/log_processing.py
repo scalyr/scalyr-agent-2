@@ -453,9 +453,17 @@ class LogFileIterator(object):
         if current_time is None:
             current_time = time.time()
 
+        available_buffer_bytes = self.__available_buffer_bytes()
+        more_file_bytes_available = self.__more_file_bytes_available()
+
+        # if there are no bytes available in the buffer or on the file
+        # shortcircuit return an empty string
+        if available_buffer_bytes == 0 and not more_file_bytes_available:
+            return LogLine( line='' )
+
         # Keep our underlying buffer of bytes filled up.
-        if self.__buffer is None or (self.__available_buffer_bytes() < self.__max_line_length and
-                                     self.__more_file_bytes_available()):
+        if self.__buffer is None or (available_buffer_bytes < self.__max_line_length and
+                                     more_file_bytes_available):
             self.__fill_buffer(current_time)
 
         # The following code and the sanity check below were to check for an old bug that was fixed a long time ago.
@@ -990,6 +998,7 @@ class LogFileIterator(object):
                 while attempts_left > 0:
                     if starting_inode is None and self.__file_system.trust_inodes:
                         starting_inode = self.__file_system.stat(file_path).st_ino
+
                     pending_file = self.__file_system.open(file_path)
                     second_stat = self.__file_system.stat(file_path)
 
@@ -1302,6 +1311,12 @@ class LogFileProcessor(object):
         self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system,
                                                    checkpoint=checkpoint)
 
+        self.__minimum_scan_interval = None
+        if 'minimum_scan_interval' in log_config and log_config['minimum_scan_interval'] is not None:
+            self.__minimum_scan_interval = log_config['minimum_scan_interval']
+        else:
+            self.__minimum_scan_interval = config.minimum_scan_interval
+
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
 
@@ -1458,10 +1473,20 @@ class LogFileProcessor(object):
             self.__last_success = current_time
 
         self.__lock.acquire()
-        self.__last_scan_time = current_time
+        last_scan_time = self.__last_scan_time
         self.__lock.release()
 
-        self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
+        # see if we need to scan for new bytes yet
+        scan = True
+        if last_scan_time is not None and self.__minimum_scan_interval is not None:
+            scan = (current_time - last_scan_time > self.__minimum_scan_interval)
+
+        # scan for new bytes
+        if scan:
+            self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
+            self.__lock.acquire()
+            self.__last_scan_time = current_time
+            self.__lock.release()
 
         # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
         if current_time - self.__last_success > self.__copy_staleness_threshold:
@@ -1611,7 +1636,7 @@ class LogFileProcessor(object):
                 @rtype: bool
                 """
                 try:
-                    log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
+                    #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
                     self.__lock.acquire()
                     # Zero out the bytes we were tracking as they were in flight.
                     self.__total_bytes_being_processed = 0
@@ -1631,7 +1656,7 @@ class LogFileProcessor(object):
 
                         # Do a mark to cleanup any state in the iterator.  We know we won't have to roll back
                         # to before this point now.
-                        # only mark files that have logged new bytes to prevent stat'ing unused files
+                        # Only mark files that have logged new bytes to prevent stat'ing unused files
                         if bytes_between_positions > 0:
                             self.__log_file_iterator.mark(final_position, current_time=current_time)
 
@@ -1655,8 +1680,8 @@ class LogFileProcessor(object):
                 finally:
                     self.__lock.release()
 
-            log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
-                    self.__path, bytes_copied, str(buffer_filled))
+            #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
+                    #self.__path, bytes_copied, str(buffer_filled))
 
             return completion_callback, buffer_filled
         except Exception:
