@@ -126,10 +126,10 @@ define_config_option( __monitor__, 'k8s_include_all_containers',
                       'will be monitored. See documentation on annotations for further detail.', convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
-                     'Optional (defaults to 120). The amount of time to wait between fully updating the k8s cache from the k8s api. '
+                     'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
                      'Increase this value if you want less network traffic from querying the k8s api.  Decrease this value if you '
                      'want dynamic updates to annotation configuration values to be processed more quickly.',
-                     convert_to=int, default=120)
+                     convert_to=int, default=30)
 
 define_config_option( __monitor__, 'k8s_max_cache_misses',
                      'Optional (defaults to 20). The maximum amount of single query k8s cache misses that can occur in `k8s_cache_miss_interval` '
@@ -836,6 +836,9 @@ class ContainerChecker( StoppableThread ):
         parser = 'docker'
         common_annotations = {}
         container_annotations = {}
+        # pod name and namespace are set to an invalid value for cases where errors occur and a log
+        # message is produced, so that the log message has clearly invalid values for these rather
+        # than just being empty
         pod_name = '--'
         pod_namespace = '--'
         short_cid = _get_short_cid( cid )
@@ -939,7 +942,7 @@ class ContainerChecker( StoppableThread ):
                 continue
 
             if key in invalid_keys:
-                self._logger.warning( "Invalid key '%s' found in annotation config for '%s/%s'. Configuration of '%s' is not currently supported via annotations" % (key, pod_namespace, pod_name, key ),
+                self._logger.warning( "Invalid key '%s' found in annotation config for '%s/%s'. Configuration of '%s' is not currently supported via annotations and has been ignored." % (key, pod_namespace, pod_name, key ),
                                     limit_once_per_x_secs=300,
                                     limit_key='k8s-invalid-annotation-config-key-%s' % key)
                 continue
@@ -1342,6 +1345,13 @@ class KubernetesMonitor( ScalyrMonitor ):
                 self._logger.emit_value( key, metrics[value], extra, monitor_id_override=container )
 
     def __log_network_interface_metrics( self, container, metrics, interface=None, k8s_extra={} ):
+        """ Logs network interface metrics
+
+            @param: container - name of the container the log originated from
+            @param: metrics - a dict of metrics keys/values to emit
+            @param: interface - an optional interface value to associate with each metric value emitted
+            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+        """
         extra = k8s_extra
         if interface:
             extra['interface'] = interface
@@ -1349,12 +1359,24 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__log_metrics( container, self.__network_metrics, metrics, extra )
 
     def __log_memory_stats_metrics( self, container, metrics, k8s_extra ):
+        """ Logs memory stats metrics
+
+            @param: container - name of the container the log originated from
+            @param: metrics - a dict of metrics keys/values to emit
+            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+        """
         if 'stats' in metrics:
             self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'], k8s_extra )
 
         self.__log_metrics( container, self.__mem_metrics, metrics, k8s_extra )
 
     def __log_cpu_stats_metrics( self, container, metrics, k8s_extra ):
+        """ Logs cpu stats metrics
+
+            @param: container - name of the container the log originated from
+            @param: metrics - a dict of metrics keys/values to emit
+            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+        """
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
             if 'percpu_usage' in cpu_usage:
@@ -1375,6 +1397,12 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__log_metrics( container, self.__cpu_throttling_metrics, metrics['throttling_data'], k8s_extra )
 
     def __log_json_metrics( self, container, metrics, k8s_extra ):
+        """ Log docker metrics based on the JSON response returned from querying the Docker API
+
+            @param: container - name of the container the log originated from
+            @param: metrics - a dict/JsonObject of metrics keys/values to emit
+            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+        """
         for key, value in metrics.iteritems():
             if value is None:
                 continue
@@ -1390,6 +1418,11 @@ class KubernetesMonitor( ScalyrMonitor ):
                 self.__log_cpu_stats_metrics( container, value, k8s_extra )
 
     def __gather_metrics_from_api_for_container( self, container, k8s_extra ):
+        """ Query the Docker API for container metrics
+
+            @param: container - name of the container to query
+            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+        """
         try:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for cid=%s' % container)
             result = self.__client.stats(
@@ -1402,6 +1435,15 @@ class KubernetesMonitor( ScalyrMonitor ):
             self._logger.error( "Error readings stats for '%s': %s\n%s" % (container, str(e), traceback.format_exc()), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
 
     def __build_k8s_deployment_info( self, k8s_cache, pod ):
+        """
+            Builds a dict containing information about the deployment settings for a given pod
+
+            @param: k8s_cache - a k8s cache object for query deployment information
+            @param: pod - a PodInfo object containing basic information (namespace/name) about the pod to query
+
+            @return: a dict containing the deployment name and deployment labels for the deployment running
+                     the specified pod, or an empty dict if the pod is not part of a deployment
+        """
         k8s_extra = {}
         if k8s_cache and pod is not None and pod.deployment_name is not None:
             deployment = k8s_cache.deployment( pod.namespace, pod.deployment_name )
@@ -1413,6 +1455,11 @@ class KubernetesMonitor( ScalyrMonitor ):
         return k8s_extra
 
     def __get_k8s_deployment_info( self, container, k8s_cache ):
+        """
+            Gets information about the kubernetes deployment of a given container
+            @param: container - a dict containing information about a container, returned by _get_containers
+            @param: k8s_cache - a cache for querying the k8s api
+        """
         k8s_info = container.get( 'k8s_info', {} )
         pod = k8s_info.get( 'pod_info', {} )
         return self.__build_k8s_deployment_info( k8s_cache, pod )

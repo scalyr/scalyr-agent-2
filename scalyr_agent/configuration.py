@@ -1155,6 +1155,9 @@ class Configuration(object):
         if count == 0:
             raise BadConfiguration('A required field is missing.  Object must contain one of "%s".  Error is in %s' % (str(fields), config_description),
                                    field, 'missingRequired')
+        elif count > 1:
+            raise BadConfiguration('A required field has too many options.  Object must contain only one of "%s".  Error is in %s' % (str(fields), config_description),
+                                   field, 'missingRequired')
 
     def __verify_or_set_optional_string(self, config_object, field, default_value, config_description, apply_defaults=True):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.

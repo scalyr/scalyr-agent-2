@@ -45,7 +45,10 @@ class PodInfo( object ):
         md5.update( uid )
         md5.update( node_name )
 
-        # flatten the labels dict in to a single string
+        # flatten the labels dict in to a single string because update
+        # expects a string arg.  To avoid cases where the 'str' of labels is
+        # just the object id, we explicitly create a flattened string of
+        # key/value pairs
         flattened = []
         for k,v in labels.iteritems():
             flattened.append( k )
@@ -53,9 +56,11 @@ class PodInfo( object ):
         md5.update( ''.join( flattened ) )
 
         # flatten the container names
+        # see previous comment for why flattening is necessary
         md5.update( ''.join( container_names ) )
 
         # flatten the annotations dict in to a single string
+        # see previous comment for why flattening is necessary
         flattened = []
         for k,v in annotations.iteritems():
             flattened.append( k )
@@ -784,7 +789,11 @@ class KubernetesApi( object ):
         return self.query_api( query )
 
     def query_pods( self, namespace=None, filter=None ):
-        """Wrapper to query all pods in a namespace, or across the entire cluster"""
+        """Wrapper to query all pods in a namespace, or across the entire cluster
+           A value of None for namespace will search for the pod across the entire cluster.
+           This is handled in the 'query_objects' method.  This method is just a convenience
+           wrapper that passes in the appropriate urls for pod objects
+        """
         return self.query_objects( '/api/v1/pods', '/api/v1/namespaces/%s/pods', namespace, filter )
 
     def query_replicaset( self, namespace, name ):
@@ -796,7 +805,11 @@ class KubernetesApi( object ):
         return self.query_api( query )
 
     def query_replicasets( self, namespace=None, filter=None ):
-        """Wrapper to query all replicasets in a namespace, or across the entire cluster"""
+        """Wrapper to query all replicasets in a namespace, or across the entire cluster
+           A value of None for namespace will search for the replicaset across the entire cluster.
+           This is handled in the 'query_objects' method.  This method is just a convenience
+           wrapper that passes in the appropriate urls for the replicaset objects
+        """
         return self.query_objects( '/apis/apps/v1/replicasets', '/apis/apps/v1/namespaces/%s/replicasets', namespace, filter )
 
     def query_deployment( self, namespace, name ):
@@ -808,7 +821,11 @@ class KubernetesApi( object ):
         return self.query_api( query )
 
     def query_deployments( self, namespace=None, filter=None ):
-        """Wrapper to query all deployments in a namespace, or across the entire cluster"""
+        """Wrapper to query all deployments in a namespace, or across the entire cluster
+           A value of None for namespace will search for the deployment across the entire cluster.
+           This is handled in the 'query_objects' method.  This method is just a convenience
+           wrapper that passes in the appropriate urls for the deployment objects
+        """
         return self.query_objects( '/apis/apps/v1/deployments', '/apis/apps/v1/namespaces/%s/deployments', namespace, filter )
 
     def query_objects( self, url, namespaced_url, namespace=None, filter=None ):

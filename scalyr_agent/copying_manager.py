@@ -208,7 +208,13 @@ class CopyingManager(StoppableThread, LogWatcher):
         # log file has been processed yet
         self.__logs_pending_removal = {}
 
-        # a list of log_matches for logs with configs that need to be reloaded
+        # a list of log_matches for logs with configs that need to be reloaded.
+        # Logs need to be reloaded if their configuration changes at runtime
+        # e.g. with the k8s monitor if an annotation attribute changes such as the
+        # sampling rules or the parser, and this is outside the usual configuration reload mechanism.
+        # By keeping logs that need reloading in a separate 'pending' list
+        # we can avoid locking around log_processors and log_paths_being_processed containers,
+        # and simply process the contents of this list on the main loop
         self.__logs_pending_reload = []
 
         # a list of dynamically added log_matchers that have not been processed yet
