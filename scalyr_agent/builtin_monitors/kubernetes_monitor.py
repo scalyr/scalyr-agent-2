@@ -556,9 +556,9 @@ class ContainerChecker( StoppableThread ):
 
         self.raw_logs = []
 
-    @property
-    def cluster_name( self ):
-        return self.__k8s.get_cluster_name()
+    #@property
+    #def cluster_name( self ):
+    #    return self.__k8s.get_cluster_name()
 
     def _build_k8s_filter( self ):
         """Builds a fieldSelector filter to be used when querying pods the k8s api"""
@@ -879,6 +879,11 @@ class ContainerChecker( StoppableThread ):
                         rename_vars['deployment_name'] = deployment.name
                         container_attributes['_k8s_dn'] = deployment.name
                         container_attributes['_k8s_dl'] = deployment.flat_labels
+
+                # get the cluster name
+                cluster_name = k8s_cache.get_cluster_name()
+                if cluster_name is not None:
+                    container_attributes['_k8s_cn'] = cluster_name
 
                 # get the annotations of this pod as a dict.
                 # by default all annotations will be applied to all containers
@@ -1465,10 +1470,14 @@ class KubernetesMonitor( ScalyrMonitor ):
         return self.__build_k8s_deployment_info( k8s_cache, pod )
 
 
-    def __gather_metrics_from_api( self, containers, k8s_cache ):
+    def __gather_metrics_from_api( self, containers, k8s_cache, cluster_name ):
+        cluster_info = {}
+        if cluster_name is not None:
+            cluster_info['_k8s_cn'] = cluster_name
 
         for cid, info in containers.iteritems():
             k8s_extra = self.__get_k8s_deployment_info( info, k8s_cache )
+            k8s_extra.update( cluster_info )
             self.__gather_metrics_from_api_for_container( info['name'], k8s_extra )
 
     def gather_sample( self ):
@@ -1476,13 +1485,21 @@ class KubernetesMonitor( ScalyrMonitor ):
         if self.__container_checker:
             k8s_cache = self.__container_checker.k8s_cache
 
+        cluster_name = None
+        if k8s_cache is not None:
+            cluster_name = k8s_cache.get_cluster_name()
+
         # gather metrics
         if self.__report_container_metrics:
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all  )
             self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
-            self.__gather_metrics_from_api( containers, k8s_cache )
+            self.__gather_metrics_from_api( containers, k8s_cache, cluster_name )
 
         if self.__gather_k8s_pod_info:
+
+            cluster_info = {}
+            if cluster_name is not None:
+                cluster_info['_k8s_cn'] = cluster_name
 
             containers = _get_containers( self.__client, only_running_containers=False, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all )
             for cid, info in containers.iteritems():
@@ -1491,6 +1508,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     extra['status'] = info.get('status', 'unknown')
                     deployment = self.__get_k8s_deployment_info( info, k8s_cache )
                     extra.update( deployment )
+                    extra.update( cluster_info )
                     namespace = extra.get( 'pod_namespace', 'invalid-namespace' )
                     self._logger.emit_value( 'docker.container_name', info['name'], extra, monitor_id_override="namespace:%s" % namespace )
                 except Exception, e:
@@ -1509,6 +1527,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                             if deployment_info:
                                 extra.update( deployment_info )
 
+                            extra.update( cluster_info )
                             self._logger.emit_value( 'k8s.pod', pod.name, extra, monitor_id_override="namespace:%s" % pod.namespace )
                         except Exception, e:
                             self._logger.error( "Error logging pod information for %s: %s" % (pod.name, str( e )) )
@@ -1524,11 +1543,11 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__container_checker.start()
             if self._global_config:
                 server_attributes = self._global_config.server_attributes
-                cluster_name = self.__container_checker.cluster_name
-                if cluster_name is not None and '_k8s_cn' not in server_attributes:
-                    # commenting this out for now because it causing the config to be continually reloaded
-                    # server_attributes['_k8s_cn'] = cluster_name
-                    pass
+                # cluster_name = self.__container_checker.cluster_name
+                # if cluster_name is not None and '_k8s_cn' not in server_attributes:
+                #    # commenting this out for now because it causing the config to be continually reloaded
+                #    # server_attributes['_k8s_cn'] = cluster_name
+                #    pass
 
         ScalyrMonitor.run( self )
 

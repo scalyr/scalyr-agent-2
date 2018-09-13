@@ -620,6 +620,10 @@ class KubernetesCache( object ):
                                max_cache_misses=max_cache_misses,
                                cache_miss_interval=cache_miss_interval )
 
+        self._k8s = k8s
+        self._cluster_name = None
+        self._cache_expiry_secs = cache_expiry_secs
+        self._last_full_update = time.time() - cache_expiry_secs - 1
 
     def deployment( self, namespace, name, current_time=None ):
         """
@@ -644,6 +648,17 @@ class KubernetesCache( object ):
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
+
+    def get_cluster_name( self, current_time=None ):
+        """Returns the cluster name"""
+        if current_time is None:
+            current_time = time.time()
+
+        if self._last_full_update + self._cache_expiry_secs < current_time:
+            self._cluster_name = self._k8s.get_cluster_name()
+            self._last_full_update = current_time
+
+        return self._cluster_name
 
 class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
@@ -754,10 +769,8 @@ class KubernetesApi( object ):
         annotations = metadata.get( 'annotations', {} )
 
         result = None
-        for key, value in annotations.iteritems():
-            if key == 'agent.config.scalyr.com/cluster_name':
-                result = value
-                break
+        if 'agent.config.scalyr.com/cluster_name' in annotations:
+            result = annotations['agent.config.scalyr.com/cluster_name']
 
         return result
 
