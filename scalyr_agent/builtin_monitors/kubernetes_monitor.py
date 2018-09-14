@@ -41,7 +41,7 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubernetesCache, PodInfo
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, KubernetesCache, PodInfo
 
 from scalyr_agent.util import StoppableThread
 
@@ -117,6 +117,10 @@ define_config_option( __monitor__, 'container_globs',
 
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
+                      'to Scalyr.', convert_to=bool, default=True)
+
+define_config_option( __monitor__, 'report_k8s_metrics',
+                      'Optional (defaults to True). If true, metrics will be collected from the k8s and reported  '
                       'to Scalyr.', convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'k8s_include_all_containers',
@@ -213,6 +217,16 @@ define_metric( __monitor__, "docker.cpu.usage_in_kernelmode", "Total CPU consume
 define_metric( __monitor__, "docker.cpu.throttling.periods", "The number of of periods with throttling active.", cumulative=True, category="CPU" )
 define_metric( __monitor__, "docker.cpu.throttling.throttled_periods", "The number of periods where the container hit its throttling limit", cumulative=True, category="CPU" )
 define_metric( __monitor__, "docker.cpu.throttling.throttled_time", "The aggregate amount of time the container was throttled in nanoseconds", cumulative=True, category="CPU" )
+
+define_metric( __monitor__, "k8s.pod.network.rx_bytes", "The total received bytes on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.pod.network.rx_errors", "The total received errors on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.pod.network.tx_bytes", "The total transmitted bytes on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.pod.network.tx_errors", "The total transmission errors on a pod", cumulative=True, category="Network" )
+
+define_metric( __monitor__, "k8s.node.network.rx_bytes", "The total received bytes on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.node.network.rx_errors", "The total received errors on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.node.network.tx_bytes", "The total transmitted bytes on a pod", cumulative=True, category="Network" )
+define_metric( __monitor__, "k8s.node.network.tx_errors", "The total transmission errors on a pod", cumulative=True, category="Network" )
 
 class WrappedStreamResponse( object ):
     """ Wrapper for generator returned by docker.Client._stream_helper
@@ -1262,6 +1276,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__include_all = self._config.get( 'k8s_include_all_containers' )
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
+        self.__report_k8s_metrics = self._config.get('report_k8s_metrics')
+        self.__kubelet_api = None
         self.__gather_k8s_pod_info = self._config.get('gather_k8s_pod_info')
 
         # This is currently an experimental feature.  Including deployment information for every event uploaded about
@@ -1273,6 +1289,20 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
                                                          self.__include_all, self.__include_deployment_info )
+
+        self.__k8s_pod_network_metrics = {
+            'k8s.pod.network.rx_bytes': 'rxBytes',
+            'k8s.pod.network.rx_errors': 'rxErrors',
+            'k8s.pod.network.tx_bytes': 'txBytes',
+            'k8s.pod.network.tx_errors': 'txErrors',
+        }
+
+        self.__k8s_node_network_metrics = {
+            'k8s.node.network.rx_bytes': 'rxBytes',
+            'k8s.node.network.rx_errors': 'rxErrors',
+            'k8s.node.network.tx_bytes': 'txBytes',
+            'k8s.node.network.tx_errors': 'txErrors',
+        }
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
             "rx_bytes",
@@ -1349,17 +1379,17 @@ class KubernetesMonitor( ScalyrMonitor ):
             result["%s%s"%(prefix, name)] = name
         return result
 
-    def __log_metrics( self, container, metrics_to_emit, metrics, extra=None ):
+    def __log_metrics( self, monitor_override, metrics_to_emit, metrics, extra=None ):
         if metrics is None:
             return
 
         for key, value in metrics_to_emit.iteritems():
             if value in metrics:
-                # Note, we do a bit of a hack to pretend the monitor's name include the container's name.  We take this
+                # Note, we do a bit of a hack to pretend the monitor's name include the container/pod's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
                 # to help auto generate dashboards.  So, we want a monitor name like `docker_monitor(foo_container)`
                 # for each running container.
-                self._logger.emit_value( key, metrics[value], extra, monitor_id_override=container )
+                self._logger.emit_value( key, metrics[value], extra, monitor_id_override=monitor_override )
 
     def __log_network_interface_metrics( self, container, metrics, interface=None, k8s_extra={} ):
         """ Logs network interface metrics
@@ -1482,10 +1512,17 @@ class KubernetesMonitor( ScalyrMonitor ):
         return self.__build_k8s_deployment_info( k8s_cache, pod )
 
 
-    def __gather_metrics_from_api( self, containers, k8s_cache, cluster_name ):
+    def __get_cluster_info( self, cluster_name ):
+        """ returns a dict of values about the cluster """
         cluster_info = {}
         if self.__include_deployment_info and cluster_name is not None:
             cluster_info['_k8s_cn'] = cluster_name
+
+        return cluster_info
+
+    def __gather_metrics_from_api( self, containers, k8s_cache, cluster_name ):
+
+        cluster_info = self.__get_cluster_info( cluster_name )
 
         for cid, info in containers.iteritems():
             k8s_extra = {}
@@ -1493,6 +1530,96 @@ class KubernetesMonitor( ScalyrMonitor ):
                 k8s_extra = self.__get_k8s_deployment_info( info, k8s_cache )
                 k8s_extra.update( cluster_info )
             self.__gather_metrics_from_api_for_container( info['name'], k8s_extra )
+
+    def __gather_k8s_metrics_for_node( self, node, extra ):
+        """
+            Gathers metrics from a Kubelet API response for a specific pod
+
+            @param: node_metrics - A JSON Object from a response to a Kubelet API query
+            @param: extra - Extra fields to append to each metric
+        """
+
+        name = node.get( "nodeName", None )
+        if name is None:
+            return
+
+        extra['node_name'] = name
+
+        for key, metrics in node.iteritems():
+            if key == 'network':
+                self.__log_metrics( name, self.__k8s_node_network_metrics, metrics, extra )
+
+    def __gather_k8s_metrics_for_pod( self, pod_metrics, pod_info, k8s_extra ):
+        """
+            Gathers metrics from a Kubelet API response for a specific pod
+
+            @param: pod_metrics - A JSON Object from a response to a Kubelet API query
+            @param: pod_info - A PodInfo structure regarding the pod in question
+            @param: k8s_extra - Extra k8s specific fields to append to each metric
+        """
+
+        extra = {
+            'pod_name': pod_info.name,
+            'pod_namespace': pod_info.namespace,
+        }
+
+        extra.update( k8s_extra )
+
+        for key, metrics in pod_metrics.iteritems():
+            if key == 'network':
+                self.__log_metrics( "%s/%s" % (pod_info.namespace, pod_info.name), self.__k8s_pod_network_metrics, metrics, extra )
+
+    def __gather_k8s_metrics_from_kubelet( self, containers, kubelet_api, k8s_cache, cluster_name ):
+        """
+            Gathers k8s metrics from a response to a stats query of the Kubelet API
+
+            @param: containers - a dict returned by _get_containers with info for all containers we are interested in
+            @param: kubelet_api - a KubeletApi object for querying the KubeletApi
+            @param: k8s_cache - a KubernetesCache object for query items from the k8s cache
+            @param: cluster_name - the name of the k8s cluster
+
+        """
+
+        cluster_info = self.__get_cluster_info( cluster_name )
+
+        # get set of pods we are interested in querying
+        pod_info = {}
+        for cid, info in containers.iteritems():
+            k8s_info = info.get( 'k8s_info', {} )
+            pod = k8s_info.get( 'pod_info', None )
+            if pod is None:
+                continue
+
+            pod_info[pod.uid] = pod
+
+        try:
+            stats = kubelet_api.query_stats()
+            node = stats.get( 'node', {} )
+
+            if node:
+                self.__gather_k8s_metrics_for_node( node, cluster_info )
+
+            pods = stats.get( 'pods', [] )
+
+            # process pod stats, skipping any that are not in our list
+            # of pod_info
+            for pod in pods:
+                pod_ref = pod.get( 'podRef', {} )
+                pod_uid = pod_ref.get( 'uid', '<invalid>' )
+                if pod_uid not in pod_info:
+                    continue
+
+                info = pod_info[pod_uid]
+                deployment_info = {}
+                if self.__include_deployment_info:
+                    deployment_info = self.__build_k8s_deployment_info( k8s_cache, info )
+                    deployment_info.update( cluster_info )
+                self.__gather_k8s_metrics_for_pod( pod, info, deployment_info )
+
+        except KubeletApiException, e:
+            self._logger.warning( "Error querying kubelet API: %s" % str( e ),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='kubelet-api-query' )
 
     def gather_sample( self ):
         k8s_cache = None
@@ -1504,16 +1631,24 @@ class KubernetesMonitor( ScalyrMonitor ):
             cluster_name = k8s_cache.get_cluster_name()
 
         # gather metrics
-        if self.__report_container_metrics:
+        containers = None
+        if self.__report_container_metrics or self.__report_k8s_metrics:
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all  )
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
-            self.__gather_metrics_from_api( containers, k8s_cache, cluster_name )
+        try:
+            if containers:
+                if self.__report_container_metrics:
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
+                    self.__gather_metrics_from_api( containers, k8s_cache, cluster_name )
+
+                if self.__report_k8s_metrics:
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve k8s metrics %d' % len(containers))
+                    self.__gather_k8s_metrics_from_kubelet( containers, self.__kubelet_api, k8s_cache, cluster_name )
+        except Exception, e:
+            self._logger.warn( "Unexpected error logging metrics: %s" %( str(e) ) )
 
         if self.__gather_k8s_pod_info:
 
-            cluster_info = {}
-            if self.__include_deployment_info and cluster_name is not None:
-                cluster_info['_k8s_cn'] = cluster_name
+            cluster_info = self.__get_cluster_info( cluster_name )
 
             containers = _get_containers( self.__client, only_running_containers=False, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all )
             for cid, info in containers.iteritems():
@@ -1565,6 +1700,14 @@ class KubernetesMonitor( ScalyrMonitor ):
                 #    # commenting this out for now because it causing the config to be continually reloaded
                 #    # server_attributes['_k8s_cn'] = cluster_name
                 #    pass
+
+        try:
+            if self.__report_k8s_metrics:
+                k8s = KubernetesApi()
+                self.__kubelet_api = KubeletApi( k8s )
+        except Exception, e:
+            self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
+            self.__report_k8s_metrics = False
 
         ScalyrMonitor.run( self )
 

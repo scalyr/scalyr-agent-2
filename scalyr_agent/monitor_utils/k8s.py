@@ -22,6 +22,12 @@ class K8sApiException( Exception ):
     """
     pass
 
+class KubeletApiException( Exception ):
+    """A wrapper around Exception that makes it easier to catch k8s specific
+    exceptions
+    """
+    pass
+
 class PodInfo( object ):
     """
         A collection class that stores label and other information about a kubernetes pod
@@ -855,4 +861,46 @@ class KubernetesApi( object ):
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
         return self.query_api( '/api/v1/namespaces' )
+
+class KubeletApi( object ):
+    """
+        A class for querying the kubelet API
+    """
+
+    def __init__( self, k8s, port=10255 ):
+        """
+        @param k8s - a KubernetesApi object
+        """
+        pod_name = k8s.get_pod_name()
+        pod = k8s.query_pod( k8s.namespace, pod_name )
+        spec = pod.get( 'spec', {} )
+        status = pod.get( 'status', {} )
+
+        host_ip = status.get( 'hostIP', None )
+
+        if host_ip is None:
+            raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
+
+        self._session = requests.Session()
+        headers = {
+            'Accept': 'application/json',
+        }
+        self._session.headers.update( headers )
+
+        self._http_host = "http://%s:%d" % ( host_ip, port )
+        self._timeout = 10.0
+
+    def query_api( self, path ):
+        """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
+        """
+        url = self._http_host + path
+        response = self._session.get( url, timeout=self._timeout )
+        if response.status_code != 200:
+            global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
+            raise KubeletApiException( "Invalid response from Kubelet API when querying '%s': %s" %( path, str( response ) ) )
+        return json_lib.parse( response.text )
+
+    def query_stats( self ):
+        return self.query_api( '/stats/summary' )
 
