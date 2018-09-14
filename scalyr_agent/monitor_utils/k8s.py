@@ -425,9 +425,10 @@ class _K8sProcessor( object ):
 
 class PodProcessor( _K8sProcessor ):
 
-    def __init__( self, k8s, logger, filter, replicasets ):
+    def __init__( self, k8s, logger, filter, replicasets, allow_annotations ):
         super( PodProcessor, self).__init__( k8s, logger, filter )
         self._replicasets = replicasets
+        self._allow_annotations = allow_annotations
 
     def query_all_objects( self ):
         """
@@ -492,11 +493,15 @@ class PodProcessor( _K8sProcessor ):
         for container in spec.get( 'containers', [] ):
             container_names.append( container.get( 'name', 'invalid-container-name' ) )
 
-        try:
-            annotations = annotation_config.process_annotations( annotations )
-        except BadAnnotationConfig, e:
-            self._logger.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str( e )),
-                                  limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s' % info.uid )
+        # check to see if we allow annotations
+        if self._allow_annotations:
+            try:
+                annotations = annotation_config.process_annotations( annotations )
+            except BadAnnotationConfig, e:
+                self._logger.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str( e )),
+                                      limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s' % info.uid )
+                annotations = {}
+        else:
             annotations = {}
 
 
@@ -597,7 +602,7 @@ class DeploymentProcessor( _K8sProcessor ):
 
 class KubernetesCache( object ):
 
-    def __init__( self, k8s, logger, cache_expiry_secs=120, max_cache_misses=20, cache_miss_interval=10, filter=None ):
+    def __init__( self, k8s, logger, cache_expiry_secs=120, max_cache_misses=20, cache_miss_interval=10, allow_annotations=True, filter=None ):
 
         # create the deployment cache
         deployment_processor = DeploymentProcessor( k8s, logger )
@@ -614,7 +619,7 @@ class KubernetesCache( object ):
                                cache_miss_interval=cache_miss_interval )
 
         # create the pod cache
-        pod_processor = PodProcessor( k8s, logger, filter, self._replicasets )
+        pod_processor = PodProcessor( k8s, logger, filter, self._replicasets, allow_annotations )
         self._pods = _K8sCache( logger, pod_processor, 'pod',
                                cache_expiry_secs=cache_expiry_secs,
                                max_cache_misses=max_cache_misses,
