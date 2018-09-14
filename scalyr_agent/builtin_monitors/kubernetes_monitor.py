@@ -466,7 +466,8 @@ class ContainerChecker( StoppableThread ):
         Monitors containers to check when they start and stop running.
     """
 
-    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path, include_all ):
+    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
+                  include_all, include_deployment_info ):
 
         self._config = config
         self._logger = logger
@@ -489,6 +490,10 @@ class ContainerChecker( StoppableThread ):
         self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
         self.__glob_list = config.get( 'container_globs' )
+
+        # This is currently an experimental feature.  Including deployment information for every event uploaded about
+        # a pod (cluster name, deployment name, deployment labels)
+        self.__include_deployment_info = include_deployment_info
 
         self.containers = {}
         self.__include_all = include_all
@@ -877,12 +882,13 @@ class ContainerChecker( StoppableThread ):
                     deployment = k8s_cache.deployment( pod.namespace, pod.deployment_name )
                     if deployment:
                         rename_vars['deployment_name'] = deployment.name
-                        container_attributes['_k8s_dn'] = deployment.name
-                        container_attributes['_k8s_dl'] = deployment.flat_labels
+                        if self.__include_deployment_info:
+                            container_attributes['_k8s_dn'] = deployment.name
+                            container_attributes['_k8s_dl'] = deployment.flat_labels
 
                 # get the cluster name
                 cluster_name = k8s_cache.get_cluster_name()
-                if cluster_name is not None:
+                if self.__include_deployment_info and cluster_name is not None:
                     container_attributes['_k8s_cn'] = cluster_name
 
                 # get the annotations of this pod as a dict.
@@ -1258,9 +1264,15 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__report_container_metrics = self._config.get('report_container_metrics')
         self.__gather_k8s_pod_info = self._config.get('gather_k8s_pod_info')
 
+        # This is currently an experimental feature.  Including deployment information for every event uploaded about
+        # a pod (cluster name, deployment name, deployment labels)
+        self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
+
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
-            self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path, self.__include_all )
+            self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
+                                                         self.__docker_api_version, host_hostname, data_path, log_path,
+                                                         self.__include_all, self.__include_deployment_info )
 
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
             "rx_bytes",
@@ -1472,12 +1484,14 @@ class KubernetesMonitor( ScalyrMonitor ):
 
     def __gather_metrics_from_api( self, containers, k8s_cache, cluster_name ):
         cluster_info = {}
-        if cluster_name is not None:
+        if self.__include_deployment_info and cluster_name is not None:
             cluster_info['_k8s_cn'] = cluster_name
 
         for cid, info in containers.iteritems():
-            k8s_extra = self.__get_k8s_deployment_info( info, k8s_cache )
-            k8s_extra.update( cluster_info )
+            k8s_extra = {}
+            if self.__include_deployment_info:
+                k8s_extra = self.__get_k8s_deployment_info( info, k8s_cache )
+                k8s_extra.update( cluster_info )
             self.__gather_metrics_from_api_for_container( info['name'], k8s_extra )
 
     def gather_sample( self ):
@@ -1498,7 +1512,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         if self.__gather_k8s_pod_info:
 
             cluster_info = {}
-            if cluster_name is not None:
+            if self.__include_deployment_info and cluster_name is not None:
                 cluster_info['_k8s_cn'] = cluster_name
 
             containers = _get_containers( self.__client, only_running_containers=False, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all )
@@ -1506,9 +1520,11 @@ class KubernetesMonitor( ScalyrMonitor ):
                 try:
                     extra = info.get( 'k8s_info', {} )
                     extra['status'] = info.get('status', 'unknown')
-                    deployment = self.__get_k8s_deployment_info( info, k8s_cache )
-                    extra.update( deployment )
-                    extra.update( cluster_info )
+                    if self.__include_deployment_info:
+                        deployment = self.__get_k8s_deployment_info( info, k8s_cache )
+                        extra.update( deployment )
+                        extra.update( cluster_info )
+
                     namespace = extra.get( 'pod_namespace', 'invalid-namespace' )
                     self._logger.emit_value( 'docker.container_name', info['name'], extra, monitor_id_override="namespace:%s" % namespace )
                 except Exception, e:
@@ -1523,11 +1539,12 @@ class KubernetesMonitor( ScalyrMonitor ):
                                       'pod_namespace': pod.namespace,
                                       'node_name': pod.node_name }
 
-                            deployment_info = self.__build_k8s_deployment_info( k8s_cache, pod )
-                            if deployment_info:
-                                extra.update( deployment_info )
+                            if self.__include_deployment_info:
+                                deployment_info = self.__build_k8s_deployment_info( k8s_cache, pod )
+                                if deployment_info:
+                                    extra.update( deployment_info )
+                                extra.update( cluster_info )
 
-                            extra.update( cluster_info )
                             self._logger.emit_value( 'k8s.pod', pod.name, extra, monitor_id_override="namespace:%s" % pod.namespace )
                         except Exception, e:
                             self._logger.error( "Error logging pod information for %s: %s" % (pod.name, str( e )) )
