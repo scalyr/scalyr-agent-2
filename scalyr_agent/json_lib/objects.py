@@ -57,11 +57,14 @@ class JsonObject(object):
 
     def to_json(self):
         """Returns a string containing the JSON representation of this object.
-         
+
         Returns the string representation.  If there were comments or other
         non-standard JSON elements in the input that created this object, they
         will not be included."""
         # ???? TODO
+
+    def __repr__(self):
+        return repr( self.__map )
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""
@@ -99,6 +102,10 @@ class JsonObject(object):
 
     def __iter__(self):
         return self.__map.iterkeys()
+
+    def update( self, other ):
+        """Updates the map with key/value pairs from other.  Overwriting existing keys"""
+        return self.__map.update( other )
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
@@ -216,10 +223,10 @@ class JsonObject(object):
         @raise JsonConversionError: If the value is not either zero or one."""
         if abs(value) < 1E-10:
             return False
-    
+
         if abs(1 - value) < 1E-10:
             return True
-    
+
         return self.__conversion_error(field, value, "boolean")
 
     def get_int(self, field, default_value=None, none_if_missing=False):
@@ -300,7 +307,7 @@ class JsonObject(object):
         if not field in self:
             return self.__compute_missing_value(
                 field, default_value, none_if_missing)
-    
+
         value = self.__map[field]
         value_type = type(value)
 
@@ -345,7 +352,7 @@ class JsonObject(object):
         if not field in self:
             return self.__compute_missing_value(
                 field, default_value, none_if_missing)
-    
+
         value = self.__map[field]
         value_type = type(value)
 
@@ -525,11 +532,17 @@ class JsonArray(object):
 
     def __init__(self, *args):
         """Inits a JsonArray.
-        
+
+        @param content: A dict containing the key/values pairs to use.
         @param *args: The elements to insert into the list."""
+
         self.__items = []
+
         for arg in args:
             self.__items.append(arg)
+
+    def __repr__(self):
+        return repr( self.__items )
 
     def __len__(self):
         """Returns the number of elements in the JsonArray"""
@@ -539,7 +552,7 @@ class JsonArray(object):
         """Returns the value at the specified index as a JsonObject.
 
         @param index: The index to lookup
-        
+
         @return: The JsonObject at the specified index.
 
         @raise JsonConversionException: If the entry is not a JsonObject
@@ -553,7 +566,7 @@ class JsonArray(object):
         """Returns the value at the specified index.
 
         @param index: The index to lookup
-        
+
         @return: The value at the specified index.
 
         @raise IndexError: If there is no entry at that index."""
@@ -586,7 +599,7 @@ class JsonArray(object):
             yield element
 
     def json_objects(self):
-        """Yields all items in the array, 
+        """Yields all items in the array,
         checking to make sure they are JsonObjects.
 
         @raise JsonConversionException: If an item is reached that is not a JsonObject."""

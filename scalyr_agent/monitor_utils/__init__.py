@@ -34,6 +34,5 @@ from scalyr_agent.monitor_utils.server_processors import ServerProcessor
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import Int32RequestParser
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
-from scalyr_agent.monitor_utils.k8s import KubernetesApi
 
-__all__ = ['ServerProcessor', 'LineRequestParser', 'Int32RequestParser', 'AutoFlushingRotatingFile', 'KubernetesApi' ]
+__all__ = ['ServerProcessor', 'LineRequestParser', 'Int32RequestParser', 'AutoFlushingRotatingFile' ]

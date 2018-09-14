@@ -31,7 +31,6 @@ from scalyr_agent.util import JsonReadFileException
 
 from __scalyr__ import get_install_root
 
-
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
 
@@ -1026,6 +1025,14 @@ class Configuration(object):
         self.__verify_or_set_optional_attributes(log_entry, 'attributes', description)
 
         self.__verify_or_set_optional_array( log_entry, 'lineGroupers', description )
+        i = 0
+        for element in log_entry.get_json_array('lineGroupers'):
+            element_description = 'the entry with index=%i in the "lineGroupers" array in ' % i
+            element_description += description
+
+            self.__verify_required_string(element, 'start', element_description)
+            self.__verify_contains_exactly_one_string_out_of( element, [ 'continueThrough', 'continuePast', 'haltBefore', 'haltWith' ], description )
+            i += 1
 
         self.__verify_or_set_optional_bool(log_entry, 'copy_from_start', False, description)
         self.__verify_or_set_optional_bool(log_entry, 'parse_lines_as_json', False, description)
@@ -1124,6 +1131,32 @@ class Configuration(object):
                                    field, 'notString')
         except JsonMissingFieldException:
             raise BadConfiguration('The required field "%s" is missing.  Error is in %s' % (field, config_description),
+                                   field, 'missingRequired')
+
+    def __verify_contains_exactly_one_string_out_of(self, config_object, fields, config_description):
+        """Verifies that config_object has exactly one of the named fields and it can be converted to a string.
+
+        Raises an exception otherwise.
+
+        @param config_object: The JsonObject containing the configuration information.
+        @param fields: A list of field names to check in the config_object.
+        @param config_description: A description of where the configuration object was sourced from to be used in the
+            error reporting to the user.
+        """
+        count = 0
+        for field in fields:
+            try:
+                value = config_object.get_string(field, none_if_missing=True)
+                if value is not None:
+                    count += 1
+            except JsonConversionException:
+                raise BadConfiguration('The field "%s" is not a string.  Error is in %s' % (field, config_description),
+                                       field, 'notString')
+        if count == 0:
+            raise BadConfiguration('A required field is missing.  Object must contain one of "%s".  Error is in %s' % (str(fields), config_description),
+                                   field, 'missingRequired')
+        elif count > 1:
+            raise BadConfiguration('A required field has too many options.  Object must contain only one of "%s".  Error is in %s' % (str(fields), config_description),
                                    field, 'missingRequired')
 
     def __verify_or_set_optional_string(self, config_object, field, default_value, config_description, apply_defaults=True):
@@ -1290,7 +1323,7 @@ class Configuration(object):
             for x in json_array:
                 if not isinstance(x, JsonObject):
                     raise BadConfiguration('The element at index=%i is not a json object as required in the array '
-                                           'field "%s".  Error is in %s' % (index, field, config_description),
+                                           'field "%s (%s, %s)".  Error is in %s' % (index, field, type(x), str(x), config_description),
                                            field, 'notJsonObject')
                 index += 1
         except JsonConversionException:
