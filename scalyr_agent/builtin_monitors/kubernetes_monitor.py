@@ -119,11 +119,6 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
                       'to Scalyr.', convert_to=bool, default=True)
 
-define_config_option( __monitor__, 'allow_annotation_config',
-                      'Optional (defaults to True). If true, then the log configuration settings for k8s containers can be '
-                      'configured with annotations.',
-                      convert_to=bool, default=True)
-
 define_config_option( __monitor__, 'k8s_include_all_containers',
                       'Optional (defaults to True). If True, all containers in all pods will be monitored by the kubernetes monitor '
                       'unless they have an include: false or exclude: true annotation. '
@@ -512,8 +507,6 @@ class ContainerChecker( StoppableThread ):
         self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
         self.__k8s_cache_miss_interval = self._config.get( 'k8s_cache_miss_interval' )
 
-        self.__allow_annotation_config = self._config.get( 'allow_annotation_config' )
-
         self.__k8s_filter = None
         self.k8s_cache = None
 
@@ -534,7 +527,6 @@ class ContainerChecker( StoppableThread ):
                 cache_expiry_secs=self.__k8s_cache_expiry_secs,
                 max_cache_misses=self.__k8s_max_cache_misses,
                 cache_miss_interval=self.__k8s_cache_miss_interval,
-                allow_annotations=self.__allow_annotation_config,
                 filter=self.__k8s_filter )
 
             self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=True, k8s_cache=self.k8s_cache, k8s_include_by_default=self.__include_all )
@@ -902,10 +894,8 @@ class ContainerChecker( StoppableThread ):
                 # get the annotations of this pod as a dict.
                 # by default all annotations will be applied to all containers
                 # in the pod
+                all_annotations = pod.annotations
                 container_specific_annotations = False
-                all_annotations = {}
-                if self.__allow_annotation_config:
-                    all_annotations = pod.annotations
 
                 # get any common annotations for all containers
                 for annotation, value in all_annotations.iteritems():
@@ -944,14 +934,10 @@ class ContainerChecker( StoppableThread ):
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=True )
             result['rename_logfile'] = '/docker/%s.log' % info['name']
 
-        if self.__allow_annotation_config:
-            # apply common annotations first
-            annotations = common_annotations
-            # set/override any container specific annotations
-            annotations.update( container_annotations )
-        else:
-            # no annotations
-            annotations = {}
+        # apply common annotations first
+        annotations = common_annotations
+        # set/override any container specific annotations
+        annotations.update( container_annotations )
 
         # ignore include/exclude options which have special
         # handling in the log_config verification that expects a different type than the one used in the nnotations
@@ -1350,19 +1336,6 @@ class KubernetesMonitor( ScalyrMonitor ):
     container is still running, there is currently no way to dynamically start/stop logging of that
     container using annotations without updating the config yaml, and applying the updated config to the
     cluster.
-
-    ### Disabling Annotation Config
-
-    You can disable using annotations to configure the log files processed by the kubernetes monitor
-    by setting the following value in the config section of the kubernetes_monitor in
-    agent.d/docker.json
-
-        "monitors":[
-          {
-            "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
-            "allow_annotation_config": false
-          }
-        ]
 
     """
 
