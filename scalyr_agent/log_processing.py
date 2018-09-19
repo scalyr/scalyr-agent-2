@@ -521,7 +521,7 @@ class LogFileIterator(object):
 
             except Exception, e:
                 # something went wrong. Return the full line and log a message
-                log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line),
+                log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line.decode( "utf-8", 'replace' )),
                          limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
         return result
 
@@ -2262,7 +2262,7 @@ class LogMatcher(object):
                             str(rule.get('hash_salt', default_value=''))
                         )
                     for rule in self.__log_entry_config['sampling_rules']:
-                        new_processor.add_sampler(rule['match_expression'], rule['sampling_rate'])
+                        new_processor.add_sampler(rule['match_expression'], rule.get_float('sampling_rate', 1.0))
                     result.append(new_processor)
 
             self.__lock.acquire()

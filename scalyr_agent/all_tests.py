@@ -22,6 +22,7 @@ __author__ = 'czerwin@scalyr.com'
 import unittest
 import os
 import sys
+import traceback
 
 
 def find_all_tests(directory=None, base_path=None):
@@ -57,11 +58,19 @@ def run_all_tests():
     """
     test_loader = unittest.defaultTestLoader
     suites = []
+    error = False
     for test_case in find_all_tests():
-        suites.append(test_loader.loadTestsFromName(test_case))
+        try:
+            suites.append(test_loader.loadTestsFromName(test_case))
+        except Exception, e:
+            error = True
+            print( "Error loading test_case '%s'.  %s, %s" % (test_case, str(e), traceback.format_exc()) )
+
     test_suite = unittest.TestSuite(suites)
     text_runner = unittest.TextTestRunner().run(test_suite)
-    sys.exit(not text_runner.wasSuccessful())
+    if not text_runner.wasSuccessful():
+        error = True
+    sys.exit(error)
 
 if __name__ == '__main__':
     run_all_tests()

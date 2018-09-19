@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.35 "Jem'hadar" - Sept 19, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 19, 2018 11:00 -0700
+--->
+
+Features:
+
+* Added support in the `kubernetes_monitor` for annotations-based configuration.  You can now specify parsers and whether or not a pod's logs can be sent to Scalyr via k8s annotations.  See documentation on `kubernetes_monitor` for more details.
+
+Bug fixes:
+
+* Added fixes that should eliminate memory leak.
+
 ## 2.0.34 "" - Jun 15, 2018
 
 <!---

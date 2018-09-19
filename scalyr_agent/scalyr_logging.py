@@ -249,9 +249,9 @@ class AgentLogger(logging.Logger):
         self.__metric_handler = None
 
         # The regular expression that must match for metric and field names.  Essentially, it has to begin with
-        # a letter, and only contain letters, digits, periods, underscores, and dashes.  If you change this, be
+        # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this, be
         # sure to fix the __force_valid_metric_or_field_name method below.
-        self.__metric_or_field_name_rule = re.compile('[a-zA-Z][\w\.\-]*$')
+        self.__metric_or_field_name_rule = re.compile('[_a-zA-Z][\w\.\-]*$')
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
@@ -492,11 +492,11 @@ class AgentLogger(logging.Logger):
     def __force_valid_metric_or_field_name(self, name, is_metric=True):
         """Forces the given metric or field name to be valid.
 
-        A valid metric/field name must being with a letter and only contain alphanumeric characters including
+        A valid metric/field name must being with a letter or underscore and only contain alphanumeric characters including
         periods, underscores, and dashes.
 
         If it is not valid, it will replace invalid characters with underscores.  If it does not being with a letter
-        a sa_ is added as a prefix.
+        or underscore a sa_ is added as a prefix.
 
         If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
 
@@ -514,16 +514,16 @@ class AgentLogger(logging.Logger):
             self.warn('Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
                       'alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been '
                       'fixed by replacing invalid characters with underscores.  Other metric names may be invalid '
-                      '(only reporting first occurrence).', limit_once_per_x_secs=86400, limit_key='badmetricname',
+                      '(only reporting first occurrence).' % name, limit_once_per_x_secs=86400, limit_key='badmetricname',
                       error_code='client/badMetricName')
         else:
             self.warn('Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
                       'alphanumeric characters as well as periods, underscores, and dashes.  The field name has been '
                       'fixed by replacing invalid characters with underscores.  Other field names may be invalid '
-                      '(only reporting first occurrence).', limit_once_per_x_secs=86400, limit_key='badfieldname',
+                      '(only reporting first occurrence).' % name, limit_once_per_x_secs=86400, limit_key='badfieldname',
                       error_code='client/badFieldName')
 
-        if not re.match('^[a-zA-Z]', name):
+        if not re.match('^[_a-zA-Z]', name):
             name = 'sa_' + name
         return re.sub("[^\w\-\.]", '_', name)
 

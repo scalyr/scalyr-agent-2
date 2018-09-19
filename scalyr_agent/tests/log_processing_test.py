@@ -33,7 +33,7 @@ from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
 from scalyr_agent.util import md5_digest
-from scalyr_agent.configuration import Configuration
+from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -168,6 +168,18 @@ class TestLogFileIterator(ScalyrTestCase):
 
         for line in expected:
             self.assertEquals(line, self.readline().line)
+
+    def test_multiple_line_grouper_options(self):
+        log_config = {'path': self.__path,
+                      'lineGroupers': JsonArray( JsonObject({'start': '^--multi', 'continueThrough': "^--", 'continuePast': '\n'}) )
+                                       }
+        self.assertRaises( BadConfiguration, DEFAULT_CONFIG.parse_log_config, log_config )
+
+    def test_insufficient_line_grouper_options(self):
+        log_config = {'path': self.__path,
+                      'lineGroupers': JsonArray( JsonObject({'start': '^--multi'}) )
+                                       }
+        self.assertRaises( BadConfiguration, DEFAULT_CONFIG.parse_log_config, log_config )
 
     def test_multiple_scans(self):
         self.append_file(self.__path,
