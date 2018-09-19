@@ -1214,12 +1214,129 @@ class ContainerIdResolver():
 
 
 class KubernetesMonitor( ScalyrMonitor ):
-    """Monitor plugin for kubernetes
+    """
+    # Kubernetes Monitor
 
-    This plugin is based of the docker_monitor plugin, and uses the raw logs mode of the docker
+    This monitor is based of the docker_monitor plugin, and uses the raw logs mode of the docker
     plugin to send kubernetes logs to Scalyr.  It also reads labels from the Kubernetes api and
     associates them with the appropriate logs.
-    TODO:  Back fill the instructions here.
+
+    ## Log Config via Annotations
+
+    The configuration of the logs added by the kubernetes monitor can be configured via annotations
+    added to the pod that owns the container.  For all pods, the monitor examins all annotations,
+    and for any annotation that begins with the prefix log.config.scalyr.com/ it extracts the
+    entries (minus the prefix) and maps them to a dict which is later applied to the log_config used
+    by the log files processed by the k8s monitor. See below for mapping behaviour.
+
+    Supported fields are:
+
+    * parser
+    * attributes
+    * sampling_rules
+    * rename_logfile
+    * redaction_rules
+
+    Which behave in the same way as specified in the main [Scalyr help
+    docs](https://www.scalyr.com/help/scalyr-agent#logUpload). Items that do not work as specified
+    in help are:
+
+    * exclude (see below)
+    * lineGroupers (not supported at all)
+    * path (the path is always fixed for k8s container logs)
+
+    ### Excluding Logs
+
+    Containers and pods can be specifically included/excluded from logging.  Unlike the normal
+    log_config `exclude` option which takes an array of log path exclusion globs, annotations simply
+    support a Boolean true/false for a given container/pod.  Both `include` and `exclude` are
+    supported, with `include` always overriding `exclude` if both are set. e.g.
+
+        config.agent.scalyr.com/exclude: true
+
+    has the same effect as
+
+        config.agent.scalyr.com/include: false
+
+    By default the agent monitors the logs of all pods/containers, and you have to manually exclude
+    pods/containers you don't want.  You can also set a value in agent.json
+    `k8s_include_all_containers: false`, in which case all containers are excluded by default and
+    have to be manually included.
+
+    ### Specifying Config Options
+
+    The kubernetes monitor takes the string value of each annotation and maps it to a dict, or
+    array value according to the following format:
+
+    Values separated by a period are mapped to dict keys e.g. if one annotation on a given pod was
+    specified as:
+
+          log.config.scalyr.com/attributes.parser: accessLog
+
+    Then this would be mapped to the following dict, which would then be applied to the log config
+    for all containers in that pod:
+
+        { "attributes": { "parser": "accessLog" } }
+
+    Arrays can be specified by using one or more digits as the key, e.g. if the annotation was
+
+          log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+          log.config.scalyr.com/sampling_rules.0.sampling_rate: 0.1
+          log.config.scalyr.com/sampling_rules.1.match_expression: FINE
+          log.config.scalyr.com/sampling_rules.1.sampling_rate: 0
+
+    This will be mapped to the following structure:
+
+        { "sampling_rules":
+          [
+            { "match_expression": "INFO", "sampling_rate": 0.1 },
+            { "match_expression": "FINE", "sampling_rate": 0 }
+          ]
+        }
+
+    Array keys are sorted by numeric order before processing and unique objects need to have
+    different digits as the array key. If a sub-key has an identical array key as a previously seen
+    sub-key, then the previous value of the sub-key is overwritten
+
+    There is no guarantee about the order of processing for items with the same numeric array key,
+    so if the config was specified as:
+
+          log.config.scalyr.com/sampling_rules.0.match_expression: INFO
+          log.config.scalyr.com/sampling_rules.0.match_expression: FINE
+
+    It is not defined or guaranteed what the actual value will be (INFO or FINE).
+
+    ### Applying config options to specific containers in a pod
+
+    If a pod has multiple containers and you only want to apply log configuration options to a
+    specific container you can do so by prefixing the option with the container name, e.g. if you
+    had a pod with two containers `nginx` and `helper1` and you wanted to exclude `helper1` logs you
+    could specify the following annotation:
+
+        log.config.scalyr.com/helper1.exclude: true
+
+    Config items specified without a container name are applied to all containers in the pod, but
+    container specific settings will override pod-level options, e.g. in this example:
+
+        log.config.scalyr.com/exclude: true
+        log.config.scalyr.com/nginx.include: true
+
+    All containers in the pod would be excluded *except* for the nginx container which is included.
+
+    This technique is applicable for all log config options, not just include/exclude, so for
+    example you could set line sampling rules for all containers in a pod, but use a different set
+    of line sampling rules for one specific container in the pod if needed.
+
+    ### Dynamic Updates
+
+    Currently all annotation config options except `exclude: true`/`include: false` can be
+    dynamically updated using the `kubectl annotate` command.
+
+    For `exclude: true`/`include: false` once a pod/container has started being logged, then while the
+    container is still running, there is currently no way to dynamically start/stop logging of that
+    container using annotations without updating the config yaml, and applying the updated config to the
+    cluster.
+
     """
 
     def __get_socket_file( self ):
