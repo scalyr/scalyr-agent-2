@@ -1218,18 +1218,18 @@ class KubernetesMonitor( ScalyrMonitor ):
     # Kubernetes Monitor
 
     This monitor is based of the docker_monitor plugin, and uses the raw logs mode of the docker
-    plugin to send kubernetes logs to Scalyr.  It also reads labels from the Kubernetes api and
+    plugin to send Kubernetes logs to Scalyr.  It also reads labels from the Kubernetes API and
     associates them with the appropriate logs.
 
     ## Log Config via Annotations
 
-    The configuration of the logs added by the kubernetes monitor can be configured via annotations
-    added to the pod that owns the container.  For all pods, the monitor examins all annotations,
-    and for any annotation that begins with the prefix log.config.scalyr.com/ it extracts the
-    entries (minus the prefix) and maps them to a dict which is later applied to the log_config used
-    by the log files processed by the k8s monitor. See below for mapping behaviour.
+    The logs collected by the Kubernetes monitor can be configured via k8s pod annotations.
+    The monitor examines all annotations on all pods, and for any annotation that begins with the
+    prefix log.config.scalyr.com/, it extracts the
+    entries (minus the prefix) and maps them to the log_config stanza for that pod's containers.
+    The mapping is described below.
 
-    Supported fields are:
+    The following fields can be configured a log via pod annotations:
 
     * parser
     * attributes
@@ -1237,9 +1237,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     * rename_logfile
     * redaction_rules
 
-    Which behave in the same way as specified in the main [Scalyr help
-    docs](https://www.scalyr.com/help/scalyr-agent#logUpload). Items that do not work as specified
-    in help are:
+    These behave in the same way as specified in the main [Scalyr help
+    docs](https://www.scalyr.com/help/scalyr-agent#logUpload). The following configuration
+    fields behave differently when configured via k8s annotations:
 
     * exclude (see below)
     * lineGroupers (not supported at all)
@@ -1247,16 +1247,17 @@ class KubernetesMonitor( ScalyrMonitor ):
 
     ### Excluding Logs
 
-    Containers and pods can be specifically included/excluded from logging.  Unlike the normal
-    log_config `exclude` option which takes an array of log path exclusion globs, annotations simply
-    support a Boolean true/false for a given container/pod.  Both `include` and `exclude` are
-    supported, with `include` always overriding `exclude` if both are set. e.g.
+    Containers and pods can be specifically included/excluded from having their logs collected and
+    sent to Scalyr.  Unlike the normal log_config `exclude` option which takes an array of log path
+    exclusion globs, annotations simply support a Boolean true/false for a given container/pod.  
+    Both `include` and `exclude` are supported, with `include` always overriding `exclude` if both
+    are set. e.g.
 
-        config.agent.scalyr.com/exclude: true
+        log.config.scalyr.com/exclude: true
 
     has the same effect as
 
-        config.agent.scalyr.com/include: false
+        log.config.scalyr.com/include: false
 
     By default the agent monitors the logs of all pods/containers, and you have to manually exclude
     pods/containers you don't want.  You can also set a value in agent.json
@@ -1265,7 +1266,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
     ### Specifying Config Options
 
-    The kubernetes monitor takes the string value of each annotation and maps it to a dict, or
+    The Kubernetes monitor takes the string value of each annotation and maps it to a dict, or
     array value according to the following format:
 
     Values separated by a period are mapped to dict keys e.g. if one annotation on a given pod was
@@ -1321,10 +1322,10 @@ class KubernetesMonitor( ScalyrMonitor ):
         log.config.scalyr.com/exclude: true
         log.config.scalyr.com/nginx.include: true
 
-    All containers in the pod would be excluded *except* for the nginx container which is included.
+    All containers in the pod would be excluded *except* for the nginx container, which is included.
 
-    This technique is applicable for all log config options, not just include/exclude, so for
-    example you could set line sampling rules for all containers in a pod, but use a different set
+    This technique is applicable for all log config options, not just include/exclude.  For
+    example you could set the line sampling rules for all containers in a pod, but use a different set
     of line sampling rules for one specific container in the pod if needed.
 
     ### Dynamic Updates
