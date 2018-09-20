@@ -1,6 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.36 "Kliint" - Sept 20, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 20, 2018 15:00 -0700
+--->
+
+Bug fixes
+
+* Remove / rework debug log statements that were consuming too much CPU.
+* Add ability to disable the Kubernetes monitor from parsing the json log lines on the client
+* Do not write out the full checkpoint.json file every iteration.  Instead, write out only the active log files on every iteration with a consolidation every one minute.
+
 ## 2.0.35 "Jem'hadar" - Sept 19, 2018
 
 <!---
