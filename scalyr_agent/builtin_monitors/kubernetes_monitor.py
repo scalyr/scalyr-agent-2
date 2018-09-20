@@ -140,6 +140,10 @@ define_config_option( __monitor__, 'k8s_cache_miss_interval',
                      'Optional (defaults to 10). The number of seconds that `k8s_max_cache_misses` cache misses can occur in before '
                      'performing a full update of the k8s cache',
                      convert_to=int, default=10)
+define_config_option( __monitor__, 'k8s_parse_json',
+                      'Optional (defaults to True). If True, the log files will be parsed as json before uploading to the server '
+                      'to extract log and timestamp fields.  If False, the raw json will be uploaded to Scalyr.',
+                      convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'verify_k8s_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
@@ -475,6 +479,8 @@ class ContainerChecker( StoppableThread ):
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
         name = self._config.get( 'container_name' )
+
+        self.__parse_json = self._config.get( 'k8s_parse_json' )
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
@@ -931,7 +937,7 @@ class ContainerChecker( StoppableThread ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "no k8s info for container %s" % short_cid )
 
         if 'log_path' in info and info['log_path']:
-            result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=True )
+            result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=self.__parse_json )
             result['rename_logfile'] = '/docker/%s.log' % info['name']
 
         # apply common annotations first
