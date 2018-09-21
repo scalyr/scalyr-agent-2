@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.36 "Kliint" - Sept 20, 2018
+## 2.0.36 "Kliint" - Sept 21, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 20, 2018 15:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 21, 2018 13:00 -0700
 --->
 
 Bug fixes
