@@ -453,9 +453,17 @@ class LogFileIterator(object):
         if current_time is None:
             current_time = time.time()
 
+        available_buffer_bytes = self.__available_buffer_bytes()
+        more_file_bytes_available = self.__more_file_bytes_available()
+
+        # if there are no bytes available in the buffer or on the file
+        # shortcircuit return an empty string
+        if available_buffer_bytes == 0 and not more_file_bytes_available:
+            return LogLine( line='' )
+
         # Keep our underlying buffer of bytes filled up.
-        if self.__buffer is None or (self.__available_buffer_bytes() < self.__max_line_length and
-                                     self.__more_file_bytes_available()):
+        if self.__buffer is None or (available_buffer_bytes < self.__max_line_length and
+                                     more_file_bytes_available):
             self.__fill_buffer(current_time)
 
         # The following code and the sanity check below were to check for an old bug that was fixed a long time ago.
@@ -558,7 +566,7 @@ class LogFileIterator(object):
             current_time = time.time()
         self.__refresh_pending_files(current_time)
 
-    def prepare_for_inactivity(self):
+    def prepare_for_inactivity(self, current_time=None):
         """Can be called before times when this iterator instance will not be used for some period of
         time.
 
@@ -568,6 +576,10 @@ class LogFileIterator(object):
         No calls are necessary to bring it out of this mode.  The next invocation of any method on this
         instance will result in the instance no longer being considered inactive.
         """
+
+        if current_time is None:
+            current_time = time.time()
+
         # This is a pain, but Windows does not allow for anyone to delete a file or its parent directory while
         # someone has a file handle open to it.  So, to be nice, we should close ours.  However, it does limit
         # our ability to detect and more easily handle log rotates.  (Ok, it is not completely true that Windows does
@@ -581,10 +593,8 @@ class LogFileIterator(object):
         # a directory with many files in it.
         if self.__max_modification_duration:
             try:
-                current_datetime = datetime.datetime.now()
-                delta = current_datetime - datetime.datetime.fromtimestamp(self.__modification_time_raw)
-                total_micros = delta.microseconds + (delta.seconds + delta.days * 24 * 3600) * 10**6
-                if total_micros > self.__max_modification_duration * 10**6:
+                delta = current_time - self.__modification_time_raw
+                if delta > self.__max_modification_duration:
                     close_file = True
 
             except OSError:
@@ -988,6 +998,7 @@ class LogFileIterator(object):
                 while attempts_left > 0:
                     if starting_inode is None and self.__file_system.trust_inodes:
                         starting_inode = self.__file_system.stat(file_path).st_ino
+
                     pending_file = self.__file_system.open(file_path)
                     second_stat = self.__file_system.stat(file_path)
 
@@ -1300,8 +1311,17 @@ class LogFileProcessor(object):
         self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system,
                                                    checkpoint=checkpoint)
 
+        self.__minimum_scan_interval = None
+        if 'minimum_scan_interval' in log_config and log_config['minimum_scan_interval'] is not None:
+            self.__minimum_scan_interval = log_config['minimum_scan_interval']
+        else:
+            self.__minimum_scan_interval = config.minimum_scan_interval
+
         # Trackers whether or not close has been invoked on this processor.
         self.__is_closed = False
+
+        # Tracks whether the processor has recently logged data
+        self.__is_active = False
 
         # The processor should be closed if the staleness of this file exceeds this number of seconds (if not None)
         self.__close_when_staleness_exceeds = close_when_staleness_exceeds
@@ -1403,6 +1423,13 @@ class LogFileProcessor(object):
         return result
 
     @property
+    def is_active( self ):
+        return self.__is_active
+
+    def set_inactive( self ):
+        self.__is_active = False
+
+    @property
     def log_path(self):
         """
         @return:  The log file path
@@ -1446,10 +1473,20 @@ class LogFileProcessor(object):
             self.__last_success = current_time
 
         self.__lock.acquire()
-        self.__last_scan_time = current_time
+        last_scan_time = self.__last_scan_time
         self.__lock.release()
 
-        self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
+        # see if we need to scan for new bytes yet
+        scan = True
+        if last_scan_time is not None and self.__minimum_scan_interval is not None:
+            scan = (current_time - last_scan_time > self.__minimum_scan_interval)
+
+        # scan for new bytes
+        if scan:
+            self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
+            self.__lock.acquire()
+            self.__last_scan_time = current_time
+            self.__lock.release()
 
         # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
         if current_time - self.__last_success > self.__copy_staleness_threshold:
@@ -1560,6 +1597,9 @@ class LogFileProcessor(object):
                 bytes_copied += line_len
                 lines_copied += 1
 
+            if not self.__is_active:
+                self.__is_active = bytes_read > 0
+
             final_position = self.__log_file_iterator.tell()
 
             # start_process_time = fast_get_time() - start_process_time
@@ -1578,7 +1618,7 @@ class LogFileProcessor(object):
 
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
             # do some clean up work until the next time we need it.
-            self.__log_file_iterator.prepare_for_inactivity()
+            self.__log_file_iterator.prepare_for_inactivity( current_time )
 
             # If we get here on what was a new file, then the file is now an existing file, so set the maximum log
             # offset size to use the size for existing files
@@ -1596,7 +1636,7 @@ class LogFileProcessor(object):
                 @rtype: bool
                 """
                 try:
-                    log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
+                    #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
                     self.__lock.acquire()
                     # Zero out the bytes we were tracking as they were in flight.
                     self.__total_bytes_being_processed = 0
@@ -1604,8 +1644,8 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        self.__total_bytes_skipped += self.__log_file_iterator.bytes_between_positions(
-                            original_position, final_position) - bytes_read
+                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
+                        self.__total_bytes_skipped +=  bytes_between_positions - bytes_read
 
                         self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
                         self.__total_bytes_pending = self.__log_file_iterator.available
@@ -1616,7 +1656,10 @@ class LogFileProcessor(object):
 
                         # Do a mark to cleanup any state in the iterator.  We know we won't have to roll back
                         # to before this point now.
-                        self.__log_file_iterator.mark(final_position, current_time=current_time)
+                        # Only mark files that have logged new bytes to prevent stat'ing unused files
+                        if bytes_between_positions > 0:
+                            self.__log_file_iterator.mark(final_position, current_time=current_time)
+
                         if self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time):
                             self.__log_file_iterator.close()
                             self.__is_closed = True
@@ -1637,8 +1680,8 @@ class LogFileProcessor(object):
                 finally:
                     self.__lock.release()
 
-            log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
-                    self.__path, bytes_copied, str(buffer_filled))
+            #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
+                    #self.__path, bytes_copied, str(buffer_filled))
 
             return completion_callback, buffer_filled
         except Exception:
