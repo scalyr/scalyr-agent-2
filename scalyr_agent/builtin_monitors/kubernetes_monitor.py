@@ -120,8 +120,8 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'to Scalyr.', convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'report_k8s_metrics',
-                      'Optional (defaults to True). If true, metrics will be collected from the k8s and reported  '
-                      'to Scalyr.', convert_to=bool, default=True)
+                      'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
+                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True)
 
 define_config_option( __monitor__, 'k8s_include_all_containers',
                       'Optional (defaults to True). If True, all containers in all pods will be monitored by the kubernetes monitor '
@@ -1400,7 +1400,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__include_all = self._config.get( 'k8s_include_all_containers' )
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
-        self.__report_k8s_metrics = self._config.get('report_k8s_metrics')
+        self.__report_k8s_metrics = self._config.get('report_k8s_metrics') and self.__report_container_metrics
+        # Object for talking to the kubelet server running on this localhost.  This is used to gather metrics only
+        # available via the kubelet.
         self.__kubelet_api = None
         self.__gather_k8s_pod_info = self._config.get('gather_k8s_pod_info')
 
@@ -1414,6 +1416,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
                                                          self.__include_all, self.__include_deployment_info )
 
+        # Metrics provided by the kubelet API.
         self.__k8s_pod_network_metrics = {
             'k8s.pod.network.rx_bytes': 'rxBytes',
             'k8s.pod.network.rx_errors': 'rxErrors',
@@ -1421,6 +1424,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'k8s.pod.network.tx_errors': 'txErrors',
         }
 
+        # Metrics provide by the kubelet API.
         self.__k8s_node_network_metrics = {
             'k8s.node.network.rx_bytes': 'rxBytes',
             'k8s.node.network.rx_errors': 'rxErrors',
@@ -1428,6 +1432,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'k8s.node.network.tx_errors': 'txErrors',
         }
 
+        # All the docker. metrics are provided by the docker API.
         self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
             "rx_bytes",
             "rx_dropped",
@@ -1756,7 +1761,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         # gather metrics
         containers = None
-        if self.__report_container_metrics or self.__report_k8s_metrics:
+        if self.__report_container_metrics:
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list, k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all  )
         try:
             if containers:
