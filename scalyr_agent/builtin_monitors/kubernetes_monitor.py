@@ -1434,9 +1434,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__kubelet_api = None
         self.__gather_k8s_pod_info = self._config.get('gather_k8s_pod_info')
 
-        # This is currently an experimental feature.  Including deployment information for every event uploaded about
-        # a pod (cluster name, deployment name, deployment labels)
-        self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
+        # Including deployment information for every event uploaded about  a pod (cluster name, deployment name,
+        # deployment labels)
+        self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=True)
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
