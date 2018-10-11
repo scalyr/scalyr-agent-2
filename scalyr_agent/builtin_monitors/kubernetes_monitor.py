@@ -1417,7 +1417,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         # The namespace whose logs we should not collect.
         self.__namespaces_to_ignore = []
         for x in self._config.get('k8s_ignore_namespaces').split():
-            self.__namespaces_to_ignore.append(x.trim())
+            self.__namespaces_to_ignore.append(x.strip())
 
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
