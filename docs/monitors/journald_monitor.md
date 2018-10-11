@@ -60,7 +60,7 @@ config the journald monitor:
 
 |||# Option                        ||| Usage
 |||# ``module``                    ||| Always ``scalyr_agent.builtin_monitors.journald_monitor``
-|||# ``journal_path``              ||| Optional (defaults to ``/var/log/journal``). Location on the filesystem of the journald logs.
+|||# ``journal_path``              ||| Optional (defaults to ``/var/log/journal``). Location on the filesystem of the journald logs. If this is the empty string, resolves to the current (boot) journal.
 |||# ``journal_poll_interval``      ||| Optional (defaults to ``5``). The number of seconds to wait for data while polling \
                                        the journal file. Fractional values are supported.
 |||# ``journal_fields``            ||| Optional dict containing journal fields to upload with each message, \
