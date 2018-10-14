@@ -2,6 +2,9 @@
 import hashlib
 import logging
 import os
+import random
+import string
+
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 import scalyr_agent.third_party.requests as requests
 import scalyr_agent.json_lib as json_lib
@@ -774,11 +777,40 @@ class KubernetesApi( object ):
         metadata = pod.get( 'metadata', {} )
         annotations = metadata.get( 'annotations', {} )
 
-        result = None
         if 'agent.config.scalyr.com/cluster_name' in annotations:
-            result = annotations['agent.config.scalyr.com/cluster_name']
+            return annotations['agent.config.scalyr.com/cluster_name']
 
-        return result
+        # If the user did not specify any cluster name, we need to supply a default that will be the same for all
+        # other scalyr agents connected to the same cluster.  Unfortunately, k8s does not actually supply the cluster
+        # name via any API, so we must make one up.
+        # We create a random string using the creation timestamp of the default timestamp as a seed.  The idea is that
+        # that creation timestamp should never change and all agents connected to the cluster will see the same value
+        # for that seed.
+        namespaces = self.query_namespaces()
+
+        # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
+        if namespaces and 'items' in namespaces:
+            for item in namespaces['items']:
+                if metadata in item and item['metadata']['name'] == 'default':
+                    if 'creationTimestamp' in item['metadata']:
+                        return 'k8s-cluster-%s' % self.__create_random_string(item['metadata']['creationTimestamp'], 6)
+        return None
+
+    def __create_random_string(self, seed_string, num_chars):
+        """
+        Return a random string of num_char characters, composed of uppercase characters and digits.
+
+        @param seed_string: The seed to use when creating the psrng
+        @param num_chars: The desired size of the string.
+
+        @type seed_string: str
+        @type num_chars: int
+        @return: A random string
+        @rtype: str
+        """
+        prng = random.Random(abs(hash(seed_string)))
+        return ''.join(prng.choice(string.ascii_uppercase + string.digits) for _ in range(num_chars))
+
 
 
     def query_api( self, path, pretty=0 ):
