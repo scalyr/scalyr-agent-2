@@ -1654,8 +1654,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             deployment = k8s_cache.deployment( pod.namespace, pod.deployment_name )
             if deployment:
                 k8s_extra = {
-                    '_k8s_dn': deployment.name,
-                    '_k8s_dl': deployment.flat_labels
+                    'k8s-deployment': deployment.name
                 }
         return k8s_extra
 
@@ -1674,7 +1673,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """ returns a dict of values about the cluster """
         cluster_info = {}
         if self.__include_deployment_info and cluster_name is not None:
-            cluster_info['_k8s_cn'] = cluster_name
+            cluster_info['k8s-cluster'] = cluster_name
 
         return cluster_info
 
