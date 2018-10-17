@@ -791,7 +791,7 @@ class KubernetesApi( object ):
         # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
         if namespaces and 'items' in namespaces:
             for item in namespaces['items']:
-                if metadata in item and item['metadata']['name'] == 'default':
+                if 'metadata' in item and 'name' in item['metadata'] and item['metadata']['name'] == 'default':
                     if 'creationTimestamp' in item['metadata']:
                         return 'k8s-cluster-%s' % self.__create_random_string(item['metadata']['creationTimestamp'], 6)
         return None
