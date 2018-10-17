@@ -122,7 +122,7 @@ define_config_option( __monitor__, 'report_container_metrics',
 
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
-                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True)
+                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=False)
 
 define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
@@ -443,25 +443,28 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                     logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (json_lib.serialize(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
                                 if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
-                                    if k8s_namespaces_to_exclude is None or not k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
-                                        pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
-                                        if pod:
-                                            k8s_info['pod_info'] = pod
+                                    if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
+                                        logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based excluded namespaces" % short_cid)
+                                        continue
 
-                                            k8s_container = k8s_info.get( 'k8s_container_name', None )
+                                    pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
+                                    if pod:
+                                        k8s_info['pod_info'] = pod
 
-                                            # check to see if we should exclude this container
-                                            default_exclude = not k8s_include_by_default
-                                            exclude = pod.exclude_pod( container_name=k8s_container, default=default_exclude)
+                                        k8s_container = k8s_info.get( 'k8s_container_name', None )
 
-                                            if exclude:
-                                                if pod.annotations:
-                                                    logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
-                                                continue
+                                        # check to see if we should exclude this container
+                                        default_exclude = not k8s_include_by_default
+                                        exclude = pod.exclude_pod( container_name=k8s_container, default=default_exclude)
 
-                                            # add a debug message if containers are excluded by default but this container is included
-                                            if default_exclude and not exclude:
-                                                logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+                                        if exclude:
+                                            if pod.annotations:
+                                                logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+                                            continue
+
+                                        # add a debug message if containers are excluded by default but this container is included
+                                        if default_exclude and not exclude:
+                                            logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
 
                         except Exception, e:
                           logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
@@ -982,7 +985,7 @@ class ContainerChecker( StoppableThread ):
         skip_keys = [ 'include', 'exclude' ]
 
         # list of config items that cannot be updated via annotations
-        invalid_keys = [ 'path', 'lineGroupers' ];
+        invalid_keys = [ 'path', 'lineGroupers' ]
 
         # set config items, ignoring invalid options and taking care to
         # handle attributes
@@ -1436,7 +1439,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         # Including deployment information for every event uploaded about  a pod (cluster name, deployment name,
         # deployment labels)
-        self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=True)
+        self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
@@ -1665,7 +1668,9 @@ class KubernetesMonitor( ScalyrMonitor ):
             @param: k8s_cache - a cache for querying the k8s api
         """
         k8s_info = container.get( 'k8s_info', {} )
-        pod = k8s_info.get( 'pod_info', {} )
+        pod = k8s_info.get( 'pod_info', None )
+        if pod is None:
+            return None
         return self.__build_k8s_deployment_info( k8s_cache, pod )
 
 
@@ -1685,8 +1690,9 @@ class KubernetesMonitor( ScalyrMonitor ):
             k8s_extra = {}
             if self.__include_deployment_info:
                 k8s_extra = self.__get_k8s_deployment_info( info, k8s_cache )
-                k8s_extra.update( cluster_info )
-                k8s_extra.update({'pod_uid': info['name']})
+                if k8s_extra is not None:
+                    k8s_extra.update( cluster_info )
+                    k8s_extra.update({'pod_uid': info['name']})
             self.__gather_metrics_from_api_for_container( info['name'], k8s_extra )
 
     def __gather_k8s_metrics_for_node( self, node, extra ):
@@ -1805,7 +1811,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve k8s metrics %d' % len(containers))
                     self.__gather_k8s_metrics_from_kubelet( containers, self.__kubelet_api, k8s_cache, cluster_name )
         except Exception, e:
-            self._logger.warn( "Unexpected error logging metrics: %s" %( str(e) ) )
+            self._logger.exception( "Unexpected error logging metrics: %s" %( str(e) ) )
 
         if self.__gather_k8s_pod_info:
 

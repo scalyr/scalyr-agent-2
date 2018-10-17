@@ -1,7 +1,13 @@
 {
+  // Whether or not to turn on v2 k8s support.  Note, you need to contact Scalyr to turn this on since
+  // it requires also turning in a service-side setting.
+  "import_vars": [ "SCALYR_K8S_V2" ],
+
   "monitors":[
     {
-      "module": "scalyr_agent.builtin_monitors.kubernetes_monitor"
+      "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+      "include_deployment_info": "$SCALYR_K8S_V2",
+      "report_k8s_metrics": "$SCALYR_K8S_V2"
     }
   ]
 }
