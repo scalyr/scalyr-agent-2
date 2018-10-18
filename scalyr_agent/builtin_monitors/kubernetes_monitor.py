@@ -1593,7 +1593,9 @@ class KubernetesMonitor( ScalyrMonitor ):
                 if percpu:
                     for usage in percpu:
                         extra = { 'cpu' : count }
-                        self._logger.emit_value( 'docker.cpu.usage', usage, k8s_extra, monitor_id_override=container )
+                        if k8s_extra is not None:
+                            extra.update(k8s_extra)
+                        self._logger.emit_value( 'docker.cpu.usage', usage, extra, monitor_id_override=container )
                         count += 1
             self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage, k8s_extra )
 
@@ -1707,11 +1709,14 @@ class KubernetesMonitor( ScalyrMonitor ):
         if name is None:
             return
 
-        extra['node_name'] = name
+        node_extra = {
+          'node_name': name
+        }
+        node_extra.update(extra)
 
         for key, metrics in node.iteritems():
             if key == 'network':
-                self.__log_metrics( name, self.__k8s_node_network_metrics, metrics, extra )
+                self.__log_metrics( name, self.__k8s_node_network_metrics, metrics, node_extra )
 
     def __gather_k8s_metrics_for_pod( self, pod_metrics, pod_info, k8s_extra ):
         """
@@ -1723,16 +1728,14 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
 
         extra = {
-            'pod_name': pod_info.name,
-            'pod_namespace': pod_info.namespace,
-            'pod_uid': pod_info.name
+            'pod_uid': pod_info.uid
         }
 
         extra.update( k8s_extra )
 
         for key, metrics in pod_metrics.iteritems():
             if key == 'network':
-                self.__log_metrics( "%s/%s" % (pod_info.namespace, pod_info.name), self.__k8s_pod_network_metrics, metrics, extra )
+                self.__log_metrics( pod_info.uid, self.__k8s_pod_network_metrics, metrics, extra )
 
     def __gather_k8s_metrics_from_kubelet( self, containers, kubelet_api, k8s_cache, cluster_name ):
         """
