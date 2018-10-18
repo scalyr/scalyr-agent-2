@@ -809,7 +809,7 @@ class KubernetesApi( object ):
         @rtype: str
         """
         prng = random.Random(abs(hash(seed_string)))
-        return ''.join(prng.choice(string.ascii_uppercase + string.digits) for _ in range(num_chars))
+        return ''.join(prng.choice(string.ascii_lowercase + string.digits) for _ in range(num_chars))
 
 
 
