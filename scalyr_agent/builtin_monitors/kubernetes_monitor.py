@@ -134,6 +134,16 @@ define_config_option( __monitor__, 'k8s_include_all_containers',
                       'If false, only pods/containers with an include:true or exclude:false annotation '
                       'will be monitored. See documentation on annotations for further detail.', convert_to=bool, default=True)
 
+define_config_option( __monitor__, 'k8s_use_v2_attributes',
+                      'Optional (defaults to False). If True, will use v2 version of attribute names instead of '
+                      'the names used with the original release of this monitor.  This is a breaking change so could '
+                      'break searches / alerts if you rely on the old names', convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
+                      'Optional (defaults to False). If True, send attributes using both v1 and v2 versions of their'
+                      'names.  This may be used to fix breakages when you relied on the v1 attribute names',
+                      convert_to=bool, default=False)
+
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
                      'Increase this value if you want less network traffic from querying the k8s api.  Decrease this value if you '
@@ -502,6 +512,9 @@ class ContainerChecker( StoppableThread ):
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
         name = self._config.get( 'container_name' )
+
+        self.__use_v2_attributes = self._config.get('k8s_use_v2_attributes')
+        self.__use_v1_and_v2_attributes = self._config.get('k8s_use_v1_and_v2_attributes')
 
         self.__parse_json = self._config.get( 'k8s_parse_json' )
 
@@ -875,8 +888,11 @@ class ContainerChecker( StoppableThread ):
         result = None
 
         container_attributes = base_attributes.copy()
-        container_attributes['containerName'] = info['name']
-        container_attributes['containerId'] = cid
+        if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+            container_attributes['containerName'] = info['name']
+            container_attributes['containerId'] = cid
+        elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+            container_attributes['container_id'] = cid
         parser = 'docker'
         common_annotations = {}
         container_annotations = {}
@@ -907,9 +923,12 @@ class ContainerChecker( StoppableThread ):
                 rename_vars['node_name'] = pod.node_name
 
                 container_attributes['pod_name'] = pod.name
-                container_attributes['namespace'] = pod.namespace
+                container_attributes['pod_namespace'] = pod.namespace
                 container_attributes['pod_uid'] = pod.uid
-                container_attributes['node_name'] = pod.node_name
+                if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+                    container_attributes['node_name'] = pod.node_name
+                elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+                    container_attributes['k8s_node'] = pod.node_name
                 container_attributes['scalyr-category'] = 'log'
 
                 for label, value in pod.labels.iteritems():
@@ -974,6 +993,9 @@ class ContainerChecker( StoppableThread ):
         if 'log_path' in info and info['log_path']:
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_as_json=self.__parse_json )
             result['rename_logfile'] = '/docker/%s.log' % info['name']
+            # This is for a hack to prevent the original log file name from being added to the attributes.
+            if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
+                result['rename_no_original'] = True
 
         # apply common annotations first
         annotations = common_annotations

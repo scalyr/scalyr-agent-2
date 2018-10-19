@@ -2292,7 +2292,10 @@ class LogMatcher(object):
                         log_attributes['logfile'] = renamed_log
 
                     if 'original_file' not in log_attributes and renamed_log != matched_file:
-                        log_attributes['original_file'] = matched_file
+                        # Note, this next line is for a hack in the kubernetes_monitor to not include the original
+                        # log file name.  TODO: Clean this up.
+                        if not 'rename_no_original' in self.__log_entry_config:
+                            log_attributes['original_file'] = matched_file
 
                     # Create the processor to handle this log.
                     new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config,
