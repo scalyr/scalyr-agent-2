@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.37 "Ly-Cilph" - Oct 19, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Sep 19, 2018 15:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 19, 2018 14:30 -0700
 --->
 
 Features
