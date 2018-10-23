@@ -18,6 +18,13 @@ spec:
               secretKeyRef:
                 name: scalyr-api-key
                 key: scalyr-api-key
+          - name: SCALYR_K8S_V2
+            value: "true"
+          - name: SCALYR_K8S_CLUSTER_NAME
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: k8s_cluster
         resources:
           limits:
             memory: 500Mi
