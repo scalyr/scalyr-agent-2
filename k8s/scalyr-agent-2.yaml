@@ -8,6 +8,7 @@ spec:
       labels:
         app: scalyr-agent-2
     spec:
+      serviceAccountName: scalyr-service-account
       containers:
       - name: scalyr-agent
         image: scalyr/scalyr-k8s-agent
