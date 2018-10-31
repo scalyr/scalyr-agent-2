@@ -9,7 +9,7 @@ nose-exclude
 nose_xunitmp==0.4.0
 pg8000==1.11.0
 pysnmp
-requests==2.18.4
+requests==2.20.0
 redis==2.10.6
 Twisted==17.9.0
 unittest2==1.1.0
