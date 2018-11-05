@@ -931,6 +931,31 @@ class KubernetesApi( object ):
         """Wrapper to query all namespaces"""
         return self.query_api( '/api/v1/namespaces' )
 
+    def stream_events( self, path="/apis/events.k8s.io/v1beta1/watch/events", last_event=None ):
+        """Streams k8s events from location specified at path"""
+        self._ensure_session()
+        url = self._http_host + path
+
+        if last_event:
+            resource='resourceVersion=%s' % str(last_event)
+            if "?" in url:
+                resource = '&%s' % resource
+            else:
+                resource = '?%s' % resource
+
+            url += resource
+
+        global_log.info( "about to stream: %s" % url )
+        response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout, stream=True )
+        if response.status_code != 200:
+            global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_stream_events' )
+            raise K8sApiException( "Invalid response from Kubernetes API when querying %d - '%s': %s" % ( response.status_code, path, str( response ) ) )
+
+        for line in response.iter_lines():
+            if line:
+                yield line
+
 class KubeletApi( object ):
     """
         A class for querying the kubelet API
