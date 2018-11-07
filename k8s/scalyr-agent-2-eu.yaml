@@ -1,0 +1,49 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: scalyr-agent-2
+spec:
+  template:
+    metadata:
+      labels:
+        app: scalyr-agent-2
+    spec:
+      serviceAccountName: scalyr-service-account
+      containers:
+      - name: scalyr-agent
+        image: scalyr/scalyr-k8s-agent-eu
+        imagePullPolicy: Always
+        env:
+          - name: SCALYR_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: scalyr-api-key
+                key: scalyr-api-key
+          - name: SCALYR_K8S_V2
+            value: "true"
+          - name: SCALYR_K8S_CLUSTER_NAME
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: k8s_cluster
+        resources:
+          limits:
+            memory: 500Mi
+        volumeMounts:
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: dockersock
+          mountPath: /var/scalyr/docker.sock
+      volumes:
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      # comment this section if you do not want to run on the master
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
