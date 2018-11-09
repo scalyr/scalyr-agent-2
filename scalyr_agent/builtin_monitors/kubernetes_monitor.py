@@ -175,6 +175,14 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
                       'from the docker and k8s APIs showing all discovered containers and pods. This is mostly a debugging aid '
                       'and there are performance implications to always leaving this enabled', convert_to=bool, default=False)
 
+define_config_option( __monitor__, 'include_daemonsets_as_deployments',
+                      'Optional (defaults to True). If true, then the logs for Daemonsets will be uploaded to Scalyr but '
+                      'will be called Deployments in the Scalyr Web UI.  This means they will be listed as a deployment and'
+                      'will have the k8s-deployment label.  This is a temporary hack because the UI does not yet have '
+                      'the ability to display Daemonsets.  In the future, it will be supported, but will break anyone who '
+                      'relies on the k8s-deployment label.',
+                      convert_to=bool, default=True)
+
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
@@ -504,7 +512,7 @@ class ContainerChecker( StoppableThread ):
     """
 
     def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
-                  include_all, include_deployment_info, include_daemonsets_with_deployments, namespaces_to_ignore ):
+                  include_all, include_deployment_info, include_daemonsets_as_deployments, namespaces_to_ignore ):
 
         self._config = config
         self._logger = logger
@@ -541,7 +549,7 @@ class ContainerChecker( StoppableThread ):
         self.__include_deployment_info = include_deployment_info
 
         # This is currently an experimental feature, that uploads DaemonSet information as a 'Deployment'
-        self.__include_daemonsets_with_deployments = include_daemonsets_with_deployments
+        self.__include_daemonsets_as_deployments = include_daemonsets_as_deployments
 
         self.containers = {}
         self.__include_all = include_all
@@ -948,7 +956,7 @@ class ContainerChecker( StoppableThread ):
                         if self.__include_deployment_info:
                             container_attributes['_k8s_dn'] = deployment.name
                             container_attributes['_k8s_dl'] = deployment.flat_labels
-                elif pod.daemonset_name is not None and self.__include_daemonsets_with_deployments:
+                elif pod.daemonset_name is not None and self.__include_daemonsets_as_deployments:
                     daemonset = k8s_cache.daemonset( pod.namespace, pod.daemonset_name )
                     if daemonset:
                         rename_vars['deployment_name'] = daemonset.name
@@ -1474,13 +1482,13 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
 
         # Treat DaemonSets as Deployments
-        self.__include_daemonsets_with_deployments = self._config.get('include_daemonsets_with_deployments', convert_to=bool, default=False)
+        self.__include_daemonsets_as_deployments = self._config.get('include_daemonsets_as_deployments')
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
-                                                         self.__include_all, self.__include_deployment_info, self.__include_daemonsets_with_deployments,
+                                                         self.__include_all, self.__include_deployment_info, self.__include_daemonsets_as_deployments,
                                                          self.__namespaces_to_ignore)
 
         # Metrics provided by the kubelet API.
@@ -1698,7 +1706,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     k8s_extra = {
                         'k8s-deployment': deployment.name
                     }
-            elif pod.daemonset_name is not None and self.__include_daemonsets_with_deployments:
+            elif pod.daemonset_name is not None and self.__include_daemonsets_as_deployments:
                 daemonset = k8s_cache.daemonset( pod.namespace, pod.daemonset_name )
                 if daemonset:
                     k8s_extra = {
