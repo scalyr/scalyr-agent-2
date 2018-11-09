@@ -35,7 +35,7 @@ class PodInfo( object ):
     """
         A collection class that stores label and other information about a kubernetes pod
     """
-    def __init__( self, name='', namespace='', uid='', node_name='', labels={}, container_names=[], annotations={}, deployment_name=None ):
+    def __init__( self, name='', namespace='', uid='', node_name='', labels={}, container_names=[], annotations={}, deployment_name=None, daemonset_name=None ):
 
         self.name = name
         self.namespace = namespace
@@ -45,6 +45,7 @@ class PodInfo( object ):
         self.container_names = container_names
         self.annotations = annotations
         self.deployment_name = deployment_name
+        self.daemonset_name = daemonset_name
 
         # generate a hash we can use to compare whether or not
         # any of the pod info has changed
@@ -110,6 +111,20 @@ class PodInfo( object ):
             result = exclude_status( self.annotations[container_name], result )
 
         return result
+
+class DaemonSetInfo( object ):
+    """
+        Class for cached DaemonSet objects
+    """
+    def __init__( self, name='', namespace='', labels={} ):
+        self.name = name
+        self.namespace = namespace
+        self.labels = labels
+        flat_labels = []
+        for key, value in labels.iteritems():
+            flat_labels.append( "%s=%s" % (key, value) )
+
+        self.flat_labels = ','.join( flat_labels )
 
 class ReplicaSetInfo( object ):
     """
@@ -434,9 +449,10 @@ class _K8sProcessor( object ):
 
 class PodProcessor( _K8sProcessor ):
 
-    def __init__( self, k8s, logger, filter, replicasets ):
+    def __init__( self, k8s, logger, filter, replicasets, daemonsets ):
         super( PodProcessor, self).__init__( k8s, logger, filter )
         self._replicasets = replicasets
+        self._daemonsets = daemonsets
 
     def query_all_objects( self ):
         """
@@ -458,13 +474,14 @@ class PodProcessor( _K8sProcessor ):
     def _get_deployment_name_from_owners( self, owners, namespace ):
         """
             Processes a list of owner references returned from a Pod's metadata to see
-            if it is eventually owned by a Deployment, and if so, returns that DeploymentInfo
+            if it is eventually owned by a Deployment, and if so, returns the name of the deployment
 
-            @return DeploymentInfo or None if not part of a deployment
+            @return String - the name of the deployment that owns this object
         """
         replicaset = None
         owner = self._get_managing_controller( owners, 'ReplicaSet' )
 
+        # check if we are owned by a replicaset
         if owner:
             name = owner.get( 'name', None )
             if name is None:
@@ -475,6 +492,28 @@ class PodProcessor( _K8sProcessor ):
             return None
 
         return replicaset.deployment_name
+
+    def _get_daemonset_name_from_owners( self, owners, namespace ):
+        """
+            Processes a list of owner references returned from a Pod's metadata to see
+            if it is eventually owned by a daemonset, and if so, returns the name of the daemonset
+
+            @return String - the name of the daemonset that owns this object
+        """
+        daemonset = None
+        owner = self._get_managing_controller( owners, 'DaemonSet' )
+
+        # check if we are owned by a daemonset
+        if owner:
+            name = owner.get( 'name', None )
+            if name is None:
+                return None
+            daemonset = self._daemonsets.lookup( namespace, name )
+
+        if daemonset is None:
+            return None
+
+        return daemonset.name
 
     def process_object( self, obj ):
         """ Generate a PodInfo object from a JSON object
@@ -496,6 +535,7 @@ class PodProcessor( _K8sProcessor ):
         namespace = metadata.get( "namespace", '' )
 
         deployment_name = self._get_deployment_name_from_owners( owners, namespace )
+        daemonset_name = self._get_daemonset_name_from_owners( owners, namespace )
 
         container_names = []
         for container in spec.get( 'containers', [] ):
@@ -519,7 +559,8 @@ class PodProcessor( _K8sProcessor ):
                           labels=labels,
                           container_names=container_names,
                           annotations=annotations,
-                          deployment_name=deployment_name)
+                          deployment_name=deployment_name,
+                          daemonset_name=daemonset_name)
         return result
 
 class ReplicaSetProcessor( _K8sProcessor ):
@@ -604,9 +645,50 @@ class DeploymentProcessor( _K8sProcessor ):
 
         return DeploymentInfo( name, namespace, labels )
 
+class DaemonSetProcessor( _K8sProcessor ):
+
+    def query_all_objects( self ):
+        """
+        Queries the k8s api for all DaemonSets that match self._filter
+        @return - a JsonObject containing an element called 'items' which is an JsonArray of DaemonSets
+                  returned by the query
+        """
+        return self._k8s.query_daemonsets( filter=self._filter )
+
+    def query_object( self, namespace, name ):
+        """
+        Queries the k8s api for a single DaemonSet
+        @param: namespace - the namespace to query in
+        @param: name - the name of the DaemonSet
+        @return - a JsonObject cointaining the DaemonSet information returned by the query
+        """
+        return self._k8s.query_daemonset( namespace, name )
+
+
+    def process_object( self, obj ):
+        """ Generate a DaemonSet object from a JSON object
+        @param obj: The JSON object returned as a response to querying
+            a specific DaemonSet from the k8s API
+
+        @return A DaemonSetInfo object
+        """
+        metadata = obj.get( 'metadata', {} )
+        namespace = metadata.get( "namespace", '' )
+        name = metadata.get( "name", '' )
+        labels = metadata.get( 'labels', {} )
+
+        return DaemonSetInfo( name, namespace, labels )
+
 class KubernetesCache( object ):
 
     def __init__( self, k8s, logger, cache_expiry_secs=120, max_cache_misses=20, cache_miss_interval=10, filter=None ):
+
+        # create the daemonset cache
+        daemonset_processor = DaemonSetProcessor( k8s, logger )
+        self._daemonsets = _K8sCache( logger, daemonset_processor, 'daemonset',
+                               cache_expiry_secs=cache_expiry_secs,
+                               max_cache_misses=max_cache_misses,
+                               cache_miss_interval=cache_miss_interval )
 
         # create the deployment cache
         deployment_processor = DeploymentProcessor( k8s, logger )
@@ -623,7 +705,7 @@ class KubernetesCache( object ):
                                cache_miss_interval=cache_miss_interval )
 
         # create the pod cache
-        pod_processor = PodProcessor( k8s, logger, filter, self._replicasets )
+        pod_processor = PodProcessor( k8s, logger, filter, self._replicasets, self._daemonsets )
         self._pods = _K8sCache( logger, pod_processor, 'pod',
                                cache_expiry_secs=cache_expiry_secs,
                                max_cache_misses=max_cache_misses,
@@ -633,6 +715,16 @@ class KubernetesCache( object ):
         self._cluster_name = None
         self._cache_expiry_secs = cache_expiry_secs
         self._last_full_update = time.time() - cache_expiry_secs - 1
+
+    def daemonset( self, namespace, name, current_time=None ):
+        """
+            Returns cached daemonset info for the daemonset specified by namespace and name
+            or None if no daemonset matches.
+
+            Querying the daemonset information is thread-safe but the returned object should
+            not be written to.
+        """
+        return self._daemonsets.lookup( namespace, name, current_time )
 
     def deployment( self, namespace, name, current_time=None ):
         """
@@ -878,6 +970,22 @@ class KubernetesApi( object ):
            wrapper that passes in the appropriate urls for the deployment objects
         """
         return self.query_objects( '/apis/apps/v1/deployments', '/apis/apps/v1/namespaces/%s/deployments', namespace, filter )
+
+    def query_daemonset( self, namespace, name ):
+        """Wrapper to query a daemonset in a namespace"""
+        if not name or not namespace:
+            return JsonObject()
+
+        query = '/apis/apps/v1/namespaces/%s/daemonsets/%s' % (namespace, name)
+        return self.query_api( query )
+
+    def query_daemonsets( self, namespace=None, filter=None ):
+        """Wrapper to query all daemonsets in a namespace, or across the entire cluster
+           A value of None for namespace will search for the daemonset across the entire cluster.
+           This is handled in the 'query_objects' method.  This method is just a convenience
+           wrapper that passes in the appropriate urls for the daemonset objects
+        """
+        return self.query_objects( '/apis/apps/v1/daemonsets', '/apis/apps/v1/namespaces/%s/daemonsets', namespace, filter )
 
     def query_objects( self, url, namespaced_url, namespace=None, filter=None ):
         """Wrapper to query all objects at a url in a namespace, or across the entire cluster"""
