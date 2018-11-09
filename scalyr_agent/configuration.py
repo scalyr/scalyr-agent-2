@@ -42,7 +42,9 @@ class Configuration(object):
 
     You may also use environment variable substitution in any string value in the configuration file.  You just
     need to define the ``import_vars`` configuration field to be a list of variable names to import from the
-    shell and then use the $VAR_NAME in any string field.
+    shell and then use the $VAR_NAME in any string field.  Each entry in ``import_vars`` may also be a dict with
+    two entries: ``var`` for the name of the environment variable and ``default`` for the value to use if the
+    the environment variable is not set or is empty.
 
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
@@ -1444,11 +1446,19 @@ class Configuration(object):
             """
             result = dict()
             if 'import_vars' in source_config:
-                for var_name in source_config.get_json_array('import_vars'):
-                    if var_name in os.environ:
+                for entry in source_config.get_json_array('import_vars'):
+                    # Allow for an entry of the form { var: "foo", default: "bar"}
+                    if isinstance(entry, JsonObject):
+                        var_name = entry['var']
+                        default_value = entry['default']
+                    else:
+                        var_name = entry
+                        default_value = ''
+
+                    if var_name in os.environ and len(os.environ[var_name]) > 0:
                         result[var_name] = os.environ[var_name]
                     else:
-                        result[var_name] = ''
+                        result[var_name] = default_value
             return result
 
         def perform_generic_substitution(value):
