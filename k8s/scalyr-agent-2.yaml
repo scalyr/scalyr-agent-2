@@ -26,6 +26,18 @@ spec:
               configMapKeyRef:
                  name: scalyr-config
                  key: k8s_cluster
+          - name: SCALYR_SERVER
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: scalyr_server
+                 optional: true
+          - name: SCALYR_DAEMONSETS_AS_DEPLOYMENTS
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: daemonsets_as_deployments
+                 optional: true
         resources:
           limits:
             memory: 500Mi
