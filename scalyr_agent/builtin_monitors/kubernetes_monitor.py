@@ -692,7 +692,6 @@ class ContainerChecker( StoppableThread ):
 
         self.raw_logs = []
 
-
     def get_k8s_data( self ):
         """ Convenience wrapper to query and process all pods
             and pods retreived by the k8s API.

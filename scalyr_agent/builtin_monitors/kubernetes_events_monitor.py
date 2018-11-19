@@ -16,13 +16,14 @@
 
 __author__ = 'imron@scalyr.com'
 
-from scalyr_agent.monitor_utils.k8s import KubernetesApi
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubernetesCache
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 import re
 import traceback
+import time
 
 import logging
 import logging.handlers
@@ -75,9 +76,25 @@ define_config_option( __monitor__, 'message_log',
 
 define_config_option( __monitor__, 'event_object_filter',
                      'Optional (defaults to [\'Pod\', \'Deployment\', \'DaemonSet\', \'Node\', \'ReplicaSet\'] ). A list of event object types to filter on. '
-                     'If set, only events whose `regarding` object `kind` is on this list will be included.',
+                     'If set, only events whose `involvedObject` `kind` is on this list will be included.',
                      default=['Pod', 'Deployment', 'DaemonSet', 'Node', 'ReplicaSet']
                      )
+
+define_config_option( __monitor__, 'k8s_cache_expiry_secs',
+                     'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
+                     'Increase this value if you want less network traffic from querying the k8s api.  Decrease this value if you '
+                     'want dynamic updates to annotation configuration values to be processed more quickly.',
+                     convert_to=int, default=30)
+
+define_config_option( __monitor__, 'k8s_max_cache_misses',
+                     'Optional (defaults to 20). The maximum amount of single query k8s cache misses that can occur in `k8s_cache_miss_interval` '
+                     'secs before performing a full update of the k8s cache',
+                     convert_to=int, default=20)
+
+define_config_option( __monitor__, 'k8s_cache_miss_interval',
+                     'Optional (defaults to 10). The number of seconds that `k8s_max_cache_misses` cache misses can occur in before '
+                     'performing a full update of the k8s cache',
+                     convert_to=int, default=10)
 
 define_config_option( __monitor__, 'leader_check_interval',
                      'Optional (defaults to 60). The number of seconds to check to see if we are still the leader.',
@@ -119,6 +136,10 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             self.log_config['attributes'] = attributes
         except Exception, e:
             global_log.error( "Error setting monitor attribute in KubernetesEventMonitor" )
+
+        self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
+        self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
+        self.__k8s_cache_miss_interval = self._config.get( 'k8s_cache_miss_interval' )
 
         default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
 
@@ -203,13 +224,24 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
         """
-        k8s = KubernetesApi()
-
-        if self.__log_watcher:
-            self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
-
-        self._pod_name = k8s.get_pod_name()
         try:
+            k8s = KubernetesApi()
+
+            k8s_filter = k8s.build_filter_for_current_node()
+
+            # create the k8s cache
+            k8s_cache = KubernetesCache( k8s, self._logger,
+                cache_expiry_secs=self.__k8s_cache_expiry_secs,
+                max_cache_misses=self.__k8s_max_cache_misses,
+                cache_miss_interval=self.__k8s_cache_miss_interval,
+                filter=k8s_filter )
+
+            if self.__log_watcher:
+                self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
+
+            self._pod_name = k8s.get_pod_name()
+            cluster_name = k8s.get_cluster_name()
+
             last_event = None
             last_resource = 0
             while not self._is_stopped():
@@ -220,6 +252,8 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                 try:
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
+
+                    current_time = time.time()
 
                     json = {}
                     for line in lines:
@@ -253,13 +287,31 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         last_event = resource_version
 
                         # see if this event is about an object we are interested in
-                        regarding = obj.get( "regarding", JsonObject())
-                        kind = regarding.get( 'kind', None, none_if_missing=True )
+                        involved = obj.get( "involvedObject", JsonObject())
+                        kind = involved.get( 'kind', None, none_if_missing=True )
                         if kind and kind not in self.__event_object_filter:
                             continue
 
+                        # get cluster and deployment information
+                        k8s_fields = "cluster-name=%s" % cluster_name
+                        if kind:
+                            name = involved.get( 'name', None, none_if_missing=True )
+                            namespace = involved.get( 'namespace', None, none_if_missing=True )
+                            if kind == 'Pod':
+                                pod = k8s_cache.pod( namespace, name, current_time )
+                                if pod and pod.deployment_name:
+                                    k8s_fields += " deployment-name=%s" % pod.deployment_name
+                            elif kind == 'ReplicaSet':
+                                rs = k8s_cache.replicaset( namespace, name, current_time )
+                                if rs and rs.deployment_name:
+                                    k8s_fields += " deployment-name=%s" % rs.deployment_name
+                            elif kind == 'Deployment':
+                                deployment = k8s_cache.deployment( namespace, name, current_time )
+                                if deployment:
+                                    k8s_fields += " deployment-name=%s" % deployment.name
+
                         # if so, log to disk
-                        self.__disk_logger.info( "%s" % str( line ) )
+                        self.__disk_logger.info( "%s %s" % (k8s_fields, str( line )) )
                     
                 except ConnectionError, e:
                     # ignore these, and just carry on querying in the next iteration

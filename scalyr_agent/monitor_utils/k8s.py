@@ -803,6 +803,21 @@ class KubernetesApi( object ):
             self._session = requests.Session()
             self._session.headers.update( self._standard_headers )
 
+    def build_filter_for_current_node( self ):
+        """Builds a fieldSelector filter limited to the current node to be used when querying pods the k8s api"""
+        result = None
+        try:
+            pod_name = self.get_pod_name()
+            node_name = self.get_node_name( pod_name )
+
+            if node_name:
+                result = 'spec.nodeName=%s' % node_name
+            else:
+                global_log.warning( "Unable to get node name for pod '%s'.  This will have negative performance implications for clusters with a large number of pods.  Please consider setting the environment variable SCALYR_K8S_NODE_NAME to valueFrom:fieldRef:fieldPath:spec.nodeName in your yaml file" )
+        except Exception, e:
+            global_log.warn( "Failed to build k8s filter %s\n%s" % (str(e), traceback.format_exc() ))
+
+        return result
     def get_pod_name( self ):
         """ Gets the pod name of the pod running the scalyr-agent """
         return os.environ.get( 'SCALYR_K8S_POD_NAME' ) or os.environ.get( 'HOSTNAME' )
@@ -931,7 +946,7 @@ class KubernetesApi( object ):
         """Wrapper to query all namespaces"""
         return self.query_api( '/api/v1/namespaces' )
 
-    def stream_events( self, path="/apis/events.k8s.io/v1beta1/watch/events", last_event=None ):
+    def stream_events( self, path="/api/v1/watch/events", last_event=None ):
         """Streams k8s events from location specified at path"""
         self._ensure_session()
         url = self._http_host + path
@@ -945,7 +960,6 @@ class KubernetesApi( object ):
 
             url += resource
 
-        global_log.info( "about to stream: %s" % url )
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout, stream=True )
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
