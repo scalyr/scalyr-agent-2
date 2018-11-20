@@ -416,7 +416,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
 
             if ignore_container is not None and cid == ignore_container:
                 if debug_k8s:
-                    global_log.info('dbg_k8s: cid=%s ignored_container' % cid)
+                    global_log.info('debug_k8s: cid=%s ignored_container' % cid)
                 continue
 
             # Note we need to *include* results that were created after the 'running_or_created_after' time.
@@ -424,7 +424,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             # hence the reason 'create_before' is assigned to a value named '...created_after'
             if _ignore_old_dead_container( container, created_before=running_or_created_after ):
                 if debug_k8s:
-                    global_log.info('dbg_k8s: cid=%s ignored_old_dead' % cid)
+                    global_log.info('debug_k8s: cid=%s ignored_old_dead' % cid)
                 continue
 
             if len( container['Names'] ) > 0:
@@ -473,7 +473,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                     if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
                                         logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based excluded namespaces" % short_cid)
                                         if debug_k8s:
-                                            global_log.info('dbg_k8s: cid=%s ignored due to namespace' % cid)
+                                            global_log.info('debug_k8s: cid=%s ignored due to namespace' % cid)
                                         continue
 
                                     pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
@@ -490,7 +490,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                             if pod.annotations:
                                                 logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
                                             if debug_k8s:
-                                                global_log.info('dbg_k8s: cid=%s ignored due to exclusion' % cid)
+                                                global_log.info('debug_k8s: cid=%s ignored due to exclusion' % cid)
                                             continue
 
                                         # add a debug message if containers are excluded by default but this container is included
@@ -741,8 +741,8 @@ class ContainerChecker( StoppableThread ):
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
                 self._k8s_debug('Retrieving containers with previous=%d glob_list=%s namespaces_to_exclude=%s '
-                                'include_by_default=%s' % (previous_time, ''.join(self.__glob_list),
-                                                           ''.join(self.__namespaces_to_ignore),
+                                'include_by_default=%s' % (previous_time, self.__list_to_str(self.__glob_list),
+                                                           self.__list_to_str(self.__namespaces_to_ignore),
                                                            str(self.__include_all)))
 
                 current_time = time.time()
@@ -773,6 +773,7 @@ class ContainerChecker( StoppableThread ):
                     pod = None
                     if 'k8s_info' in info:
                         pod_name = info['k8s_info'].get( 'pod_name', 'invalid_pod' )
+                        self._k8s_debug('Pod name for cid=%s is %s' % (cid, pod_name))
                         pod_namespace = info['k8s_info'].get( 'pod_namespace', 'invalid_namespace' )
                         pod = info['k8s_info'].get( 'pod_info', None )
 
@@ -1195,6 +1196,11 @@ class ContainerChecker( StoppableThread ):
     def _k8s_debug(self, message):
         if self._should_debug_k8s:
             global_log.info('debug_k8s: %s' % message)
+
+    def __list_to_str(self, x):
+        if x is None:
+            return '[]'
+        return ''.join(x)
 
 
 class ContainerIdResolver():
