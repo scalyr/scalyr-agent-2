@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.38 "Nox" - Nov 9, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 9, 2018 16:00 -0800
+--->
+
+Features
+
+* Added ability to specify default values for environment variables imported in configuration files.
+
+Bugs
+* Added temporary hack to new Kubernetes support to upload Daemonsets as Deployments.
+
 ## 2.0.37 "Ly-Cilph" - Oct 19, 2018
 
 <!---
