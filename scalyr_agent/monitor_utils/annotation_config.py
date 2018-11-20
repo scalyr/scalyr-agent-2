@@ -24,14 +24,14 @@ from scalyr_agent.json_lib import JsonArray
 
 global_log = scalyr_logging.getLogger(__name__)
 
-SCALYR_LOG_ANNOTATION_RE = re.compile( '^(log\.config\.scalyr\.com/)(.+)' )
+SCALYR_ANNOTATION_PREFIX_RE = re.compile( '^(log\.config\.scalyr\.com/)(.+)' )
 SCALYR_ANNOTATION_ELEMENT_RE = re.compile( '([^.]+)\.(.+)' )
 
 class BadAnnotationConfig( Exception ):
     pass
 
 
-def process_annotations( annotations ):
+def process_annotations( annotations, annotation_prefix_re=SCALYR_ANNOTATION_PREFIX_RE ):
     """
     Process the annotations, extracting log.config.scalyr.com/* entries
     and mapping them to a dict corresponding to the same names as the log_config
@@ -133,7 +133,7 @@ def process_annotations( annotations ):
     # first split out any scalyr log-config annotations
     items = {}
     for annotation_key, annotation_value in annotations.iteritems():
-        m = SCALYR_LOG_ANNOTATION_RE.match( annotation_key )
+        m = annotation_prefix_re.match( annotation_key )
         if m:
             key = m.group(2)
             if key in items:

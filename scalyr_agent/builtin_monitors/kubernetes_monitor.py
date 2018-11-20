@@ -35,6 +35,8 @@ from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
+import scalyr_agent.monitor_utils.annotation_config as annotation_config
+from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.log_watcher import LogWatcher
@@ -52,6 +54,8 @@ from requests.packages.urllib3.exceptions import ProtocolError
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
+
+SCALYR_CONFIG_ANNOTATION_RE = re.compile( '^(agent\.config\.scalyr\.com/)(.+)' )
 
 define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.kubernetes_monitor``',
@@ -563,6 +567,8 @@ class ContainerChecker( StoppableThread ):
         self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
         self.__k8s_cache_miss_interval = self._config.get( 'k8s_cache_miss_interval' )
 
+        self.__annotations = JsonObject()
+
         self.__k8s_filter = None
         self.k8s_cache = None
 
@@ -584,6 +590,9 @@ class ContainerChecker( StoppableThread ):
                 max_cache_misses=self.__k8s_max_cache_misses,
                 cache_miss_interval=self.__k8s_cache_miss_interval,
                 filter=self.__k8s_filter )
+
+            self.__annotations = self._get_annotations( self.__k8s )
+            self.__k8s_debug = self._get_k8s_debug_level( self.__annotations )
 
             self.containers = _get_containers(self.__client, ignore_container=self.container_id,
                                               glob_list=self.__glob_list, include_log_path=True,
@@ -619,6 +628,46 @@ class ContainerChecker( StoppableThread ):
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
 
         self.raw_logs = []
+
+    def _get_annotations(self, k8s ):
+        """
+        Gets the annotations for the pod running the scalyr agent.
+
+        @return: A JsonObject of any annotations starting with the SCALYR_CONFIG_ANNOTATION_RE
+        """
+        pod_name = k8s.get_pod_name()
+
+        if pod_name is None:
+            return JsonObject()
+
+        result = k8s.query_pod( k8s.namespace, pod_name )
+        if result is None:
+            return JsonObject()
+
+        metadata = result.get( 'metadata', {} )
+        annotations = metadata.get( 'annotations', JsonObject() )
+
+        try:
+            annotations = annotation_config.process_annotations( annotations, annotation_prefix_re=SCALYR_CONFIG_ANNOTATION_RE )
+        except BadAnnotationConfig, e:
+            self._logger.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (k8s.namespace, pod_name, str( e )),
+                                  limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s/%s' % (k8s.namespace, pod_name) )
+            annotations = JsonObject()
+
+        return annotations
+
+    def _get_k8s_debug_level( self, annotations ):
+        """Takes a JsonObject containing the annotations for the agent pod, and returns the
+           integer value of the field k8s_debug if it exists, or 0 otherwise
+        """
+
+        result = 0
+        try:
+            result = annotations.get_int( 'k8s_debug', result )
+        except Exception, e:
+            pass
+
+        return result
 
     #@property
     #def cluster_name( self ):
@@ -668,6 +717,10 @@ class ContainerChecker( StoppableThread ):
 
         while run_state.is_running():
             try:
+                self.__annotations = self._get_annotations( self.__k8s )
+                self.__k8s_debug = self._get_k8s_debug_level( self.__annotations )
+
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, 'k8s debug level is %d' % self.__k8s_debug )
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
