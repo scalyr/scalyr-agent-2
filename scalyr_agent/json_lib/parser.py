@@ -399,7 +399,7 @@ class JsonParser(object):
 
         self.__consume_repeated_chars('"', count=3)
 
-        return self.__process_escapes(result.decode("utf8"), start_pos)
+        return self.__process_escapes(result.decode("utf8", errors='replace'), start_pos)
 
     def __parse_string_with_concatenation(self):
         """Parse a string literal. The scanner must be at the first '"'.
@@ -470,7 +470,7 @@ class JsonParser(object):
         # Have to consume the quote mark
         self.__scanner.read_ubyte()
 
-        return self.__process_escapes(result.decode("utf8"), start_pos + 1)
+        return self.__process_escapes(result.decode("utf8", errors='replace'), start_pos + 1)
   
     def __process_escapes(self, s, literal_start):
         """Convert backlash sequences in raw string literal.
