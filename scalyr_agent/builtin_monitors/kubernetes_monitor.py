@@ -621,7 +621,7 @@ class ContainerChecker( StoppableThread ):
 
             #create and start the DockerLoggers
             self.__start_docker_logs( self.docker_logs )
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting docker monitor for Scalyr" )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting k8s monitor for Scalyr" )
             self.__thread.start()
 
         except Exception, e:
@@ -2057,6 +2057,11 @@ class KubernetesMonitor( ScalyrMonitor ):
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
 
+        global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_deployments %s, '
+                        'report_daemonsets %s, report_metrics %s' % (','.join(self.__namespaces_to_ignore),
+                                                                     str(self.__include_deployment_info),
+                                                                     str(self.__include_daemonsets_as_deployments),
+                                                                     str(self.__report_container_metrics)))
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):

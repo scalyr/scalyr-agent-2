@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.39 "Orion" - Nov 30, 2018
+
+Note, this release is still TBD including release date.
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 30, 2018 16:00 -0800
+--->
+
+Bugs
+* Adjusted unicode decoding to be more tolerant of bad input.
+
 ## 2.0.38 "Nox" - Nov 9, 2018
 
 <!---
