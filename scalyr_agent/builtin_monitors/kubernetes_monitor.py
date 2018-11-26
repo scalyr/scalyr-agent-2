@@ -998,8 +998,11 @@ class ContainerChecker( StoppableThread ):
         result = None
 
         if self._should_debug_k8s:
-            self._k8s_debug('Attempting to generate config for cid=%s with info (%s,%s,%s,%s,%s) ' % (
-                cid, info['name'], info['namespace'], info['uid'], info['deployment_name'], info['daemonset_name']))
+            k8s_info = info.get( 'k8s_info', {} )
+            pod_name = k8s_info.get('pod_name', 'invalid_pod')
+            pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
+            self._k8s_debug('Attempting to generate config for cid=%s with info (%s,%s) ' % (
+                cid, pod_name, pod_namespace))
 
         # Hacky way to capture which paths are followed below.  Outputted as part of debug output.
         code_path = ''
