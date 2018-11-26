@@ -606,18 +606,33 @@ class ContainerChecker( StoppableThread ):
             self.__annotations = self._get_annotations( self.__k8s )
             self.__k8s_debug = self._get_k8s_debug_level( self.__annotations )
 
+            self._should_debug_k8s = self._should_emit_k8s_debug()
+
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
+            self._k8s_debug('Retrieving containers for first time with glob_list=%s namespaces_to_exclude=%s '
+                            'include_by_default=%s' % (self.__list_to_str(self.__glob_list),
+                                                       self.__list_to_str(self.__namespaces_to_ignore),
+                                                       str(self.__include_all)))
+
             self.containers = _get_containers(self.__client, ignore_container=self.container_id,
                                               glob_list=self.__glob_list, include_log_path=True,
                                               k8s_cache=self.k8s_cache, k8s_include_by_default=self.__include_all,
                                               k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
 
             # if querying the docker api fails, set the container list to empty
-            if self.containers == None:
+            if self.containers is None:
                 self.containers = {}
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
+                self._k8s_debug('Failed to get list of containers')
+
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Found %d containers' % len(self.containers))
+            self._k8s_debug('Found %d containers' % len(self.containers))
 
             self.raw_logs = []
 
             self.docker_logs = self.__get_docker_logs( self.containers, self.k8s_cache )
+
+            self._k8s_debug('Found %d containers to start' % len(self.docker_logs))
 
             #create and start the DockerLoggers
             self.__start_docker_logs( self.docker_logs )
@@ -670,10 +685,10 @@ class ContainerChecker( StoppableThread ):
 
     def _get_k8s_debug_level( self, annotations ):
         """Takes a JsonObject containing the annotations for the agent pod, and returns the
-           integer value of the field k8s_debug if it exists, or 0 otherwise
+           integer value of the field k8s_debug if it exists, or 1 otherwise
         """
 
-        result = 0
+        result = 1
         try:
             result = annotations.get_int( 'k8s_debug', result )
         except Exception, e:
@@ -1181,12 +1196,15 @@ class ContainerChecker( StoppableThread ):
             log_config = self.__get_log_config_for_container( cid, info, k8s_cache, attributes )
             if log_config:
                 result.append( { 'cid': cid, 'stream': 'raw', 'log_config': log_config } )
+            else:
+                self._k8s_debug('Ignoring container %s due to no log config' % cid)
 
         return result
 
     def _should_emit_k8s_debug(self):
         current_time = time.time()
         k8s_debug_level = self._get_k8s_debug_level(self._get_annotations(self.__k8s))
+
         if k8s_debug_level > 0 and (self._last_debug_k8s is None or self._last_debug_k8s + 300 < current_time):
             self._last_debug_k8s = current_time
             return True
@@ -2058,7 +2076,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__report_k8s_metrics = False
 
         global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_deployments %s, '
-                        'report_daemonsets %s, report_metrics %s' % (','.join(self.__namespaces_to_ignore),
+                        'report_daemonsets %s, report_metrics %s' % (str(self.__namespaces_to_ignore),
                                                                      str(self.__include_deployment_info),
                                                                      str(self.__include_daemonsets_as_deployments),
                                                                      str(self.__report_container_metrics)))
