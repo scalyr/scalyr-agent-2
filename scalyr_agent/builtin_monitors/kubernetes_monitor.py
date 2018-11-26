@@ -998,7 +998,8 @@ class ContainerChecker( StoppableThread ):
         result = None
 
         if self._should_debug_k8s:
-            self._k8s_debug('Attempting to generate config for cid=%s with info %s' % (cid, json_lib.serialize(info)))
+            self._k8s_debug('Attempting to generate config for cid=%s with info (%s,%s,%s,%s,%s) ' % (
+                cid, info['name'], info['namespace'], info['uid'], info['deployment_name'], info['daemonset_name']))
 
         # Hacky way to capture which paths are followed below.  Outputted as part of debug output.
         code_path = ''
@@ -2001,7 +2002,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             current_time = time.time()
             if self._last_debug is None or self._last_debug + 300 < current_time:
                 if containers is not None:
-                    global_log.info('debug_k8s: Found x containers for metrics' % len(containers))
+                    global_log.info('debug_k8s: Found x containers for metrics %d' % len(containers))
                     for cid in containers.keys():
                         global_log.info('debug_k8s: Reporting metrics for %s' % cid)
                 else:
