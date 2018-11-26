@@ -510,10 +510,18 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
+                last_debug_time = None
+
                 while self._run_state.is_running():
                     log.log(scalyr_logging.DEBUG_LEVEL_1, 'At top of copy log files loop.')
                     current_time = time.time()
                     pipeline_time = 0.0
+
+                    if last_debug_time is None or last_debug_time + 300 < current_time:
+                        last_debug_time = current_time
+                        for processor in self.__log_processors:
+                            log.info('debug: Watching path %s' % processor.log_path)
+
                     # noinspection PyBroadException
                     try:
                         # If we have a pending request and it's been too taken too long to send it, just drop it
