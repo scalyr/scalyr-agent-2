@@ -1586,6 +1586,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         self._log_write_rate = self._config.get('monitor_log_write_rate', convert_to=int, default=-1)
         self._log_max_write_burst = self._config.get('monitor_log_max_write_burst', convert_to=int, default=-1)
 
+        self._last_debug = None
+
         if self._global_config:
             data_path = self._global_config.agent_data_path
             log_path = self._global_config.agent_log_path
@@ -1996,6 +1998,15 @@ class KubernetesMonitor( ScalyrMonitor ):
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
                                          k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
                                          k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
+            current_time = time.time()
+            if self._last_debug is None or self._last_debug + 300 < current_time:
+                if containers is not None:
+                    global_log.info('debug_k8s: Found x containers for metrics' % len(containers))
+                    for cid in containers.keys():
+                        global_log.info('debug_k8s: Reporting metrics for %s' % cid)
+                else:
+                    global_log.info('debug_k8s: Did not find containers for metrics')
+
         try:
             if containers:
                 if self.__report_container_metrics:
