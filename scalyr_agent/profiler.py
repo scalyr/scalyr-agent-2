@@ -37,7 +37,7 @@ class Profiler( object ):
     """
 
     def __init__( self, config ):
-        
+
         enable_profiling = config.enable_profiling
 
         if enable_profiling:
@@ -57,10 +57,10 @@ class Profiler( object ):
 
         self._profile_start = 0
         self._profile_end = 0
-    
+
     def _get_clock_type( self, clock_type, allowed, default_value ):
         """
-            gets the clock type.  If clock type is `random` then 
+            gets the clock type.  If clock type is `random` then
             randomly choose from the first 2 elements of the `allowed` array.
         """
         result = default_value
@@ -72,16 +72,16 @@ class Profiler( object ):
             result = allowed[r]
 
         return result
-    
+
     def _get_random_start_time( self, current_time, maximum_interval_minutes ):
         if maximum_interval_minutes < 1:
             maximum_interval_minutes = 1
-        r = random.randint( 1, maximum_interval_minutes ) #* 60
+        r = random.randint( 1, maximum_interval_minutes ) * 60
         return current_time + r
-     
+
     def _update_start_interval( self, config, current_time ):
         self._profile_start = self._get_random_start_time( current_time, config.max_profile_interval_minutes )
-        self._profile_end = self._profile_start + (config.profile_duration_minutes ) #* 60)
+        self._profile_end = self._profile_start + (config.profile_duration_minutes * 60)
 
     def _start( self, config, current_time ):
 
@@ -92,15 +92,6 @@ class Profiler( object ):
             yappi.set_clock_type( self._profile_clock )
         global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Starting profiling using '%s' clock. Duration: %d seconds" % (self._profile_clock, self._profile_end - self._profile_start) )
         yappi.start()
-
-    #def _ensure_path(self, path):
-    #    try:
-    #        os.makedirs(path)
-    #    except OSError, e:
-    #        if e.errno == errno.EEXIST and os.path.isdir(path):
-    #            pass
-    #        else:
-    #            raise
 
     def _stop( self, config, current_time ):
         yappi.stop()
@@ -117,7 +108,7 @@ class Profiler( object ):
         """
         # no profiling if the profiler isn't available
         if yappi is None:
-            return 
+            return
 
         if current_time is None:
             current_time = time.time()
