@@ -97,7 +97,16 @@ class Profiler( object ):
         yappi.stop()
         global_log.log( scalyr_logging.DEBUG_LEVEL_0, 'Stopping profiling' )
         stats = yappi.get_func_stats()
-        stats.save( os.path.join( config.agent_log_path, config.profile_log_name ), 'callgrind' )
+        path = os.path.join( config.agent_log_path, config.profile_log_name )
+        if os.path.exists( path ):
+            os.remove( path )
+        stats.save( path, 'callgrind' )
+
+        f = open( path, "a" )
+        if f:
+            f.write( "\n" )
+            f.close()
+
         yappi.clear_stats()
         del stats
 
