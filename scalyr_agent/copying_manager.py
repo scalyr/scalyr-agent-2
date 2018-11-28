@@ -264,6 +264,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         for monitor in monitors:
             monitor.set_log_watcher( self )
 
+        self.__debug_tracer = scalyr_logging.DebugTracer(log, "copier", 300)
         # debug leaks
         self.__disable_new_file_matches = configuration.disable_new_file_matches
         self.__disable_scan_for_new_bytes = configuration.disable_scan_for_new_bytes
@@ -865,6 +866,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Track which processor we first look at in this method.
         first_processor = current_processor
 
+        self.__debug_tracer.start()
+
         # Whether or not the max bytes allowed to send has been reached.
         buffer_filled = False
 
@@ -899,6 +902,9 @@ class CopyingManager(StoppableThread, LogWatcher):
                 current_processor = self.__current_processor
             else:
                 break
+
+        if self.__debug_tracer.is_tracing():
+            self.__debug_tracer.debug('request was %s' % add_events_request.get_timing_data())
 
         # Define the single callback we will return to wrap all of the callbacks we have collected.
         def handle_completed_callback(result):
