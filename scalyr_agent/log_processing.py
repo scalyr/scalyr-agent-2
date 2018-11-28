@@ -1488,15 +1488,16 @@ class LogFileProcessor(object):
             self.__last_scan_time = current_time
             self.__lock.release()
 
-        # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
-        if current_time - self.__last_success > self.__copy_staleness_threshold:
-            self.skip_to_end('Too long since last success.  Last success was \'%s\'' % scalyr_util.format_time(
-                self.__last_success), 'skipForStaleness', current_time=current_time)
-        # Also make sure we are at least within 5MB of the tail of the log.  If not, then we skip ahead.
-        elif self.__log_file_iterator.available > self.__max_log_offset_size:
-            self.skip_to_end(
-                'Too far behind end of log.  Num of bytes to end is %ld' % self.__log_file_iterator.available,
-                'skipForTooFarBehind', current_time=current_time)
+        if not self.__path.endswith( 'agent.callgrind' ):
+            # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
+            if current_time - self.__last_success > self.__copy_staleness_threshold:
+                self.skip_to_end('Too long since last success.  Last success was \'%s\'' % scalyr_util.format_time(
+                    self.__last_success), 'skipForStaleness', current_time=current_time)
+            # Also make sure we are at least within 5MB of the tail of the log.  If not, then we skip ahead.
+            elif self.__log_file_iterator.available > self.__max_log_offset_size:
+                self.skip_to_end(
+                    'Too far behind end of log.  Num of bytes to end is %ld' % self.__log_file_iterator.available,
+                    'skipForTooFarBehind', current_time=current_time)
 
         # Keep track of both the position in the iterator and where we are about to add new events to the request,
         # in case we have to roll it back.

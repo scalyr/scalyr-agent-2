@@ -280,17 +280,18 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         return self.__log_matchers
 
-    def add_log_config( self, monitor, log_config ):
+    def add_log_config( self, monitor_name, log_config ):
         """Add the log_config item to the list of paths being watched
-        params: log_config - a log_config object containing the path to be added
+        param: monitor_name - the name of the monitor adding the log config
+        param: log_config - a log_config object containing the path to be added
         returns: an updated log_config object
         """
-        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor_name).copy()
 
         self.__lock.acquire()
         try:
             if log_config['path'] not in self.__all_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor_name ) )
                 self.__pending_log_matchers.append( LogMatcher( self.__config, log_config ) )
                 self.__all_paths[log_config['path']] = 1
             else:

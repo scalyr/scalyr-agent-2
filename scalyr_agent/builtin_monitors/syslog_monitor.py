@@ -793,7 +793,7 @@ class SyslogHandler(object):
                     if info['logger']:
                         # add it to the main scalyr log watcher
                         if watcher and module:
-                            info['log_config'] = watcher.add_log_config( module, info['log_config'] )
+                            info['log_config'] = watcher.add_log_config( module.module_name, info['log_config'] )
 
                         # and keep a record for ourselves
                         self.__docker_loggers[cname] = info
