@@ -169,6 +169,12 @@ class Configuration(object):
             if agent_log is not None:
                 self.__log_configs.append(agent_log)
 
+            # add in the profile log if we have enabled profiling
+            if self.enable_profiling:
+                profile_config = JsonObject(path=self.profile_log_name, copy_from_start=True, staleness_threshold_secs=20*60, parser='scalyrAgentProfiling')
+                self.__verify_log_entry_and_set_defaults(profile_config, description='profile log config')
+                self.__log_configs.append( profile_config )
+
             self.__monitor_configs = list(self.__config.get_json_array('monitors'))
 
         except BadConfiguration, e:
@@ -241,6 +247,26 @@ class Configuration(object):
         self.__verify_monitor_entry_and_set_defaults(monitor_config, context_description=context_description)
 
         return monitor_config
+
+    @property
+    def enable_profiling( self ):
+        return self.__get_config().get_bool( 'enable_profiling' )
+
+    @property
+    def max_profile_interval_minutes( self ):
+        return self.__get_config().get_int( 'max_profile_interval_minutes' )
+
+    @property
+    def profile_duration_minutes( self ):
+        return self.__get_config().get_int( 'profile_duration_minutes' )
+
+    @property
+    def profile_clock( self ):
+        return self.__get_config().get_string( 'profile_clock' )
+
+    @property
+    def profile_log_name( self ):
+        return self.__get_config().get_string( 'profile_log_name' )
 
     # Debug leak flags
     @property
@@ -952,6 +978,13 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults)
+
+        self.__verify_or_set_optional_bool(config, 'enable_profiling', True, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'max_profile_interval_minutes', 120, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 10, description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'profile_clock', 'random', description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'profile_log_name', 'agent.callgrind', description, apply_defaults)
+
 
         #Debug leak flags
         self.__verify_or_set_optional_bool(config, 'disable_leak_send_requests', False, description, apply_defaults)

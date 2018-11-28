@@ -556,7 +556,7 @@ class ContainerChecker( StoppableThread ):
     def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
             if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                log['log_config'] = self.__log_watcher.add_log_config( self.__module.module_name, log['log_config'] )
 
             if self._use_raw_logs:
                 self.raw_logs.append( log )
