@@ -1750,8 +1750,13 @@ class KubernetesMonitor( ScalyrMonitor ):
             @param: interface - an optional interface value to associate with each metric value emitted
             @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        extra = k8s_extra
+        extra = None
         if interface:
+            if k8s_extra is None:
+                extra = {}
+            else:
+                extra = k8s_extra.copy()
+
             extra['interface'] = interface
 
         self.__log_metrics( container, self.__network_metrics, metrics, extra )
