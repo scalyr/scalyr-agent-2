@@ -214,14 +214,14 @@ class _K8sCache( object ):
 
         return result
 
-    def _update( self, current_time ):
+    def _update( self, current_time, debug_tracer=None ):
         """ do a full update of all information from the API
         """
 
         try:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Attempting to update k8s data from API' )
-            query_result = self._processor.query_all_objects()
-            objects = self._process_objects( query_result )
+            query_result = self._processor.query_all_objects(debug_tracer=debug_tracer)
+            objects = self._process_objects( query_result, debug_tracer=debug_tracer )
         except Exception, e:
             self._logger.warning( "Exception occurred when updating k8s %s cache.  Cache was not updated %s\n%s" % (self._object_type, str( e ), traceback.format_exc()) )
             # early return because we don't want to update our cache with bad data,
@@ -237,13 +237,13 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def _update_object( self, namespace, name ):
+    def _update_object( self, namespace, name, debug_tracer=None ):
         """ update a single object, returns the object if found, otherwise return None """
         result = None
         try:
             # query k8s api and process objects
-            obj = self._processor.query_object( namespace, name )
-            result = self._processor.process_object( obj )
+            obj = self._processor.query_object( namespace, name, debug_tracer=debug_tracer )
+            result = self._processor.process_object( obj, debug_tracer=debug_tracer )
         except K8sApiException, e:
             # Don't do anything here.  This means the object we are querying doensn't exist
             # and it's up to the caller to handle this by detecting a None result
@@ -264,7 +264,7 @@ class _K8sCache( object ):
 
         return result
 
-    def _process_objects( self, objects ):
+    def _process_objects( self, objects, debug_tracer=None ):
         """
             Processes the JsonObject returned from querying the objects and calls the _K8sProcessor to create relevant objects for caching,
 
@@ -280,8 +280,11 @@ class _K8sCache( object ):
         # iterate over all objects, getting Info objects and storing them in the result
         # dict, hashed by namespace and object name
         result = {}
+        if debug_tracer is not None:
+            debug_tracer.debug('Processing %d objects' % len(items))
+
         for obj in items:
-            info = self._processor.process_object( obj )
+            info = self._processor.process_object( obj, debug_tracer=debug_tracer )
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Processing %s: %s:%s" % (self._object_type, info.namespace, info.name) )
 
             if info.namespace not in result:
@@ -302,16 +305,18 @@ class _K8sCache( object ):
         """
         return self._last_full_update + self._cache_expiry_secs < current_time
 
-    def update_if_expired( self, current_time ):
+    def update_if_expired( self, current_time, debug_tracer=None ):
         """
         If the cache has expired, perform a full update of all object information from the API
         """
         if self._expired( current_time ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s %s cache expired, performing full update" % self._object_type )
-            self._update( current_time )
+            if debug_tracer is not None:
+                debug_tracer.debug('Expiration seen, updating')
+            self._update( current_time, debug_tracer=debug_tracer )
 
 
-    def _update_if_cache_miss_count_exceeds_threshold( self, current_time ):
+    def _update_if_cache_miss_count_exceeds_threshold( self, current_time, debug_tracer=None ):
         """
             If too many cache misses happen on single object queries within a short timespan
             force an update of all objects.
@@ -321,11 +326,13 @@ class _K8sCache( object ):
         updated = False
         if self._query_cache_miss > self._max_cache_misses:
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Too many k8s %s cache misses, performing full update" % self._object_type )
-            self._update( current_time )
+            if debug_tracer is not None:
+                debug_tracer.debug('Expiration seen, updating')
+            self._update( current_time, debug_tracer=debug_tracer )
             updated = True
         return updated
 
-    def _lookup_object( self, namespace, name, current_time ):
+    def _lookup_object( self, namespace, name, current_time, debug_tracer=None ):
         """ Look to see if the object specified by the namespace and name
         exists within the cached data.
 
@@ -352,7 +359,7 @@ class _K8sCache( object ):
 
         return result
 
-    def lookup( self, namespace, name, current_time=None ):
+    def lookup( self, namespace, name, current_time=None, debug_tracer=None ):
         """ returns info for the object specified by namespace and name
         or None if no object is found in the cache.
 
@@ -364,23 +371,23 @@ class _K8sCache( object ):
         if current_time is None:
             current_time = time.time()
 
-        self.update_if_expired( current_time )
+        self.update_if_expired( current_time, debug_tracer=debug_tracer )
 
         # see if the object exists in the cache and return it if so
-        result = self._lookup_object( namespace, name, current_time )
+        result = self._lookup_object( namespace, name, current_time, debug_tracer=debug_tracer )
         if result:
             self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (self._object_type, namespace, name) )
             return result
 
         # do a full update if too many cache misses in a short period
         # of time
-        if self._update_if_cache_miss_count_exceeds_threshold( current_time ):
+        if self._update_if_cache_miss_count_exceeds_threshold( current_time, debug_tracer=debug_tracer ):
             # object might exist in the cache now, so check again
-            result = self._lookup_object( namespace, name, current_time )
+            result = self._lookup_object( namespace, name, current_time, debug_tracer=debug_tracer )
         else:
             # otherwise query objects individually
             self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (self._object_type, namespace, name) )
-            result = self._update_object( namespace, name )
+            result = self._update_object( namespace, name, debug_tracer=debug_tracer )
 
         return result
 
@@ -421,7 +428,7 @@ class _K8sProcessor( object ):
 
         return None
 
-    def query_all_objects( self ):
+    def query_all_objects( self, debug_tracer=None ):
         """
         Queries the k8s api for all objects of a specific type (determined by subclasses).
         @return - a JsonObject containing at least one element called 'items' which is a JsonArray of JsonObjects
@@ -429,7 +436,7 @@ class _K8sProcessor( object ):
         """
         return JsonObject( { 'items': JsonArray( [] ) } )
 
-    def query_object( self, namespace, name ):
+    def query_object( self, namespace, name, debug_tracer=None ):
         """
         Queries the k8s api for a single object of a specific type (determined by subclasses).
         @param: namespace - the namespace to query in
@@ -438,7 +445,7 @@ class _K8sProcessor( object ):
         """
         return JsonObject( {} )
 
-    def process_object( self, obj ):
+    def process_object( self, obj, debug_tracer=None ):
         """
         Creates a python object based of a JsonObject
         @param obj: A JSON object returned as a response to querying
@@ -454,24 +461,24 @@ class PodProcessor( _K8sProcessor ):
         self._replicasets = replicasets
         self._daemonsets = daemonsets
 
-    def query_all_objects( self ):
+    def query_all_objects( self,  debug_tracer=None):
         """
         Queries the k8s api for all Pods that match self._filter
         @return - a JsonObject containing an element called 'items' which is an JsonArray of Pods
                   returned by the query
         """
-        return self._k8s.query_pods( filter=self._filter )
+        return self._k8s.query_pods( filter=self._filter, debug_tracer=debug_tracer )
 
-    def query_object( self, namespace, name ):
+    def query_object( self, namespace, name, debug_tracer=None ):
         """
         Queries the k8s api for a single pod
         @param: namespace - the namespace to query in
         @param: name - the name of the pod
         @return - a JsonObject cointaining the Pod information returned by the query
         """
-        return self._k8s.query_pod( namespace, name )
+        return self._k8s.query_pod( namespace, name, debug_tracer=debug_tracer )
 
-    def _get_deployment_name_from_owners( self, owners, namespace ):
+    def _get_deployment_name_from_owners( self, owners, namespace, debug_tracer=None ):
         """
             Processes a list of owner references returned from a Pod's metadata to see
             if it is eventually owned by a Deployment, and if so, returns the name of the deployment
@@ -486,14 +493,14 @@ class PodProcessor( _K8sProcessor ):
             name = owner.get( 'name', None )
             if name is None:
                 return None
-            replicaset = self._replicasets.lookup( namespace, name )
+            replicaset = self._replicasets.lookup( namespace, name, debug_tracer=debug_tracer )
 
         if replicaset is None:
             return None
 
         return replicaset.deployment_name
 
-    def _get_daemonset_name_from_owners( self, owners, namespace ):
+    def _get_daemonset_name_from_owners( self, owners, namespace, debug_tracer=None ):
         """
             Processes a list of owner references returned from a Pod's metadata to see
             if it is eventually owned by a daemonset, and if so, returns the name of the daemonset
@@ -508,21 +515,22 @@ class PodProcessor( _K8sProcessor ):
             name = owner.get( 'name', None )
             if name is None:
                 return None
-            daemonset = self._daemonsets.lookup( namespace, name )
+            daemonset = self._daemonsets.lookup( namespace, name, debug_tracer=debug_tracer )
 
         if daemonset is None:
             return None
 
         return daemonset.name
 
-    def process_object( self, obj ):
+    def process_object( self, obj, debug_tracer=None ):
         """ Generate a PodInfo object from a JSON object
         @param pod: The JSON object returned as a response to querying
             a specific pod from the k8s API
 
         @return A PodInfo object
         """
-
+        if debug_tracer is not None:
+            debug_tracer.debug('Processing pod object')
         result = {}
 
         metadata = obj.get( 'metadata', {} )
@@ -534,13 +542,19 @@ class PodProcessor( _K8sProcessor ):
         pod_name = metadata.get( "name", '' )
         namespace = metadata.get( "namespace", '' )
 
-        deployment_name = self._get_deployment_name_from_owners( owners, namespace )
-        daemonset_name = self._get_daemonset_name_from_owners( owners, namespace )
+        if debug_tracer is not None:
+            debug_tracer.debug('Getting deployment name')
+        deployment_name = self._get_deployment_name_from_owners( owners, namespace, debug_tracer=debug_tracer )
+        if debug_tracer is not None:
+            debug_tracer.debug('Getting daemonset name')
+        daemonset_name = self._get_daemonset_name_from_owners( owners, namespace, debug_tracer=debug_tracer )
 
         container_names = []
         for container in spec.get( 'containers', [] ):
             container_names.append( container.get( 'name', 'invalid-container-name' ) )
 
+        if debug_tracer is not None:
+            debug_tracer.debug('Processing annotations')
         try:
             annotations = annotation_config.process_annotations( annotations )
         except BadAnnotationConfig, e:
@@ -551,6 +565,8 @@ class PodProcessor( _K8sProcessor ):
 
         self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % ( str( annotations ) ) )
 
+        if debug_tracer is not None:
+            debug_tracer.debug('Creating PodInfo')
         # create the PodInfo
         result = PodInfo( name=pod_name,
                           namespace=namespace,
@@ -561,6 +577,8 @@ class PodProcessor( _K8sProcessor ):
                           annotations=annotations,
                           deployment_name=deployment_name,
                           daemonset_name=daemonset_name)
+        if debug_tracer is not None:
+            debug_tracer.debug('Finished processing PodInfo')
         return result
 
 class ReplicaSetProcessor( _K8sProcessor ):
@@ -569,32 +587,33 @@ class ReplicaSetProcessor( _K8sProcessor ):
         super( ReplicaSetProcessor, self).__init__( k8s, logger )
         self._deployments = deployments
 
-    def query_all_objects( self ):
+    def query_all_objects( self, debug_tracer=None ):
         """
         Queries the k8s api for all ReplicaSets that match self._filter
         @return - a JsonObject containing an element called 'items' which is an JsonArray of ReplicaSets
                   returned by the query
         """
-        return self._k8s.query_replicasets( filter=self._filter )
+        return self._k8s.query_replicasets( filter=self._filter, debug_tracer=debug_tracer )
 
-    def query_object( self, namespace, name ):
+    def query_object( self, namespace, name, debug_tracer=None ):
         """
         Queries the k8s api for a single ReplicaSet
         @param: namespace - the namespace to query in
         @param: name - the name of the ReplicaSet
         @return - a JsonObject cointaining the ReplicaSet information returned by the query
         """
-        return self._k8s.query_replicaset( namespace, name )
+        return self._k8s.query_replicaset( namespace, name, debug_tracer=debug_tracer )
 
 
-    def process_object( self, obj ):
+    def process_object( self, obj, debug_tracer=None ):
         """ Generate a ReplicaSetInfo object from a JSON object
         @param obj: The JSON object returned as a response to querying
             a specific replicaset from the k8s API
 
         @return A ReplicaSetInfo object
         """
-
+        if debug_tracer is not None:
+            debug_tracer.debug("Processing replica set")
         metadata = obj.get( 'metadata', {} )
         owners = metadata.get( 'ownerReferences', [] )
         namespace = metadata.get( "namespace", '' )
@@ -609,35 +628,39 @@ class ReplicaSetProcessor( _K8sProcessor ):
                 if deployment:
                     deployment_name = deployment.name
 
+        if debug_tracer is not None:
+            debug_tracer.debug("Done processing replica set")
         return ReplicaSetInfo( name, namespace, deployment_name )
 
 class DeploymentProcessor( _K8sProcessor ):
 
-    def query_all_objects( self ):
+    def query_all_objects( self, debug_tracer=None ):
         """
         Queries the k8s api for all Deployments that match self._filter
         @return - a JsonObject containing an element called 'items' which is an JsonArray of Deployments
                   returned by the query
         """
-        return self._k8s.query_deployments( filter=self._filter )
+        return self._k8s.query_deployments( filter=self._filter, debug_tracer=debug_tracer )
 
-    def query_object( self, namespace, name ):
+    def query_object( self, namespace, name, debug_tracer=None ):
         """
         Queries the k8s api for a single deployment
         @param: namespace - the namespace to query in
         @param: name - the name of the deployment
         @return - a JsonObject cointaining the Deployment information returned by the query
         """
-        return self._k8s.query_deployment( namespace, name )
+        return self._k8s.query_deployment( namespace, name, debug_tracer=debug_tracer )
 
 
-    def process_object( self, obj ):
+    def process_object( self, obj, debug_tracer=None ):
         """ Generate a DeploymentInfo object from a JSON object
         @param obj: The JSON object returned as a response to querying
             a specific deployment from the k8s API
 
         @return A DeploymentInfo object
         """
+        if debug_tracer is not None:
+            debug_tracer.debug('Processing deployment')
         metadata = obj.get( 'metadata', {} )
         namespace = metadata.get( "namespace", '' )
         name = metadata.get( "name", '' )
@@ -647,31 +670,34 @@ class DeploymentProcessor( _K8sProcessor ):
 
 class DaemonSetProcessor( _K8sProcessor ):
 
-    def query_all_objects( self ):
+    def query_all_objects( self, debug_tracer=None ):
         """
         Queries the k8s api for all DaemonSets that match self._filter
         @return - a JsonObject containing an element called 'items' which is an JsonArray of DaemonSets
                   returned by the query
         """
-        return self._k8s.query_daemonsets( filter=self._filter )
+        return self._k8s.query_daemonsets( filter=self._filter, debug_tracer=debug_tracer )
 
-    def query_object( self, namespace, name ):
+    def query_object( self, namespace, name, debug_tracer=None ):
         """
         Queries the k8s api for a single DaemonSet
         @param: namespace - the namespace to query in
         @param: name - the name of the DaemonSet
         @return - a JsonObject cointaining the DaemonSet information returned by the query
         """
-        return self._k8s.query_daemonset( namespace, name )
+        return self._k8s.query_daemonset( namespace, name, debug_tracer=debug_tracer )
 
 
-    def process_object( self, obj ):
+    def process_object( self, obj, debug_tracer=None ):
         """ Generate a DaemonSet object from a JSON object
         @param obj: The JSON object returned as a response to querying
             a specific DaemonSet from the k8s API
 
         @return A DaemonSetInfo object
         """
+        if debug_tracer is not None:
+            debug_tracer.debug('Processing deployment')
+
         metadata = obj.get( 'metadata', {} )
         namespace = metadata.get( "namespace", '' )
         name = metadata.get( "name", '' )
@@ -716,7 +742,7 @@ class KubernetesCache( object ):
         self._cache_expiry_secs = cache_expiry_secs
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
-    def daemonset( self, namespace, name, current_time=None ):
+    def daemonset( self, namespace, name, current_time=None, debug_tracer=None ):
         """
             Returns cached daemonset info for the daemonset specified by namespace and name
             or None if no daemonset matches.
@@ -724,9 +750,9 @@ class KubernetesCache( object ):
             Querying the daemonset information is thread-safe but the returned object should
             not be written to.
         """
-        return self._daemonsets.lookup( namespace, name, current_time )
+        return self._daemonsets.lookup( namespace, name, current_time, debug_tracer=debug_tracer )
 
-    def deployment( self, namespace, name, current_time=None ):
+    def deployment( self, namespace, name, current_time=None, debug_tracer=None ):
         """
             Returns cached deployment info for the deployment specified by namespace and name
             or None if no deployment matches.
@@ -734,29 +760,29 @@ class KubernetesCache( object ):
             Querying the deployment information is thread-safe but the returned object should
             not be written to.
         """
-        return self._deployments.lookup( namespace, name, current_time )
+        return self._deployments.lookup( namespace, name, current_time, debug_tracer=debug_tracer )
 
 
-    def pod( self, namespace, name, current_time=None ):
+    def pod( self, namespace, name, current_time=None, debug_tracer=None ):
         """ returns pod info for the pod specified by namespace and name
         or None if no pad matches.
 
         Querying the pod information is thread-safe, but the returned object should
         not be written to.
         """
-        return self._pods.lookup( namespace, name, current_time )
+        return self._pods.lookup( namespace, name, current_time, debug_tracer=debug_tracer )
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
 
-    def get_cluster_name( self, current_time=None ):
+    def get_cluster_name( self, current_time=None, debug_tracer=None ):
         """Returns the cluster name"""
         if current_time is None:
             current_time = time.time()
 
         if self._last_full_update + self._cache_expiry_secs < current_time:
-            self._cluster_name = self._k8s.get_cluster_name()
+            self._cluster_name = self._k8s.get_cluster_name(debug_tracer=debug_tracer)
             self._last_full_update = current_time
 
         return self._cluster_name
@@ -834,16 +860,16 @@ class KubernetesApi( object ):
         return os.environ.get( 'SCALYR_K8S_POD_NAME' ) or os.environ.get( 'HOSTNAME' )
 
 
-    def get_node_name( self, pod_name ):
+    def get_node_name( self, pod_name, debug_tracer=None ):
         """ Gets the node name of the node running the agent """
         node = os.environ.get( 'SCALYR_K8S_NODE_NAME' )
         if not node:
-            pod = self.query_pod( self.namespace, pod_name )
+            pod = self.query_pod( self.namespace, pod_name, debug_tracer=debug_tracer )
             spec = pod.get( 'spec', {} )
             node = spec.get( 'nodeName' )
         return node
 
-    def get_cluster_name( self ):
+    def get_cluster_name( self, debug_tracer=None ):
         """ Returns the name of the cluster running this agent.
 
         There is no way to get this from the k8s API so we check the following:
@@ -861,7 +887,7 @@ class KubernetesApi( object ):
             return cluster
 
         pod_name = self.get_pod_name()
-        pod = self.query_pod( self.namespace, pod_name )
+        pod = self.query_pod( self.namespace, pod_name, debug_tracer=debug_tracer )
 
         if pod is None:
             return None
@@ -878,7 +904,7 @@ class KubernetesApi( object ):
         # We create a random string using the creation timestamp of the default timestamp as a seed.  The idea is that
         # that creation timestamp should never change and all agents connected to the cluster will see the same value
         # for that seed.
-        namespaces = self.query_namespaces()
+        namespaces = self.query_namespaces(debug_tracer=debug_tracer)
 
         # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
         if namespaces and 'items' in namespaces:
@@ -905,9 +931,12 @@ class KubernetesApi( object ):
 
 
 
-    def query_api( self, path, pretty=0 ):
+    def query_api( self, path, pretty=0, debug_tracer=None):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
+        if debug_tracer is not None:
+            debug_tracer.debug('Issuing query for %s' % path)
+
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -916,78 +945,89 @@ class KubernetesApi( object ):
             pretty = '?%s' % pretty
 
         url = self._http_host + path + pretty
+        if debug_tracer is not None:
+            debug_tracer.debug('Starting query with timeout %f' % self._timeout)
+
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
             raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
-        return json_lib.parse( response.text )
+        if debug_tracer is not None:
+            debug_tracer.debug('Response size was %d' % len(response.text))
+        x = json_lib.parse( response.text )
+        if debug_tracer is not None:
+            debug_tracer.debug('Done parsing json')
+        return x
 
-    def query_pod( self, namespace, pod ):
+    def query_pod( self, namespace, pod, debug_tracer=None):
         """Wrapper to query a pod in a namespace"""
         if not pod or not namespace:
             return JsonObject()
 
         query = '/api/v1/namespaces/%s/pods/%s' % (namespace, pod)
-        return self.query_api( query )
+        return self.query_api( query, debug_tracer=debug_tracer )
 
-    def query_pods( self, namespace=None, filter=None ):
+    def query_pods( self, namespace=None, filter=None, debug_tracer=None ):
         """Wrapper to query all pods in a namespace, or across the entire cluster
            A value of None for namespace will search for the pod across the entire cluster.
            This is handled in the 'query_objects' method.  This method is just a convenience
            wrapper that passes in the appropriate urls for pod objects
         """
-        return self.query_objects( '/api/v1/pods', '/api/v1/namespaces/%s/pods', namespace, filter )
+        return self.query_objects( '/api/v1/pods', '/api/v1/namespaces/%s/pods', namespace, filter, debug_tracer=debug_tracer )
 
-    def query_replicaset( self, namespace, name ):
+    def query_replicaset( self, namespace, name, debug_tracer=None ):
         """Wrapper to query a replicaset in a namespace"""
         if not name or not namespace:
             return JsonObject()
 
         query = '/apis/apps/v1/namespaces/%s/replicasets/%s' % (namespace, name)
-        return self.query_api( query )
+        return self.query_api( query, debug_tracer=debug_tracer )
 
-    def query_replicasets( self, namespace=None, filter=None ):
+    def query_replicasets( self, namespace=None, filter=None, debug_tracer=None ):
         """Wrapper to query all replicasets in a namespace, or across the entire cluster
            A value of None for namespace will search for the replicaset across the entire cluster.
            This is handled in the 'query_objects' method.  This method is just a convenience
            wrapper that passes in the appropriate urls for the replicaset objects
         """
-        return self.query_objects( '/apis/apps/v1/replicasets', '/apis/apps/v1/namespaces/%s/replicasets', namespace, filter )
+        return self.query_objects( '/apis/apps/v1/replicasets', '/apis/apps/v1/namespaces/%s/replicasets', namespace,
+                                   filter, debug_tracer=debug_tracer )
 
-    def query_deployment( self, namespace, name ):
+    def query_deployment( self, namespace, name, debug_tracer=None ):
         """Wrapper to query a deployment in a namespace"""
         if not name or not namespace:
             return JsonObject()
 
         query = '/apis/apps/v1/namespaces/%s/deployments/%s' % (namespace, name)
-        return self.query_api( query )
+        return self.query_api( query, debug_tracer=debug_tracer )
 
-    def query_deployments( self, namespace=None, filter=None ):
+    def query_deployments( self, namespace=None, filter=None, debug_tracer=None ):
         """Wrapper to query all deployments in a namespace, or across the entire cluster
            A value of None for namespace will search for the deployment across the entire cluster.
            This is handled in the 'query_objects' method.  This method is just a convenience
            wrapper that passes in the appropriate urls for the deployment objects
         """
-        return self.query_objects( '/apis/apps/v1/deployments', '/apis/apps/v1/namespaces/%s/deployments', namespace, filter )
+        return self.query_objects( '/apis/apps/v1/deployments', '/apis/apps/v1/namespaces/%s/deployments', namespace,
+                                   filter, debug_tracer=debug_tracer )
 
-    def query_daemonset( self, namespace, name ):
+    def query_daemonset( self, namespace, name, debug_tracer=None ):
         """Wrapper to query a daemonset in a namespace"""
         if not name or not namespace:
             return JsonObject()
 
         query = '/apis/apps/v1/namespaces/%s/daemonsets/%s' % (namespace, name)
-        return self.query_api( query )
+        return self.query_api( query, debug_tracer=debug_tracer )
 
-    def query_daemonsets( self, namespace=None, filter=None ):
+    def query_daemonsets( self, namespace=None, filter=None, debug_tracer=None ):
         """Wrapper to query all daemonsets in a namespace, or across the entire cluster
            A value of None for namespace will search for the daemonset across the entire cluster.
            This is handled in the 'query_objects' method.  This method is just a convenience
            wrapper that passes in the appropriate urls for the daemonset objects
         """
-        return self.query_objects( '/apis/apps/v1/daemonsets', '/apis/apps/v1/namespaces/%s/daemonsets', namespace, filter )
+        return self.query_objects( '/apis/apps/v1/daemonsets', '/apis/apps/v1/namespaces/%s/daemonsets', namespace,
+                                   filter, debug_tracer=debug_tracer )
 
-    def query_objects( self, url, namespaced_url, namespace=None, filter=None ):
+    def query_objects( self, url, namespaced_url, namespace=None, filter=None, debug_tracer=None ):
         """Wrapper to query all objects at a url in a namespace, or across the entire cluster"""
         query = url
         if namespace:
@@ -996,11 +1036,11 @@ class KubernetesApi( object ):
         if filter:
             query = "%s?fieldSelector=%s" % (query, urllib.quote( filter ))
 
-        return self.query_api( query )
+        return self.query_api( query, debug_tracer=debug_tracer )
 
-    def query_namespaces( self ):
+    def query_namespaces( self, debug_tracer=None ):
         """Wrapper to query all namespaces"""
-        return self.query_api( '/api/v1/namespaces' )
+        return self.query_api( '/api/v1/namespaces', debug_tracer=debug_tracer )
 
 class KubeletApi( object ):
     """
@@ -1030,17 +1070,23 @@ class KubeletApi( object ):
         self._http_host = "http://%s:%d" % ( host_ip, port )
         self._timeout = 10.0
 
-    def query_api( self, path ):
+    def query_api( self, path, debug_tracer=None ):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
         url = self._http_host + path
+        if debug_tracer is not None:
+            debug_tracer.debug('Issuing kublet api for %s' % path)
         response = self._session.get( url, timeout=self._timeout )
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
             raise KubeletApiException( "Invalid response from Kubelet API when querying '%s': %s" %( path, str( response ) ) )
-        return json_lib.parse( response.text )
-
-    def query_stats( self ):
-        return self.query_api( '/stats/summary' )
+        if debug_tracer is not None:
+            debug_tracer.debug('Kublet response was %d' % len(response.text))
+        x = json_lib.parse( response.text )
+        if debug_tracer is not None:
+            debug_tracer.debug('Finished parsing kublet response')
+        return x
+    def query_stats( self, debug_tracer=None ):
+        return self.query_api( '/stats/summary', debug_tracer=debug_tracer )
 
