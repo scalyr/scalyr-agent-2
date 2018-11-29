@@ -723,6 +723,7 @@ class ScalyrAgent(object):
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'JSON library is %s' % (scalyr_util.get_json_lib()) )
 
                 self.__scalyr_client = self.__create_client()
                 worker_thread = self.__create_worker_thread(self.__config)
