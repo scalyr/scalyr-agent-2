@@ -4,6 +4,6 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 RUN apt-get update && \
     apt-get install -y python-pip && \
     apt-get clean && \
-    pip install yappi
+    pip --no-cache-dir install yappi ujson
 
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
