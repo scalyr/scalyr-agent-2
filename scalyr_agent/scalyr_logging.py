@@ -1185,7 +1185,8 @@ class AgentLogManager(object):
         If self.__stdout is set, then a handler will be created for stdout, otherwise it is a rotating log handler
         for to the self.__main_log_fn file name.
         """
-        self.__main_log_handler = self.__recreate_handler(self.__main_log_handler, self.__main_log_fn, is_debug=False)
+        self.__main_log_handler = self.__recreate_handler(self.__main_log_handler, self.__main_log_fn, is_debug=False,
+                                                          is_main=True)
 
     def __recreate_debug_handler(self):
         """Recreates the debug log handler according to the variables set on this instance.
@@ -1201,7 +1202,7 @@ class AgentLogManager(object):
         """
         self.__debug_log_handler = self.__recreate_handler(self.__debug_log_handler, self.__debug_log_fn, is_debug=True)
 
-    def __recreate_handler(self, previous_handler, file_path, is_debug=False):
+    def __recreate_handler(self, previous_handler, file_path, is_debug=False, is_main=False):
         """Creates and returns an appropriate handler for either the main or debug log.
 
         @param previous_handler: The current handler instance, if any, for this log.  If this is not None, then
@@ -1239,8 +1240,8 @@ class AgentLogManager(object):
         # Limit to only emitting the write log records.
         handler.addFilter(AgentLogFilter(is_debug))
         formatter = AgentLogFormatter()
-        # Rate limit the log if this is the main log since we are copying it up to Scalyr as well.
-        if not is_debug:
+        # Do not rate limit the debug or the main (the main is an exception for this debug build).
+        if not is_debug and not is_main:
             handler.addFilter(RateLimiterLogFilter(formatter, max_write_burst=self.__max_write_burst,
                                                    log_write_rate=self.__log_write_rate))
         handler.setFormatter(formatter)
@@ -1294,6 +1295,32 @@ class AgentLogManager(object):
                                                        file_name[index_of_first+1:]))
         else:
             return '%s%s' % (agent_log, agent_debug_log_file_suffix)
+
+
+class DebugTracer():
+    def __init__(self, logger, line_prefix, interval):
+        self.__logger = logger
+        self.__interval = interval
+        self.__last_sample_time = None
+        self.__is_tracing = False
+        self.__line_prefix = line_prefix
+
+    def debug(self, msg):
+        if self.__is_tracing:
+            self.__logger.info('%s: %s' % (self.__line_prefix, msg))
+
+    def start(self):
+        self.stop()
+        current_time = time.time()
+        if self.__last_sample_time is None or self.__last_sample_time + self.__interval < current_time:
+            self.__is_tracing = True
+            self.__last_sample_time = current_time
+
+    def stop(self):
+        self.__is_tracing = False
+
+    def is_tracing(self):
+        return self.__is_tracing
 
 
 # noinspection PyRedeclaration

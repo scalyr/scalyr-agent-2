@@ -981,7 +981,7 @@ class Configuration(object):
 
         self.__verify_or_set_optional_bool(config, 'enable_profiling', True, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'max_profile_interval_minutes', 120, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 10, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 2, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'profile_clock', 'random', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'profile_log_name', 'agent.callgrind', description, apply_defaults)
 
