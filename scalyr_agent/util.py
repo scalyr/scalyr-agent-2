@@ -55,6 +55,58 @@ try:
 except ImportError:
     uuid = None
 
+def _fallback_json_encode( obj ):
+    return json_lib.serialize( obj )
+
+def _fallback_json_decode( text ):
+    return json_lib.parse( text )
+
+_json_lib = 'json_lib'
+
+_json_encode = _fallback_json_encode
+_json_decode = _fallback_json_decode
+
+try:
+    import ujson
+    _json_lib = 'ujson'
+    json_encode = ujson.dumps
+    json_decode = ujson.loads
+except ImportError:
+    try:
+        import json
+        _json_lib = 'json'
+        json_encode = json.dumps
+        json_decode = json.loads
+    except:
+        pass
+
+def get_json_lib():
+    return _json_lib
+
+def json_encode( obj ):
+    """ Encodes an object as json """
+    return _json_encode( obj )
+
+def json_decode( text ):
+    """ Decodes text containing json and returns a dict containing the contents """
+    return _json_decode( text )
+
+def value_to_bool( value ):
+    value_type = type(value)
+    if value_type is bool:
+        return value
+    elif value_type is int:
+        return self.__num_to_bool(field, float(value))
+    elif value_type is long:
+        return self.__num_to_bool(field, float(value))
+    elif value_type is float:
+        return self.__num_to_bool(field, value)
+    elif value_type is str or value_type is unicode:
+        return not value == "" and not value == "f" and not value.lower() == "false"
+    elif value is None:
+        return False
+
+    raise ValueError( "Cannot convert %s value to bool: %s" % (str(value_type), str( value ) ))
 
 def read_file_as_json(file_path):
     """Reads the entire file as a JSON value and return it.

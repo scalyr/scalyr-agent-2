@@ -16,7 +16,6 @@
 
 __author__ = 'imron@scalyr.com'
 
-import json
 import re
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject

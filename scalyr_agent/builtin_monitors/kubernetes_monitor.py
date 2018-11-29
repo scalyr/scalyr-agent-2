@@ -33,7 +33,6 @@ import time
 import threading
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
-import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
@@ -458,7 +457,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                         logger.warn( "Missing kubernetes label '%s' in container %s" % (label, short_cid), limit_once_per_x_secs=300,limit_key="docker-inspect-k8s-%s" % short_cid)
 
                                 if missing_field:
-                                    logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (json_lib.serialize(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
+                                    logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
                                 if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
                                     if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
@@ -584,6 +583,8 @@ class ContainerChecker( StoppableThread ):
                 max_cache_misses=self.__k8s_max_cache_misses,
                 cache_miss_interval=self.__k8s_cache_miss_interval,
                 filter=self.__k8s_filter )
+
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
             self.containers = _get_containers(self.__client, ignore_container=self.container_id,
                                               glob_list=self.__glob_list, include_log_path=True,
@@ -1659,7 +1660,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """ Log docker metrics based on the JSON response returned from querying the Docker API
 
             @param: container - name of the container the log originated from
-            @param: metrics - a dict/JsonObject of metrics keys/values to emit
+            @param: metrics - a dict of metrics keys/values to emit
             @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
         """
         for key, value in metrics.iteritems():
