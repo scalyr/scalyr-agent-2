@@ -1304,12 +1304,14 @@ class DebugTracer():
         self.__last_sample_time = None
         self.__is_tracing = False
         self.__line_prefix = line_prefix
+        self.__count = 0
 
     def debug(self, msg):
         if self.__is_tracing:
-            self.__logger.info('%s: %s' % (self.__line_prefix, msg))
+            self.__logger.info('%s[%d]: %s' % (self.__line_prefix, self.__count, msg))
 
     def start(self):
+        self.__count += 1
         self.stop()
         current_time = time.time()
         if self.__last_sample_time is None or self.__last_sample_time + self.__interval < current_time:

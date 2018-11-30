@@ -200,6 +200,7 @@ class _K8sCache( object ):
         self._max_cache_misses = max_cache_misses
         self._cache_miss_interval = cache_miss_interval
         self._query_cache_miss = 0
+        self._update_count = 0
 
     def shallow_copy(self):
         """Returns a shallow copy of all the cached objects dict"""
@@ -232,6 +233,7 @@ class _K8sCache( object ):
         try:
             self._objects = objects
             self._last_full_update = current_time
+            self._update_count += 1
         finally:
             self._lock.release()
 
@@ -311,8 +313,10 @@ class _K8sCache( object ):
         if self._expired( current_time ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s %s cache expired, performing full update" % self._object_type )
             if debug_tracer is not None:
-                debug_tracer.debug('Expiration seen, updating')
+                debug_tracer.debug('Expiration seen, updating %s' % self._object_type)
             self._update( current_time, debug_tracer=debug_tracer )
+            if debug_tracer is not None:
+                debug_tracer.debug('Finished updating %s.  Count is %d' % (self._object_type, self._update_count))
 
 
     def _update_if_cache_miss_count_exceeds_threshold( self, current_time, debug_tracer=None ):

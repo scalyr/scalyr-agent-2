@@ -69,14 +69,14 @@ _json_decode = _fallback_json_decode
 try:
     import ujson
     _json_lib = 'ujson'
-    json_encode = ujson.dumps
-    json_decode = ujson.loads
+    _json_encode = ujson.dumps
+    _json_decode = ujson.loads
 except ImportError:
     try:
         import json
         _json_lib = 'json'
-        json_encode = json.dumps
-        json_decode = json.loads
+        _json_encode = json.dumps
+        _json_decode = json.loads
     except:
         pass
 
