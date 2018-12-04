@@ -518,7 +518,7 @@ class ContainerChecker( StoppableThread ):
 
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
-        name = self._config.get( 'container_name' )
+        self.__name = self._config.get( 'container_name' )
 
         self.__use_v2_attributes = self._config.get('k8s_use_v2_attributes')
         self.__use_v1_and_v2_attributes = self._config.get('k8s_use_v1_and_v2_attributes')
@@ -527,11 +527,10 @@ class ContainerChecker( StoppableThread ):
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
-        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+        self.__client = None
 
-        self.container_id = self.__get_scalyr_container_id( self.__client, name )
+        self.container_id = None
 
-        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
         self.__log_path = log_path
 
         self.__host_hostname = host_hostname
@@ -553,10 +552,7 @@ class ContainerChecker( StoppableThread ):
         self.containers = {}
         self.__include_all = include_all
 
-        if self._config.get( 'verify_k8s_api_queries' ):
-            self.__k8s = KubernetesApi()
-        else:
-            self.__k8s = KubernetesApi( ca_file=None )
+        self.__k8s = None
 
         self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
         self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
@@ -573,9 +569,17 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            self.__k8s_filter = self._build_k8s_filter()
+            if self._config.get( 'verify_k8s_api_queries' ):
+                self.__k8s = KubernetesApi()
+            else:
+                self.__k8s = KubernetesApi( ca_file=None )
 
+            self.__k8s_filter = self._build_k8s_filter()
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s filter for pod '%s' is '%s'" % (self.__k8s.get_pod_name(), self.__k8s_filter) )
+
+            self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+
+            self.container_id = self.__get_scalyr_container_id( self.__client, self.__name )
 
             # create the k8s cache
             self.k8s_cache = KubernetesCache( self.__k8s, self._logger,
@@ -592,7 +596,7 @@ class ContainerChecker( StoppableThread ):
                                               k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
 
             # if querying the docker api fails, set the container list to empty
-            if self.containers == None:
+            if self.containers is None:
                 self.containers = {}
 
             self.raw_logs = []
