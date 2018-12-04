@@ -102,9 +102,13 @@ class Profiler( object ):
             os.remove( path )
         stats.save( path, 'callgrind' )
 
+        lines = 0
+        for line in open(path):
+            lines += 1
+
         f = open( path, "a" )
         if f:
-            f.write( "\n" )
+            f.write( "\n# %s, %s clock, total lines: %d\n" % (path, self._profile_clock, lines) )
             f.close()
 
         yappi.clear_stats()
