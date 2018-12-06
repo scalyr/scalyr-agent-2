@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.39 "Orion" - Dec 5, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 5, 2018 16:15 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 5, 2018 16:50 -0800
 --->
 
 Bugs
