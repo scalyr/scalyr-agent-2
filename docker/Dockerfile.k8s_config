@@ -1,5 +1,5 @@
 # Dockerfile for building an image of scalyr/scalyr-k8s-agent with custom configuration
 # files for the Scalyr Agent.
-FROM scalyr/scalyr-docker-agent-k8s-preview:latest
+FROM scalyr/scalyr-k8s-agent:latest
 COPY k8s-config/agent.d/* /etc/scalyr-agent-2/agent.d/
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
