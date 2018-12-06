@@ -678,6 +678,44 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.api_key, 'hibye')
 
+    def test_substitution_with_default(self):
+        self.__write_file_with_separator_conversion(""" {
+            import_vars: [ {var: "UNDEFINED_VAR", default: "foo" } ],
+            api_key: "hi$UNDEFINED_VAR",
+          }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hifoo')
+
+    def test_substitution_with_unused_default(self):
+        self.__write_file_with_separator_conversion(""" {
+            import_vars: [ {var: "TEST_VAR2", default: "foo" } ],
+            api_key: "hi$TEST_VAR2",
+          }
+        """)
+
+        os.environ['TEST_VAR2'] = 'bar'
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hibar')
+
+    def test_substitution_with_empty_var(self):
+        self.__write_file_with_separator_conversion(""" {
+            import_vars: [ {var: "TEST_VAR2", default: "foo" } ],
+            api_key: "hi$TEST_VAR2",
+          }
+        """)
+
+        os.environ['TEST_VAR2'] = ''
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        self.assertEquals(config.api_key, 'hifoo')
+
     def test_api_key_override_no_override(self):
         self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],

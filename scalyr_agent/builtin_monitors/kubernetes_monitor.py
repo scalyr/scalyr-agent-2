@@ -33,7 +33,6 @@ import time
 import threading
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
-import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
@@ -174,6 +173,14 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
                       'Optional (defaults to False). If true, then every gather_sample interval, metrics will be collected '
                       'from the docker and k8s APIs showing all discovered containers and pods. This is mostly a debugging aid '
                       'and there are performance implications to always leaving this enabled', convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'include_daemonsets_as_deployments',
+                      'Optional (defaults to True). If true, then the logs for Daemonsets will be uploaded to Scalyr but '
+                      'will be called Deployments in the Scalyr Web UI.  This means they will be listed as a deployment and'
+                      'will have the k8s-deployment label.  This is a temporary hack because the UI does not yet have '
+                      'the ability to display Daemonsets.  In the future, it will be supported, but will break anyone who '
+                      'relies on the k8s-deployment label.',
+                      convert_to=bool, default=True)
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -450,7 +457,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                         logger.warn( "Missing kubernetes label '%s' in container %s" % (label, short_cid), limit_once_per_x_secs=300,limit_key="docker-inspect-k8s-%s" % short_cid)
 
                                 if missing_field:
-                                    logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (json_lib.serialize(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
+                                    logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
                                 if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
                                     if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
@@ -504,14 +511,14 @@ class ContainerChecker( StoppableThread ):
     """
 
     def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
-                  include_all, include_deployment_info, namespaces_to_ignore ):
+                  include_all, include_deployment_info, include_daemonsets_as_deployments, namespaces_to_ignore ):
 
         self._config = config
         self._logger = logger
 
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
-        name = self._config.get( 'container_name' )
+        self.__name = self._config.get( 'container_name' )
 
         self.__use_v2_attributes = self._config.get('k8s_use_v2_attributes')
         self.__use_v1_and_v2_attributes = self._config.get('k8s_use_v1_and_v2_attributes')
@@ -520,11 +527,10 @@ class ContainerChecker( StoppableThread ):
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
-        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+        self.__client = None
 
-        self.container_id = self.__get_scalyr_container_id( self.__client, name )
+        self.container_id = None
 
-        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
         self.__log_path = log_path
 
         self.__host_hostname = host_hostname
@@ -540,13 +546,13 @@ class ContainerChecker( StoppableThread ):
         # a pod (cluster name, deployment name, deployment labels)
         self.__include_deployment_info = include_deployment_info
 
+        # This is currently an experimental feature, that uploads DaemonSet information as a 'Deployment'
+        self.__include_daemonsets_as_deployments = include_daemonsets_as_deployments
+
         self.containers = {}
         self.__include_all = include_all
 
-        if self._config.get( 'verify_k8s_api_queries' ):
-            self.__k8s = KubernetesApi()
-        else:
-            self.__k8s = KubernetesApi( ca_file=None )
+        self.__k8s = None
 
         self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
         self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
@@ -563,9 +569,17 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            self.__k8s_filter = self._build_k8s_filter()
+            if self._config.get( 'verify_k8s_api_queries' ):
+                self.__k8s = KubernetesApi()
+            else:
+                self.__k8s = KubernetesApi( ca_file=None )
 
+            self.__k8s_filter = self._build_k8s_filter()
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s filter for pod '%s' is '%s'" % (self.__k8s.get_pod_name(), self.__k8s_filter) )
+
+            self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
+
+            self.container_id = self.__get_scalyr_container_id( self.__client, self.__name )
 
             # create the k8s cache
             self.k8s_cache = KubernetesCache( self.__k8s, self._logger,
@@ -574,13 +588,15 @@ class ContainerChecker( StoppableThread ):
                 cache_miss_interval=self.__k8s_cache_miss_interval,
                 filter=self.__k8s_filter )
 
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
+
             self.containers = _get_containers(self.__client, ignore_container=self.container_id,
                                               glob_list=self.__glob_list, include_log_path=True,
                                               k8s_cache=self.k8s_cache, k8s_include_by_default=self.__include_all,
                                               k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
 
             # if querying the docker api fails, set the container list to empty
-            if self.containers == None:
+            if self.containers is None:
                 self.containers = {}
 
             self.raw_logs = []
@@ -589,7 +605,7 @@ class ContainerChecker( StoppableThread ):
 
             #create and start the DockerLoggers
             self.__start_docker_logs( self.docker_logs )
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting docker monitor for Scalyr" )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting k8s monitor for Scalyr" )
             self.__thread.start()
 
         except Exception, e:
@@ -945,6 +961,13 @@ class ContainerChecker( StoppableThread ):
                         if self.__include_deployment_info:
                             container_attributes['_k8s_dn'] = deployment.name
                             container_attributes['_k8s_dl'] = deployment.flat_labels
+                elif pod.daemonset_name is not None and self.__include_daemonsets_as_deployments:
+                    daemonset = k8s_cache.daemonset( pod.namespace, pod.daemonset_name )
+                    if daemonset:
+                        rename_vars['deployment_name'] = daemonset.name
+                        if self.__include_deployment_info:
+                            container_attributes['_k8s_dn'] = daemonset.name
+                            container_attributes['_k8s_dl'] = daemonset.flat_labels
 
                 # get the cluster name
                 cluster_name = k8s_cache.get_cluster_name()
@@ -1463,11 +1486,14 @@ class KubernetesMonitor( ScalyrMonitor ):
         # deployment labels)
         self.__include_deployment_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
 
+        # Treat DaemonSets as Deployments
+        self.__include_daemonsets_as_deployments = self._config.get('include_daemonsets_as_deployments')
+
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
-                                                         self.__include_all, self.__include_deployment_info,
+                                                         self.__include_all, self.__include_deployment_info, self.__include_daemonsets_as_deployments,
                                                          self.__namespaces_to_ignore)
 
         # Metrics provided by the kubelet API.
@@ -1582,8 +1608,13 @@ class KubernetesMonitor( ScalyrMonitor ):
             @param: interface - an optional interface value to associate with each metric value emitted
             @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        extra = k8s_extra
+        extra = None
         if interface:
+            if k8s_extra is None:
+                extra = {}
+            else:
+                extra = k8s_extra.copy()
+
             extra['interface'] = interface
 
         self.__log_metrics( container, self.__network_metrics, metrics, extra )
@@ -1633,7 +1664,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """ Log docker metrics based on the JSON response returned from querying the Docker API
 
             @param: container - name of the container the log originated from
-            @param: metrics - a dict/JsonObject of metrics keys/values to emit
+            @param: metrics - a dict of metrics keys/values to emit
             @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
         """
         for key, value in metrics.iteritems():
@@ -1678,12 +1709,19 @@ class KubernetesMonitor( ScalyrMonitor ):
                      the specified pod, or an empty dict if the pod is not part of a deployment
         """
         k8s_extra = {}
-        if k8s_cache and pod is not None and pod.deployment_name is not None:
-            deployment = k8s_cache.deployment( pod.namespace, pod.deployment_name )
-            if deployment:
-                k8s_extra = {
-                    'k8s-deployment': deployment.name
-                }
+        if k8s_cache and pod is not None:
+            if pod.deployment_name is not None:
+                deployment = k8s_cache.deployment( pod.namespace, pod.deployment_name )
+                if deployment:
+                    k8s_extra = {
+                        'k8s-deployment': deployment.name
+                    }
+            elif pod.daemonset_name is not None and self.__include_daemonsets_as_deployments:
+                daemonset = k8s_cache.daemonset( pod.namespace, pod.daemonset_name )
+                if daemonset:
+                    k8s_extra = {
+                        'k8s-deployment': daemonset.name
+                    }
         return k8s_extra
 
     def __get_k8s_deployment_info( self, container, k8s_cache ):
@@ -1904,6 +1942,11 @@ class KubernetesMonitor( ScalyrMonitor ):
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
 
+        global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_deployments %s, '
+                        'report_daemonsets %s, report_metrics %s' % (','.join(self.__namespaces_to_ignore),
+                                                                     str(self.__include_deployment_info),
+                                                                     str(self.__include_daemonsets_as_deployments),
+                                                                     str(self.__report_container_metrics)))
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):

@@ -496,7 +496,7 @@ class LogFileIterator(object):
         # check to see if we need to parse the line as json
         if self.__parse_as_json:
             try:
-                json = json_lib.parse(result.line)
+                json = scalyr_util.json_decode( result.line )
 
                 line = None
                 attrs = {}

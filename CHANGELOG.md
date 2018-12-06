@@ -1,10 +1,33 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.39 "Orion" - Dec 5, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 5, 2018 16:15 -0800
+--->
+
+Bugs
+* Adjusted unicode decoding to be more tolerant of bad input.
+* Added support for optimized json parsing library.  Changed k8s agent to use optimized version.
+
+## 2.0.38 "Nox" - Nov 9, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 9, 2018 16:00 -0800
+--->
+
+Features
+
+* Added ability to specify default values for environment variables imported in configuration files.
+
+Bugs
+* Added temporary hack to new Kubernetes support to upload Daemonsets as Deployments.
+
 ## 2.0.37 "Ly-Cilph" - Oct 19, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 19, 2018 14:30 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 19, 2018 15:00 -0700
 --->
 
 Features
