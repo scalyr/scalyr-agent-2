@@ -131,6 +131,11 @@ define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
                       'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
 
+define_config_option( __monitor__, 'k8s_ignore_pod_sandboxes',
+                      'Optional (defaults to True). If True then all containers with the label '
+                      '`io.kubernetes.docker.type` equal to `podsandbox` are excluded from the'
+                      'logs being collected', convert_to=bool, default=True)
+
 define_config_option( __monitor__, 'k8s_include_all_containers',
                       'Optional (defaults to True). If True, all containers in all pods will be monitored by the kubernetes monitor '
                       'unless they have an include: false or exclude: true annotation. '
@@ -375,7 +380,7 @@ _global_container_tracer = scalyr_logging.DebugTracer(global_log, 'debug_k8s(get
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
                     only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, k8s_cache=None,
-                    k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None,
+                    k8s_include_by_default=True, k8s_namespaces_to_exclude=None, ignore_pod_sandboxes=True, current_time=None,
                     debug_k8s=False, debug_tracer=None):
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
         @param client: A docker.Client object
@@ -392,6 +397,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         @param k8s_include_by_default: Boolean.  If True, then all k8s containers are included by default, unless an include/exclude annotation excludes them.
             If False, then all k8s containers are excluded by default, unless an include/exclude annotation includes them.
         @param k8s_namespaces_to_exclude: List  The of namespaces whose containers should be excluded.
+        @param ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
         @param current_time.  Timestamp since the epoch
     """
     if logger is None:
@@ -439,6 +445,14 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             if len( container['Names'] ) > 0:
                 debug_tracer.debug('Further processing in _get_containers')
                 name = container['Names'][0].lstrip('/')
+
+                # ignore any pod sandbox containers
+                if ignore_pod_sandboxes:
+                    container_type = container.get( 'Labels', {} ).get( 'io.kubernetes.docker.type', '' )
+                    if container_type == 'podsandbox':
+                        if debug_k8s:
+                            global_log.info('debug_k8s: cid=%s ignored podsandbox container' % cid)
+                        continue
 
                 add_container = True
 
@@ -541,7 +555,8 @@ class ContainerChecker( StoppableThread ):
     """
 
     def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
-                  include_all, include_deployment_info, include_daemonsets_as_deployments, namespaces_to_ignore ):
+                  include_all, include_deployment_info, include_daemonsets_as_deployments, namespaces_to_ignore,
+                  ignore_pod_sandboxes ):
 
         self._config = config
         self._logger = logger
@@ -573,6 +588,8 @@ class ContainerChecker( StoppableThread ):
 
         # The namespace whose logs we should not collect.
         self.__namespaces_to_ignore = namespaces_to_ignore
+
+        self.__ignore_pod_sandboxes = ignore_pod_sandboxes
 
         # This is currently an experimental feature.  Including deployment information for every event uploaded about
         # a pod (cluster name, deployment name, deployment labels)
@@ -1622,6 +1639,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         for x in self._config.get('k8s_ignore_namespaces').split():
             self.__namespaces_to_ignore.append(x.strip())
 
+        self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
 
@@ -1649,7 +1667,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
                                                          self.__include_all, self.__include_deployment_info, self.__include_daemonsets_as_deployments,
-                                                         self.__namespaces_to_ignore)
+                                                         self.__namespaces_to_ignore, self.__ignore_pod_sandboxes )
 
         # Metrics provided by the kubelet API.
         self.__k8s_pod_network_metrics = {
