@@ -954,13 +954,15 @@ def _calculate_per_thread_extra_bytes():
     threads = []
     test_string = 'A'
     for i in range(3):
-        sizes_by_entries.append(len(json_lib.serialize(threads)))
+        sizes_by_entries.append(len(scalyr_util.json_encode(threads)))
+
         # Add in another thread for the next round through the loop.
         threads.append({'id': test_string, 'name': test_string})
 
     # Now go back and calculate the deltas between the different cases.  We have to remember to subtract
     # out the length due to the id and name strings.
-    test_string_len = len(json_lib.serialize(test_string))
+
+    test_string_len = len(scalyr_util.json_encode(test_string))
     result = []
     for i in range(1, 3):
         result.append(sizes_by_entries[i] - sizes_by_entries[i - 1] - 2 * test_string_len)
@@ -1022,7 +1024,7 @@ class PostFixBuffer(object):
         @rtype: str
         """
         result = self.__format.replace('TIMESTAMP', str(self.__client_timestamp))
-        result = result.replace('THREADS', json_lib.serialize(self.__threads))
+        result = result.replace('THREADS', scalyr_util.json_encode(self.__threads))
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
         # assert here to make sure it's always equal (it should be) but we don't want errors to cause issues for
@@ -1074,7 +1076,7 @@ class PostFixBuffer(object):
         @rtype: bool
         """
         # Calculate the size difference.  It is at least the size of taken by the serialized strings.
-        size_difference = len(json_lib.serialize(thread_name)) + len(json_lib.serialize(thread_id))
+        size_difference = len(scalyr_util.json_encode(thread_name)) + len(scalyr_util.json_encode(thread_id))
 
         # Use the __per_thread_extra_bytes to calculate the additional bytes that will be consumed by serializing
         # the JSON object containing the thread id and name.  The number of extra bytes depends on whether or not
@@ -1226,13 +1228,13 @@ class Event(object):
         tmp_buffer.write('{')
         if thread_id is not None:
             tmp_buffer.write('thread:')
-            json_lib.serialize(thread_id, use_fast_encoding=True, output=tmp_buffer)
+            tmp_buffer.write( scalyr_util.json_encode(thread_id) )
             tmp_buffer.write(', ')
         if attributes is not None:
             # Serialize the attributes object, but we have to remove the closing brace because we want to
             # insert more fields.
             tmp_buffer.write('attrs:')
-            json_lib.serialize(attributes, use_fast_encoding=True, output=tmp_buffer)
+            tmp_buffer.write( scalyr_util.json_encode(attributes) )
             _rewind_past_close_curly(tmp_buffer)
             tmp_buffer.write(',')
         else:

@@ -85,7 +85,7 @@ def get_json_lib():
 
 def json_encode( obj ):
     """ Encodes an object as json """
-    return _json_encode( obj )
+    return _json_encode( obj, sort_keys=True )
 
 def json_decode( text ):
     """ Decodes text containing json and returns a dict containing the contents """

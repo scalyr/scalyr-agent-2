@@ -36,7 +36,7 @@ ESCAPES = {
 }
 
 
-def serialize(value, output=None, use_fast_encoding=False, use_length_prefix_string=False):
+def serialize(value, output=None, use_fast_encoding=False, use_length_prefix_string=False, sort_keys=True):
     """Serializes the specified value as JSON.
 
     @param value: The value to write. Can be a bool, int, long, float, dict, and list. If this value is a list or dict,
@@ -44,6 +44,8 @@ def serialize(value, output=None, use_fast_encoding=False, use_length_prefix_str
     @param output: If specified, this should be a StringIO object to collect the output.
     @param use_fast_encoding: To be used only when JSON is going to be sent as part of a request to the Scalyr servers.
         We support a non-spec variant that allows us to skip a UTF-8 decoding step.
+    @param sort_keys: This parameter is ignored and keys are always sorted.  It is for compatibility with the ujson and json libs
+        so their respective 'serialize' functions can be called interchangeably.
 
     @return: The string containing the JSON if the output argument is None.  Otherwise, the results are
         written to output and the output object is returned.

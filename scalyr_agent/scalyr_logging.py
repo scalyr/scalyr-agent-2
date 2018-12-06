@@ -34,6 +34,7 @@ import re
 import sys
 import time
 import threading
+import scalyr_agent.util as util
 
 from cStringIO import StringIO
 from scalyr_agent.util import RateLimiter
@@ -304,7 +305,7 @@ class AgentLogger(logging.Logger):
         if not type(metric_value) in (str, unicode, bool, int, long, float):
             raise UnsupportedValueType(metric_name=metric_name, metric_value=metric_value)
 
-        string_buffer.write("%s %s" % (metric_name, json_lib.serialize(metric_value)))
+        string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
 
         if extra_fields is not None:
             for field_name in extra_fields:
@@ -317,7 +318,7 @@ class AgentLogger(logging.Logger):
 
                 field_name = self.__force_valid_metric_or_field_name(field_name, is_metric=False)
 
-                string_buffer.write(' %s=%s' % (field_name, json_lib.serialize(field_value)))
+                string_buffer.write(' %s=%s' % (field_name, util.json_encode(field_value)))
 
         self.info(string_buffer.getvalue(), metric_log_for_monitor=monitor, monitor_id_override=monitor_id_override)
         string_buffer.close()

@@ -952,6 +952,7 @@ class KubernetesApi( object ):
             debug_tracer.debug('Starting query with timeout %f' % self._timeout)
 
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
+        response.encoding = "utf-8"
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
@@ -1080,6 +1081,7 @@ class KubeletApi( object ):
         if debug_tracer is not None:
             debug_tracer.debug('Issuing kublet api for %s' % path)
         response = self._session.get( url, timeout=self._timeout )
+        response.encoding = "utf-8"
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
