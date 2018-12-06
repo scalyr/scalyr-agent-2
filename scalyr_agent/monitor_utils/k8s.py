@@ -202,6 +202,9 @@ class _K8sCache( object ):
         self._query_cache_miss = 0
         self._update_count = 0
 
+        self._paused = False
+        self._pause_key = None
+
     def shallow_copy(self):
         """Returns a shallow copy of all the cached objects dict"""
         result = {}
@@ -213,6 +216,41 @@ class _K8sCache( object ):
             self._lock.release()
 
         return result
+
+    def pause( self, key, update_if_expired, current_time, debug_tracer=None ):
+        if update_if_expired:
+            self.update_if_expired( current_time, debug_tracer )
+
+        paused = False
+        self._lock.acquire()
+        try:
+            if not self._paused:
+                self._paused = True
+                self._pause_key = key
+                paused = True
+        finally:
+            self._lock.release()
+
+        if paused and debug_tracer:
+            debug_tracer.debug('Pausing %s cache - %s' % (self._object_type, key) )
+
+    def unpause( self, key, debug_tracer=None ):
+        unpaused = False
+        self._lock.acquire()
+        try:
+            if self._paused and self._pause_key == key:
+                self._pause_key = None
+                self._paused = False
+                unpaused = True
+            else:
+                debug_tracer.debug('Not unpausing %s, %s, %s' % (str(self._paused), self._pause_key, key) )
+        finally:
+            self._lock.release()
+
+        if unpaused and debug_tracer:
+            debug_tracer.debug('Unpausing %s cache - %s' % (self._object_type, key) )
+
+
 
     def _update( self, current_time, debug_tracer=None ):
         """ do a full update of all information from the API
@@ -300,6 +338,14 @@ class _K8sCache( object ):
 
         return result
 
+    def _is_paused( self ):
+        result = False
+        self._lock.acquire()
+        try:
+            result = self._paused
+        finally:
+            self._lock.release()
+        return result
 
     def _expired( self, current_time ):
         """ returns a boolean indicating whether the cache has expired
@@ -310,7 +356,9 @@ class _K8sCache( object ):
         """
         If the cache has expired, perform a full update of all object information from the API
         """
-        if self._expired( current_time ):
+        paused = self._is_paused()
+
+        if not paused and self._expired( current_time ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s %s cache expired, performing full update" % self._object_type )
             if debug_tracer is not None:
                 debug_tracer.debug('Expiration seen, updating %s' % self._object_type)
@@ -327,7 +375,8 @@ class _K8sCache( object ):
         """
 
         updated = False
-        if self._query_cache_miss > self._max_cache_misses:
+        paused = self._is_paused()
+        if not paused and self._query_cache_miss > self._max_cache_misses:
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Too many k8s %s cache misses, performing full update" % self._object_type )
             if debug_tracer is not None:
                 debug_tracer.debug('Expiration seen, updating')
@@ -744,6 +793,21 @@ class KubernetesCache( object ):
         self._cluster_name = None
         self._cache_expiry_secs = cache_expiry_secs
         self._last_full_update = time.time() - cache_expiry_secs - 1
+
+    def pause( self, key=None, update_if_expired=True, current_time=None, debug_tracer=None ):
+        if current_time is None:
+            current_time = time.time()
+
+        self._daemonsets.pause( key, update_if_expired, current_time, debug_tracer )
+        self._deployments.pause( key, update_if_expired, current_time, debug_tracer )
+        self._replicasets.pause( key, update_if_expired, current_time, debug_tracer )
+        self._pods.pause( key, update_if_expired, current_time, debug_tracer )
+
+    def unpause( self, key=None, debug_tracer=None ):
+        self._daemonsets.unpause( key, debug_tracer )
+        self._deployments.unpause( key, debug_tracer )
+        self._replicasets.unpause( key, debug_tracer )
+        self._pods.unpause( key, debug_tracer )
 
     def daemonset( self, namespace, name, current_time=None, debug_tracer=None ):
         """
