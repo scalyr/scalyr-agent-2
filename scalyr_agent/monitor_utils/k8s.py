@@ -201,6 +201,9 @@ class _K8sCache( object ):
         self._cache_miss_interval = cache_miss_interval
         self._query_cache_miss = 0
 
+        self._paused = False
+        self._pause_key = None
+
     def shallow_copy(self):
         """Returns a shallow copy of all the cached objects dict"""
         result = {}
@@ -213,7 +216,35 @@ class _K8sCache( object ):
 
         return result
 
-    def _update( self, current_time ):
+
+    def pause( self, key, update_if_expired, current_time ):
+        if update_if_expired:
+            self.update_if_expired( current_time )
+
+        paused = False
+        self._lock.acquire()
+        try:
+            if not self._paused:
+                self._paused = True
+                self._pause_key = key
+                paused = True
+        finally:
+            self._lock.release()
+
+    def unpause( self, key):
+        unpaused = False
+        self._lock.acquire()
+        try:
+            if self._paused and self._pause_key == key:
+                self._pause_key = None
+                self._paused = False
+                unpaused = True
+        finally:
+            self._lock.release()
+
+
+
+    def _update( self, current_time):
         """ do a full update of all information from the API
         """
 
@@ -295,6 +326,14 @@ class _K8sCache( object ):
 
         return result
 
+    def _is_paused( self ):
+        result = False
+        self._lock.acquire()
+        try:
+            result = self._paused
+        finally:
+            self._lock.release()
+        return result
 
     def _expired( self, current_time ):
         """ returns a boolean indicating whether the cache has expired
@@ -305,7 +344,9 @@ class _K8sCache( object ):
         """
         If the cache has expired, perform a full update of all object information from the API
         """
-        if self._expired( current_time ):
+        paused = self._is_paused()
+
+        if not paused and self._expired( current_time ):
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "k8s %s cache expired, performing full update" % self._object_type )
             self._update( current_time )
 
@@ -318,7 +359,8 @@ class _K8sCache( object ):
         """
 
         updated = False
-        if self._query_cache_miss > self._max_cache_misses:
+        paused = self._is_paused()
+        if not paused and self._query_cache_miss > self._max_cache_misses:
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Too many k8s %s cache misses, performing full update" % self._object_type )
             self._update( current_time )
             updated = True
@@ -715,6 +757,21 @@ class KubernetesCache( object ):
         self._cache_expiry_secs = cache_expiry_secs
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
+    def pause( self, key=None, update_if_expired=True, current_time=None):
+        if current_time is None:
+            current_time = time.time()
+
+        self._daemonsets.pause( key, update_if_expired, current_time)
+        self._deployments.pause( key, update_if_expired, current_time)
+        self._replicasets.pause( key, update_if_expired, current_time )
+        self._pods.pause( key, update_if_expired, current_time )
+
+    def unpause( self, key=None ):
+        self._daemonsets.unpause( key )
+        self._deployments.unpause( key )
+        self._replicasets.unpause( key )
+        self._pods.unpause( key )
+
     def daemonset( self, namespace, name, current_time=None ):
         """
             Returns cached daemonset info for the daemonset specified by namespace and name
@@ -916,6 +973,7 @@ class KubernetesApi( object ):
 
         url = self._http_host + path + pretty
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
+        response.encoding = "utf-8"
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
@@ -1035,6 +1093,7 @@ class KubeletApi( object ):
         """
         url = self._http_host + path
         response = self._session.get( url, timeout=self._timeout )
+        response.encoding = "utf-8"
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
