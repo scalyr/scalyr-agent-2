@@ -698,86 +698,87 @@ class ContainerChecker( StoppableThread ):
                 if self.k8s_cache:
                     self.k8s_cache.pause( key=cache_pause, update_if_expired=True, current_time=current_time, debug_tracer=self._k8s_debug )
 
-                running_containers = _get_containers(
-                    self.__client, ignore_container=self.container_id, running_or_created_after=previous_time,
-                    glob_list=self.__glob_list, include_log_path=True, k8s_cache=self.k8s_cache,
-                    k8s_include_by_default=self.__include_all, current_time=current_time,
-                    k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
-                previous_time = current_time - 1
+                try:
+                    running_containers = _get_containers(
+                        self.__client, ignore_container=self.container_id, running_or_created_after=previous_time,
+                        glob_list=self.__glob_list, include_log_path=True, k8s_cache=self.k8s_cache,
+                        k8s_include_by_default=self.__include_all, current_time=current_time,
+                        k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
+                    previous_time = current_time - 1
 
-                # if running_containers is None, that means querying the docker api failed.
-                # rather than resetting the list of running containers to empty
-                # continue using the previous list of containers
-                if running_containers is None:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
-                    running_containers = self.containers
+                    # if running_containers is None, that means querying the docker api failed.
+                    # rather than resetting the list of running containers to empty
+                    # continue using the previous list of containers
+                    if running_containers is None:
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
+                        running_containers = self.containers
 
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Found %d containers' % len(running_containers))
-                #get the containers that have started since the last sample
-                starting = {}
-                changed = {}
-                digests = {}
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Found %d containers' % len(running_containers))
+                    #get the containers that have started since the last sample
+                    starting = {}
+                    changed = {}
+                    digests = {}
 
-                for cid, info in running_containers.iteritems():
-                    pod = None
-                    if 'k8s_info' in info:
-                        pod_name = info['k8s_info'].get( 'pod_name', 'invalid_pod' )
-                        pod_namespace = info['k8s_info'].get( 'pod_namespace', 'invalid_namespace' )
-                        pod = info['k8s_info'].get( 'pod_info', None )
+                    for cid, info in running_containers.iteritems():
+                        pod = None
+                        if 'k8s_info' in info:
+                            pod_name = info['k8s_info'].get( 'pod_name', 'invalid_pod' )
+                            pod_namespace = info['k8s_info'].get( 'pod_namespace', 'invalid_namespace' )
+                            pod = info['k8s_info'].get( 'pod_info', None )
 
-                        if not pod:
-                            self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
-                                                  limit_once_per_x_secs=300,
-                                                  limit_key='check-container-pod-info-%s' % cid)
+                            if not pod:
+                                self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
+                                                      limit_once_per_x_secs=300,
+                                                      limit_key='check-container-pod-info-%s' % cid)
 
-                    # start the container if have a container that wasn't running
-                    if cid not in self.containers:
-                        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Starting loggers for container '%s'" % info['name'] )
-                        starting[cid] = info
-                    elif cid in prev_digests:
-                        # container was running and it exists in the previous digest dict, so see if
-                        # it has changed
-                        if pod and prev_digests[cid] != pod.digest:
-                            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Pod digest changed for '%s'" % info['name'] )
-                            changed[cid] = info
+                        # start the container if have a container that wasn't running
+                        if cid not in self.containers:
+                            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Starting loggers for container '%s'" % info['name'] )
+                            starting[cid] = info
+                        elif cid in prev_digests:
+                            # container was running and it exists in the previous digest dict, so see if
+                            # it has changed
+                            if pod and prev_digests[cid] != pod.digest:
+                                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Pod digest changed for '%s'" % info['name'] )
+                                changed[cid] = info
 
-                    # store the digest from this iteration of the loop
-                    if pod:
-                        digests[cid] = pod.digest
+                        # store the digest from this iteration of the loop
+                        if pod:
+                            digests[cid] = pod.digest
 
-                #get the containers that have stopped
-                stopping = {}
-                for cid, info in self.containers.iteritems():
-                    if cid not in running_containers:
-                        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping logger for container '%s' (%s)" % (info['name'], cid[:6] ) )
-                        stopping[cid] = info
+                    #get the containers that have stopped
+                    stopping = {}
+                    for cid, info in self.containers.iteritems():
+                        if cid not in running_containers:
+                            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping logger for container '%s' (%s)" % (info['name'], cid[:6] ) )
+                            stopping[cid] = info
 
-                #stop the old loggers
-                self.__stop_loggers( stopping )
+                    #stop the old loggers
+                    self.__stop_loggers( stopping )
 
-                #update the list of running containers
-                #do this before starting new ones, as starting up new ones
-                #will access self.containers
-                self.containers = running_containers
+                    #update the list of running containers
+                    #do this before starting new ones, as starting up new ones
+                    #will access self.containers
+                    self.containers = running_containers
 
-                #start the new ones
-                self.__start_loggers( starting, self.k8s_cache )
+                    #start the new ones
+                    self.__start_loggers( starting, self.k8s_cache )
 
-                prev_digests = digests
+                    prev_digests = digests
 
-                # update the log config for any changed containers
-                if self.__log_watcher:
-                    for logger in self.raw_logs:
-                        if logger['cid'] in changed:
-                            info = changed[logger['cid']]
-                            new_config = self.__get_log_config_for_container( logger['cid'], info, self.k8s_cache, base_attributes )
-                            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "updating config for '%s'" % info['name'] )
-                            self.__log_watcher.update_log_config( self.__module.module_name, new_config )
-
+                    # update the log config for any changed containers
+                    if self.__log_watcher:
+                        for logger in self.raw_logs:
+                            if logger['cid'] in changed:
+                                info = changed[logger['cid']]
+                                new_config = self.__get_log_config_for_container( logger['cid'], info, self.k8s_cache, base_attributes )
+                                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "updating config for '%s'" % info['name'] )
+                                self.__log_watcher.update_log_config( self.__module.module_name, new_config )
+                finally:
+                    if self.k8s_cache:
+                        self.k8s_cache.unpause( key=cache_pause)
             except Exception, e:
                 self._logger.warn( "Exception occurred when checking containers %s\n%s" % (str( e ), traceback.format_exc()) )
-            if self.k8s_cache:
-                self.k8s_cache.unpause( key=cache_pause, debug_tracer=self._k8s_debug )
 
             run_state.sleep_but_awaken_if_stopped( self.__delay )
 
