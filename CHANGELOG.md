@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.40 "Nox" - Dec 7, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 7 2018 16:00 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 7, 2018 16:00 -0800
 --->
 
 Bugs
