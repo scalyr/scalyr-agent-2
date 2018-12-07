@@ -1879,63 +1879,11 @@ class KubernetesMonitor( ScalyrMonitor ):
         if self.__container_checker:
             k8s_cache = self.__container_checker.k8s_cache
 
-        cluster_name = None
-        if k8s_cache is not None:
-            cluster_name = k8s_cache.get_cluster_name()
-
-        # gather metrics
-        containers = None
-        if self.__report_container_metrics:
-            containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
-                                         k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
-                                         k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
-        try:
-            if containers:
-                if self.__report_container_metrics:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
-                    self.__gather_metrics_from_api( containers, k8s_cache, cluster_name )
-
-                if self.__report_k8s_metrics:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve k8s metrics %d' % len(containers))
-                    self.__gather_k8s_metrics_from_kubelet( containers, self.__kubelet_api, k8s_cache, cluster_name )
-        except Exception, e:
-            self._logger.exception( "Unexpected error logging metrics: %s" %( str(e) ) )
-
-        if self.__gather_k8s_pod_info:
-
-            cluster_info = self.__get_cluster_info( cluster_name )
-
-            containers = _get_containers( self.__client, only_running_containers=False, k8s_cache=k8s_cache,
-                                          k8s_include_by_default=self.__include_all,
-                                          k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
-            for cid, info in containers.iteritems():
-                try:
-                    extra = info.get( 'k8s_info', {} )
-                    extra['status'] = info.get('status', 'unknown')
-                    if self.__include_deployment_info:
-                        deployment = self.__get_k8s_deployment_info( info, k8s_cache )
-                        extra.update( deployment )
-                        extra.update( cluster_info )
-
-                    namespace = extra.get( 'pod_namespace', 'invalid-namespace' )
-                    self._logger.emit_value( 'docker.container_name', info['name'], extra, monitor_id_override="namespace:%s" % namespace )
-                except Exception, e:
-                    self._logger.error( "Error logging container information for %s: %s" % (_get_short_cid( cid ), str( e )) )
-
-            if self.__container_checker:
-                namespaces = self.__container_checker.get_k8s_data()
-                for namespace, pods in namespaces.iteritems():
-                    for pod_name, pod in pods.iteritems():
-                        try:
-                            extra = { 'pod_uid': pod.uid,
-                                      'pod_namespace': pod.namespace,
-                                      'node_name': pod.node_name }
         cache_pause = "gather_sample"
         if k8s_cache:
             k8s_cache.pause( key=cache_pause, update_if_expired=True )
 
         try:
-
             cluster_name = None
             if k8s_cache is not None:
                 cluster_name = k8s_cache.get_cluster_name()
@@ -1946,7 +1894,6 @@ class KubernetesMonitor( ScalyrMonitor ):
                 containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
                                              k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
                                              k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
-
             try:
                 if containers:
                     if self.__report_container_metrics:
