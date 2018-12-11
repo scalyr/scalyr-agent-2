@@ -233,10 +233,10 @@ class DockerClient( docker.Client ):
         shutdown
     """
     def _stream_helper( self, response, decode=False ):
-        return WrappedResponseGenerator( self, response, decode )
+        return WrappedStreamResponse( self, response, decode )
 
     def _stream_raw_result( self, response ):
-        return WrappedRawGenerator( self, response )
+        return WrappedRawResponse( self, response )
 
     def _multiplexed_response_stream_helper( self, response ):
         return WrappedMultiplexedStreamResponse( self, response )
