@@ -1,7 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.40 "Nox" - Dec 7, 2018
+## 2.0.41 "Q" - Dec 11, 2018
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 11, 2018 12:00 -0800
+--->
+
+Bugs
+* Fix bad class name for wrapped responses in Docker and Kubernetes monitor.
+* Fix high CPU consumption in Kubernetes monitor due to encoding detection.
+* Add defensive code to Kubernetes cache to prevent cache death spiral.
+
+
+## 2.0.40 "Primes" - Dec 7, 2018
 
 <!---
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 7, 2018 16:00 -0800
