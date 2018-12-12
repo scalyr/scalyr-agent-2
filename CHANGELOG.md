@@ -1,10 +1,10 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.41 "Q" - Dec 11, 2018
+## 2.0.41 "Q" - Dec 12, 2018
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 11, 2018 12:00 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 12, 2018 11:15 -0800
 --->
 
 Bugs
