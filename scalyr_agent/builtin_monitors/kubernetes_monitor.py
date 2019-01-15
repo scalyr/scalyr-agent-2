@@ -696,7 +696,7 @@ class ContainerChecker( StoppableThread ):
                 current_time = time.time()
 
                 if self.k8s_cache:
-                    self.k8s_cache.pause( key=cache_pause, update_if_expired=True, current_time=current_time, debug_tracer=self._k8s_debug )
+                    self.k8s_cache.pause( key=cache_pause, update_if_expired=True, current_time=current_time)
 
                 try:
                     running_containers = _get_containers(
