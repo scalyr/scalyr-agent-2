@@ -710,6 +710,16 @@ class KubernetesCache( object ):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
 
+    def is_using_custom_cluster_name( self ):
+        """Returns a boolean indicating whether or not a custom cluster name was specified"""
+        cluster_name = self.get_cluster_name()
+
+        result = False
+        if cluster_name:
+            result = cluster_name != self._k8s.generate_default_cluster_name()
+
+        return result
+
     def get_cluster_name( self ):
         """Returns the cluster name"""
         result = None
@@ -803,6 +813,26 @@ class KubernetesApi( object ):
             node = spec.get( 'nodeName' )
         return node
 
+    def generate_default_cluster_name( self ):
+        """
+        # If the user did not specify any cluster name, we need to supply a default that will be the same for all
+        # other scalyr agents connected to the same cluster.  Unfortunately, k8s does not actually supply the cluster
+        # name via any API, so we must make one up.
+        # We create a random string using the creation timestamp of the default timestamp as a seed.  The idea is that
+        # that creation timestamp should never change and all agents connected to the cluster will see the same value
+        # for that seed.
+        """
+
+        namespaces = self.query_namespaces()
+
+        # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
+        if namespaces and 'items' in namespaces:
+            for item in namespaces['items']:
+                if 'metadata' in item and 'name' in item['metadata'] and item['metadata']['name'] == 'default':
+                    if 'creationTimestamp' in item['metadata']:
+                        return 'k8s-cluster-%s' % self.__create_random_string(item['metadata']['creationTimestamp'], 6)
+        return None
+
     def get_cluster_name( self ):
         """ Returns the name of the cluster running this agent.
 
@@ -832,21 +862,7 @@ class KubernetesApi( object ):
         if 'agent.config.scalyr.com/cluster_name' in annotations:
             return annotations['agent.config.scalyr.com/cluster_name']
 
-        # If the user did not specify any cluster name, we need to supply a default that will be the same for all
-        # other scalyr agents connected to the same cluster.  Unfortunately, k8s does not actually supply the cluster
-        # name via any API, so we must make one up.
-        # We create a random string using the creation timestamp of the default timestamp as a seed.  The idea is that
-        # that creation timestamp should never change and all agents connected to the cluster will see the same value
-        # for that seed.
-        namespaces = self.query_namespaces()
-
-        # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
-        if namespaces and 'items' in namespaces:
-            for item in namespaces['items']:
-                if 'metadata' in item and 'name' in item['metadata'] and item['metadata']['name'] == 'default':
-                    if 'creationTimestamp' in item['metadata']:
-                        return 'k8s-cluster-%s' % self.__create_random_string(item['metadata']['creationTimestamp'], 6)
-        return None
+        return self.generate_default_cluster_name()
 
     def __create_random_string(self, seed_string, num_chars):
         """

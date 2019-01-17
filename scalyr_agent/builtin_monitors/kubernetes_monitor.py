@@ -614,6 +614,12 @@ class ContainerChecker( StoppableThread ):
                     self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - unable to start Kubernetes cache in a timely manner.  Some caching may be disabled' )
                     break
 
+            # check to see if the user has manually specified a cluster name, and if so then
+            # force enable 'Starbuck' features
+            if self.k8s_cache.is_using_custom_cluster_name():
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_0, "ContainerChecker - custom cluster name detected, enabling v2 attributes and controller information" )
+                self.__use_v2_attributes = True
+                self.__include_controller_info = True
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
@@ -1939,21 +1945,22 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         if self.__container_checker:
             self.__container_checker.start()
-            if self._global_config:
-                server_attributes = self._global_config.server_attributes
-                # cluster_name = self.__container_checker.cluster_name
-                # if cluster_name is not None and '_k8s_cn' not in server_attributes:
-                #    # commenting this out for now because it causing the config to be continually reloaded
-                #    # server_attributes['_k8s_cn'] = cluster_name
-                #    pass
 
         try:
+            # check to see if the user has manually specified a cluster name, and if so then
+            # force enable 'Starbuck' features
+            if self.__container_checker and self.__container_checker.k8s_cache.is_using_custom_cluster_name():
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Custom cluster name detected, enabling k8s metric reporting and controller information" )
+                self.__include_controller_info = True
+                self.__report_k8s_metrics = self.__report_container_metrics
+
             if self.__report_k8s_metrics:
                 k8s = KubernetesApi()
                 self.__kubelet_api = KubeletApi( k8s )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
+
 
         global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers %s, '
                         'report_metrics %s' % (','.join(self.__namespaces_to_ignore),
