@@ -1354,9 +1354,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         log.config.scalyr.com/include: false
 
     By default the agent monitors the logs of all pods/containers, and you have to manually exclude
-    pods/containers you don't want.  You can also set a value in agent.json
-    `k8s_include_all_containers: false`, in which case all containers are excluded by default and
-    have to be manually included.
+    pods/containers you don't want.  You can also set `k8s_include_all_containers: false` in the
+    kubernetes_monitor monitor config section of `agent.d/docker.json`, in which case all containers are
+    excluded by default and have to be manually included.
 
     ### Specifying Config Options
 
