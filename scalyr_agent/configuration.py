@@ -22,6 +22,7 @@ import os
 import re
 import socket
 import time
+import urlparse
 
 import scalyr_agent.util as scalyr_util
 
@@ -49,7 +50,7 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, default_paths):
+    def __init__(self, file_path, default_paths, force_http=False):
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -70,6 +71,8 @@ class Configuration(object):
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
+
+        self.__force_http = force_http
 
         # FIX THESE:
         # Add documentation, verify, etc.
@@ -152,6 +155,21 @@ class Configuration(object):
                 self.__config.put('scalyr_server', scalyr_server)
             self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
                                                  'configuration file %s' % self.__file_path)
+
+            # force https unless otherwise instructed not to
+            if not self.__force_http:
+                server = self.__config['scalyr_server'].strip()
+
+                parts = urlparse.urlparse( server )
+                if not parts.scheme:
+                    https_server = 'https://' + server
+                elif parts.scheme == 'http':
+                    https_server = re.sub( "^http://", "https://", server )
+
+                if https_server != server:
+                    self.__config['scalyr_server'] = https_server
+                    if logger:
+                        logger.info( "Forcing https protocol for server url: %s -> %s.  You can override this with the --force-http flag, but be mindful that there are security implications with doing this, including tramsitting your Scalyr api key over an insecure connection." % (server, self.__config['scalyr_server'] ) )
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.

@@ -213,7 +213,7 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            self.__config = self.__read_and_verify_config(config_file_path)
+            self.__config = self.__read_and_verify_config(config_file_path, force_http=command_options.force_http )
 
             # check if not a tty and override the no check remote variable
             if not sys.stdout.isatty():
@@ -275,21 +275,24 @@ class ScalyrAgent(object):
                 raise Exception('Caught exception when attempt to execute command %s.  Exception was %s' %
                                 (command, str(e)))
 
-    def __read_and_verify_config(self, config_file_path):
+    def __read_and_verify_config(self, config_file_path, force_http ):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
 
+        @param force_http: Whether or not to force the scalyr server to use 'http'
+        @type force_http: boolean
+
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__read_config(config_file_path)
+        config = self.__read_config(config_file_path, force_http )
         self.__verify_config(config)
         return config
 
-    def __read_config(self, config_file_path):
+    def __read_config(self, config_file_path, force_http ):
         """Reads the configuration from the file path but does not do a full verification.
 
         This will only throw an error if the files themselves cannot be read.  This includes the configuration
@@ -300,10 +303,13 @@ class ScalyrAgent(object):
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
 
+        @param force_http: Whether or not to force the scalyr server to use 'http'
+        @type force_http: boolean
+
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        return Configuration(config_file_path, self.__default_paths)
+        return Configuration(config_file_path, self.__default_paths, force_http=force_http)
 
     def __verify_config(self, config, disable_create_monitors_manager=False,
                                       disable_create_copying_manager=False,
@@ -1214,6 +1220,9 @@ if __name__ == '__main__':
                       help="For status command, prints detailed information about running agent.")
     parser.add_option("", "--no-fork", action="store_true", dest="no_fork", default=False,
                       help="For the run command, does not fork the program to the background.")
+    parser.add_option("", "--force-http", action="store_true", dest="force_http", default=False,
+                      help="Forces the agent to use an http connection.  Without this flag the agent will *always* use an https connection, even "
+                           "if the URL for the remote server specifics an http link" )
     parser.add_option("", "--no-check-remote-server", action="store_true", dest="no_check_remote",
                       help="For the start command, does not perform the first check to see if the agent can "
                            "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "
