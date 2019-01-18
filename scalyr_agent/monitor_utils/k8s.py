@@ -20,6 +20,19 @@ import urllib
 
 global_log = scalyr_logging.getLogger(__name__)
 
+# endpoints used by the agent for querying the k8s api.  Having this mapping allows
+# us to avoid special casing the logic for each different object type.  We can just
+# look up the appropriate endpoint in this dict and query objects however we need.
+#
+# The dict is keyed by object kind, and or each object kind, there are 3 endpoints:
+#       single, list and list all.
+#
+# `single` is for querying a single object of a specific type
+# `list` is for querying all objects of a given type in a specific namespace
+# `list-all` is for querying all objects of a given type in the entire cluster
+#
+# the `single` and `list` endpoints are Templates that require the caller to substitute
+# in the appropriate values for ${namespace} and ${name}
 _OBJECT_ENDPOINTS = {
     'CronJob' : {
         'single' : Template( '/apis/batch/v1beta1/namespaces/${namespace}/cronjobs/${name}' ),
@@ -710,16 +723,6 @@ class KubernetesCache( object ):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
 
-    def is_using_custom_cluster_name( self ):
-        """Returns a boolean indicating whether or not a custom cluster name was specified"""
-        cluster_name = self.get_cluster_name()
-
-        result = False
-        if cluster_name:
-            result = cluster_name != self._k8s.generate_default_cluster_name()
-
-        return result
-
     def get_cluster_name( self ):
         """Returns the cluster name"""
         result = None
@@ -813,26 +816,6 @@ class KubernetesApi( object ):
             node = spec.get( 'nodeName' )
         return node
 
-    def generate_default_cluster_name( self ):
-        """
-        # If the user did not specify any cluster name, we need to supply a default that will be the same for all
-        # other scalyr agents connected to the same cluster.  Unfortunately, k8s does not actually supply the cluster
-        # name via any API, so we must make one up.
-        # We create a random string using the creation timestamp of the default timestamp as a seed.  The idea is that
-        # that creation timestamp should never change and all agents connected to the cluster will see the same value
-        # for that seed.
-        """
-
-        namespaces = self.query_namespaces()
-
-        # Get the creation timestamp from the default namespace.  We try to be very defensive in case the API changes.
-        if namespaces and 'items' in namespaces:
-            for item in namespaces['items']:
-                if 'metadata' in item and 'name' in item['metadata'] and item['metadata']['name'] == 'default':
-                    if 'creationTimestamp' in item['metadata']:
-                        return 'k8s-cluster-%s' % self.__create_random_string(item['metadata']['creationTimestamp'], 6)
-        return None
-
     def get_cluster_name( self ):
         """ Returns the name of the cluster running this agent.
 
@@ -862,24 +845,7 @@ class KubernetesApi( object ):
         if 'agent.config.scalyr.com/cluster_name' in annotations:
             return annotations['agent.config.scalyr.com/cluster_name']
 
-        return self.generate_default_cluster_name()
-
-    def __create_random_string(self, seed_string, num_chars):
-        """
-        Return a random string of num_char characters, composed of uppercase characters and digits.
-
-        @param seed_string: The seed to use when creating the psrng
-        @param num_chars: The desired size of the string.
-
-        @type seed_string: str
-        @type num_chars: int
-        @return: A random string
-        @rtype: str
-        """
-        prng = random.Random(abs(hash(seed_string)))
-        return ''.join(prng.choice(string.ascii_lowercase + string.digits) for _ in range(num_chars))
-
-
+        return None
 
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects

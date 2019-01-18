@@ -158,6 +158,11 @@ define_config_option( __monitor__, 'k8s_cache_purge_secs',
                      'Optional (defaults to 300). The number of seconds to wait before purging unused items from the k8s cache',
                      convert_to=int, default=300)
 
+define_config_option( __monitor__, 'k8s_cache_init_abort_delay',
+                     'Optional (defaults to 20). The number of seconds to wait for initialization of the kubernetes cache before aborting '
+                     'the kubernetes_monitor.',
+                     convert_to=int, default=20)
+
 define_config_option( __monitor__, 'k8s_parse_json',
                       'Optional (defaults to True). If True, the log files will be parsed as json before uploading to the server '
                       'to extract log and timestamp fields.  If False, the raw json will be uploaded to Scalyr.',
@@ -250,6 +255,9 @@ define_metric( __monitor__, "k8s.node.network.rx_errors", "The total received er
 define_metric( __monitor__, "k8s.node.network.tx_bytes", "The total transmitted bytes on a pod", cumulative=True, category="Network" )
 define_metric( __monitor__, "k8s.node.network.tx_errors", "The total transmission errors on a pod", cumulative=True, category="Network" )
 
+# A mapping of k8s controller kinds to the appropriate field name
+# passed to the scalyr server for metrics that originate from pods
+# controlled by that object. See #API-62
 _CONTROLLER_KEYS = {
     'CronJob' : 'k8s-cron-job',
     'DaemonSet' : 'k8s-daemon-set',
@@ -259,6 +267,11 @@ _CONTROLLER_KEYS = {
     'ReplicationController': 'k8s-replication-controller',
     'StatefulSet': 'k8s-stateful-set'
 }
+
+class K8sInitException( Exception ):
+    """ Wrapper exception to indicate when the monitor failed to start due to
+        a problem with initializing the k8s cache
+    """
 
 class WrappedStreamResponse( object ):
     """ Wrapper for generator returned by docker.Client._stream_helper
@@ -570,6 +583,7 @@ class ContainerChecker( StoppableThread ):
 
         self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
         self.__k8s_cache_purge_secs = self._config.get( 'k8s_cache_purge_secs' )
+        self.__k8s_cache_init_abort_delay = self._config.get( 'k8s_cache_init_abort_delay' )
 
         self.k8s_cache = None
 
@@ -597,27 +611,35 @@ class ContainerChecker( StoppableThread ):
                 namespaces_to_ignore=self.__namespaces_to_ignore )
 
 
-            delay = 0.25
-            backoff = 1.5
-            message_delay = 6
-            kill_delay = 20
+            delay = 0.5
+            message_delay = 5
             start_time = time.time()
+            message_time = start_time
+            abort = False
 
+            # wait until the k8s_cache is initialized before aborting
             while not self.k8s_cache.is_initialized():
                 time.sleep( delay )
-                delay *= backoff
-                elapsed = time.time() - start_time
+                current_time = time.time()
+                # see if we need to print a message
+                elapsed = current_time - message_time
                 if elapsed > message_delay:
                     self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
+                    message_time = current_time
 
-                if elapsed > kill_delay:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - unable to start Kubernetes cache in a timely manner.  Some caching may be disabled' )
+                # see if we need to abort the monitor because we've been waiting too long for init
+                elapsed = current_time - start_time
+                if elapsed > self.__k8s_cache_init_abort_delay:
+                    abort = True
                     break
+
+            if abort:
+                raise K8sInitException( "Unable to initialize kubernetes cache" )
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.k8s_cache.is_using_custom_cluster_name():
-                self._logger.log( scalyr_logging.DEBUG_LEVEL_0, "ContainerChecker - custom cluster name detected, enabling v2 attributes and controller information" )
+            if self.k8s_cache.get_cluster_name() is not None:
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
 
@@ -641,8 +663,11 @@ class ContainerChecker( StoppableThread ):
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting k8s monitor for Scalyr" )
             self.__thread.start()
 
+        except K8sInitException, e:
+            global_log.warn( "Failed to start container checker - %s. Aborting kubernetes_monitor" % (str(e)) )
+            raise
         except Exception, e:
-            global_log.warn( "Failed to start container checker %s\n%s" % (str(e), traceback.format_exc() ))
+            global_log.warn( "Failed to start container checker - %s\n%s" % (str(e), traceback.format_exc() ))
 
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
@@ -679,6 +704,11 @@ class ContainerChecker( StoppableThread ):
         """Update thread for monitoring docker containers and the k8s info such as labels
         """
 
+        # Assert that the cache has been initialized
+        if not self.k8s_cache.is_initialized():
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'container_checker - Kubernetes cache not initialized' )
+            raise K8sInitException( "check_container - Kubernetes cache not initialized. Aborting" )
+
         # store the digests from the previous iteration of the main loop to see
         # if any pod information has changed
         prev_digests = {}
@@ -687,10 +717,6 @@ class ContainerChecker( StoppableThread ):
 
         while run_state.is_running():
             try:
-                if not self.k8s_cache.is_initialized():
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'container_checker - waiting for Kubernetes cache to be initialized' )
-                    run_state.sleep_but_awaken_if_stopped( self.__delay )
-                    continue
 
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
@@ -1874,10 +1900,6 @@ class KubernetesMonitor( ScalyrMonitor ):
         if k8s_cache is not None:
             cluster_name = k8s_cache.get_cluster_name()
 
-            if not k8s_cache.is_initialized():
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'gather_sample - waiting for Kubernetes cache to be initialized' )
-                return
-
         # gather metrics
         containers = None
         if self.__report_container_metrics:
@@ -1949,8 +1971,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         try:
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.__container_checker and self.__container_checker.k8s_cache.is_using_custom_cluster_name():
-                self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Custom cluster name detected, enabling k8s metric reporting and controller information" )
+            if self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
+                self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics
 
