@@ -213,7 +213,7 @@ class ScalyrAgent(object):
         self.__config_file_path = config_file_path
 
         try:
-            self.__config = self.__read_and_verify_config(config_file_path, force_http=command_options.force_http )
+            self.__config = self.__read_and_verify_config(config_file_path)
 
             # check if not a tty and override the no check remote variable
             if not sys.stdout.isatty():
@@ -275,24 +275,21 @@ class ScalyrAgent(object):
                 raise Exception('Caught exception when attempt to execute command %s.  Exception was %s' %
                                 (command, str(e)))
 
-    def __read_and_verify_config(self, config_file_path, force_http ):
+    def __read_and_verify_config(self, config_file_path):
         """Reads the configuration and verifies it can be successfully parsed including the monitors existing and
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
 
-        @param force_http: Whether or not to force the scalyr server to use 'http'
-        @type force_http: boolean
-
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__read_config(config_file_path, force_http )
+        config = self.__read_config(config_file_path)
         self.__verify_config(config)
         return config
 
-    def __read_config(self, config_file_path, force_http ):
+    def __read_config(self, config_file_path):
         """Reads the configuration from the file path but does not do a full verification.
 
         This will only throw an error if the files themselves cannot be read.  This includes the configuration
@@ -303,13 +300,10 @@ class ScalyrAgent(object):
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
 
-        @param force_http: Whether or not to force the scalyr server to use 'http'
-        @type force_http: boolean
-
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        return Configuration(config_file_path, self.__default_paths, force_http=force_http)
+        return Configuration(config_file_path, self.__default_paths)
 
     def __verify_config(self, config, disable_create_monitors_manager=False,
                                       disable_create_copying_manager=False,
@@ -672,6 +666,11 @@ class ScalyrAgent(object):
 
         return self.__start(quiet, no_fork, no_check_remote)
 
+    def __print_force_https_message( self, scalyr_server, raw_scalyr_server ):
+        """Convenience function for printing a message stating whether the scalyr_server was forced to use https"""
+        if scalyr_server != raw_scalyr_server:
+            log.info( "Forcing https protocol for server url: %s -> %s.  You can prevent this by setting the `allow_http` global config option, but be mindful that there are security implications with doing this, including tramsitting your Scalyr api key over an insecure connection." % (raw_scalyr_server, scalyr_server ) )
+
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
 
@@ -730,6 +729,10 @@ class ScalyrAgent(object):
                 self.__start_or_stop_unsafe_debugging()
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'JSON library is %s' % (scalyr_util.get_json_lib()) )
 
+                scalyr_server = self.__config.scalyr_server
+                raw_scalyr_server = self.__config.raw_scalyr_server
+                self.__print_force_https_message( scalyr_server, raw_scalyr_server )
+
                 self.__scalyr_client = self.__create_client()
                 worker_thread = self.__create_worker_thread(self.__config)
                 worker_thread.start(self.__scalyr_client, logs_initial_positions)
@@ -750,6 +753,8 @@ class ScalyrAgent(object):
 
                 gc_interval = self.__config.garbage_collect_interval
                 last_gc_time = current_time
+
+                prev_server = scalyr_server
 
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
 
@@ -852,6 +857,18 @@ class ScalyrAgent(object):
                     self.__controller.consume_config(new_config, new_config.file_path)
 
                     self.__start_or_stop_unsafe_debugging()
+
+                    # get the server and the raw server to see if we forced https
+                    scalyr_server = self.__config.scalyr_server
+                    raw_scalyr_server = self.__config.raw_scalyr_server
+
+                    # only print a message if this is the first time we have seen this scalyr_server
+                    # and the server field is different from the raw server field
+                    if scalyr_server != prev_server:
+                        self.__print_force_https_message( scalyr_server, raw_scalyr_server )
+
+                    prev_server = scalyr_server
+
                     self.__scalyr_client = self.__create_client()
 
                     log.info('Starting new copying and metrics threads')
@@ -1220,9 +1237,6 @@ if __name__ == '__main__':
                       help="For status command, prints detailed information about running agent.")
     parser.add_option("", "--no-fork", action="store_true", dest="no_fork", default=False,
                       help="For the run command, does not fork the program to the background.")
-    parser.add_option("", "--force-http", action="store_true", dest="force_http", default=False,
-                      help="Forces the agent to use an http connection.  Without this flag the agent will *always* use an https connection, even "
-                           "if the URL for the remote server specifics an http link" )
     parser.add_option("", "--no-check-remote-server", action="store_true", dest="no_check_remote",
                       help="For the start command, does not perform the first check to see if the agent can "
                            "communicate with the Scalyr servers.  The agent will just keep trying to contact it in "

@@ -50,7 +50,7 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, default_paths, force_http=False):
+    def __init__(self, file_path, default_paths):
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -71,8 +71,6 @@ class Configuration(object):
         # The DefaultPaths object that specifies the default paths for things like the data and log directory
         # based on platform.
         self.__default_paths = default_paths
-
-        self.__force_http = force_http
 
         # FIX THESE:
         # Add documentation, verify, etc.
@@ -156,8 +154,10 @@ class Configuration(object):
             self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
                                                  'configuration file %s' % self.__file_path)
 
+            self.__config['raw_scalyr_server'] = self.__config['scalyr_server']
+
             # force https unless otherwise instructed not to
-            if not self.__force_http:
+            if not self.__config['allow_http']:
                 server = self.__config['scalyr_server'].strip()
 
                 parts = urlparse.urlparse( server )
@@ -168,8 +168,6 @@ class Configuration(object):
 
                 if https_server != server:
                     self.__config['scalyr_server'] = https_server
-                    if logger:
-                        logger.info( "Forcing https protocol for server url: %s -> %s.  You can override this with the --force-http flag, but be mindful that there are security implications with doing this, including tramsitting your Scalyr api key over an insecure connection." % (server, self.__config['scalyr_server'] ) )
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
@@ -407,6 +405,11 @@ class Configuration(object):
     def scalyr_server(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_string('scalyr_server')
+
+    @property
+    def raw_scalyr_server(self):
+        """Returns the configuration value for 'raw_scalyr_server'."""
+        return self.__get_config().get_string('raw_scalyr_server')
 
     @property
     def check_remote_if_no_tty(self):
@@ -854,6 +857,7 @@ class Configuration(object):
     """
         description = 'configuration file "%s"' % file_path
 
+        self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults)
         self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
