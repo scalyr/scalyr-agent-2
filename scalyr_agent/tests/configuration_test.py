@@ -133,6 +133,7 @@ class TestConfiguration(ScalyrTestCase):
             implicit_metric_monitor: false,
             implicit_agent_log_collection: false,
             use_unsafe_debugging: true,
+            allow_http: true,
             scalyr_server: "noland.scalyr.com",
             global_monitor_sample_interval: 60.0,
             max_allowed_request_size: 2000000,
@@ -238,6 +239,57 @@ class TestConfiguration(ScalyrTestCase):
 
         config = self.__create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
+
+    def test_force_https_no_scheme(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            scalyr_server: "agent.scalyr.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
+
+    def test_force_https_http(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            scalyr_server: "http://agent.scalyr.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
+
+    def test_force_https_https(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            scalyr_server: "https://agent.scalyr.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
+
+    def test_force_https_leading_whitespace(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            scalyr_server: "  http://agent.scalyr.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
+
+    def test_allow_http(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            allow_http: true,
+            scalyr_server: "http://agent.scalyr.com",
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEqual( "http://agent.scalyr.com", config.scalyr_server)
 
     def test_non_string_value(self):
         self.__write_file_with_separator_conversion(""" {
@@ -476,6 +528,7 @@ class TestConfiguration(ScalyrTestCase):
         self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            api_key: "hi there",
            scalyr_server: "foobar",
+           allow_http: true,
            logs: [ { path: "/var/log/nginx/access.log" } ],
           }
         """)

@@ -159,6 +159,7 @@ class Configuration(object):
             # force https unless otherwise instructed not to
             if not self.__config['allow_http']:
                 server = self.__config['scalyr_server'].strip()
+                https_server = server
 
                 parts = urlparse.urlparse( server )
                 if not parts.scheme:
