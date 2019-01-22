@@ -666,6 +666,11 @@ class ScalyrAgent(object):
 
         return self.__start(quiet, no_fork, no_check_remote)
 
+    def __print_force_https_message( self, scalyr_server, raw_scalyr_server ):
+        """Convenience function for printing a message stating whether the scalyr_server was forced to use https"""
+        if scalyr_server != raw_scalyr_server:
+            log.info( "Forcing https protocol for server url: %s -> %s.  You can prevent this by setting the `allow_http` global config option, but be mindful that there are security implications with doing this, including tramsitting your Scalyr api key over an insecure connection." % (raw_scalyr_server, scalyr_server ) )
+
     def __run(self, controller):
         """Runs the Scalyr Agent 2.
 
@@ -724,6 +729,10 @@ class ScalyrAgent(object):
                 self.__start_or_stop_unsafe_debugging()
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'JSON library is %s' % (scalyr_util.get_json_lib()) )
 
+                scalyr_server = self.__config.scalyr_server
+                raw_scalyr_server = self.__config.raw_scalyr_server
+                self.__print_force_https_message( scalyr_server, raw_scalyr_server )
+
                 self.__scalyr_client = self.__create_client()
                 worker_thread = self.__create_worker_thread(self.__config)
                 worker_thread.start(self.__scalyr_client, logs_initial_positions)
@@ -744,6 +753,8 @@ class ScalyrAgent(object):
 
                 gc_interval = self.__config.garbage_collect_interval
                 last_gc_time = current_time
+
+                prev_server = scalyr_server
 
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
 
@@ -846,6 +857,18 @@ class ScalyrAgent(object):
                     self.__controller.consume_config(new_config, new_config.file_path)
 
                     self.__start_or_stop_unsafe_debugging()
+
+                    # get the server and the raw server to see if we forced https
+                    scalyr_server = self.__config.scalyr_server
+                    raw_scalyr_server = self.__config.raw_scalyr_server
+
+                    # only print a message if this is the first time we have seen this scalyr_server
+                    # and the server field is different from the raw server field
+                    if scalyr_server != prev_server:
+                        self.__print_force_https_message( scalyr_server, raw_scalyr_server )
+
+                    prev_server = scalyr_server
+
                     self.__scalyr_client = self.__create_client()
 
                     log.info('Starting new copying and metrics threads')

@@ -22,6 +22,7 @@ import os
 import re
 import socket
 import time
+import urlparse
 
 import scalyr_agent.util as scalyr_util
 
@@ -152,6 +153,22 @@ class Configuration(object):
                 self.__config.put('scalyr_server', scalyr_server)
             self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
                                                  'configuration file %s' % self.__file_path)
+
+            self.__config['raw_scalyr_server'] = self.__config['scalyr_server']
+
+            # force https unless otherwise instructed not to
+            if not self.__config['allow_http']:
+                server = self.__config['scalyr_server'].strip()
+                https_server = server
+
+                parts = urlparse.urlparse( server )
+                if not parts.scheme:
+                    https_server = 'https://' + server
+                elif parts.scheme == 'http':
+                    https_server = re.sub( "^http://", "https://", server )
+
+                if https_server != server:
+                    self.__config['scalyr_server'] = https_server
 
             # Add in 'serverHost' to server_attributes if it is not set.  We must do this after merging any
             # server attributes from the config fragments.
@@ -389,6 +406,11 @@ class Configuration(object):
     def scalyr_server(self):
         """Returns the configuration value for 'scalyr_server'."""
         return self.__get_config().get_string('scalyr_server')
+
+    @property
+    def raw_scalyr_server(self):
+        """Returns the configuration value for 'raw_scalyr_server'."""
+        return self.__get_config().get_string('raw_scalyr_server')
 
     @property
     def check_remote_if_no_tty(self):
@@ -836,6 +858,7 @@ class Configuration(object):
     """
         description = 'configuration file "%s"' % file_path
 
+        self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults)
         self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
