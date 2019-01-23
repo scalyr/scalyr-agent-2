@@ -40,7 +40,7 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, KubernetesCache, PodInfo
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, KubernetesCache, PodInfo, DockerMetricFetcher
 
 from scalyr_agent.util import StoppableThread
 
@@ -1468,6 +1468,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         data_path = ""
         log_path = ""
         host_hostname = ""
+        self.__sample_num = 0
 
         # Override the default value for the rate limit for writing the metric logs.  We override it to set no limit
         # because it is fairly difficult to bound this since the log will emit X metrics for every pod being monitored.
@@ -1497,6 +1498,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
+        self.__metric_fetcher = DockerMetricFetcher(self.__client, 20, self._logger)
         self.__glob_list = self._config.get( 'container_globs' )
         self.__include_all = self._config.get( 'k8s_include_all_containers' )
 
@@ -1712,16 +1714,9 @@ class KubernetesMonitor( ScalyrMonitor ):
             @param: container - name of the container to query
             @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        try:
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for cid=%s' % container)
-            result = self.__client.stats(
-                container=container,
-                stream=False
-            )
-            if result is not None:
-                self.__log_json_metrics( container, result, k8s_extra )
-        except Exception, e:
-            self._logger.error( "Error readings stats for '%s': %s\n%s" % (container, str(e), traceback.format_exc()), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
+        result = self.__metric_fetcher.get_metrics(container)
+        if result is not None:
+            self.__log_json_metrics( container, result, k8s_extra )
 
     def __build_k8s_deployment_info( self, k8s_cache, pod ):
         """
@@ -1773,6 +1768,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __gather_metrics_from_api( self, containers, k8s_cache, cluster_name ):
 
         cluster_info = self.__get_cluster_info( cluster_name )
+
+        for cid, info in containers.iteritems():
+            self.__metric_fetcher.prefetch_metrics(info['name'])
 
         for cid, info in containers.iteritems():
             k8s_extra = {}
@@ -1986,6 +1984,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
-        if self.__container_checker:
+        if self.__container_checker is not None:
             self.__container_checker.stop( wait_on_join, join_timeout )
+
+        if self.__metric_fetcher is not None:
+            self.__metric_fetcher.stop()
 
