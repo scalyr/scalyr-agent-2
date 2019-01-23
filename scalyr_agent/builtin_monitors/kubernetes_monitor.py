@@ -84,6 +84,10 @@ define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
                      convert_to=str, default='docker')
 
+define_config_option( __monitor__, 'docker_max_parallel_stats',
+                     'Optional (defaults to 20). Maximum stats requests to issue in parallel when retrieving container '
+                     'metrics using the Docker API.', convert_to=int, default=20)
+
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
                      'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
@@ -1468,7 +1472,11 @@ class KubernetesMonitor( ScalyrMonitor ):
         data_path = ""
         log_path = ""
         host_hostname = ""
-        self.__sample_num = 0
+
+        # Since getting metrics from Docker takes a non-trivial amount of time, we will deduct the time spent
+        # in gathering the metric samples from the time we should sleep so that we do gather a sample once every
+        # sample_interval_secs
+        self._adjust_sleep_by_gather_time = True
 
         # Override the default value for the rate limit for writing the metric logs.  We override it to set no limit
         # because it is fairly difficult to bound this since the log will emit X metrics for every pod being monitored.
@@ -1498,7 +1506,8 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.__metric_fetcher = DockerMetricFetcher(self.__client, 20, self._logger)
+        self.__metric_fetcher = DockerMetricFetcher(self.__client, self._config.get('docker_max_parallel_stats'),
+                                                    self._logger)
         self.__glob_list = self._config.get( 'container_globs' )
         self.__include_all = self._config.get( 'k8s_include_all_containers' )
 

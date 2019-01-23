@@ -23,6 +23,7 @@
 import inspect
 import os
 import sys
+import time
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -136,6 +137,9 @@ class ScalyrMonitor(StoppableThread):
         # flushing, but at the cost of possible loss of data if the agent shutdowns down unexpectantly.
         self._log_flush_delay = self._config.get('monitor_log_flush_delay', convert_to=float, default=0.0, min_value=0)
 
+        # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
+        # than sleeping the full sample_interval_secs time.
+        self._adjust_sleep_by_gather_time = False
         self._initialize()
 
         StoppableThread.__init__(self, name='metric thread')
@@ -217,13 +221,18 @@ class ScalyrMonitor(StoppableThread):
         try:
             while not self._is_stopped():
                 # noinspection PyBroadException
+                adjustment = 0
                 try:
+                    start_time = time.time()
                     self.gather_sample()
+                    if self._adjust_sleep_by_gather_time:
+                        adjustment = min(time.time() - start_time, self._sample_interval_secs)
                 except Exception:
                     self._logger.exception('Failed to gather sample due to the following exception')
                     self.increment_counter(errors=1)
 
-                self._sleep_but_awaken_if_stopped(self._sample_interval_secs)
+                self._sleep_but_awaken_if_stopped(self._sample_interval_secs - adjustment)
+
             self._logger.info('Monitor has finished')
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not
