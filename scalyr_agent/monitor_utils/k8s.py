@@ -974,3 +974,234 @@ class KubeletApi( object ):
     def query_stats( self ):
         return self.query_api( '/stats/summary')
 
+
+class DockerMetricFetcher(object):
+    """Allows for parallel fetching of container metrics from Docker.  Typically, one instance of this object
+    will be created per monitor (Docker or Kubernetes).  This current implementation relies on threads to
+    issue multiple `stats` requests in parallel.
+
+    This approach is necessary because the `stats` Docker command blocks for 2 seconds while it gathers
+    cpu measures over the interval.  If we had 40 containers whose metrics we were trying to retrieve, we would
+    have to wait for a total of 80 seconds if we issued the `stats` request one at a time.
+
+    To get the benefit of this approach, you must first invoke `prefetch_metrics` for each container whose metrics
+    you wish to retrieve, and then invoke `get_metrics` to actually get the metrics.
+    """
+    def __init__(self, docker_client, concurrency, logger):
+        """
+
+        @param docker_client:  The docker client object to use for issuing `stats` requests.
+        @param concurrency:  The maximum number of `stats` requests to issue in parallel.  This controls the maximum
+            number of threads that will be created.
+        @param logger:  The logger
+        @type docker_client: k8s_test.MetricFaker
+        @type concurrency: int
+        @type logger: scalyr_agent.scalyr_logging.AgentLogger
+        """
+        self.__docker_client = docker_client
+        self.__logger = logger
+        self.__concurrency = concurrency
+
+        # A sentinel value used in the `__container_scoreboard` to indicate the container is in the queue to be fetched.
+        self.__PENDING = dict()
+        # A sentinel value used in the `__container_scoreboard` to indicate the `stats` call for a container has been
+        # issued but no response has been received.
+        self.__IN_FLIGHT = dict()
+
+        # The lock that must be held for all other state variables in this class.
+        self.__lock = threading.Lock()
+        # Records the state of requesting metrics for all containers.  Maps the container name to its state or
+        # metric value.  If the value is __PENDING, then the `stats` request for the request has not been issued.
+        # If it is __IN_FLIGHT, it has been requested.  If it is None, an error occurred.  Otherwise, the value
+        # is the result of the `stats` request.
+        self.__container_scoreboard = dict()
+
+        # Whether or not `stop` has been invoked.
+        self.__is_stopped = False
+
+        # The conditional variable that can be waited on to be notified of any changes to the state of this object,
+        # such as whether it has been stopped or if a stats results has been added in to `__container_scoreboard`.
+        self.__cv = threading.Condition(self.__lock)
+
+        # The number of worker threads (to perform `stats` calls) that have been created.  This will always be
+        # less than `concurrency`.
+        self.__num_worker_threads = 0
+
+        # A list of containers whose metrics should be fetched.  This is the same as all entries in
+        # `__container_scoreboard` whose value is `__PENDING`.
+        self.__pending_fetches = []
+        # The total number of containers in `__container_scoreboard` with value either `__PENDING` or `__IN_FLIGHT`.
+        self.__remaining_metrics_count = 0
+        # The number of worker threads blocked, waiting for a container to fetch its metrics.
+        self.__idle_workers_count = 0
+
+    def prefetch_metrics(self, container_id):
+        """Initiates requesting invoking `stats` for the specified container.  If you invoke this, you must
+        also eventually invoke `get_metrics` with the same container.  By invoking this first, the `get_metrics`
+        call will take less time when issuing many `stats` requests.
+
+        Whenever possible, you should first invoke this method for all containers whose metrics you wish to request
+        before any call to `get_metrics`.
+
+        The behavior is not well defined if you invoke `prefetch_metrics` multiple times for a container before
+        invoking `get_metrics` for it.
+
+        @param container_id: The id of the container to fetch.
+        @type container_id: str
+        """
+        self.__lock.acquire()
+        try:
+            if container_id not in self.__container_scoreboard:
+                self._add_fetch_task(container_id)
+        finally:
+            self.__lock.release()
+
+    def get_metrics(self, container_id):
+        """Blocks until the `stats` call for the specified container is received.  If `prefetch_metrics` was not
+        invoked already for this container, then the `stats` request will be issued.
+
+        @param container_id:  The container whose metrics should be fetched.
+        @type container_id: str
+        @return The metrics for the container, or None if there was an error or if `stop` was invoked on this object.
+        @rtype JSON
+        """
+        self.__lock.acquire()
+        try:
+            while True:
+                if self.__is_stopped:
+                    return None
+
+                # Fetch the result if it was prefetched.
+                if container_id not in self.__container_scoreboard:
+                    self._add_fetch_task(container_id)
+
+                status = self.__container_scoreboard[container_id]
+                if status is not self.__PENDING and status is not self.__IN_FLIGHT:
+                    result = self.__container_scoreboard[container_id]
+                    del self.__container_scoreboard[container_id]
+                    return result
+                # Otherwise no result has been received yet.. wait..
+                self.__cv.wait()
+        finally:
+            self.__lock.release()
+
+    def stop(self):
+        """Stops the fetcher.  Any calls blocking on `get_metrics` will finish and return `None`.  All threads
+        started by this instance will be stopped (though, this method does not wait on them to terminate).
+        """
+        self.__lock.acquire()
+        try:
+            self.__is_stopped = True
+            # Notify all threads that may be waiting on a new container or waiting on a metric result that we have
+            # been stopped.
+            self.__cv.notifyAll()
+        finally:
+            self.__lock.release()
+
+    def idle_workers(self):
+        """
+        Used for testing.
+
+        @return:  The number of worker threads currently blocking, waiting for a container whose metrics need fetching.
+        @rtype: int
+        """
+        self.__lock.acquire()
+        try:
+            return self.__idle_workers_count
+        finally:
+            self.__lock.release()
+
+    def _get_fetch_task(self):
+        """Blocks until either there is a new container whose metrics need to be fetched or until this instance
+        is stopped.
+        @return:  A tuple containing the container whose metrics should be fetched and a boolean indicating if the
+            instance has been stopped.  If it has been stopped, the container will be None.
+        @rtype: (str, bool)
+        """
+        self.__lock.acquire()
+        try:
+            while True:
+                if self.__is_stopped:
+                    return None, True
+                if len(self.__pending_fetches) > 0:
+                    container = self.__pending_fetches.pop(0)
+                    self.__container_scoreboard[container] = self.__PENDING
+                    self.__idle_workers_count -= 1
+                    return container, False
+                self.__cv.wait()
+        finally:
+            self.__lock.release()
+
+    def __start_workers(self, count):
+        """Start `count` worker threads that will fetch metrics results.
+
+        @param count:  The number of threads to start.
+        @type count: int
+        """
+        new_number_workers = min(self.__concurrency, count + self.__num_worker_threads)
+        for i in range(self.__num_worker_threads, new_number_workers):
+            x = threading.Thread(target=self.__worker)
+            # Set daemon so this thread does not need to be finished for the overall process to stop.  This allows
+            # the process to terminate even if a `stats` request is still in-flight.
+            x.setDaemon(True)
+            x.start()
+            self.__num_worker_threads += 1
+            # For accounting purposes,we consider the thread idle until it actually has a container it is fetching.
+            self.__idle_workers_count += 1
+
+    def __worker(self):
+        """The body for the worker threads.
+        """
+        while True:
+            # Get the next container to fetch if there is one.
+            container_id, is_stopped = self._get_fetch_task()
+            if is_stopped:
+                return
+
+            result = None
+            try:
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3,
+                                  'Attempting to retrieve metrics for cid=%s' % container_id)
+                result = self.__docker_client.stats(container=container_id, stream=False)
+            except Exception, e:
+                self.__logger.error("Error readings stats for '%s': %s\n%s" % (container_id, str(e),
+                                                                               traceback.format_exc()),
+                                    limit_once_per_x_secs=300, limit_key='api-stats-%s' % container_id)
+            self._record_fetch_result(container_id, result)
+
+    def _add_fetch_task(self, container_id):
+        """Adds the specified container to the list of containers whose metrics will be fetched.  Eventually, a worker
+        thread will grab this container and fetch its metrics.
+
+        IMPORTANT: callers must hold `__lock` when invoking this method.
+
+        @param container_id:  The container whose metrics should be fetched.
+        @type container_id: str
+        """
+        self.__remaining_metrics_count += 1
+        self.__container_scoreboard[container_id] = self.__PENDING
+        self.__pending_fetches.append(container_id)
+        # Notify any worker threads waiting for a container.
+        self.__cv.notifyAll()
+
+        # We need to spin up new worker threads if the amount of remaining metrics (PENDING or IN-FLIGHT) is greater
+        # than the number of threads we already have.
+        if self.__remaining_metrics_count > self.__num_worker_threads and self.__num_worker_threads < self.__concurrency:
+            self.__start_workers(self.__remaining_metrics_count - self.__num_worker_threads)
+
+    def _record_fetch_result(self, container_id, result):
+        """Record that the `stats` result for the specified container.  If there was an error, result should be
+        None.
+        @type container_id: str
+        @type result: JsonObject
+        """
+        self.__lock.acquire()
+        try:
+            self.__container_scoreboard[container_id] = result
+            self.__remaining_metrics_count -= 1
+            # Since this is only invoked by a worker once their stats call is done, we know they are now idle.
+            self.__idle_workers_count += 1
+            # Wake up any thread that was waiting on this result.
+            self.__cv.notifyAll()
+        finally:
+            self.__lock.release()
