@@ -1303,6 +1303,8 @@ class DockerMetricFetcher(object):
         """Adds the specified container to the list of containers whose metrics will be fetched.  Eventually, a worker
         thread will grab this container and fetch its metrics.
 
+        IMPORTANT: callers must hold `__lock` when invoking this method.
+
         @param container_id:  The container whose metrics should be fetched.
         @type container_id: str
         """
