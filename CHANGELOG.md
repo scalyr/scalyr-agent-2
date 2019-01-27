@@ -1,6 +1,21 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.42 "Unas" - Jan 27, 2019
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 27, 2019 11:15 -0800
+--->
+
+Features
+* Add in v2 K8s support.  You must configure a k8s cluster name to start using the new v2 support.  See Kubernetes Agent Install directions.
+
+Bugs
+* Only allow non-secure connections to Scalyr if explicit override option is sset.
+* Redesign of k8s cache to better handle large number of pods
+* Allow the k8s api server address to be set via a configuration option.
+* Parallelized container metric fetches to avoid not being able to collect metrics in time.
+
 ## 2.0.41 "Q" - Dec 12, 2018
 
 <!---
