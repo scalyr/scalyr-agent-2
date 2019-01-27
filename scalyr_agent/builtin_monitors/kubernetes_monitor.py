@@ -152,6 +152,10 @@ define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
                       'names.  This may be used to fix breakages when you relied on the v1 attribute names',
                       convert_to=bool, default=False)
 
+define_config_option( __monitor__, 'k8s_api_url',
+                      'Optional (defaults to "https://kubernetes.default"). The URL for the Kubernetes API server for '
+                      'this cluster.', convert_to=str, default='https://kubernetes.default')
+
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
                      'Increase this value if you want less network traffic from querying the k8s api.  Decrease this value if you '
@@ -599,10 +603,11 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
+            k8s_api_url = self._config('k8s_api_url')
             if self._config.get( 'verify_k8s_api_queries' ):
-                self.__k8s = KubernetesApi()
+                self.__k8s = KubernetesApi(k8s_api_url=k8s_api_url)
             else:
-                self.__k8s = KubernetesApi( ca_file=None )
+                self.__k8s = KubernetesApi( ca_file=None, k8s_api_url=k8s_api_url)
 
             self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
@@ -1519,7 +1524,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-
+        self.__k8s_api_url = self._config.get('k8s_api_url')
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
         self.__metric_fetcher = DockerMetricFetcher(self.__client, self._config.get('docker_max_parallel_stats'),
@@ -1984,7 +1989,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                 self.__report_k8s_metrics = self.__report_container_metrics
 
             if self.__report_k8s_metrics:
-                k8s = KubernetesApi()
+                k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
                 self.__kubelet_api = KubeletApi( k8s )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )

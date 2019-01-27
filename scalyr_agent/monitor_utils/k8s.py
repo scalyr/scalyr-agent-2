@@ -738,7 +738,8 @@ class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
     """
 
-    def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt' ):
+    def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
+                  k8s_api_url="https://kubernetes.default"):
         """Init the kubernetes object
         """
 
@@ -749,7 +750,7 @@ class KubernetesApi( object ):
         # fixed well known location for namespace file
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
-        self._http_host="https://kubernetes.default"
+        self._http_host = k8s_api_url
 
         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host )
         self._timeout = 10.0
