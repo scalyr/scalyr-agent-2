@@ -603,7 +603,7 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            k8s_api_url = self._config('k8s_api_url')
+            k8s_api_url = self._config.get('k8s_api_url')
             if self._config.get( 'verify_k8s_api_queries' ):
                 self.__k8s = KubernetesApi(k8s_api_url=k8s_api_url)
             else:
