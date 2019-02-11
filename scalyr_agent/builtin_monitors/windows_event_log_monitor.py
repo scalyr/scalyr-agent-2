@@ -33,6 +33,7 @@ except ImportError:
     windll = None
 
 from scalyr_agent import ScalyrMonitor, define_config_option
+import scalyr_agent.scalyr_logging as scalyr_logging
 
 __author__ = 'imron@imralsoftware.com'
 
@@ -76,6 +77,18 @@ define_config_option(__monitor__, 'server_name',
                      'Optional (defaults to ``localhost``). The remote server where the event log is to be opened\n',
                      default='localhost', convert_to=str)
 
+define_config_option(__monitor__, 'remote_user',
+                     'Optional (defaults to ``None``). The username to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n',
+                     default=None, convert_to=str)
+
+define_config_option(__monitor__, 'remote_password',
+                     'Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n',
+                     default=None, convert_to=str)
+
+define_config_option(__monitor__, 'remote_domain',
+                     'Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above\n',
+                     default=None, convert_to=str)
+
 class Api( object ):
     def __init__( self, config, logger ):
         self._checkpoints = {}
@@ -89,7 +102,7 @@ class Api( object ):
     def checkpoints( self ):
         return self._checkpoints
 
-    def load_checkpoints( self, checkpoints ):
+    def load_checkpoints( self, checkpoints, config ):
         pass
 
     def update_checkpoints( self ):
@@ -122,7 +135,7 @@ class OldApi( Api ):
 
         self.__sources = source_list
 
-    def load_checkpoints( self, checkpoints ):
+    def load_checkpoints( self, checkpoints, config ):
         for source, record_number in checkpoints.iteritems():
             self._checkpoints[source] = record_number
 
@@ -221,6 +234,7 @@ class NewApi( Api ):
         self.__bookmark_lock = threading.Lock()
         self.__channels = channels
         self.__channel_list = []
+        self._session = None
         seen = {}
         # build a list of unique channels
         for info in channels:
@@ -232,7 +246,29 @@ class NewApi( Api ):
 
         self.__bookmarks = {}
 
-    def load_checkpoints( self, checkpoints ):
+    def load_checkpoints( self, checkpoints, config ):
+
+        # see if we need to create a remote connection
+        if self._server is not None and self._server != 'localhost':
+            username = config.get( 'remote_user' )
+            password = config.get( 'remote_password' )
+            domain = config.get( 'remote_domain' )
+            flags = win32evtlog.EvtRpcLoginAuthDefault
+
+            # login object is a tuple
+            login = (self._server, username, domain, password, flags )
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_0, "Performing remote login: server - %s, user - %s, domain - %s" % (self._server, username, domain) )
+
+            session = None
+            session = win32evtlog.EvtOpenSession( login, win32evtlog.EvtRpcLogin, 0, 0 )
+
+            if session is None:
+                #0 means to call GetLastError for the error code
+                error_message = win32api.FormatMessage(0)
+                self._logger.warn( "Error connecting to remote server %s, as %s - %s" % ( self._server, username, error_message ) )
+                raise Exception( "Error connecting to remote server %s, as %s - %s" % ( self._server, username, error_message ) )
+
+            self._session = session
 
         # only use new checkpoints
         if 'api' not in checkpoints or checkpoints['api'] != 'new':
@@ -264,7 +300,21 @@ class NewApi( Api ):
                 finally:
                     self.__bookmark_lock.release()
 
-                self.__eventHandles.append( win32evtlog.EvtSubscribe( channel, flags, Bookmark=bookmark, Query=query, Callback=event_callback, Context=self ) )
+                error_message = None
+                try:
+                    handle = win32evtlog.EvtSubscribe( channel, flags, Bookmark=bookmark, Query=query, Callback=event_callback, Context=self, Session=self._session )
+                except Exception, e:
+                    handle = None
+                    error_message = win32api.FormatMessage( 0 )
+
+                if handle is None:
+                    self._logger.warn( "Error subscribing to channel '%s' - %s" % (channel, error_message) )
+                else:
+                    self.__eventHandles.append( handle )
+
+        # make sure we have at least one successfully subscribed channel
+        if len( self.__eventHandles ) == 0:
+            raise Exception( "Failed to subscribe to any channels" )
 
     def update_checkpoints( self ):
         self._checkpoints['api'] = 'new'
@@ -484,7 +534,7 @@ and System sources:
             self._logger.info( "No checkpoint file '%s' exists.\nAll logs will be read starting from their current end.", self.__checkpoint_file )
             checkpoints = {}
 
-        self.__api.load_checkpoints( checkpoints )
+        self.__api.load_checkpoints( checkpoints, self._config )
 
     def __update_checkpoints( self ):
         # updatedate the api's checkpoints
