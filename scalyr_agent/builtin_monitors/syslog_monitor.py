@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author:  Imron Alston <imron@imralsoftware.com>
+# author:  Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@imralsoftware.com'
+__author__ = 'imron@scalyr.com'
 
 import errno
 import glob

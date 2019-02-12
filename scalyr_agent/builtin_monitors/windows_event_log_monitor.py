@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-# author:  Imron Alston <imron@imralsoftware.com>
+# author:  Imron Alston <imron@scalyr.com>
 
 import datetime
 import os
@@ -34,7 +34,7 @@ except ImportError:
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 
-__author__ = 'imron@imralsoftware.com'
+__author__ = 'imron@scalyr.com'
 
 __monitor__ = __name__
 

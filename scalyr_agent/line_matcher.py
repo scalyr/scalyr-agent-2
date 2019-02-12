@@ -18,11 +18,11 @@
 # See here for a more detailed description of each log type:
 # https://www.scalyr.com/help/parsing-logs#multiline
 #
-# author: Imron Alston <imron@imralsoftware.com>
+# author: Imron Alston <imron@scalyr.com>
 
 import re
 
-__author__ = 'imron@imralsoftware.com'
+__author__ = 'imron@scalyr.com'
 
 
 class LineMatcher(object):

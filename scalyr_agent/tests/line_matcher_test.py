@@ -13,9 +13,9 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# author: Imron Alston <imron@imralsoftware.com>
+# author: Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@imralsoftware.com'
+__author__ = 'imron@scalyr.com'
 
 import time
 import unittest

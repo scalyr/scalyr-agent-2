@@ -13,12 +13,12 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 #
-# author: Imron Alston <imron@imralsoftware.com>
+# author: Imron Alston <imron@scalyr.com>
 #
 # An empty monitor, that will return immediately without doing anything
 
 
-__author__ = 'imron@imralsoftware.com'
+__author__ = 'imron@scalyr.com'
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
