@@ -19,6 +19,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import datetime
+import fnmatch
 import os
 import threading
 import time
@@ -280,6 +281,14 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         return self.__log_matchers
 
+    def __path_in_globs( self, path, path_globs ):
+        """ Returns the first glob pattern in 'path_globs' that matches 'path' if one exists."""
+        for p in path_globs:
+            if fnmatch.fnmatch( path, p ):
+                return p
+
+        return None
+
     def add_log_config( self, monitor, log_config ):
         """Add the log_config item to the list of paths being watched
         params: log_config - a log_config object containing the path to be added
@@ -289,12 +298,20 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         self.__lock.acquire()
         try:
-            if log_config['path'] not in self.__all_paths:
+            path = self.__path_in_globs( log_config['path'], self.__all_paths.keys() )
+            if path is None:
                 log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
                 self.__pending_log_matchers.append( LogMatcher( self.__config, log_config ) )
                 self.__all_paths[log_config['path']] = 1
+                path = log_config['path']
             else:
-                self.__all_paths[log_config['path']] += 1
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'New log file \'%s\' already matches \'%s\' for monitor \'%s\'' % (log_config['path'], path, monitor.module_name ) )
+                # log_config['path'] and path will not be equal if log_config['path'] matched path
+                # because of a glob pattern.  They will only be equal if they are the exact same path.
+                # We want to ignore any added paths that match a glob pattern, and so we skip over incrementing the path count
+                # unless they are the exact same path.
+                if path == log_config['path']:
+                    self.__all_paths[path] += 1
 
             # if the log was previously pending removal, cancel the pending removal
             self.__logs_pending_removal.pop( log_config['path'], None )
