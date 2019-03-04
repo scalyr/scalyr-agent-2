@@ -1,6 +1,17 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.43 "Vorta" - Feb 27, 2019
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Feb 27, 2019 11:15 -0800
+--->
+
+NOTE: This release is still under development.  Release date TBD.
+
+Bugs
+* Fix issue preventing log configs with glob patterns to override exact match patterns.  This is required to help override redaction and parsers rules for Docker.
+
 ## 2.0.42 "Unas" - Jan 27, 2019
 
 <!---
