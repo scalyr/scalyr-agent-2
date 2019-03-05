@@ -92,7 +92,8 @@ class K8sApiAuthorizationException( K8sApiException ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
     """
-    pass
+    def __init( self, path ):
+        super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
 
 class KubeletApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
@@ -719,6 +720,15 @@ class KubernetesCache( object ):
         """
         return self._pods.lookup( namespace, name, kind='Pod', current_time=current_time )
 
+    def controller( self, namespace, name, kind, current_time=None ):
+        """ returns controller info for the controller specified by namespace and name
+        or None if no controller matches.
+
+        Querying the controller information is thread-safe, but the returned object should
+        not be written to.
+        """
+        return self._controllers.lookup( namespace, name, kind=kind, current_time=current_time )
+
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
@@ -803,21 +813,6 @@ class KubernetesApi( object ):
             self._session = requests.Session()
             self._session.headers.update( self._standard_headers )
 
-    def build_filter_for_current_node( self ):
-        """Builds a fieldSelector filter limited to the current node to be used when querying pods the k8s api"""
-        result = None
-        try:
-            pod_name = self.get_pod_name()
-            node_name = self.get_node_name( pod_name )
-
-            if node_name:
-                result = 'spec.nodeName=%s' % node_name
-            else:
-                global_log.warning( "Unable to get node name for pod '%s'.  This will have negative performance implications for clusters with a large number of pods.  Please consider setting the environment variable SCALYR_K8S_NODE_NAME to valueFrom:fieldRef:fieldPath:spec.nodeName in your yaml file" )
-        except Exception, e:
-            global_log.warn( "Failed to build k8s filter %s\n%s" % (str(e), traceback.format_exc() ))
-
-        return result
     def get_pod_name( self ):
         """ Gets the pod name of the pod running the scalyr-agent """
         return os.environ.get( 'SCALYR_K8S_POD_NAME' ) or os.environ.get( 'HOSTNAME' )
@@ -878,7 +873,7 @@ class KubernetesApi( object ):
         response.encoding = "utf-8"
         if response.status_code != 200:
             if response.status_code == 401 or response.status_code == 403:
-                raise K8sApiAuthorizationException( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
+                raise K8sApiAuthorizationException( path )
 
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )

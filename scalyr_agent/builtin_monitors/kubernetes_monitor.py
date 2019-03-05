@@ -1771,7 +1771,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                 name = controller.name
 
             k8s_extra = {
-                key: controller.name
+                key: name
             }
         return k8s_extra
 

@@ -16,14 +16,16 @@
 
 __author__ = 'imron@scalyr.com'
 
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubernetesCache
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, KubernetesCache
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
+import datetime
 import re
 import traceback
 import time
+import urllib
 
 import logging
 import logging.handlers
@@ -35,6 +37,7 @@ from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVE
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 from scalyr_agent.util import StoppableThread
 import scalyr_agent.json_lib as json_lib
+import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -75,9 +78,9 @@ define_config_option( __monitor__, 'message_log',
                      convert_to=str, default='kubernetes_events.log')
 
 define_config_option( __monitor__, 'event_object_filter',
-                     'Optional (defaults to [\'Pod\', \'Deployment\', \'DaemonSet\', \'Node\', \'ReplicaSet\'] ). A list of event object types to filter on. '
+                     'Optional (defaults to [ \'CronJob\', \'DaemonSet\', \'Deployment\', \'Job\', \'Node\', \'Pod\', \'ReplicaSet\', \'ReplicationController\', \'StatefulSet\' ] ). A list of event object types to filter on. '
                      'If set, only events whose `involvedObject` `kind` is on this list will be included.',
-                     default=['Pod', 'Deployment', 'DaemonSet', 'Node', 'ReplicaSet']
+                     default=[ 'CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet' ]
                      )
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
@@ -86,19 +89,32 @@ define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'want dynamic updates to annotation configuration values to be processed more quickly.',
                      convert_to=int, default=30)
 
-define_config_option( __monitor__, 'k8s_max_cache_misses',
-                     'Optional (defaults to 20). The maximum amount of single query k8s cache misses that can occur in `k8s_cache_miss_interval` '
-                     'secs before performing a full update of the k8s cache',
-                     convert_to=int, default=20)
+define_config_option( __monitor__, 'k8s_cache_purge_secs',
+                     'Optional (defaults to 300). The number of seconds to wait before purging unused items from the k8s cache',
+                     convert_to=int, default=300)
 
-define_config_option( __monitor__, 'k8s_cache_miss_interval',
-                     'Optional (defaults to 10). The number of seconds that `k8s_max_cache_misses` cache misses can occur in before '
-                     'performing a full update of the k8s cache',
-                     convert_to=int, default=10)
+define_config_option( __monitor__, 'k8s_ignore_namespaces',
+                      'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
+                      'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
 
 define_config_option( __monitor__, 'leader_check_interval',
                      'Optional (defaults to 60). The number of seconds to check to see if we are still the leader.',
                      convert_to=int, default=60)
+
+define_config_option( __monitor__, 'leader_node',
+                     'Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node.',
+                     convert_to=str, default=None)
+
+define_config_option( __monitor__, 'check_labels',
+                     'Optional (defaults to False). If true, then the monitor will check for any nodes with the label '
+                     '`agent.config.scalyr.com/events_leader=true` and the node with this label set and that has the oldest'
+                     'creation time will be the event monitor leader.',
+                     convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'ignore_master',
+                     'Optional (defaults to True). If true, then the monitor will ignore any nodes with the label '
+                     '`node-role.kubernetes.io/master` when determining which node is the event monitor leader.',
+                     convert_to=bool, default=True)
 
 class KubernetesEventsMonitor( ScalyrMonitor ):
     """
@@ -118,7 +134,6 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         self.__module = None
 
         self._node_name = None
-        self._pod_name = None
 
         #configure the logger and path
         self.__message_log = self._config.get( 'message_log' )
@@ -129,6 +144,11 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         }
 
         self._leader_check_interval = self._config.get( 'leader_check_interval' )
+        self._leader_node = self._config.get( 'leader_node' )
+        self._check_labels = self._config.get( 'check_labels' )
+        self._ignore_master = self._config.get( 'ignore_master' )
+
+        self._current_leader = self._leader_node
 
         self.__flush_delay = self._config.get('log_flush_delay')
         try:
@@ -138,12 +158,16 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             global_log.error( "Error setting monitor attribute in KubernetesEventMonitor" )
 
         self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
-        self.__k8s_max_cache_misses = self._config.get( 'k8s_max_cache_misses' )
-        self.__k8s_cache_miss_interval = self._config.get( 'k8s_cache_miss_interval' )
+        self.__k8s_cache_purge_secs = self._config.get( 'k8s_cache_purge_secs' )
+
+        # The namespace whose logs we should not collect.
+        self.__k8s_namespaces_to_ignore = []
+        for x in self._config.get('k8s_ignore_namespaces').split():
+            self.__k8s_namespaces_to_ignore.append(x.strip())
 
         default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
 
-        self.__event_object_filter = self._config.get( 'event_object_filter', [ 'Pod', 'Deployment', 'DaemonSet', 'Node', 'ReplicaSet' ] )
+        self.__event_object_filter = self._config.get( 'event_object_filter', [  'CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet' ] )
 
         self.__max_log_size = self._config.get( 'max_log_size' )
         if self.__max_log_size is None:
@@ -192,34 +216,140 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
     def set_log_watcher( self, log_watcher ):
         self.__log_watcher = log_watcher
 
+    def _check_if_alive( self, k8s, node ):
+        """
+            Checks to see if the node specified by `node` is alive
+        """
+        if node is None:
+            return False
+
+        result = {}
+        try:
+            # this call will throw an exception on failure
+            result = k8s.query_api( '/api/v1/nodes/%s' % node )
+        except Exception, e:
+            return False
+
+        # if we are here, then the above node exists so return True
+        return True
+
+    def _get_oldest_node( self, nodes, ignore_master ):
+        """
+            Takes a list of nodes returned from querying the k8s api, and returns the name
+            of the node with the oldest creationTimestamp or None if nodes is empty or doesn't
+            contain Node objects.
+
+            if `ignore_master` is true, then any nodes with the label `node-role.kubernetes.io/master` are ignored.
+        """
+
+        oldest_time = datetime.datetime.utcnow()
+        oldest = None
+
+        # loop over all nodes and find the one with the oldest create time
+        for node in nodes:
+            metadata = node.get( 'metadata', {} )
+            create_time = metadata.get( 'creationTimestamp', None )
+            if create_time is None:
+                continue
+
+            name = metadata.get( 'name', None )
+            if name is None:
+                continue
+
+            # skip the master node if necessary
+            labels = metadata.get( 'labels', {} )
+            if ignore_master and 'node-role.kubernetes.io/master' in labels:
+                continue
+
+            #convert to datetime
+            create_time = scalyr_util.rfc3339_to_datetime( create_time )
+
+            # if we are older than the previous oldest datetime, then update the oldest time
+            if create_time is not None and create_time < oldest_time:
+                oldest_time = create_time
+                oldest = name
+
+        return oldest
+
+    def _check_nodes_for_leader( self, k8s, query_fields='' ):
+        """
+            Checks all nodes on the cluster to see which one has the oldest creationTime
+            If `ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
+            is ignored.
+        """
+        response = k8s.query_api( '/api/v1/nodes%s' % query_fields )
+        nodes = response.get( 'items', [] )
+
+        # sort the list by node name to ensure consistent processing order
+        # if two nodes have exactly the same creation time
+        nodes.sort( key=lambda n: n.get( 'metadata', {} ).get( 'name', '' ) )
+
+        # the leader is the longest running node
+        return self._get_oldest_node( nodes, self._ignore_master )
+
+    def _get_current_leader( self, k8s ):
+        """
+            Queries the kubernetes api to see which node is the current leader node.
+
+            If there is currently a leader node, then only that node is polled to see if it still
+            exists.
+
+            Check to see if the leader is specified as a node label.
+            If not, then if there is not a current leader node, or if the current leader node no longer exists
+            then query all nodes for the leader
+        """
+
+        try:
+            leader = None
+            # first check to see if the leader node is specified as a label
+            # we do this first in case the label has been moved to a different node but the old node is still
+            # alive
+            if self._check_labels:
+                query = "?labelSelector=%s" % (urllib.quote( 'agent.config.scalyr.com/events_leader=true' ) )
+                leader = self._check_nodes_for_leader( k8s, query )
+
+            # if no labelled leader was found, then check to see if the previous leader is still alive
+            if leader is None:
+                if self._check_if_alive( k8s, self._current_leader ):
+                    # still the same leader
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "New leader same as the old leader" )
+                    leader = self._current_leader
+                else:
+                    # previous leader is not alive so check all nodes for the leader
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Checking for a new leader" )
+                    leader = self._check_nodes_for_leader( k8s )
+            else:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader set from label" )
+
+            # update the global leader (leader can be None)
+            self._current_leader = leader
+
+        except K8sApiException, e:
+            global_log.error( "get current leader: %s, %s" %( str(e), traceback.format_exc() ) )
+
+        return self._current_leader
+
+
     def _is_leader(self, k8s):
         """
         Detects if this agent is the `leader` for events in a cluster.  In order to prevent duplicates, only `leader` agents will log events.
         """
-        if self._pod_name is None:
+        if self._node_name is None:
             return False
 
-        result = k8s.query_pod( k8s.namespace, self._pod_name )
-        if result is None:
-            return False
-
-        metadata = result.get( 'metadata', {} )
-        annotations = metadata.get( 'annotations', {} )
+        # see if we have a fixed leader node specified
+        leader = self._leader_node
 
         try:
-            annotations = annotation_config.process_annotations( annotations, annotation_prefix_re=SCALYR_CONFIG_ANNOTATION_RE )
-        except BadAnnotationConfig, e:
-            self._logger.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (k8s.namespace, self._pod_name, str( e )),
-                                  limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s/%s' % (k8s.namespace, self._pod_name) )
-            annotations = JsonObject()
+            # if not then query the k8s api for the leader
+            if leader is None:
+                leader = self._get_current_leader( k8s )
 
-        result = True
-        try:
-            result = annotations.get_bool( 'is_leader', False )
+            # check if this node is the current leader node
         except Exception, e:
-            result = False
-    
-        return result
+            global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Unexpected error checking for leader: %s" % (str(e)))
+
+        return leader is not None and self._node_name == leader
 
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
@@ -227,33 +357,43 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         try:
             k8s = KubernetesApi()
 
-            k8s_filter = k8s.build_filter_for_current_node()
-
             # create the k8s cache
             k8s_cache = KubernetesCache( k8s, self._logger,
                 cache_expiry_secs=self.__k8s_cache_expiry_secs,
-                max_cache_misses=self.__k8s_max_cache_misses,
-                cache_miss_interval=self.__k8s_cache_miss_interval,
-                filter=k8s_filter )
+                cache_purge_secs=self.__k8s_cache_purge_secs,
+                namespaces_to_ignore=self.__k8s_namespaces_to_ignore
+                )
 
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
 
-            self._pod_name = k8s.get_pod_name()
+            pod_name = k8s.get_pod_name()
+            self._node_name = k8s.get_node_name( pod_name )
             cluster_name = k8s.get_cluster_name()
 
             last_event = None
             last_resource = 0
-            while not self._is_stopped():
-                if not self._is_leader( k8s ):
-                    self._sleep_but_awaken_if_stopped(self._leader_check_interval)
-                    continue
 
+            last_check = time.time() - self._leader_check_interval
+
+            while not self._is_stopped():
+                current_time = time.time()
+
+                # if we are the leader, we could be going through this loop before the leader_check_interval
+                # has expired, so make sure to only check for a new leader if the interval has expired
+                if last_check + self._leader_check_interval <= current_time:
+                    last_check = current_time
+                    # check if we are the leader
+                    if not self._is_leader( k8s ):
+                        #if not, then sleep and try again
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader is %s" % (str(self._current_leader)) )
+                        self._sleep_but_awaken_if_stopped(self._leader_check_interval)
+                        continue
+
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader is %s" % (str(self._current_leader)) )
                 try:
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
-
-                    current_time = time.time()
 
                     json = {}
                     for line in lines:
@@ -271,6 +411,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                                 # if so, reset to None to get all events, we'll skip over the already seen
                                 # ones later
                                 last_event = None
+                                global_log.log( scalyr_logging.DEBUG_LEVEL_1, "K8S resource expired" )
                                 continue
 
                         # resource version hasn't expired, so update it to the most recently seen version
@@ -281,6 +422,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         # skip any events with resourceVersions higher than ones we've already seen
                         resource_version = metadata.get_int( "resourceVersion", None, none_if_missing=True )
                         if resource_version and resource_version <= last_resource:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Skipping older resource events" )
                             continue
 
                         last_resource = resource_version
@@ -290,6 +432,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         involved = obj.get( "involvedObject", JsonObject())
                         kind = involved.get( 'kind', None, none_if_missing=True )
                         if kind and kind not in self.__event_object_filter:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to unknown kind %s - %s" % (kind, str(metadata) ) )
                             continue
 
                         # get cluster and deployment information
@@ -297,21 +440,25 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         if kind:
                             name = involved.get( 'name', None, none_if_missing=True )
                             namespace = involved.get( 'namespace', None, none_if_missing=True )
+
                             if kind == 'Pod':
                                 pod = k8s_cache.pod( namespace, name, current_time )
-                                if pod and pod.deployment_name:
-                                    k8s_fields += " deployment-name=%s" % pod.deployment_name
-                            elif kind == 'ReplicaSet':
-                                rs = k8s_cache.replicaset( namespace, name, current_time )
-                                if rs and rs.deployment_name:
-                                    k8s_fields += " deployment-name=%s" % rs.deployment_name
-                            elif kind == 'Deployment':
-                                deployment = k8s_cache.deployment( namespace, name, current_time )
-                                if deployment:
-                                    k8s_fields += " deployment-name=%s" % deployment.name
+                                if pod and pod.controller:
+                                    k8s_fields += " deployment-name=%s" % pod.controller.name
+                            elif kind == 'Node':
+                                pass # don't add deployment info for node events
+                            else:
+                                controller = k8s_cache.controller( namespace, name, kind, current_time )
+                                if controller:
+                                    k8s_fields += " deployment-name=%s" % controller.name
 
                         # if so, log to disk
                         self.__disk_logger.info( "%s %s" % (k8s_fields, str( line )) )
+
+                        # see if we need to check for a new leader
+                        if last_check + self._leader_check_interval <= current_time:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Time to check for a new event leader" )
+                            continue
                     
                 except ConnectionError, e:
                     # ignore these, and just carry on querying in the next iteration
