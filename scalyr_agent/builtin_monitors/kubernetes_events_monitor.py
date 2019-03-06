@@ -98,7 +98,7 @@ define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
 
 define_config_option( __monitor__, 'leader_check_interval',
-                     'Optional (defaults to 60). The number of seconds to check to see if we are still the leader.',
+                     'Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader.',
                      convert_to=int, default=60)
 
 define_config_option( __monitor__, 'leader_node',
@@ -107,7 +107,7 @@ define_config_option( __monitor__, 'leader_node',
 
 define_config_option( __monitor__, 'check_labels',
                      'Optional (defaults to False). If true, then the monitor will check for any nodes with the label '
-                     '`agent.config.scalyr.com/events_leader=true` and the node with this label set and that has the oldest'
+                     '`agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldest'
                      'creation time will be the event monitor leader.',
                      convert_to=bool, default=False)
 
@@ -274,8 +274,10 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
     def _check_nodes_for_leader( self, k8s, query_fields='' ):
         """
             Checks all nodes on the cluster to see which one has the oldest creationTime
-            If `ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
+            If `self._ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
             is ignored.
+            @param: k8s - a KubernetesApi object for querying the k8s api
+            @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
         response = k8s.query_api( '/api/v1/nodes%s' % query_fields )
         nodes = response.get( 'items', [] )
@@ -297,32 +299,33 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             Check to see if the leader is specified as a node label.
             If not, then if there is not a current leader node, or if the current leader node no longer exists
             then query all nodes for the leader
+            @param: k8s - a KubernetesApi object for querying the k8s api
         """
 
         try:
-            leader = None
+            new_leader = None
             # first check to see if the leader node is specified as a label
             # we do this first in case the label has been moved to a different node but the old node is still
             # alive
             if self._check_labels:
-                query = "?labelSelector=%s" % (urllib.quote( 'agent.config.scalyr.com/events_leader=true' ) )
-                leader = self._check_nodes_for_leader( k8s, query )
+                query = "?labelSelector=%s" % (urllib.quote( 'agent.config.scalyr.com/events_leader_candidate=true' ) )
+                new_leader = self._check_nodes_for_leader( k8s, query )
 
             # if no labelled leader was found, then check to see if the previous leader is still alive
-            if leader is None:
-                if self._check_if_alive( k8s, self._current_leader ):
+            if new_leader is not None:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader set from label" )
+            else:
+                if self._current_leader is not None and self._check_if_alive( k8s, self._current_leader ):
                     # still the same leader
                     global_log.log( scalyr_logging.DEBUG_LEVEL_0, "New leader same as the old leader" )
-                    leader = self._current_leader
+                    new_leader = self._current_leader
                 else:
                     # previous leader is not alive so check all nodes for the leader
                     global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Checking for a new leader" )
-                    leader = self._check_nodes_for_leader( k8s )
-            else:
-                global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader set from label" )
+                    new_leader = self._check_nodes_for_leader( k8s )
 
             # update the global leader (leader can be None)
-            self._current_leader = leader
+            self._current_leader = new_leader
 
         except K8sApiException, e:
             global_log.error( "get current leader: %s, %s" %( str(e), traceback.format_exc() ) )
@@ -350,6 +353,34 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Unexpected error checking for leader: %s" % (str(e)))
 
         return leader is not None and self._node_name == leader
+
+    def _is_resource_expired( self, response ):
+        """
+            Checks to see if the resource identified in `response` is expired or not.
+            @param: response - a response from querying the k8s api for a resource
+        """
+        obj = response.get( "object", JsonObject() )
+
+        # check to see if the resource version we are using has expired
+        return response.get( 'type', '' ) == 'ERROR' and obj.get( 'kind', '' ) == 'Status' and obj.get( 'reason', '' ) == 'Expired'
+
+    def _get_involved_object( self, obj ):
+        """
+            Processes an object returned from querying the k8s api, and determines whether the object
+            has an `involvedObject` and if so returns a tuple containing the kind, namespace and name of the involved object.
+            Otherwise returns (None, None, None)
+            @param: obj - an object returned from querying th k8s api
+        """
+        involved = obj.get( "involvedObject", JsonObject())
+        kind = involved.get( 'kind', None, none_if_missing=True )
+        namespace = None
+        name = None
+
+        if kind:
+            name = involved.get( 'name', None, none_if_missing=True )
+            namespace = involved.get( 'namespace', None, none_if_missing=True )
+
+        return ( kind, namespace, name )
 
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
@@ -403,16 +434,13 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                             global_log.warning( "Error parsing event json: %s, %s, %s" % (line, str(e), traceback.format_exc() ) )
                             continue
 
-                        obj = json.get( "object", JsonObject() )
-
                         # check to see if the resource version we are using has expired
-                        if json.get( 'type', '' ) == 'ERROR':
-                            if obj.get( 'kind', '' ) == 'Status' and obj.get( 'reason', '' ) == 'Expired':
-                                # if so, reset to None to get all events, we'll skip over the already seen
-                                # ones later
-                                last_event = None
-                                global_log.log( scalyr_logging.DEBUG_LEVEL_1, "K8S resource expired" )
-                                continue
+                        if self._is_resource_expired( json ):
+                            last_event = None
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "K8S resource expired" )
+                            continue
+
+                        obj = json.get( "object", JsonObject() )
 
                         # resource version hasn't expired, so update it to the most recently seen version
                         last_event = last_resource
@@ -429,28 +457,35 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         last_event = resource_version
 
                         # see if this event is about an object we are interested in
-                        involved = obj.get( "involvedObject", JsonObject())
-                        kind = involved.get( 'kind', None, none_if_missing=True )
-                        if kind and kind not in self.__event_object_filter:
+                        (kind, namespace, name) = self._get_involved_object( obj )
+
+                        if kind is None:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to None kind" )
+                            continue
+
+                        # exclude any events that don't involve objects we are interested in
+                        if self.__event_object_filter and kind not in self.__event_object_filter:
                             global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to unknown kind %s - %s" % (kind, str(metadata) ) )
+                            continue
+
+                        # ignore events that belong to namespaces we are not interested in
+                        if namespace in self.__k8s_namespaces_to_ignore:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to belonging to an excluded namespace" % (namespace) )
                             continue
 
                         # get cluster and deployment information
                         k8s_fields = "cluster-name=%s" % cluster_name
-                        if kind:
-                            name = involved.get( 'name', None, none_if_missing=True )
-                            namespace = involved.get( 'namespace', None, none_if_missing=True )
 
-                            if kind == 'Pod':
-                                pod = k8s_cache.pod( namespace, name, current_time )
-                                if pod and pod.controller:
-                                    k8s_fields += " deployment-name=%s" % pod.controller.name
-                            elif kind == 'Node':
-                                pass # don't add deployment info for node events
-                            else:
-                                controller = k8s_cache.controller( namespace, name, kind, current_time )
-                                if controller:
-                                    k8s_fields += " deployment-name=%s" % controller.name
+                        if kind == 'Pod':
+                            pod = k8s_cache.pod( namespace, name, current_time )
+                            if pod and pod.controller:
+                                k8s_fields += " deployment-name=%s" % pod.controller.name
+                        elif kind == 'Node':
+                            pass # don't add deployment info for node events
+                        else:
+                            controller = k8s_cache.controller( namespace, name, kind, current_time )
+                            if controller:
+                                k8s_fields += " deployment-name=%s" % controller.name
 
                         # if so, log to disk
                         self.__disk_logger.info( "%s %s" % (k8s_fields, str( line )) )
@@ -458,7 +493,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         # see if we need to check for a new leader
                         if last_check + self._leader_check_interval <= current_time:
                             global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Time to check for a new event leader" )
-                            continue
+                            break
                     
                 except ConnectionError, e:
                     # ignore these, and just carry on querying in the next iteration
