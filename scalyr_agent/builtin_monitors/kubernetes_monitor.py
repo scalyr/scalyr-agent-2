@@ -692,7 +692,6 @@ class ContainerChecker( StoppableThread ):
 
         self.raw_logs = []
 
-
     def get_k8s_data( self ):
         """ Convenience wrapper to query and process all pods
             and pods retreived by the k8s API.
@@ -1772,7 +1771,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                 name = controller.name
 
             k8s_extra = {
-                key: controller.name
+                key: name
             }
         return k8s_extra
 

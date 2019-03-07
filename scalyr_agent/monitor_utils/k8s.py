@@ -92,7 +92,8 @@ class K8sApiAuthorizationException( K8sApiException ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
     """
-    pass
+    def __init( self, path ):
+        super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
 
 class KubeletApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
@@ -719,6 +720,15 @@ class KubernetesCache( object ):
         """
         return self._pods.lookup( namespace, name, kind='Pod', current_time=current_time )
 
+    def controller( self, namespace, name, kind, current_time=None ):
+        """ returns controller info for the controller specified by namespace and name
+        or None if no controller matches.
+
+        Querying the controller information is thread-safe, but the returned object should
+        not be written to.
+        """
+        return self._controllers.lookup( namespace, name, kind=kind, current_time=current_time )
+
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
         return self._pods.shallow_copy()
@@ -863,7 +873,7 @@ class KubernetesApi( object ):
         response.encoding = "utf-8"
         if response.status_code != 200:
             if response.status_code == 401 or response.status_code == 403:
-                raise K8sApiAuthorizationException( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
+                raise K8sApiAuthorizationException( path )
 
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
@@ -930,6 +940,30 @@ class KubernetesApi( object ):
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
         return self.query_api( '/api/v1/namespaces' )
+
+    def stream_events( self, path="/api/v1/watch/events", last_event=None ):
+        """Streams k8s events from location specified at path"""
+        self._ensure_session()
+        url = self._http_host + path
+
+        if last_event:
+            resource='resourceVersion=%s' % str(last_event)
+            if "?" in url:
+                resource = '&%s' % resource
+            else:
+                resource = '?%s' % resource
+
+            url += resource
+
+        response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout, stream=True )
+        if response.status_code != 200:
+            global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_stream_events' )
+            raise K8sApiException( "Invalid response from Kubernetes API when querying %d - '%s': %s" % ( response.status_code, path, str( response ) ) )
+
+        for line in response.iter_lines():
+            if line:
+                yield line
 
 class KubeletApi( object ):
     """
