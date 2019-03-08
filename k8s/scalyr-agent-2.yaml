@@ -31,6 +31,12 @@ spec:
                  name: scalyr-config
                  key: scalyr_server
                  optional: true
+          - name: K8S_EVENTS_DISABLE
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: k8s_events_disable
+                 optional: true
         resources:
           limits:
             memory: 500Mi

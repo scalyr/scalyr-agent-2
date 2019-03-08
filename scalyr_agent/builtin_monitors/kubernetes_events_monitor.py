@@ -22,6 +22,7 @@ import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 import datetime
+import os
 import re
 import traceback
 import time
@@ -188,6 +189,11 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         if self.__max_log_rotations is None:
             self.__max_log_rotations = default_rotation_count
 
+        # TODO: This should be a config option but we will wait until we have general support for options set via
+        # K8s ConfigMap
+        disable = str(os.environ.get('K8S_EVENTS_DISABLE', "false")).lower()
+        # Note, accepting just a single `t` here due to K8s ConfigMap issues with having a value of `true`
+        self.__disable_monitor = disable == 'true' or disable == 't'
 
     def open_metric_log( self ):
         """Override open_metric_log to prevent a metric log from being created for the Kubernetes Events Monitor
@@ -400,6 +406,10 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
         """
+        if self.__disable_monitor:
+            global_log.info('kubernetes_events_monitor exiting because it has been disabled.')
+            return
+
         try:
             k8s = KubernetesApi()
 
