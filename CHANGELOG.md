@@ -1,16 +1,18 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.43 "Vorta" - Feb 27, 2019
+## 2.0.43 "Vorta" - Mar 8, 2019
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Feb 27, 2019 11:15 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 8, 2019 15:15 -0800
 --->
 
-NOTE: This release is still under development.  Release date TBD.
+Features
+* Release of the `kubernetes_events_monitor` plugin with collects Kubernetes Events and pushes them into Scalyr.  See the [monitor documentation](https://www.scalyr.com/help/monitors/kubernetes-events) for more information.
 
 Bugs
 * Fix issue preventing log configs with glob patterns to override exact match patterns.  This is required to help override redaction and parsers rules for Docker.
+* Fix issue in mysql_monitor preventing error message from being logged
 
 ## 2.0.42 "Unas" - Jan 27, 2019
 
