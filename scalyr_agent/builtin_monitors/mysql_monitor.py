@@ -236,7 +236,8 @@ class MysqlDB(object):
             self._cursor.execute(sql)
         except pymysql.OperationalError, (errcode, msg):
             if errcode != 2006:  # "MySQL server has gone away"
-                raise Exception("Database error -- " + errcode)
+                self._logger.exception("Exception trying to execute query: %d '%s'" % (errcode, msg))
+                raise Exception("Database error -- " + str(errcode) + ": " + str(msg))
             self._reconnect()
             return None
         return self._cursor.fetchall()        
