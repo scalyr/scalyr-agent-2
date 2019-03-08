@@ -16,7 +16,7 @@
 
 __author__ = 'imron@scalyr.com'
 
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, KubernetesCache
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException, KubernetesCache
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
@@ -348,6 +348,17 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             # update the global leader (leader can be None)
             self._current_leader = new_leader
 
+        except K8sApiAuthorizationException:
+            global_log.warning("Could not determine K8s event leader due to authorization error.  The "
+                               "Scalyr Service Account does not have permission to retrieve the list of "
+                               "available nodes.  Please recreate the role with the latest definition which can be found "
+                               "at https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml "
+                               "K8s event collection will be disabled until this is resolved.  See the K8s install "
+                               "directions for instructions on how to create the role "
+                               "https://www.scalyr.com/help/install-agent-kubernetes", limit_once_per_x_secs=300,
+                               limit_key='k8s-events-no-permission')
+            self._current_leader = None
+            return None
         except K8sApiException, e:
             global_log.error( "get current leader: %s, %s" %( str(e), traceback.format_exc() ) )
 
@@ -444,7 +455,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                     if not self._is_leader( k8s ):
                         #if not, then sleep and try again
                         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader is %s" % (str(self._current_leader)) )
-                        if last_reported_leader != self._current_leader:
+                        if self._current_leader is not None and last_reported_leader != self._current_leader:
                             global_log.info('Kubernetes event leader is %s' % str(self._current_leader))
                             last_reported_leader = self._current_leader
                         self._sleep_but_awaken_if_stopped(self._leader_check_interval)
