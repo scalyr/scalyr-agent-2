@@ -32,6 +32,7 @@ import logging.handlers
 
 from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
 from scalyr_agent.log_watcher import LogWatcher
+from scalyr_agent.scalyr_logging import BaseFormatter
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVEL_2
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
@@ -116,6 +117,16 @@ define_config_option( __monitor__, 'ignore_master',
                      '`node-role.kubernetes.io/master` when determining which node is the event monitor leader.',
                      convert_to=bool, default=True)
 
+class EventLogFormatter(BaseFormatter):
+    """Formatter used for the logs produced by the event monitor.
+
+    """
+    def __init__(self):
+        # TODO: It seems on Python 2.4 the filename and line number do not work correctly.  I think we need to
+        # define a custom findCaller method to actually fix the problem.
+        BaseFormatter.__init__(self, '%(asctime)s [kubernetes_events_monitor] %(message)s', 'k8s_events')
+
+
 class KubernetesEventsMonitor( ScalyrMonitor ):
     """
 # Kubernetes Events Monitor
@@ -139,7 +150,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         self.__message_log = self._config.get( 'message_log' )
 
         self.log_config = {
-            'parser': self._config.get( 'parser' ),
+            'parser': 'k8sEvents',
             'path': self.__message_log,
         }
 
@@ -197,8 +208,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                                                                       backupCount = self.__max_log_rotations,
                                                                       flushDelay = self.__flush_delay)
 
-                formatter = logging.Formatter()
-                self.__log_handler.setFormatter( formatter )
+                self.__log_handler.setFormatter(EventLogFormatter())
                 self.__disk_logger.addHandler( self.__log_handler )
                 self.__disk_logger.setLevel( logging.INFO )
                 self.__disk_logger.propagate = False
@@ -282,6 +292,11 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         response = k8s.query_api( '/api/v1/nodes%s' % query_fields )
         nodes = response.get( 'items', [] )
 
+        if len(nodes) > 100:
+            # TODO: Add in URL for how to use labels to rectify this once we have the documentation written up.
+            global_log.warning('Warning, Kubernetes Events monitor leader election is finding more than 100 possible '
+                               'candidates.  This could impact performance.  Contact support@scalyr.com for more '
+                               'information', limit_once_per_x_secs=300, limit_key='k8s-too-many-event-leaders')
         # sort the list by node name to ensure consistent processing order
         # if two nodes have exactly the same creation time
         nodes.sort( key=lambda n: n.get( 'metadata', {} ).get( 'name', '' ) )
@@ -313,15 +328,15 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
 
             # if no labelled leader was found, then check to see if the previous leader is still alive
             if new_leader is not None:
-                global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader set from label" )
+                global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader set from label" )
             else:
                 if self._current_leader is not None and self._check_if_alive( k8s, self._current_leader ):
                     # still the same leader
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "New leader same as the old leader" )
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "New leader same as the old leader" )
                     new_leader = self._current_leader
                 else:
                     # previous leader is not alive so check all nodes for the leader
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Checking for a new leader" )
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Checking for a new leader" )
                     new_leader = self._check_nodes_for_leader( k8s )
 
             # update the global leader (leader can be None)
@@ -407,6 +422,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
 
             last_check = time.time() - self._leader_check_interval
 
+            last_reported_leader = None
             while not self._is_stopped():
                 current_time = time.time()
 
@@ -417,12 +433,19 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                     # check if we are the leader
                     if not self._is_leader( k8s ):
                         #if not, then sleep and try again
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader is %s" % (str(self._current_leader)) )
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader is %s" % (str(self._current_leader)) )
+                        if last_reported_leader != self._current_leader:
+                            global_log.info('Kubernetes event leader is %s' % str(self._current_leader))
+                            last_reported_leader = self._current_leader
                         self._sleep_but_awaken_if_stopped(self._leader_check_interval)
                         continue
 
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_0, "Leader is %s" % (str(self._current_leader)) )
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader is %s" % (str(self._current_leader)) )
                 try:
+                    if last_reported_leader != self._current_leader:
+                        global_log.info("Acting as Kubernetes event leader")
+                        last_reported_leader = self._current_leader
+
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
 
@@ -441,6 +464,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                             continue
 
                         obj = json.get( "object", JsonObject() )
+                        event_type = json.get("type", "UNKNOWN")
 
                         # resource version hasn't expired, so update it to the most recently seen version
                         last_event = last_resource
@@ -474,21 +498,24 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                             continue
 
                         # get cluster and deployment information
-                        k8s_fields = "cluster-name=%s" % cluster_name
-
-                        if kind == 'Pod':
-                            pod = k8s_cache.pod( namespace, name, current_time )
-                            if pod and pod.controller:
-                                k8s_fields += " deployment-name=%s" % pod.controller.name
-                        elif kind == 'Node':
-                            pass # don't add deployment info for node events
-                        else:
-                            controller = k8s_cache.controller( namespace, name, kind, current_time )
-                            if controller:
-                                k8s_fields += " deployment-name=%s" % controller.name
+                        extra_fields = {'k8s-cluster': cluster_name, 'watchEventType': event_type}
+                        if kind:
+                            if kind == 'Pod':
+                                extra_fields['pod_name'] = name
+                                extra_fields['pod_namespace'] = namespace
+                                pod = k8s_cache.pod( namespace, name, current_time )
+                                if pod and pod.controller:
+                                    extra_fields['k8s-controller'] = pod.controller.name
+                                    extra_fields['k8s-kind'] = pod.controller.kind
+                            elif kind != 'Node':
+                                controller = k8s_cache.controller( namespace, name, kind, current_time )
+                                if controller:
+                                    extra_fields['k8s-controller'] = controller.name
+                                    extra_fields['k8s-kind'] = controller.kind
 
                         # if so, log to disk
-                        self.__disk_logger.info( "%s %s" % (k8s_fields, str( line )) )
+                        self.__disk_logger.info( 'event=%s extra=%s' % (str(json_lib.serialize(obj)),
+                                                                        str(json_lib.serialize(extra_fields))))
 
                         # see if we need to check for a new leader
                         if last_check + self._leader_check_interval <= current_time:
