@@ -424,12 +424,8 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         try:
             k8s = KubernetesApi()
 
-            # create the k8s cache
-            k8s_cache = KubernetesCache( k8s, self._logger,
-                cache_expiry_secs=self.__k8s_cache_expiry_secs,
-                cache_purge_secs=self.__k8s_cache_purge_secs,
-                namespaces_to_ignore=self.__k8s_namespaces_to_ignore
-                )
+            # We only create the k8s_cache while we are the leader
+            k8s_cache = None
 
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
@@ -458,6 +454,9 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         if self._current_leader is not None and last_reported_leader != self._current_leader:
                             global_log.info('Kubernetes event leader is %s' % str(self._current_leader))
                             last_reported_leader = self._current_leader
+                        if k8s_cache is not None:
+                            k8s_cache.stop()
+                            k8s_cache = None
                         self._sleep_but_awaken_if_stopped(self._leader_check_interval)
                         continue
 
@@ -467,6 +466,11 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         global_log.info("Acting as Kubernetes event leader")
                         last_reported_leader = self._current_leader
 
+                    if k8s_cache is None:
+                        k8s_cache = KubernetesCache( k8s, self._logger,
+                                                     cache_expiry_secs=self.__k8s_cache_expiry_secs,
+                                                     cache_purge_secs=self.__k8s_cache_purge_secs,
+                                                     namespaces_to_ignore=self.__k8s_namespaces_to_ignore)
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
 
@@ -549,13 +553,16 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                 except Exception, e:
                     global_log.exception('Failed to stream k8s events due to the following exception: %s, %s, %s' % (repr(e), str(e), traceback.format_exc() ) )
 
+            if k8s_cache is not None:
+                k8s_cache.stop()
+                k8s_cache = None
+
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not
             # right now join on the monitor threads, so no one would catch it.  We should change that.
             global_log.exception('Monitor died from due to exception:', error_code='failedMonitor')
 
     def stop(self, wait_on_join=True, join_timeout=5):
-
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
