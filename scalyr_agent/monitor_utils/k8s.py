@@ -598,6 +598,9 @@ class KubernetesCache( object ):
 
         self._thread.start()
 
+    def stop(self):
+        """Stops the cache, specifically stopping the background thread that refreshes the cache"""
+        self._thread.stop()
 
     def is_initialized( self ):
         """Returns whether or not the k8s cache has been initialized with the full pod list"""
