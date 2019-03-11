@@ -98,6 +98,9 @@ class Api( object ):
     def read_event_log( self ):
         pass
 
+    def stop( self ):
+        pass
+
 class OldApi( Api ):
     def __init__( self, config, logger, source_list, event_filter ):
         super( OldApi, self ).__init__( config, logger )
@@ -276,6 +279,11 @@ class NewApi( Api ):
         finally:
             self.__bookmark_lock.release()
 
+    def stop( self ):
+        # explicitly empty the eventHandles array so that EvtClose will be called
+        # on all the event handles - this prevents duplicate logs if the config changes
+        self.__eventHandles = []
+
     def _FormattedMessage( self, metadata, event, field, value ):
         result = value
         try:
@@ -294,8 +302,14 @@ class NewApi( Api ):
 
         result = {}
 
-        event_id = vals[win32evtlog.EvtSystemEventID]
-        qualifiers = vals[win32evtlog.EvtSystemQualifiers]
+        # build the EventId
+        event_id_val = vals[win32evtlog.EvtSystemEventID]
+        if event_id_val[1] != win32evtlog.EvtVarTypeNull:
+            event_id = event_id_val[0]
+            qualifiers_val = vals[win32evtlog.EvtSystemQualifiers]
+            if qualifiers_val[1] != win32evtlog.EvtVarTypeNull:
+                event_id = win32api.MAKELONG( event_id, qualifiers_val[0] )
+            result['EventID'] = event_id
 
         metadata = None
         try:
@@ -541,6 +555,9 @@ and System sources:
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the monitor
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
+
+        # stop any event monitoring
+        self.__api.stop()
 
         #update checkpoints
         self.__update_checkpoints()
