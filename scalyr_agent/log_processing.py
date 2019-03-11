@@ -2128,7 +2128,7 @@ class RedactionRule(object):
 
     @property
     def hash_redacted_data(self):
-        return "\{}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
+        return "\{0}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
 
 
 class LogMatcher(object):
