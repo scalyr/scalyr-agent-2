@@ -302,12 +302,20 @@ class NewApi( Api ):
 
         result = {}
 
-        # build the EventId
+        # In the new event log api, EventIds were replaced by an InstanceId.
+        # The InstanceID is made by combining the old EventId with any
+        # SystemQualifiers associated with the event, to create a new 32bit value
+        # with the EventId in the lower 16bits and the SystemQualifiers
+        # in the high 16bits.
         event_id_val = vals[win32evtlog.EvtSystemEventID]
         if event_id_val[1] != win32evtlog.EvtVarTypeNull:
+            # by default use the event id value as the event id
             event_id = event_id_val[0]
             qualifiers_val = vals[win32evtlog.EvtSystemQualifiers]
+            # if we have any system qualifiers for this event
             if qualifiers_val[1] != win32evtlog.EvtVarTypeNull:
+                # then combine the event id with the qualifiers to
+                # make the full event id.
                 event_id = win32api.MAKELONG( event_id, qualifiers_val[0] )
             result['EventID'] = event_id
 
