@@ -156,7 +156,7 @@ class PostgreSQLDb(object):
         }
     }
     
-    def _connect(self):
+    def connect(self):
         try:
             conn = pg8000.connect(user = self._user, host = self._host, port = self._port,
                                   database = self._database, password = self._password)
@@ -171,7 +171,11 @@ class PostgreSQLDb(object):
             self._logger.error("Exception trying to connect occured:  %s" % ex)
             raise Exception("Exception trying to connect:  %s" % ex)
         
-    def _close(self):
+    def is_connected(self):
+        """returns True if the database is connected"""
+        return self._db is not None
+
+    def close(self):
         """Closes the cursor and connection to this PostgreSQL server."""
         if self._cursor:
             self._cursor.close()
@@ -180,10 +184,10 @@ class PostgreSQLDb(object):
         self._cursor = None
         self._db = None
             
-    def _reconnect(self):
+    def reconnect(self):
         """Reconnects to this PostgreSQL server."""
-        self._close()
-        self._connect()
+        self.close()
+        self.connect()
         
     def _get_version(self):
         version = "unknown"
@@ -232,7 +236,7 @@ class PostgreSQLDb(object):
         except pg8000.OperationalError, (errcode, msg):
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
-            self._reconnect()
+            self.reconnect()
             return None
   
         # combine the fields and data
@@ -260,7 +264,7 @@ class PostgreSQLDb(object):
         except pg8000.OperationalError, (errcode, msg):
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
-            self._reconnect
+            self.reconnect()
             return None
         return size          
           
@@ -287,10 +291,8 @@ class PostgreSQLDb(object):
         self._password = password
         self._logger = logger
 
-        self._connect()
-        if self._db is None:
-            raise Exception('Unable to connect to db')
-
+        self._db = None
+        self._cursor = None
 
 class PostgresMonitor(ScalyrMonitor):
     """
@@ -384,6 +386,16 @@ instance."""
             dt = dt.replace(tzinfo=None)
             td = dt - epoch
             return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 1000000) / 1000
+
+        try:
+            self._db.reconnect()
+        except Exception, e:
+            self._logger.warning( "Unable to gather stats for postgres database - %s" % str(e) )
+            return
+
+        if not self._db.is_connected():
+            self._logger.warning( "Unable to gather stats for postgres database - unable to connect to database" )
+            return
         
         dbsize = self._db.retrieve_database_size()
         if dbsize != None:
@@ -401,3 +413,10 @@ instance."""
                             self._logger.emit_value(self._db._database_stats[table][key][0], dbstats[key], extra)
                         else:
                             self._logger.emit_value(self._db._database_stats[table][key][0], timestamp_ms(dbstats[key]))
+        # Database statistics are constant for the duration of a transaction, and by default, the
+        # database runs all queries for a connection under a single transaction.  If we don't close
+        # the connection then next gather sample we will still hold the same connection, which is
+        # still the same transaction, and no statistics will have been updated.
+        # Closing the connection also means that we are not needlessly holding an idle connection
+        # for the duration of the gather sample interval.
+        self._db.close()
