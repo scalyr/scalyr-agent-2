@@ -413,4 +413,10 @@ instance."""
                             self._logger.emit_value(self._db._database_stats[table][key][0], dbstats[key], extra)
                         else:
                             self._logger.emit_value(self._db._database_stats[table][key][0], timestamp_ms(dbstats[key]))
+        # Database statistics are constant for the duration of a transaction, and by default, the
+        # database runs all queries for a connection under a single transaction.  If we don't close
+        # the connection then next gather sample we will still hold the same connection, which is
+        # still the same transaction, and no statistics will have been updated.
+        # Closing the connection also means that we are not needlessly holding an idle connection
+        # for the duration of the gather sample interval.
         self._db.close()
