@@ -246,18 +246,25 @@ class NewApi( Api ):
 
         self.__bookmarks = {}
 
-    def load_checkpoints( self, checkpoints, config ):
+    def _open_remote_session_if_necessary( self, server, config ):
+        """
+            Opens a session to a remote server if `server` is not localhost or None
+            @param: server - string containing the server to connect to (can be None)
+            @param: config - a log config object
+            @return: a valid session to a remote machine, or None if no remote session was needed
+        """
+        session = None
 
         # see if we need to create a remote connection
-        if self._server is not None and self._server != 'localhost':
+        if server is not None and server != 'localhost':
             username = config.get( 'remote_user' )
             password = config.get( 'remote_password' )
             domain = config.get( 'remote_domain' )
             flags = win32evtlog.EvtRpcLoginAuthDefault
 
             # login object is a tuple
-            login = (self._server, username, domain, password, flags )
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_0, "Performing remote login: server - %s, user - %s, domain - %s" % (self._server, username, domain) )
+            login = (server, username, domain, password, flags )
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Performing remote login: server - %s, user - %s, domain - %s" % (server, username, domain) )
 
             session = None
             session = win32evtlog.EvtOpenSession( login, win32evtlog.EvtRpcLogin, 0, 0 )
@@ -265,24 +272,18 @@ class NewApi( Api ):
             if session is None:
                 #0 means to call GetLastError for the error code
                 error_message = win32api.FormatMessage(0)
-                self._logger.warn( "Error connecting to remote server %s, as %s - %s" % ( self._server, username, error_message ) )
-                raise Exception( "Error connecting to remote server %s, as %s - %s" % ( self._server, username, error_message ) )
+                self._logger.warn( "Error connecting to remote server %s, as %s - %s" % ( server, username, error_message ) )
+                raise Exception( "Error connecting to remote server %s, as %s - %s" % ( server, username, error_message ) )
 
-            self._session = session
+        return session
 
-        # only use new checkpoints
-        if 'api' not in checkpoints or checkpoints['api'] != 'new':
-            checkpoints = {}
+    def _subscribe_to_events( self ):
+        """
+            Go through all channels, and create an event subscription to that channel.
+            If a bookmark exists for a given channel, start the events from that bookmark, otherwise subscribe
+            to future events only.
+        """
 
-        self._checkpoints['api'] = 'new'
-        self._checkpoints['bookmarks'] = {}
-        if 'bookmarks' not in checkpoints:
-            checkpoints['bookmarks'] = {}
-
-        for channel, bookmarkXml in checkpoints['bookmarks'].iteritems():
-            self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark( bookmarkXml )
-
-        # subscribe to channels
         for info in self.__channels:
             channel_list = info['channel']
             query = info['query']
@@ -311,6 +312,30 @@ class NewApi( Api ):
                     self._logger.warn( "Error subscribing to channel '%s' - %s" % (channel, error_message) )
                 else:
                     self.__eventHandles.append( handle )
+
+    def load_checkpoints( self, checkpoints, config ):
+
+
+        # open a remote session if needed - we do this before creating the bookmarks and event subscriptions,
+        # because this method could fail with an Exception, so check to see if we can actually connect before
+        # doing any further work.
+        # Assign the result to a member variable so that the session remains open for the lifetime of the object
+        self._session = self._open_remote_session_if_necessary( self._server, config )
+
+        # only use new checkpoints
+        if 'api' not in checkpoints or checkpoints['api'] != 'new':
+            checkpoints = {}
+
+        self._checkpoints['api'] = 'new'
+        self._checkpoints['bookmarks'] = {}
+        if 'bookmarks' not in checkpoints:
+            checkpoints['bookmarks'] = {}
+
+        for channel, bookmarkXml in checkpoints['bookmarks'].iteritems():
+            self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark( bookmarkXml )
+
+        # subscribe to the events
+        self._subscribe_to_events()
 
         # make sure we have at least one successfully subscribed channel
         if len( self.__eventHandles ) == 0:
