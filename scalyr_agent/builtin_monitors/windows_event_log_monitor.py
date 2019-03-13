@@ -98,6 +98,9 @@ class Api( object ):
     def read_event_log( self ):
         pass
 
+    def stop( self ):
+        pass
+
 class OldApi( Api ):
     def __init__( self, config, logger, source_list, event_filter ):
         super( OldApi, self ).__init__( config, logger )
@@ -276,6 +279,11 @@ class NewApi( Api ):
         finally:
             self.__bookmark_lock.release()
 
+    def stop( self ):
+        # explicitly empty the eventHandles array so that EvtClose will be called
+        # on all the event handles - this prevents duplicate logs if the config changes
+        self.__eventHandles = []
+
     def _FormattedMessage( self, metadata, event, field, value ):
         result = value
         try:
@@ -294,8 +302,22 @@ class NewApi( Api ):
 
         result = {}
 
-        event_id = vals[win32evtlog.EvtSystemEventID]
-        qualifiers = vals[win32evtlog.EvtSystemQualifiers]
+        # In the new event log api, EventIds were replaced by an InstanceId.
+        # The InstanceID is made by combining the old EventId with any
+        # SystemQualifiers associated with the event, to create a new 32bit value
+        # with the EventId in the lower 16bits and the SystemQualifiers
+        # in the high 16bits.
+        event_id_val = vals[win32evtlog.EvtSystemEventID]
+        if event_id_val[1] != win32evtlog.EvtVarTypeNull:
+            # by default use the event id value as the event id
+            event_id = event_id_val[0]
+            qualifiers_val = vals[win32evtlog.EvtSystemQualifiers]
+            # if we have any system qualifiers for this event
+            if qualifiers_val[1] != win32evtlog.EvtVarTypeNull:
+                # then combine the event id with the qualifiers to
+                # make the full event id.
+                event_id = win32api.MAKELONG( event_id, qualifiers_val[0] )
+            result['EventID'] = event_id
 
         metadata = None
         try:
@@ -541,6 +563,9 @@ and System sources:
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the monitor
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
+
+        # stop any event monitoring
+        self.__api.stop()
 
         #update checkpoints
         self.__update_checkpoints()
