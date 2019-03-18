@@ -40,6 +40,8 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
+import scalyr_agent.monitor_utils.annotation_config as annotation_config
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from scalyr_agent.util import StoppableThread
 
@@ -50,6 +52,8 @@ from requests.packages.urllib3.exceptions import ProtocolError
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
+
+DOCKER_LABEL_CONFIG_RE = re.compile( '^(com\.scalyr\.config\.log\.)(.+)' )
 
 define_config_option(__monitor__, 'module',
                      'Always ``scalyr_agent.builtin_monitors.docker_monitor``',
@@ -123,6 +127,35 @@ define_config_option( __monitor__, 'container_globs',
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
                       'to Scalyr.', convert_to=bool, default=True)
+
+define_config_option( __monitor__, 'label_include_globs',
+                     'Optional (defaults to [\'*\']). If `labels_as_attributes` is True then this option is a list of glob strings used to '
+                     'include labels that should be uploadeded as log attributes.  The docker monitor first gets all container labels that '
+                     'match a glob in this list and then filters out any labels that match a glob in `label_exclude_globs`, and the final list is then '
+                     'uploaded as log attributes. ',
+                      default=['*'])
+
+define_config_option( __monitor__, 'label_exclude_globs',
+                     'Optional (defaults to [\'com.scalyr.config.*\']). If `labels_as_attributes` is True, then this is a list of glob strings used to '
+                     'exclude labels from being uploaded as log attributes.  Any label whose key matches a glob on this list will not be added as a '
+                     'log attribute.  Note: the globs in this list are applied *after* `label_include_globs`',
+                      default=['com.scalyr.config.*'])
+
+define_config_option( __monitor__, 'labels_as_attributes',
+                     'Optional (defaults to False). If true, the docker monitor will add any labels found on the container as log attributes, after '
+                     'applying `label_include_globs` and `label_exclude_globs`.',
+                     convert_to=bool, default=False)
+
+define_config_option( __monitor__, 'label_prefix',
+                     'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
+                     'adding it to the log attributes ',
+                     convert_to=str, default="")
+
+define_config_option( __monitor__, 'use_labels_for_log_config',
+                     'Optional (defaults to True). If true, the docker monitor will check each container for any labels that begin with '
+                     '`com.scalyr.config.log.` and use those labels (minus the prefix) as fields in the containers log_config.  Keys that '
+                     'contain hyphens will automatically be converted to underscores.',
+                     convert_to=bool, default=True)
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -261,7 +294,7 @@ def _split_datetime_from_line( line ):
     return (dt, log_line)
 
 def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
-                    only_running_containers=True, glob_list=None, include_log_path=False):
+                    only_running_containers=True, glob_list=None, include_log_path=False, get_labels=False):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -291,17 +324,23 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
 
                 if add_container:
                     log_path = None
-                    if include_log_path:
+                    labels = None
+                    if include_log_path or get_labels:
                         try:
                             info = client.inspect_container( cid )
-                            log_path = info['LogPath'] if 'LogPath' in info else None
+                            if include_log_path:
+                                log_path = info['LogPath'] if 'LogPath' in info else None
+
+                            if get_labels:
+                                config = info.get( 'Config', {} )
+                                labels = config.get( 'Labels', None )
                         except Exception, e:
                           logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
 
-                    result[cid] = {'name': name, 'log_path': log_path }
+                    result[cid] = {'name': name, 'log_path': log_path, 'labels': labels }
 
             else:
-                result[cid] = {'name': cid, 'log_path': None}
+                result[cid] = {'name': cid, 'log_path': None, 'labels': None }
 
     except Exception, e:  # container querying failed
         logger.error("Error querying running containers", limit_once_per_x_secs=300,
@@ -309,6 +348,50 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         result = None
 
     return result
+
+def get_attributes_and_config_from_labels( labels, docker_options ):
+    """
+        Takes a dict of labels and splits it in to two separate attributes and config dicts.
+
+        @param: labels - a dict containing all the labels
+        @param: docker_options - a DockerOptions object
+
+        @return A tuple with the first element containing a dict of attributes and the second element containing a dict of config items
+        @rtype: (dict, dict)
+
+    """
+    config = {}
+    attributes = {}
+
+    if labels:
+        # see if we need to add any labels as attributes
+        if docker_options.labels_as_attributes:
+
+            included = {}
+            # apply include globs
+            for key, value in labels.iteritems():
+                for glob in docker_options.label_include_globs:
+                    if fnmatch.fnmatch( key, glob ):
+                        included[key] = value
+                        break
+
+            # filter excluded labels
+            for key, value in included.iteritems():
+                add_label = True
+                for glob in docker_options.label_exclude_globs:
+                    if fnmatch.fnmatch( key, glob ):
+                        add_label = False
+                        break
+
+                if add_label:
+                    label_key = docker_options.label_prefix + key
+                    attributes[label_key] = value
+
+        # see if we need to configure the log file from labels
+        if docker_options.use_labels_for_log_config:
+            config = annotation_config.process_annotations( labels, annotation_prefix_re=DOCKER_LABEL_CONFIG_RE, hyphens_as_underscores=True )
+
+    return (attributes, config)
 
 class ContainerChecker( StoppableThread ):
     """
@@ -325,6 +408,16 @@ class ContainerChecker( StoppableThread ):
         self.__delay = self._config.get( 'container_check_interval' )
         self.__log_prefix = self._config.get( 'docker_log_prefix' )
         name = self._config.get( 'container_name' )
+
+        self.__docker_options = DockerOptions(
+            labels_as_attributes=self._config.get( 'labels_as_attributes' ),
+            label_prefix=self._config.get( 'label_prefix' ),
+            label_include_globs=self._config.get( 'label_include_globs' ),
+            label_exclude_globs=self._config.get( 'label_exclude_globs' ),
+            use_labels_for_log_config=self._config.get( 'use_labels_for_log_config' )
+        )
+
+        self.__get_labels = self.__docker_options.use_labels_for_log_config or self.__docker_options.labels_as_attributes
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
@@ -351,7 +444,7 @@ class ContainerChecker( StoppableThread ):
 
     def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs)
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs, get_labels=self.__get_labels)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
@@ -396,7 +489,7 @@ class ContainerChecker( StoppableThread ):
                 self.__update_checkpoints()
 
                 self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
-                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs)
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs, get_labels=self.__get_labels)
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty
@@ -556,7 +649,10 @@ class ContainerChecker( StoppableThread ):
     def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
             if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                try:
+                    log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                except Exception, e:
+                    global_log.info( "Error adding log '%s' to log watcher - %s", log['log_config]['path'], str(e) )
 
             if self._use_raw_logs:
                 self.raw_logs.append( log )
@@ -596,14 +692,23 @@ class ContainerChecker( StoppableThread ):
 
         return scalyr_util.seconds_since_epoch( result )
 
-    def __create_log_config( self, parser, path, attributes, parse_as_json=False ):
+    def __create_log_config( self, parser, path, attributes, base_config={}, parse_as_json=False ):
         """Convenience function to create a log_config dict from the parameters"""
 
-        return { 'parser': parser,
-                 'path': path,
-                 'parse_lines_as_json' : parse_as_json,
-                 'attributes': attributes
-               }
+        result = base_config.copy()
+
+        if 'parser' not in result and 'parser' not in attributes:
+            result['parser'] = parser
+
+        result['path'] = path
+        result['parse_lines_as_json'] = parse_as_json
+
+        if 'attributes' in result:
+            result['attributes'].update( attributes )
+        else:
+            result['attributes'] = JsonObject( attributes )
+
+        return result
 
     def __get_docker_logs( self, containers ):
         """Returns a list of dicts containing the container id, stream, and a log_config
@@ -629,18 +734,26 @@ class ContainerChecker( StoppableThread ):
             container_attributes['containerName'] = info['name']
             container_attributes['containerId'] = cid
 
+            # get the attributes and config items from the labels
+            attrs, base_config = get_attributes_and_config_from_labels( info.get('labels', None), self.__docker_options )
+
+            attrs.update( container_attributes )
+
             if self._use_raw_logs and 'log_path' in info and info['log_path']:
-                log_config = self.__create_log_config( parser='docker', path=info['log_path'], attributes=container_attributes, parse_as_json=True )
-                log_config['rename_logfile'] = '/docker/%s.log' % info['name']
+                log_config = self.__create_log_config( parser='docker', path=info['log_path'], attributes=attrs, base_config=base_config, parse_as_json=True )
+                if 'rename_logfile' not in log_config:
+                    log_config['rename_logfile'] = '/docker/%s.log' % info['name']
+
                 result.append( { 'cid': cid, 'stream': 'raw', 'log_config': log_config } )
             else:
                 path =  prefix + info['name'] + '-stdout.log'
-                log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=container_attributes )
+                log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=attrs, base_config=base_config )
                 result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
                 path = prefix + info['name'] + '-stderr.log'
-                log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=container_attributes.copy() )
+                log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=attrs, base_config=base_config )
                 result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
+
 
         return result
 
@@ -849,9 +962,10 @@ class ContainerIdResolver():
 
         @param container_id: The container id
         @type container_id: str
-        @return:  The container name or None if the container id could not be resolved, or if there was an error
-            accessing Docker.
-        @rtype: str or None
+        @return:  A tuple with the first element containing the container name or None if the container id could not be resolved, or if there was an error
+            accessing Docker, and the second element containing a dict of labels associated with the container, or None if the container id could not bei
+            resolved, or if there was an error accessing Docker.
+        @rtype: (str, dict) or (None, None)
         """
         try:
             #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
@@ -867,25 +981,25 @@ class ContainerIdResolver():
                     self._touch(entry, current_time)
                     #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
                                       #entry.container_name)
-                    return entry.container_name
+                    return (entry.container_name, entry.labels)
             finally:
                 self.__lock.release()
 
-            container_name = self._fetch_id_from_docker(container_id)
+            (container_name, labels) = self._fetch_id_from_docker(container_id, get_labels=True)
 
             if container_name is not None:
                 #self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
                 #                  container_name)
 
-                self._insert_entry(container_id, container_name, current_time)
-                return container_name
+                self._insert_entry(container_id, container_name, labels, current_time)
+                return (container_name, labels)
 
             #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
 
         except Exception, e:
             self.__logger.error('Error seen while attempting resolving docker cid="%s"', container_id)
 
-        return None
+        return (None, None)
 
     def _clean_cache_if_necessary(self, current_time):
         """Cleans the cache if it has been too long since the last cleaning.
@@ -931,35 +1045,44 @@ class ContainerIdResolver():
             del self.__untouched_ids[cid]
         cache_entry.touch(last_access_time)
 
-    def _fetch_id_from_docker(self, container_id):
+    def _fetch_id_from_docker(self, container_id, get_labels):
         """Fetch the container name for the specified container using the Docker API.
 
         @param container_id: The id of the container.
         @type container_id: str
-        @return: The container name or None if it was either not found or if there was an error.
-        @rtype: str or None
+        @param get_labels: Whether to gather label information for the container
+        @type get_labels: bool
+        @return: A tuple containing the container name and labels, or (None, None) if it was either not found or if there was an error.
+                    if `get_labels` is False then the returned labels will always be an empty dict
+        @rtype: (str, dict) or (None, None)
         """
         matches = _get_containers(self.__docker_client, restrict_to_container=container_id,
-                                  logger=self.__logger, only_running_containers=False)
+                                  logger=self.__logger, only_running_containers=False, get_labels=get_labels)
         if len(matches) == 0:
             #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
-            return None
+            return (None, None)
 
         if len(matches) > 1:
             self.__logger.warning("Container id matches %d containers for id='%s'." % (len(matches), container_id),
                                   limit_once_per_x_secs=300,
                                   limit_key='docker_container_id_more_than_one')
-            return None
+            return (None, None)
 
         # Note, the cid used as the key for the returned matches is the long container id, not the short one that
         # we were passed in as `container_id`.
-        return matches[matches.keys()[0]]['name']
+        match = matches[matches.keys()[0]]
+        labels = match.get( 'labels', {} )
+        if labels is None:
+            labels = {}
 
-    def _insert_entry(self, container_id, container_name, last_access_time):
+        return (match['name'], labels)
+
+    def _insert_entry(self, container_id, container_name, labels, last_access_time):
         """Inserts a new cache entry mapping the specified id to the container name.
 
         @param container_id: The id of the container.
         @param container_name: The name of the container.
+        @param labels: The labels associated with this container.
         @param last_access_time: The time it this entry was last used.
         @type container_id: str
         @type container_name: str
@@ -967,17 +1090,22 @@ class ContainerIdResolver():
         """
         self.__lock.acquire()
         try:
-            self.__cache[container_id] = ContainerIdResolver.Entry(container_id, container_name, last_access_time)
+            # ensure that labels is never None
+            if labels is None:
+                labels = {}
+
+            self.__cache[container_id] = ContainerIdResolver.Entry(container_id, container_name, labels, last_access_time)
         finally:
             self.__lock.release()
 
     class Entry():
         """Helper abstraction representing a single cache entry mapping a container id to its name.
         """
-        def __init__(self, container_id, container_name, last_access_time):
+        def __init__(self, container_id, container_name, labels, last_access_time):
             """
             @param container_id: The id of the container.
             @param container_name: The name of the container.
+            @param labels: The labels associated with this container.
             @param last_access_time: The time the entry was last used.
             @type container_id: str
             @type container_name: str
@@ -985,6 +1113,7 @@ class ContainerIdResolver():
             """
             self.__container_id = container_id
             self.__container_name = container_name
+            self.__labels = labels
             self.__last_access_time = last_access_time
 
         @property
@@ -1004,6 +1133,14 @@ class ContainerIdResolver():
             return self.__container_name
 
         @property
+        def labels(self):
+            """
+            @return:  The labels associated with this container.
+            @rtype: str
+            """
+            return self.__labels
+
+        @property
         def last_access_time(self):
             """
             @return:  The last time this entry was used, in seconds past epoch.
@@ -1018,6 +1155,74 @@ class ContainerIdResolver():
             @type access_time: double
             """
             self.__last_access_time = access_time
+
+class DockerOptions( object ):
+    """
+    A class representing label configuration options from the docker monitor
+    """
+
+    def __init__(self, labels_as_attributes=False, label_prefix='', label_include_globs=None, label_exclude_globs=None, use_labels_for_log_config=True):
+        """
+        @param: labels_as_attributes - boolean - if True any labels that are not excluded will be added to the attributes result dict
+        @param: label_prefix - str - a prefix to add to the key of any labels added to the attributes result dict
+        @param: label_include_globs - list[str] - a list of strings.  Any label that matches a glob in this list will be included
+                   will be included in the attributes result dict as long as it isn't filtered out by `label_exclude_globs`.
+        @param: label_exclude_globs - list[str] - a list of strings.  Any label that matches a glob in this list will be excluded
+                   from the attributes result dict.  This is applied to the labels *after* `label_include_globs`
+        @param: use_labels_for_log_config - bool - if True any label that begins with com.scalyr.config.log will be converted
+                   to a dict, based on the rules for processing k8s annotations
+        """
+        if label_include_globs is None:
+            label_include_globs = [ '*' ]
+        if label_exclude_globs is None:
+            label_exclude_globs = [ 'com.scalyr.config.*' ]
+
+        self.label_exclude_globs = label_exclude_globs
+        self.label_include_globs = label_include_globs
+        self.use_labels_for_log_config = use_labels_for_log_config
+        self.label_prefix = label_prefix
+        self.labels_as_attributes = labels_as_attributes
+
+    def __str__(self):
+        """
+        String representation of a DockerOption
+        """
+        return "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s" % (
+                   str(self.labels_as_attributes),
+                   self.label_prefix,
+                   str(self.label_include_globs),
+                   str(self.label_exclude_globs),
+                   str(self.use_labels_for_log_config)
+               )
+
+    def configure_from_monitor( self, monitor ):
+        """
+        Configures the options based on the values from the docker monitor
+        @param: monitor - a docker monitor object
+        """
+
+        # get a local copy of the default docker config options
+        label_exclude_globs = self.label_exclude_globs
+        label_include_globs = self.label_include_globs
+        use_labels_for_log_config = self.use_labels_for_log_config
+        label_prefix = self.label_prefix
+        labels_as_attributes = self.labels_as_attributes
+
+        try:
+            # set values from the docker monitor
+            self.label_exclude_globs = monitor.label_exclude_globs
+            self.label_include_globs = monitor.label_include_globs
+            self.use_labels_for_log_config = monitor.use_labels_for_log_config
+            self.label_prefix = monitor.label_prefix
+            self.labels_as_attributes = monitor.labels_as_attributes
+        except Exception, e:
+            global_log.warning( "Error getting docker config from docker monitor - %s.  Using defaults" % str(e) )
+            # if there was an error, reset all values back to defaults
+            label_exclude_globs = self.label_exclude_globs
+            label_include_globs = self.label_include_globs
+            use_labels_for_log_config = self.use_labels_for_log_config
+            label_prefix = self.label_prefix
+            labels_as_attributes = self.labels_as_attributes
 
 
 class DockerMonitor( ScalyrMonitor ):
@@ -1073,6 +1278,19 @@ class DockerMonitor( ScalyrMonitor ):
         self.__report_container_metrics = self._config.get('report_container_metrics')
 
         metrics_only = self._config.get('metrics_only')
+
+        self.label_exclude_globs = self._config.get( 'label_exclude_globs' )
+        self.label_include_globs = self._config.get( 'label_include_globs' )
+
+        if not scalyr_util.is_list_of_strings( self.label_include_globs):
+            raise BadMonitorConfiguration( "label_include_globs contains a non-string value: %s" % str( self.label_include_globs ), 'label_include_globs' )
+
+        if not scalyr_util.is_list_of_strings( self.label_exclude_globs):
+            raise BadMonitorConfiguration( "label_exclude_globs contains a non-string value: %s" % str( self.label_exclude_globs ), 'label_exclude_globs' )
+
+        self.use_labels_for_log_config = self._config.get( 'use_labels_for_log_config' )
+        self.label_prefix = self._config.get( 'label_prefix' )
+        self.labels_as_attributes = self._config.get( 'labels_as_attributes' )
 
         # always force reporting of container metrics if metrics_only is True
         if metrics_only:

@@ -200,6 +200,17 @@ class ScalyrMonitor(StoppableThread):
         self.__errors += errors
         self.__lock.release()
 
+    def monitor_manager( self, manager ):
+        """
+        Called directly before running the `run` method.
+        This method passes in the module manager object to a monitor before
+        it runs so that the monitor can query the monitor about other monitors
+        that exist.
+        In order to prevent circular references, callees should *not* retain a
+        reference to the manager object
+        """
+        pass
+
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
 
