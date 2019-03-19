@@ -114,7 +114,7 @@ class MonitorsManager(object):
                 # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead
                 # fail.
                 if monitor.open_metric_log():
-                    monitor.monitor_manager( self )
+                    monitor.config_from_monitors( self )
                     log.info('Starting monitor %s', monitor.monitor_name)
                     monitor.start()
                     self.__running_monitors.append(monitor)

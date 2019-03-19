@@ -131,13 +131,13 @@ define_config_option( __monitor__, 'report_container_metrics',
 define_config_option( __monitor__, 'label_include_globs',
                      'Optional (defaults to [\'*\']). If `labels_as_attributes` is True then this option is a list of glob strings used to '
                      'include labels that should be uploadeded as log attributes.  The docker monitor first gets all container labels that '
-                     'match a glob in this list and then filters out any labels that match a glob in `label_exclude_globs`, and the final list is then '
+                     'match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then '
                      'uploaded as log attributes. ',
                       default=['*'])
 
 define_config_option( __monitor__, 'label_exclude_globs',
                      'Optional (defaults to [\'com.scalyr.config.*\']). If `labels_as_attributes` is True, then this is a list of glob strings used to '
-                     'exclude labels from being uploaded as log attributes.  Any label whose key matches a glob on this list will not be added as a '
+                     'exclude labels from being uploaded as log attributes.  Any label whose key matches any glob on this list will not be added as a '
                      'log attribute.  Note: the globs in this list are applied *after* `label_include_globs`',
                       default=['com.scalyr.config.*'])
 
@@ -353,14 +353,14 @@ def get_attributes_and_config_from_labels( labels, docker_options ):
     """
         Takes a dict of labels and splits it in to two separate attributes and config dicts.
 
-        @param: labels - a dict containing all the labels
+        @param: labels - a dict containing all the Docker labels for a container
         @param: docker_options - a DockerOptions object
 
-        @return A tuple with the first element containing a dict of attributes and the second element containing a dict of config items
-        @rtype: (dict, dict)
+        @return A tuple with the first element containing a dict of attributes and the second element containing a JsonObject of config items
+        @rtype: (dict, JsonObject)
 
     """
-    config = {}
+    config = JsonObject( {} )
     attributes = {}
 
     if labels:
@@ -652,7 +652,7 @@ class ContainerChecker( StoppableThread ):
                 try:
                     log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
                 except Exception, e:
-                    global_log.info( "Error adding log '%s' to log watcher - %s", log['log_config]['path'], str(e) )
+                    global_log.info( "Error adding log '%s' to log watcher - %s", log['log_config']['path'], str(e) )
 
             if self._use_raw_logs:
                 self.raw_logs.append( log )
@@ -693,7 +693,12 @@ class ContainerChecker( StoppableThread ):
         return scalyr_util.seconds_since_epoch( result )
 
     def __create_log_config( self, parser, path, attributes, base_config={}, parse_as_json=False ):
-        """Convenience function to create a log_config dict from the parameters"""
+        """Convenience function to create a log_config dict
+        @param: parser - string - a parser to use if no parser is found in the attributes or base_config
+        @param: path - string - the path of the log file being configured
+        @param: attributes - a dict or JsonObject containing any attributes to include as part of the log_config['attributes'
+        @param: base_config - a dict or JsonObject containing a base set of configuration options to build the log_config from
+        """
 
         result = base_config.copy()
 
@@ -704,8 +709,14 @@ class ContainerChecker( StoppableThread ):
         result['parse_lines_as_json'] = parse_as_json
 
         if 'attributes' in result:
+            # if 'attributes' exists in `result`, then it must have come from
+            # base config, which should already be a JsonObject, so no need to
+            # explicitly convert the `attributes` dict, just update the existing object.
             result['attributes'].update( attributes )
         else:
+            # make sure the log_config attributes are a JsonObject
+            # because the code for verifying log configs explicitly checks for JsonObjects
+            # and throws an error if other types are found
             result['attributes'] = JsonObject( attributes )
 
         return result
@@ -1165,9 +1176,9 @@ class DockerOptions( object ):
         """
         @param: labels_as_attributes - boolean - if True any labels that are not excluded will be added to the attributes result dict
         @param: label_prefix - str - a prefix to add to the key of any labels added to the attributes result dict
-        @param: label_include_globs - list[str] - a list of strings.  Any label that matches a glob in this list will be included
+        @param: label_include_globs - list[str] - a list of strings.  Any label that matches any glob in this list will be included
                    will be included in the attributes result dict as long as it isn't filtered out by `label_exclude_globs`.
-        @param: label_exclude_globs - list[str] - a list of strings.  Any label that matches a glob in this list will be excluded
+        @param: label_exclude_globs - list[str] - a list of strings.  Any label that matches any glob in this list will be excluded
                    from the attributes result dict.  This is applied to the labels *after* `label_include_globs`
         @param: use_labels_for_log_config - bool - if True any label that begins with com.scalyr.config.log will be converted
                    to a dict, based on the rules for processing k8s annotations

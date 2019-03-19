@@ -1204,7 +1204,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
     def __get_log_watcher( self ):
         return (self.__log_watcher, self)
 
-    def monitor_manager( self, manager ):
+    def config_from_monitors( self, manager ):
         """
         Called directly before running the `run` method.
         This method passes in the module manager object to a monitor before

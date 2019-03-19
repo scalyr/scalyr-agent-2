@@ -174,7 +174,22 @@ def _process_annotation_items( items, hyphens_as_underscores ):
             return int( key )
         return key
 
-    def key_name( key, convert_hyphens ):
+    def normalize_key_name( key, convert_hyphens ):
+        """
+        Normalizes the name of the key by converting any hyphens to underscores (or not)
+        depending on the `convert_hyphens` parameter.
+        Typically, `convert_hypens` will be false when converting k8s annotations because
+        label and annotation keys in k8s can contain underscores.
+        Keys for docker labels however cannot container underscores, therefore `convert_hyphens`
+        can be used to convert any label keys to use underscores, which are expected by various
+        log_config options.
+        This function means the code that processes the labels/annotations doesn't need to care
+        if it is running under docker or k8s, because the root caller decides whether or not hyphens
+        need converting.
+        @param: key - string - a key for an annotation/label
+        @param: convert_hyphens - bool - if True, any hyphens in the `key` parameter will be
+                converted to underscores
+        """
         if convert_hyphens:
             key = key.replace( '-', '_' )
         return key
@@ -213,7 +228,7 @@ def _process_annotation_items( items, hyphens_as_underscores ):
             # else if the keys are different which means we have a new key,
             # so add the current object to the list of results and create a new object
             elif previous_key is not None and root_key != previous_key:
-                updated_key = key_name(previous_key, hyphens_as_underscores)
+                updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
                 result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
                 current_object = {}
 
@@ -234,18 +249,18 @@ def _process_annotation_items( items, hyphens_as_underscores ):
             # if there was a previous key 
             if previous_key is not None and current_object is not None:
                 # stick it in the result
-                updated_key = key_name(previous_key, hyphens_as_underscores)
+                updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
                 result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
 
             # add the current value to the result
-            updated_key = key_name(key, hyphens_as_underscores)
+            updated_key = normalize_key_name(key, hyphens_as_underscores)
             result[updated_key] = value
             current_object = None
             previous_key = None
 
     # add the final object if there was one
     if previous_key is not None and current_object is not None:
-        updated_key = key_name(previous_key, hyphens_as_underscores)
+        updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
         result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
 
     # if the result should be an array, return values as a JsonArray, sorted by numeric order of keys
