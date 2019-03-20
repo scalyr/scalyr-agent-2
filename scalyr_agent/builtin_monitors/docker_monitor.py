@@ -353,10 +353,12 @@ def get_attributes_and_config_from_labels( labels, docker_options ):
     """
         Takes a dict of labels and splits it in to two separate attributes and config dicts.
 
-        @param: labels - a dict containing all the Docker labels for a container
-        @param: docker_options - a DockerOptions object
+        @param labels: - All the Docker labels for a container
+        @param docker_options: - Options for determining which labels to use for the attributes and config items
+        @type labels: dict
+        @type docker_options: DockerOptions
 
-        @return A tuple with the first element containing a dict of attributes and the second element containing a JsonObject of config items
+        @return: A tuple with the first element containing a dict of attributes and the second element containing a JsonObject of config items
         @rtype: (dict, JsonObject)
 
     """
@@ -610,8 +612,9 @@ class ContainerChecker( StoppableThread ):
     def __stop_loggers( self, stopping ):
         """
         Stops any DockerLoggers in the 'stopping' dict
-        @param: stopping - a dict of container ids => container names. Any running containers that have
+        @param stopping: - a dict of container ids => container names. Any running containers that have
         the same container-id as a key in the dict will be stopped.
+        @type stopping: dict
         """
         if stopping:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Stopping all docker loggers')
@@ -638,7 +641,8 @@ class ContainerChecker( StoppableThread ):
     def __start_loggers( self, starting ):
         """
         Starts a list of DockerLoggers
-        @param: starting - a list of DockerLoggers to start
+        @param starting: a list of DockerLoggers to start
+        @type starting: list
         """
         if starting:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Starting all docker loggers')
@@ -692,18 +696,22 @@ class ContainerChecker( StoppableThread ):
 
         return scalyr_util.seconds_since_epoch( result )
 
-    def __create_log_config( self, parser, path, attributes, base_config={}, parse_as_json=False ):
+    def __create_log_config( self, default_parser, path, attributes, base_config={}, parse_as_json=False ):
         """Convenience function to create a log_config dict
-        @param: parser - string - a parser to use if no parser is found in the attributes or base_config
-        @param: path - string - the path of the log file being configured
-        @param: attributes - a dict or JsonObject containing any attributes to include as part of the log_config['attributes'
-        @param: base_config - a dict or JsonObject containing a base set of configuration options to build the log_config from
+        @param default_parser: a parser to use if no parser is found in the attributes or base_config
+        @param path: the path of the log file being configured
+        @param attributes: Any attributes to include as part of the log_config['attributes']
+        @param base_config: A base set of configuration options to build the log_config from
+        @type parser: str
+        @type path: str
+        @type attributes: dict of JsonObject
+        @type base_config: dict or JsonObject
         """
 
         result = base_config.copy()
 
         if 'parser' not in result and 'parser' not in attributes:
-            result['parser'] = parser
+            result['parser'] = default_parser
 
         result['path'] = path
         result['parse_lines_as_json'] = parse_as_json
@@ -751,30 +759,29 @@ class ContainerChecker( StoppableThread ):
             attrs.update( container_attributes )
 
             if self._use_raw_logs and 'log_path' in info and info['log_path']:
-                log_config = self.__create_log_config( parser='docker', path=info['log_path'], attributes=attrs, base_config=base_config, parse_as_json=True )
+                log_config = self.__create_log_config( default_parser='docker', path=info['log_path'], attributes=attrs, base_config=base_config, parse_as_json=True )
                 if 'rename_logfile' not in log_config:
                     log_config['rename_logfile'] = '/docker/%s.log' % info['name']
 
                 result.append( { 'cid': cid, 'stream': 'raw', 'log_config': log_config } )
             else:
                 path =  prefix + info['name'] + '-stdout.log'
-                log_config = self.__create_log_config( parser='dockerStdout', path=path, attributes=attrs, base_config=base_config )
+                log_config = self.__create_log_config( default_parser='dockerStdout', path=path, attributes=attrs, base_config=base_config )
                 result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
                 path = prefix + info['name'] + '-stderr.log'
-                log_config = self.__create_log_config( parser='dockerStderr', path=path, attributes=attrs, base_config=base_config )
-                result.append( { 'cid': cid, 'stream': 'stderr', 'log_config': log_config } )
-
+                log_config = self.__create_log_config( default_parser='dockerStderr', path=path, attributes=attrs, base_config=base_config )
 
         return result
 
     def __create_docker_logger( self, log, last_request ):
         """Creates a new DockerLogger object, based on the parameters passed in in the 'log' param.
 
-        @param: log - a dict consisting of:
+        @param log: - a dict consisting of:
                         cid - the container id
                         stream - whether this is the stdout or stderr stream
                         log_config - the log config used by the scalyr-agent for this log file
+        @type log: dict
         """
         cid = log['cid']
         name = self.containers[cid]['name']
@@ -1060,8 +1067,8 @@ class ContainerIdResolver():
         """Fetch the container name for the specified container using the Docker API.
 
         @param container_id: The id of the container.
-        @type container_id: str
         @param get_labels: Whether to gather label information for the container
+        @type container_id: str
         @type get_labels: bool
         @return: A tuple containing the container name and labels, or (None, None) if it was either not found or if there was an error.
                     if `get_labels` is False then the returned labels will always be an empty dict
@@ -1174,14 +1181,19 @@ class DockerOptions( object ):
 
     def __init__(self, labels_as_attributes=False, label_prefix='', label_include_globs=None, label_exclude_globs=None, use_labels_for_log_config=True):
         """
-        @param: labels_as_attributes - boolean - if True any labels that are not excluded will be added to the attributes result dict
-        @param: label_prefix - str - a prefix to add to the key of any labels added to the attributes result dict
-        @param: label_include_globs - list[str] - a list of strings.  Any label that matches any glob in this list will be included
+        @param labels_as_attributes: If True any labels that are not excluded will be added to the attributes result dict
+        @param label_prefix: A prefix to add to the key of any labels added to the attributes result dict
+        @param label_include_globs: Any label that matches any glob in this list will be included
                    will be included in the attributes result dict as long as it isn't filtered out by `label_exclude_globs`.
-        @param: label_exclude_globs - list[str] - a list of strings.  Any label that matches any glob in this list will be excluded
+        @param label_exclude_globs: Any label that matches any glob in this list will be excluded
                    from the attributes result dict.  This is applied to the labels *after* `label_include_globs`
-        @param: use_labels_for_log_config - bool - if True any label that begins with com.scalyr.config.log will be converted
+        @param use_labels_for_log_config: If True any label that begins with com.scalyr.config.log will be converted
                    to a dict, based on the rules for processing k8s annotations
+        @type labels_as_attributes: bool
+        @type label_prefix: str
+        @type label_include_globs: list[str]
+        @type label_exclude_globs: list[str]
+        @type use_labels_for_log_config: bool
         """
         if label_include_globs is None:
             label_include_globs = [ '*' ]
@@ -1209,7 +1221,8 @@ class DockerOptions( object ):
     def configure_from_monitor( self, monitor ):
         """
         Configures the options based on the values from the docker monitor
-        @param: monitor - a docker monitor object
+        @param monitor: - a docker monitor that can be used to configure the options
+        @type monitor: DockerMonitor
         """
 
         # get a local copy of the default docker config options
@@ -1247,7 +1260,9 @@ class DockerMonitor( ScalyrMonitor ):
 
     ## Docker Labels
 
-    You can get the Scalyr agent to upload custom attributes for your containers by setting labels on the container, and then configuring the agent to upload labels as attributes.  This is controlled by a number of config options:
+    You can configure the Scalyr Agent to upload customer attributes for your containers based on the labels you set on the container itself. This can be used to easily set the parser that should be used to parse the container's log, as well as adding in arbitrary labels on the container's log.
+
+    To use this functionality, you must properly configure the agent by setting the `labels_as_attributes` configuration option to `true`. All of the docker monitor configuration options related to this feature are as follows:`
 
     * **labels\_as\_attributes** - When `true` upload labels that pass the include/exclude filters (see below) as log attributes for the logs generated by the container.  Defaults to `false`
     *  **label\_include\_globs** - A list of [glob strings](https://docs.python.org/2/library/fnmatch.html) used to include labels to be uploaded as log attributes.  Any label that matches any glob in this list will be included as an attribute, as long as it not excluded by `label_exclude_globs`.  Defaults to `[ '*' ]` (everything)
@@ -1290,7 +1305,9 @@ class DockerMonitor( ScalyrMonitor ):
     { "attributes": { "parser": "accessLog" } }
     ```
 
-    The following fields can be configured via pod annotations and behave as described in the [Scalyr help docs](https://www.scalyr.com/help/scalyr-agent#logUpload):
+    This feature is enabled by default, and by default any configuration labels are ignored by the `labels_as_attributes` option.  To turn off this feature entirely, you can set the `use_labels_for_log_config` option to `false` in the docker monitor configuration, and the agent will not process container labels for configuration options.
+
+    The following fields can be configured via container labels and behave as described in the [Scalyr help docs](https://www.scalyr.com/help/scalyr-agent#logUpload):
 
     * parser
     * attributes
