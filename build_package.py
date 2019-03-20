@@ -457,11 +457,13 @@ def build_container_builder(variant, version, no_versioned_file_name, for_k8s=Fa
 
     if not for_k8s:
         image_tag = "scalyr/scalyr-docker-agent:%s" % version_string
+        latest_tag = "scalyr/scalyr-docker-agent:latest"
     else:
         image_tag = "scalyr/scalyr-k8s-agent:%s" % version_string
+        latest_tag = "scalyr/scalyr-docker-agent:latest"
 
     fp = open('build-image.sh', 'w')
-    fp.write("#!/bin/bash\ndocker build -t \"%s\" -f .\n" % image_tag)
+    fp.write("#!/bin/bash\ndocker build -t \"%s\" -t \"%s\" .\n" % (image_tag, latest_tag))
     fp.close()
 
     # Make the script user and group executable.
