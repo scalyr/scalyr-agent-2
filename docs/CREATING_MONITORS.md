@@ -278,7 +278,7 @@ a rate limiter built into it to prevent excessive log, especially in the case of
 ### Agent stability
 
 Since the Monitor Plugins are running in the same process as Scalyr Agent 2, any problems with the monitors that cause
-the entire Python process to crash or exit will stop your agent from working.  Scalyr Agent 2 does not to isolate the
+the entire Python process to crash or exit will stop your agent from working.  Scalyr Agent 2 does try to isolate the
 effects of monitors from one another by executing them in their own threads and catching thrown exceptions, but it
 cannot isolate all things.
 
