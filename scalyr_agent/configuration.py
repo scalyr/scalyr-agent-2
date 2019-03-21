@@ -259,6 +259,27 @@ class Configuration(object):
 
         return monitor_config
 
+    # k8s cache options
+    @property
+    def k8s_ignore_namespaces(self):
+        return self.__get_config().get_string('k8s_ignore_namespaces')
+
+    @property
+    def k8s_api_url(self):
+        return self.__get_config().get_string('k8s_api_url')
+
+    @property
+    def k8s_verify_api_queries(self):
+        return self.__get_config().get_bool('verify_k8s_api_queries')
+
+    @property
+    def k8s_cache_expiry_secs(self):
+        return self.__get_config().get_int('k8s_cache_expiry_secs')
+
+    @property
+    def k8s_cache_purge_secs(self):
+        return self.__get_config().get_int('k8s_cache_purge_secs')
+
     # Debug leak flags
     @property
     def disable_send_requests(self):
@@ -975,6 +996,12 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults)
+
+        self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults )
+        self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults )
+        self.__verify_or_set_optional_bool(config, 'verify_k8s_api_queries', True, description, apply_defaults )
+        self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults )
+        self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults )
 
         #Debug leak flags
         self.__verify_or_set_optional_bool(config, 'disable_leak_send_requests', False, description, apply_defaults)

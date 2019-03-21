@@ -41,6 +41,7 @@ from scalyr_agent.monitor_utils.server_processors import LineRequestParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, KubernetesCache, PodInfo, DockerMetricFetcher
+import scalyr_agent.monitor_utils.k8s as k8s_utils
 
 from scalyr_agent.util import StoppableThread
 
@@ -545,11 +546,12 @@ class ContainerChecker( StoppableThread ):
         Monitors containers to check when they start and stop running.
     """
 
-    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
+    def __init__( self, config, global_config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
                   include_all, include_controller_info, namespaces_to_ignore,
                   ignore_pod_sandboxes ):
 
         self._config = config
+        self._global_config = global_config
         self._logger = logger
 
         self.__delay = self._config.get( 'container_check_interval' )
@@ -587,10 +589,6 @@ class ContainerChecker( StoppableThread ):
         self.containers = {}
         self.__include_all = include_all
 
-        self.__k8s = None
-
-        self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
-        self.__k8s_cache_purge_secs = self._config.get( 'k8s_cache_purge_secs' )
         self.__k8s_cache_init_abort_delay = self._config.get( 'k8s_cache_init_abort_delay' )
 
         self.k8s_cache = None
@@ -603,22 +601,15 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            k8s_api_url = self._config.get('k8s_api_url')
-            if self._config.get( 'verify_k8s_api_queries' ):
-                self.__k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-            else:
-                self.__k8s = KubernetesApi( ca_file=None, k8s_api_url=k8s_api_url)
-
             self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
             self.container_id = self.__get_scalyr_container_id( self.__client, self.__name )
 
-            # create the k8s cache
-            self.k8s_cache = KubernetesCache( self.__k8s, self._logger,
-                cache_expiry_secs=self.__k8s_cache_expiry_secs,
-                cache_purge_secs=self.__k8s_cache_purge_secs,
-                namespaces_to_ignore=self.__namespaces_to_ignore )
+            k8s_api_url = self._config.get('k8s_api_url')
+            verify_k8s_api_queries = self._config.get( 'verify_k8s_api_queries' )
 
+            # create the k8s cache
+            self.k8s_cache = k8s_utils.cache( self._global_config )
 
             delay = 0.5
             message_delay = 5
@@ -1312,8 +1303,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__k8s_api_url = self._config.get('k8s_api_url')
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.__metric_fetcher = DockerMetricFetcher(self.__client, self._config.get('docker_max_parallel_stats'),
-                                                    self._logger)
+        self.__metric_fetcher = DockerMetricFetcher(self.__client, self._config.get('docker_max_parallel_stats') )
         self.__glob_list = self._config.get( 'container_globs' )
         self.__include_all = self._config.get( 'k8s_include_all_containers' )
 
@@ -1330,7 +1320,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
-            self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file,
+            self.__container_checker = ContainerChecker( self._config, self._global_config, self._logger, self.__socket_file,
                                                          self.__docker_api_version, host_hostname, data_path, log_path,
                                                          self.__include_all, self.__include_controller_info,
                                                          self.__namespaces_to_ignore, self.__ignore_pod_sandboxes )

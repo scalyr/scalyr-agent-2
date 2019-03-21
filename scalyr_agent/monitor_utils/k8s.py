@@ -82,6 +82,30 @@ _OBJECT_ENDPOINTS = {
     },
 }
 
+def cache( config ):
+    """
+        Returns the global k8s cache, configured using the options in `config`
+        @param config: - The configuration
+        @type config: A Scalyr Configuration object
+    """
+
+    # split comma delimited string of namespaces to ignore in to a list
+    # of strings
+    namespaces_to_ignore = []
+    for x in config.k8s_ignore_namespaces.split():
+        namespaces_to_ignore.append(x.strip())
+
+    # create a new cache config
+    cache_config = _CacheConfig( api_url=config.k8s_api_url,
+                                 verify_api_queries=config.k8s_verify_api_queries,
+                                 cache_expiry_secs=config.k8s_cache_expiry_secs,
+                                 cache_purge_secs=config.k8s_cache_purge_secs,
+                                 namespaces_to_ignore=namespaces_to_ignore )
+
+    #update the config and return current cache
+    _k8s_cache.update_config( cache_config )
+    return _k8s_cache
+
 class K8sApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
@@ -210,15 +234,12 @@ class _K8sCache( object ):
         from querying the cache are never written to.
     """
 
-    def __init__( self, logger, k8s, processor, object_type, filter=None, perform_full_updates=True ):
+    def __init__( self, processor, object_type, perform_full_updates=True ):
         """
             Initialises a Kubernees Cache
-            @param: logger - a Scalyr logger
-            @param: k8s - a KubernetesApi object
-            @param: processor - a _K8sProcessor object for querying/processing the k8s api
-            @param: object_type - a string containing a textual name of the objects being cached, for use in log messages
-            @param: filter - a k8s filter string or none if no filtering is to be done
-            @param: perform_full_updates - Boolean.  If False no attempts will be made to fully update the cache (only single items will be cached)
+            @param processor: a _K8sProcessor object for querying/processing the k8s api
+            @param object_type: a string containing a textual name of the objects being cached, for use in log messages
+            @param perform_full_updates: If False no attempts will be made to fully update the cache (only single items will be cached)
         """
         # protects self.objects
         self._lock = threading.Lock()
@@ -227,11 +248,8 @@ class _K8sCache( object ):
         # and the inner dict is hashed by object name
         self._objects = {}
 
-        self._logger = logger
-        self._k8s = k8s
         self._processor = processor
         self._object_type = object_type
-        self._filter = filter
         self._perform_full_updates=perform_full_updates
 
     def shallow_copy(self):
@@ -267,7 +285,7 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def update( self, kind ):
+    def update( self, k8s, filter, kind ):
         """ do a full update of all information from the API
         """
         if not self._perform_full_updates:
@@ -275,16 +293,16 @@ class _K8sCache( object ):
 
         objects = {}
         try:
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Attempting to update k8s %s data from API' % kind )
-            query_result = self._k8s.query_objects( kind, filter=self._filter)
-            objects = self._process_objects( kind, query_result )
+            global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'Attempting to update k8s %s data from API' % kind )
+            query_result = k8s.query_objects( kind, filter=filter)
+            objects = self._process_objects( k8s, kind, query_result )
         except K8sApiException, e:
             global_log.warn( "Error accessing the k8s API: %s" % (str( e ) ),
                              limit_once_per_x_secs=300, limit_key='k8s_cache_update' )
             # early return because we don't want to update our cache with bad data
             return
         except Exception, e:
-            self._logger.warning( "Exception occurred when updating k8s %s cache.  Cache was not updated %s\n%s" % (kind, str( e ), traceback.format_exc()) )
+            global_log.warning( "Exception occurred when updating k8s %s cache.  Cache was not updated %s\n%s" % (kind, str( e ), traceback.format_exc()) )
             # early return because we don't want to update our cache with bad data
             return
 
@@ -295,13 +313,13 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def _update_object( self, kind, namespace, name, current_time ):
+    def _update_object( self, k8s, kind, namespace, name, current_time ):
         """ update a single object, returns the object if found, otherwise return None """
         result = None
         try:
             # query k8s api and process objects
-            obj = self._k8s.query_object( kind, namespace, name )
-            result = self._processor.process_object( obj )
+            obj = k8s.query_object( kind, namespace, name )
+            result = self._processor.process_object( k8s, obj )
         except K8sApiException, e:
             # Don't do anything here.  This means the object we are querying doensn't exist
             # and it's up to the caller to handle this by detecting a None result
@@ -309,7 +327,7 @@ class _K8sCache( object ):
 
         # update our cache if we have a result
         if result:
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "Processing single %s: %s/%s" % (self._object_type, result.namespace, result.name) )
+            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Processing single %s: %s/%s" % (self._object_type, result.namespace, result.name) )
             self._lock.acquire()
             try:
                 if result.namespace not in self._objects:
@@ -322,10 +340,11 @@ class _K8sCache( object ):
 
         return result
 
-    def _process_objects( self, kind, objects ):
+    def _process_objects( self, k8s, kind, objects ):
         """
             Processes the dict returned from querying the objects and calls the _K8sProcessor to create relevant objects for caching,
 
+            @param k8s: a KubernetesApi object
             @param kind: The kind of the objects
             @param objects: The JSON object returned as a response from quering all objects.  This JSON object should contain an
                          element called 'items', which is an array of dicts
@@ -340,15 +359,15 @@ class _K8sCache( object ):
         # dict, hashed by namespace and object name
         result = {}
         for obj in items:
-            info = self._processor.process_object( obj )
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Processing %s: %s:%s" % (kind, info.namespace, info.name) )
+            info = self._processor.process_object( k8s, obj )
+            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Processing %s: %s:%s" % (kind, info.namespace, info.name) )
 
             if info.namespace not in result:
                 result[info.namespace] = {}
 
             current = result[info.namespace]
             if info.name in current:
-                self._logger.warning( "Duplicate %s '%s' found in namespace '%s', overwriting previous values" % (kind, info.name, info.namespace),
+                global_log.warning( "Duplicate %s '%s' found in namespace '%s', overwriting previous values" % (kind, info.name, info.namespace),
                                       limit_once_per_x_secs=300, limit_key='duplicate-%s-%s' % (kind, info.uid) )
 
             current[info.name] = info
@@ -377,7 +396,7 @@ class _K8sCache( object ):
         return result
 
 
-    def lookup( self, namespace, name, kind=None, current_time=None ):
+    def lookup( self, k8s, namespace, name, kind=None, current_time=None ):
         """ returns info for the object specified by namespace and name
         or None if no object is found in the cache.
 
@@ -391,12 +410,12 @@ class _K8sCache( object ):
         # see if the object exists in the cache and return it if so
         result = self._lookup_object( namespace, name, current_time )
         if result:
-            self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
+            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
             return result
 
         # we have a cache miss so query the object individually
-        self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
-        result = self._update_object( kind, namespace, name, current_time )
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
+        result = self._update_object( k8s, kind, namespace, name, current_time )
 
         return result
 
@@ -405,12 +424,6 @@ class _K8sProcessor( object ):
         An abstract interface used by _K8sCache for querying a specific type of
         object from the k8s api, and generating python objects from the queried result JSON.
     """
-
-    def __init__( self, logger ):
-        """
-            @param: logger - a Scalyr logger object for logging
-        """
-        self._logger = logger
 
     def _get_managing_controller( self, items ):
         """
@@ -429,9 +442,10 @@ class _K8sProcessor( object ):
 
         return None
 
-    def process_object( self, obj ):
+    def process_object( self, k8s, obj ):
         """
         Creates a python object based of a dict
+        @param k8s: a KubernetesApi object
         @param obj: A JSON dict returned as a response to querying
                     the k8s API for a specific object type.
         @return a python object relevant to the
@@ -440,11 +454,11 @@ class _K8sProcessor( object ):
 
 class PodProcessor( _K8sProcessor ):
 
-    def __init__( self, logger, controllers ):
-        super( PodProcessor, self).__init__( logger )
+    def __init__( self, controllers ):
+        super( PodProcessor, self).__init__()
         self._controllers = controllers
 
-    def _get_controller_from_owners( self, owners, namespace ):
+    def _get_controller_from_owners( self, k8s, owners, namespace ):
         """
             Processes a list of owner references returned from a Pod's metadata to see
             if it is eventually owned by a Controller, and if so, returns the Controller object
@@ -469,18 +483,18 @@ class PodProcessor( _K8sProcessor ):
 
         # walk the parent until we get to the root controller
         # Note: Parent controllers will always be in the same namespace as the child
-        controller = self._controllers.lookup( namespace, name, kind=kind )
+        controller = self._controllers.lookup( k8s, namespace, name, kind=kind )
         while controller:
             if controller.parent_name is None:
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent name' % controller.name )
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent name' % controller.name )
                 break
 
             if controller.parent_kind is None:
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent kind' % controller.name )
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent kind' % controller.name )
                 break
 
             # get the parent controller
-            parent_controller = self._controllers.lookup( namespace, controller.parent_name, kind=controller.parent_kind )
+            parent_controller = self._controllers.lookup( k8s, namespace, controller.parent_name, kind=controller.parent_kind )
             # if the parent controller doesn't exist, assume the current controller
             # is the root controller
             if parent_controller is None:
@@ -492,8 +506,9 @@ class PodProcessor( _K8sProcessor ):
         return controller
 
 
-    def process_object( self, obj ):
+    def process_object( self, k8s, obj ):
         """ Generate a PodInfo object from a JSON object
+        @param k8s: a KubernetesApi object
         @param pod: The JSON object returned as a response to querying
             a specific pod from the k8s API
 
@@ -511,7 +526,7 @@ class PodProcessor( _K8sProcessor ):
         pod_name = metadata.get( "name", '' )
         namespace = metadata.get( "namespace", '' )
 
-        controller = self._get_controller_from_owners( owners, namespace )
+        controller = self._get_controller_from_owners( k8s, owners, namespace )
 
         container_names = []
         for container in spec.get( 'containers', [] ):
@@ -520,12 +535,12 @@ class PodProcessor( _K8sProcessor ):
         try:
             annotations = annotation_config.process_annotations( annotations )
         except BadAnnotationConfig, e:
-            self._logger.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str( e )),
+            global_log.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str( e )),
                                   limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s' % info.uid )
             annotations = JsonObject()
 
 
-        self._logger.log( scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % ( str( annotations ) ) )
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % ( str( annotations ) ) )
 
         # create the PodInfo
         result = PodInfo( name=pod_name,
@@ -539,11 +554,10 @@ class PodProcessor( _K8sProcessor ):
         return result
 
 class ControllerProcessor( _K8sProcessor ):
-    def __init__( self, logger ):
-        super( ControllerProcessor, self).__init__( logger )
 
-    def process_object( self, obj ):
+    def process_object( self, k8s, obj ):
         """ Generate a Controller object from a JSON object
+        @param k8s: a KubernetesApi object
         @param obj: The JSON object returned as a response to querying
             a specific controller from the k8s API
 
@@ -566,41 +580,208 @@ class ControllerProcessor( _K8sProcessor ):
 
         return Controller( name, namespace, kind, parent_name, parent_kind, labels )
 
+class _CacheConfig( object ):
+    """
+    Internal configuration options for the Kubernetes cache
+    """
+
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None ):
+        """
+        @param api_url: the url for querying the k8s api
+        @param verify_api_queries: whether to verify queries to the k8s api
+        @param cache_expiry_secs: the number of secs to wait before updating the cache
+        @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
+        @param namespaces_to_ignore: a list of namespaces to ignore
+        @type api_url: str
+        @type verify_api_queries: bool
+        @type cache_expiry_secs: int or float
+        @type cache_purge_secs: int or float
+        @type namespaces_to_ignore: list[str]
+        """
+        self.api_url = api_url
+        self.verify_api_queries = verify_api_queries
+        self.cache_expiry_secs = cache_expiry_secs
+        self.cache_purge_secs = cache_purge_secs
+        self.namespaces_to_ignore = namespaces_to_ignore
+
+    def __str__( self ):
+        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n" % ( str(self.api_url),
+            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ) )
+
+    def need_new_k8s_object( self, new_config ):
+        """
+        Determines if a new KubernetesApi object needs to created for the cache based on the new config
+        @param new_config: The new config options
+        @type new_config: _CacheConfig
+        @return: True if a new KubernetesApi object should be created based on the differences between the
+                 current and the new config.  False otherwise.
+        """
+        return self.api_url != new_config.api_url or self.verify_api_queries != new_config.verify_api_queries
+
+    def need_new_filters( self, new_config ):
+        """
+        Determines if new node and namespace filters need to be created based on the new config
+        @param new_config: The new config options
+        @type new_config: _CacheConfig
+        @return: True if new filters need to be created based on the differences between the current and the new config.
+                 False otherwise
+        """
+        return self.namespaces_to_ignore != new_config.namespaces_to_ignore
+
+
 class KubernetesCache( object ):
 
-    def __init__( self, k8s, logger, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None ):
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True ):
 
-        self._k8s = k8s
+        self._lock = threading.Lock()
+        self._namespace_filter = None
+        self._node_filter = None
+        self._k8s = None
+        self._cache_expiry_secs=cache_expiry_secs
+        self._cache_purge_secs=cache_purge_secs
+        self._config_update_count = 0
 
-        self._namespace_filter = self._build_namespace_filter( namespaces_to_ignore )
-        self._node_filter = self._build_node_filter( self._namespace_filter )
+        empty_config = _CacheConfig( api_url='', namespaces_to_ignore=[] )
+
+
+        new_config = _CacheConfig( api_url=api_url,
+                                   verify_api_queries=verify_api_queries,
+                                   cache_expiry_secs=cache_expiry_secs,
+                                   cache_purge_secs=cache_purge_secs,
+                                   namespaces_to_ignore=namespaces_to_ignore )
+
+        # perform initial configuration of the cache
+        self._configure( old_config=empty_config, new_config=new_config )
 
         # create the controller cache
-        self._controller_processor = ControllerProcessor( logger )
-        self._controllers = _K8sCache( logger, k8s, self._controller_processor, '<controller>',
-                               filter=self._namespace_filter,
+        self._controller_processor = ControllerProcessor()
+        self._controllers = _K8sCache( self._controller_processor, '<controller>',
                                perform_full_updates=False )
 
         # create the pod cache
-        self._pod_processor = PodProcessor( logger, self._controllers )
-        self._pods = _K8sCache( logger, k8s, self._pod_processor, 'Pod',
-                               filter=self._node_filter )
+        self._pod_processor = PodProcessor( self._controllers )
+        self._pods = _K8sCache( self._pod_processor, 'Pod' )
 
         self._cluster_name = None
-        self._cache_expiry_secs = cache_expiry_secs
-        self._cache_purge_secs = cache_purge_secs
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
-        self._lock = threading.Lock()
         self._initialized = False
 
-        self._thread = StoppableThread( target=self.update_cache, name="K8S Cache" )
+        self._thread = None
 
-        self._thread.start()
+        if start_caching:
+            self.start()
+
+    def _configure( self, old_config, new_config ):
+        """
+        Configures the cache based on any changes in the configuration
+        @param old_config: the old configuration
+        @param new_config: the new configuration
+        @type old_config: _CacheConfig
+        @type new_config: _CacheConfig
+        @return: True if the config changed, False otherwise
+        """
+
+        changed = False
+
+        # get old state values
+        old_k8s = None
+        old_namespace_filter = None
+        old_node_filter = None
+        old_config_update_count = 0
+        self._lock.acquire()
+        try:
+            old_k8s = self._k8s
+            old_namespace_filter = self._namespace_filter
+            old_node_filter = self._node_filter
+            old_config_update_count = self._config_update_count
+        finally:
+            self._lock.release()
+
+        # create a new k8s api object if we need one
+        k8s = old_k8s
+        if k8s is None or old_config.need_new_k8s_object( new_config ):
+            changed = True
+            if new_config.verify_api_queries:
+                k8s = KubernetesApi(k8s_api_url=new_config.api_url)
+            else:
+                k8s = KubernetesApi( ca_file=None, k8s_api_url=new_config.k8s_api_url)
+
+        # create new filters if we need them
+        namespace_filter = old_namespace_filter
+        node_filter = old_node_filter
+        if old_config.need_new_filters( new_config ):
+            changed = True
+            namespace_filter = self._build_namespace_filter( new_config.namespaces_to_ignore )
+            node_filter = self._build_node_filter( k8s, namespace_filter )
+
+        #see if expiry or purge times have changed
+        if old_config.cache_expiry_secs != new_config.cache_expiry_secs or old_config.cache_purge_secs != new_config.cache_purge_secs:
+            changed = True
+
+        # update with new values
+        self._lock.acquire()
+        try:
+            # if config update count has changed, it means a newer config change
+            # came through on another thread before we finished this call, so only make our changes
+            # if the update counts are the same
+            if self._config_update_count != old_config_update_count:
+                changed = False
+            else:
+
+                self._k8s = k8s
+
+                self._namespace_filter = namespace_filter
+                self._node_filter = node_filter
+
+                self._cache_expiry_secs = new_config.cache_expiry_secs
+                self._cache_purge_secs = new_config.cache_expiry_secs
+
+                self._config = new_config
+
+                if changed:
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Got new config %s", str( self._config ) )
+
+                self._config_update_count += 1
+        finally:
+            self._lock.release()
+
+        return changed
 
     def stop(self):
         """Stops the cache, specifically stopping the background thread that refreshes the cache"""
         self._thread.stop()
+
+    def start( self ):
+        """
+            Starts the background thread that reads from the k8s cache
+        """
+        if self._thread is None:
+            self._thread = StoppableThread( target=self.update_cache, name="K8S Cache" )
+            self._thread.start()
+
+    def update_config( self, new_config ):
+        """
+        Updates the cache config
+        """
+        old_config = _CacheConfig( api_url='', namespaces_to_ignore=[] )
+        self._lock.acquire()
+        try:
+            old_config = self._config
+        finally:
+            self._lock.release()
+
+        changed = self._configure( old_config=old_config, new_config=new_config )
+
+        if changed:
+            global_log.info( "K8s Cache configuration has been updated" )
+
+        self._lock.acquire()
+        try:
+            if self._thread is None:
+                self.start()
+        finally:
+            self._lock.release()
 
     def is_initialized( self ):
         """Returns whether or not the k8s cache has been initialized with the full pod list"""
@@ -613,9 +794,9 @@ class KubernetesCache( object ):
 
         return result
 
-    def _update_cluster_name( self ):
+    def _update_cluster_name( self, k8s ):
         """Updates the cluster name"""
-        cluster_name = self._k8s.get_cluster_name()
+        cluster_name = k8s.get_cluster_name()
         self._lock.acquire()
         try:
             self._cluster_name = cluster_name
@@ -627,13 +808,31 @@ class KubernetesCache( object ):
             Main thread for updating the k8s cache
         """
 
+        cache_purge_secs = 30
+        cache_expiry_secs = 30
+        k8s = None
+        namespace_filter = None
+        node_filter = None
+
         start_time = time.time()
         while run_state.is_running() and not self.is_initialized():
+
+            # get cache state values that will be consistent for the duration of the loop iteration
+            self._lock.acquire()
+            try:
+                cache_purge_secs = self._cache_purge_secs
+                cache_expiry_secs = self._cache_expiry_secs
+                k8s = self._k8s
+                namespace_filter = self._namespace_filter
+                node_filter = self._node_filter
+            finally:
+                self._lock.release()
+
             try:
                 # we only pre warm the pod cache and the cluster name
                 # controllers are cached on an as needed basis
-                self._pods.update( 'Pod' )
-                self._update_cluster_name()
+                self._pods.update( k8s, node_filter, 'Pod' )
+                self._update_cluster_name( k8s )
 
                 self._lock.acquire()
                 try:
@@ -652,19 +851,30 @@ class KubernetesCache( object ):
         global_log.info( "Kubernetes cache initialized in %.2f seconds" % elapsed )
 
         # go back to sleep if we haven't taken longer than the expiry time
-        if elapsed < self._cache_expiry_secs:
-            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "sleeping for %.2f seconds" % (self._cache_expiry_secs - elapsed) )
-            run_state.sleep_but_awaken_if_stopped( self._cache_expiry_secs - elapsed )
+        if elapsed < cache_expiry_secs:
+            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "sleeping for %.2f seconds" % (cache_expiry_secs - elapsed) )
+            run_state.sleep_but_awaken_if_stopped( cache_expiry_secs - elapsed )
 
         # start the main update loop
         last_purge = time.time()
         while run_state.is_running():
+            # get cache state values that will be consistent for the duration of the loop iteration
+            self._lock.acquire()
+            try:
+                cache_purge_secs = self._cache_purge_secs
+                cache_expiry_secs = self._cache_expiry_secs
+                k8s = self._k8s
+                namespace_filter = self._namespace_filter
+                node_filter = self._node_filter
+            finally:
+                self._lock.release()
+
             try:
                 current_time = time.time()
-                self._pods.update( 'Pod' )
-                self._update_cluster_name()
+                self._pods.update( k8s, node_filter, 'Pod' )
+                self._update_cluster_name( k8s )
 
-                if last_purge + self._cache_purge_secs < current_time:
+                if last_purge + cache_purge_secs < current_time:
                     global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
                     self._controllers.purge_expired( last_purge )
                     last_purge = current_time
@@ -675,7 +885,7 @@ class KubernetesCache( object ):
             except Exception, e:
                 global_log.warn( "Exception occurred when updating k8s cache - %s\n%s" % (str( e ), traceback.format_exc()) )
 
-            run_state.sleep_but_awaken_if_stopped( self._cache_expiry_secs )
+            run_state.sleep_but_awaken_if_stopped( cache_expiry_secs )
 
 
     def _build_namespace_filter( self, namespaces_to_ignore ):
@@ -690,13 +900,13 @@ class KubernetesCache( object ):
 
         return result
 
-    def _build_node_filter( self, namespace_filter ):
+    def _build_node_filter( self, k8s, namespace_filter ):
         """Builds a fieldSelector filter to be used when querying pods the k8s api, limiting them to the current node"""
         result = None
         pod_name = '<unknown>'
         try:
-            pod_name = self._k8s.get_pod_name()
-            node_name = self._k8s.get_node_name( pod_name )
+            pod_name = k8s.get_pod_name()
+            node_name = k8s.get_node_name( pod_name )
 
             if node_name:
                 result = 'spec.nodeName=%s' % node_name
@@ -721,7 +931,17 @@ class KubernetesCache( object ):
         Querying the pod information is thread-safe, but the returned object should
         not be written to.
         """
-        return self._pods.lookup( namespace, name, kind='Pod', current_time=current_time )
+        k8s = None
+        self._lock.acquire()
+        try:
+            k8s = self._k8s
+        finally:
+            self._lock.release()
+
+        if k8s is None:
+            return
+
+        return self._pods.lookup( k8s, namespace, name, kind='Pod', current_time=current_time )
 
     def controller( self, namespace, name, kind, current_time=None ):
         """ returns controller info for the controller specified by namespace and name
@@ -730,7 +950,17 @@ class KubernetesCache( object ):
         Querying the controller information is thread-safe, but the returned object should
         not be written to.
         """
-        return self._controllers.lookup( namespace, name, kind=kind, current_time=current_time )
+        k8s = None
+        self._lock.acquire()
+        try:
+            k8s = self._k8s
+        finally:
+            self._lock.release()
+
+        if k8s is None:
+            return
+
+        return self._controllers.lookup( k8s, namespace, name, kind=kind, current_time=current_time )
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
@@ -1025,19 +1255,16 @@ class DockerMetricFetcher(object):
     To get the benefit of this approach, you must first invoke `prefetch_metrics` for each container whose metrics
     you wish to retrieve, and then invoke `get_metrics` to actually get the metrics.
     """
-    def __init__(self, docker_client, concurrency, logger):
+    def __init__(self, docker_client, concurrency):
         """
 
         @param docker_client:  The docker client object to use for issuing `stats` requests.
         @param concurrency:  The maximum number of `stats` requests to issue in parallel.  This controls the maximum
             number of threads that will be created.
-        @param logger:  The logger
         @type docker_client: k8s_test.MetricFaker
         @type concurrency: int
-        @type logger: scalyr_agent.scalyr_logging.AgentLogger
         """
         self.__docker_client = docker_client
-        self.__logger = logger
         self.__concurrency = concurrency
 
         # A sentinel value used in the `__container_scoreboard` to indicate the container is in the queue to be fetched.
@@ -1198,11 +1425,11 @@ class DockerMetricFetcher(object):
 
             result = None
             try:
-                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3,
+                global_log.log(scalyr_logging.DEBUG_LEVEL_3,
                                   'Attempting to retrieve metrics for cid=%s' % container_id)
                 result = self.__docker_client.stats(container=container_id, stream=False)
             except Exception, e:
-                self.__logger.error("Error readings stats for '%s': %s\n%s" % (container_id, str(e),
+                global_log.error("Error readings stats for '%s': %s\n%s" % (container_id, str(e),
                                                                                traceback.format_exc()),
                                     limit_once_per_x_secs=300, limit_key='api-stats-%s' % container_id)
             self._record_fetch_result(container_id, result)
@@ -1243,3 +1470,15 @@ class DockerMetricFetcher(object):
             self.__cv.notifyAll()
         finally:
             self.__lock.release()
+
+def _create_k8s_cache():
+    """
+        creates a new k8s cache object
+    """
+
+    return KubernetesCache( start_caching=False )
+
+# global cache object - the module loading system guarantees this is only ever
+# initialized once, regardless of how many modules import k8s.py
+_k8s_cache = _create_k8s_cache()
+
