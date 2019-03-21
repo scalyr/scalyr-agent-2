@@ -7,4 +7,4 @@ install:
 script:
   - nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml --ignore-files=.*log_processing_test.*
 
-# Add a dummy comment 2
+# Add a dummy comment 3
