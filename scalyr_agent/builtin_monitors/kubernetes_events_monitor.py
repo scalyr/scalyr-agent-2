@@ -190,7 +190,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
     When the leader node is explicitly set like this, no API queries are made to the K8s API server and only the node with that name will be used to query K8s events.  The downside to this approach is that it is less flexible, especially in the event of the node shutting down unexpectedly.
 
-    Since the leader election relies on some assumptions and could impact load on the K8s API server, The leader election algorithm does rely on a few assumptions to work correctly and could, for large clusters, impact performance.
+    The leader election algorithm relies on a few assumptions to work correctly and could, for large clusters, impact performance. If necessary, the events monitor can also be disabled.
 
     ## Disabling the Kubernetes Events Monitor
 
