@@ -394,6 +394,20 @@ def get_pid_tid():
     except:
         return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
+def is_list_of_strings( vals ):
+    """Returns True if val is a list (or enumerable) of strings.  False otherwise"""
+    try:
+        # check if everything is a string
+        for val in vals:
+            if not isinstance( val, basestring ):
+                return False
+    except:
+        # vals is not enumerable
+        return False
+
+    # everything is a string
+    return True
+
 
 class JsonReadFileException(Exception):
     """Raised when a failure occurs when reading a file as a JSON object."""

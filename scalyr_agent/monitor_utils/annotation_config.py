@@ -30,7 +30,7 @@ class BadAnnotationConfig( Exception ):
     pass
 
 
-def process_annotations( annotations, annotation_prefix_re=SCALYR_ANNOTATION_PREFIX_RE ):
+def process_annotations( annotations, annotation_prefix_re=SCALYR_ANNOTATION_PREFIX_RE, hyphens_as_underscores=False ):
     """
     Process the annotations, extracting log.config.scalyr.com/* entries
     and mapping them to a dict corresponding to the same names as the log_config
@@ -141,7 +141,7 @@ def process_annotations( annotations, annotation_prefix_re=SCALYR_ANNOTATION_PRE
             else:
                 items[key] = annotation_value
 
-    return _process_annotation_items( items )
+    return _process_annotation_items( items, hyphens_as_underscores )
 
 def _is_int( string ):
     """Returns true or false depending on whether or not the passed in string can be converted to an int"""
@@ -154,10 +154,9 @@ def _is_int( string ):
    
     return result
 
-def _process_annotation_items( items ):
+def _process_annotation_items( items, hyphens_as_underscores ):
     """ Process annotation items after the scalyr config prefix has been stripped
     """
-    result = {}
     def sort_annotation( pair ):
         (key, value) = pair
         m = SCALYR_ANNOTATION_ELEMENT_RE.match( key )
@@ -174,6 +173,28 @@ def _process_annotation_items( items ):
         if _is_int( key ):
             return int( key )
         return key
+
+    def normalize_key_name( key, convert_hyphens ):
+        """
+        Normalizes the name of the key by converting any hyphens to underscores (or not)
+        depending on the `convert_hyphens` parameter.
+        Typically, `convert_hypens` will be false when converting k8s annotations because
+        label and annotation keys in k8s can contain underscores.
+        Keys for docker labels however cannot container underscores, therefore `convert_hyphens`
+        can be used to convert any label keys to use underscores, which are expected by various
+        log_config options.
+        This function means the code that processes the labels/annotations doesn't need to care
+        if it is running under docker or k8s, because the root caller decides whether or not hyphens
+        need converting.
+        @param: key - string - a key for an annotation/label
+        @param: convert_hyphens - bool - if True, any hyphens in the `key` parameter will be
+                converted to underscores
+        """
+        if convert_hyphens:
+            key = key.replace( '-', '_' )
+        return key
+
+    result = {}
             
     # sort dict by the value of the first sub key (up to the first '.')
     # this ensures that all items of the same key are processed together
@@ -207,7 +228,8 @@ def _process_annotation_items( items ):
             # else if the keys are different which means we have a new key,
             # so add the current object to the list of results and create a new object
             elif previous_key is not None and root_key != previous_key:
-                result[previous_key] = _process_annotation_items( current_object )
+                updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
+                result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
                 current_object = {}
 
             current_object[child_key] = value
@@ -227,16 +249,19 @@ def _process_annotation_items( items ):
             # if there was a previous key 
             if previous_key is not None and current_object is not None:
                 # stick it in the result
-                result[previous_key] = _process_annotation_items( current_object )
+                updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
+                result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
 
             # add the current value to the result
-            result[key] = value
+            updated_key = normalize_key_name(key, hyphens_as_underscores)
+            result[updated_key] = value
             current_object = None
             previous_key = None
 
     # add the final object if there was one
     if previous_key is not None and current_object is not None:
-        result[previous_key] = _process_annotation_items( current_object )
+        updated_key = normalize_key_name(previous_key, hyphens_as_underscores)
+        result[updated_key] = _process_annotation_items( current_object, hyphens_as_underscores )
 
     # if the result should be an array, return values as a JsonArray, sorted by numeric order of keys
     if is_array:

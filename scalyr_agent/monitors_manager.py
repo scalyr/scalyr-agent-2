@@ -54,6 +54,22 @@ class MonitorsManager(object):
         # The list of monitors.  Each element is a ScalyrMonitor instance.  __lock must be held to modify this var.
         self.__running_monitors = []
 
+    def find_monitor( self, module_name ):
+        """Finds a monitor with a specific name
+           @param: module_name - the module name of the monitor to find
+           @return: a monitor object if a monitor matches `module_name`, or None
+        """
+
+        self.__lock.acquire()
+        try:
+            for monitor in self.__monitors:
+                if monitor.module_name == module_name:
+                    return monitor
+        finally:
+            self.__lock.release()
+
+        return None
+
     def generate_status(self):
         """Creates and returns a status object that reports the monitor status.
 
@@ -98,6 +114,7 @@ class MonitorsManager(object):
                 # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead
                 # fail.
                 if monitor.open_metric_log():
+                    monitor.config_from_monitors( self )
                     log.info('Starting monitor %s', monitor.monitor_name)
                     monitor.start()
                     self.__running_monitors.append(monitor)

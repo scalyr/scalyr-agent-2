@@ -154,6 +154,15 @@ class TestUtil(ScalyrTestCase):
         self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 1000), 'ok   there')
         self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 6), 'ok   t')
 
+    def test_is_list_of_strings_yes( self ):
+        self.assertTrue( scalyr_util.is_list_of_strings( [ '*', 'blah', 'dah' ] ) )
+
+    def test_is_list_of_strings_no( self ):
+        self.assertFalse( scalyr_util.is_list_of_strings( [ '*', 3, { 'blah': 'dah' } ] ) )
+
+    def test_is_list_of_strings_none( self ):
+        self.assertFalse( scalyr_util.is_list_of_strings( None ) )
+
 
 class TestRateLimiter(ScalyrTestCase):
     def setUp(self):

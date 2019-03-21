@@ -24,6 +24,8 @@ from scalyr_agent.json_lib import JsonArray
 
 from scalyr_agent.test_base import ScalyrTestCase
 
+import re
+
 class TestAnnotationConfig(ScalyrTestCase):
 
     def test_invalid_annotations( self ):
@@ -99,4 +101,24 @@ class TestAnnotationConfig(ScalyrTestCase):
         self.assertEquals( 'item2 element 1', result['item2'][1] )
         self.assertEquals( 'item2 element 2', result['item2'][2] )
         self.assertEquals( 'item2 element 3', result['item2'][3] )
+
+    def test_annotation_keys_with_hyphens( self ):
+        annotations = {
+            "com.scalyr.config.log.item1-1.element-1" : "item1 element 1",
+            "com.scalyr.config.log.item1-2.element-2" : "item1 element 2",
+            "com.scalyr.config.log.item1-3.element-3" : "item1 element 3",
+            "com.scalyr.config.log.item2-1.element-1" : "item2 element 1",
+            "com.scalyr.config.log.item2-2.element-2" : "item2 element 2",
+            "com.scalyr.config.log.item2-3.element-3" : "item2 element 3",
+        }
+
+        result = process_annotations( annotations, annotation_prefix_re=re.compile( '^(com\.scalyr\.config\.log\.)(.+)' ), hyphens_as_underscores=True )
+
+        self.assertEquals( 'item1 element 1', result['item1_1']['element_1'] )
+        self.assertEquals( 'item1 element 2', result['item1_2']['element_2'] )
+        self.assertEquals( 'item1 element 3', result['item1_3']['element_3'] )
+        self.assertEquals( 'item2 element 1', result['item2_1']['element_1'] )
+        self.assertEquals( 'item2 element 2', result['item2_2']['element_2'] )
+        self.assertEquals( 'item2 element 3', result['item2_3']['element_3'] )
+
 

@@ -42,6 +42,8 @@ from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.builtin_monitors.docker_monitor import get_attributes_and_config_from_labels
+from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 global_log = scalyr_logging.getLogger(__name__)
@@ -571,7 +573,7 @@ class SyslogHandler(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options ):
+    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options, docker_options ):
 
         docker_logging = config.get('mode') == 'docker'
         self.__docker_regex = None
@@ -579,6 +581,8 @@ class SyslogHandler(object):
         self.__docker_id_resolver = None
         self.__docker_file_template = None
         self.__docker_log_deleter = None
+
+        self._docker_options = None
 
         if rotate_options is None:
             rotate_options = (2, 20*1024*1024)
@@ -594,6 +598,10 @@ class SyslogHandler(object):
             max_log_size = default_max_bytes
 
         if docker_logging:
+            self._docker_options = docker_options
+            if self._docker_options is None:
+                self._docker_options = DockerOptions()
+
             self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
             self.__docker_regex = self.__get_regex(config, 'docker_regex')
             self.__docker_file_template = Template(config.get('docker_logfile_template'))
@@ -623,7 +631,7 @@ class SyslogHandler(object):
         self.__line_reporter = line_reporter
         self.__docker_logging = docker_logging
         self.__docker_loggers = {}
-        self.__container_names = {}
+        self.__container_info = {}
         self.__expire_count = 0
         self.__logger_lock = threading.Lock()
 
@@ -640,16 +648,27 @@ class SyslogHandler(object):
         else:
             return None
 
-    def __create_log_config( self, cname, cid ):
+    def __create_log_config( self, cname, cid, base_config, attributes ):
+
+        # only set the parser if it is not already set
+        if 'parser' not in base_config and 'parser' not in attributes:
+            base_config['parser'] = 'agentSyslogDocker'
+
+        # config attributes override passed in attributes
+        attributes.update( base_config.get( 'attributes', {} ) )
+
+        # extra attributes override passed in attributes and config attributes
+        extra_attributes = self.__extra_attributes( cname, cid )
+        if extra_attributes:
+            attributes.update( extra_attributes )
+
+        base_config['attributes'] = JsonObject( attributes )
 
         full_path = os.path.join( self.__log_path, self.__docker_file_template.safe_substitute(
             {'CID': cid, 'CNAME': cname}))
-        log_config = {
-            'parser': 'agentSyslogDocker',
-            'path': full_path
-        }
+        base_config['path'] = full_path
 
-        return log_config
+        return base_config
 
     def __extra_attributes( self, cname, cid ):
 
@@ -687,18 +706,18 @@ class SyslogHandler(object):
 
         return result
 
-    def __extract_container_name_and_id(self, data):
-        """Attempts to extract the container id and container name from the log line received from Docker via
+    def __extract_container_info(self, data):
+        """Attempts to extract the container id, container name and container labels from the log line received from Docker via
         syslog.
 
-        First, attempts to extract container id using `__docker_regex` and look up the container name via Docker.
+        First, attempts to extract container id using `__docker_regex` and look up the container name and labels via Docker.
         If that fails, attempts to extract the container id and container name using the `__docker_regex_full`.
 
         @param data: The incoming line
         @type data: str
-        @return: The container name, container id, and the rest of the line if extract was successful.  Otherwise,
-            None, None, None.
-        @rtype: str, str, str
+        @return: The container name, container id, container labels (or an empty dict) and the rest of the line if extract was successful.  Otherwise,
+            None, None, None, None.
+        @rtype: str, str, dict, str
         """
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.
@@ -711,18 +730,19 @@ class SyslogHandler(object):
                 #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
                 cname = None
+                clabels = None
                 self.__logger_lock.acquire()
                 try:
-                    if cid not in self.__container_names:
+                    if cid not in self.__container_info:
                         reason_flags += '3'
-                        self.__container_names[cid] = self.__docker_id_resolver.lookup(cid)
-                    cname = self.__container_names[cid]
+                        self.__container_info[cid] = self.__docker_id_resolver.lookup(cid)
+                    cname, clabels = self.__container_info[cid]
                 finally:
                     self.__logger_lock.release()
 
-                if cid is not None and cname is not None:
+                if cid is not None and cname is not None and clabels is not None:
                     #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
-                    return cname, cid, data[m.end():]
+                    return cname, cid, clabels, data[m.end():]
 
         if self.__docker_regex_full is not None:
             reason_flags += '4'
@@ -732,7 +752,7 @@ class SyslogHandler(object):
 
             if m is not None and m.lastindex == 2:
                 #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
-                return m.group(1), m.group(2), data[m.end():]
+                return m.group(1), m.group(2), {}, data[m.end():]
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
@@ -743,7 +763,7 @@ class SyslogHandler(object):
                         limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
         #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
-        return None, None, None
+        return None, None, None, None
 
     def __get_pattern_str(self, regex_value):
         """Helper method for getting the string version of a compiled regular expression.  Also handles if the regex
@@ -762,7 +782,7 @@ class SyslogHandler(object):
         if self.__get_log_watcher:
             watcher, module = self.__get_log_watcher()
 
-        (cname, cid, line_content) = self.__extract_container_name_and_id(data)
+        (cname, cid, labels, line_content) = self.__extract_container_info(data)
 
         if cname is None:
             return
@@ -778,12 +798,11 @@ class SyslogHandler(object):
                 if cname not in self.__docker_loggers:
                     info = dict()
 
+                    attrs, base_config = get_attributes_and_config_from_labels( labels, self._docker_options )
+
                     # get the config and set the attributes
-                    info['log_config'] = self.__create_log_config( cname, cid )
+                    info['log_config'] = self.__create_log_config( cname, cid, base_config, attrs  )
                     info['cid'] = cid
-                    attributes = self.__extra_attributes( cname, cid )
-                    if attributes:
-                        info['log_config']['attributes'] = attributes
 
                     # create the physical log files
                     info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
@@ -881,7 +900,8 @@ class SyslogServer(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None, rotate_options=None):
+    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None, rotate_options=None,
+                  docker_options=None):
         server = None
 
         accept_ips = config.get( 'docker_accept_ips' )
@@ -918,7 +938,7 @@ class SyslogServer(object):
             raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
 
         #create the syslog handler, and add to the list of servers
-        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options )
+        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options, docker_options )
         server.syslog_transport_protocol = protocol
         server.syslog_port = port
 
@@ -1092,6 +1112,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         if self.__max_log_rotations is None:
             self.__max_log_rotations = default_rotation_count
 
+        self._docker_options = None
 
     def __build_server_list( self, protocol_string ):
         """Builds a list containing (protocol, port) tuples, based on a comma separated list
@@ -1183,6 +1204,31 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
     def __get_log_watcher( self ):
         return (self.__log_watcher, self)
 
+    def config_from_monitors( self, manager ):
+        """
+        Called directly before running the `run` method.
+        This method passes in the module manager object to a monitor before
+        it runs so that the monitor can query the monitor about other monitors
+        that exist.
+        In order to prevent circular references, callees should *not* retain a
+        reference to the manager object
+        """
+
+        # if we are using docker, then see if the docker monitor is also running
+        # and if so, read the config options from there
+        monitor = None
+        if self._config.get( 'mode' ) == 'docker':
+            monitor = manager.find_monitor( 'scalyr_agent.builtin_monitors.docker_monitor' )
+
+        # if the docker monitor doesn't exist don't do anything
+        if monitor is None:
+            return
+
+        self._docker_options = DockerOptions()
+        global_log.info( "About to configure options from monitor: %s", monitor.module_name )
+        self._docker_options.configure_from_monitor( monitor )
+
+
     def run( self ):
         def line_reporter(num_lines):
             self.increment_counter(reported_lines=num_lines)
@@ -1197,14 +1243,16 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
                                           line_reporter, accept_remote=self.__accept_remote_connections,
                                           server_host=self.__server_host, log_path=self.__log_path,
-                                          get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
+                                          get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options,
+                                          docker_options=self._docker_options)
 
             #iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
                 server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
                                        line_reporter, accept_remote=self.__accept_remote_connections,
                                        server_host=self.__server_host, log_path=self.__log_path,
-                                       get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options )
+                                       get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options,
+                                       docker_options=self._docker_options)
                 self.__extra_servers.append( server )
 
             #start any extra servers in their own threads
