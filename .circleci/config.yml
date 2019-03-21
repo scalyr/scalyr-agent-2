@@ -9,8 +9,6 @@ jobs:
     docker:
       - image: circleci/python:2.7-jessie-browsers
 
-    working_directory: ~/scalyr-agent-2
-
     steps:
       - checkout
       - restore_cache:
