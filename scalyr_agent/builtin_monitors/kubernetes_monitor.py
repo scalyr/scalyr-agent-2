@@ -177,7 +177,7 @@ define_config_option( __monitor__, 'k8s_parse_json',
                       'to extract log and timestamp fields.  If False, the raw json will be uploaded to Scalyr.',
                       convert_to=bool, default=True)
 
-define_config_option( __monitor__, 'verify_k8s_api_queries',
+define_config_option( __monitor__, 'k8s_verify_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
                       'the ca.crt certificate found in the service account directory. If false, no verification will be performed. '
                       'This is useful for older k8s clusters where certificate verification can fail.',
@@ -606,7 +606,7 @@ class ContainerChecker( StoppableThread ):
             self.container_id = self.__get_scalyr_container_id( self.__client, self.__name )
 
             k8s_api_url = self._config.get('k8s_api_url')
-            verify_k8s_api_queries = self._config.get( 'verify_k8s_api_queries' )
+            k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache( self._global_config )

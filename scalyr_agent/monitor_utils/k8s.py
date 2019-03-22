@@ -604,6 +604,22 @@ class _CacheConfig( object ):
         self.cache_purge_secs = cache_purge_secs
         self.namespaces_to_ignore = namespaces_to_ignore
 
+    def __eq__( self, other ):
+        """Equivalence method for _CacheConfig objects so == testing works """
+        return (self.api_url == other.api_url and
+                self.verify_api_queries == other.verify_api_queries and
+                self.cache_expiry_secs == other.cache_expiry_secs and
+                self.cache_purge_secs == other.cache_purge_secs and
+                self.namespaces_to_ignore == other.namespaces_to_ignore)
+
+    def __ne__( self, other ):
+        """Non-Equivalence method for _CacheConfig objects because Python 2 doesn't
+        automatically generate != if == is defined
+        """
+        # return result based on negation of `==` rather than negation of `__eq__`
+        return not (self == other)
+
+
     def __str__( self ):
         return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n" % ( str(self.api_url),
             str( self.verify_api_queries), self.cache_expiry_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ) )
@@ -634,14 +650,11 @@ class KubernetesCache( object ):
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True ):
 
         self._lock = threading.Lock()
-        self._namespace_filter = None
         self._node_filter = None
         self._k8s = None
-        self._cache_expiry_secs=cache_expiry_secs
-        self._cache_purge_secs=cache_purge_secs
-        self._config_update_count = 0
+        self._pending_config = None
 
-        empty_config = _CacheConfig( api_url='', namespaces_to_ignore=[] )
+        self._config = _CacheConfig( api_url='', namespaces_to_ignore=[] )
 
 
         new_config = _CacheConfig( api_url=api_url,
@@ -651,7 +664,7 @@ class KubernetesCache( object ):
                                    namespaces_to_ignore=namespaces_to_ignore )
 
         # perform initial configuration of the cache
-        self._configure( old_config=empty_config, new_config=new_config )
+        self._configure( new_config )
 
         # create the controller cache
         self._controller_processor = ControllerProcessor()
@@ -672,81 +685,62 @@ class KubernetesCache( object ):
         if start_caching:
             self.start()
 
-    def _configure( self, old_config, new_config ):
+    def _configure( self, new_config ):
         """
         Configures the cache based on any changes in the configuration
-        @param old_config: the old configuration
         @param new_config: the new configuration
-        @type old_config: _CacheConfig
         @type new_config: _CacheConfig
-        @return: True if the config changed, False otherwise
         """
-
-        changed = False
-
         # get old state values
         old_k8s = None
-        old_namespace_filter = None
         old_node_filter = None
-        old_config_update_count = 0
+        need_new_k8s = False
+        need_new_filters = False
         self._lock.acquire()
         try:
+            if self._config == new_config:
+                return
+
             old_k8s = self._k8s
-            old_namespace_filter = self._namespace_filter
             old_node_filter = self._node_filter
-            old_config_update_count = self._config_update_count
+            self._pending_config = new_config
+            need_new_k8s = (old_k8s is None or self._config.need_new_k8s_object( new_config ))
+            need_new_filters = self._config.need_new_filters( new_config )
         finally:
             self._lock.release()
 
         # create a new k8s api object if we need one
         k8s = old_k8s
-        if k8s is None or old_config.need_new_k8s_object( new_config ):
-            changed = True
+        if need_new_k8s:
             if new_config.verify_api_queries:
                 k8s = KubernetesApi(k8s_api_url=new_config.api_url)
             else:
                 k8s = KubernetesApi( ca_file=None, k8s_api_url=new_config.k8s_api_url)
 
         # create new filters if we need them
-        namespace_filter = old_namespace_filter
         node_filter = old_node_filter
-        if old_config.need_new_filters( new_config ):
-            changed = True
-            namespace_filter = self._build_namespace_filter( new_config.namespaces_to_ignore )
-            node_filter = self._build_node_filter( k8s, namespace_filter )
-
-        #see if expiry or purge times have changed
-        if old_config.cache_expiry_secs != new_config.cache_expiry_secs or old_config.cache_purge_secs != new_config.cache_purge_secs:
-            changed = True
+        if need_new_filters:
+            node_filter = self._build_node_filter( k8s, new_config.namespaces_to_ignore )
 
         # update with new values
         self._lock.acquire()
         try:
-            # if config update count has changed, it means a newer config change
-            # came through on another thread before we finished this call, so only make our changes
-            # if the update counts are the same
-            if self._config_update_count != old_config_update_count:
-                changed = False
-            else:
-
+            # if new_config is not self._pending_config then it means a newer config
+            # came through on another thread before we finished this call and therefore
+            # we should avoid updating because we only want the most recent update to succeed.
+            # use 'is' rather than == because we want to see if they are the same object
+            # not if the objects are semantically identical
+            if new_config is self._pending_config:
                 self._k8s = k8s
-
-                self._namespace_filter = namespace_filter
                 self._node_filter = node_filter
-
-                self._cache_expiry_secs = new_config.cache_expiry_secs
-                self._cache_purge_secs = new_config.cache_expiry_secs
-
                 self._config = new_config
+                self._pending_config = None
 
-                if changed:
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Got new config %s", str( self._config ) )
+                global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Got new config %s", str( self._config ) )
 
-                self._config_update_count += 1
         finally:
             self._lock.release()
 
-        return changed
 
     def stop(self):
         """Stops the cache, specifically stopping the background thread that refreshes the cache"""
@@ -764,17 +758,7 @@ class KubernetesCache( object ):
         """
         Updates the cache config
         """
-        old_config = _CacheConfig( api_url='', namespaces_to_ignore=[] )
-        self._lock.acquire()
-        try:
-            old_config = self._config
-        finally:
-            self._lock.release()
-
-        changed = self._configure( old_config=old_config, new_config=new_config )
-
-        if changed:
-            global_log.info( "K8s Cache configuration has been updated" )
+        self._configure( new_config )
 
         self._lock.acquire()
         try:
@@ -811,7 +795,6 @@ class KubernetesCache( object ):
         cache_purge_secs = 30
         cache_expiry_secs = 30
         k8s = None
-        namespace_filter = None
         node_filter = None
 
         start_time = time.time()
@@ -820,10 +803,9 @@ class KubernetesCache( object ):
             # get cache state values that will be consistent for the duration of the loop iteration
             self._lock.acquire()
             try:
-                cache_purge_secs = self._cache_purge_secs
-                cache_expiry_secs = self._cache_expiry_secs
+                cache_purge_secs = self._config.cache_purge_secs
+                cache_expiry_secs = self._config.cache_expiry_secs
                 k8s = self._k8s
-                namespace_filter = self._namespace_filter
                 node_filter = self._node_filter
             finally:
                 self._lock.release()
@@ -861,10 +843,9 @@ class KubernetesCache( object ):
             # get cache state values that will be consistent for the duration of the loop iteration
             self._lock.acquire()
             try:
-                cache_purge_secs = self._cache_purge_secs
-                cache_expiry_secs = self._cache_expiry_secs
+                cache_purge_secs = self._config.cache_purge_secs
+                cache_expiry_secs = self._config.cache_expiry_secs
                 k8s = self._k8s
-                namespace_filter = self._namespace_filter
                 node_filter = self._node_filter
             finally:
                 self._lock.release()
@@ -900,8 +881,16 @@ class KubernetesCache( object ):
 
         return result
 
-    def _build_node_filter( self, k8s, namespace_filter ):
-        """Builds a fieldSelector filter to be used when querying pods the k8s api, limiting them to the current node"""
+    def _build_node_filter( self, k8s, namespaces_to_ignore ):
+        """Builds a fieldSelector filter to be used when querying pods the k8s api, limiting them to the current node,
+           and also ignoring any excluded namespaces
+           @param k8s: a KubernetesApi object for querying the api
+           @param namespaces: a list of namespaces to ignore
+           @type k8s: KubernetesApi
+           @type namespaces_to_ignore: list[str]
+        """
+
+        namespace_filter = self._build_namespace_filter( namespaces_to_ignore )
         result = None
         pod_name = '<unknown>'
         try:

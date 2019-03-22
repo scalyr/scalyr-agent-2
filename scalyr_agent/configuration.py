@@ -270,7 +270,7 @@ class Configuration(object):
 
     @property
     def k8s_verify_api_queries(self):
-        return self.__get_config().get_bool('verify_k8s_api_queries')
+        return self.__get_config().get_bool('k8s_verify_api_queries')
 
     @property
     def k8s_cache_expiry_secs(self):
@@ -999,7 +999,7 @@ class Configuration(object):
 
         self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults )
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults )
-        self.__verify_or_set_optional_bool(config, 'verify_k8s_api_queries', True, description, apply_defaults )
+        self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults )
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults )
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults )
 

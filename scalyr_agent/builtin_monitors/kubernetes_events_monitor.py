@@ -405,7 +405,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
 
         try:
             k8s_api_url = self._global_config.k8s_api_url
-            verify_k8s_api_queries = self._global_config.k8s_verify_api_queries
+            k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
 
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
@@ -414,7 +414,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                 self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
 
             k8s = None
-            if verify_k8s_api_queries:
+            if k8s_verify_api_queries:
                 k8s = KubernetesApi(k8s_api_url=k8s_api_url)
             else:
                 k8s = KubernetesApi( ca_file=None, k8s_api_url=k8s_api_url)
@@ -548,7 +548,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not
             # right now join on the monitor threads, so no one would catch it.  We should change that.
-            global_log.exception('Monitor died from due to exception:', error_code='failedMonitor')
+            global_log.exception('Monitor died due to exception:', error_code='failedMonitor')
 
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the main server
