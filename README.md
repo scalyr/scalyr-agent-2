@@ -1,4 +1,4 @@
-scalyr-agent-2
+scalyr-agent
 ==============
 Travis: [![Build Status](https://travis-ci.com/echee2/scalyr-agent-2.svg?branch=master)](https://travis-ci.com/echee2/scalyr-agent-2)
 
