@@ -149,8 +149,23 @@ class Configuration(object):
                 api_key = env_api_key
 
             self.__set_api_key(self.__config, api_key)
+
+            # if we don't have a scalyr_server from the config, check if `scalyr_server` is defined as an
+            # environment variable
+            if scalyr_server is None:
+                scalyr_server = os.environ.get('scalyr_server')
+
+            # if we still don't have a scalyr_server, now check for the uppercase `SCALYR_SERVER` env
+            # variable, because for sure some people are going to set that instead of the lowercase version
+            # and this will save a support call
+            if scalyr_server is None:
+                scalyr_server = os.environ.get('SCALYR_SERVER')
+
+            # if we have a scalyr_server at this point, put it in our __config
             if scalyr_server is not None:
                 self.__config.put('scalyr_server', scalyr_server)
+
+            # if we still don't have a scalyr_server value, use a default
             self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
                                                  'configuration file %s' % self.__file_path)
 
