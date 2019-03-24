@@ -535,6 +535,15 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                             global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Time to check for a new event leader" )
                             break
                     
+                except K8sApiAuthorizationException:
+                    global_log.warning("Could not stream K8s events due to an authorization error.  The "
+                                       "Scalyr Service Account does not have permission to watch available events.  "
+                                       "Please recreate the role with the latest definition which can be found "
+                                       "at https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml "
+                                       "K8s event collection will be disabled until this is resolved.  See the K8s install "
+                                       "directions for instructions on how to create the role "
+                                       "https://www.scalyr.com/help/install-agent-kubernetes", limit_once_per_x_secs=300,
+                                       limit_key='k8s-stream-events-no-permission')
                 except ConnectionError, e:
                     # ignore these, and just carry on querying in the next iteration
                     pass
