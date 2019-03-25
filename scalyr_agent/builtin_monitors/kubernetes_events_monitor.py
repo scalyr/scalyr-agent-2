@@ -17,6 +17,7 @@
 __author__ = 'imron@scalyr.com'
 
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException, KubernetesCache
+import scalyr_agent.monitor_utils.k8s as k8s_utils
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
@@ -35,9 +36,7 @@ from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotati
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.scalyr_logging import BaseFormatter
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVEL_2
-from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
-from scalyr_agent.util import StoppableThread
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
@@ -84,20 +83,6 @@ define_config_option( __monitor__, 'event_object_filter',
                      'If set, only events whose `involvedObject` `kind` is on this list will be included.',
                      default=[ 'CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet' ]
                      )
-
-define_config_option( __monitor__, 'k8s_cache_expiry_secs',
-                     'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
-                     'Increase this value if you want less network traffic from querying the k8s api.  Decrease this value if you '
-                     'want dynamic updates to annotation configuration values to be processed more quickly.',
-                     convert_to=int, default=30)
-
-define_config_option( __monitor__, 'k8s_cache_purge_secs',
-                     'Optional (defaults to 300). The number of seconds to wait before purging unused items from the k8s cache',
-                     convert_to=int, default=300)
-
-define_config_option( __monitor__, 'k8s_ignore_namespaces',
-                      'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
-                      'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
 
 define_config_option( __monitor__, 'leader_check_interval',
                      'Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader.',
@@ -169,12 +154,9 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         except Exception, e:
             global_log.error( "Error setting monitor attribute in KubernetesEventMonitor" )
 
-        self.__k8s_cache_expiry_secs = self._config.get( 'k8s_cache_expiry_secs' )
-        self.__k8s_cache_purge_secs = self._config.get( 'k8s_cache_purge_secs' )
-
         # The namespace whose logs we should not collect.
         self.__k8s_namespaces_to_ignore = []
-        for x in self._config.get('k8s_ignore_namespaces').split():
+        for x in self._global_config.k8s_ignore_namespaces.split():
             self.__k8s_namespaces_to_ignore.append(x.strip())
 
         default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
@@ -422,13 +404,20 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
             return
 
         try:
-            k8s = KubernetesApi()
+            k8s_api_url = self._global_config.k8s_api_url
+            k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
 
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
 
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
+
+            k8s = None
+            if k8s_verify_api_queries:
+                k8s = KubernetesApi(k8s_api_url=k8s_api_url)
+            else:
+                k8s = KubernetesApi( ca_file=None, k8s_api_url=k8s_api_url)
 
             pod_name = k8s.get_pod_name()
             self._node_name = k8s.get_node_name( pod_name )
@@ -467,10 +456,9 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                         last_reported_leader = self._current_leader
 
                     if k8s_cache is None:
-                        k8s_cache = KubernetesCache( k8s, self._logger,
-                                                     cache_expiry_secs=self.__k8s_cache_expiry_secs,
-                                                     cache_purge_secs=self.__k8s_cache_purge_secs,
-                                                     namespaces_to_ignore=self.__k8s_namespaces_to_ignore)
+                        # create the k8s cache
+                        k8s_cache = k8s_utils.cache( self._global_config )
+
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
 
@@ -547,6 +535,15 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
                             global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Time to check for a new event leader" )
                             break
                     
+                except K8sApiAuthorizationException:
+                    global_log.warning("Could not stream K8s events due to an authorization error.  The "
+                                       "Scalyr Service Account does not have permission to watch available events.  "
+                                       "Please recreate the role with the latest definition which can be found "
+                                       "at https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml "
+                                       "K8s event collection will be disabled until this is resolved.  See the K8s install "
+                                       "directions for instructions on how to create the role "
+                                       "https://www.scalyr.com/help/install-agent-kubernetes", limit_once_per_x_secs=300,
+                                       limit_key='k8s-stream-events-no-permission')
                 except ConnectionError, e:
                     # ignore these, and just carry on querying in the next iteration
                     pass
@@ -560,7 +557,7 @@ The Kuberntes Events monitor streams Kubernetes events from the Kubernetes API
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not
             # right now join on the monitor threads, so no one would catch it.  We should change that.
-            global_log.exception('Monitor died from due to exception:', error_code='failedMonitor')
+            global_log.exception('Monitor died due to exception:', error_code='failedMonitor')
 
     def stop(self, wait_on_join=True, join_timeout=5):
         #stop the main server
