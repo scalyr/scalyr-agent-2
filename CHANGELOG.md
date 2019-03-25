@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.44 "Wurwhal" - Mar 25, 2019
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 25, 2019 14:10 -0700
+--->
+
+Features
+* Add configuration-via-labels support for the `docker_monitor`.
+* Record `eventId` in `windows_events_monitor`.
+
+Bugs
+* Fix issue preventin collection of remote events in `windows_events_monitor`.
+* Fix incorrect metrics collection in `postgres_monitor` due to not properly reseting cursor.
+* Eliminate redudant K8s cache in the agent running on the K8s event leader.
+
+
+
 ## 2.0.43 "Vorta" - Mar 8, 2019
 
 <!---
