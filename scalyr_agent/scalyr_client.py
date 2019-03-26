@@ -255,7 +255,8 @@ class ScalyrClientSession(object):
             # noinspection PyBroadException
             try:
                 if self.__disable_send_requests:
-                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Send requests disabled.  %d bytes dropped" % self.total_request_bytes_sent )
+                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Send requests disabled.  %d bytes dropped" % self.total_request_bytes_sent,
+                             limit_once_per_x_secs=60, limit_key='send-requests-disabled')
                 else:
                     if is_post:
                         log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
