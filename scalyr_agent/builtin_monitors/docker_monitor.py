@@ -1296,13 +1296,13 @@ class DockerMonitor( ScalyrMonitor ):
     For example, if you add the following label to your container:
 
     ```
-    com.scalyr.config.log.attributes.parser=accessLog
+    com.scalyr.config.log.parser=accessLog
     ```
 
     The Scalyr Agent will automatically use the following for that containers's `log_config` stanza:
 
     ```
-    { "attributes": { "parser": "accessLog" } }
+    { "parser": "accessLog" }
     ```
 
     This feature is enabled by default, and by default any configuration labels are ignored by the `labels_as_attributes` option.  To turn off this feature entirely, you can set the `use_labels_for_log_config` option to `false` in the docker monitor configuration, and the agent will not process container labels for configuration options.
