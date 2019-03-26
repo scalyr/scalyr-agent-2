@@ -30,13 +30,13 @@ import glob
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
 import time
 import uuid
-import stat
 
 from cStringIO import StringIO
 from optparse import OptionParser
@@ -49,6 +49,9 @@ scalyr_init()
 # The root of the Scalyr repository should just be the parent of this file.
 __source_root__ = get_install_root()
 
+# All the different packages that this script can build.
+PACKAGE_TYPES = ['rpm', 'tarball', 'deb', 'win32', 'docker_syslog_builder', 'docker_json_builder', 'k8s_builder']
+
 
 def build_package(package_type, variant, no_versioned_file_name):
     """Builds the scalyr-agent-2 package specified by the arguments.
@@ -56,8 +59,7 @@ def build_package(package_type, variant, no_versioned_file_name):
     The package is left in the current working directory.  The file name of the
     package is returned by this function.
 
-    @param package_type: One of 'rpm', 'deb', 'docker', 'docker_tarball', or 'tarball'. Determines which package type is
-        built.
+    @param package_type: One of `PACKAGE_TYPES`. Determines which package type is built.
     @param variant: Adds the specified string into the package's iteration name. This may be None if no additional
         tweak to the name is required. This is used to produce different packages even for the same package type (such
         as 'rpm').
@@ -80,16 +82,33 @@ def build_package(package_type, variant, no_versioned_file_name):
             artifact_file_name = build_tarball_package(variant, version, no_versioned_file_name)
         elif package_type == 'win32':
             artifact_file_name = build_win32_installer_package(variant, version)
-        elif package_type == 'docker':
-            artifact_file_name = build_docker_container(variant, version)
-        elif package_type == 'docker_tarball':
-            artifact_file_name = build_container_tarball(variant, version, no_versioned_file_name, for_k8s=False)
-        elif package_type == 'k8_tarball':
-            artifact_file_name = build_container_tarball(variant, version, no_versioned_file_name, for_k8s=True)
-        elif package_type == 'docker_builder':
-            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name, for_k8s=False)
+        elif package_type == 'docker_syslog_builder':
+            # An image for running on Docker configured to receive logs from other containers via syslog.
+            # This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
+            # backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
+            # with the eventual migration.
+            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
+                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile',
+                                                         'docker/docker-syslog-config',
+                                                         'scalyr-docker-agent-syslog',
+                                                         ['scalyr/scalyr-agent-docker-syslog',
+                                                          'scalyr/scalyr-agent-docker'])
+        elif package_type == 'docker_json_builder':
+            # An image for running on Docker configured to fetch logs via the file system (the container log
+            # directory is mounted to the agent container.)  This is the preferred way of running on Docker.
+            # This image is published to scalyr/scalyr-agent-docker-json.
+            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
+                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile',
+                                                         'docker/docker-json-config',
+                                                         'scalyr-docker-agent-json',
+                                                         ['scalyr/scalyr-agent-docker-json'])
         elif package_type == 'k8s_builder':
-            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name, for_k8s=True)
+            # An image for running the agent on Kubernetes.
+            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
+                                                         'scalyr-k8s-agent.tar.gz', 'docker/Dockerfile.k8s',
+                                                         'docker/k8s-config',
+                                                         'scalyr-k8s-agent',
+                                                         ['scalyr/scalyr-k8s-agent'])
         else:
             assert package_type in ('deb', 'rpm')
             artifact_file_name = build_rpm_or_deb_package(package_type == 'rpm', variant, version)
@@ -97,8 +116,7 @@ def build_package(package_type, variant, no_versioned_file_name):
         os.chdir(original_cwd)
 
         # Move the artifact (built package) to the original current working dir.
-        if package_type != 'docker':
-            shutil.move(os.path.join(tmp_dir, artifact_file_name), artifact_file_name)
+        shutil.move(os.path.join(tmp_dir, artifact_file_name), artifact_file_name)
         return artifact_file_name
     finally:
         # Be sure to delete the temporary directory.
@@ -110,28 +128,6 @@ def build_package(package_type, variant, no_versioned_file_name):
 # Scalyr Agent.  DO NOT MODIFY THIS VALUE, or already installed software on clients machines will not be able
 # to be upgraded.
 _scalyr_guid_ = uuid.UUID('{0b52b8a0-22c7-4d50-92c1-8ea3b258984e}')
-
-
-def build_docker_container(variant, version):
-    """Creates a docker image by creating the docker_tarball and invoking `docker` to build the image
-    via `docker/Dockerfile`.
-    """
-    image_name = 'scalyr/scalyr-docker-agent:' + version
-    original_dir = os.getcwd()
-
-    os.chdir(make_path(__source_root__, 'docker'))
-
-    # Build the docker tarball
-    package_file = build_container_tarball(variant, version, True, for_k8s=False)
-
-    try:
-        # Build the docker image
-        run_command('docker build -t %s .' % image_name, exit_on_fail=True, command_name='docker')
-    finally:
-        os.unlink(package_file)
-        os.chdir(original_dir)
-
-    return image_name
 
 
 def build_win32_installer_package(variant, version):
@@ -387,15 +383,15 @@ def expand_template(input_lines, dist_files):
     return result
 
 
-def build_common_docker_and_package_files(create_initd_link, use_docker_config=False, use_k8_config=False):
-    """Builds the common `root` system used by Debian, RPM, and Docker tarball in the current working directory.
+def build_common_docker_and_package_files(create_initd_link, base_configs=None):
+    """Builds the common `root` system used by Debian, RPM, and container source tarballs in the current working
+    directory.
 
     @param create_initd_link: Whether or not to create the link from initd to the scalyr agent binary.
-    @param use_docker_config: Whether or not to use the docker config.
-    @param use_k8_config:  Whether or not to use the kubernetes config.
+    @param base_configs:  The directory (relative to the top of the source tree) that contains the configuration
+        files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
     @type create_initd_link: bool
-    @type use_docker_config: bool
-    @type use_k8_config: bool
+    @type base_configs: str
     """
     original_dir = os.getcwd()
 
@@ -408,7 +404,8 @@ def build_common_docker_and_package_files(create_initd_link, use_docker_config=F
 
     # Place all of the import source in /usr/share/scalyr-agent-2.
     os.chdir('root/usr/share')
-    build_base_files(use_docker_config=use_docker_config, use_k8_config=use_k8_config)
+
+    build_base_files(base_configs=base_configs)
 
     os.chdir('scalyr-agent-2')
     # The build_base_files leaves the config directory in config, but we have to move it to its etc
@@ -416,8 +413,8 @@ def build_common_docker_and_package_files(create_initd_link, use_docker_config=F
     shutil.move(convert_path('config'), make_path(original_dir, 'root/etc/scalyr-agent-2'))
     os.chdir(original_dir)
 
-    if not use_docker_config:   # The default config directory doesn't have an agent.d dir, so create it.
-        make_directory('root/etc/scalyr-agent-2/agent.d')
+    # Make sure there is an agent.d directory regardless of the config directory we used.
+    make_directory('root/etc/scalyr-agent-2/agent.d')
 
     # Create the links to the appropriate commands in /usr/sbin and /etc/init.d/
     if create_initd_link:
@@ -426,104 +423,96 @@ def build_common_docker_and_package_files(create_initd_link, use_docker_config=F
     make_soft_link('/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config', 'root/usr/sbin/scalyr-agent-2-config')
 
 
-def build_container_builder(variant, version, no_versioned_file_name, for_k8s=False):
-    """Builds a tarball that can be used to build the image for either Docker or Kubernetes scalyr-agent-2 in the
-    current working directory.  This tarball contains the tarball generated by `build_container_tarball` as well
-    as the Dockerfile and shell script necessary to build the image.
+def build_container_builder(variant, version, no_versioned_file_name, source_tarball, dockerfile, base_configs,
+                            image_name, image_repos):
+    """Builds an executable script in the current working directory that will build the container image for the various
+    Docker and Kubernetes targets.  This script embeds all assets it needs in it so it can be a standalone artifact.
+    The script is based on `docker/scripts/container_builder_base.sh`.  See that script for information on it can
+    be used.
 
-    @param variant: If not None, will add the specified string into the final tarball name. This allows for different
-        tarballs to be built for the same type and same version.
+    @param variant: If not None, will add the specified string into the final script name. This allows for different
+        scripts to be built for the same type and same version.
     @param version: The agent version.
-    @param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
-    @param for_k8s:  True if this is for building an image to use with Kubernetes (as opposed to straight Docker).
+    @param no_versioned_file_name:  True if the version number should not be embedded in the script's file name.
+    @param source_tarball:  The filename for the source tarball (including the `.tar.gz` extension) that will
+        be built and then embedded in the artifact.  The contents of the Dockerfile will determine what this
+        name should be.
+    @param dockerfile:  The file path for the Dockerfile to embed in the script, relative to the top of the
+        agent source directory.
+    @param base_configs:  The file path for the configuration to use when building the container image, relative
+        to the top of the agent source directory.  This allows for different `agent.json` and `agent.d` directories
+        to be used for Kubernetes, docker, etc.
+    @param image_name:  The name for the image that is being built.  Will be used for the artifact's name.
+    @param image_repos:  A list of repositories that should be added as tags to the image once it is built.
+        Each repository will have two tags added -- one for the specific agent version and one for `latest`.
 
     @return: The file name of the built artifact.
     """
-    build_container_tarball(variant, version, True, for_k8s=for_k8s)
+    build_container_tarball(source_tarball, base_configs=base_configs)
 
-    # Copy the appropriate Dockerfile into the tarball.
     agent_source_root = __source_root__
-    if not for_k8s:
-        shutil.copy(make_path(agent_source_root, 'docker/Dockerfile'), 'Dockerfile')
-    else:
-        shutil.copy(make_path(agent_source_root, 'docker/Dockerfile.k8s'), 'Dockerfile')
+    # Make a copy of the right Dockerfile to embed in the script.
+    shutil.copy(make_path(agent_source_root, dockerfile), 'Dockerfile')
 
-    # Now make a convenience shell script that will invoke docker build but also tag the image with the correct
-    # version number and repository.
     if variant is None:
         version_string = version
     else:
         version_string = '%s.%s' % (version, variant)
 
-    if not for_k8s:
-        image_tag = "scalyr/scalyr-docker-agent:%s" % version_string
-        latest_tag = "scalyr/scalyr-docker-agent:latest"
-    else:
-        image_tag = "scalyr/scalyr-k8s-agent:%s" % version_string
-        latest_tag = "scalyr/scalyr-docker-agent:latest"
+    # Read the base builder script into memory
+    base_fp = open(make_path(agent_source_root, 'docker/scripts/container_builder_base.sh'), 'r')
+    base_script = base_fp.read()
+    base_fp.close()
 
-    fp = open('build-image.sh', 'w')
-    fp.write("#!/bin/bash\ndocker build -t \"%s\" -t \"%s\" .\n" % (image_tag, latest_tag))
-    fp.close()
+    # The script has two lines defining environment variables (REPOSITORIES and TAGS) that we need to overwrite to
+    # set them to what we want.  We'll just do some regex replace to do that.
+    base_script = re.sub(r'\n.*OVERRIDE_REPOSITORIES.*\n', '\nREPOSITORIES="%s"\n' % ','.join(image_repos), base_script)
+    base_script = re.sub(r'\n.*OVERRIDE_TAGS.*\n', '\nTAGS="%s"\n' % '%s,latest' % version_string, base_script)
 
-    # Make the script user and group executable.
-    st = os.stat('build-image.sh')
-    os.chmod('build-image.sh', st.st_mode | stat.S_IEXEC | stat.S_IXGRP)
-
-    # Now build the tarfile.
     if no_versioned_file_name:
-        embedded_version = ''
+        output_name = image_name
     else:
-        embedded_version = '-%s' % version_string
+        output_name = '%s-%s' % (image_name, version_string)
 
-    if not for_k8s:
-        output_name = 'scalyr-docker-agent-builder%s.tar.gz' % embedded_version
-    else:
-        output_name = 'scalyr-k8s-agent-builder%s.tar.gz' % embedded_version
-
-    # Tar it up.
-    tar = tarfile.open(output_name, 'w:gz')
-    tar.add("Dockerfile")
-    tar.add("build-image.sh")
-    if not for_k8s:
-        tar.add("scalyr-docker-agent.tar.gz")
-    else:
-        tar.add("scalyr-k8s-agent.tar.gz")
+    # Tar it up but hold the tarfile in memory.  Note, if the source tarball really becomes massive, might have to
+    # rethink this.
+    tar_out = StringIO()
+    tar = tarfile.open('assets.tar.gz', 'w|gz', tar_out)
+    tar.add('Dockerfile')
+    tar.add(source_tarball)
     tar.close()
+
+    # Write one file that has the contents of the script followed by the contents of the tarfile.
+    builder_fp = open(output_name, 'w')
+    builder_fp.write(base_script)
+    builder_fp.write(tar_out.getvalue())
+    builder_fp.close()
+
+    # Make the script executable.
+    st = os.stat(output_name)
+    os.chmod(output_name, st.st_mode | stat.S_IEXEC | stat.S_IXGRP)
 
     return output_name
 
 
-def build_container_tarball(variant, version, no_versioned_file_name, for_k8s=False):
+def build_container_tarball(tarball_name, base_configs=None):
     """Builds the scalyr-agent-2 tarball for either Docker or Kubernetes in the current working directory.
 
-    @param variant: If not None, will add the specified string into the final tarball name. This allows for different
-        tarballs to be built for the same type and same version.
-    @param version: The agent version.
-    @param no_versioned_file_name:  True if the version number should not be embedded in the artifact's file name.
-    @param for_k8s:  True if this is for building an image to use with Kubernetes (as opposed to straight Docker).
+    @param tarball_name:  The name for the output tarball (including the `.tar.gz` extension)
+    @param base_configs: The directory (relative to the top of the source tree) that contains the configuration
+        files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
+    @type tarball_name: str
+    @type base_configs: str
 
     @return: The file name of the built tarball.
     """
-    build_common_docker_and_package_files(False, use_docker_config=not for_k8s, use_k8_config=for_k8s)
+    build_common_docker_and_package_files(False, base_configs=base_configs)
 
     # Need to create some docker specific files
     make_directory('root/var/log/scalyr-agent-2/containers')
 
-    if no_versioned_file_name:
-        embedded_version = ''
-    elif variant is None:
-        embedded_version = '-%s' % version
-    else:
-        embedded_version = '-%s.%s' % (version, variant)
-
-    if not for_k8s:
-        output_name = 'scalyr-docker-agent%s.tar.gz' % embedded_version
-    else:
-        output_name = 'scalyr-k8s-agent%s.tar.gz' % embedded_version
-
     # Tar it up.
-    tar = tarfile.open(output_name, 'w:gz')
+    tar = tarfile.open(tarball_name, 'w:gz')
     original_dir = os.getcwd()
 
     os.chdir('root')
@@ -556,7 +545,7 @@ def build_container_tarball(variant, version, no_versioned_file_name, for_k8s=Fa
 
     tar.close()
 
-    return output_name
+    return tarball_name
 
 
 def build_rpm_or_deb_package(is_rpm, variant, version):
@@ -670,7 +659,7 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     return output_name
 
 
-def build_base_files(use_docker_config=False, use_k8_config=False):
+def build_base_files(base_configs='config'):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
     This creates scalyr-agent-2 in the current working directory and then populates it with the basic structure
@@ -689,8 +678,8 @@ def build_base_files(use_docker_config=False, use_k8_config=False):
         build_info                 -- A file containing the commit id of the latest commit included in this package,
                                       the time it was built, and other information.
 
-    @param use_docker_config:  Whether or not to use the docker configuration files instead of default.
-    @param use_k8_config:  Whether or not to use the kubernetes configuration files instead of default.
+    @param base_configs:  The directory (relative to the top of the source tree) that contains the configuration
+        files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
     """
     original_dir = os.getcwd()
     # This will return the parent directory of this file.  We will use that to determine the path
@@ -727,12 +716,11 @@ def build_base_files(use_docker_config=False, use_k8_config=False):
     os.chdir('..')
 
     # Copy the config
-    if use_docker_config:
-        shutil.copytree(make_path(agent_source_root, 'docker/config'), 'config')
-    elif use_k8_config:
-        shutil.copytree(make_path(agent_source_root, 'docker/k8s-config'), 'config')
+    if base_configs is not None:
+        config_path = base_configs
     else:
-        shutil.copytree(make_path(agent_source_root, 'config'), 'config')
+        config_path = 'config'
+    shutil.copytree(make_path(agent_source_root, config_path), 'config')
 
     # Create the trusted CA root list.
     os.chdir('certs')
@@ -1449,7 +1437,7 @@ class BadChangeLogFormat(Exception):
     pass
 
 if __name__ == '__main__':
-    parser = OptionParser(usage='Usage: python build_package.py [options] rpm|tarball|deb|docker|win32|docker_tarball|docker_builder|k8s_builder')
+    parser = OptionParser(usage='Usage: python build_package.py [options] %s' % '|'.join(PACKAGE_TYPES))
     parser.add_option('-v', '--variant', dest='variant', default=None,
                       help='An optional string that is included in the package name to identify a variant '
                       'of the main release created by a different packager.  '
@@ -1462,7 +1450,7 @@ if __name__ == '__main__':
 
     parser.add_option('', '--no-versioned-file-name', action='store_true', dest='no_versioned_file_name', default=False,
                       help='If true, will not embed the version number in the artifact\'s file name.  This only '
-                           'applies to the `tarball` and `docker_tarball` builds.')
+                           'applies to the `tarball` and container builders artifacts.')
 
     parser.add_option('', '--set-build-info', dest='build_info', default=None,
                       help='The path to the build_info file to include in the final package.  If this is used, '
@@ -1478,14 +1466,14 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if len(args) < 1:
-        print >> sys.stderr, 'You must specify the package you wish to build, such as "rpm", "deb", "docker", "docker_tarball", or "tarball".'
+        print >> sys.stderr, 'You must specify the package you wish to build, one of the following: %s.' % ', '.join(PACKAGE_TYPES)
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
         print >> sys.stderr, 'You may only specify one package to build.'
         parser.print_help(sys.stderr)
         sys.exit(1)
-    elif args[0] not in ('rpm', 'deb', 'docker', 'tarball', 'win32', 'docker_tarball', 'docker_builder', 'k8s_builder'):
+    elif args[0] not in PACKAGE_TYPES:
         print >> sys.stderr, 'Unknown package type given: "%s"' % args[0]
         parser.print_help(sys.stderr)
         sys.exit(1)
