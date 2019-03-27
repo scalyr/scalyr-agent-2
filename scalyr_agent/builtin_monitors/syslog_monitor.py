@@ -43,6 +43,7 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingR
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.builtin_monitors.docker_monitor import get_attributes_and_config_from_labels
+from scalyr_agent.builtin_monitors.docker_monitor import get_parser_from_config
 from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -650,9 +651,10 @@ class SyslogHandler(object):
 
     def __create_log_config( self, cname, cid, base_config, attributes ):
 
-        # only set the parser if it is not already set
-        if 'parser' not in base_config and 'parser' not in attributes:
-            base_config['parser'] = 'agentSyslogDocker'
+        # Set the parser the log_config['parser'] level
+        # otherwise it will be overwritten by a default value due to the way
+        # log_config verification works
+        base_config['parser'] = get_parser_from_config( base_config, attributes, 'agentSyslogDocker' )
 
         # config attributes override passed in attributes
         attributes.update( base_config.get( 'attributes', {} ) )

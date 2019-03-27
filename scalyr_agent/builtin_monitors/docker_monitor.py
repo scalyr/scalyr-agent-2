@@ -395,6 +395,34 @@ def get_attributes_and_config_from_labels( labels, docker_options ):
 
     return (attributes, config)
 
+def get_parser_from_config( base_config, attributes, default_parser ):
+    """
+    Checks the various places that the parser option could be set and returns
+    the value with the highest precedence, or `default_parser` if no parser was found
+    @param base_config: a set of log config options for a logfile
+    @param attributes: a set of attributes to apply to a logfile
+    @param default_parser: the default parser if no parser setting is found in base_config or attributes
+    """
+    # check all the places `parser` might be set
+    # highest precedence is base_config['attributes']['parser'] - this is if
+    # `com.scalyr.config.log.attributes.parser is set as a label
+    if 'attributes' in base_config and 'parser' in base_config['attributes']:
+        return base_config['attributes']['parser']
+
+    # next precedence is base_config['parser'] - this is if
+    # `com.scalyr.config.log.parser` is set as a label
+    if 'parser' in base_config:
+        return base_config['parser']
+
+    # lowest precedence is attributes['parser'] - this is if
+    # `parser` is a label and labels are being uploaded as attributes
+    # and the `parser` label passes the attribute filters
+    if 'parser' in attributes:
+        return attributes['parser']
+
+    # if we are here, then we found nothing so return the default
+    return default_parser
+
 class ContainerChecker( StoppableThread ):
     """
         Monitors containers to check when they start and stop running.
@@ -710,8 +738,10 @@ class ContainerChecker( StoppableThread ):
 
         result = base_config.copy()
 
-        if 'parser' not in result and 'parser' not in attributes:
-            result['parser'] = default_parser
+        # Set the parser the log_config['parser'] level
+        # otherwise it will be overwritten by a default value due to the way
+        # log_config verification works
+        result['parser'] = get_parser_from_config( result, attributes, default_parser )
 
         result['path'] = path
         result['parse_lines_as_json'] = parse_as_json
