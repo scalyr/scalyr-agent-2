@@ -52,7 +52,6 @@ scalyr_init()
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.json_lib as json_lib
-from scalyr_agent.log_watcher import LogWatcher
 
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
