@@ -52,11 +52,13 @@ class Configuration(object):
     """
     def __init__(self, file_path, default_paths):
         self.__file_path = os.path.abspath(file_path)
+        self.__override_file_path = os.path.abspath(file_path + '.override')
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
-        # The JsonObject holding the contents of the configuration file, along with any default
-        # values filled in.
+        # The JsonObject holding the contents of the configuration file, along with any default values filled in.
         self.__config = None
+        # The JsonObject holding the contents of top-level configuration overrides
+        self.__config_override = None
         # The number of seconds past epoch when the file was read.
         self.__read_time = None
         # The exception, if any, that was raised when the state was read.  This will be a BadConfiguration exception.
@@ -84,6 +86,8 @@ class Configuration(object):
             try:
                 # First read the file.  This makes sure it exists and can be parsed.
                 self.__config = scalyr_util.read_file_as_json(self.__file_path)
+                self.__config_override = scalyr_util.read_file_as_json(self.__override_file_path)
+                self.__config.update(self.__config_override)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException, e:

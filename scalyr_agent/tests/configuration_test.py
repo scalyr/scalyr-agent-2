@@ -231,6 +231,32 @@ class TestConfiguration(ScalyrTestCase):
         self.assertTrue(config.log_configs[0].get_bool('ignore_stale_files'))
         self.assertEqual(config.network_proxies, {"http": "http://foo.com", "https": "https://bar.com"})
 
+    def test_agent_json_override(self):
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there",
+            agent_log_path: "/var/silly1",
+            agent_data_path: "/var/silly2",
+            server_attributes: { region: "us-east" },
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
+          }
+        """)
+        self.__write_file_with_separator_conversion(""" {
+            api_key: "hi there OVERRIDDEN",
+            agent_log_path: "/var/silly1/OVERRIDDEN",
+            agent_data_path: "/var/silly2/OVERRIDDEN",
+            server_attributes: { region: "us-east-OVERRIDDEN" },
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: false} ]
+          }
+        """, self.__config_file + '.override')
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        self.assertEquals(config.api_key, "hi there OVERRIDDEN")
+        self.assertPathEquals(config.agent_log_path, '/var/silly1/OVERRIDDEN')
+        self.assertPathEquals(config.agent_data_path, '/var/silly2/OVERRIDDEN')
+        self.assertEquals(len(config.server_attributes), 2)
+        self.assertEquals(config.server_attributes['region'], 'us-east-OVERRIDDEN')
+        self.assertFalse(config.log_configs[0].get_bool('ignore_stale_files'))
+
     def test_missing_api_key(self):
         self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
@@ -952,10 +978,11 @@ class TestConfiguration(ScalyrTestCase):
                 self.__convert_separators(contents[i])
         return contents
 
-    def __write_file_with_separator_conversion(self, contents):
+    def __write_file_with_separator_conversion(self, contents, filename=None):
         contents = serialize_json(self.__convert_separators(parse_json(contents)))
 
-        fp = open(self.__config_file, 'w')
+        fname = self.__config_file if not filename else filename
+        fp = open(fname, 'w')
         fp.write(contents)
         fp.close()
 
