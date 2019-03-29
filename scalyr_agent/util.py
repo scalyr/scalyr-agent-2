@@ -75,7 +75,14 @@ except ImportError:
     try:
         import json
         _json_lib = 'json'
-        _json_encode = json.dumps
+
+        def dumps_no_space(*args, **kwargs):
+            """Eliminate spaces by default. Python 2.4 does not support partials."""
+            if 'separators' not in kwargs:
+                kwargs['separators'] = (',', ':')
+            return json.dumps(*args, **kwargs)
+
+        _json_encode = dumps_no_space
         _json_decode = json.loads
     except:
         pass
