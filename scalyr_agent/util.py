@@ -55,7 +55,8 @@ try:
 except ImportError:
     uuid = None
 
-def _fallback_json_encode( obj ):
+def _fallback_json_encode( obj, sort_keys=False ):
+    # json_lib.serialize() always ignores sort_keys
     return json_lib.serialize( obj )
 
 def _fallback_json_decode( text ):

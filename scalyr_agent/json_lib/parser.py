@@ -176,7 +176,7 @@ class JsonParser(object):
     """Parses raw byte input into JsonObjects and supports Scalyr's extensions.
 
     JsonParser is the main abstraction for parsing raw byte input
-    into JsonObject and other related objects.  It also supports Scaylr's
+    into JsonObject and other related objects.  It also supports Scalyr's
     extensions to the Json format, including comments and binary data.
     Specifically, the following are allowed:
 
@@ -320,6 +320,7 @@ class JsonParser(object):
             # Check for end-of-array.
             if self.__peek_next_non_whitespace() == ']':
                 self.__scanner.read_ubyte()
+                print('returning array %s' % array)
                 return array
       
             self.__peek_next_non_whitespace()  # skip any whitespace
@@ -708,7 +709,7 @@ class JsonParser(object):
 def parse(input_bytes, check_duplicate_keys=False):
     """Parses the input as JSON and returns its contents.
 
-    It supports Scaylr's extensions to the Json format, including comments and
+    It supports Scalyr's extensions to the Json format, including comments and
     binary data. Specifically, the following are allowed:
 
      - // and /* comments
