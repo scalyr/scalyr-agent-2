@@ -443,7 +443,7 @@ class CopyingManager(StoppableThread, LogWatcher):
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops the manager.
 
-        @param wait_on_join: If True, will block on a join of of the thread running the manager.
+        @param wait_on_join: If True, will block on a join of the thread running the manager.
         @param join_timeout: The maximum number of seconds to block for the join.
         """
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)

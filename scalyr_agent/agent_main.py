@@ -734,11 +734,15 @@ class ScalyrAgent(object):
                 self.__print_force_https_message( scalyr_server, raw_scalyr_server )
 
                 self.__scalyr_client = self.__create_client()
-                worker_thread = self.__create_worker_thread(self.__config)
-                worker_thread.start(self.__scalyr_client, logs_initial_positions)
 
-                self.__copying_manager = worker_thread.copying_manager
-                self.__monitors_manager = worker_thread.monitors_manager
+                def start_worker_thread(config, logs_initial_positions=None):
+                    wt = self.__create_worker_thread(config)
+                    # attach callbacks before starting monitors
+                    wt.monitors_manager.set_user_agent_augment_callback(self.__scalyr_client.augment_user_agent)
+                    wt.start(self.__scalyr_client, logs_initial_positions)
+                    return wt, wt.copying_manager, wt.monitors_manager
+
+                worker_thread, self.__copying_manager, self.__monitors_manager = start_worker_thread(self.__config, logs_initial_positions)
                 current_time = time.time()
 
                 disable_all_config_updates_until = _update_disabled_until( self.__config.disable_all_config_updates, current_time )
@@ -872,11 +876,8 @@ class ScalyrAgent(object):
                     self.__scalyr_client = self.__create_client()
 
                     log.info('Starting new copying and metrics threads')
-                    worker_thread = self.__create_worker_thread(new_config)
-                    worker_thread.start(self.__scalyr_client)
+                    worker_thread, self.__copying_manager, self.__monitors_manager = start_worker_thread(new_config)
 
-                    self.__copying_manager = worker_thread.copying_manager
-                    self.__monitors_manager = worker_thread.monitors_manager
 
                     self.__current_bad_config = None
                     config_change_check_interval = self.__config.config_change_check_interval

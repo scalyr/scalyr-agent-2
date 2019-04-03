@@ -963,7 +963,7 @@ class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
     def set_flush_delay(self, flushDelay):
         """Sets the flush delay.
 
-        Warning, this method is not thread safe.  You should invoke it soon after the constructore and before the
+        Warning, this method is not thread safe.  You should invoke it soon after the constructor and before the
         handler is actually in use.
 
         @param flushDelay: The maximum number of seconds to wait to flush the underlying file handle.

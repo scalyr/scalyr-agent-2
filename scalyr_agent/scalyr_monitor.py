@@ -250,6 +250,17 @@ class ScalyrMonitor(StoppableThread):
             # right now join on the monitor threads, so no one would catch it.  We should change that.
             self._logger.exception('Monitor died from due to exception:', error_code='failedMonitor')
 
+    def get_user_agent_fragment(self):
+        """Derived classes may optionally return a string fragment to be appended to the User-Agent header for all
+        data sent to Scalyr.  Note: User-Agent augmentation applies to all data (not restricted to data from this
+        monitor).
+
+        You must ensure that this method is thread-safe as it will be invoked by a different thread (MonitorsManager).
+
+        @return: A string fragment or None (Empty strings are treated as None)
+        """
+        return None
+
     def gather_sample(self):
         """Derived classes should implement this method to gather a data sample for this monitor plugin
         and report it.

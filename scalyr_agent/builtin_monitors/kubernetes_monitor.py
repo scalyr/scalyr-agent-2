@@ -1678,10 +1678,25 @@ class KubernetesMonitor( ScalyrMonitor ):
                                   limit_once_per_x_secs=300,
                                   limit_key='kubelet-api-query' )
 
-    def gather_sample( self ):
+    def __get_k8s_cache(self):
         k8s_cache = None
         if self.__container_checker:
             k8s_cache = self.__container_checker.k8s_cache
+        return k8s_cache
+
+    def get_user_agent_fragment(self):
+        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
+        """
+        k8s_cache = self.__get_k8s_cache()
+        ver = None
+        if k8s_cache:
+            ver = k8s_cache.get_api_server_version()
+            if ver:
+                ver = 'k8s=%s' % ver
+        return ver
+
+    def gather_sample( self ):
+        k8s_cache = self.__get_k8s_cache()
 
         cluster_name = None
         if k8s_cache is not None:
