@@ -44,6 +44,6 @@ physical host to send their logs to Scalyr through it.
 
 To do this, you must add the following options when you start a container: `--log-driver=syslog --log-opt syslog-address=tcp://127.0.0.1:601`
 
-The following is an example of a small container that will write `Hello Word` repeatedly to Scalyr:
+The following is an example of a small container that will write `Hello World` repeatedly to Scalyr:
 
     docker run  --log-driver=syslog --log-opt syslog-address=tcp://127.0.0.1:601 -d ubuntu /bin/sh -c "while true; do echo hello world; sleep 1; done"

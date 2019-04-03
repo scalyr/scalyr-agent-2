@@ -19,8 +19,10 @@ __author__ = 'czerwin@scalyr.com'
 
 from cStringIO import StringIO
 
+from scalyr_agent.__scalyr__ import SCALYR_VERSION
+
 from scalyr_agent import scalyr_client
-from scalyr_agent.scalyr_client import AddEventsRequest, PostFixBuffer, EventSequencer, Event
+from scalyr_agent.scalyr_client import AddEventsRequest, PostFixBuffer, EventSequencer, Event, ScalyrClientSession
 from scalyr_agent import json_lib
 from scalyr_agent.test_base import ScalyrTestCase
 import unittest
@@ -644,3 +646,16 @@ class PostFixBufferTest(ScalyrTestCase):
 
         self.assertEquals(test_buffer.content(), """], threads: [{"id":"log_5","name":"histogram_builder"}], """
                                                  """client_time: 1 }""")
+
+class ClientSessionTest(ScalyrTestCase):
+
+    def test_user_agent_callback(self):
+        session = ScalyrClientSession("https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION)
+
+        def get_user_agent():
+            return session._ScalyrClientSession__standard_headers['User-Agent']
+
+        base_ua = get_user_agent()
+        frags = ['frag1', 'frag2', 'frag3']
+        session.augment_user_agent(frags)
+        self.assertEquals(get_user_agent(), base_ua + ';' + ';'.join(frags))

@@ -18,11 +18,11 @@
 __author__ = 'czerwin@scalyr.com'
 
 import os
-import threading
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
 from scalyr_agent.scalyr_monitor import load_monitor_class, ScalyrMonitor
+from scalyr_agent.util import StoppableThread
 
 from __scalyr__ import get_package_root
 
@@ -31,8 +31,12 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 log = scalyr_logging.getLogger(__name__)
 
 
-class MonitorsManager(object):
-    """Maintains the list of currently running ScalyrMonitor instances and allows control to start and stop them."""
+class MonitorsManager(StoppableThread):
+    """Maintains the list of currently running ScalyrMonitor instances and allows control to start and stop them.
+
+    Also periodically polls all monitors for user-agent fragments that are then immediately reflected in all requests
+    sent to Scalyr.
+    """
     def __init__(self, configuration, platform_controller):
         """Initializes the manager.
         @param configuration: The agent configuration that controls what monitors should be run.
@@ -41,6 +45,7 @@ class MonitorsManager(object):
         @type configuration: scalyr_agent.Configuration
         @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
+        StoppableThread.__init__(self, name='monitor manager thread')
         if configuration.disable_monitors_creation:
             log.log( scalyr_logging.DEBUG_LEVEL_0, "Creation of Scalyr Monitors disabled.  No monitors created." )
             self.__monitors = []
@@ -49,24 +54,18 @@ class MonitorsManager(object):
 
         self.__disable_monitor_threads = configuration.disable_monitor_threads
 
-        # This lock protects __running_monitors.
-        self.__lock = threading.Lock()
-        # The list of monitors.  Each element is a ScalyrMonitor instance.  __lock must be held to modify this var.
         self.__running_monitors = []
+        self.__user_agent_callback = None
+        self._user_agent_refresh_interval = configuration.user_agent_refresh_interval
 
     def find_monitor( self, module_name ):
         """Finds a monitor with a specific name
            @param: module_name - the module name of the monitor to find
            @return: a monitor object if a monitor matches `module_name`, or None
         """
-
-        self.__lock.acquire()
-        try:
-            for monitor in self.__monitors:
-                if monitor.module_name == module_name:
-                    return monitor
-        finally:
-            self.__lock.release()
+        for monitor in self.__monitors:
+            if monitor.module_name == module_name:
+                return monitor
 
         return None
 
@@ -76,25 +75,21 @@ class MonitorsManager(object):
         @return:  The status for all the monitors.
         @rtype: MonitorManagerStatus
         """
-        try:
-            self.__lock.acquire()
-            result = MonitorManagerStatus()
+        result = MonitorManagerStatus()
 
-            for monitor in self.__monitors:
-                if monitor.isAlive():
-                    result.total_alive_monitors += 1
+        for monitor in self.__monitors:
+            if monitor.isAlive():
+                result.total_alive_monitors += 1
 
-                status = MonitorStatus()
-                status.monitor_name = monitor.monitor_name
-                status.reported_lines = monitor.reported_lines()
-                status.errors = monitor.errors()
-                status.is_alive = monitor.isAlive()
+            status = MonitorStatus()
+            status.monitor_name = monitor.monitor_name
+            status.reported_lines = monitor.reported_lines()
+            status.errors = monitor.errors()
+            status.is_alive = monitor.isAlive()
 
-                result.monitors_status.append(status)
+            result.monitors_status.append(status)
 
-            return result
-        finally:
-            self.__lock.release()
+        return result
 
     def start_manager(self):
         """Starts all of the required monitors running.
@@ -111,22 +106,30 @@ class MonitorsManager(object):
                 if self.__disable_monitor_threads:
                     log.log( scalyr_logging.DEBUG_LEVEL_0, "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name )
                     continue
-                # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead
-                # fail.
+                # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead fail.
                 if monitor.open_metric_log():
                     monitor.config_from_monitors( self )
                     log.info('Starting monitor %s', monitor.monitor_name)
                     monitor.start()
                     self.__running_monitors.append(monitor)
                 else:
-                    log.warn('Could not start monitor %s because its log cold not be opened', monitor.monitor_name)
+                    log.warn('Could not start monitor %s because its log could not be opened', monitor.monitor_name)
+            # Start the monitor manager thread. Do not wait for all monitor threads to start as some may misbehave
+            if not self.__disable_monitor_threads:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, "Starting Scalyr Monitors manager thread")
+                self.start()
+            else:
+                log.log(scalyr_logging.DEBUG_LEVEL_0, "Scalyr Monitors disabled.  Skipping monitor manager thread")
         except:
             log.exception('Failed to start the monitors due to an exception')
 
-    def stop_manager(self):
+    def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops all of the monitors.
 
         This will only return after all the threads for the monitors have been stopped and joined on.
+
+        @param wait_on_join: If True, will block on a join of of the thread running the manager.
+        @param join_timeout: The maximum number of seconds to block for the join.
         """
         # TODO:  Move these try statements out of here.  Let higher layers catch it.
         for monitor in self.__running_monitors:
@@ -150,6 +153,43 @@ class MonitorsManager(object):
                 monitor.close_metric_log()
             except:
                 log.exception('Failed to close the metric log due to an exception')
+
+        self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
+    def set_user_agent_augment_callback(self, callback):
+        """Registers a callback that, when invoked, will augment the User-Agent.
+
+        The callback should be passed a single list of string fragments which will be appended in order.
+
+        This method is not thread safe so it must be invoked before self.start_manager()
+        """
+        self.__user_agent_callback = callback
+
+    def run(self):
+        """Poll monitors for User-Agent fragment. Only modify user-agent on any changes."""
+
+        prev_user_agent_frags = None
+
+        # noinspection PyBroadException
+        while self._run_state.is_running():
+            # noinspection PyBroadException
+            try:
+                # noinspection PyBroadException
+                try:
+                    # Invoke user-agent callback only if the fragments have changed
+                    user_agent_frags = set()
+                    for monitor in self.__running_monitors:
+                        frag = monitor.get_user_agent_fragment()
+                        if frag:
+                            user_agent_frags.add(frag)
+                    if user_agent_frags != prev_user_agent_frags:
+                        self.__user_agent_callback(sorted(user_agent_frags))
+                    prev_user_agent_frags = user_agent_frags
+                except Exception:
+                    log.exception('Monitor manager failed to query monitor %s' % monitor.monitor_name)
+                self._run_state.sleep_but_awaken_if_stopped(self._user_agent_refresh_interval)
+            except Exception:
+                log.exception('Monitor manager failed due to exception', limit_once_per_x_secs=300)
 
     @property
     def monitors(self):

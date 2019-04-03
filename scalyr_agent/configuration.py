@@ -346,6 +346,10 @@ class Configuration(object):
         return self.__get_config().get_float('config_change_check_interval')
 
     @property
+    def user_agent_refresh_interval(self):
+        return self.__get_config().get_float('user_agent_refresh_interval')
+
+    @property
     def garbage_collect_interval(self):
         return self.__get_config().get_int('garbage_collect_interval')
 
@@ -997,6 +1001,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults)
 
+
         self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults )
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults )
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults )
@@ -1023,6 +1028,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description, apply_defaults)
 
         self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'user_agent_refresh_interval', 60, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'garbage_collect_interval', 300, description, apply_defaults)
 
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_monitors_manager', None, description, apply_defaults)

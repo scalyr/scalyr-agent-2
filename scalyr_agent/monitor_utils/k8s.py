@@ -808,6 +808,7 @@ class KubernetesCache( object ):
         self._pods = _K8sCache( self._pod_processor, 'Pod' )
 
         self._cluster_name = None
+        self._api_server_version = None
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
         self._initialized = False
@@ -862,6 +863,15 @@ class KubernetesCache( object ):
         finally:
             self._lock.release()
 
+    def _update_api_server_version(self, k8s):
+        """Update the API server version"""
+        gitver = k8s.get_api_server_version()
+        self._lock.acquire()
+        try:
+            self._api_server_version = gitver
+        finally:
+            self._lock.release()
+
     def update_cache( self, run_state ):
         """
             Main thread for updating the k8s cache
@@ -878,6 +888,7 @@ class KubernetesCache( object ):
                 # controllers are cached on an as needed basis
                 self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
                 self._update_cluster_name( local_state.k8s )
+                self._update_api_server_version(local_state.k8s)
 
                 self._lock.acquire()
                 try:
@@ -912,6 +923,7 @@ class KubernetesCache( object ):
                 current_time = time.time()
                 self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
                 self._update_cluster_name( local_state.k8s )
+                self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
@@ -969,6 +981,17 @@ class KubernetesCache( object ):
             self._lock.release()
 
         return result
+
+    def get_api_server_version(self):
+        """Returns API server version"""
+        result = None
+        self._lock.acquire()
+        try:
+            result = self._api_server_version
+        finally:
+            self._lock.release()
+        return result
+
 
 class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
@@ -1052,6 +1075,15 @@ class KubernetesApi( object ):
             spec = pod.get( 'spec', {} )
             node = spec.get( 'nodeName' )
         return node
+
+    def get_api_server_version(self):
+        """Get the API server version (specifically the server gitVersion)
+
+        @return: The gitVersion extracted from /version JSON
+        @rtype: str
+        """
+        version_map = self.query_api('/version')
+        return version_map.get('gitVersion')
 
     def get_cluster_name( self ):
         """ Returns the name of the cluster running this agent.

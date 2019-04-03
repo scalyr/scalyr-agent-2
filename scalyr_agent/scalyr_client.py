@@ -59,7 +59,7 @@ class ScalyrClientSession(object):
     are monotonically increasing within a session.
     """
     def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
-                 proxies=None, compression_type=None, compression_level=9, disable_send_requests=False ):
+                 proxies=None, compression_type=None, compression_level=9, disable_send_requests=False):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -177,6 +177,14 @@ class ScalyrClientSession(object):
 
         # debug flag to disable send requests
         self.__disable_send_requests = disable_send_requests
+
+    def augment_user_agent(self, fragments):
+        """Modifies User-Agent header (applies to all data sent to Scalyr)
+
+        @param fragments String fragments to append (in order) to the standard user agent data
+        @type fragments: List of str
+        """
+        self.__standard_headers['User-Agent'] = ScalyrClientSession.__get_user_agent(self.__agent_version, fragments)
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -484,14 +492,16 @@ class ScalyrClientSession(object):
         return AddEventsRequest(body, max_size=max_size)
 
     @staticmethod
-    def __get_user_agent(agent_version):
+    def __get_user_agent(agent_version, fragments=None):
         """Determine the user agent to report in the request headers.
 
         We construct an agent that gives Scalyr some information about the platform the customer is running on,
         the Python version, and a few other tidbits.  This is used to make decisions about support issues.
 
         @param agent_version: The agent version number.
+        @param fragments: Additional strings to be appended. Each will be preceded by a semicolon
         @type agent_version: str
+        @type fragments: List of str
 
         @return: The user agent string.
         @rtype: str
@@ -538,7 +548,10 @@ class ScalyrClientSession(object):
         else:
             ssl_str = 'nossllib'
 
-        return '%s;%s;agent-%s;%s;' % (platform_value, python_version_str, agent_version, ssl_str)
+        parts = [platform_value, python_version_str, 'agent-%s' % agent_version, ssl_str]
+        if fragments:
+            parts.extend(fragments)
+        return ';'.join(map(str, parts))
 
     def perform_agent_version_check(self, track='stable'):
         """Query the Scalyr API to determine if a newer version is available
