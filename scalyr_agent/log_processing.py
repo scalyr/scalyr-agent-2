@@ -1297,6 +1297,9 @@ class LogFileProcessor(object):
             file_system = FileSystem()
         if log_attributes is None:
             log_attributes = {}
+        else:
+            if not isinstance(log_attributes, dict):
+                raise Exception('log_attributes must be of type dict.')
 
         self.__path = file_path
         # To mimic the behavior of the old agent which would use the ``thread_id`` feature of the Scalyr API to

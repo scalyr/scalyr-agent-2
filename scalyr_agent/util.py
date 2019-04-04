@@ -72,26 +72,23 @@ def get_json_implementation(lib_name):
 
     elif lib_name == 'ujson':
         import ujson
-        return lib_name, ujson.dumps, ujson.loads
+
+        def ujson_dumps_custom(*args, **kwargs):
+            # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
+            # Detect and complain loudly.
+            if isinstance(args[0], (json_lib.JsonObject, json_lib.JsonArray)):
+                raise TypeError('ujson does not correctly encode objects of type: %s' % type(args[0]))
+            return ujson.dumps(*args, **kwargs)
+
+        return lib_name, ujson_dumps_custom, ujson.loads
 
     if lib_name == 'json':
         import json
-
-        class JsonObjArrayEncode(json.JSONEncoder):
-            def default(self, obj):
-                if isinstance(obj, json_lib.JsonObject):
-                    return obj.asDict()
-                if isinstance(obj, json_lib.JsonArray):
-                    return obj.asList()
-                # Let the base class default method raise the TypeError
-                return json.JSONEncoder.default(self, obj)
 
         def json_dumps_custom(*args, **kwargs):
             """Eliminate spaces by default. Python 2.4 does not support partials."""
             if 'separators' not in kwargs:
                 kwargs['separators'] = (',', ':')
-            if 'cls' not in kwargs:
-                kwargs['cls'] = JsonObjArrayEncode
             return json.dumps(*args, **kwargs)
 
         return lib_name, json_dumps_custom, json.loads

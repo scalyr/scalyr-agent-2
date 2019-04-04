@@ -1442,10 +1442,11 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertTrue(completion_callback(LogFileProcessor.SUCCESS))
 
     def test_log_attributes(self):
-        vals = {'path': self.__path, 'attributes': JsonObject({'host': 'scalyr-1'})}
+        attribs = {'host': 'scalyr-1'}
+        vals = {'path': self.__path, 'attributes': JsonObject(attribs)}
         log_config = DEFAULT_CONFIG.parse_log_config(vals)
         log_processor = LogFileProcessor(self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system,
-                                         log_attributes=vals['attributes'])
+                                         log_attributes=attribs)
         log_processor.perform_processing(TestLogFileProcessor.TestAddEventsRequest(), current_time=self.__fake_time)
 
         self.append_file(self.__path, 'First line\nSecond line\n')
