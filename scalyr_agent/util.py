@@ -196,14 +196,11 @@ def create_unique_id():
     return result
 
 
-def md5_digest(data, hexdigest=True):
+def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
-    @param hexdigest: if True return the digest as a hex string.  If False return the raw bytes which may contain non-ASCII characters,
-                      including null bytes
     @type data: str
-    @type hexdigest: bool
     @rtype: str
     """
 
@@ -216,11 +213,7 @@ def md5_digest(data, hexdigest=True):
         m = md5()
     m.update(data)
 
-    if hexdigest:
-        return m.hexdigest()
-
-    return m.digest()
-
+    return m.hexdigest()
 
 def remove_newlines_and_truncate(input_string, char_limit):
     """Returns the input string but with all newlines removed and truncated.
