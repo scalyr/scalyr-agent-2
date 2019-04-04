@@ -108,18 +108,14 @@ def _set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-force_json_lib = os.getenv('SCALYR_FORCE_JSON_LIB')
-if force_json_lib:
-    _set_json_lib(force_json_lib)
-else:
-    _set_json_lib('json_lib')
+_set_json_lib('json_lib')
+try:
+    _set_json_lib('ujson')
+except ImportError:
     try:
-        _set_json_lib('ujson')
-    except ImportError:
-        try:
-            _set_json_lib('json')
-        except:
-            pass
+        _set_json_lib('json')
+    except:
+        pass
 
 
 def get_json_lib():
