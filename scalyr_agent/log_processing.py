@@ -2051,10 +2051,7 @@ class LogLineRedacter(object):
                 for _group_index, _group in enumerate(_groups):
                     # for each group in a match, replace the `replacement_ex` with either its `group` content, or
                     # the hash of the `group` depending on the hash indicator \\1 vs \\H1 etc.
-                    group_hash_indicator = "\{}{}".format(
-                        LogLineRedacter.HASH_GROUP_INDICATOR,
-                        _group_index + 1
-                    )
+                    group_hash_indicator = "\\%s%s" % (LogLineRedacter.HASH_GROUP_INDICATOR, _group_index + 1)
                     replacement_matches += 1
                     if group_hash_indicator in replacement_ex:
                         # the group needs to be hashed
@@ -2066,7 +2063,7 @@ class LogLineRedacter(object):
                         )
                     else:
                         # the group does not need to be hashed
-                        replaced_group = replaced_group.replace("\{}".format(_group_index + 1), _group, 1)
+                        replaced_group = replaced_group.replace("\\%s" % (_group_index + 1), _group, 1)
                 # once we have formed the replacement expression, we just need to replace the matched
                 # portion of the `line` with the `replaced_group` that we just built
                 replaced_string = replaced_string + line[last_match_index: _match.start()]
@@ -2128,7 +2125,7 @@ class RedactionRule(object):
 
     @property
     def hash_redacted_data(self):
-        return "\{0}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
+        return ("\\%s" % (LogLineRedacter.HASH_GROUP_INDICATOR)) in self.replacement_text
 
 
 class LogMatcher(object):

@@ -825,10 +825,10 @@ class TestLogLineRedactor(ScalyrTestCase):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('(password)', '\\H1')
 
-        self._run_case(redactor, "auth=password", "auth={}".format(md5_digest("password")), True)
+        self._run_case(redactor, "auth=password", "auth=%s" % (md5_digest("password")), True)
         self._run_case(
             redactor, "another line password",
-            "another line {}".format(md5_digest("password")),
+            "another line %s" % (md5_digest("password")),
             True
         )
 
@@ -839,12 +839,12 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "auth=password",
-            "auth={}".format(md5_digest("password" + "himalayan-salt")),
+            "auth=%s" % (md5_digest("password" + "himalayan-salt")),
             True
         )
         self._run_case(
             redactor, "another line password",
-            "another line {}".format(md5_digest("password" + "himalayan-salt")),
+            "another line %s" % (md5_digest("password" + "himalayan-salt")),
             True
         )
 
@@ -854,7 +854,7 @@ class TestLogLineRedactor(ScalyrTestCase):
 
         self._run_case(
             redactor,
-            "auth=password foo=password", "auth={} foo={}".format(
+            "auth=password foo=password", "auth=%s foo=%s" % (
                 md5_digest("password"), md5_digest("password")),
             True
         )
@@ -865,7 +865,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin",
-            "sometext.... secretoption={}".format(md5_digest("czerwin")),
+            "sometext.... secretoption=%s" % (md5_digest("czerwin")),
             True
         )
 
@@ -923,7 +923,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "userInfo=saurabh abcd1234",
-            "userInfo={}".format(md5_digest("saurabh")),
+            "userInfo=%s" % (md5_digest("saurabh")),
             True
         )
 
