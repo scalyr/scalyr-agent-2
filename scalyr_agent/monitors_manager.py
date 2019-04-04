@@ -140,12 +140,13 @@ class MonitorsManager(StoppableThread):
             except:
                 log.exception('Failed to stop the metric log without join due to an exception')
 
-        for monitor in self.__running_monitors:
-            # noinspection PyBroadException
-            try:
-                monitor.stop(join_timeout=1)
-            except:
-                log.exception('Failed to stop the metric log due to an exception')
+        if wait_on_join:
+            for monitor in self.__running_monitors:
+                # noinspection PyBroadException
+                try:
+                    monitor.stop(join_timeout=1)
+                except:
+                    log.exception('Failed to stop the metric log due to an exception')
 
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
