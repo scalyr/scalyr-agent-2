@@ -29,10 +29,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
     """
     def setUp(self):
         self._faker = DockerClientFaker()
-        self._logger = logging.getLogger("fake_logger")
-        if not len(self._logger.handlers):
-            self._logger.addHandler(logging.NullHandler())
-        self._fetcher = DockerMetricFetcher(self._faker, 5, self._logger)
+        self._fetcher = DockerMetricFetcher(self._faker, 5)
 
     def test_basic_prefetch(self):
         """Tests the typical prefetch and then get_metrics path.. just for one container.
