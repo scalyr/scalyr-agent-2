@@ -320,7 +320,6 @@ class JsonParser(object):
             # Check for end-of-array.
             if self.__peek_next_non_whitespace() == ']':
                 self.__scanner.read_ubyte()
-                print('returning array %s' % array)
                 return array
       
             self.__peek_next_non_whitespace()  # skip any whitespace

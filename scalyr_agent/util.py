@@ -55,48 +55,87 @@ try:
 except ImportError:
     uuid = None
 
+
 def _fallback_json_encode( obj, sort_keys=False ):
-    # json_lib.serialize() always ignores sort_keys
+    # json_lib.serialize() always ignores sort_keys param (always sorts regardless)
     return json_lib.serialize( obj )
+
 
 def _fallback_json_decode( text ):
     return json_lib.parse( text )
 
-_json_lib = 'json_lib'
 
-_json_encode = _fallback_json_encode
-_json_decode = _fallback_json_decode
+def get_json_implementation(lib_name):
 
-try:
-    import ujson
-    _json_lib = 'ujson'
-    _json_encode = ujson.dumps
-    _json_decode = ujson.loads
-except ImportError:
-    try:
+    if lib_name == 'json_lib':
+        return lib_name, _fallback_json_encode, _fallback_json_decode
+
+    elif lib_name == 'ujson':
+        import ujson
+        return lib_name, ujson.dumps, ujson.loads
+
+    if lib_name == 'json':
         import json
-        _json_lib = 'json'
 
-        def dumps_no_space(*args, **kwargs):
+        class JsonObjArrayEncode(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, json_lib.JsonObject):
+                    return obj.asDict()
+                if isinstance(obj, json_lib.JsonArray):
+                    return obj.asList()
+                # Let the base class default method raise the TypeError
+                return json.JSONEncoder.default(self, obj)
+
+        def json_dumps_custom(*args, **kwargs):
             """Eliminate spaces by default. Python 2.4 does not support partials."""
             if 'separators' not in kwargs:
                 kwargs['separators'] = (',', ':')
+            if 'cls' not in kwargs:
+                kwargs['cls'] = JsonObjArrayEncode
             return json.dumps(*args, **kwargs)
 
-        _json_encode = dumps_no_space
-        _json_decode = json.loads
-    except:
-        pass
+        return lib_name, json_dumps_custom, json.loads
+
+
+_json_lib = None
+_json_encode = None
+_json_decode = None
+
+
+def _set_json_lib(lib_name):
+    # This function is not meant to be invoked at runtime.  It exists primarily for testing.
+    global _json_lib, _json_encode, _json_decode
+    _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
+
+
+force_json_lib = os.getenv('SCALYR_FORCE_JSON_LIB')
+if force_json_lib:
+    _set_json_lib(force_json_lib)
+else:
+    _set_json_lib('json_lib')
+    try:
+        _set_json_lib('ujson')
+    except ImportError:
+        try:
+            _set_json_lib('json')
+        except:
+            pass
+
 
 def get_json_lib():
     return _json_lib
 
 def json_encode( obj ):
-    """ Encodes an object as json """
+    """Encodes an object into a JSON string.  All underlying implementations handle our custom JsonObject/JsonArray"""
     return _json_encode( obj, sort_keys=True )
 
 def json_decode( text ):
-    """ Decodes text containing json and returns a dict containing the contents """
+    """Decodes text containing json and returns either a dict or a scalyr_agent.json_lib.objects.JsonObject
+    depending on which underlying decoder is used.
+
+    If json or ujson are used, a dict is returned.
+    If the scalyr _fallback decoder is used, a JsonObject is returned
+    """
     return _json_decode( text )
 
 def value_to_bool( value ):
