@@ -119,7 +119,9 @@ def get_json_lib():
     return _json_lib
 
 def json_encode( obj ):
-    """Encodes an object into a JSON string.  All underlying implementations handle our custom JsonObject/JsonArray"""
+    """Encodes an object into a JSON string.  The underlying implementation either handles JsonObject/JsonArray
+    or else complains loudly (raises Exception) if they do not correctly support encoding.
+    """
     return _json_encode( obj, sort_keys=True )
 
 def json_decode( text ):
@@ -127,7 +129,7 @@ def json_decode( text ):
     depending on which underlying decoder is used.
 
     If json or ujson are used, a dict is returned.
-    If the scalyr _fallback decoder is used, a JsonObject is returned
+    If the Scalyr custom json_lib decoder is used, a JsonObject is returned
     """
     return _json_decode( text )
 
