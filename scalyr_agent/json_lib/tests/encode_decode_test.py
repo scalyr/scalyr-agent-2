@@ -68,28 +68,34 @@ class EncodeDecodeTest(ScalyrTestCase):
     def test_list2(self):
         self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u'a'])
 
-    def test_dict(self):
+    def test_jsonarray(self):
+        self.__test_encode_decode(r'[1,2,3]', JsonArray(1, 2, 3))
+
+    def test_jsonobject(self):
         self.__test_encode_decode(r'{"a":1,"b":2}', JsonObject({u'a': 1, u'b': 2}))
 
-    def test_dict_nested_dict(self):
+    def test_jsonobject_nested_dict(self):
         self.__test_encode_decode(r'{"a":{"b":{"c":3}}}', JsonObject({u'a': JsonObject({u'b': JsonObject({u'c': 3})})}))
 
-    def test_dict_nested_list(self):
+    def test_jsonobject_nested_jsonarray(self):
         self.__test_encode_decode(r'{"a":[1,2,3]}', JsonObject({u'a': JsonArray(1, 2, 3)}))
 
-    def test_dict_nested_list2(self):
+    def test_jsonobject_nested_jsonarray2(self):
         self.__test_encode_decode(r'{"a":[1,2,3,[1,2,3]]}', JsonObject({u'a': JsonArray(1, 2, 3, JsonArray(1, 2, 3))}))
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):
             self._setlib(library)
-            text2 = util.json_encode(obj)
-            self.assertEquals(text, text2)
 
-            obj2 = util.json_decode(text2)
-
-            text3 = util.json_encode(obj2)
-            self.assertEquals(text, text3)
+            if library == FALLBACK or not isinstance(obj, (JsonArray, JsonObject)):
+                text2 = util.json_encode(obj)
+                self.assertEquals(text, text2)
+                obj2 = util.json_decode(text2)
+                text3 = util.json_encode(obj2)
+                self.assertEquals(text, text3)
+            else:
+                with self.assertRaises(TypeError):
+                    util.json_encode(obj)
 
         __runtest(JSON)
         __runtest(UJSON)
