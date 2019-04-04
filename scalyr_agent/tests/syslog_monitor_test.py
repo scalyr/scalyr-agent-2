@@ -303,7 +303,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockets.append(s)
 
-        expected = "UDP Test {}".format(uuid.uuid4())
+        expected = "UDP Test %s" % (uuid.uuid4())
         s.sendto(expected, ('localhost', 5514))
         time.sleep(1)
         self.monitor.stop(wait_on_join=False)

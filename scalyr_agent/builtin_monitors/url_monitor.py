@@ -105,7 +105,7 @@ class UrlMonitor(ScalyrMonitor):
 
         if self.request_headers and type(self.request_headers) != JsonArray:
             raise Exception(
-                'URL Monitor has malformed optional headers: {}'.format(repr(self.request_headers))
+                'URL Monitor has malformed optional headers: %s' % (repr(self.request_headers))
             )
 
         extract_expression = self._config.get("extract")

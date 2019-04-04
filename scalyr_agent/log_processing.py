@@ -2051,22 +2051,19 @@ class LogLineRedacter(object):
                 for _group_index, _group in enumerate(_groups):
                     # for each group in a match, replace the `replacement_ex` with either its `group` content, or
                     # the hash of the `group` depending on the hash indicator \\1 vs \\H1 etc.
-                    group_hash_indicator = "\{}{}".format(
-                        LogLineRedacter.HASH_GROUP_INDICATOR,
-                        _group_index + 1
-                    )
+                    group_hash_indicator = "\\%s%d" % (LogLineRedacter.HASH_GROUP_INDICATOR, _group_index + 1)
                     replacement_matches += 1
                     if group_hash_indicator in replacement_ex:
                         # the group needs to be hashed
                         replaced_group = replaced_group.encode('utf8')
                         replaced_group = replaced_group.replace(
                             group_hash_indicator,
-                            scalyr_util.md5_digest(_group + redaction_rule.hash_salt),
+                            scalyr_util.md5_hexdigest(_group + redaction_rule.hash_salt),
                             1
                         )
                     else:
                         # the group does not need to be hashed
-                        replaced_group = replaced_group.replace("\{}".format(_group_index + 1), _group, 1)
+                        replaced_group = replaced_group.replace("\\%d" % (_group_index + 1), _group, 1)
                 # once we have formed the replacement expression, we just need to replace the matched
                 # portion of the `line` with the `replaced_group` that we just built
                 replaced_string = replaced_string + line[last_match_index: _match.start()]
@@ -2128,7 +2125,7 @@ class RedactionRule(object):
 
     @property
     def hash_redacted_data(self):
-        return "\{0}".format(LogLineRedacter.HASH_GROUP_INDICATOR) in self.replacement_text
+        return ("\\%s" % (LogLineRedacter.HASH_GROUP_INDICATOR)) in self.replacement_text
 
 
 class LogMatcher(object):

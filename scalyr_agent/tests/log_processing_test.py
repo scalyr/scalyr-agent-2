@@ -32,7 +32,7 @@ from scalyr_agent.log_processing import FileSystem
 from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
-from scalyr_agent.util import md5_digest
+from scalyr_agent.util import md5_hexdigest
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.platform_controller import DefaultPaths
 
@@ -825,10 +825,10 @@ class TestLogLineRedactor(ScalyrTestCase):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('(password)', '\\H1')
 
-        self._run_case(redactor, "auth=password", "auth={}".format(md5_digest("password")), True)
+        self._run_case(redactor, "auth=password", "auth=%s" % (md5_hexdigest("password")), True)
         self._run_case(
             redactor, "another line password",
-            "another line {}".format(md5_digest("password")),
+            "another line %s" % (md5_hexdigest("password")),
             True
         )
 
@@ -839,12 +839,12 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "auth=password",
-            "auth={}".format(md5_digest("password" + "himalayan-salt")),
+            "auth=%s" % (md5_hexdigest("password" + "himalayan-salt")),
             True
         )
         self._run_case(
             redactor, "another line password",
-            "another line {}".format(md5_digest("password" + "himalayan-salt")),
+            "another line %s" % (md5_hexdigest("password" + "himalayan-salt")),
             True
         )
 
@@ -854,8 +854,8 @@ class TestLogLineRedactor(ScalyrTestCase):
 
         self._run_case(
             redactor,
-            "auth=password foo=password", "auth={} foo={}".format(
-                md5_digest("password"), md5_digest("password")),
+            "auth=password foo=password", "auth=%s foo=%s" % (
+                md5_hexdigest("password"), md5_hexdigest("password")),
             True
         )
 
@@ -865,7 +865,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin",
-            "sometext.... secretoption={}".format(md5_digest("czerwin")),
+            "sometext.... secretoption=%s" % (md5_hexdigest("czerwin")),
             True
         )
 
@@ -876,9 +876,9 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             "sometext.... secretoption=czerwin moretextsecretbar=xxx andsecret123=saurabh",
             "sometext.... secretoption=%smoretextsecretbar=%sandsecret123=%s" % (
-                md5_digest("czerwin "),
-                md5_digest("xxx "),
-                md5_digest("saurabh"),
+                md5_hexdigest("czerwin "),
+                md5_hexdigest("xxx "),
+                md5_hexdigest("saurabh"),
             ),
             True
         )
@@ -890,8 +890,8 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             "sometext.... secretoption=czerwin andsecret123=saurabh",
             "sometext.... secretczerwin =%sandsecretsaurabh=%s" % (
-                md5_digest("option"),
-                md5_digest("123"),
+                md5_hexdigest("option"),
+                md5_hexdigest("123"),
             ),
             True
         )
@@ -923,7 +923,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self._run_case(
             redactor,
             "userInfo=saurabh abcd1234",
-            "userInfo={}".format(md5_digest("saurabh")),
+            "userInfo=%s" % (md5_hexdigest("saurabh")),
             True
         )
 

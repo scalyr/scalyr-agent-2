@@ -196,7 +196,7 @@ def create_unique_id():
     return result
 
 
-def md5_digest(data):
+def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
@@ -212,8 +212,8 @@ def md5_digest(data):
     else:
         m = md5()
     m.update(data)
-    return m.digest()
 
+    return m.hexdigest()
 
 def remove_newlines_and_truncate(input_string, char_limit):
     """Returns the input string but with all newlines removed and truncated.
