@@ -55,9 +55,6 @@ class JsonObject(object):
         for key, value in key_values.iteritems():
             self.__map[key] = value
 
-    def asDict(self):
-        return self.__map
-
     def to_json(self):
         """Returns a string containing the JSON representation of this object.
 
@@ -550,9 +547,6 @@ class JsonArray(object):
     def __len__(self):
         """Returns the number of elements in the JsonArray"""
         return len(self.__items)
-
-    def asList(self):
-        return self.__items
 
     def get_json_object(self, index):
         """Returns the value at the specified index as a JsonObject.
