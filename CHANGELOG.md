@@ -4,7 +4,7 @@ Scalyr Agent 2 Changes By Release
 ## 2.0.45 "Xindi" - Apr 5, 2019
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 5, 2019 15:00 -0700
+Packaged by Edward Chee <echee@scalyr.com> on Apr 5, 2019 15:00 -0700
 --->
 
 Features
