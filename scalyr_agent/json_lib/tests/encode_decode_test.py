@@ -28,8 +28,6 @@ from scalyr_agent.test_base import ScalyrTestCase
 JSON = 1
 UJSON = 2
 FALLBACK = 3
-ALL_JSON_LIBS = [FALLBACK]
-ALL_JSON_LIBS_AS_TUPLES = [(lib,) for lib in ALL_JSON_LIBS]
 
 
 class EncodeDecodeTest(ScalyrTestCase):
