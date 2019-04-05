@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.45 "Xindi" - Apr 5, 2019
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Apr 5, 2019 15:00 -0700
+--->
+
+Features
+* Publish image supporting Docker logs via `json` driver instead of `syslog`
+* Include K8s versioning information when reporting to Scalyr
+
+Bugs
+* Remove Python 2.7 specific uses for `format`
+* Fix parser not being respected when set in log file attributes
+
 ## 2.0.44 "Wurwhal" - Mar 25, 2019
 
 <!---
