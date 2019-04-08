@@ -18,6 +18,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import os
+import time
 
 from scalyr_agent.agent_status import MonitorManagerStatus
 from scalyr_agent.agent_status import MonitorStatus
@@ -132,6 +133,9 @@ class MonitorsManager(StoppableThread):
         @param join_timeout: The maximum number of seconds to block for the join.
         """
         # TODO:  Move these try statements out of here.  Let higher layers catch it.
+
+        start_time = time.time()
+
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
@@ -142,9 +146,12 @@ class MonitorsManager(StoppableThread):
 
         if wait_on_join:
             for monitor in self.__running_monitors:
+                max_wait = start_time + join_timeout - time.time()
+                if max_wait <= 0:
+                    break
                 # noinspection PyBroadException
                 try:
-                    monitor.stop(join_timeout=1)
+                    monitor.stop(join_timeout=max_wait)
                 except:
                     log.exception('Failed to stop the metric log due to an exception')
 
