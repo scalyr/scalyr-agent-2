@@ -82,7 +82,10 @@ def get_json_implementation(lib_name):
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
-    if lib_name == 'json':
+    else:
+        if lib_name != 'json':
+            raise ValueError('Unsupported json library %s' % lib_name)
+
         import json
 
         def json_dumps_custom(*args, **kwargs):

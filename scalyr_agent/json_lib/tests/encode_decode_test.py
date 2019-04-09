@@ -41,6 +41,10 @@ class EncodeDecodeTest(ScalyrTestCase):
         else:
             util._set_json_lib('json_lib')
 
+    def test_invalid_lib(self):
+        with self.assertRaises(ValueError):
+            util._set_json_lib('BAD JSON LIBRARY NAME')
+
     def test_dict(self):
         self.__test_encode_decode('{"a":1,"b":2}', {u'a': 1, u'b': 2})
 
