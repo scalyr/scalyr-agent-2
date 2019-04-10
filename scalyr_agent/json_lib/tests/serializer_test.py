@@ -18,7 +18,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import unittest
-from scalyr_agent.json_lib import serialize, serialize_as_length_prefixed_string
+from scalyr_agent.json_lib import serialize
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -106,8 +106,8 @@ class SerializeTests(ScalyrTestCase):
         self.assertEquals('`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!', serialize(u'Howdy \u84b8 folks!',
                                                                                    use_length_prefix_string=True))
 
-    def write(self, value):
-        return serialize(value, use_fast_encoding=True)
+    def write(self, value, sort_keys=False):
+        return serialize(value, use_fast_encoding=True, sort_keys=sort_keys)
 
     def __run_string_test_case(self, input_string, expected_result):
         self.assertEquals(serialize(input_string, use_fast_encoding=True), expected_result)
