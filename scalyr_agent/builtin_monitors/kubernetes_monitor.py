@@ -1676,9 +1676,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         ver = None
         if k8s_cache:
             ver = k8s_cache.get_api_server_version()
-            if ver:
-                ver = 'k8s=%s' % ver
-        return ver
+        return 'k8s=%s' % (ver if ver else 'true')
 
     def gather_sample( self ):
         k8s_cache = self.__get_k8s_cache()

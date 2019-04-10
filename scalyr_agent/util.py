@@ -691,6 +691,69 @@ class FakeClock(object):
         self._waiting_condition.release()
 
 
+class FakeClockCounter(object):
+    """Helper class for multithreaded testing. Provides a method for a thread to block until a count has reached target
+    value.  Moreover, for every successfully observed increment, it will advance the fake_clock and wait for all
+    other threads (driven the fake clock) to wait on the clock.  For example usage, see MonitorsManagerTest.
+    """
+
+    def __init__(self, fake_clock, num_waiters):
+        """
+        @param fake_clock: FakeClock that will be advanced on every
+        @param num_waiters: Number of threads that wait on fake clock
+        """
+        self.__fake_clock = fake_clock
+        self.__num_waiters = num_waiters
+        self.__count = 0
+        self.__condition = threading.Condition()
+
+    def count(self):
+        self.__condition.acquire()
+        try:
+            return self.__count
+        finally:
+            self.__condition.release()
+
+    def increment(self):
+        self.__condition.acquire()
+        try:
+            self.__count += 1
+            self.__condition.notifyAll()
+        finally:
+            self.__condition.release()
+
+    def __wait_for_increment(self, old_count, timeout=None):
+        remaining = timeout
+        self.__condition.acquire()
+        try:
+            while self.__count == old_count and remaining > 0:
+                t1 = time.time()
+                self.__condition.wait(remaining)
+                remaining -= time.time() - t1
+        finally:
+            self.__condition.release()
+
+    def sleep_until_count_or_maxwait(self, target, fake_increment_sec, maxwait):
+        """Blocks until the counter reaches the target value, or a specified amount of time passes,
+        whichever comes first.
+
+        @param target: Target count to reach
+        @param fake_increment_sec: Seconds to increment the fake clock on each poll
+        @param maxwait: Time (seconds) to wait for target to be reached
+        @return: True if number of polls reaches target_polls, else False
+        """
+        deadline = time.time() + maxwait
+        while self.count() < target and time.time() < deadline:
+            # Important: wait for monitor thread & all monitor loops to complete
+            # Failing to do so leads to non-deterministic test hangs
+            self.__fake_clock.block_until_n_waiting_threads(self.__num_waiters)
+            old_count = self.count()
+            self.__fake_clock.advance_time(increment_by=fake_increment_sec)
+            self.__wait_for_increment(old_count, timeout=deadline - time.time())
+
+        return self.count() == target
+
+
 class StoppableThread(threading.Thread):
     """A slight extension of a thread that uses a RunState instance to track if it should still be running.
 
