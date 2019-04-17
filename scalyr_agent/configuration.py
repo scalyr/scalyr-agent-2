@@ -26,11 +26,13 @@ import urlparse
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
+from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings
 from scalyr_agent.util import JsonReadFileException
+from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from __scalyr__ import get_install_root
+
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -50,7 +52,9 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
-    def __init__(self, file_path, default_paths):
+    def __init__(self, file_path, default_paths, logger):
+        # Captures all environment aware variables for testing purposes
+        self._environment_aware_map = {}
         self.__file_path = os.path.abspath(file_path)
         # Paths for additional configuration files that were read (from the config directory).
         self.__additional_paths = []
@@ -77,7 +81,9 @@ class Configuration(object):
         self.max_retry_time = 15 * 60
         self.max_allowed_checkpoint_age = 15 * 60
 
-    def parse(self, logger=None):
+        self.__logger = logger
+
+    def parse(self):
         self.__read_time = time.time()
 
         try:
@@ -134,25 +140,12 @@ class Configuration(object):
                 self.__add_elements_from_array('monitors', content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
-            # Check for api_key in the environment variable `scalyr_api_key`. Sometimes, injecting a secret key like
-            # this is preferable via environment variables. However if the key is specified in the configuration
-            # file, it takes precedence. Key should only be specified in either the config file of env variable
-            env_api_key = os.environ.get('scalyr_api_key')
-            if api_key and env_api_key and api_key != env_api_key:
-                # ignore and key in the env variable and warn the user
-                if logger:
-                    logger.warn("You have different api keys in the config file and env variable `scalyr_api_key`."
-                             " Ignoring the env variable.")
-            elif not api_key and env_api_key:
-                if logger:
-                    logger.debug("Using the api key from the env variable `scalyr_api_key`")
-                api_key = env_api_key
-
             self.__set_api_key(self.__config, api_key)
             if scalyr_server is not None:
                 self.__config.put('scalyr_server', scalyr_server)
             self.__verify_or_set_optional_string(self.__config, 'scalyr_server', 'https://agent.scalyr.com',
-                                                 'configuration file %s' % self.__file_path)
+                                                 'configuration file %s' % self.__file_path,
+                                                 env_name='SCALYR_SERVER')
 
             self.__config['raw_scalyr_server'] = self.__config['scalyr_server']
 
@@ -864,7 +857,6 @@ class Configuration(object):
             return result_key, result_file
         return previous_value, previous_config_file
 
-
     def __verify_main_config(self, config, file_path):
         self.__verify_main_config_and_apply_defaults( config, file_path, apply_defaults=False)
 
@@ -883,65 +875,66 @@ class Configuration(object):
     """
         description = 'configuration file "%s"' % file_path
 
-        self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults)
+        self.__verify_or_set_optional_string(config, 'api_key', '', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
-                                             description, apply_defaults)
+                                             description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'agent_data_path',  self.__default_paths.agent_data_path,
-                                             description, apply_defaults)
-        self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description, apply_defaults)
-        self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'implicit_metric_monitor', True, description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description, apply_defaults)
+                                             description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'additional_monitor_module_paths', '', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'config_directory', 'agent.d', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'implicit_agent_log_collection', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'implicit_metric_monitor', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'implicit_agent_process_metrics_monitor', True, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'use_unsafe_debugging', False, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'copying_thread_profile_interval', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'copying_thread_profile_output_path',
-                                             '/tmp/copying_thread_profiles_', description, apply_defaults)
+                                             '/tmp/copying_thread_profiles_', description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'full_checkpoint_interval_in_seconds', 60, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'global_monitor_sample_interval', 30.0, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'close_old_files_duration_in_seconds', 60*60*1, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'full_checkpoint_interval_in_seconds', 60, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'min_request_spacing_interval', 1.0, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'max_request_spacing_interval', 5.0, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'max_error_request_spacing_interval', 30.0, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'minimum_scan_interval', None, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'max_allowed_request_size', 1*1024*1024, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'min_allowed_request_size', 100*1024, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'min_request_spacing_interval', 1.0, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'max_request_spacing_interval', 5.0, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'max_error_request_spacing_interval', 30.0, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'minimum_scan_interval', None, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_int(config, 'low_water_bytes_sent', 20*1024, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'low_water_request_spacing_adjustment', 1.5, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'low_water_bytes_sent', 20*1024, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'low_water_request_spacing_adjustment', 1.5, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_int(config, 'high_water_bytes_sent', 100*1024, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'high_water_request_spacing_adjustment', 0.6, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'high_water_bytes_sent', 100*1024, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'high_water_request_spacing_adjustment', 0.6, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description, apply_defaults)
-        self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'failure_request_spacing_adjustment', 1.5, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_float(config, 'request_too_large_adjustment', 0.5, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_float(config, 'max_new_log_detection_time', 60.0, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'max_new_log_detection_time', 60.0, description, apply_defaults, env_aware=True)
 
         # These parameters are used in log_processing.py to govern how logs are copied.
 
         # The maximum allowed size for a line when reading from a log file.
         # We do not strictly enforce this -- some lines returned by LogFileIterator may be
         # longer than this due to some edge cases.
-        self.__verify_or_set_optional_int(config, 'max_line_size', 9900, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'max_line_size', 9900, description, apply_defaults, env_aware=True)
 
         # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does
         # not currently end in a new line (referred to as a partial line).  It could be that the full line just hasn't
         # made it all the way to disk yet.  After this time though, we will just return the bytes as a line
-        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'line_completion_wait_time', 5, description, apply_defaults, env_aware=True)
 
         # The maximum negative offset relative to the end of a previously unseen log the log file
         # iterator is allowed to become.  If bytes are not being read quickly enough, then
         # the iterator will automatically advance so that it is no more than this length
         # to the end of the file.  This is essentially the maximum bytes a new log file
         # is allowed to be caught up when used in copying logs to Scalyr.
-        self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'max_log_offset_size', 5 * 1024 * 1024, description, apply_defaults, env_aware=True)
 
 
         # The maximum negative offset relative to the end of an existing log the log file
@@ -949,66 +942,66 @@ class Configuration(object):
         # the iterator will automatically advance so that it is no more than this length
         # to the end of the file.  This is essentially the maximum bytes an existing log file
         # is allowed to be caught up when used in copying logs to Scalyr.
-        self.__verify_or_set_optional_int(config, 'max_existing_log_offset_size', 100 * 1024 * 1024, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'max_existing_log_offset_size', 100 * 1024 * 1024, description, apply_defaults, env_aware=True)
 
         # The maximum sequence number for a given sequence
         # The sequence number is typically the total number of bytes read from a given file
         # (across restarts and log rotations), and it resets to zero (and begins a new sequence)
         # for each file once the current sequence_number exceeds this value
         # defaults to 1 TB
-        self.__verify_or_set_optional_int( config, 'max_sequence_number', 1024**4, description, apply_defaults )
+        self.__verify_or_set_optional_int(config, 'max_sequence_number', 1024**4, description, apply_defaults, env_aware=True)
 
         # The number of bytes to read from a file at a time into the buffer.  This must
         # always be greater than the MAX_LINE_SIZE
-        self.__verify_or_set_optional_int(config, 'read_page_size', 64 * 1024, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'read_page_size', 64 * 1024, description, apply_defaults, env_aware=True)
 
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
-        self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'log_deletion_delay', 10 * 60, description, apply_defaults, env_aware=True)
 
         # How many log rotations to do
-        self.__verify_or_set_optional_int(config, 'log_rotation_backup_count', 2, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'log_rotation_backup_count', 2, description, apply_defaults, env_aware=True)
 
         # The size of each log rotation file
-        self.__verify_or_set_optional_int(config, 'log_rotation_max_bytes', 20 * 1024 * 1024, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'log_rotation_max_bytes', 20 * 1024 * 1024, description, apply_defaults, env_aware=True)
 
         # The percentage of the maximum message size a message (max_allowed_request_size) has to be to trigger
         # pipelining the next add events request.  This intentionally set to 110% to prevent it from being used unless
         # explicitly requested.
-        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'pipeline_threshold', 1.1, description, apply_defaults, env_aware=True)
 
         # If we have noticed that new bytes have appeared in a file but we do not read them before this threshold
         # is exceeded, then we consider those bytes to be stale and just skip to reading from the end to get the
         # freshest bytes.
-        self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'copy_staleness_threshold', 15 * 60, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'debug_init', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'debug_init', False, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'pidfile_advanced_reuse_guard', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'pidfile_advanced_reuse_guard', False, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'strip_domain_from_default_server_host', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'strip_domain_from_default_server_host', False, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_int(config, 'debug_level', 0, description, apply_defaults)
+        self.__verify_or_set_optional_int(config, 'debug_level', 0, description, apply_defaults, env_aware=True)
         debug_level = config.get_int('debug_level', apply_defaults)
         if debug_level < 0 or debug_level > 5:
             raise BadConfiguration('The debug level must be between 0 and 5 inclusive', 'debug_level', 'badDebugLevel')
-        self.__verify_or_set_optional_float(config, 'request_deadline', 60.0, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'request_deadline', 60.0, description, apply_defaults, env_aware=True)
 
         self.__verify_or_set_optional_string(config, 'ca_cert_path', Configuration.default_ca_cert_path(),
-                                             description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description, apply_defaults)
-        self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults)
-        self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults)
-        self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults)
+                                             description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
 
-        self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults )
-        self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults )
-        self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults )
-        self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults )
-        self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults )
+        self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 
         #Debug leak flags
         self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description, apply_defaults)
@@ -1027,13 +1020,81 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_can_write_to_logs', None, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'disable_leak_config_reload', None, description, apply_defaults)
 
-        self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'user_agent_refresh_interval', 60, description, apply_defaults)
-        self.__verify_or_set_optional_int(config, 'garbage_collect_interval', 300, description, apply_defaults)
+        self.__verify_or_set_optional_float(config, 'config_change_check_interval', 30, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'user_agent_refresh_interval', 60, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'garbage_collect_interval', 300, description, apply_defaults, env_aware=True)
 
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_monitors_manager', None, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_copying_manager', None, description, apply_defaults)
         self.__verify_or_set_optional_bool(config, 'disable_leak_verify_config_cache_config', False, description, apply_defaults)
+
+    def __get_config_or_environment_val(self, config_object, param_name, param_type, env_aware, custom_env_name):
+        """Returns a type-converted config param value or if not found, a matching environment value.
+
+        If the environment value is returned, it is also written into the config_object.
+
+        Currently only handles the following types (str, int, bool, float, JsonObject, JsonArray).
+        Also validates that environment variables can be correctly converted into the primitive type.
+
+        Both upper-case and lower-case versions of the environment variable will be checked.
+
+        @param config_object: The JsonObject config containing the field as a key
+        @param param_name: Parameter name
+        @param param_type: Parameter primitive type
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
+            Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
+
+        @return A python object representing the config param (or environment) value or None
+        @raises
+            JsonConversionException: if the config value or env value cannot be correctly converted.
+            TypeError: if the param_type is not supported.
+        """
+        if param_type == int:
+            config_val = config_object.get_int(param_name, none_if_missing=True)
+        elif param_type == bool:
+            config_val = config_object.get_bool(param_name, none_if_missing=True)
+        elif param_type == float:
+            config_val = config_object.get_float(param_name, none_if_missing=True)
+        elif param_type == str:
+            config_val = config_object.get_string(param_name, none_if_missing=True)
+        elif param_type == JsonObject:
+            config_val = config_object.get_json_object(param_name, none_if_missing=True)
+        elif param_type == JsonArray:
+            config_val = config_object.get_json_array(param_name, none_if_missing=True)
+        elif param_type == ArrayOfStrings:
+            # ArrayOfStrings are extracted from config file as JsonArray
+            # (but extracted from the environment different from JsonArray)
+            config_val = config_object.get_json_array(param_name, none_if_missing=True)
+        else:
+            raise TypeError('Unsupported environment variable conversion type %s (param name = %s)'
+                            % (param_type, param_name))
+
+        if not env_aware:
+            if not custom_env_name:
+                return config_val
+
+        self._environment_aware_map[param_name] = custom_env_name or ('SCALYR_%s' % param_name.upper())
+
+        env_val = get_config_from_env(
+            param_name,
+            custom_env_name=custom_env_name,
+            convert_to=param_type,
+            logger=self.__logger,
+            param_val=config_val,
+        )
+
+        # Not set in environment
+        if env_val is None:
+            return config_val
+
+        # Config file value wins if set
+        if config_val is not None:
+            return config_val
+
+        config_object.update({param_name: env_val})
+        return env_val
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.
@@ -1045,7 +1106,7 @@ class Configuration(object):
 
         @param config: The main JsonObject configuration object.
         @param file_path: The file that was read to retrieve the config object. This is used in error reporting.
-    """
+        """
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, 'logs', description)
         self.__verify_or_set_optional_array(config, 'monitors', description)
@@ -1232,7 +1293,8 @@ class Configuration(object):
             raise BadConfiguration('A required field has too many options.  Object must contain only one of "%s".  Error is in %s' % (str(fields), config_description),
                                    field, 'missingRequired')
 
-    def __verify_or_set_optional_string(self, config_object, field, default_value, config_description, apply_defaults=True):
+    def __verify_or_set_optional_string(self, config_object, field, default_value, config_description,
+                                        apply_defaults=True, env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
         Raises an exception if the existing field cannot be converted to a string.
@@ -1244,9 +1306,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            value = config_object.get_string(field, none_if_missing=True)
+            value = self.__get_config_or_environment_val(config_object, field, str, env_aware, env_name)
 
             if value is None:
                 if apply_defaults:
@@ -1258,7 +1323,8 @@ class Configuration(object):
                                                                                                   config_description),
                                    field, 'notString')
 
-    def __verify_or_set_optional_int(self, config_object, field, default_value, config_description, apply_defaults=True):
+    def __verify_or_set_optional_int(self, config_object, field, default_value, config_description,
+                                     apply_defaults=True, env_aware=False, env_name=None):
         """Verifies that the specified field in config_object can be converted to an int if present, otherwise
         sets default.
 
@@ -1271,9 +1337,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            value = config_object.get_int(field, none_if_missing=True)
+            value = self.__get_config_or_environment_val(config_object, field, int, env_aware, env_name)
 
             if value is None:
                 if apply_defaults:
@@ -1285,7 +1354,8 @@ class Configuration(object):
                                                                                                 config_description),
                                    field, 'notInt')
 
-    def __verify_or_set_optional_float(self, config_object, field, default_value, config_description, apply_defaults=True):
+    def __verify_or_set_optional_float(self, config_object, field, default_value, config_description,
+                                       apply_defaults=True, env_aware=False, env_name=None):
         """Verifies that the specified field in config_object can be converted to a float if present, otherwise
         sets default.
 
@@ -1298,9 +1368,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            value = config_object.get_float(field, none_if_missing=True)
+            value = self.__get_config_or_environment_val(config_object, field, float, env_aware, env_name)
 
             if value is None:
                 if apply_defaults:
@@ -1312,7 +1385,8 @@ class Configuration(object):
                                                                                                   config_description),
                                    field, 'notFloat')
 
-    def __verify_or_set_optional_attributes(self, config_object, field, config_description, apply_defaults=True):
+    def __verify_or_set_optional_attributes(self, config_object, field, config_description, apply_defaults=True,
+                                            env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is a json object if present, otherwise sets to empty
         object.
 
@@ -1325,9 +1399,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            json_object = config_object.get_json_object(field, none_if_missing=True)
+            json_object = self.__get_config_or_environment_val(config_object, field, JsonObject, env_aware, env_name)
 
             if json_object is None:
                 if apply_defaults:
@@ -1346,7 +1423,8 @@ class Configuration(object):
             raise BadConfiguration('The value for the field "%s" is not a json object.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonObject')
 
-    def __verify_or_set_optional_bool(self, config_object, field, default_value, config_description, apply_defaults=True):
+    def __verify_or_set_optional_bool(self, config_object, field, default_value, config_description,
+                                      apply_defaults=True, env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is a boolean if present, otherwise sets default.
 
         Raises an exception if the existing field cannot be converted to a boolean.
@@ -1358,9 +1436,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            value = config_object.get_bool(field, none_if_missing=True)
+            value = self.__get_config_or_environment_val(config_object, field, bool, env_aware, env_name)
 
             if value is None:
                 if apply_defaults:
@@ -1371,7 +1452,8 @@ class Configuration(object):
             raise BadConfiguration('The value for the required field "%s" is not a boolean.  '
                                    'Error is in %s' % (field, config_description), field, 'notBoolean')
 
-    def __verify_or_set_optional_array(self, config_object, field, config_description, apply_defaults=True):
+    def __verify_or_set_optional_array(self, config_object, field, config_description, apply_defaults=True,
+                                       env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is an array of json objects if present, otherwise sets
         to empty array.
 
@@ -1383,9 +1465,12 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            json_array = config_object.get_json_array(field, none_if_missing=True)
+            json_array = self.__get_config_or_environment_val(config_object, field, JsonArray, env_aware, env_name)
 
             if json_array is None:
                 if apply_defaults:
@@ -1403,7 +1488,8 @@ class Configuration(object):
             raise BadConfiguration('The value for the required field "%s" is not an array.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonArray')
 
-    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description, apply_defaults=True):
+    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description, apply_defaults=True,
+                                                  env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
 
@@ -1415,17 +1501,21 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param env_aware: If True and not defined in config file, look for presence of environment variable.
+        @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+            scalyr_<field> as the environment variable name.
         """
         try:
-            json_array = config_object.get_json_array(field, none_if_missing=True)
+            array_of_strings = self.__get_config_or_environment_val(config_object, field, ArrayOfStrings,
+                                                                    env_aware, env_name)
 
-            if json_array is None:
+            if array_of_strings is None:
                 if apply_defaults:
-                    config_object.put(field, JsonArray())
+                    config_object.put(field, ArrayOfStrings())
                 return
 
             index = 0
-            for x in json_array:
+            for x in array_of_strings:
                 if not isinstance(x, basestring):
                     raise BadConfiguration('The element at index=%i is not a string or unicode object as required in the array '
                                            'field "%s".  Error is in %s' % (index, field, config_description),
@@ -1586,17 +1676,3 @@ class Configuration(object):
         substitutions = import_shell_variables()
         if len(substitutions) > 0:
             perform_object_substitution(source_config)
-
-
-class BadConfiguration(Exception):
-    """Raised when bad values are supplied in the configuration."""
-    def __init__(self, message, field, error_code):
-        """
-        @param message:  The main error message
-        @param field:  If not None, the field that the error pertains to in the configuration file.
-        @param error_code:  The error code to include in the error message.
-        """
-        if field is not None:
-            Exception.__init__(self, '%s [[badField="%s" errorCode="%s"]]' % (message, field, error_code))
-        else:
-            Exception.__init__(self, '%s [[errorCode="%s"]]' % (message, error_code))

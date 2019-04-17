@@ -8,7 +8,8 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie-browsers
-
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - checkout
       - restore_cache:
@@ -25,7 +26,8 @@ jobs:
       - run:
           command: |
             source venv/bin/activate
-            nosetests --with-cov --cover-erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml --ignore-files=.*log_processing_test.*
+            python run_tests.py
+            # nosetests --with-cov --cover- erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml --ignore-files=.*log_processing_test.*
 
       - store_artifacts:
           path: xunit.xml

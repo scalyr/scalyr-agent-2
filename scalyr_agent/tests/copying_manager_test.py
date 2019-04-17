@@ -129,7 +129,7 @@ class CopyingParamsTest(ScalyrTestCase):
 
         default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                      '/var/lib/scalyr-agent-2')
-        return Configuration(self.__config_file, default_paths)
+        return Configuration(self.__config_file, default_paths, None)
 
 
 class CopyingManagerInitializationTest(ScalyrTestCase):
@@ -200,7 +200,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                      '/var/lib/scalyr-agent-2')
 
-        config = Configuration(config_file, default_paths)
+        config = Configuration(config_file, default_paths, None)
         config.parse()
 
         self.__monitor_fake_instances = []
@@ -468,7 +468,7 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         default_paths = DefaultPaths(log_dir, config_file, data_dir)
 
-        config = Configuration(config_file, default_paths)
+        config = Configuration(config_file, default_paths, None)
         config.parse()
 
         # noinspection PyTypeChecker

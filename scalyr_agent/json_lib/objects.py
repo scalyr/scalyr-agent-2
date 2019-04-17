@@ -465,8 +465,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
         if not field in self:
-            return self.__compute_missing_value(
-                field, default_value, none_if_missing)
+            return self.__compute_missing_value(field, default_value, none_if_missing)
         value = self.__map[field]
         if isinstance(value, JsonArray):
             return value
@@ -489,8 +488,7 @@ class JsonObject(object):
             "Failed converting %s of type %s for field %s to desired type %s"
             % (str(value), type(value), field_name, desired_type))
 
-    def __compute_missing_value(self, field_name, default_value,
-                                none_if_missing):
+    def __compute_missing_value(self, field_name, default_value, none_if_missing):
         """Perform the appropriate action for a missing value.
 
         @param field_name: The name of the missing field.
@@ -536,17 +534,17 @@ class JsonArray(object):
         @param content: A dict containing the key/values pairs to use.
         @param *args: The elements to insert into the list."""
 
-        self.__items = []
+        self._items = []
 
         for arg in args:
-            self.__items.append(arg)
+            self._items.append(arg)
 
     def __repr__(self):
-        return repr( self.__items )
+        return repr(self._items)
 
     def __len__(self):
         """Returns the number of elements in the JsonArray"""
-        return len(self.__items)
+        return len(self._items)
 
     def get_json_object(self, index):
         """Returns the value at the specified index as a JsonObject.
@@ -570,10 +568,10 @@ class JsonArray(object):
         @return: The value at the specified index.
 
         @raise IndexError: If there is no entry at that index."""
-        if index >= len(self.__items) or index < 0:
+        if index >= len(self._items) or index < 0:
             raise IndexError(
-                "The index=%i is out of bounds of array size=%i" % (index, len(self.__items)))
-        return self.__items[index]
+                "The index=%i is out of bounds of array size=%i" % (index, len(self._items)))
+        return self._items[index]
 
     def __setitem__(self, index, value):
         """Sets the value at the specified index.
@@ -582,20 +580,20 @@ class JsonArray(object):
         @param value: The value
 
         @raise IndexError: If there is no entry at that index."""
-        if index >= len(self.__items) or index < 0:
+        if index >= len(self._items) or index < 0:
             raise IndexError(
-                "The index=%i is out of bounds of array size=%i" % (index, len(self.__items)))
-        self.__items[index] = value
+                "The index=%i is out of bounds of array size=%i" % (index, len(self._items)))
+        self._items[index] = value
 
     def add(self, value):
         """Inserts a new element at the end of the array.
 
         @param value: The value to append."""
-        self.__items.append(value)
+        self._items.append(value)
 
     def __iter__(self):
         """Yields all items in the array"""
-        for element in self.__items:
+        for element in self._items:
             yield element
 
     def json_objects(self):
@@ -603,8 +601,8 @@ class JsonArray(object):
         checking to make sure they are JsonObjects.
 
         @raise JsonConversionException: If an item is reached that is not a JsonObject."""
-        for index in range(len(self.__items)):
-            element = self.__items[index]
+        for index in range(len(self._items)):
+            element = self._items[index]
             if not isinstance(element, JsonObject):
                 yield self.__raise_not_json_object(index)
             else:
@@ -615,9 +613,22 @@ class JsonArray(object):
             return False
         if type(self) is not type(other):
             return False
-        assert isinstance(other.__items, list)
-        return self.__items == other.__items
+        assert isinstance(other._items, list)
+        return self._items == other._items
 
     def __raise_not_json_object(self, index):
         raise JsonConversionException(
             "A non-JsonObject entry was found in array at index=%i" % index)
+
+
+class ArrayOfStrings(JsonArray):
+
+    def __init__(self, *args):
+        """Imposes additional constraint that each element must be a string
+        @raise TypeError if an element is not a string
+        """
+        self._items = []
+        for arg in args:
+            if type(arg) not in (str, unicode):
+                raise TypeError('A non-string element was found: %s' % str(arg))
+            self._items.append(arg)
