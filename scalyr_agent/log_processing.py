@@ -79,6 +79,44 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
 
+def _parse_cri_log( line ):
+    """
+    Parse a log line that uses the K8S Container Runtime Interface (CRI) format
+    https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md
+    """
+    # find the end of the timestamp segment
+    index = line.find( ' ' )
+    if index < 0:
+        return None, None, None, None
+
+    #parse the timestamp
+    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch( line[:index] )
+    if timestamp is None:
+        return None, None, None, None
+
+    # skip over the ' ' delimiter and parse the stream type
+    line = line[index+1:]
+    index = line.find( ' ' )
+    if index < 0:
+        return None, None, None, None
+
+    stream = line[:index]
+    if stream != 'stdout' and stream != 'stderr':
+        return None, None, None, None
+
+    # skip over the ' ' delimiter and parse the tags
+    line = line[index+1:]
+    index = line.find( ' ' )
+    if index < 0:
+        return None, None, None, None
+
+    tags = line[:index]
+
+    # skip over the ' ' delimiter and get the log line
+    line = line[index+1:]
+
+    return timestamp, stream, tags, line
+
 class LogLine(object):
     """A class representing a line from a log file.
     This object will always have a single field 'line' which contains the log line.
@@ -183,7 +221,14 @@ class LogFileIterator(object):
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
-        self.__parse_as_json = log_config.get('parse_lines_as_json', False)
+        self.__parse_format = log_config.get( 'parse_format' )
+        parse_as_json = log_config.get('parse_lines_as_json', None, none_if_missing=True)
+        if parse_as_json is not None:
+            if parse_as_json:
+                self.__parse_format = 'json'
+            else:
+                self.__parse_format = 'raw'
+
         self.__json_log_key = log_config.get('json_message_field', 'log' )
         self.__json_timestamp_key = log_config.get('json_timestamp_field', 'time')
 
@@ -425,7 +470,7 @@ class LogFileIterator(object):
         then a line will be returned using the available bytes up to the max line size.  Second, if there are bytes
         available, and sufficient time has past without seeing a newline, then the available lines are returned.
 
-        If the 'parse_as_json' configuration item is True then this function will also attempt to process the line as json,
+        If the 'parse_format' configuration item is 'json' then this function will also attempt to process the line as json,
         extracting a log message, a timestamp and any other remaining fields, all of which are returned as a LogLine object.
 
         When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
@@ -444,6 +489,11 @@ class LogFileIterator(object):
         this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
 
         All other fields of the json object will be stored in the attrs dict of the LogLine object.
+
+        If the 'parse_format' configuration item is 'cri' then this function will attempt to process the line as the k8s
+        container runtime interface (cri) format, extracting a log message, a timestamp and a stream, all of which are returned as a LogLine object.
+
+        If `parse_format` is not `json` or `cri` then the entire log line will be logged.
 
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float
@@ -493,8 +543,22 @@ class LogFileIterator(object):
         #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
         #                                              expected_size, actual_size)
 
-        # check to see if we need to parse the line as json
-        if self.__parse_as_json:
+        # check to see if we need to parse the line as cri.
+        # Note: we don't handle multi-line lines.
+        if self.__parse_format == 'cri':
+            timestamp, stream, tags, message = _parse_cri_log( result.line )
+            if message is None:
+                log.warn("Didn't find a valid log line in CRI format for log %s.  Logging full line." %
+                        (self.__path), limit_once_per_x_secs=300, limit_key=('invalid-cri-format-%s' % self.__path))
+            else:
+                result.line = message
+                result.timestamp = timestamp
+                result.attrs = { 'raw_timestamp': timestamp,
+                                 'stream': stream
+                               }
+
+        # or see if we need to parse it as json
+        elif self.__parse_format == 'json':
             try:
                 json = scalyr_util.json_decode( result.line )
 
