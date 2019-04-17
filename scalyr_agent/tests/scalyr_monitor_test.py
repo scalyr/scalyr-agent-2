@@ -18,6 +18,9 @@
 __author__ = 'czerwin@scalyr.com'
 
 
+from scalyr_agent.json_lib import serialize
+from scalyr_agent.json_lib import parse as json_lib_parse
+from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings
 from scalyr_agent.scalyr_monitor import MonitorConfig, BadMonitorConfiguration, define_config_option
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -25,6 +28,8 @@ from scalyr_agent.test_base import ScalyrTestCase
 class MonitorConfigTest(ScalyrTestCase):
 
     def test_base(self):
+        test_array = ["a", 1, False]
+        test_obj = {"a": 100, "b": 200}
         config = MonitorConfig(
             {
                 'int': 1,
@@ -32,10 +37,12 @@ class MonitorConfigTest(ScalyrTestCase):
                 'string': 'hi',
                 'unicode': u'bye',
                 'float': 1.4,
-                'long': 1L
+                'long': 1L,
+                'JsonArray': JsonArray(*test_array),
+                'JsonObject': JsonObject(**test_obj),
             })
 
-        self.assertEquals(len(config), 6)
+        self.assertEquals(len(config), 8)
         self.assertTrue('int' in config)
         self.assertFalse('foo' in config)
 
@@ -45,11 +52,13 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEquals(config['unicode'], u'bye')
         self.assertEquals(config['float'], 1.4)
         self.assertEquals(config['long'], 1L)
+        self.assertEquals(config['JsonArray'], JsonArray(*test_array))
+        self.assertEquals(config['JsonObject'], JsonObject(**test_obj))
 
         count = 0
         for _ in config:
             count += 1
-        self.assertEquals(count, 6)
+        self.assertEquals(count, 8)
 
     def test_int_conversion(self):
         self.assertEquals(self.get(1, convert_to=int), 1)
@@ -67,6 +76,27 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEquals(self.get(False, convert_to=str), 'False')
         self.assertEquals(self.get(1.3, convert_to=str), '1.3')
         self.assertEquals(self.get(1L, convert_to=str), '1')
+
+        test_array = ["a", "b", "c"]
+
+        # str -> ArrayOfStrings (must support different variations)
+        arr = ArrayOfStrings(*test_array)
+        self.assertEquals(self.get('a,b,c', convert_to=ArrayOfStrings), arr)
+        self.assertEquals(self.get('a,b,  c', convert_to=ArrayOfStrings), arr)
+        self.assertEquals(self.get('"a", "b", "c"', convert_to=ArrayOfStrings), arr)
+        self.assertEquals(self.get("'a', 'b', 'c'", convert_to=ArrayOfStrings), arr)
+        self.assertEquals(self.get("[a, b, c]" , convert_to=ArrayOfStrings), arr)
+        self.assertEquals(self.get("['a', \"b\", c]" , convert_to=ArrayOfStrings), arr)
+
+        # str -> JsonArray
+        self.assertEquals(self.get(serialize(test_array), convert_to=JsonArray), JsonArray(*test_array))
+        with self.assertRaises(BadMonitorConfiguration):
+            # single quotes are invalid JSON
+            self.assertEquals(self.get(str(test_array), convert_to=JsonArray), JsonArray(*test_array))
+
+        # str -> JsonObject
+        test_obj = {'a': 1, 'b': 'two', 'c': [1, 2, 3]}
+        self.assertEquals(self.get(serialize(test_obj), convert_to=JsonObject), json_lib_parse(serialize(test_obj)))
 
     def test_unicode_conversion(self):
         self.assertEquals(self.get(1, convert_to=unicode), u'1')
@@ -98,6 +128,52 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertRaises(BadMonitorConfiguration, self.get, 1, convert_to=bool)
         self.assertRaises(BadMonitorConfiguration, self.get, 2.1, convert_to=bool)
         self.assertRaises(BadMonitorConfiguration, self.get, 3L, convert_to=bool)
+
+    def test_list_conversion(self):
+        # list -> JsonArray supported
+        test_array = ["a", 1, False]
+        json_arr = JsonArray(*test_array)
+        self.assertEquals(
+            self.get(list(json_arr), convert_to=JsonArray),
+            JsonArray(*test_array),
+        )
+
+        # list -> ArrayOfStrings not supported
+        test_array = ["a", "b", "c"]
+        self.assertEquals(
+            self.get(test_array, convert_to=ArrayOfStrings),
+            ArrayOfStrings(*test_array)
+        )
+
+    def test_jsonarray_conversion(self):
+        # JsonArray -> list not supported
+        test_array = ["a", "b", "c"]
+        json_arr = JsonArray(*test_array)
+        with self.assertRaises(BadMonitorConfiguration):
+            self.get(json_arr, convert_to=list)
+
+        # JsonArray -> ArrayOfStrings supported
+        test_array = ["a", "b", "c"]
+        json_arr = JsonArray(*test_array)
+        self.assertEquals(self.get(json_arr, convert_to=ArrayOfStrings), ArrayOfStrings(*test_array))
+
+        # JsonArray -> invalid ArrayOfStrings
+        test_array = ["a", "b", 3]
+        json_arr = JsonArray(*test_array)
+        with self.assertRaises(BadMonitorConfiguration):
+            self.get(json_arr, convert_to=ArrayOfStrings)
+
+    def test_arrayofstrings_conversion(self):
+        # JsonArray -> list not supported
+        test_array = ["a", "b", "c"]
+        json_arr = ArrayOfStrings(*test_array)
+        with self.assertRaises(BadMonitorConfiguration):
+            self.get(json_arr, convert_to=list)
+
+        # ArrayOfStrings -> JsonArray supported
+        test_array = ["a", "b", "c"]
+        json_arr = JsonArray(*test_array)
+        self.assertEquals(self.get(json_arr, convert_to=JsonArray), JsonArray(*test_array))
 
     def test_required_field(self):
         config = MonitorConfig({'foo': 10})
@@ -140,8 +216,13 @@ class MonitorConfigTest(ScalyrTestCase):
         config = MonitorConfig({'a': 5}, monitor_module='foo')
         self.assertTrue('c' not in config)
 
-    def get(self, original_value, convert_to=None, required_field=False, max_value=None,
-            min_value=None):
+    def test_list_of_strings(self):
+        define_config_option('foo', 'some_param', 'A list of strings', default=['a', 'b', 'c', 'd'])
+        self.assertEquals(self.get(['x', 'y', 'z'], convert_to=None), ['x', 'y', 'z'])
+        with self.assertRaises(Exception):
+            self.get("['x', 'y', 'z']", convert_to=list), ['x', 'y', 'z']
+
+    def get(self, original_value, convert_to=None, required_field=False, max_value=None, min_value=None):
         config = MonitorConfig({'foo': original_value})
         return config.get('foo', convert_to=convert_to, required_field=required_field,
                           max_value=max_value, min_value=min_value)

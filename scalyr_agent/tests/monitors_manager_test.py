@@ -263,7 +263,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                      '/var/lib/scalyr-agent-2')
 
-        config = Configuration(config_file, default_paths)
+        config = Configuration(config_file, default_paths, None)
         config.parse()
         # noinspection PyTypeChecker
         return MonitorsManager(config, FakePlatform(platform_monitors))

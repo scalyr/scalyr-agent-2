@@ -13,12 +13,12 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
+import scalyr_agent.json_lib.objects
 
 __author__ = 'imron@scalyr.com'
 
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException, KubernetesCache
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException
 import scalyr_agent.monitor_utils.k8s as k8s_utils
-import scalyr_agent.monitor_utils.annotation_config as annotation_config
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
@@ -33,11 +33,9 @@ import logging
 import logging.handlers
 
 from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
-from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.scalyr_logging import BaseFormatter
-from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVEL_2
-from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 import scalyr_agent.json_lib as json_lib
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
 
@@ -59,49 +57,52 @@ define_config_option( __monitor__, 'max_log_size',
                      'disk space on the host running the agent. However, a very small limit could cause logs to be '
                      'dropped if there is a temporary network outage and the log overflows before it can be sent to '
                      'Scalyr',
-                     convert_to=int, default=None)
+                     convert_to=int, default=None, env_name='SCALYR_K8S_MAX_LOG_SIZE')
 
 define_config_option( __monitor__, 'max_log_rotations',
                      'Optional (defaults to None). The maximum number of log rotations before older log files are '
                      'deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. '
                      'Set to zero for infinite rotations.',
-                     convert_to=int, default=None)
+                     convert_to=int, default=None, env_name='SCALYR_K8S_MAX_LOG_ROTATIONS')
 
 define_config_option( __monitor__, 'log_flush_delay',
                      'Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing '
                      'the kubernetes event messages.',
-                     convert_to=float, default=1.0)
+                     convert_to=float, default=1.0, env_name='SCALYR_K8S_LOG_FLUSH_DELAY')
 
 define_config_option( __monitor__, 'message_log',
                      'Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages '
                      'are stored. The file will be placed in the default Scalyr log directory, unless it is an '
                      'absolute path',
-                     convert_to=str, default='kubernetes_events.log')
+                     convert_to=str, default='kubernetes_events.log', env_name='SCALYR_K8S_MESSAGE_LOG')
 
-define_config_option( __monitor__, 'event_object_filter',
-                     'Optional (defaults to [ \'CronJob\', \'DaemonSet\', \'Deployment\', \'Job\', \'Node\', \'Pod\', \'ReplicaSet\', \'ReplicationController\', \'StatefulSet\' ] ). A list of event object types to filter on. '
-                     'If set, only events whose `involvedObject` `kind` is on this list will be included.',
-                     default=[ 'CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet' ]
-                     )
+EVENT_OBJECT_FILTER_DEFAULTS = [
+    'CronJob', 'DaemonSet', 'Deployment', 'Job', 'Node', 'Pod', 'ReplicaSet', 'ReplicationController', 'StatefulSet'
+]
+define_config_option(__monitor__, 'event_object_filter',
+                     'Optional (defaults to %s). A list of event object types to filter on. '
+                     'If set, only events whose `involvedObject` `kind` is on this list will be included.'
+                     % str(EVENT_OBJECT_FILTER_DEFAULTS),
+                     convert_to=ArrayOfStrings, default=EVENT_OBJECT_FILTER_DEFAULTS, env_name='SCALYR_K8S_EVENT_OBJECT_FILTER')
 
 define_config_option( __monitor__, 'leader_check_interval',
                      'Optional (defaults to 60). The number of seconds to wait between checks to see if we are still the leader.',
-                     convert_to=int, default=60)
+                     convert_to=int, default=60, env_name='SCALYR_K8S_LEADER_CHECK_INTERVAL')
 
 define_config_option( __monitor__, 'leader_node',
                      'Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node.',
-                     convert_to=str, default=None)
+                     convert_to=str, default=None, env_name='SCALYR_K8S_LEADER_NODE')
 
 define_config_option( __monitor__, 'check_labels',
                      'Optional (defaults to False). If true, then the monitor will check for any nodes with the label '
                      '`agent.config.scalyr.com/events_leader_candidate=true` and the node with this label set and that has the oldest'
                      'creation time will be the event monitor leader.',
-                     convert_to=bool, default=False)
+                     convert_to=bool, default=False, env_name='SCALYR_K8S_CHECK_LABELS')
 
 define_config_option( __monitor__, 'ignore_master',
                      'Optional (defaults to True). If true, then the monitor will ignore any nodes with the label '
                      '`node-role.kubernetes.io/master` when determining which node is the event monitor leader.',
-                     convert_to=bool, default=True)
+                     convert_to=bool, default=True, env_name='SCALYR_K8S_IGNORE_MASTER')
 
 class EventLogFormatter(BaseFormatter):
     """Formatter used for the logs produced by the event monitor.
@@ -212,7 +213,6 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
        kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
        ```
     """
-
     def _initialize( self ):
 
         #our disk logger and handler

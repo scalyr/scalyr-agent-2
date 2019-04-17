@@ -31,6 +31,7 @@ from threading import Lock
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+from scalyr_agent.config_util import convert_config_param, get_config_from_env, BadConfiguration
 from scalyr_agent.util import StoppableThread
 
 log = scalyr_logging.getLogger(__name__)
@@ -402,7 +403,7 @@ def load_monitor_class(module_name, additional_python_paths):
 
 
 def define_config_option(monitor_module, option_name, option_description, required_option=False,
-                         max_value=None, min_value=None, convert_to=None, default=None):
+                         max_value=None, min_value=None, convert_to=None, default=None, env_aware=False, env_name=None):
     """Defines a configuration option for the specified monitor.
 
     Once this is invoked, any validation rules supplied here are applied to all MonitorConfig objects created
@@ -427,6 +428,10 @@ def define_config_option(monitor_module, option_name, option_description, requir
         value is greater during configuration parsing.
     @param min_value: If not None, the minimum allowed value for option. Raises a BadMonitorConfiguration if the
         value is less than during configuration parsing.
+    @param env_aware: If True and not defined in config file, look for presence of environment variable.
+    @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
+        scalyr_<field> as the environment variable name.
+        Note: A non-empty value also automatically implies env_aware as True, regardless of it's value.
     """
     option = ConfigOption()
     option.option_name = option_name
@@ -436,9 +441,10 @@ def define_config_option(monitor_module, option_name, option_description, requir
     option.min_value = min_value
     option.convert_to = convert_to
     option.default = default
+    option.env_aware = env_aware
+    option.env_name = env_name
 
     MonitorInformation.set_monitor_info(monitor_module, option=option)
-
     return None
 
 
@@ -662,7 +668,13 @@ class ConfigOption(object):
         self.convert_to = None
         # The default value, if any.
         self.default = None
+        # Whether to look in the environment for a fallback value if not defined in config file
+        self.env_aware = False
+        # Customer environment variable name (instead of SCALYR_<option_name>
+        self.env_name = None
 
+    def __repr__(self):
+        return '%s %s %s' % (self.option_name, self.env_aware, self.env_name)
 
 class MetricDescription(object):
     """Simple object to hold fields describing a monitor's metric."""
@@ -703,6 +715,7 @@ class MonitorConfig(object):
 
     This abstraction does not support any mutator operations.  The configuration is read-only.
     """
+
     def __init__(self, content=None, monitor_module=None):
         """Initializes MonitorConfig.
 
@@ -711,6 +724,9 @@ class MonitorConfig(object):
             used for 'define_config_option' for any options registered for this monitor.
         """
         self.__map = {}
+        self.__monitor_module = monitor_module
+        self._environment_aware_map = {}
+
         if content is not None:
             for x in content:
                 self.__map[x] = content[x]
@@ -718,18 +734,28 @@ class MonitorConfig(object):
         info = MonitorInformation.get_monitor_info(monitor_module)
         if info is not None:
             for x in info.config_options:
+
+                # Config option is environment aware if either of the following are Truthy
+                env_aware = x.env_aware or x.env_name
+                if env_aware:
+                    env_name = x.env_name or ('SCALYR_%s' % x.option_name.upper())
+                    self._environment_aware_map[x.option_name] = env_name
+
                 if x.required_option or x.default is not None or x.option_name in self.__map:
                     self.__map[x.option_name] = self.get(x.option_name, required_field=x.required_option,
                                                          max_value=x.max_value, min_value=x.min_value,
-                                                         convert_to=x.convert_to, default=x.default)
+                                                         convert_to=x.convert_to, default=x.default,
+                                                         report_conflicting_environment_value=True)
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""
         return len(self.__map)
 
     def get(self, field, required_field=False, max_value=None, min_value=None,
-            convert_to=None, default=None):
+            convert_to=None, default=None, report_conflicting_environment_value=False):
         """Returns the value for the requested field.
+
+        If the value is not set via config file, also look for it in the environment.
 
         This method will optionally apply some validation rules as indicated by the optional arguments.  If any
         of these validation operations fail, then a BadMonitorConfiguration exception is raised.  Monitor developers are
@@ -740,77 +766,61 @@ class MonitorConfig(object):
             present.
         @param convert_to: If not None, then will convert the value for the field to the specified type. Only int,
             bool, float, long, str, and unicode are supported. If the type conversion cannot be done, a
-            BadMonitorConfiguration exception is raised. The only true conversions allowed are those from str, unicode
-            value to other types such as int, bool, long, float. Trivial conversions are allowed from int, long to
+            BadMonitorConfiguration exception is raised. The only conversions allowed are those mapped out in
+            ALLOWED_CONVERSIONS. Trivial conversions are allowed from int, long to
             float, but not the other way around. Additionally, any primitive type can be converted to str, unicode.
+            str, unicode can be converted to complex types such as ArrayOfStrings, JsonArray, JsonObject as long as
+            they can be correctly parsed.
         @param default: The value to return if the field is not present in the configuration. This is ignored if
             'required_field' is True.
         @param max_value: If not None, the maximum allowed value for field. Raises a BadMonitorConfiguration if the
             value is greater.
         @param min_value: If not None, the minimum allowed value for field. Raises a BadMonitorConfiguration if the
             value is less than.
+        @param report_conflicting_environment_value: If True, disallows overriding via environment variable.
 
         @return: The value
         @raise BadMonitorConfiguration: If any of the conversion or required rules are violated.
         """
-        if required_field and field not in self.__map:
-            raise BadMonitorConfiguration('Missing required field "%s"' % field, field)
-        result = self.__map.get(field, default)
+        try:
+            result = self.__map.get(field)
+            if result is not None and convert_to is not None and type(result) != convert_to:
+                result = convert_config_param(field, result, convert_to)
 
-        if result is None:
+            # Param not found in config file, so check environment
+            if result is None or report_conflicting_environment_value:
+                envar_name = self._environment_aware_map.get(field)
+                logger = log if report_conflicting_environment_value else None
+                envar_val = get_config_from_env(field, envar_name, convert_to=convert_to,
+                                                logger=logger, param_val=result, monitor_name=self.__monitor_module)
+                if result is None:
+                    result = envar_val
+
+            # Required field not found in environment nor in config
+            if result is None:
+                if required_field and field not in self.__map:
+                    raise BadMonitorConfiguration('Missing required field "%s"' % field, field)
+                result = self.__map.get(field, default)
+
+            if result is None:
+                return result
+
+            # Perform conversion again in case both config-file and environment values were absent and the default
+            # value requires conversion.
+            if convert_to is not None and type(result) != convert_to:
+                result = convert_config_param(field, result, convert_to)
+
+            if max_value is not None and result > max_value:
+                raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; maximum is %s' % (
+                                              str(result), field, str(max_value)), field)
+
+            if min_value is not None and result < min_value:
+                raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; minimum is %s' % (
+                                              str(result), field, str(min_value)), field)
+
             return result
-
-        if convert_to is not None and type(result) != convert_to:
-            result = self.__perform_conversion(field, result, convert_to)
-
-        if max_value is not None and result > max_value:
-            raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; maximum is %s' % (
-                                          str(result), field, str(max_value)), field)
-
-        if min_value is not None and result < min_value:
-            raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; minimum is %s' % (
-                                          str(result), field, str(min_value)), field)
-
-        return result
-
-    def __perform_conversion(self, field_name, value, convert_to):
-        value_type = type(value)
-        primitive_types = (int, long, float, str, unicode, bool)
-        if convert_to not in primitive_types:
-            raise Exception('Unsupported type for conversion passed as convert_to: "%s"' % str(convert_to))
-        if value_type not in primitive_types:
-            raise BadMonitorConfiguration('Unable to convert type %s for field "%s" to type %s' % (
-                str(value_type), field_name, str(convert_to)), field_name)
-
-        # Anything is allowed to go to str/unicode
-        if convert_to == str or convert_to == unicode:
-            return convert_to(value)
-
-        # Anything is allowed to go from string/unicode to the conversion type, as long as it can be parsed.
-        # Handle bool first.
-        if value_type in (str, unicode):
-            if convert_to == bool:
-                return str(value).lower() == 'true'
-            elif convert_to in (int, float, long):
-                try:
-                    return convert_to(value)
-                except ValueError:
-                    raise BadMonitorConfiguration('Could not parse value %s for field "%s" as numeric type %s' % (
-                                                  value, field_name, str(convert_to)), field_name)
-
-        if convert_to == bool:
-            raise BadMonitorConfiguration('A numeric value %s was given for boolean field "%s"' % (
-                                          str(value), field_name), field_name)
-
-        # At this point, we are trying to convert a number to another number type.  We only allow long to int,
-        # and long, int to float.
-        if convert_to == float and value_type in (long, int):
-            return float(value)
-        if convert_to == long and value_type == int:
-            return long(value)
-
-        raise BadMonitorConfiguration('A numeric value of %s was given for field "%s" but a %s is required.', (
-                                      str(value), field_name, str(convert_to)))
+        except BadConfiguration, e:
+            raise BadMonitorConfiguration(message=e.message, field=e.field)
 
     def __iter__(self):
         return self.__map.iterkeys()
@@ -868,6 +878,7 @@ class MonitorConfig(object):
 class BadMonitorConfiguration(Exception):
     """Exception indicating a bad monitor configuration, such as missing a required field."""
     def __init__(self, message, field):
+        self.message = message
         self.field = field
         Exception.__init__(self, message)
 

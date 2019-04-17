@@ -20,34 +20,20 @@ import datetime
 import docker
 import fnmatch
 import traceback
-import logging
 import os
 import re
-import random
-import socket
 import stat
 from string import Template
-import struct
-import sys
 import time
-import threading
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
-from scalyr_agent.log_watcher import LogWatcher
-from scalyr_agent.monitor_utils.server_processors import LineRequestParser
-from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-from scalyr_agent.monitor_utils.server_processors import RequestStream
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, KubernetesCache, PodInfo, DockerMetricFetcher
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, DockerMetricFetcher
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
 from scalyr_agent.util import StoppableThread
 
-from scalyr_agent.util import RunState
-
-from requests.packages.urllib3.exceptions import ProtocolError
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -65,7 +51,7 @@ define_config_option( __monitor__, 'container_name',
 
 define_config_option( __monitor__, 'container_check_interval',
                      'Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.',
-                     convert_to=int, default=5)
+                     convert_to=int, default=5, env_aware=True)
 
 define_config_option( __monitor__, 'api_socket',
                      'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
@@ -87,7 +73,7 @@ define_config_option( __monitor__, 'docker_log_prefix',
 
 define_config_option( __monitor__, 'docker_max_parallel_stats',
                      'Optional (defaults to 20). Maximum stats requests to issue in parallel when retrieving container '
-                     'metrics using the Docker API.', convert_to=int, default=20)
+                     'metrics using the Docker API.', convert_to=int, default=20, env_aware=True)
 
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
@@ -117,16 +103,16 @@ define_config_option( __monitor__, 'metrics_only',
 define_config_option( __monitor__, 'container_globs',
                      'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
                      'match one of the glob patterns will be monitored.',
-                      default=None)
+                      default=None, env_aware=True)
 
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
                       'to Scalyr.  Note, metrics are only collected from those containers whose logs are being collected',
-                      convert_to=bool, default=True)
+                      convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
-                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=False)
+                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=False, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
@@ -135,13 +121,13 @@ define_config_option( __monitor__, 'k8s_ignore_namespaces',
 define_config_option( __monitor__, 'k8s_ignore_pod_sandboxes',
                       'Optional (defaults to True). If True then all containers with the label '
                       '`io.kubernetes.docker.type` equal to `podsandbox` are excluded from the'
-                      'logs being collected', convert_to=bool, default=True)
+                      'logs being collected', convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_include_all_containers',
                       'Optional (defaults to True). If True, all containers in all pods will be monitored by the kubernetes monitor '
                       'unless they have an include: false or exclude: true annotation. '
                       'If false, only pods/containers with an include:true or exclude:false annotation '
-                      'will be monitored. See documentation on annotations for further detail.', convert_to=bool, default=True)
+                      'will be monitored. See documentation on annotations for further detail.', convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_use_v2_attributes',
                       'Optional (defaults to False). If True, will use v2 version of attribute names instead of '
@@ -175,7 +161,7 @@ define_config_option( __monitor__, 'k8s_cache_init_abort_delay',
 define_config_option( __monitor__, 'k8s_parse_json',
                       'Optional (defaults to True). If True, the log files will be parsed as json before uploading to the server '
                       'to extract log and timestamp fields.  If False, the raw json will be uploaded to Scalyr.',
-                      convert_to=bool, default=True)
+                      convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_verify_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
@@ -186,7 +172,7 @@ define_config_option( __monitor__, 'k8s_verify_api_queries',
 define_config_option( __monitor__, 'gather_k8s_pod_info',
                       'Optional (defaults to False). If true, then every gather_sample interval, metrics will be collected '
                       'from the docker and k8s APIs showing all discovered containers and pods. This is mostly a debugging aid '
-                      'and there are performance implications to always leaving this enabled', convert_to=bool, default=False)
+                      'and there are performance implications to always leaving this enabled', convert_to=bool, default=False, env_aware=True)
 
 define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
@@ -1250,7 +1236,6 @@ class KubernetesMonitor( ScalyrMonitor ):
     cluster.
 
     """
-
     def __get_socket_file( self ):
         """Gets the Docker API socket file and validates that it is a UNIX socket
         """

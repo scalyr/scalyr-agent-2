@@ -285,17 +285,14 @@ class ScalyrAgent(object):
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        config = self.__read_config(config_file_path)
+        config = self.__make_config(config_file_path)
         self.__verify_config(config)
         return config
 
-    def __read_config(self, config_file_path):
-        """Reads the configuration from the file path but does not do a full verification.
+    def __make_config(self, config_file_path):
+        """Make Configuration object. Does not read nor verify.
 
-        This will only throw an error if the files themselves cannot be read.  This includes the configuration
-        fragments in the agent.d file.
-
-        You must call ``__verify_config`` to fully verify the configuration.
+        You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
         @type config_file_path: str
@@ -303,12 +300,12 @@ class ScalyrAgent(object):
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
         """
-        return Configuration(config_file_path, self.__default_paths)
+        return Configuration(config_file_path, self.__default_paths, log)
 
     def __verify_config(self, config, disable_create_monitors_manager=False,
                                       disable_create_copying_manager=False,
                                       disable_cache_config=False):
-        """Verifies the passed in configuration object is valid, including the referenced monitors exist and have
+        """Verifies the passed-in configuration object is valid, and that the referenced monitors exist and have
         valid configuration.
 
         @param config: The configuration object.
@@ -316,7 +313,7 @@ class ScalyrAgent(object):
         @return: A boolean value indicating whether or not the configuration was fully verified
         """
         try:
-            config.parse(logger=log)
+            config.parse()
 
             if disable_create_monitors_manager:
                 log.info( "verify_config - creation of monitors manager disabled" )
@@ -787,7 +784,7 @@ class ScalyrAgent(object):
                         if _check_disabled( current_time, disable_all_config_updates_until, "all config updates" ):
                             continue
 
-                        new_config = self.__read_config(self.__config_file_path)
+                        new_config = self.__make_config(self.__config_file_path)
                         # TODO:  By parsing the configuration file, we are doing a lot of work just to have it thrown
                         # out in a few seconds when we discover it is equivalent to the previous one.  Maybe we should
                         # rework the equivalence so that it can work on the raw files, but this is difficult since

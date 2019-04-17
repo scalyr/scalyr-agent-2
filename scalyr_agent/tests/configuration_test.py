@@ -14,29 +14,44 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
+import scalyr_agent.json_lib.objects
 
 __author__ = 'czerwin@scalyr.com'
 
 import os
+import logging
 import tempfile
+from mock import patch, Mock
+from parameterized import parameterized
 
+from scalyr_agent import scalyr_monitor
 from scalyr_agent.configuration import Configuration, BadConfiguration
+from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
+from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
+from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.platform_controller import DefaultPaths
+from scalyr_agent.scalyr_logging import AgentLogger
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 
 from scalyr_agent.test_base import ScalyrTestCase
 
 
 class TestConfiguration(ScalyrTestCase):
     def setUp(self):
+        self.original_os_env = {k:v for k, v in os.environ.iteritems()}
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')
         self.__config_fragments_dir = os.path.join(self.__config_dir, 'agent.d')
         os.makedirs(self.__config_fragments_dir)
         if os.environ.get('scalyr_api_key'):
             del os.environ['scalyr_api_key']
+
+    def tearDown(self):
+        """Restore the pre-test os environment"""
+        os.environ.clear()
+        os.environ.update(self.original_os_env)
 
     def test_basic_case(self):
         self.__write_file_with_separator_conversion(""" {
@@ -794,30 +809,41 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.api_key, 'abcd1234')
 
-    def test_api_key_override_ignore_env(self):
+    def test_api_key_overridden_by_config_file(self):
         self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
           }
         """)
-        os.environ['scalyr_api_key'] = "xyz"
-
-        config = self.__create_test_configuration_instance()
+        os.environ['SCALYR_API_KEY'] = "xyz"
+        mock_logger = Mock()
+        config = self.__create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
         self.assertEquals(config.api_key, 'abcd1234')
+        mock_logger.warn.assert_called_with(
+            "Conflicting values detected between global config file parameter `api_key` and the environment variable "
+            "`SCALYR_API_KEY`. Ignoring environment variable.",
+            limit_once_per_x_secs=300,
+        )
+        mock_logger.debug.assert_not_called()
 
-    def test_api_key_override_use_env(self):
+    def test_api_key_use_env(self):
         self.__write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
           }
         """)
-        os.environ['scalyr_api_key'] = "xyz"
-
-        config = self.__create_test_configuration_instance()
+        os.environ['SCALYR_API_KEY'] = "xyz"
+        mock_logger = Mock()
+        config = self.__create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
         self.assertEquals(config.api_key, 'xyz')
+        mock_logger.warn.assert_not_called()
+        mock_logger.debug.assert_called_with(
+            "Using the api key from environment variable `SCALYR_API_KEY`",
+            limit_once_per_x_secs=300
+        )
 
     def test_duplicate_api_key(self):
         self.__write_file_with_separator_conversion("""{
@@ -832,6 +858,349 @@ class TestConfiguration(ScalyrTestCase):
 
         config = self.__create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
+
+    @parameterized.expand([(True,), (False,)])
+    def test_environment_aware_global_params(self, uppercase):
+        """Tests config params that have environment variable overrides as follows:
+
+        1. Ensure params are "environment variable aware" -- meaning code exists to look for corresponding environment
+            variable to override with.
+        2. Generate fake environment variable values and ensure they propagate to the configuration object.
+             Fake value is guaranteed different from config-file (or default) value.
+        3. Repeat test for lower-case environment variables (we support both fully upper or lower case).
+        """
+        field_types = {}
+
+        config_file_dict = {
+            "logs": [
+                {"path": "/var/log/tomcat6/$DIR_VAR.log"}
+            ],
+            "api_key": "abcd1234",
+            "use_unsafe_debugging": False,
+        }
+        self.__write_file_with_separator_conversion(serialize_json(JsonObject(config_file_dict)))
+
+        config = self.__create_test_configuration_instance()
+
+        # Parse config files once to capture all environment-aware variables in Configuration._environment_aware_map
+        config.parse()
+        expected_aware_fields = config._environment_aware_map
+
+        # Currently, all environment-aware global config params are primitives.
+        # (In the future, we will need to intercept the json_array, json_object, ArrayOfString methods)
+        original_verify_or_set_optional_bool = config._Configuration__verify_or_set_optional_bool
+        original_verify_or_set_optional_int = config._Configuration__verify_or_set_optional_int
+        original_verify_or_set_optional_float = config._Configuration__verify_or_set_optional_float
+        original_verify_or_set_optional_string = config._Configuration__verify_or_set_optional_string
+
+        with patch.object(
+            config, '_Configuration__verify_or_set_optional_bool'
+        ) as p0, patch.object(
+            config, '_Configuration__verify_or_set_optional_int'
+        ) as p1, patch.object(
+            config, '_Configuration__verify_or_set_optional_float'
+        ) as p2, patch.object(
+            config, '_Configuration__verify_or_set_optional_string'
+        ) as p3:
+
+            # Decorate the Configuration.__verify_or_set_optional_xxx methods as follows:
+            # 1) capture fields that are environment-aware
+            # 2) allow setting of the corresponding environment variable
+            def capture_aware_field(field_type):
+                def wrapper(*args, **kwargs):
+                    field = args[1]
+                    field_types[field] = field_type
+                    envar_val = function_lookup['get_environment'](field)
+                    if envar_val:
+                        env_name = expected_aware_fields[field]
+                        if not env_name:
+                            env_name = 'SCALYR_%s' % field
+                        if uppercase:
+                            env_name = env_name.upper()
+                        else:
+                            env_name = env_name.lower()
+                        os.environ[env_name] = envar_val
+
+                    if field_type == bool:
+                        return original_verify_or_set_optional_bool(*args, **kwargs)
+                    elif field_type == int:
+                        return original_verify_or_set_optional_int(*args, **kwargs)
+                    elif field_type == float:
+                        return original_verify_or_set_optional_float(*args, **kwargs)
+                    elif field_type == str:
+                        return original_verify_or_set_optional_string(*args, **kwargs)
+                return wrapper
+
+            p0.side_effect = capture_aware_field(bool)
+            p1.side_effect = capture_aware_field(int)
+            p2.side_effect = capture_aware_field(float)
+            p3.side_effect = capture_aware_field(str)
+
+            # Build the Configuration object tree, also populating the field_types lookup in the process
+            # This first iteration does not set any environment variables
+            def no_set_values(field):
+                return None
+            function_lookup = {'get_environment': no_set_values}
+            config.parse()
+
+            # ---------------------------------------------------------------------------------------------------------
+            # Ensure each field can be overridden (by faking environment variables)
+            # ---------------------------------------------------------------------------------------------------------
+
+            fake_env = {}
+            config_obj = config._Configuration__get_config()
+
+            # prepare fake environment variable values that differ from existing config object
+            FAKE_INT = 1234567890
+            FAKE_FLOAT = 1234567.89
+            FAKE_STRING = str(FAKE_INT)
+
+            for field in expected_aware_fields:
+                field_type = field_types[field]
+
+                if field_type == bool:
+                    # fake value should be different from config-file value
+                    fake_env[field] = not config_obj.get_bool(field, none_if_missing=True)
+
+                elif field_type == int:
+                    # special case : debug_level cannot be arbitrary. Set it to config file value + 1
+                    if field == 'debug_level':
+                        existing_level = config_obj.get_int(field, none_if_missing=True)
+                        fake_env[field] = existing_level + 1
+                    else:
+                        self.assertNotEquals(FAKE_INT, config_obj.get_int(field, none_if_missing=True))
+                        fake_env[field] = FAKE_INT
+
+                elif field_type == float:
+                    self.assertNotEquals(FAKE_FLOAT, config_obj.get_float(field, none_if_missing=True))
+                    fake_env[field] = FAKE_FLOAT
+
+                elif field_type == str:
+                    self.assertNotEquals(FAKE_STRING, config_obj.get_string(field, none_if_missing=True))
+                    fake_env[field] = FAKE_STRING
+
+            def fake_environment_value(field):
+                if field not in fake_env:
+                    return None
+                return str(fake_env[field]).lower()
+            function_lookup = {'get_environment': fake_environment_value}
+
+            config.parse()
+            self.assertGreater(len(expected_aware_fields), 1)
+            for field, env_varname in expected_aware_fields.items():
+                field_type = field_types[field]
+                if field_type == bool:
+                    value = config._Configuration__get_config().get_bool(field)
+                elif field_type == int:
+                    value = config._Configuration__get_config().get_int(field)
+                elif field_type == float:
+                    value = config._Configuration__get_config().get_float(field)
+                elif field_type == str:
+                    value = config._Configuration__get_config().get_string(field)
+
+                config_file_value = config_file_dict.get(field)
+                if field in config_file_dict:
+                    # Config params defined in the config file must not take on the fake environment values.
+                    self.assertNotEquals(value, fake_env[field])
+                    self.assertEquals(value, config_file_value)
+                else:
+                    # But those not defined in config file will take on environment values.
+                    self.assertEquals(value, fake_env[field])
+                    self.assertNotEquals(value, config_file_value)
+
+    @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
+    def test_environment_aware_module_params(self, mock_docker):
+
+        # Define test values here for all k8s and k8s_event monitor config params that are environment aware.
+        # Be sure to use non-default test values
+        TEST_INT = 123456789
+        TEST_FLOAT = 1234567.89
+        TEST_STRING = 'dummy string'
+        TEST_ARRAY_OF_STRINGS = ['s1', 's2', 's3']
+        STANDARD_PREFIX = '_STANDARD_PREFIX_'  # env var is SCALYR_<param_name>
+
+        # The following map contains config params to be tested
+        # config_param_name: (custom_env_name, test_value)
+        k8s_testmap = {
+            "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
+            "docker_max_parallel_stats": (STANDARD_PREFIX, TEST_INT, int),
+            "container_globs": (STANDARD_PREFIX, TEST_STRING, str),
+            "report_container_metrics": (STANDARD_PREFIX, False, bool),
+            "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
+            "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
+            "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
+            "k8s_parse_json": (STANDARD_PREFIX, False, bool),
+            "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
+        }
+
+        k8s_events_testmap = {
+            "max_log_size": ("SCALYR_K8S_MAX_LOG_SIZE", TEST_INT, int),
+            "max_log_rotations": ("SCALYR_K8S_MAX_LOG_ROTATIONS", TEST_INT, int),
+            "log_flush_delay": ("SCALYR_K8S_LOG_FLUSH_DELAY", TEST_FLOAT, float),
+            "message_log": ("SCALYR_K8S_MESSAGE_LOG", TEST_STRING, str),
+            "event_object_filter": ("SCALYR_K8S_EVENT_OBJECT_FILTER", TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
+            "leader_check_interval": ("SCALYR_K8S_LEADER_CHECK_INTERVAL", TEST_INT, int),
+            "leader_node": ("SCALYR_K8S_LEADER_NODE", TEST_STRING, str),
+            "check_labels": ("SCALYR_K8S_CHECK_LABELS", True, bool),
+            "ignore_master": ("SCALYR_K8S_IGNORE_MASTER", False, bool),
+        }
+
+        # Fake the environment varaibles
+        for map in [k8s_testmap, k8s_events_testmap]:
+            for key, value in map.items():
+                custom_name = value[0]
+                env_name = ('SCALYR_%s' % key).upper() if custom_name == STANDARD_PREFIX else custom_name.upper()
+                envar_value = str(value[1]).lower()  # lower() needed for proper bool encoding
+                os.environ[env_name] = envar_value
+
+        self.__write_file_with_separator_conversion(""" {
+            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
+            api_key: "abcd1234",
+        }      
+        """)
+        self.__write_config_fragment_file_with_separator_conversion('k8s.json',  """ {
+            "monitors": [
+                {
+                    "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                    "report_k8s_metrics": false,                    
+                },
+                {
+                    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor"
+                }            
+            ]
+        }
+        """)
+
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        # echee TODO: once AGENT-40 docker PR merges in, some of the test-setup code below can be eliminated and
+        # reused from that PR (I moved common code into scalyr_agent/test_util
+        def fake_init(self):
+            # Initialize some requisite variables so that the k8s monitor loop can run
+            self._KubernetesMonitor__container_checker = None
+            self._KubernetesMonitor__namespaces_to_ignore = []
+            self._KubernetesMonitor__include_controller_info = None
+            self._KubernetesMonitor__report_container_metrics = None
+            self._KubernetesMonitor__metric_fetcher = None
+
+        with patch.object(KubernetesMonitor, '_initialize', fake_init):
+
+            mock_logger = Mock()
+            scalyr_monitor.log = mock_logger
+
+            monitors_manager = MonitorsManager(config, FakePlatform([]))
+            k8s_monitor = monitors_manager.monitors[0]
+            k8s_events_monitor = monitors_manager.monitors[1]
+
+            # All environment-aware params defined in the k8s and k8s_events monitors must be tested
+            self.assertEquals(
+                set(k8s_testmap.keys()),
+                set(k8s_monitor._config._environment_aware_map.keys()))
+
+            self.assertEquals(
+                set(k8s_events_testmap.keys()),
+                set(k8s_events_monitor._config._environment_aware_map.keys()))
+
+            # Verify module-level conflicts between env var and config file are logged at module-creation time
+            mock_logger.warn.assert_called_with(
+                'Conflicting values detected between scalyr_agent.builtin_monitors.kubernetes_monitor config file '
+                'parameter `report_k8s_metrics` and the environment variable `SCALYR_REPORT_K8S_METRICS`. '
+                'Ignoring environment variable.',
+                limit_once_per_x_secs=300,
+            )
+
+            CopyingManager(config, monitors_manager.monitors)
+            # Override Agent Logger to prevent writing to disk
+            for monitor in monitors_manager.monitors:
+                monitor._logger = FakeAgentLogger('fake_agent_logger')
+
+            # Verify environment variable values propagate into kubernetes monitor MonitorConfig
+            monitor_2_testmap = {
+                k8s_monitor: k8s_testmap,
+                k8s_events_monitor: k8s_events_testmap,
+            }
+            for monitor, testmap in monitor_2_testmap.items():
+                for key, value in testmap.items():
+                    test_val, convert_to = value[1:]
+                    if key in ['report_k8s_metrics', 'api_key']:
+                        # Keys were defined in config files so should not have changed
+                        self.assertNotEquals(test_val, monitor._config.get(key, convert_to=convert_to))
+                    else:
+                        # Keys were empty in config files so they take on environment values
+                        materialized_value = monitor._config.get(key, convert_to=convert_to)
+                        if hasattr(test_val, '__iter__'):
+                            self.assertEquals([x1 for x1 in test_val], [x2 for x2 in materialized_value])
+                        else:
+                            self.assertEquals(test_val, materialized_value)
+
+    def test_log_excludes_from_config(self):
+        self.__write_file_with_separator_conversion(""" { 
+            api_key: "hi there",
+            logs: [
+                { 
+                    path: "/var/log/tomcat6/access.log",
+                    exclude: ["*.[0-9]*", "*.bak"]  
+                }
+            ],
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+        excludes = config.log_configs[0]['exclude']
+        self.assertEquals(type(excludes), JsonArray)
+        self.assertEquals(list(excludes), ["*.[0-9]*", "*.bak"])
+
+    def test_k8s_event_object_filter_from_config(self):
+        self.__write_file_with_separator_conversion(""" { 
+            api_key: "hi there",
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+            monitors: [
+                {
+                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+                    event_object_filter: ["CronJob", "DaemonSet", "Deployment"]
+                }
+            ]
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        test_manager = MonitorsManager(config, FakePlatform([]))
+        k8s_event_monitor = test_manager.monitors[0]
+        event_object_filter = k8s_event_monitor._config.get('event_object_filter')
+        elems = ["CronJob", "DaemonSet", "Deployment"]
+        self.assertNotEquals(elems, event_object_filter)  # list != JsonArray
+        self.assertEquals(elems, [x for x in event_object_filter])
+
+    @parameterized.expand([
+        '["CronJob", "DaemonSet", "Deployment"]',
+        '"CronJob", "DaemonSet", "Deployment"',
+        'CronJob, DaemonSet, Deployment',
+        'CronJob,DaemonSet,Deployment',
+    ])
+    def test_k8s_event_object_filter_from_environment(self, environment_value):
+        elems = ["CronJob", "DaemonSet", "Deployment"]
+        os.environ['SCALYR_K8S_EVENT_OBJECT_FILTER'] = environment_value
+        self.__write_file_with_separator_conversion(""" { 
+            api_key: "hi there",
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+            monitors: [
+                {
+                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",                    
+                }
+            ]
+          }
+        """)
+        config = self.__create_test_configuration_instance()
+        config.parse()
+
+        test_manager = MonitorsManager(config, FakePlatform([]))
+        k8s_event_monitor = test_manager.monitors[0]
+        event_object_filter = k8s_event_monitor._config.get('event_object_filter')
+        self.assertNotEquals(elems, event_object_filter)  # list != ArrayOfStrings
+        self.assertEquals(type(event_object_filter), ArrayOfStrings)
+        self.assertEquals(elems, list(event_object_filter))
 
     def test_global_options_in_fragments(self):
         self.__write_config_fragment_file_with_separator_conversion("fragment.json", """{
@@ -978,7 +1347,7 @@ class TestConfiguration(ScalyrTestCase):
             self.config = config
             self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
 
-    def __create_test_configuration_instance(self):
+    def __create_test_configuration_instance(self, logger=None):
         """Creates an instance of a Configuration file for testing.
 
         @return:  The test instance
@@ -988,7 +1357,7 @@ class TestConfiguration(ScalyrTestCase):
                                      self.convert_path('/etc/scalyr-agent-2/agent.json'),
                                      self.convert_path('/var/lib/scalyr-agent-2'))
 
-        return Configuration(self.__config_file, default_paths)
+        return Configuration(self.__config_file, default_paths, logger)
 
     # noinspection PyPep8Naming
     def assertPathEquals(self, actual_path, expected_path):
@@ -1044,3 +1413,22 @@ class TestConfiguration(ScalyrTestCase):
         @return: The path created by converting the forward slashes to the platform's separator.
         """
         return self.make_path(None, path)
+
+
+class FakeAgentLogger(AgentLogger):
+    def __init__(self, name):
+        super(FakeAgentLogger, self).__init__(name)
+        if not len(self.handlers):
+            self.addHandler(logging.NullHandler())
+
+
+class FakePlatform(object):
+    """Fake implementation of PlatformController.
+
+    Only implements the one method required for testing MonitorsManager.
+    """
+    def __init__(self, default_monitors):
+        self.__monitors = default_monitors
+
+    def get_default_monitors(self, _):
+        return self.__monitors

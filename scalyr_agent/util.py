@@ -20,6 +20,8 @@ import sys
 import struct
 import thread
 
+import scalyr_agent.json_lib.objects
+
 __author__ = 'czerwin@scalyr.com'
 
 import base64

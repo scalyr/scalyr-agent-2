@@ -1857,7 +1857,7 @@ def _create_configuration(extra=None):
     default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
                                  '/var/lib/scalyr-agent-2')
 
-    config = Configuration(config_file, default_paths)
+    config = Configuration(config_file, default_paths, None)
     config.parse()
 
     # we need to delete the config dir when done
