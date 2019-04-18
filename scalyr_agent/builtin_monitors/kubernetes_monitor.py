@@ -19,6 +19,7 @@ __author__ = 'imron@scalyr.com'
 import datetime
 import docker
 import fnmatch
+import glob
 import traceback
 import os
 import re
@@ -31,6 +32,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, DockerMetricFetcher
 import scalyr_agent.monitor_utils.k8s as k8s_utils
+from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 from scalyr_agent.util import StoppableThread
 
@@ -159,8 +161,8 @@ define_config_option( __monitor__, 'k8s_cache_init_abort_delay',
                      convert_to=int, default=20)
 
 define_config_option( __monitor__, 'k8s_parse_json',
-                      'Deprecated, please use `k8s_parse_format`. If set, and True, then this flag will have the equivalent of setting `k8s_parse_format` to `auto`. '
-                      'If set and False, then this flag will be equivalent to setting `k8s_parse_format` to `raw`',
+                      'Deprecated, please use `k8s_parse_format`. If set, and True, then this flag will override the `k8s_parse_format` to `auto`. '
+                      'If set and False, then this flag will override the `k8s_parse_format` to `raw`.',
                       convert_to=bool, default=None)
 
 define_config_option( __monitor__, 'k8s_parse_format',
@@ -168,12 +170,16 @@ define_config_option( __monitor__, 'k8s_parse_format',
                       'If `auto`, the monitor will try to detect the format of the raw log files, '
                       'e.g. `json` or `cri`.  Log files will be parsed in this format before uploading to the server '
                       'to extract log and timestamp fields.  If `raw`, the raw contents of the log will be uploaded to Scalyr.',
-                      convert_to=str, default='auto')
+                      convert_to=str, default='auto', env_aware=True)
 
 define_config_option( __monitor__, 'k8s_always_use_cri',
                      'Optional (defaults to False). If True, the kubernetes monitor will always try to read logs using the container runtime interface '
                      'even when the runtime is detected as docker',
-                     convert_to=bool, default=False)
+                     convert_to=bool, default=False, env_aware=True)
+
+define_config_option( __monitor__, 'k8s_cri_query_filesystem',
+                     'Optional (defaults to False). If True, then when in CRI mode, the monitor will query the filesystem for the list of active containers, rather than the Kubelet API.  This is useful in environments where the Kubelet API has been disabled.',
+                     convert_to=bool, default=False, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_verify_api_queries',
                       'Optional (defaults to True). If true, then the ssl connection for all queries to the k8s API will be verified using '
@@ -550,8 +556,8 @@ class ContainerEnumerator( object):
     def __init__( self, container_id ):
         self._container_id = container_id
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=[], current_time=None ):
-        return {}
+    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
+        raise NotImplementedError()
 
 class DockerEnumerator( ContainerEnumerator ):
     """
@@ -562,7 +568,7 @@ class DockerEnumerator( ContainerEnumerator ):
         super( DockerEnumerator, self).__init__( container_id )
         self._client = client
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=[], current_time=None ):
+    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         return _get_containers(
             self._client,
             ignore_container=self._container_id,
@@ -580,16 +586,124 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__( self, container_id, k8s_api_url ):
+    def __init__( self, container_id, k8s_api_url, query_filesystem ):
         super( CRIEnumerator, self).__init__( container_id )
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
         self._kubelet = KubeletApi( k8s )
+        self._query_filesystem = query_filesystem
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=[], current_time=None ):
-        result = {} 
+        self._log_base = '/var/log/containers'
+        self._container_glob = '%s/*.log' % self._log_base
+        self._info_re = re.compile( '^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$' % self._log_base )
+
+    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
+        result = {}
+        container_info = []
+
+        if k8s_namespaces_to_exclude is None:
+            k8s_namespaces_to_exclude = []
 
         if current_time is None:
             current_time = time.time()
+
+        try:
+            # see if we should query the container list from the filesystem or the kubelet API
+            if self._query_filesystem:
+                container_info = self._get_containers_from_filesystem( k8s_namespaces_to_exclude )
+            else:
+                container_info = self._get_containers_from_kubelet( k8s_namespaces_to_exclude )
+
+            # process the container info
+            for pod_name, pod_namespace, cname, cid in container_info:
+                short_cid = _get_short_cid( cid )
+
+                # filter against the container glob list
+                add_container = True
+                if glob_list:
+                    add_container = False
+                    for glob in glob_list:
+                        if fnmatch.fnmatch( cname, glob ):
+                            add_container = True
+                            break
+
+                if not add_container:
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on glob_list" % short_cid)
+                    continue
+
+                # build a k8s_info structure similar to the one built by _get_containers
+                k8s_info = {}
+                k8s_info['pod_name'] = pod_name
+                k8s_info['pod_namespace'] = pod_namespace
+                k8s_info['k8s_container_name'] = cname
+
+                # get pod and deployment/controller information for the container
+                if k8s_cache:
+                    pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
+                    if pod:
+                        # check to see if we should exclude this container
+                        default_exclude = not k8s_include_by_default
+                        exclude = pod.exclude_pod( container_name=cname, default=default_exclude)
+
+                        # exclude if necessary
+                        if exclude:
+                            if pod.annotations:
+                                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, pod.annotations) )
+                            continue
+
+                        # add a debug message if containers are excluded by default but this container is included
+                        if default_exclude and not exclude:
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, pod.annotations) )
+
+                        k8s_info['pod_info'] = pod
+                        k8s_info['pod_uid'] = pod.uid
+
+                # build the path to the log file on disk
+                log_path = "%s/%s_%s_%s-%s.log" % (self._log_base, pod_name, pod_namespace, cname, cid)
+
+                # add this container to the list of results
+                result[cid] = {'name': cname, 'log_path': log_path, 'k8s_info': k8s_info }
+        except Exception, e:
+            global_log.error("Error querying containers %s - %s" % (str(e), traceback.format_exc()), limit_once_per_x_secs=300,
+                         limit_key='query-cri-containers' )
+        return result
+
+    def _get_containers_from_filesystem( self, k8s_namespaces_to_exclude ):
+
+        result = []
+
+        # iterate over all files that match our container glob
+        for filename in glob.iglob( self._container_glob ):
+
+            # ignore any files that don't match the format we are expecting
+            m = self._info_re.match( filename )
+            if m is None:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding file '%s' because the filename doesn't match the expected log format" % (filename) )
+                continue
+
+            # extract pod and container info
+            pod_name = m.group(1)
+            pod_namespace = m.group(2)
+            cname = m.group(3)
+            cid = m.group(4)
+
+            # ignore any unwanted namespaces
+            if pod_namespace in k8s_namespaces_to_exclude:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because namespace '%s' is excluded" % (cname, pod_namespace) )
+                continue
+
+            # ignore the scalyr-agent container
+            if cid == self._container_id:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % _get_short_cid( cid ) )
+                continue
+
+            result.append( (pod_name, pod_namespace, cname, cid) )
+
+        return result
+
+
+    def _get_containers_from_kubelet( self, k8s_namespaces_to_exclude ):
+
+        result = []
 
         try:
             # query the api
@@ -646,56 +760,16 @@ class CRIEnumerator( ContainerEnumerator ):
                         global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because not yet running" % short_cid )
                         continue
 
-                    add_container = True
+                    result.append( (pod_name, pod_namespace, cname, cid) )
 
-                    # filter against the container glob list
-                    if glob_list:
-                        add_container = False
-                        for glob in glob_list:
-                            if fnmatch.fnmatch( cname, glob ):
-                                add_container = True
-                                break
 
-                    if not add_container:
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on glob_list" % short_cid)
-                        continue
-
-                    # build a k8s_info structure similar to the one built by _get_containers
-                    k8s_info = {}
-                    k8s_info['pod_name'] = pod_name
-                    k8s_info['pod_namespace'] = pod_namespace
-                    k8s_info['pod_uid'] = pod_uid
-                    k8s_info['k8s_container_name'] = cname
-
-                    # get pod and deployment/controller information for the container
-                    if k8s_cache:
-                        pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
-                        if pod:
-                            # check to see if we should exclude this container
-                            default_exclude = not k8s_include_by_default
-                            exclude = pod.exclude_pod( container_name=cname, default=default_exclude)
-
-                            # exclude if necessary
-                            if exclude:
-                                if pod.annotations:
-                                    global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
-                                continue
-
-                            # add a debug message if containers are excluded by default but this container is included
-                            if default_exclude and not exclude:
-                                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
-
-                            k8s_info['pod_info'] = pod
-
-                    # build the path to the log file on disk
-                    log_path = "/var/log/containers/%s_%s_%s-%s.log" % (pod_name, pod_namespace, cname, cid)
-
-                    # add this container to the list of results
-                    result[cid] = {'name': cname, 'log_path': log_path, 'k8s_info': k8s_info }
-
+        except ConnectionError, e:
+            global_log.error("Error connecting to kubelet API endpoint - %s. The Scalyr Agent will now monitor containers from the filesystem" % str(e), limit_once_per_x_secs=300,
+                         limit_key='kubelet-api-connect' )
+            self._query_filesystem = True
         except Exception, e:
             global_log.error("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
-                         limit_key='kubelet-api-running-pods' )
+                         limit_key='kubelet-api-query-pods' )
 
         return result
 
@@ -736,6 +810,7 @@ class ContainerChecker( StoppableThread ):
         self.__docker_api_version = docker_api_version
         self.__client = None
         self.__always_use_cri = self._config.get( 'k8s_always_use_cri' )
+        self.__cri_query_filesystem = self._config.get( 'k8s_cri_query_filesystem' )
 
         self.container_id = None
 
@@ -768,7 +843,7 @@ class ContainerChecker( StoppableThread ):
         self.__start_time = time.time()
         self.__thread = StoppableThread( target=self.check_containers, name="Container Checker" )
         self._container_enumerator = None
-        self._container_runtime = 'none'
+        self._container_runtime = 'unknown'
 
     def start( self ):
 
@@ -813,15 +888,15 @@ class ContainerChecker( StoppableThread ):
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-            self.container_id = self.k8s_cache.get_agent_container_id()
-            self._container_runtime = self.k8s_cache.get_container_runtime()
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % self._container_runtime )
+            self.container_id = self.k8s_cache.get_agent_container_id() or 'unknown'
+            self._container_runtime = self.k8s_cache.get_container_runtime() or 'unknown'
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
             if self._container_runtime == 'docker' and not self.__always_use_cri:
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                 self._container_enumerator = DockerEnumerator( self.__client, self.container_id )
             else:
-                self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url )
+                self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_filesystem=self.__cri_query_filesystem )
 
             if self.__parse_format == 'auto':
                 if self._container_runtime == 'docker':

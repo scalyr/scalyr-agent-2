@@ -121,7 +121,7 @@ class K8sApiAuthorizationException( K8sApiException ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
     """
-    def __init( self, path ):
+    def __init__( self, path ):
         super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
 
 class KubeletApiException( Exception ):
@@ -887,7 +887,7 @@ class KubernetesCache( object ):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod( k8s.namespace, pod_name )
         if pod is None:
-            return '<none>', '<none>'
+            return None, None
 
         status = pod.get( 'status', {} )
         containers = status.get( 'containerStatuses', [] )
@@ -899,7 +899,7 @@ class KubernetesCache( object ):
                 if m:
                     return m.group(2), m.group(1)
 
-        return '<none>', '<none>'
+        return None, None
 
     def update_cache( self, run_state ):
         """

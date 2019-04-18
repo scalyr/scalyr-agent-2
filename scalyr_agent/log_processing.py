@@ -222,7 +222,11 @@ class LogFileIterator(object):
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
         self.__parse_format = log_config.get( 'parse_format' )
-        parse_as_json = log_config.get('parse_lines_as_json', None, none_if_missing=True)
+        parse_as_json = None
+        if type(log_config) is dict:
+            parse_as_json = log_config.get('parse_lines_as_json', None)
+        else:
+            parse_as_json = log_config.get('parse_lines_as_json', None, none_if_missing=True)
         if parse_as_json is not None:
             if parse_as_json:
                 self.__parse_format = 'json'
