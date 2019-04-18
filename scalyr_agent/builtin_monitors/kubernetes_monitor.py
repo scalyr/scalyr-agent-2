@@ -28,7 +28,7 @@ import time
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, DockerMetricFetcher
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
@@ -103,7 +103,7 @@ define_config_option( __monitor__, 'metrics_only',
 define_config_option( __monitor__, 'container_globs',
                      'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
                      'match one of the glob patterns will be monitored.',
-                      default=None, env_aware=True)
+                      convert_to=ArrayOfStrings, default=None, env_aware=True)
 
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
@@ -393,7 +393,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
         @param only_running_containers: Boolean.  If true, will only return currently running containers
         @param running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
             dead containers that were created after the specified time.  Used to pick up short-lived containers.
-        @param glob_list: String.  A glob string that limit results to containers whose container names match the glob
+        @param glob_list: List of strings.  A glob string limits results to containers whose container names match the glob
         @param include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
         @param k8s_cache: KubernetesCache.  If not None, k8s information (if it exists) for the container will be added as part of the extra info mapped to the container id
         @param k8s_include_by_default: Boolean.  If True, then all k8s containers are included by default, unless an include/exclude annotation excludes them.
