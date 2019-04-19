@@ -18,6 +18,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import cStringIO
+import os
 
 from scalyr_agent.agent_status import OverallStats, AgentStatus, ConfigStatus, LogProcessorStatus, MonitorStatus
 from scalyr_agent.agent_status import CopyingManagerStatus, MonitorManagerStatus, LogMatcherStatus, report_status
@@ -85,7 +86,13 @@ class TestOverallStats(ScalyrTestCase):
 
 
 class TestReportStatus(ScalyrTestCase):
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.saved_env)
+
     def setUp(self):
+        self.saved_env = dict(os.environ)
+        os.environ.clear()
         self.time = 1409958853
         self.status = AgentStatus()
         self.status.launch_time = self.time - 86400
@@ -205,6 +212,17 @@ class TestReportStatus(ScalyrTestCase):
 
     def test_basic(self):
         output = cStringIO.StringIO()
+
+        # Environment variables
+        os.environ['SCALYR_API_KEY'] = 'This private key should be redacted'
+        # intentionally leave out required scalyr_server
+        os.environ['scalyr_K8S_CLUSTER_NAME'] = 'test_cluster'
+        os.environ['K8S_EVENT_DISABLE'] = 'Special-case-included despite missing prefix.  Appears at end of main keys.'
+        os.environ['SCALYR_K8S_EVENT_DISABLE'] = 'true'
+        os.environ['SCALYR_AAA'] = 'Should appear just after main keys'
+        os.environ['SCALYR_XXX_A'] = 'A before b (ignores case)'
+        os.environ['sCaLyR_XXX_b'] = 'b after A (ignores case)'
+        os.environ['SCALYR_ZZZ'] = 'Should appear at the end'
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
@@ -227,6 +245,16 @@ Configuration files:   /etc/scalyr-agent-2/agent.json
 Status:                Good (files parsed successfully)
 Last checked:          Fri Sep  5 23:14:13 2014 UTC
 Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Redacted>
+                       SCALYR_SERVER = <Missing>
+                       K8S_EVENT_DISABLE = Special-case-included despite missing prefix.  Appears at end of main keys.
+                       SCALYR_AAA = Should appear just after main keys
+                       scalyr_K8S_CLUSTER_NAME = test_cluster
+                       SCALYR_K8S_EVENT_DISABLE = true
+                       SCALYR_XXX_A = A before b (ignores case)
+                       sCaLyR_XXX_b = b after A (ignores case)
+                       SCALYR_ZZZ = Should appear at the end
 
 
 Log transmission:
@@ -290,6 +318,9 @@ Last checked:          Fri Sep  5 23:14:13 2014 UTC
 Last changed observed: Fri Sep  5 11:14:13 2014 UTC
 Parsing error:         Bad stuff
 
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
+
 
 Log transmission:
 =================
@@ -352,6 +383,9 @@ Configuration files:   /etc/scalyr-agent-2/agent.json
 Status:                Good (files parsed successfully)
 Last checked:          Fri Sep  5 23:14:13 2014 UTC
 Last changed observed: Fri Sep  5 11:14:13 2014 UTC
+
+Environment variables: SCALYR_API_KEY = <Missing>
+                       SCALYR_SERVER = <Missing>
 
 
 Log transmission:
