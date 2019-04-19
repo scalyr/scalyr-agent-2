@@ -27,6 +27,8 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import os
+
 import scalyr_agent.util as scalyr_util
 
 
@@ -282,6 +284,42 @@ def report_status(output, status, current_time):
 
     if status.config_status.last_error is not None:
         print >>output, 'Parsing error:         %s' % str(status.config_status.last_error)
+
+    def print_environment():
+
+        # Print scalyr-related env variables in sorted order with critical variables up top. Redact API key.
+        main_keys = ['SCALYR_API_KEY', 'SCALYR_SERVER']
+        special_case_keys = set(['K8S_EVENT_DISABLE'])
+        redacted_keys = set(['SCALYR_API_KEY'])
+
+        # Make a map of uppercase keys -> relevant environment vars (beginning with SCALYR)
+        upper2actualkey = {}
+        for k in os.environ.keys():
+            kup = k.upper()
+            if kup.startswith('SCALYR') or kup in special_case_keys:
+                upper2actualkey[kup] = k
+
+        # Sorted list of all scalyr keys, including main_keys which may not be present
+        # Sort order does not consider letter case.
+        sorted_upperkeys = main_keys + sorted(set(upper2actualkey.keys()) - set(main_keys))
+
+        print >>output, ''
+        row = 0
+        for kup in sorted_upperkeys:
+            key = upper2actualkey.get(kup, kup)
+            val = os.getenv(key)
+            if not val:
+                val = '<Missing>'
+            elif key.upper() in redacted_keys:
+                val = '<Redacted>'
+
+            if row == 0:
+                print >>output, 'Environment variables: %s = %s' % (key, val)
+            else:
+                print >>output, '                       %s = %s' % (key, val)
+            row += 1
+
+    print_environment()
 
     if status.copying_manager_status is not None:
         print >>output, ''
