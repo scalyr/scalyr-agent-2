@@ -816,6 +816,8 @@ class KubernetesCache( object ):
         self._api_server_version = None
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
+        self._container_runtime = None
+        self._agent_container_id = None
         self._initialized = False
 
         self._thread = None

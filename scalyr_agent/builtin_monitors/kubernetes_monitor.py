@@ -169,7 +169,9 @@ define_config_option( __monitor__, 'k8s_parse_format',
                       'Optional (defaults to `auto`). Valid values are: `auto`, `json`, `cri` and `raw`. '
                       'If `auto`, the monitor will try to detect the format of the raw log files, '
                       'e.g. `json` or `cri`.  Log files will be parsed in this format before uploading to the server '
-                      'to extract log and timestamp fields.  If `raw`, the raw contents of the log will be uploaded to Scalyr.',
+                      'to extract log and timestamp fields.  If `raw`, the raw contents of the log will be uploaded to Scalyr. '
+                      '(Note: An incorrect setting can cause parsing to fail which will result in raw logs being uploaded to Scalyr, so please leave '
+                      'this as `auto` if in doubt.)',
                       convert_to=str, default='auto', env_aware=True)
 
 define_config_option( __monitor__, 'k8s_always_use_cri',
@@ -845,6 +847,14 @@ class ContainerChecker( StoppableThread ):
         self._container_enumerator = None
         self._container_runtime = 'unknown'
 
+    def _is_running_in_docker( self ):
+        """
+        Checks to see if the agent is running inside a docker container
+        """
+        # whether or not we are running inside docker can be determined
+        # by the existence of the file /.dockerenv
+        return os.path.exists( "/.dockerenv" )
+
     def start( self ):
 
         try:
@@ -899,7 +909,9 @@ class ContainerChecker( StoppableThread ):
                 self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_filesystem=self.__cri_query_filesystem )
 
             if self.__parse_format == 'auto':
-                if self._container_runtime == 'docker':
+                # parse in json if we detect the container runtime to be 'docker' or if we detect
+                # that we are running in docker
+                if self._container_runtime == 'docker' or self._is_running_in_docker():
                     self.__parse_format = 'json'
                 else:
                     self.__parse_format = 'cri'
@@ -1921,10 +1933,14 @@ class KubernetesMonitor( ScalyrMonitor ):
                     controller_info.update( cluster_info )
                 self.__gather_k8s_metrics_for_pod( pod, info, controller_info )
 
+        except ConnectionError, e:
+            self._logger.warning( "Error connecting to kubelet API: %s.  No Kubernetes stats will be available" % str( e ),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='kubelet-api-connection-stats' )
         except KubeletApiException, e:
             self._logger.warning( "Error querying kubelet API: %s" % str( e ),
                                   limit_once_per_x_secs=300,
-                                  limit_key='kubelet-api-query' )
+                                  limit_key='kubelet-api-query-stats' )
 
     def __get_k8s_cache(self):
         k8s_cache = None
