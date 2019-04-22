@@ -34,7 +34,7 @@ from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.monitor_utils.server_processors import LineRequestParser
@@ -122,7 +122,7 @@ define_config_option( __monitor__, 'metrics_only',
 define_config_option( __monitor__, 'container_globs',
                      'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
                      'match one of the glob patterns will be monitored.',
-                      default=None)
+                      convert_to=ArrayOfStrings, default=None)
 
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '

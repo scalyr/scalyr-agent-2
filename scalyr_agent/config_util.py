@@ -195,16 +195,16 @@ def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
     @return: An object representing the converted environment value.
     @raise BadConfiguration if cannot be converted to expected_type
     """
-    key = custom_env_name
-    if not key:
-        key = 'SCALYR_%s' % param_name
+    env_name = custom_env_name
+    if not env_name:
+        env_name = 'SCALYR_%s' % param_name
 
-    key = key.upper()
-    strval = os.getenv(key)
+    env_name = env_name.upper()
+    strval = os.getenv(env_name)
 
     if not strval:
-        key = key.lower()
-        strval = os.getenv(key)
+        env_name = env_name.lower()
+        strval = os.getenv(env_name)
 
     if not strval or convert_to is None:
         return strval
@@ -216,13 +216,15 @@ def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
         if param_val is not None and param_val != converted_val:
             logger.warn(
                 "Conflicting values detected between %s config file parameter `%s` and the environment variable `%s`. "
-                "Ignoring environment variable." % (monitor_name or 'global', param_name, key),
-                limit_once_per_x_secs=300)
+                "Ignoring environment variable." % (monitor_name or 'global', param_name, env_name),
+                limit_once_per_x_secs=300,
+                limit_key='config_conflict_%s_%s_%s' % (monitor_name or 'global', param_name, env_name))
 
         # Extra logging for critical params
         if param_val is None:
             if param_name == 'api_key':
-                logger.debug("Using the api key from environment variable `%s`" % key, limit_once_per_x_secs=300)
+                logger.debug("Using the api key from environment variable `%s`" % env_name,
+                             limit_once_per_x_secs=300, limit_key='api_key_from_env')
 
     return converted_val
 

@@ -824,7 +824,7 @@ class TestConfiguration(ScalyrTestCase):
         mock_logger.warn.assert_called_with(
             "Conflicting values detected between global config file parameter `api_key` and the environment variable "
             "`SCALYR_API_KEY`. Ignoring environment variable.",
-            limit_once_per_x_secs=300,
+            limit_once_per_x_secs=300, limit_key='config_conflict_global_api_key_SCALYR_API_KEY',
         )
         mock_logger.debug.assert_not_called()
 
@@ -842,7 +842,7 @@ class TestConfiguration(ScalyrTestCase):
         mock_logger.warn.assert_not_called()
         mock_logger.debug.assert_called_with(
             "Using the api key from environment variable `SCALYR_API_KEY`",
-            limit_once_per_x_secs=300
+            limit_once_per_x_secs=300, limit_key='api_key_from_env',
         )
 
     def test_duplicate_api_key(self):
@@ -1024,7 +1024,7 @@ class TestConfiguration(ScalyrTestCase):
         k8s_testmap = {
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
             "docker_max_parallel_stats": (STANDARD_PREFIX, TEST_INT, int),
-            "container_globs": (STANDARD_PREFIX, TEST_STRING, str),
+            "container_globs": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
             "report_container_metrics": (STANDARD_PREFIX, False, bool),
             "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
             "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
@@ -1050,7 +1050,14 @@ class TestConfiguration(ScalyrTestCase):
             for key, value in map.items():
                 custom_name = value[0]
                 env_name = ('SCALYR_%s' % key).upper() if custom_name == STANDARD_PREFIX else custom_name.upper()
-                envar_value = str(value[1]).lower()  # lower() needed for proper bool encoding
+                envar_value = str(value[1])
+                if value[2] == ArrayOfStrings:
+                    # Array of strings should be entered into environment in the user-preferred format
+                    # which is without square brackets and quotes around each element
+                    envar_value = envar_value[1:-1]  # strip square brackets
+                    envar_value = envar_value.replace("'", '')
+                else:
+                    envar_value = envar_value.lower()  # lower() needed for proper bool encoding
                 os.environ[env_name] = envar_value
 
         self.__write_file_with_separator_conversion(""" {
@@ -1108,6 +1115,7 @@ class TestConfiguration(ScalyrTestCase):
                 'parameter `report_k8s_metrics` and the environment variable `SCALYR_REPORT_K8S_METRICS`. '
                 'Ignoring environment variable.',
                 limit_once_per_x_secs=300,
+                limit_key='config_conflict_scalyr_agent.builtin_monitors.kubernetes_monitor_report_k8s_metrics_SCALYR_REPORT_K8S_METRICS',
             )
 
             CopyingManager(config, monitors_manager.monitors)
