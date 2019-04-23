@@ -1044,6 +1044,29 @@ class ContainerChecker( StoppableThread ):
             # This is for a hack to prevent the original log file name from being added to the attributes.
             if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
                 result['rename_no_original'] = True
+        else:
+            # without a log_path there is no log config that can be created.  Log a warning and return
+            # See ticket: #AGENT-88
+            self._logger.warning( "No log path found for container '%s' of %s/%s" % (short_cid, pod_namespace, pod_name ),
+                                    limit_once_per_x_secs=3600,
+                                    limit_key='k8s-invalid-log-path-%s' % short_cid)
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Info is: %s\nCommon annotations: %s\nContainer annotations: %s" % (info, common_annotations, container_annotations),
+                                    limit_once_per_x_secs=3600,
+                                    limit_key='k8s-invalid-log-path-info-%s' % short_cid)
+
+            return None
+
+        if result is None:
+            # This should never be true because either we have created a result based on the log path
+            # or we have returned early, however it is here to protect against processing annotations
+            # on an empty result.  See ticket: #AGENT-88
+            self._logger.warning( "Empty result for container '%s' of %s/%s" % (short_cid, pod_namespace, pod_name ),
+                                    limit_once_per_x_secs=3600,
+                                    limit_key='k8s-empty-result-%s' % short_cid)
+            self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Info is: %s\nCommon annotations: %s\nContainer annotations: %s" % (info, common_annotations, container_annotations),
+                                    limit_once_per_x_secs=3600,
+                                    limit_key='k8s-empty-result-info-%s' % short_cid)
+            return None
 
         # apply common annotations first
         annotations = common_annotations

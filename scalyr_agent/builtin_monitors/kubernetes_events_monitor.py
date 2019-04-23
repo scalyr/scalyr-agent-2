@@ -599,7 +599,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
                         # ignore events that belong to namespaces we are not interested in
                         if namespace in self.__k8s_namespaces_to_ignore:
-                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to belonging to an excluded namespace" % (namespace) )
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Ignoring event due to belonging to an excluded namespace '%s'" % (namespace) )
                             continue
 
                         # get cluster and deployment information
