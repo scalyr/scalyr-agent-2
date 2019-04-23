@@ -26,26 +26,16 @@ import re
 import random
 import socket
 import stat
-import struct
-import sys
 import time
 import threading
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
-import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
-from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
-from scalyr_agent.log_watcher import LogWatcher
-from scalyr_agent.monitor_utils.server_processors import LineRequestParser
-from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-from scalyr_agent.monitor_utils.server_processors import RequestStream
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from scalyr_agent.util import StoppableThread
-
-from scalyr_agent.util import RunState
 
 from requests.packages.urllib3.exceptions import ProtocolError
 
@@ -102,9 +92,9 @@ define_config_option( __monitor__, 'log_mode',
                      'Optional (defaults to "docker_api"). Determine which method is used to gather logs from the '
                      'local containers. If "docker_api", then this agent will use the docker API to contact the local '
                      'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
-                     'to push logs to this one using the syslog Docker log plugin.  Currently, "syslog" is the '
-                     'preferred method due to bugs/issues found with the docker API.  It is not the default to protect '
-                     'legacy behavior.\n',
+                     'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
+                     'preferred method due to bugs/issues found with the docker API (To protect legacy behavior, '
+                     'the default method is "docker_api").',
                      convert_to=str, default="docker_api")
 
 define_config_option( __monitor__, 'docker_raw_logs',
@@ -1534,6 +1524,8 @@ class DockerMonitor( ScalyrMonitor ):
             "throttled_time"
         ])
 
+        self.__version = None
+        self.__version_lock = threading.RLock()
 
     def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
@@ -1624,7 +1616,56 @@ class DockerMonitor( ScalyrMonitor ):
         for cid, info in containers.iteritems():
             self.__gather_metrics_from_api_for_container( info['name'] )
 
+    def get_user_agent_fragment(self):
+        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe."""
+
+        def _version_to_fragment(ver):
+            # Helper function to transform docker version to user-agent fragment
+            if not ver:
+                # version not yet set: return 'docker=yes' to signify docker
+                return 'docker=true'
+            log_mode = self._config.get('log_mode')
+            if log_mode == 'syslog':
+                extra = ''
+            else:
+                extra = '|raw' if self._config.get('docker_raw_logs') else '|api'
+            return 'docker=%s|%s%s' % (ver, log_mode, extra)
+
+        self.__version_lock.acquire()
+        try:
+            return _version_to_fragment(self.__version)
+        finally:
+            self.__version_lock.release()
+
+    def _fetch_and_set_version(self):
+        """Fetch and record the docker system version via the docker API"""
+        ver = None
+        try:
+            ver = self.__client.version().get('Version')
+        except Exception:
+            self._logger.exception('Could not determine Docker system version')
+
+        if not ver:
+            return
+
+        self.__version_lock.acquire()
+        try:
+            self.__version = ver
+        finally:
+            self.__version_lock.release()
+
     def gather_sample( self ):
+        """Besides gathering data, this main-loop method also queries the docker API for version number.
+
+        Due to potential race condition between the MonitorsManager and this manager at start up, we set the version
+        in lazy fashion as follows:  On each gather_sample() the DockerMonitor thread queries the docker API for
+        the version until the first success (In most cases, this means a single query shortly after start up). Once
+        set, it will never be queried again as the docker system version cannot change without necessitating an agent
+        restart.
+        """
+        if not self.__version:
+            self._fetch_and_set_version()
+
         # gather metrics
         if self.__report_container_metrics:
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
@@ -1649,4 +1690,3 @@ class DockerMonitor( ScalyrMonitor ):
 
         if self.__container_checker:
             self.__container_checker.stop( wait_on_join, join_timeout )
-

@@ -19,7 +19,6 @@
 __author__ = 'czerwin@scalyr.com'
 
 import sys
-
 import unittest
 
 

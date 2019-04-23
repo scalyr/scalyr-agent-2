@@ -40,6 +40,7 @@ from scalyr_agent.copying_manager import CopyingParameters, CopyingManager
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent import json_lib
 
@@ -183,25 +184,11 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
 
     def __create_test_instance(self, configuration_logs_entry, monitors_log_configs):
-        config_dir = tempfile.mkdtemp()
-        config_file = os.path.join(config_dir, 'agentConfig.json')
-        config_fragments_dir = os.path.join(config_dir, 'configs.d')
-        os.makedirs(config_fragments_dir)
-
         logs_json_array = JsonArray()
-
         for entry in configuration_logs_entry:
             logs_json_array.add(JsonObject(content=entry))
 
-        fp = open(config_file, 'w')
-        fp.write(json_lib.serialize(JsonObject(api_key='fake', logs=logs_json_array)))
-        fp.close()
-
-        default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
-                                     '/var/lib/scalyr-agent-2')
-
-        config = Configuration(config_file, default_paths, None)
-        config.parse()
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
 
         self.__monitor_fake_instances = []
         for monitor_log_config in monitors_log_configs:
