@@ -1,18 +1,21 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.46 "Yadera" - Apr 22, 2019
+## 2.0.46 "Yadera" - Apr 24, 2019
 
 <!---
-Packaged by Edward Chee <echee@scalyr.com> on Apr 22, 2019 22:00 -0700
+Packaged by Edward Chee <echee@scalyr.com> on Apr 24, 2019 11:00 -0700
 --->
 
 Features
-* Expanded mapping of config vars to environment variables in code (not `import_vars`).
-* Expanded env vars enable agent configuration via single k8s configMap imported with `envFrom`.
-* Config vars declared as ArrayOfStrings will be parsed as comma-separated strings.
+* Expanded mapping of config vars to top-level and k8s environment variables in code (not `import_vars`).
+* Expanded env vars enable agent configuration via single k8s configMap (imported with `envFrom`).
+* Config vars such as `container_globs` and logs `exclude` globs are now assigned a type (comma-separated strings).
 * Display Scalyr-related environment variables in `agent status -v`.
 * Include Docker versioning information when reporting to Scalyr.
+
+Bugs
+* Fix issue preventing k8s agent from recognizing new pods.
 
 
 ## 2.0.45 "Xindi" - Apr 5, 2019
@@ -40,7 +43,7 @@ Features
 * Record `eventId` in `windows_events_monitor`.
 
 Bugs
-* Fix issue preventin collection of remote events in `windows_events_monitor`.
+* Fix issue preventing collection of remote events in `windows_events_monitor`.
 * Fix incorrect metrics collection in `postgres_monitor` due to not properly reseting cursor.
 * Eliminate redudant K8s cache in the agent running on the K8s event leader.
 
@@ -69,7 +72,7 @@ Features
 * Add in v2 K8s support.  You must configure a k8s cluster name to start using the new v2 support.  See Kubernetes Agent Install directions.
 
 Bugs
-* Only allow non-secure connections to Scalyr if explicit override option is sset.
+* Only allow non-secure connections to Scalyr if explicit override option is set.
 * Redesign of k8s cache to better handle large number of pods
 * Allow the k8s api server address to be set via a configuration option.
 * Parallelized container metric fetches to avoid not being able to collect metrics in time.
@@ -93,7 +96,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Dec 7, 2018 16:00 -0800
 --->
 
 Bugs
-* Fix urgent incompability issue with python version < 2.7 in call to string decoding.
+* Fix urgent incompatibility issue with python version < 2.7 in call to string decoding.
 
 
 ## 2.0.39 "Orion" - Dec 5, 2018
