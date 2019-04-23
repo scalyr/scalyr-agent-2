@@ -1935,7 +1935,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         except ConnectionError, e:
             self._logger.warning( "Error connecting to kubelet API: %s.  No Kubernetes stats will be available" % str( e ),
-                                  limit_once_per_x_secs=300,
+                                  limit_once_per_x_secs=3600,
                                   limit_key='kubelet-api-connection-stats' )
         except KubeletApiException, e:
             self._logger.warning( "Error querying kubelet API: %s" % str( e ),
