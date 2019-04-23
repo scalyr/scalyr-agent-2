@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.46 "Yadera" - Apr 22, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on Apr 22, 2019 22:00 -0700
+--->
+
+Features
+* Expanded mapping of config vars to environment variables in code (not `import_vars`).
+* Expanded env vars enable agent configuration via single k8s configMap imported with `envFrom`.
+* Config vars declared as ArrayOfStrings will be parsed as comma-separated strings.
+* Display Scalyr-related environment variables in `agent status -v`.
+* Include Docker versioning information when reporting to Scalyr.
+
+
 ## 2.0.45 "Xindi" - Apr 5, 2019
 
 <!---
