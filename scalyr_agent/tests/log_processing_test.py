@@ -76,6 +76,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L1\n',
                          'L2\n')
+        self.log_file.scan_for_new_bytes()
 
         result = self.readline()
 
@@ -94,6 +95,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          expected,
                          expected_next)
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(expected, self.readline().line)
         self.assertEquals(expected_next, self.readline().line)
@@ -110,6 +112,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          expected,
                          expected_next)
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(expected, self.readline().line)
         self.assertEquals(expected_next, self.readline().line)
@@ -126,6 +129,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          expected, "--end\n",
                          expected_next)
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(expected, self.readline().line)
         self.assertEquals("--end\n", self.readline().line)
@@ -143,6 +147,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          expected,
                          expected_next)
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(expected, self.readline().line)
         self.assertEquals(expected_next, self.readline().line)
@@ -165,6 +170,7 @@ class TestLogFileIterator(ScalyrTestCase):
                     "the end\n"]
 
         self.append_file(self.__path, ''.join(expected))
+        self.log_file.scan_for_new_bytes()
 
         for line in expected:
             self.assertEquals(line, self.readline().line)
@@ -189,6 +195,7 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L004\n',
                          'L005\n',
                          'L006\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.log_file.page_reads, 1)
@@ -203,6 +210,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, 'L002\n')
@@ -212,6 +220,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, 'L002\n')
@@ -281,6 +290,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, 'L002\n')
@@ -306,6 +316,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.append_file(self.__path,
                          'L001\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, '')
@@ -469,6 +480,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
 
         position = self.log_file.tell()
         self.assertEquals(self.readline().line, 'L001\n')
@@ -485,6 +497,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
 
         position = self.log_file.tell()
         original = position
@@ -501,6 +514,7 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L001\n',
                          'L002\n',
                          'L003\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, 'L002\n')
@@ -516,6 +530,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
         position = self.log_file.tell()
 
         self.assertEquals(self.readline().line, 'L001\n')
@@ -532,6 +547,7 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n',
                          'L003\n',
                          'L004\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L001\n')
         self.mark(self.log_file.tell())
@@ -574,6 +590,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L00001\n',
                          'L002\n')
+        self.log_file.scan_for_new_bytes()
         self.assertEquals(self.readline().line, 'L0000')
         self.assertEquals(self.readline().line, '1\n')
         self.assertEquals(self.readline().line, 'L002\n')
@@ -613,6 +630,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L007\n',
                          'L008\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L007\n')
         self.assertEquals(self.readline().line, 'L008\n')
@@ -630,6 +648,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L004\n',
                          'L005\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L004\n')
         self.assertEquals(self.readline().line, 'L005\n')
@@ -649,6 +668,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.append_file(self.__path,
                          'L004\n',
                          'L005\n')
+        self.log_file.scan_for_new_bytes()
 
         self.assertEquals(self.readline().line, 'L004\n')
         self.assertEquals(self.readline().line, 'L005\n')
@@ -662,6 +682,7 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n',
                          'L003\n',
                          'L004\n')
+        self.log_file.scan_for_new_bytes()
         pos1 = self.log_file.tell()
         self.assertEquals(self.readline().line, 'L001\n')
         self.assertEquals(self.readline().line, 'L002\n')
