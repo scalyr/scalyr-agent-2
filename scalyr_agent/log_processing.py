@@ -2069,10 +2069,12 @@ class LogLineRedacter(object):
                         replaced_group = replaced_group.replace("\\%d" % (_group_index + 1), _group, 1)
                 # once we have formed the replacement expression, we just need to replace the matched
                 # portion of the `line` with the `replaced_group` that we just built
-                replaced_string = replaced_string + line[last_match_index: _match.start()]
+                replaced_string += line[last_match_index: _match.start()]
                 replaced_string += replaced_group
                 # forward the last match index to the end of the match group
                 last_match_index = _match.end()
+
+            replaced_string += line[last_match_index:]
             return replaced_string, replacement_matches
 
         try:

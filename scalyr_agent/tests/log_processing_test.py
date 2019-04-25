@@ -1357,6 +1357,46 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
         self.assertEquals(events.get_message(0), 'GET /foo&password=foo&start=true\n')
 
+    def test_hashed_redaction_in_middle_of_line(self):
+        # Testing for #AGENT-83 indicated that redaction rules with hashing was truncating
+        # lines after the end of the final hash.  This is an explicit test to catch that
+        # problem
+        log_processor = self.log_processor
+        log_processor.add_redacter( "\"([A-F0-9]{32})(\\.app1.)\"", "\"*****\\H2\"" )
+
+        line_base = '127.0.0.1 - - [15/Apr/2019:16:30:42 -0700] "GET /10/ HTTP/1.1" 200 113020 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36" D=63388 R=app1b/- '
+
+        line_unredacted = line_base + '"0123456789ABCDEF0123456789ABCDEF.app1b" something extra\n'
+        line_expected = line_base + '"*****9e174c63530b55ef27fcbfdbdde9c403" something extra\n'
+        self.append_file( self.__path, line_unredacted )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(1, events.total_events())
+        self.assertEquals( line_expected, events.get_message(0) )
+
+    def test_hashed_redaction_with_non_redacted_lines(self):
+        # Test for when a redaction rule with hashing is used, to make sure that
+        # lines that don't match the hash are still returned.  See #AGENT-83
+        log_processor = self.log_processor
+        log_processor.add_redacter( "\"([A-F0-9]{32})(\\.app1.)\"", "\"*****\\H2\"" )
+
+        line_base = '127.0.0.1 - - [15/Apr/2019:16:30:42 -0700] "GET /10/ HTTP/1.1" 200 113020 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36" D=63388 R=app1b/- '
+
+        line_unredacted = line_base + '"0123456789ABCDEF0123456789ABCDEF.app1b"\n'
+        line_expected = line_base + '"*****9e174c63530b55ef27fcbfdbdde9c403"\n'
+        self.append_file( self.__path, 'ello\n', line_unredacted )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+
+        self.assertEquals(2, events.total_events())
+        self.assertEquals( 'ello\n', events.get_message(0) )
+        self.assertEquals( line_expected, events.get_message(1) )
+
     def test_redacting_utf8(self):
 
         # build this manually following a similar process to the main agent, because this will create
