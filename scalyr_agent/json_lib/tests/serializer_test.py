@@ -17,7 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
+import unittest2 as unittest
 from scalyr_agent.json_lib import serialize
 
 from scalyr_agent.test_base import ScalyrTestCase

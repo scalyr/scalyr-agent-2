@@ -17,7 +17,7 @@
 
 __author__ = 'imron@scalyr.com'
 
-import unittest
+import unittest2 as unittest
 import os
 import shutil
 import tempfile

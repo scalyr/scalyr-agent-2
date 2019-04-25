@@ -21,8 +21,6 @@ __author__ = 'czerwin@scalyr.com'
 
 import re
 
-from collections import Counter
-
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -86,7 +84,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         - Even though this test could have been broken up into 2 smaller ones, it is kept as one to minimize overhead
             time taken by stop_manager()
         """
-        counter = Counter()
+        counter = {'callback_invocations': 0}
         test_frag = 'some_frag'
         poll_interval = 30
 

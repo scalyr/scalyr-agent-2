@@ -25,7 +25,7 @@ from scalyr_agent import scalyr_client
 from scalyr_agent.scalyr_client import AddEventsRequest, PostFixBuffer, EventSequencer, Event, ScalyrClientSession
 from scalyr_agent import json_lib
 from scalyr_agent.test_base import ScalyrTestCase
-import unittest
+import unittest2 as unittest
 
 
 class AddEventsRequestTest(ScalyrTestCase):

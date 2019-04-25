@@ -22,7 +22,7 @@ import atexit
 import os
 import shutil
 import tempfile
-import unittest
+import unittest2 as unittest
 import sys
 
 from scalyr_agent.scalyr_client import EventSequencer

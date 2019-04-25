@@ -24,7 +24,7 @@ import tempfile
 
 import logging
 import sys
-import unittest
+import unittest2 as unittest
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)

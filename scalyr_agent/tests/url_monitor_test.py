@@ -17,7 +17,7 @@
 
 __author__ = 'saurabh@scalyr.com'
 
-import unittest
+import unittest2 as unittest
 import mock
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.scalyr_monitor import MonitorConfig

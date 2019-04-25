@@ -20,7 +20,7 @@ __author__ = 'czerwin@scalyr.com'
 import datetime
 import os
 import tempfile
-import unittest
+import unittest2 as unittest
 import struct
 import threading
 
