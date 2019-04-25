@@ -40,7 +40,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class TestConfiguration(ScalyrTestCase):
     def setUp(self):
-        self.original_os_env = {k:v for k, v in os.environ.iteritems()}
+        self.original_os_env = dict([(k, v) for k, v in os.environ.iteritems()])
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')
         self.__config_fragments_dir = os.path.join(self.__config_dir, 'agent.d')

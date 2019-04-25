@@ -151,10 +151,10 @@ class TestProcessListUtility(ScalyrTestCase):
         self.assertEqual(self.ps.get_child_processes('bad pid'), [])
         self.assertEqual(self.ps.get_child_processes(1), [2])
         # positive match
-        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2})
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), set([1, 2]))
         self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
         self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
-        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2})
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), set([1, 2]))
 
     def test_single_process_with_children(self):
         # override
@@ -170,13 +170,13 @@ class TestProcessListUtility(ScalyrTestCase):
         self.ps.parent_to_children_map[0] = [1]
 
         self.assertEqual(self.ps.get_child_processes('bad pid'), [])
-        self.assertEqual(set(self.ps.get_child_processes(1)), {2, 3})
+        self.assertEqual(set(self.ps.get_child_processes(1)), set([2, 3]))
         self.assertEqual(self.ps.get_child_processes(2), [3])
         # positive match
-        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2, 3})
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), set([1, 2, 3]))
         self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
         self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
-        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2, 3})
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), set([1, 2, 3]))
 
     def test_multiple_processes_with_children(self):
         # override
@@ -193,13 +193,13 @@ class TestProcessListUtility(ScalyrTestCase):
         self.ps.parent_to_children_map[0] = [1, 4]
 
         self.assertEqual(self.ps.get_child_processes('bad pid'), [])
-        self.assertEqual(set(self.ps.get_child_processes(1)), {2, 3})
+        self.assertEqual(set(self.ps.get_child_processes(1)), set([2, 3]))
         self.assertEqual(self.ps.get_child_processes(2), [3])
         # positive match
-        self.assertEqual(set(self.ps.get_matches_commandline('.*')), {1, 2, 3, 4})
+        self.assertEqual(set(self.ps.get_matches_commandline('.*')), set([1, 2, 3, 4]))
         self.assertEqual(self.ps.get_matches_commandline('.*bash.*'), [1])
         self.assertEqual(self.ps.get_matches_commandline('.*py.*'), [2])
-        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), {1, 2, 3, 4})
+        self.assertEqual(set(self.ps.get_matches_commandline_with_children('.*')), set([1, 2, 3, 4]))
 
 
 class TestProcessMonitorRunningTotal(ScalyrTestCase):
