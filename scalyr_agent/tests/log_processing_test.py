@@ -1368,9 +1368,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         line_unredacted = line_base + '"0123456789ABCDEF0123456789ABCDEF.app1b" something extra\n'
         line_expected = line_base + '"*****9e174c63530b55ef27fcbfdbdde9c403" something extra\n'
-        self.append_file( self.__path,
-            line_unredacted
-            )
+        self.append_file( self.__path, line_unredacted )
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = log_processor.perform_processing(
@@ -1389,10 +1387,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         line_unredacted = line_base + '"0123456789ABCDEF0123456789ABCDEF.app1b"\n'
         line_expected = line_base + '"*****9e174c63530b55ef27fcbfdbdde9c403"\n'
-        self.append_file( self.__path,
-            'ello\n',
-            line_unredacted
-            )
+        self.append_file( self.__path, 'ello\n', line_unredacted )
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = log_processor.perform_processing(
