@@ -175,7 +175,7 @@ if hasattr(sys, '_getframe'):
 
 
 # noinspection PyPep8Naming
-class AgentLogger(logging.Logger, object):
+class AgentLogger(logging.Logger):
     """Custom logger to use for logging information, errors, and metrics from the Scalyr agent.
 
     These instances are returned by scalyr_agent.getLogger.  You should use that method in place of logging.getLogger.

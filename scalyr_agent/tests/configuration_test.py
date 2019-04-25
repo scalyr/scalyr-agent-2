@@ -1428,7 +1428,7 @@ class NullHandler(logging.Handler):
         pass
 
 
-class FakeAgentLogger(AgentLogger):
+class FakeAgentLogger(AgentLogger, object):
     def __init__(self, name):
         super(FakeAgentLogger, self).__init__(name)
         if not len(self.handlers):
