@@ -19,7 +19,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest
+import unittest2 as unittest
 import os
 import sys
 import traceback

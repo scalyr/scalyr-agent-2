@@ -31,7 +31,7 @@ We do this by:
 
 """
 
-import unittest
+import unittest2 as unittest
 from subprocess import call
 import os
 

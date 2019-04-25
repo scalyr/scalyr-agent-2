@@ -18,7 +18,7 @@
 __author__ = 'imron@scalyr.com'
 
 import time
-import unittest
+import unittest2 as unittest
 
 import pdb
 

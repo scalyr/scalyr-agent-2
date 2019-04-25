@@ -18,7 +18,7 @@
 __author__ = 'echee@scalyr.com'
 
 
-import unittest
+import unittest2 as unittest
 
 from scalyr_agent import util
 from scalyr_agent.json_lib import JsonObject

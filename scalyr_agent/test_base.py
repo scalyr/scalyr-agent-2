@@ -19,7 +19,7 @@
 __author__ = 'czerwin@scalyr.com'
 
 import sys
-import unittest
+import unittest2 as unittest
 
 
 if sys.version_info < (2, 5, 0):

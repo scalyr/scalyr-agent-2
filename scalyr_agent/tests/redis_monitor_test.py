@@ -18,7 +18,7 @@
 __author__ = 'imron@scalyr.com'
 
 import time
-import unittest
+import unittest2 as unittest
 from struct import pack
 
 from scalyr_agent.builtin_monitors.redis_monitor import RedisMonitor

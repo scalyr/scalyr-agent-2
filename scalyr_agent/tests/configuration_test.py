@@ -1423,11 +1423,16 @@ class TestConfiguration(ScalyrTestCase):
         return self.make_path(None, path)
 
 
+class NullHandler(logging.Handler):
+    def emit(self, record):
+        pass
+
+
 class FakeAgentLogger(AgentLogger):
     def __init__(self, name):
         super(FakeAgentLogger, self).__init__(name)
         if not len(self.handlers):
-            self.addHandler(logging.NullHandler())
+            self.addHandler(NullHandler())
 
 
 class FakePlatform(object):

@@ -19,7 +19,7 @@ __author__ = 'imron@scalyr.com'
 
 import time
 import sys
-import unittest
+import unittest2 as unittest
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 

@@ -4,7 +4,7 @@
 #
 version: 2
 jobs:
-  test:
+  test27:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie-browsers
@@ -35,8 +35,19 @@ jobs:
       - store_artifacts:
           path: cover/
 
+  test26:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} edwardchee/scalyr-agent-ci:python26 /tmp/run_unittests.sh
+
+
 workflows:
   version: 2
   unittest:
     jobs:
-      - test
+      - test27
+      - test26
