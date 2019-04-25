@@ -19,8 +19,6 @@
 __author__ = 'echee@scalyr.com'
 
 
-from collections import Counter
-
 import mock
 from mock import patch
 
@@ -67,7 +65,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
             )
 
             fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
-            counter = Counter()
+            counter = {'callback_invocations': 0}
             detected_fragment_changes = []
 
             # Mock the callback (that would normally be invoked on ScalyrClientSession
@@ -104,11 +102,9 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 else:
                     return version2
 
-            with patch.object(
-                k8s_mon, 'get_user_agent_fragment'
-            ) as m1, patch.object(
-                k8s_mon, '_KubernetesMonitor__get_k8s_cache'  # return Mock obj instead of a KubernetesCache
-            ) as m2:
+            @patch.object(k8s_mon, 'get_user_agent_fragment')
+            @patch.object(k8s_mon, '_KubernetesMonitor__get_k8s_cache')  # return Mock obj instead of a KubernetesCache)
+            def start_test(m2, m1):
                 m1.side_effect = fake_get_user_agent_fragment
                 m2.return_value.get_api_server_version.side_effect = fake_get_api_server_version
                 manager.set_user_agent_augment_callback(augment_user_agent)
@@ -128,3 +124,4 @@ class KubernetesMonitorTest(ScalyrTestCase):
 
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
+            start_test()

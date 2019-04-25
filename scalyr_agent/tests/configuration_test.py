@@ -893,16 +893,11 @@ class TestConfiguration(ScalyrTestCase):
         original_verify_or_set_optional_float = config._Configuration__verify_or_set_optional_float
         original_verify_or_set_optional_string = config._Configuration__verify_or_set_optional_string
 
-        with patch.object(
-            config, '_Configuration__verify_or_set_optional_bool'
-        ) as p0, patch.object(
-            config, '_Configuration__verify_or_set_optional_int'
-        ) as p1, patch.object(
-            config, '_Configuration__verify_or_set_optional_float'
-        ) as p2, patch.object(
-            config, '_Configuration__verify_or_set_optional_string'
-        ) as p3:
-
+        @patch.object(config, '_Configuration__verify_or_set_optional_bool')
+        @patch.object(config, '_Configuration__verify_or_set_optional_int')
+        @patch.object(config, '_Configuration__verify_or_set_optional_float')
+        @patch.object(config, '_Configuration__verify_or_set_optional_string')
+        def patch_and_start_test(p3, p2, p1, p0):
             # Decorate the Configuration.__verify_or_set_optional_xxx methods as follows:
             # 1) capture fields that are environment-aware
             # 2) allow setting of the corresponding environment variable
@@ -1007,6 +1002,7 @@ class TestConfiguration(ScalyrTestCase):
                     # But those not defined in config file will take on environment values.
                     self.assertEquals(value, fake_env[field])
                     self.assertNotEquals(value, config_file_value)
+        patch_and_start_test()
 
     @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
     def test_environment_aware_module_params(self, mock_docker):

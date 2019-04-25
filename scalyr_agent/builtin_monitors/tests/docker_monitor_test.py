@@ -20,7 +20,6 @@ __author__ = 'echee@scalyr.com'
 
 
 import threading
-from collections import Counter
 
 import mock
 from mock import patch
@@ -66,7 +65,7 @@ class DockerMonitorTest(ScalyrTestCase):
             )
 
             fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
-            counter = Counter()
+            counter = {'callback_invocations': 0}
             detected_fragment_changes = []
 
             # Mock the callback (that would normally be invoked on ScalyrClientSession
@@ -127,13 +126,10 @@ class DockerMonitorTest(ScalyrTestCase):
                 else:
                     return original_monitor_config_get(key)
 
-            with patch.object(
-                docker_mon, 'get_user_agent_fragment'
-            ) as m1, patch.object(
-                docker_mon, '_fetch_and_set_version'
-            ) as m2, patch.object(
-                docker_mon._config, 'get'
-            ) as m3:
+            @patch.object(docker_mon, 'get_user_agent_fragment')
+            @patch.object(docker_mon, '_fetch_and_set_version')
+            @patch.object(docker_mon._config, 'get')
+            def start_test(m3, m2, m1):
                 m1.side_effect = fake_get_user_agent_fragment
                 m2.side_effect = fake_fetch_and_set_version
                 m3.side_effect = fake_monitor_config_get
@@ -156,3 +152,4 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
+            start_test()
