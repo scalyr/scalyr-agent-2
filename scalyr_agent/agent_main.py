@@ -682,7 +682,7 @@ class ScalyrAgent(object):
 
         import sys
         if sys.version_info[1] == 6:  # Python 2.6
-            xxx
+            raise Exception('Force fail for python 2.6')
         self.__start_time = time.time()
         controller.register_for_termination(self.__handle_terminate)
 
