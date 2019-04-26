@@ -679,6 +679,7 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
+        xxx
         self.__start_time = time.time()
         controller.register_for_termination(self.__handle_terminate)
 
