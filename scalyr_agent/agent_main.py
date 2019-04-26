@@ -679,10 +679,7 @@ class ScalyrAgent(object):
         @return: the exit status code
         @rtype: int
         """
-
-        import sys
-        if sys.version_info[1] == 6:  # Python 2.6
-            raise Exception('Force fail for python 2.6')
+        xxx
         self.__start_time = time.time()
         controller.register_for_termination(self.__handle_terminate)
 
