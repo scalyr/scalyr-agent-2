@@ -45,8 +45,9 @@ class TestConfiguration(ScalyrTestCase):
         self.__config_file = os.path.join(self.__config_dir, 'agent.json')
         self.__config_fragments_dir = os.path.join(self.__config_dir, 'agent.d')
         os.makedirs(self.__config_fragments_dir)
-        if os.environ.get('scalyr_api_key'):
-            del os.environ['scalyr_api_key']
+        for key in os.environ.keys():
+            if 'scalyr' in key.lower():
+                del os.environ[key]
 
     def tearDown(self):
         """Restore the pre-test os environment"""
