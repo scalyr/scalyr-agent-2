@@ -44,6 +44,41 @@ jobs:
       - run:
           command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} edwardchee/scalyr-agent-ci:python26 /tmp/run_unittests.sh
 
+  smoke27:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+
+  smoke26:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+
+  smoke25:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+
+  smoke24:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
 
 workflows:
   version: 2
@@ -51,3 +86,7 @@ workflows:
     jobs:
       - test27
       - test26
+      - smoke27
+      - smoke26
+      - smoke25
+      - smoke24
