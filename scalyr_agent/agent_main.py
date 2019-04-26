@@ -680,7 +680,10 @@ class ScalyrAgent(object):
         @rtype: int
         """
 
-        xxx self.__start_time = time.time()
+        import sys
+        if sys.version_info[1] == 6:  # Python 2.6
+            xxx
+        self.__start_time = time.time()
         controller.register_for_termination(self.__handle_terminate)
 
         # Register handler for when we get an interrupt signal.  That indicates we should dump the status to
