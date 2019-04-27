@@ -1,9 +1,5 @@
-FROM ubuntu:16.04
-ENV DEBIAN_FRONTEND noninteractive
+FROM python:2.7-alpine3.9 as scalyr
 MAINTAINER Scalyr Inc <support@scalyr.com>
-RUN apt-get update && \
-    apt-get install -y python && \
-    apt-get clean
 COPY scalyr-docker-agent.tar.gz /tmp/
 RUN tar --no-same-owner -C / -zxf /tmp/scalyr-docker-agent.tar.gz && \
   rm /tmp/scalyr-docker-agent.tar.gz
