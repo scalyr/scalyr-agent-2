@@ -15,9 +15,9 @@ In particular, the key integration features are:
 To build the Docker image, you must execute the following commands:
 
     cd scalyr-agent-2/docker
-    python ../build_package.py --no-versioned-file-name docker_tarball
-    docker build -t scalyr/scalyr-docker-agent .
-    
+    python ../build_package.py --no-versioned-file-name docker_syslog_builder
+    ./scalyr-docker-agent-syslog
+
 ## Running the Scalyr Agent in Docker
 
 To run a Scalyr Agent container, you must first create a file containing a write logs key from
