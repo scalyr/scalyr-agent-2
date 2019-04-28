@@ -9,4 +9,7 @@ COPY scalyr-k8s-agent.tar.gz /tmp/
 RUN tar --no-same-owner -C / -zxf /tmp/scalyr-k8s-agent.tar.gz && \
   rm /tmp/scalyr-k8s-agent.tar.gz
 
+EXPOSE 601/tcp
+EXPOSE 514/udp
+
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]

@@ -13,4 +13,8 @@ RUN cd /usr/bin && mkdir -p /tmp/scalyr/src && cd /tmp/scalyr && \
   tar --no-same-owner -C / -zxf /tmp/scalyr/src/scalyr-docker-agent.tar.gz && \
   cd / && \
   rm -rf /tmp/scalyr
+
+EXPOSE 601/tcp
+EXPOSE 514/udp
+
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
