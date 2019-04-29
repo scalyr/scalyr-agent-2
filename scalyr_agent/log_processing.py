@@ -814,6 +814,7 @@ class LogFileIterator(object):
                     current_log_file.position_end = current_log_file.position_start + current_log_file.last_known_size
                 if self.__log_deletion_time is None:
                     self.__log_deletion_time = current_time
+                print('#### asdfasdfasdfas')
                 self.at_end = current_time - self.__log_deletion_time > self.__log_deletion_delay
 
             else:
