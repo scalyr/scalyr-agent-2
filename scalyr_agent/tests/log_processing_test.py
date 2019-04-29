@@ -274,17 +274,26 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L001\n',
                          'L002\n')
         restore_access = self.remove_read_access()
-        os.chmod(self.__tempdir, 0)
+        # os.chmod(self.__tempdir, 0)
+        print(1)
         self.scan_for_new_bytes()
 
+        print(2)
         self.assertEquals(self.readline().line, 'L001\n')
+        print(3)
         self.assertEquals(self.readline().line, 'L002\n')
+        print(4)
         self.assertEquals(self.readline().line, '')
+        print(5)
         self.assertFalse(self.log_file.at_end)
 
+        print(6)
         self.scan_for_new_bytes(time_advance=60 * 11)
+        print(7)
         self.assertTrue(self.log_file.at_end)
+        print(8)
         restore_access()
+        print(9)
 
     def test_rotated_file_with_truncation(self):
         self.append_file(self.__path,
