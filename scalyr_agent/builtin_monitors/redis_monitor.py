@@ -207,7 +207,7 @@ class RedisHost( object ):
         except UnicodeDecodeError, e:
             if self.utf8_warning_interval:
                 logger.warn( "Redis command contains invalid utf8: %s" % binascii.hexlify( entry['command'] ), limit_once_per_x_secs=self.utf8_warning_interval, limit_key="redis-utf8" )
-            command = entry['command'].decode('utf8', errors="replace")
+            command = entry['command'].decode('utf8', "replace")
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
         logger.emit_value( 'redis', 'slowlog', extra_fields={
