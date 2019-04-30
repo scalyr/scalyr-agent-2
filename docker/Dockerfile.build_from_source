@@ -1,5 +1,10 @@
 FROM python:2.7-alpine3.9 as scalyr
 MAINTAINER Scalyr Inc <support@scalyr.com>
+
+RUN apk --update add --virtual build-dependencies build-base python-dev gcc \
+  && pip --no-cache-dir install ujson \
+  && apk del build-dependencies
+
 RUN cd /usr/bin && mkdir -p /tmp/scalyr/src && cd /tmp/scalyr && \
   git init && \
   git config --local user.name "Scalyr" && git config --local user.email support@scalyr.com && \
@@ -11,6 +16,8 @@ RUN cd /usr/bin && mkdir -p /tmp/scalyr/src && cd /tmp/scalyr && \
   rm -rf /tmp/scalyr
 
 EXPOSE 601/tcp
+
+# Please note Syslog UDP 1024 max packet length (rfc3164)
 EXPOSE 514/udp
 
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
