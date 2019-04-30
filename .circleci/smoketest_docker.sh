@@ -18,12 +18,11 @@
 #   $3 : max secs until test hard fails
 #
 # e.g. usage
-#   smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:v1.1 json 300
+#   smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:1 json 300
 #----------------------------------------------------------------------------------------
 
 # The following variables are needed
 # Docker image in which runs smoketest python3 code
-# smoketest_image="scalyr/scalyr-agent-ci-smoketest:v1.1"
 smoketest_image=$1
 
 # Chooses json or syslog docker test.  Incorporated into container name which is then used by
