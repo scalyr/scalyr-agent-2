@@ -19,7 +19,6 @@ import scalyr_agent.json_lib.objects
 __author__ = 'czerwin@scalyr.com'
 
 import os
-import logging
 import tempfile
 from mock import patch, Mock
 from parameterized import parameterized
@@ -32,8 +31,9 @@ from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_js
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.platform_controller import DefaultPaths
-from scalyr_agent.scalyr_logging import AgentLogger
 from scalyr_agent.json_lib.objects import ArrayOfStrings
+from scalyr_agent.test_util import FakeAgentLogger
+from scalyr_agent.test_util import FakePlatform
 
 from scalyr_agent.test_base import ScalyrTestCase
 
@@ -1418,27 +1418,3 @@ class TestConfiguration(ScalyrTestCase):
         @return: The path created by converting the forward slashes to the platform's separator.
         """
         return self.make_path(None, path)
-
-
-class NullHandler(logging.Handler):
-    def emit(self, record):
-        pass
-
-
-class FakeAgentLogger(AgentLogger, object):
-    def __init__(self, name):
-        super(FakeAgentLogger, self).__init__(name)
-        if not len(self.handlers):
-            self.addHandler(NullHandler())
-
-
-class FakePlatform(object):
-    """Fake implementation of PlatformController.
-
-    Only implements the one method required for testing MonitorsManager.
-    """
-    def __init__(self, default_monitors):
-        self.__monitors = default_monitors
-
-    def get_default_monitors(self, _):
-        return self.__monitors

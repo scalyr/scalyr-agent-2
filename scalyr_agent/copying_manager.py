@@ -369,7 +369,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     self.__logs_pending_removal.pop( log_path, None )
 
             else:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor.module_name, log_path) )
+                log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor_name, log_path) )
         finally:
             self.__lock.release()
 

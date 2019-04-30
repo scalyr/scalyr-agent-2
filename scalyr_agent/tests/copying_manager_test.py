@@ -183,6 +183,14 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         # We also verify the monitor instance itself's log config object was updated to have the full path.
         self.assertEquals(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
 
+    def test_remove_log_path_with_non_existing_path(self):
+        test_manager = self.__create_test_instance([
+        ], [
+            {'path': 'test.log'},
+        ])
+        # check that removing a non-existent path runs without throwing an exception
+        test_manager.remove_log_path( 'test_monitor', 'blahblah.log' )
+
     def __create_test_instance(self, configuration_logs_entry, monitors_log_configs):
         logs_json_array = JsonArray()
         for entry in configuration_logs_entry:
