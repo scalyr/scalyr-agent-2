@@ -4,7 +4,7 @@
 #
 version: 2
 jobs:
-  test27:
+  unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie-browsers
@@ -27,7 +27,6 @@ jobs:
           command: |
             source venv/bin/activate
             python run_tests.py
-            # nosetests --with-cov --cover- erase --cover-html scalyr_agent/tests/ --verbose --with-xunit --xunit-file xunit.xml --ignore-files=.*log_processing_test.*
 
       - store_artifacts:
           path: xunit.xml
@@ -35,7 +34,7 @@ jobs:
       - store_artifacts:
           path: cover/
 
-  test26:
+  unittest-26:
     docker:
       - image: circleci/python:2.7-jessie-browsers
     steps:
@@ -44,49 +43,93 @@ jobs:
       - run:
           command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} edwardchee/scalyr-agent-ci:python26 /tmp/run_unittests.sh
 
-  smoke27:
+  smoke-standalone-27:
     docker:
       - image: circleci/python:2.7-jessie-browsers
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest:1 /tmp/smoketest_standalone.sh
 
-  smoke26:
+  smoke-standalone-26:
     docker:
       - image: circleci/python:2.7-jessie-browsers
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest:1 /tmp/smoketest_standalone.sh
 
-  smoke25:
+  smoke-standalone-25:
     docker:
       - image: circleci/python:2.7-jessie-browsers
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest:1 /tmp/smoketest_standalone.sh
 
-  smoke24:
+  smoke-standalone-24:
     docker:
       - image: circleci/python:2.7-jessie-browsers
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e SCALYR_MAX_QUERY_SEC=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest /tmp/smoketest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} scalyr/scalyr-agent-ci-smoketest:1 /tmp/smoketest_standalone.sh
+
+  smoke-docker-json:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+      - run:
+          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:1 json 300
+
+  smoke-docker-syslog:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+      - run:
+          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:1 syslog 300
 
 workflows:
   version: 2
   unittest:
     jobs:
-      - test27
-      - test26
-      - smoke27
-      - smoke26
-      - smoke25
-      - smoke24
+      - unittest-27
+      - unittest-26
+      - smoke-standalone-27
+      - smoke-standalone-26
+      - smoke-standalone-25
+      - smoke-standalone-24
+      - smoke-docker-json
+      - smoke-docker-syslog
