@@ -31,14 +31,9 @@ import threading
 import time
 import traceback
 from string import Template
-from threading import Timer
 
 from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
-from scalyr_agent.log_watcher import LogWatcher
-from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVEL_2
-from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-from scalyr_agent.monitor_utils.server_processors import RequestStream
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject

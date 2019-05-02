@@ -19,7 +19,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest2 as unittest
+import unittest
 import os
 import sys
 import traceback
@@ -52,6 +52,16 @@ def find_all_tests(directory=None, base_path=None):
     return result
 
 
+PRE_PYTHON27_WHITELIST = [
+    'scalyr_agent.tests.configuration_k8s_test',
+    'scalyr_agent.builtin_monitors.tests.docker_monitor_test',
+    'scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test',
+    'scalyr_agent.monitor_utils.tests.k8s_test',
+    'scalyr_agent.tests.syslog_request_parser_test',
+    'scalyr_agent.tests.syslog_monitor_test',
+    'scalyr_agent.tests.redis_monitor_test',
+]
+
 def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
     contained in files ending in '_test.py'.
@@ -61,7 +71,15 @@ def run_all_tests():
     error = False
     for test_case in find_all_tests():
         try:
-            suites.append(test_loader.loadTestsFromName(test_case))
+            try:
+                suites.append(test_loader.loadTestsFromName(test_case))
+            except Exception, ex:
+                if sys.version[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
+                    print("Warning. Skipping unloadable module '%s'.\n"
+                          "This module was whitelisted as non-critical for pre-2.7 testing.\n"
+                          "Module-load exception message: '%s'\n" % (test_case, ex))
+                else:
+                    raise
         except Exception, e:
             error = True
             print( "Error loading test_case '%s'.  %s, %s" % (test_case, str(e), traceback.format_exc()) )

@@ -18,7 +18,8 @@
 __author__ = 'echee@scalyr.com'
 
 
-import unittest2 as unittest
+import sys
+import unittest
 
 from scalyr_agent import util
 from scalyr_agent.json_lib import JsonObject
@@ -42,8 +43,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             util._set_json_lib('json_lib')
 
     def test_invalid_lib(self):
-        with self.assertRaises(ValueError):
-            util._set_json_lib('BAD JSON LIBRARY NAME')
+        self.assertRaises(ValueError, lambda: util._set_json_lib('BAD JSON LIBRARY NAME'))
 
     def test_dict(self):
         self.__test_encode_decode('{"a":1,"b":2}', {u'a': 1, u'b': 2})
@@ -96,11 +96,12 @@ class EncodeDecodeTest(ScalyrTestCase):
                 text3 = util.json_encode(obj2)
                 self.assertEquals(text, text3)
             else:
-                with self.assertRaises(TypeError):
-                    util.json_encode(obj)
+                self.assertRaises(TypeError, lambda: util.json_encode(obj))
 
-        __runtest(JSON)
-        __runtest(UJSON)
+        if sys.version_info[:2] > (2, 4):
+            __runtest(UJSON)
+        if sys.version_info[:2] > (2, 5):
+            __runtest(JSON)
         __runtest(FALLBACK)
 
 

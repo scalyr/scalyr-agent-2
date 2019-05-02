@@ -33,8 +33,11 @@ import threading
 import time
 
 import scalyr_agent.json_lib as json_lib
+from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
+
+
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
 try:

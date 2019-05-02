@@ -20,7 +20,7 @@ __author__ = 'imron@scalyr.com'
 import time
 import sys
 import socket
-import unittest2 as unittest
+import unittest
 import logging
 import uuid
 import os

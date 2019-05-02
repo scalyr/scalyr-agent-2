@@ -31,9 +31,11 @@ We do this by:
 
 """
 
-import unittest2 as unittest
+import unittest
 from subprocess import call
 import os
+
+from scalyr_agent.test_base import skipUnless
 
 
 class WorkingDirectory:
@@ -55,35 +57,47 @@ class RunPlatformTests(unittest.TestCase):
     """
     Runs Scalyr Agent Tests on all platforms
     """
-    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_alpine(self):
-        with WorkingDirectory("scalyr_agent/platform_tests/alpine"):
+        wd = WorkingDirectory("scalyr_agent/platform_tests/alpine")
+        try:
+            wd.__enter__()
             call(["docker", "build", "-t",  "scalyr:python_2-alpine", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_alpine", "scalyr:python_2-alpine",
                  "python", "run_tests.py", "--verbose"]
             )
+        finally:
+            wd.__exit__()
 
-    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_wheezy(self):
-        with WorkingDirectory("scalyr_agent/platform_tests/wheezy"):
+        wd = WorkingDirectory("scalyr_agent/platform_tests/wheezy")
+        try:
+            wd.__enter__()
             call(["docker", "build", "-t",  "scalyr:python_2-wheezy", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_wheezy", "scalyr:python_2-wheezy",
                  "python", "run_tests.py", "--verbose"]
             )
+        finally:
+            wd.__exit__()
 
-    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_jessie(self):
-        with WorkingDirectory("scalyr_agent/platform_tests/jessie"):
+        wd = WorkingDirectory("scalyr_agent/platform_tests/jessie")
+        try:
+            wd.__enter__()
             call(["docker", "build", "-t",  "scalyr:python_2-jessie", "."])
             call(
                 ["docker", "run", "--name", "scalyr_container_jessie", "scalyr:python_2-jessie",
                  "python", "run_tests.py", "--verbose"]
             )
+        finally:
+            wd.__exit__()
 
     @classmethod
-    @unittest.skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
+    @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def tearDownClass(cls):
         call(["docker", "stop", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])
         call(["docker", "rm", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])

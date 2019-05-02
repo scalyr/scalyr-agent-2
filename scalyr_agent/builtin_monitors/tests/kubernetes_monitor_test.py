@@ -24,7 +24,7 @@ from mock import patch
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
 from scalyr_agent.util import FakeClock, FakeClockCounter
-from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase, skipIf, PYTHON_26_OR_OLDER
 from scalyr_agent.test_util import ScalyrTestUtils
 
 
@@ -38,6 +38,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
     to enable the main loop to run.
     """
 
+    @skipIf(PYTHON_26_OR_OLDER, 'Docker Agent requires python 2.7')
     @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
     def test_user_agent_fragment(self, mock_docker):
 
@@ -49,10 +50,11 @@ class KubernetesMonitorTest(ScalyrTestCase):
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
 
-        with mock.patch.object(KubernetesMonitor, '_initialize', fake_init):
+        manager_poll_interval = 30
+        fake_clock = FakeClock()
 
-            manager_poll_interval = 30
-            fake_clock = FakeClock()
+        @patch.object(KubernetesMonitor, '_initialize', new=fake_init)
+        def create_manager():
             manager = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
                     {
@@ -63,65 +65,67 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 null_logger=True,
                 fake_clock=fake_clock,
             )
+            return manager
+        manager = create_manager()
 
-            fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
-            counter = {'callback_invocations': 0}
-            detected_fragment_changes = []
+        fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
+        counter = {'callback_invocations': 0}
+        detected_fragment_changes = []
 
-            # Mock the callback (that would normally be invoked on ScalyrClientSession
-            def augment_user_agent(fragments):
-                counter['callback_invocations'] += 1
-                detected_fragment_changes.append(fragments[0])
+        # Mock the callback (that would normally be invoked on ScalyrClientSession
+        def augment_user_agent(fragments):
+            counter['callback_invocations'] += 1
+            detected_fragment_changes.append(fragments[0])
 
-            # Decorate the get_user_agent_fragment() function as follows:
-            # Each invocation increments the FakeClockCounter
-            # Simulate the following race condition:
-            # 1. The first 10 polls by MonitorsManager is such that KubernetesMonitor has not yet started. Therefore,
-            #     the version is None
-            # 2. After the 20th poll, version is set
-            # 3. After the 30th poll, version changes (does not normally happen, but we ensure this repeated check)
-            #
-            # Total number of times the user_agent_callback is called should be twice:
-            # - once for when docker version is None (fragment is 'k8s=true')
-            # - once for when docker version changes to a real number
-            version1 = '1.13.4'
-            version2 = '1.14.1'
-            k8s_mon = manager.monitors[0]
-            original_get_user_agent_fragment = k8s_mon.get_user_agent_fragment
+        # Decorate the get_user_agent_fragment() function as follows:
+        # Each invocation increments the FakeClockCounter
+        # Simulate the following race condition:
+        # 1. The first 10 polls by MonitorsManager is such that KubernetesMonitor has not yet started. Therefore,
+        #     the version is None
+        # 2. After the 20th poll, version is set
+        # 3. After the 30th poll, version changes (does not normally happen, but we ensure this repeated check)
+        #
+        # Total number of times the user_agent_callback is called should be twice:
+        # - once for when docker version is None (fragment is 'k8s=true')
+        # - once for when docker version changes to a real number
+        version1 = '1.13.4'
+        version2 = '1.14.1'
+        k8s_mon = manager.monitors[0]
+        original_get_user_agent_fragment = k8s_mon.get_user_agent_fragment
 
-            def fake_get_user_agent_fragment():
-                result = original_get_user_agent_fragment()
-                fragment_polls.increment()
-                return result
+        def fake_get_user_agent_fragment():
+            result = original_get_user_agent_fragment()
+            fragment_polls.increment()
+            return result
 
-            def fake_get_api_server_version():
-                if fragment_polls.count() < 10:
-                    return None
-                elif fragment_polls.count() < 20:
-                    return version1
-                else:
-                    return version2
+        def fake_get_api_server_version():
+            if fragment_polls.count() < 10:
+                return None
+            elif fragment_polls.count() < 20:
+                return version1
+            else:
+                return version2
 
-            @patch.object(k8s_mon, 'get_user_agent_fragment')
-            @patch.object(k8s_mon, '_KubernetesMonitor__get_k8s_cache')  # return Mock obj instead of a KubernetesCache)
-            def start_test(m2, m1):
-                m1.side_effect = fake_get_user_agent_fragment
-                m2.return_value.get_api_server_version.side_effect = fake_get_api_server_version
-                manager.set_user_agent_augment_callback(augment_user_agent)
+        @patch.object(k8s_mon, 'get_user_agent_fragment')
+        @patch.object(k8s_mon, '_KubernetesMonitor__get_k8s_cache')  # return Mock obj instead of a KubernetesCache)
+        def start_test(m2, m1):
+            m1.side_effect = fake_get_user_agent_fragment
+            m2.return_value.get_api_server_version.side_effect = fake_get_api_server_version
+            manager.set_user_agent_augment_callback(augment_user_agent)
 
-                manager.start_manager()
-                fragment_polls.sleep_until_count_or_maxwait(40, manager_poll_interval, maxwait=1)
+            manager.start_manager()
+            fragment_polls.sleep_until_count_or_maxwait(40, manager_poll_interval, maxwait=1)
 
-                m1.assert_called()
-                m2.assert_called()
-                self.assertEqual(fragment_polls.count(), 40)
-                self.assertEqual(counter['callback_invocations'], 3)
-                self.assertEquals(detected_fragment_changes, [
-                    'k8s=true',
-                    'k8s=%s' % version1,
-                    'k8s=%s' % version2,
-                ])
+            m1.assert_called()
+            m2.assert_called()
+            self.assertEqual(fragment_polls.count(), 40)
+            self.assertEqual(counter['callback_invocations'], 3)
+            self.assertEquals(detected_fragment_changes, [
+                'k8s=true',
+                'k8s=%s' % version1,
+                'k8s=%s' % version2,
+            ])
 
-                manager.stop_manager(wait_on_join=False)
-                fake_clock.advance_time(increment_by=manager_poll_interval)
-            start_test()
+            manager.stop_manager(wait_on_join=False)
+            fake_clock.advance_time(increment_by=manager_poll_interval)
+        start_test()

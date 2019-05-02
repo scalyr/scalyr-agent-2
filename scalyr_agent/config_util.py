@@ -87,7 +87,9 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     """Convert monitor config values to a different type according to the ALLOWED_CONVERSIONS matrix"""
     convert_from = type(value)
 
-    kind = 'config param' if not is_environment_variable else 'environment variable'
+    kind = 'environment variable'
+    if not is_environment_variable:
+        kind = 'config param'
 
     conversion_allowed = False
     if convert_from in ALLOWED_CONVERSIONS:

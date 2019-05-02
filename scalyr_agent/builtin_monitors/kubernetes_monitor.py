@@ -17,12 +17,12 @@
 __author__ = 'imron@scalyr.com'
 
 import datetime
-import docker
 import fnmatch
 import glob
 import traceback
 import os
 import re
+import sys
 import stat
 from string import Template
 import time
@@ -35,6 +35,9 @@ import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 from scalyr_agent.util import StoppableThread
+
+
+import docker
 
 
 global_log = scalyr_logging.getLogger(__name__)

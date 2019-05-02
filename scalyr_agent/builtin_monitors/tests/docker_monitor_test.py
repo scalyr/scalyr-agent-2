@@ -48,10 +48,11 @@ class DockerMonitorTest(ScalyrTestCase):
             self._DockerMonitor__version_lock = threading.RLock()
             self._DockerMonitor__version = None
 
-        with mock.patch.object(DockerMonitor, '_initialize', fake_init):
+        manager_poll_interval = 30
+        fake_clock = FakeClock()
 
-            manager_poll_interval = 30
-            fake_clock = FakeClock()
+        @patch.object(DockerMonitor, '_initialize', new=fake_init)
+        def create_manager():
             manager = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
                     {
@@ -63,93 +64,95 @@ class DockerMonitorTest(ScalyrTestCase):
                 null_logger=True,
                 fake_clock=fake_clock,
             )
+            return manager
+        manager = create_manager()
 
-            fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
-            counter = {'callback_invocations': 0}
-            detected_fragment_changes = []
+        fragment_polls = FakeClockCounter(fake_clock, num_waiters=2)
+        counter = {'callback_invocations': 0}
+        detected_fragment_changes = []
 
-            # Mock the callback (that would normally be invoked on ScalyrClientSession
-            def augment_user_agent(fragments):
-                counter['callback_invocations'] += 1
-                detected_fragment_changes.append(fragments[0])
+        # Mock the callback (that would normally be invoked on ScalyrClientSession
+        def augment_user_agent(fragments):
+            counter['callback_invocations'] += 1
+            detected_fragment_changes.append(fragments[0])
 
-            # Decorate the get_user_agent_fragment() function as follows:
-            # Each invocation increments the FakeClockCounter
-            # Simulate the following race condition:
-            # 1. The first 10 polls by MonitorsManager is such that DockerMonitor has not yet started. Therefore,
-            #     the docker version is None
-            # 2. After the 20th poll, docker version is set
-            # 3. After the 30th poll, docker mode changes to docker_api|raw
-            # 4. After the 40th poll, docker mode changes to docker_api|api
-            #
-            # Note: (3) and (4) do not happen in real life.  We force these config changes to test permutations
-            # of user agent fragments for different config scenarios
-            #
-            # Total number of times the user_agent_callback is called should be twice:
-            # - once for when docker version is None (fragment is 'docker=true')
-            # - once for when docker version changes to a real number
-            fake_docker_version = '18.09.2'
-            docker_mon = manager.monitors[0]
-            original_get_user_agent_fragment = docker_mon.get_user_agent_fragment
-            original_monitor_config_get = docker_mon._config.get
+        # Decorate the get_user_agent_fragment() function as follows:
+        # Each invocation increments the FakeClockCounter
+        # Simulate the following race condition:
+        # 1. The first 10 polls by MonitorsManager is such that DockerMonitor has not yet started. Therefore,
+        #     the docker version is None
+        # 2. After the 20th poll, docker version is set
+        # 3. After the 30th poll, docker mode changes to docker_api|raw
+        # 4. After the 40th poll, docker mode changes to docker_api|api
+        #
+        # Note: (3) and (4) do not happen in real life.  We force these config changes to test permutations
+        # of user agent fragments for different config scenarios
+        #
+        # Total number of times the user_agent_callback is called should be twice:
+        # - once for when docker version is None (fragment is 'docker=true')
+        # - once for when docker version changes to a real number
+        fake_docker_version = '18.09.2'
+        docker_mon = manager.monitors[0]
+        original_get_user_agent_fragment = docker_mon.get_user_agent_fragment
+        original_monitor_config_get = docker_mon._config.get
 
-            def fake_get_user_agent_fragment():
-                result = original_get_user_agent_fragment()
-                fragment_polls.increment()
-                return result
+        def fake_get_user_agent_fragment():
+            result = original_get_user_agent_fragment()
+            fragment_polls.increment()
+            return result
 
-            def fake_fetch_and_set_version():
-                # Simulate slow-to-start DockerMonitor where version is set only after 10th poll by MonitorsManager
-                # Thus, polls 0-9 return in version=None which ultimately translates to 'docker=true' fragment
-                docker_mon._DockerMonitor__version_lock.acquire()
-                try:
-                    if fragment_polls.count() < 10:
-                        docker_mon._DockerMonitor__version = None
-                    else:
-                        docker_mon._DockerMonitor__version = fake_docker_version
-                finally:
-                    docker_mon._DockerMonitor__version_lock.release()
-
-            def fake_monitor_config_get(key):
-                # Fake the return values from MonitorConfig.get in order to exercise different permutations of
-                # user_agent fragment.
-                if key == 'log_mode':
-                    if fragment_polls.count() < 20:
-                        return 'syslog'
-                    else:
-                        return 'docker_api'
-                elif key == 'docker_raw_logs':
-                    if fragment_polls.count() < 30:
-                        return True
-                    else:
-                        return False
+        def fake_fetch_and_set_version():
+            # Simulate slow-to-start DockerMonitor where version is set only after 10th poll by MonitorsManager
+            # Thus, polls 0-9 return in version=None which ultimately translates to 'docker=true' fragment
+            docker_mon._DockerMonitor__version_lock.acquire()
+            try:
+                if fragment_polls.count() < 10:
+                    docker_mon._DockerMonitor__version = None
                 else:
-                    return original_monitor_config_get(key)
+                    docker_mon._DockerMonitor__version = fake_docker_version
+            finally:
+                docker_mon._DockerMonitor__version_lock.release()
 
-            @patch.object(docker_mon, 'get_user_agent_fragment')
-            @patch.object(docker_mon, '_fetch_and_set_version')
-            @patch.object(docker_mon._config, 'get')
-            def start_test(m3, m2, m1):
-                m1.side_effect = fake_get_user_agent_fragment
-                m2.side_effect = fake_fetch_and_set_version
-                m3.side_effect = fake_monitor_config_get
-                manager.set_user_agent_augment_callback(augment_user_agent)
+        def fake_monitor_config_get(key):
+            # Fake the return values from MonitorConfig.get in order to exercise different permutations of
+            # user_agent fragment.
+            if key == 'log_mode':
+                if fragment_polls.count() < 20:
+                    return 'syslog'
+                else:
+                    return 'docker_api'
+            elif key == 'docker_raw_logs':
+                if fragment_polls.count() < 30:
+                    return True
+                else:
+                    return False
+            else:
+                return original_monitor_config_get(key)
 
-                manager.start_manager()
-                fragment_polls.sleep_until_count_or_maxwait(40, manager_poll_interval, maxwait=1)
+        @patch.object(docker_mon, 'get_user_agent_fragment')
+        @patch.object(docker_mon, '_fetch_and_set_version')
+        @patch.object(docker_mon._config, 'get')
+        def start_test(m3, m2, m1):
+            m1.side_effect = fake_get_user_agent_fragment
+            m2.side_effect = fake_fetch_and_set_version
+            m3.side_effect = fake_monitor_config_get
+            manager.set_user_agent_augment_callback(augment_user_agent)
 
-                m1.assert_called()
-                m2.assert_called()
-                m3.assert_called()
-                self.assertEquals(fragment_polls.count(), 40)
-                self.assertEquals(counter['callback_invocations'], 4)
-                self.assertEquals(detected_fragment_changes, [
-                    'docker=true',
-                    'docker=18.09.2|syslog',
-                    'docker=18.09.2|docker_api|raw',
-                    'docker=18.09.2|docker_api|api',
-                ])
+            manager.start_manager()
+            fragment_polls.sleep_until_count_or_maxwait(40, manager_poll_interval, maxwait=1)
 
-                manager.stop_manager(wait_on_join=False)
-                fake_clock.advance_time(increment_by=manager_poll_interval)
-            start_test()
+            m1.assert_called()
+            m2.assert_called()
+            m3.assert_called()
+            self.assertEquals(fragment_polls.count(), 40)
+            self.assertEquals(counter['callback_invocations'], 4)
+            self.assertEquals(detected_fragment_changes, [
+                'docker=true',
+                'docker=18.09.2|syslog',
+                'docker=18.09.2|docker_api|raw',
+                'docker=18.09.2|docker_api|api',
+            ])
+
+            manager.stop_manager(wait_on_join=False)
+            fake_clock.advance_time(increment_by=manager_poll_interval)
+        start_test()

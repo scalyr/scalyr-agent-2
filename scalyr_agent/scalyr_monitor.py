@@ -790,7 +790,9 @@ class MonitorConfig(object):
             # Param not found in config file, so check environment
             if result is None or report_conflicting_environment_value:
                 envar_name = self._environment_aware_map.get(field)
-                logger = log if report_conflicting_environment_value else None
+                logger = None
+                if report_conflicting_environment_value:
+                    logger = log
                 envar_val = get_config_from_env(field, envar_name, convert_to=convert_to,
                                                 logger=logger, param_val=result, monitor_name=self.__monitor_module)
                 if result is None:

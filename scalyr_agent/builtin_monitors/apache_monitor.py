@@ -215,7 +215,7 @@ options, see Configuration Reference.
         # verify that the URL is valid
         try:
             url = urlparse.urlparse(self.__url)
-        except Exception as e:
+        except Exception, e:
             self._logger.error(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s" %
                 self.__url)
@@ -227,7 +227,7 @@ options, see Configuration Reference.
             data = handle.read()
             if data is not None:
                 data = self._parse_data(data)
-        except urllib2.HTTPError as err:
+        except urllib2.HTTPError, err:
             message = "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ", err.code
             if err.code == 404:
                 message = "The URL used to request the status page appears to be incorrect.  Please verify the correct URL and update your apache_monitor configuration."
@@ -237,13 +237,13 @@ options, see Configuration Reference.
                 message = "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: ", err.code
             self._logger.error(message)
             data = None
-        except urllib2.URLError as err:
+        except urllib2.URLError, err:
             message = "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ", err
             if err.reason.errno == 111:
                 message = "The HTTP server does not appear to running or cannot be reached.  Please check that it is running and is reachable at the address: %s" % url.netloc
             self._logger.error(message)
             data = None
-        except Exception as e:
+        except Exception, e:
             self._logger.error(
                 "An error occurred attempting to request the server status: %s" %
                 e)
