@@ -749,16 +749,17 @@ def build_base_files(base_configs='config'):
     os.chdir(original_dir)
 
 
-def make_directory(path):
+def make_directory(path, mode=0o755):
     """Creates the specified directory including any parents that do not yet exist.
 
     @param path: The path of the directory to create. This string can use a forward slash to separate path
            components regardless of the separator character for this platform.  This method will perform the necessary
            conversion.
+    @param mode: The directory mode to pass to os.makedirs
     """
     converted_path = convert_path(path)
     try:
-        os.makedirs(converted_path)
+        os.makedirs(converted_path, mode)
     except OSError, error:
         if error.errno == errno.EEXIST and os.path.isdir(converted_path):
             pass
