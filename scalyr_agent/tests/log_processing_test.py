@@ -33,6 +33,7 @@ from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
 from scalyr_agent.util import md5_hexdigest
+from scalyr_agent.util import rfc3339_to_nanoseconds_since_epoch
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.platform_controller import DefaultPaths
 
@@ -733,6 +734,227 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
         # The numbers might not be perfect because some file systems do not return a mod time with fractional secs.
         self.assertTrue(abs(known_time - self.log_file.last_modification_time) < 1)
+
+    def test_parse_as_json(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = {
+            "stream": "stdout",
+            "raw_timestamp": "2019-04-30T14:42:20.430372409Z"
+        }
+        expected_timestamp = rfc3339_to_nanoseconds_since_epoch( "2019-04-30T14:42:20.430372409Z" )
+
+        self.assertEquals( 'Tue Apr 30 14:42:20 UTC 2019 - hello\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_empty(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.write_file( self.__path, '' )
+        self.log_file.scan_for_new_bytes()
+
+        #from pprint import pprint
+        #import pdb; pdb.set_trace()
+        line = self.readline()
+        expected_attrs = None
+        expected_timestamp = None
+
+        self.assertEquals( '', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_different_message_field(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True,
+                      'json_message_field': 'message'
+                      }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"message":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = {
+            "stream": "stdout",
+            "raw_timestamp": "2019-04-30T14:42:20.430372409Z"
+        }
+        expected_timestamp = rfc3339_to_nanoseconds_since_epoch( "2019-04-30T14:42:20.430372409Z" )
+
+        self.assertEquals( 'Tue Apr 30 14:42:20 UTC 2019 - hello\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_invalid_message_field(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True,
+                      'json_message_field': 'invalid'
+                      }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = None
+        expected_timestamp = None
+
+        self.assertEquals( '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_different_timestamp_field(self):
+        log_config = {'path': self.__path,
+                      'json_timestamp_field': 'ts',
+                      'parse_lines_as_json': True }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","ts":"2019-04-30T14:42:20.430372409Z"}\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = {
+            "stream": "stdout",
+            "raw_timestamp": "2019-04-30T14:42:20.430372409Z"
+        }
+        expected_timestamp = rfc3339_to_nanoseconds_since_epoch( "2019-04-30T14:42:20.430372409Z" )
+
+        self.assertEquals( 'Tue Apr 30 14:42:20 UTC 2019 - hello\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_invalid_timestamp_field(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True,
+                      'json_timestamp_field': 'invalid'
+                      }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = {
+            "stream": "stdout",
+            "time": "2019-04-30T14:42:20.430372409Z"
+        }
+        expected_timestamp = None
+
+        self.assertEquals( 'Tue Apr 30 14:42:20 UTC 2019 - hello\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_invalid_json(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True
+                      }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.append_file(self.__path,
+            '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"st\n',
+        )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = None
+        expected_timestamp = None
+
+        self.assertEquals( '{"log":"Tue Apr 30 14:42:20 UTC 2019 - hello\\n","stream":"st\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_large_line(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.log_file.set_parameters(max_line_length=51, page_size=1*1024*1024)
+
+        # start the json object
+        text = '{"log":"Tue Apr 30 14:42:20 UTC 2019 - '
+        for _ in range(0, 10000):
+            # append 100 bytes each iteration
+            text += 'abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789'
+
+        # and finish the json object
+        text += '\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n'
+
+        self.append_file( self.__path, text )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = {
+            "stream": "stdout",
+            "raw_timestamp": "2019-04-30T14:42:20.430372409Z"
+        }
+        expected_timestamp = rfc3339_to_nanoseconds_since_epoch( "2019-04-30T14:42:20.430372409Z" )
+
+        self.assertEquals( 'Tue Apr 30 14:42:20 UTC 2019 - abcdefghij0123456789...truncated 999981 bytes...', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def test_parse_as_json_large_line_small_page_size(self):
+        log_config = {'path': self.__path,
+                      'parse_lines_as_json': True }
+
+        self.reload_with_config( DEFAULT_CONFIG, log_config )
+
+        self.log_file.set_parameters(max_line_length=100, page_size=150)
+
+        # start the json object
+        text = '{"log":"Tue Apr 30 14:42:20 UTC 2019 - '
+        text += 'abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789'
+        text += '\\n","stream":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n'
+
+        self.append_file( self.__path, text )
+        self.log_file.scan_for_new_bytes()
+
+        line = self.readline()
+        expected_attrs = None
+        expected_timestamp = None
+
+        self.assertEquals( '{"log":"Tue Apr 30 14:42:20 UTC 2019 - abcdefghij0123456789abcdefghij0123456789abcdefghij0123456789a...truncated 50 bytes...', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+        line = self.readline()
+
+        self.assertEquals( '":"stdout","time":"2019-04-30T14:42:20.430372409Z"}\n', line.line )
+        self.assertEquals( expected_attrs, line.attrs )
+        self.assertEquals( expected_timestamp, line.timestamp )
+
+    def reload_with_config( self, global_config, log_config ):
+        log_config = global_config.parse_log_config(log_config)
+
+        self.log_file = LogFileIterator( self.__path, global_config, log_config, file_system=self.__file_system )
+        self.log_file.set_parameters( max_line_length=global_config.max_line_size, page_size=global_config.read_page_size )
+        self.log_file.scan_for_new_bytes()
 
     def write_file(self, path, *lines):
         contents = ''.join(lines)
