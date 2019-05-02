@@ -166,12 +166,8 @@ class LogFileIterator(object):
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
-        self.__parse_as_json = log_config.get('parse_lines_as_json', False)
-        self.__json_log_key = log_config.get('json_message_field', 'log' )
-        self.__json_timestamp_key = log_config.get('json_timestamp_field', 'time')
-
         # create the line matcher objects for matching single and multiple lines
-        self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
+        self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.read_page_size, config.max_line_size,
                                                                config.line_completion_wait_time)
 
         # Stat just used in testing to verify pages are being read correctly.
@@ -266,6 +262,8 @@ class LogFileIterator(object):
 
         if page_size is not None:
             self.__page_size = page_size
+
+        self.__line_matcher.read_page_size = self.__page_size
 
     def __get_unique_id( self ):
         """Returns a uuid as a string
@@ -408,26 +406,6 @@ class LogFileIterator(object):
         then a line will be returned using the available bytes up to the max line size.  Second, if there are bytes
         available, and sufficient time has past without seeing a newline, then the available lines are returned.
 
-        If the 'parse_as_json' configuration item is True then this function will also attempt to process the line as json,
-        extracting a log message, a timestamp and any other remaining fields, all of which are returned as a LogLine object.
-
-        When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
-        the line will be returned unprocessed.
-
-        The configuration options 'json_message_field' and 'json_timestamp_field' are used to specify which field to use
-        as the log message, and which field to use for the timestamp.
-
-        'json_message_field' defaults to 'log' and if no field with this name is found, the function will return the
-        full line unprocessed.
-
-        'json_timestamp_field' defaults to 'time', and the value of this field is required to be in rfc3339 format
-        otherwise an error will occur.  If the field does not exist in the json object, then the agent will use
-        the current time instead.  Note, the value specified in the timestamp field might not be the final value uploaded
-        to the server, as the agent ensures that the timestamps of all messages are monotonically increasing.  For
-        this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
-
-        All other fields of the json object will be stored in the attrs dict of the LogLine object.
-
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float
         @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
@@ -460,7 +438,7 @@ class LogFileIterator(object):
         #            expected_buffer_index, original_buffer_index)
 
         # read a complete line from our line_matcher
-        result = self.__line_matcher.readline(self.__buffer, current_time)
+        result = self.__line_matcher.readline(self.__buffer, current_time, current_file=self.__path)
 
         if len(result.line) == 0:
             return result
@@ -475,44 +453,6 @@ class LogFileIterator(object):
         #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
         #                                              expected_size, actual_size)
 
-        # check to see if we need to parse the line as json
-        if self.__parse_as_json:
-            try:
-                json = scalyr_util.json_decode( result.line )
-
-                line = None
-                attrs = {}
-                timestamp = None
-                # go over all json key/values, adding non-message values to a attr dict
-                # and the message value to the line variable
-                for key, value in json.iteritems():
-                    if key == self.__json_log_key:
-                        line = value
-                    elif key == self.__json_timestamp_key:
-                        # TODO: need to add support for multiple timestamp formats
-                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(value)
-                        if 'raw_timestamp' not in attrs:
-                            attrs['raw_timestamp'] = value
-                    else:
-                        attrs[key] = value
-
-                # if we didn't find a valid line key/value pair
-                # throw a warning and treat it as a normal line
-                if line is None:
-                    log.warn("Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration" %
-                        (self.__json_log_key, self.__path), limit_once_per_x_secs=300, limit_key=('json-message-field-missing-%s' % self.__path))
-                else:
-                    # we found a key match for the message field, so use that for the log line
-                    # and store any other fields in the attr dict
-                    result.line = line
-                    result.timestamp = timestamp
-                    if attrs:
-                        result.attrs = attrs
-
-            except Exception, e:
-                # something went wrong. Return the full line and log a message
-                log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line.decode( "utf-8", 'replace' )),
-                         limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
         return result
 
     def advance_to_end(self, current_time=None):

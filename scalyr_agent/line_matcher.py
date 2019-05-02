@@ -21,6 +21,10 @@
 # author: Imron Alston <imron@scalyr.com>
 
 import re
+import scalyr_agent.util as scalyr_util
+import scalyr_agent.scalyr_logging as scalyr_logging
+
+log = scalyr_logging.getLogger(__name__)
 
 __author__ = 'imron@scalyr.com'
 
@@ -54,14 +58,15 @@ class LineMatcher(object):
     """
 
     @staticmethod
-    def create_line_matchers( log_config, max_line_length, line_completion_wait_time ):
+    def create_line_matchers( log_config, read_page_size, max_line_length, line_completion_wait_time ):
         """Creates line matchers based on the config passed in
         see: https://www.scalyr.com/help/parsing-logs#multiline for more info
 
         If no lineGroupers attribute is found, then it defaults to a single line matcher
 
         @param log_config: A JsonObject containing the log config
-        @param max_line_length: The maximum amount to read before returning a new line
+        @param read_page_size: The maximum page size to read - used by line matches that parse a specific line format
+        @param max_line_length: The maximum line length of a log message
         @param line_completion_wait_time: The maximum amount of time to wait
             if only a partial line is ready
         @return - a line matcher object based on the config
@@ -71,6 +76,17 @@ class LineMatcher(object):
 
         #return a single line matcher if line_groupers is empty or None
         if not line_groupers:
+            # return a json line parser if necessary
+            if log_config.get( 'parse_lines_as_json', False ):
+                return JsonLineMatcher(
+                    max_line_length=max_line_length,
+                    line_completion_wait_time=line_completion_wait_time,
+                    read_page_size=read_page_size,
+                    json_message_field=log_config.get( 'json_message_field', 'log' ),
+                    json_timestamp_field=log_config.get( 'json_timestamp_field', 'time' )
+                )
+
+            # otherwise return a normal parser
             return LineMatcher( max_line_length, line_completion_wait_time )
 
         #build a line matcher collection
@@ -100,24 +116,30 @@ class LineMatcher(object):
         self.__line_completion_wait_time = line_completion_wait_time
         self.__partial_line_time = None
 
-    def readline( self, file_like, current_time ):
+    def readline( self, file_like, current_time, current_file=None ):
         """
-        @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
+        Reads a line from a `file_like` object
+
+        @return: A LogLine object.
         @rtype: LogLine
         """
         #save the original position
         original_offset = file_like.tell()
 
         #read a line, and whether or not this is a partial line from the file_like object
-        line, partial = self._readline( file_like )
+        line, partial = self._readline( file_like, current_file=current_file )
 
-        if len( line ) == 0:
+        # convert line to a LogLine if necessary
+        if not isinstance(line, LogLine):
+            line = LogLine(line)
+
+        if len( line.line ) == 0:
             self.__partial_line_time = None
-            return LogLine(line)
+            return line
 
         # If we have a partial line then we should only
         # return it if sufficient time has passed.
-        if partial and len( line ) < self.max_line_length:
+        if partial and len( line.line ) < self.max_line_length:
 
             if self.__partial_line_time is None:
                 self.__partial_line_time = current_time
@@ -129,9 +151,9 @@ class LineMatcher(object):
         else:
             self.__partial_line_time = None
 
-        return LogLine(line)
+        return line
 
-    def _readline( self, file_like, max_length=0 ):
+    def _readline( self, file_like, max_length=0, current_file=None ):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
         and returns either a full line, or a partial line.
         @param file_like: a file like object (e.g. StringIO)
@@ -147,6 +169,135 @@ class LineMatcher(object):
         partial = len( line) > 0 and line[-1] != '\n' and line[-1] != '\r'
         return line, partial
 
+class JsonLineMatcher( LineMatcher ):
+    """
+    Parses a line as JSON
+
+    If the `parse_as_json` configuration item is True then
+    """
+    def __init__( self, max_line_length=5*1024, line_completion_wait_time=5*60, read_page_size=60*1024, json_message_field='log', json_timestamp_field="time" ):
+        LineMatcher.__init__( self, max_line_length, line_completion_wait_time )
+
+        self._json_message_field = json_message_field
+        self._json_timestamp_field= json_timestamp_field
+
+    def _truncated_log_line( self, line, max_length ):
+        """
+        Truncates a line if it is greater than `max_length`, and appends a message saying the number of bytes truncted
+        @return: A LogLine with the truncated message
+        @rtype: LogLine
+        """
+
+        line_len = len(line)
+        if line_len > max_length:
+            line = line[:max_length]
+            line += "...truncated %d bytes..." % (line_len - max_length)
+        return LogLine( line )
+
+    def _readline( self, file_like, max_length=0, current_file=None ):
+        """ Takes a file_like object (e.g. anything conforming to python's file interface
+        and attempts to parse the line as JSON.
+
+        This method will attempt to process the line as json, extracting a log message, a timestamp and any
+        other remaining fields, all of which are returned as a LogLine object.
+
+        When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
+        the line will be returned unprocessed.
+
+        The configuration options 'json_message_field' and 'json_timestamp_field' are used to specify which field to use
+        as the log message, and which field to use for the timestamp.
+
+        'json_message_field' defaults to 'log' and if no field with this name is found, the function will return the
+        full line unprocessed.
+
+        'json_timestamp_field' defaults to 'time', and the value of this field is required to be in rfc3339 format
+        otherwise an error will occur.  If the field does not exist in the json object, then the agent will use
+        the current time instead.  Note, the value specified in the timestamp field might not be the final value uploaded
+        to the server, as the agent ensures that the timestamps of all messages are monotonically increasing.  For
+        this reason, if the timestamp field is found, a 'raw_timestamp' attributed is also added to the LogLine's attrs.
+
+        All other fields of the json object will be stored in the attrs dict of the LogLine object.
+
+        The method will read up to `read_page_size` bytes from the buffer, and truncate any log message to `max_line_size` bytes.
+
+        @param file_like: a file like object (e.g. StringIO)
+        @param max_length: the maximum length to read from the file_like object
+
+        @return: a tuple containing the content read from the file_like object and whether
+            this is a partial line or not.  `partial` will only be true if `read_page_size`
+            was exceeded and a full json object wasn't found.
+
+        @rtype: (LogLine, bool)
+        """
+
+        # set some sensible defaults
+        if max_length == 0:
+            max_length = self.read_page_size
+
+        if current_file is None:
+            current_file = '<unknown>'
+
+        # read from the buffer
+        line = file_like.readline( max_length )
+
+        #return early if no line found
+        if len( line ) == 0:
+            return LogLine( '' ), False
+
+        # check for presence of newline chars to see if this is a partial line
+        partial = line[-1] != '\n' and line[-1] != '\r'
+
+        # early abort if this appears to be a partial line
+        if partial:
+            log.warn("Error parsing line as json for %s.  Log line does not appear to be a full line.  You can increase the buffer size for json line parsing with the global config option `read_page_size`.  The full line will be uploaded to Scalyr: %s" % (current_file, line.decode( "utf-8", 'replace' )),
+                     limit_once_per_x_secs=300, limit_key=('bad-json-%s' % current_file))
+
+            return self._truncated_log_line(line, self.max_line_length), partial
+
+        message = None
+        attrs = {}
+        timestamp = None
+
+        try:
+            json = scalyr_util.json_decode( line )
+
+            # go over all json key/values, adding non-message values to a attr dict
+            # and the message value to the message variable
+            for key, value in json.iteritems():
+                if key == self._json_message_field:
+                    message = value
+                elif key == self._json_timestamp_field:
+                    # TODO: need to add support for multiple timestamp formats
+                    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(value)
+                    if 'raw_timestamp' not in attrs:
+                        attrs['raw_timestamp'] = value
+                else:
+                    attrs[key] = value
+
+        except Exception, e:
+            # something went wrong. Return the full line and log a message
+            log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (current_file, e, line.decode( "utf-8", 'replace' )),
+                     limit_once_per_x_secs=300, limit_key=('bad-json-%s' % current_file))
+            return self._truncated_log_line( line, self.max_line_length ), False
+
+
+        # if we didn't find a valid message key/value pair
+        # throw a warning and treat it as a normal line
+        if message is None:
+            log.warn("Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration" %
+                (self._json_message_field, current_file), limit_once_per_x_secs=300, limit_key=('json-message-field-missing-%s' % current_file))
+            return self._truncated_log_line( line, self.max_line_length ), False
+
+        # we found a key match for the message field, so use that for the log message
+        # and store any other fields in the attr dict
+        result = self._truncated_log_line( message, self.max_line_length )
+        result.timestamp = timestamp
+        if attrs:
+            result.attrs = attrs
+
+        return result, False
+
+
 class LineMatcherCollection( LineMatcher ):
     """ A group of line matchers.
     Returns the line from the first line matcher that returns a non-empty line,
@@ -159,9 +310,9 @@ class LineMatcherCollection( LineMatcher ):
     def add_matcher( self, matcher ):
         self.__matchers.append( matcher )
 
-    def _readline( self, file_like, max_length=0 ):
+    def _readline( self, file_like, max_length=0, current_file=None ):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
-        and checks all self.__matchers to see if any of them match.  If so then return the 
+        and checks all self.__matchers to see if any of them match.  If so then return the
         first matching line, otherwise return a single newline terminated line from the input.
 
         @param file_like: a file like object (e.g. StringIO)
@@ -186,12 +337,12 @@ class LineMatcherCollection( LineMatcher ):
 
             #no match, so reset back to the original offset to prepare for the next line
             file_like.seek( offset )
-        
+
         #if we didn't match any of self.__matchers, then check to see if there is a
         #single line waiting
         if not line:
             line, partial =  LineMatcher._readline( self, file_like, max_length )
-            
+
         return line, partial
 
 class LineGrouper( LineMatcher ):
@@ -205,7 +356,7 @@ class LineGrouper( LineMatcher ):
         self._start_pattern = re.compile( start_pattern )
         self._continuation_pattern = re.compile( continuation_pattern )
 
-    def _readline( self, file_like, max_length=0 ):
+    def _readline( self, file_like, max_length=0, current_file=None ):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
         and returns either a full line, or a partial line.
         @param file_like: a file like object (e.g. StringIO)
@@ -248,7 +399,7 @@ class LineGrouper( LineMatcher ):
                 cont = self._continue_line( next_line )
                 if cont:
                     line = start_line
-                    # build up a multiline string by looping over all lines for as long as 
+                    # build up a multiline string by looping over all lines for as long as
                     # the multiline continues, there is still more input in the file and we still have space in our buffer
                     line_max_reached = False
 
@@ -336,7 +487,7 @@ class ContinueThrough( LineGrouper ):
             return True
 
         return self._continuation_pattern.search( line ) != None
-            
+
 
 class ContinuePast( LineGrouper ):
     """ A ContinuePast multiline grouper.
@@ -380,7 +531,7 @@ class ContinuePast( LineGrouper ):
                 result = False
 
         return result
-    
+
 class HaltBefore( LineGrouper ):
     """ A HaltBefore line grouper.
     If the start pattern matches, then all consecutive lines not matching the contuation pattern are included in the line.
@@ -432,5 +583,5 @@ class HaltWith( LineGrouper ):
             self.__last_line = True
             cont = True
         return cont
-        
+
 

@@ -87,7 +87,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH)}
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 100, 60)
         self.log_file.set_line_matcher(matcher)
         self.log_file.set_parameters(100, 100)
 
@@ -104,7 +104,7 @@ class TestLogFileIterator(ScalyrTestCase):
     def test_continue_past_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_PAST)}
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 100, 60)
         self.log_file.set_line_matcher(matcher)
         self.log_file.set_parameters(100, 100)
 
@@ -121,7 +121,7 @@ class TestLogFileIterator(ScalyrTestCase):
     def test_halt_before_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_BEFORE)}
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 100, 60)
         self.log_file.set_line_matcher(matcher)
         self.log_file.set_parameters(100, 100)
 
@@ -139,7 +139,7 @@ class TestLogFileIterator(ScalyrTestCase):
     def test_halt_with_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_WITH)}
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 100, 60)
         self.log_file.set_line_matcher(matcher)
         self.log_file.set_parameters(100, 100)
 
@@ -158,7 +158,7 @@ class TestLogFileIterator(ScalyrTestCase):
                       'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH, DEFAULT_CONTINUE_PAST, DEFAULT_HALT_BEFORE,
                                                 DEFAULT_HALT_WITH)}
         log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-        matcher = LineMatcher.create_line_matchers(log_config, 100, 60)
+        matcher = LineMatcher.create_line_matchers(log_config, 100, 100, 60)
         self.log_file.set_line_matcher(matcher)
         self.log_file.set_parameters(200, 200)
         expected = ["--multi\n--continue\n--some more\n",
