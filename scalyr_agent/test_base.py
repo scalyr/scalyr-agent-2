@@ -22,7 +22,7 @@ import sys
 import unittest
 
 
-PYTHON_26_OR_OLDER = sys.version[:2] < (2, 7)
+PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
 
 
 def _noop_skip(reason):

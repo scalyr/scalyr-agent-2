@@ -2,7 +2,7 @@ import sys
 
 
 def custom_any(iterable):
-    if sys.version[:2] > (2, 4):
+    if sys.version_info[:2] > (2, 4):
         return any(iterable)
     else:
         for element in iterable:
@@ -12,7 +12,7 @@ def custom_any(iterable):
 
 
 def custom_all(iterable):
-    if sys.version[:2] > (2, 4):
+    if sys.version_info[:2] > (2, 4):
         return all(iterable)
     else:
         for element in iterable:
@@ -22,7 +22,7 @@ def custom_all(iterable):
 
 
 def custom_defaultdict(default_type):
-    if sys.version[:2] > (2, 4):
+    if sys.version_info[:2] > (2, 4):
         from collections import defaultdict
         return defaultdict(default_type)
     else:

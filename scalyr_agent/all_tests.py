@@ -74,7 +74,7 @@ def run_all_tests():
             try:
                 suites.append(test_loader.loadTestsFromName(test_case))
             except Exception, ex:
-                if sys.version[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
+                if sys.version_info[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
                     print("Warning. Skipping unloadable module '%s'.\n"
                           "This module was whitelisted as non-critical for pre-2.7 testing.\n"
                           "Module-load exception message: '%s'\n" % (test_case, ex))
