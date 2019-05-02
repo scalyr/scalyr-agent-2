@@ -506,7 +506,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                             logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
 
                         except Exception, e:
-                          logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
+                          logger.error("Error inspecting container '%s' - %s, %s" % (cid, e, traceback.format_exc()), limit_once_per_x_secs=300,limit_key="docker-api-inspect")
 
 
                     result[cid] = {'name': name, 'log_path': log_path }
