@@ -47,6 +47,7 @@ from scalyr_agent.agent_status import LogMatcherStatus
 from scalyr_agent.agent_status import LogProcessorStatus
 
 from scalyr_agent.line_matcher import LineMatcher
+from scalyr_agent.line_matcher import LogLine
 
 from scalyr_agent.scalyr_client import Event
 
@@ -78,24 +79,6 @@ LOG_DELETION_DELAY = 10 * 60
 COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
-
-class LogLine(object):
-    """A class representing a line from a log file.
-    This object will always have a single field 'line' which contains the log line.
-    It can also contain two other attributes 'timestamp' which is the timestamp of the
-    the log line in nanoseconds since the epoch (defaults to None, in which case the
-    current time.time() will be used), and 'attrs' which are optional attributes for the line.
-    """
-    def __init__(self, line):
-        # line is a string
-        self.line = line
-
-        # timestamp is a long, counting nanoseconds since Epoch
-        # or None to use current time
-        self.timestamp = None
-
-        # attrs is a dict of optional attributes to attach to the log message
-        self.attrs = None
 
 class LogFileIterator(object):
     """Reads the bytes from a log file at a particular path, returning the lines.
@@ -477,8 +460,7 @@ class LogFileIterator(object):
         #            expected_buffer_index, original_buffer_index)
 
         # read a complete line from our line_matcher
-        next_line = self.__line_matcher.readline(self.__buffer, current_time)
-        result = LogLine(line=next_line)
+        result = self.__line_matcher.readline(self.__buffer, current_time)
 
         if len(result.line) == 0:
             return result

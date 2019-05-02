@@ -24,6 +24,24 @@ import re
 
 __author__ = 'imron@scalyr.com'
 
+class LogLine(object):
+    """A class representing a line from a log file.
+    This object will always have a single field 'line' which contains the log line.
+    It can also contain two other attributes 'timestamp' which is the timestamp of the
+    the log line in nanoseconds since the epoch (defaults to None, in which case the
+    current time.time() will be used), and 'attrs' which are optional attributes for the line.
+    """
+    def __init__(self, line):
+        # line is a string
+        self.line = line
+
+        # timestamp is a long, counting nanoseconds since Epoch
+        # or None to use current time
+        self.timestamp = None
+
+        # attrs is a dict of optional attributes to attach to the log message
+        self.attrs = None
+
 
 class LineMatcher(object):
     """ An abstraction for a Line Matcher.
@@ -83,6 +101,10 @@ class LineMatcher(object):
         self.__partial_line_time = None
 
     def readline( self, file_like, current_time ):
+        """
+        @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
+        @rtype: LogLine
+        """
         #save the original position
         original_offset = file_like.tell()
 
@@ -91,7 +113,7 @@ class LineMatcher(object):
 
         if len( line ) == 0:
             self.__partial_line_time = None
-            return line
+            return LogLine(line)
 
         # If we have a partial line then we should only
         # return it if sufficient time has passed.
@@ -103,11 +125,11 @@ class LineMatcher(object):
             if current_time - self.__partial_line_time < self.__line_completion_wait_time:
                 # We aren't going to return it so reset buffer back to the original spot.
                 file_like.seek( original_offset )
-                return ''
+                return LogLine('')
         else:
             self.__partial_line_time = None
 
-        return line
+        return LogLine(line)
 
     def _readline( self, file_like, max_length=0 ):
         """ Takes a file_like object (e.g. anything conforming to python's file interface

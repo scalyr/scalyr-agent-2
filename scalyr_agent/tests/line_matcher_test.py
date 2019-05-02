@@ -51,7 +51,7 @@ class SingleLineMatcherTestCase( unittest.TestCase ):
 
         line_matcher = LineMatcher()
         actual = line_matcher.readline( line, time.time() )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
 
     def test_single_line_partial( self ):
@@ -60,12 +60,12 @@ class SingleLineMatcherTestCase( unittest.TestCase ):
 
         line_matcher = LineMatcher()
         actual = line_matcher.readline( line, time.time() )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, "\n" )
 
         actual = line_matcher.readline( line, time.time() )
-        self.assertEqual( expected + "\n", actual )
+        self.assertEqual( expected + "\n", actual.line )
 
     def test_single_line_partial_timeout( self ):
         expected = "Hello World"
@@ -74,10 +74,10 @@ class SingleLineMatcherTestCase( unittest.TestCase ):
         line_matcher = LineMatcher( line_completion_wait_time = 5 )
         current_time = time.time() - 6
         actual = line_matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line_matcher.readline( line, time.time() )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
     def test_single_line_partial_too_long( self ):
         expected = "Hello World"
@@ -86,7 +86,7 @@ class SingleLineMatcherTestCase( unittest.TestCase ):
         line_matcher = LineMatcher( max_line_length=11 )
         current_time = time.time()
         actual = line_matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
 class ContinueThroughTestCase( unittest.TestCase ):
 
@@ -102,10 +102,10 @@ class ContinueThroughTestCase( unittest.TestCase ):
         matcher = ContinueThrough( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -119,7 +119,7 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected, actual )
@@ -134,12 +134,12 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_next + expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_next, actual )
+        self.assertEqual( expected + expected_next, actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -153,12 +153,12 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
         
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -171,9 +171,9 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( line1, actual )
@@ -185,15 +185,15 @@ class ContinueThroughTestCase( unittest.TestCase ):
         matcher = ContinueThrough( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         expected_next = "  starts with a space\n"
         line = append_string( line, expected_next )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -205,15 +205,15 @@ class ContinueThroughTestCase( unittest.TestCase ):
         matcher = ContinueThrough( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         expected_next = "  starts with a space\n"
         line = append_string( line, expected_next )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -227,7 +227,7 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( "Exception\n", actual )
@@ -241,7 +241,7 @@ class ContinueThroughTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( remainder, actual )
@@ -260,10 +260,10 @@ class ContinuePastTestCase( unittest.TestCase ):
         matcher = ContinuePast( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -277,10 +277,10 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -295,12 +295,12 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_next + expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_next, actual )
+        self.assertEqual( expected + expected_next, actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -314,12 +314,12 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_last, actual )
+        self.assertEqual( expected + expected_last, actual.line )
         
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -332,9 +332,9 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( line1, actual )
@@ -346,10 +346,10 @@ class ContinuePastTestCase( unittest.TestCase ):
         matcher = ContinuePast( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -361,10 +361,10 @@ class ContinuePastTestCase( unittest.TestCase ):
         matcher = ContinuePast( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -378,7 +378,7 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( " multiline\\\n", actual )
@@ -392,7 +392,7 @@ class ContinuePastTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( remainder, actual )
@@ -411,10 +411,10 @@ class HaltBeforeTestCase( unittest.TestCase ):
         matcher = HaltBefore( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -428,10 +428,10 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
     def test_partial_first_line_match( self ):
         expected = "--begin\n"
@@ -443,12 +443,12 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_next + expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_next, actual )
+        self.assertEqual( expected + expected_next, actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -462,12 +462,12 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
         
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -480,9 +480,9 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( line1, actual )
@@ -494,10 +494,10 @@ class HaltBeforeTestCase( unittest.TestCase ):
         matcher = HaltBefore( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -509,10 +509,10 @@ class HaltBeforeTestCase( unittest.TestCase ):
         matcher = HaltBefore( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -526,7 +526,7 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( " multiline\n", actual )
@@ -540,7 +540,7 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( remainder, actual )
@@ -554,7 +554,7 @@ class HaltBeforeTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( remainder, actual )
@@ -573,10 +573,10 @@ class HaltWithTestCase( unittest.TestCase ):
         matcher = HaltWith( self.start_pattern, self.continuation_pattern )
         current_time = time.time()
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_next, actual )
@@ -590,10 +590,10 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_next, actual )
+        self.assertEqual( expected + expected_next, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
 
     def test_partial_first_line_match( self ):
@@ -606,12 +606,12 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_next + expected_last )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_next, actual )
+        self.assertEqual( expected + expected_next, actual.line )
 
         actual = line.readline()
         self.assertEqual( expected_last, actual )
@@ -625,12 +625,12 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         line = append_string( line, expected_end )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected + expected_end, actual )
+        self.assertEqual( expected + expected_end, actual.line )
         
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -643,9 +643,9 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = line.readline()
         self.assertEqual( line1, actual )
@@ -657,10 +657,10 @@ class HaltWithTestCase( unittest.TestCase ):
         matcher = HaltWith( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -672,10 +672,10 @@ class HaltWithTestCase( unittest.TestCase ):
         matcher = HaltWith( self.start_pattern, self.continuation_pattern, line_completion_wait_time = 5 )
         current_time = time.time()
         actual = matcher.readline( line, current_time - 6 )
-        self.assertEqual( '', actual )
+        self.assertEqual( '', actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -689,7 +689,7 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( " multiline\n", actual )
@@ -703,7 +703,7 @@ class HaltWithTestCase( unittest.TestCase ):
         current_time = time.time()
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( remainder, actual )
@@ -755,7 +755,7 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected + self.single_string() )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( self.single_string(), actual )
@@ -768,7 +768,7 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected + self.single_string() )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( self.single_string(), actual )
@@ -781,7 +781,7 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected + "--last\n" )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( "--last\n", actual )
@@ -794,7 +794,7 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected + self.single_string() )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( self.single_string(), actual )
@@ -806,7 +806,7 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( expected, actual )
+        self.assertEqual( expected, actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
@@ -819,25 +819,25 @@ class LineMatcherCollectionTestCase( unittest.TestCase ):
         current_time = time.time()
         line = make_string( expected )
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.single_string(), actual )
+        self.assertEqual( self.single_string(), actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.halt_with_string(), actual )
+        self.assertEqual( self.halt_with_string(), actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.halt_before_string(), actual )
+        self.assertEqual( self.halt_before_string(), actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( end_marker, actual )
+        self.assertEqual( end_marker, actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.continue_past_string(), actual )
+        self.assertEqual( self.continue_past_string(), actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.continue_through_string(), actual )
+        self.assertEqual( self.continue_through_string(), actual.line )
 
         actual = matcher.readline( line, current_time )
-        self.assertEqual( self.single_string(), actual )
+        self.assertEqual( self.single_string(), actual.line )
 
         actual = line.readline()
         self.assertEqual( '', actual )
