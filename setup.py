@@ -103,8 +103,11 @@ if "win32" == sys.platform:
     import py2exe
 
 # Get the long description from the relevant file
-with open(path.join(get_install_root(), 'DESCRIPTION.rst'), encoding='utf-8') as f:
+f = open(path.join(get_install_root(), 'DESCRIPTION.rst'), encoding='utf-8')
+try:
     long_description = f.read()
+finally:
+    f.close()
 
 
 class Target:
