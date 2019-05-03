@@ -604,11 +604,10 @@ class AgentLogger(logging.Logger):
             rv = (filename, f.f_lineno, co.co_name)
             break
 
-        if sys.version_info[:2] < (2, 5):
-            print 'PYTHON VERSION == %s' % sys.version
-            # Python 2.4 expects 2-tuple.
-            # https://docs.python.org/release/2.4.4/lib/node341.html
-            # Note that some (other) python docs incorrectly state that python 2.4 expects a 3-tuple
+        if sys.version_info[:3] < (2, 4, 2):
+            # Python 2.4.2 and below expects 2-tuple instead of 3-tuple.
+            # Note however that the docs are imprecise. E.g. the following link suggests 2.4.4 expects a 2 tuple.
+            # https://docs.python.org/release/2.4.4/lib/node341.html.
             # TODO: for python 3, return a 4 tuple !
             return rv[:2]
         else:

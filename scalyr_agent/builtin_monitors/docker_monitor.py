@@ -17,6 +17,7 @@
 __author__ = 'imron@scalyr.com'
 
 import datetime
+import docker
 import fnmatch
 import traceback
 import logging
@@ -25,7 +26,6 @@ import re
 import random
 import socket
 import stat
-import sys
 import time
 import threading
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
@@ -38,10 +38,6 @@ from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.util import StoppableThread
 
 from requests.packages.urllib3.exceptions import ProtocolError
-
-import docker
-
-
 
 global_log = scalyr_logging.getLogger(__name__)
 
