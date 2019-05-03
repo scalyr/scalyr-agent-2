@@ -105,7 +105,8 @@ ${smoketest_script} ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
---short_cid_agent ${short_cid_agent}
+--short_cid_agent ${short_cid_agent} \
+--debug=False
 
 # Capture uploader short container ID
 short_cid_uploader=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
@@ -118,7 +119,8 @@ ${smoketest_script} ${contname_verifier} ${max_wait} \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
 --short_cid_agent ${short_cid_agent} \
---short_cid_uploader ${short_cid_uploader}
+--short_cid_uploader ${short_cid_uploader} \
+--debug=False
 
 
 kill_and_delete_docker_test_containers
