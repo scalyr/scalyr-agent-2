@@ -29,6 +29,7 @@ from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor, LogMatcher
 from scalyr_agent.log_processing import FileSystem
+from scalyr_agent.log_processing import _parse_cri_log as parse_cri_log
 from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
@@ -37,6 +38,96 @@ from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+class TestCRILogParsing(ScalyrTestCase):
+
+    def test_invalid_line( self ):
+        line = "sdflkjasdlfkjweirjlasdfj"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertIsNone( ts )
+        self.assertIsNone( stream )
+        self.assertIsNone( tags )
+        self.assertIsNone( msg )
+
+    def test_invalid_timestamp( self ):
+        line = "sdflkjasdlfk jweirjlasdfj"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertIsNone( ts )
+        self.assertIsNone( stream )
+        self.assertIsNone( tags )
+        self.assertIsNone( msg )
+
+    def test_missing_stream( self ):
+        line = "2019-04-08T15:18:20.56064743Z "
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertIsNone( ts )
+        self.assertIsNone( stream )
+        self.assertIsNone( tags )
+        self.assertIsNone( msg )
+
+    def test_invalid_stream( self ):
+        line = "2019-04-08T15:18:20.56064743Z foobar"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertIsNone( ts )
+        self.assertIsNone( stream )
+        self.assertIsNone( tags )
+        self.assertIsNone( msg )
+
+    def test_missing_tags( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout "
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertIsNone( ts )
+        self.assertIsNone( stream )
+        self.assertIsNone( tags )
+        self.assertIsNone( msg )
+
+    def test_multi_tags( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout P:B:D message"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stdout", stream )
+        self.assertEquals( "P:B:D", tags )
+        self.assertEquals( "message", msg )
+
+    def test_missing_log( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout P "
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stdout", stream )
+        self.assertEquals( "P", tags )
+        self.assertEquals( "", msg )
+
+    def test_valid_line_stdout( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout P message"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stdout", stream )
+        self.assertEquals( "P", tags )
+        self.assertEquals( "message", msg )
+
+    def test_valid_line_stderr( self ):
+        line = "2019-04-08T15:18:20.56064743Z stderr P message"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stderr", stream )
+        self.assertEquals( "P", tags )
+        self.assertEquals( "message", msg )
+
+    def test_valid_line_single( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout F message"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stdout", stream )
+        self.assertEquals( "F", tags )
+        self.assertEquals( "message", msg )
+
+    def test_valid_line_partial( self ):
+        line = "2019-04-08T15:18:20.56064743Z stdout P message"
+        ts, stream, tags, msg = parse_cri_log( line )
+        self.assertEquals( 1554736700560647430L, ts )
+        self.assertEquals( "stdout", stream )
+        self.assertEquals( "P", tags )
+        self.assertEquals( "message", msg )
 
 
 class TestLogFileIterator(ScalyrTestCase):

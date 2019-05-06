@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import random
+import re
 import string
 from string import Template
 
@@ -19,6 +20,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import urllib
 
 global_log = scalyr_logging.getLogger(__name__)
+
+# A regex for splitting a container id and runtime
+_CID_RE = re.compile( '^(.+)://(.+)$' )
 
 # endpoints used by the agent for querying the k8s api.  Having this mapping allows
 # us to avoid special casing the logic for each different object type.  We can just
@@ -106,6 +110,7 @@ def cache( config ):
     _k8s_cache.update_config( cache_config )
     return _k8s_cache
 
+
 class K8sApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
@@ -116,7 +121,7 @@ class K8sApiAuthorizationException( K8sApiException ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
     """
-    def __init( self, path ):
+    def __init__( self, path ):
         super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
 
 class KubeletApiException( Exception ):
@@ -811,6 +816,8 @@ class KubernetesCache( object ):
         self._api_server_version = None
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
+        self._container_runtime = None
+        self._agent_container_id = None
         self._initialized = False
 
         self._thread = None
@@ -829,6 +836,12 @@ class KubernetesCache( object ):
         if self._thread is None:
             self._thread = StoppableThread( target=self.update_cache, name="K8S Cache" )
             self._thread.start()
+
+    def local_state( self ):
+        """
+        Returns a local copy of the current state
+        """
+        return self._state.copy_state()
 
     def update_config( self, new_config ):
         """
@@ -872,6 +885,24 @@ class KubernetesCache( object ):
         finally:
             self._lock.release()
 
+    def _get_scalyr_container_id_and_runtime( self, k8s ):
+        pod_name = k8s.get_pod_name()
+        pod = k8s.query_pod( k8s.namespace, pod_name )
+        if pod is None:
+            return None, None
+
+        status = pod.get( 'status', {} )
+        containers = status.get( 'containerStatuses', [] )
+        for container in containers:
+            name = container.get( 'name' )
+            if name and name == 'scalyr-agent':
+                containerId = container.get( 'containerID', '' )
+                m = _CID_RE.match( containerId )
+                if m:
+                    return m.group(2), m.group(1)
+
+        return None, None
+
     def update_cache( self, run_state ):
         """
             Main thread for updating the k8s cache
@@ -890,8 +921,12 @@ class KubernetesCache( object ):
                 self._update_cluster_name( local_state.k8s )
                 self._update_api_server_version(local_state.k8s)
 
+                cid, runtime = self._get_scalyr_container_id_and_runtime( local_state.k8s )
+
                 self._lock.acquire()
                 try:
+                    self._container_runtime = runtime
+                    self._agent_container_id = cid
                     self._initialized = True
                 finally:
                     self._lock.release()
@@ -977,6 +1012,28 @@ class KubernetesCache( object ):
         self._lock.acquire()
         try:
             result = self._cluster_name
+        finally:
+            self._lock.release()
+
+        return result
+
+    def get_agent_container_id( self ):
+        """Returns the id of the container running the agent"""
+        result = None
+        self._lock.acquire()
+        try:
+            result = self._agent_container_id
+        finally:
+            self._lock.release()
+
+        return result
+
+    def get_container_runtime( self ):
+        """Returns the k8s container runtime currently being used"""
+        result = None
+        self._lock.acquire()
+        try:
+            result = self._container_runtime
         finally:
             self._lock.release()
 
@@ -1263,6 +1320,9 @@ class KubeletApi( object ):
             raise KubeletApiException( "Invalid response from Kubelet API when querying '%s': %s" %( path, str( response ) ) )
 
         return util.json_decode( response.text )
+
+    def query_pods( self ):
+        return self.query_api( '/pods' )
 
     def query_stats( self ):
         return self.query_api( '/stats/summary')

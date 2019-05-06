@@ -115,7 +115,6 @@ class TestDockerMetricFetcher(ScalyrTestCase):
         self.assertEqual(1, self._fetcher.idle_workers())
         self.assertEqual(10, value)
 
-
 class DockerClientFaker(object):
     """A fake DockerClient that only supports the `stats` call.  Used for tests to control when a `stats` call
     should finish and what it should return.

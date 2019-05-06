@@ -1167,7 +1167,8 @@ class Configuration(object):
             i += 1
 
         self.__verify_or_set_optional_bool(log_entry, 'copy_from_start', False, description)
-        self.__verify_or_set_optional_bool(log_entry, 'parse_lines_as_json', False, description)
+        self.__verify_or_set_optional_bool(log_entry, 'parse_lines_as_json', None, description, apply_defaults=False)
+        self.__verify_or_set_optional_string(log_entry, 'parse_format', 'raw', description)
         self.__verify_or_set_optional_string(log_entry, 'json_message_field', 'log', description)
         self.__verify_or_set_optional_string(log_entry, 'json_timestamp_field', 'time', description)
 
