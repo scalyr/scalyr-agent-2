@@ -303,8 +303,11 @@ def create_wxs_file(template_path, dist_path, destination_path):
         dist_files.append(entry)
 
     # For the sake of easier coding, we read all of the lines of the input file into an array.
-    with open(template_path) as f:
+    f = open(template_path)
+    try:
         template_lines = f.readlines()
+    finally:
+        f.close()
 
     # Now go through, looking for the markers, and when we find them, do the replacement.
     result = []
@@ -317,9 +320,12 @@ def create_wxs_file(template_path, dist_path, destination_path):
             result.append(l)
 
     # Write the resulting lines out.
-    with open(destination_path, 'wb') as f:
+    f = open(destination_path, 'wb')
+    try:
         for line in result:
             f.write(line)
+    finally:
+        f.close()
 
 
 def expand_template(input_lines, dist_files):

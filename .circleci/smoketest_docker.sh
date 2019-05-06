@@ -18,7 +18,7 @@
 #   $3 : max secs until test hard fails
 #
 # e.g. usage
-#   smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:1 json 300
+#   smoketest_docker.sh scalyr/scalyr-agent-ci-smoketest:2 json 300
 #----------------------------------------------------------------------------------------
 
 # The following variables are needed

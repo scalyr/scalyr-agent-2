@@ -155,9 +155,13 @@ class Configuration(object):
                 https_server = server
 
                 parts = urlparse.urlparse( server )
-                if not parts.scheme:
+
+                # use index-based addressing for 2.4 compatibility
+                scheme = parts[0]
+
+                if not scheme:
                     https_server = 'https://' + server
-                elif parts.scheme == 'http':
+                elif scheme == 'http':
                     https_server = re.sub( "^http://", "https://", server )
 
                 if https_server != server:

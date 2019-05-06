@@ -17,9 +17,10 @@
 
 __author__ = 'imron@scalyr.com'
 
-import time
-import sys
-import unittest2 as unittest
+
+import unittest
+from scalyr_agent.test_base import ScalyrTestCase
+
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogRequestParser
 
@@ -30,7 +31,7 @@ class Handler( object ):
     def handle( self, message ):
         self.values.append( message )
 
-class SyslogRequestParserTestCase( unittest.TestCase ):
+class SyslogRequestParserTestCase(ScalyrTestCase):
 
     def test_framed_messages( self ):
         parser = SyslogRequestParser( None, 32 )
@@ -120,4 +121,6 @@ class SyslogRequestParserTestCase( unittest.TestCase ):
         self.assertEqual( 2, len( handler.values ) )
         self.assertEqual( "100 dollars", handler.values[1] )
 
+if __name__ == '__main__':
+    unittest.main()
 

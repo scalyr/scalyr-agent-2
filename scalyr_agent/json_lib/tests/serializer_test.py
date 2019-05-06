@@ -17,10 +17,10 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest2 as unittest
+import unittest
 from scalyr_agent.json_lib import serialize
 
-from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase, skip
 
 
 class SerializeTests(ScalyrTestCase):
@@ -42,7 +42,7 @@ class SerializeTests(ScalyrTestCase):
         expected_fast = '"\xf0\\u009f\\u0098\xa2"'
         self.assertEquals(serialize(actual, use_fast_encoding=True), expected_fast)
 
-    @unittest.skip("@czerwin to take a look why slow encoding is not working.")
+    @skip("@czerwin to take a look why slow encoding is not working.")
     def test_4byte_utf8_slow(self):
         actual = '\xF0\xAA\x9A\xA5'
         expected_slow = '"\\U0002a6a5"'
@@ -70,7 +70,7 @@ class SerializeTests(ScalyrTestCase):
 
         self.assertEquals(serialize('Escaped\xE2\x82\xAC', use_fast_encoding=True), '"Escaped\xe2\\u0082\xac"')
 
-    @unittest.skip("@czerwin to take a look why slow encoding is not working.")
+    @skip("@czerwin to take a look why slow encoding is not working.")
     def test_string_slow(self):
         self.__run_string_test_case('Hi there', '"Hi there"')
         self.__run_string_test_case('Hi there\n', '"Hi there\\n"')

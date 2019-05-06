@@ -90,9 +90,10 @@ class MonitorConfigTest(ScalyrTestCase):
 
         # str -> JsonArray
         self.assertEquals(self.get(serialize(test_array), convert_to=JsonArray), JsonArray(*test_array))
-        with self.assertRaises(BadMonitorConfiguration):
+        self.assertRaises(
+            BadMonitorConfiguration,
             # single quotes are invalid JSON
-            self.assertEquals(self.get(str(test_array), convert_to=JsonArray), JsonArray(*test_array))
+            lambda: self.assertEquals(self.get(str(test_array), convert_to=JsonArray), JsonArray(*test_array)))
 
         # str -> JsonObject
         test_obj = {'a': 1, 'b': 'two', 'c': [1, 2, 3]}
@@ -149,8 +150,7 @@ class MonitorConfigTest(ScalyrTestCase):
         # JsonArray -> list not supported
         test_array = ["a", "b", "c"]
         json_arr = JsonArray(*test_array)
-        with self.assertRaises(BadMonitorConfiguration):
-            self.get(json_arr, convert_to=list)
+        self.assertRaises(BadMonitorConfiguration, lambda: self.get(json_arr, convert_to=list))
 
         # JsonArray -> ArrayOfStrings supported
         test_array = ["a", "b", "c"]
@@ -160,15 +160,13 @@ class MonitorConfigTest(ScalyrTestCase):
         # JsonArray -> invalid ArrayOfStrings
         test_array = ["a", "b", 3]
         json_arr = JsonArray(*test_array)
-        with self.assertRaises(BadMonitorConfiguration):
-            self.get(json_arr, convert_to=ArrayOfStrings)
+        self.assertRaises(BadMonitorConfiguration, lambda: self.get(json_arr, convert_to=ArrayOfStrings))
 
     def test_arrayofstrings_conversion(self):
         # JsonArray -> list not supported
         test_array = ["a", "b", "c"]
         json_arr = ArrayOfStrings(*test_array)
-        with self.assertRaises(BadMonitorConfiguration):
-            self.get(json_arr, convert_to=list)
+        self.assertRaises(BadMonitorConfiguration, lambda: self.get(json_arr, convert_to=list))
 
         # ArrayOfStrings -> JsonArray supported
         test_array = ["a", "b", "c"]
@@ -219,8 +217,7 @@ class MonitorConfigTest(ScalyrTestCase):
     def test_list_of_strings(self):
         define_config_option('foo', 'some_param', 'A list of strings', default=['a', 'b', 'c', 'd'])
         self.assertEquals(self.get(['x', 'y', 'z'], convert_to=None), ['x', 'y', 'z'])
-        with self.assertRaises(Exception):
-            self.get("['x', 'y', 'z']", convert_to=list), ['x', 'y', 'z']
+        self.assertRaises(Exception, lambda: self.get("['x', 'y', 'z']", convert_to=list), ['x', 'y', 'z'])
 
     def get(self, original_value, convert_to=None, required_field=False, max_value=None, min_value=None):
         config = MonitorConfig({'foo': original_value})

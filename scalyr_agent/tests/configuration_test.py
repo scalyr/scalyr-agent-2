@@ -21,18 +21,13 @@ __author__ = 'czerwin@scalyr.com'
 import os
 import tempfile
 from mock import patch, Mock
-from parameterized import parameterized
 
-from scalyr_agent import scalyr_monitor
 from scalyr_agent.configuration import Configuration, BadConfiguration
-from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
-from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.json_lib.objects import ArrayOfStrings
-from scalyr_agent.test_util import FakeAgentLogger
 from scalyr_agent.test_util import FakePlatform
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -55,12 +50,12 @@ class TestConfiguration(ScalyrTestCase):
         os.environ.update(self.original_os_env)
 
     def test_basic_case(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
         self.assertPathEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
@@ -127,12 +122,12 @@ class TestConfiguration(ScalyrTestCase):
         self.assertIsNone(config.network_proxies)
 
     def test_empty_config(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there"
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
         self.assertEquals(len(config.log_configs), 1)
@@ -140,7 +135,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
     def test_overriding_basic_settings(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             agent_log_path: "/var/silly1",
             agent_data_path: "/var/silly2",
@@ -191,7 +186,7 @@ class TestConfiguration(ScalyrTestCase):
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(config.api_key, "hi there")
         self.assertPathEquals(config.agent_log_path, '/var/silly1')
@@ -248,123 +243,123 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEqual(config.network_proxies, {"http": "http://foo.com", "https": "https://bar.com"})
 
     def test_missing_api_key(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_force_https_no_scheme(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             scalyr_server: "agent.scalyr.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
 
     def test_force_https_http(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             scalyr_server: "http://agent.scalyr.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
 
     def test_force_https_https(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             scalyr_server: "https://agent.scalyr.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
 
     def test_force_https_leading_whitespace(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             scalyr_server: "  http://agent.scalyr.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual( "https://agent.scalyr.com", config.scalyr_server)
 
     def test_allow_http(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             allow_http: true,
             scalyr_server: "http://agent.scalyr.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual( "http://agent.scalyr.com", config.scalyr_server)
 
     def test_non_string_value(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             agent_log_path: [ "hi" ],
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_json_attributes(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             server_attributes: [ "hi" ],
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_string_attribute_values(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             server_attributes: { hi: [ 1 ] },
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_non_bool_value(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             implicit_metric_monitor: [ 1 ],
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_no_https_proxy(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             http_proxy: "http://bar.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual(config.network_proxies, {"http": "http://bar.com"})
 
     def test_no_http_proxy(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             https_proxy: "https://bar.com",
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
 
     def test_sampling_rules(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -373,7 +368,7 @@ class TestConfiguration(ScalyrTestCase):
             }]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.log_configs), 2)
@@ -386,62 +381,62 @@ class TestConfiguration(ScalyrTestCase):
 
     def test_bad_sampling_rules(self):
         # Missing match_expression.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               sampling_rules: [ { sampling_rate: 0} ]
           }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Bad regular expression.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               sampling_rules: [ { match_expression: "[a", sampling_rate: 0} ]
           }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Missing sampling.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               sampling_rules: [ { match_expression: "INFO"} ]
           }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Not number for percentage.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               sampling_rules: [ { match_expression: "INFO", sampling_rate: true} ]
           }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Bad percentage.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               sampling_rules: [ { match_expression: "INFO", sampling_rate: 2.0} ]
           }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_redaction_rules(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
@@ -452,7 +447,7 @@ class TestConfiguration(ScalyrTestCase):
             }]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.log_configs), 2)
@@ -467,57 +462,57 @@ class TestConfiguration(ScalyrTestCase):
 
     def test_bad_redaction_rules(self):
         # Missing match expression.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               redaction_rules: [ { replacement: "password=foo"} ],
             }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Match expression is not a regexp.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               redaction_rules: [ { match_expression: "[a" } ],
             }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         # Replacement is not a string.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ {
               path:"/var/log/tomcat6/access.log",
               redaction_rules: [ { match_expression: "a", replacement: [ true ] } ],
             }] }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_configuration_directory(self):
-        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
+        self._write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             server_attributes: {  serverHost:"foo.com" }
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            logs: [ { path: "/var/log/nginx/access.log" } ],
            server_attributes: { webServer:"true"}
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('apache.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('apache.json', """ {
            logs: [ { path: "/var/log/apache/access.log" } ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.additional_file_paths), 2)
@@ -536,12 +531,12 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
 
     def test_api_key_and_scalyr_server_defined_in_config_directory(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log" }],
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            api_key: "hi there",
            scalyr_server: "foobar",
            allow_http: true,
@@ -549,78 +544,78 @@ class TestConfiguration(ScalyrTestCase):
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.scalyr_server, 'foobar')
         self.assertEquals(config.api_key, 'hi there')
 
     def test_bad_fields_in_configuration_directory(self):
-        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
+        self._write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }]
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            api_key: "should cause an error",
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_multiple_scalyr_servers_in_configuration_directory(self):
-        self.__write_file_with_separator_conversion(""" { api_key: "hi there", scalyr_server: "test1",
+        self._write_file_with_separator_conversion(""" { api_key: "hi there", scalyr_server: "test1",
             logs: [ { path:"/var/log/tomcat6/access.log" }]
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            scalyr_server: "should cause an error",
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
     def test_ignore_non_json_files_in_config_dir(self):
-        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
+        self._write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }]
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx', """ {
            logs: [ { path: "/var/log/nginx/access.log" } ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.log_configs), 2)
 
     def test_parser_specification(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             implicit_agent_log_collection: false,
             api_key: "hi there",
             logs: [ { path: "/tmp/foo.txt",
                       parser: "foo-parser"} ]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         self.assertEquals(len(config.log_configs), 1)
         self.assertEquals(config.log_configs[0]['attributes']['parser'], 'foo-parser')
 
     def test_monitors(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             monitors: [ { module: "httpPuller"} ]
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.monitor_configs), 1)
@@ -631,11 +626,11 @@ class TestConfiguration(ScalyrTestCase):
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
     def test_parse_log_config(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there"
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         parsed_log_config = config.parse_log_config({
@@ -651,12 +646,12 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(parsed_log_config['attributes']['parser'], 'foo')
 
     def test_parse_monitor_config(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there"
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         parsed_monitor_config = config.parse_monitor_config({
@@ -666,47 +661,47 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(parsed_monitor_config['module'], 'foo')
 
     def test_equivalent_configuration(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
-        config_a = self.__create_test_configuration_instance()
+        config_a = self._create_test_configuration_instance()
         config_a.parse()
 
-        config_b = self.__create_test_configuration_instance()
+        config_b = self._create_test_configuration_instance()
         config_b.parse()
 
         self.assertTrue(config_a.equivalent(config_b))
 
         # Now write a new file that is slightly different.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             logs: [ { path:"/var/log/nginx/access.log"} ]
           }
         """)
 
-        config_b = self.__create_test_configuration_instance()
+        config_b = self._create_test_configuration_instance()
         config_b.parse()
 
         self.assertFalse(config_a.equivalent(config_b))
 
     def test_equivalent_configuration_ignore_debug_level(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
           }
         """)
-        config_a = self.__create_test_configuration_instance()
+        config_a = self._create_test_configuration_instance()
         config_a.parse()
 
         # Now write a new file that is slightly different.
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             api_key: "hi there",
             debug_level: 1,
           }
         """)
 
-        config_b = self.__create_test_configuration_instance()
+        config_b = self._create_test_configuration_instance()
         config_b.parse()
 
         # Should be not equivalent when we aren't ignoring debug_level,
@@ -718,12 +713,12 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEquals(config_b.debug_level, 1)
 
     def test_multiple_calls_to_bad_config(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/access.log"} ]
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
         error_seen = False
@@ -735,90 +730,90 @@ class TestConfiguration(ScalyrTestCase):
         self.assertTrue(error_seen)
 
     def test_substitution(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR" ],
             api_key: "hi$TEST_VAR",
           }
         """)
 
         os.environ['TEST_VAR'] = 'bye'
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
 
     def test_substitution_with_default(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ {var: "UNDEFINED_VAR", default: "foo" } ],
             api_key: "hi$UNDEFINED_VAR",
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hifoo')
 
     def test_substitution_with_unused_default(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ {var: "TEST_VAR2", default: "foo" } ],
             api_key: "hi$TEST_VAR2",
           }
         """)
 
         os.environ['TEST_VAR2'] = 'bar'
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hibar')
 
     def test_substitution_with_empty_var(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ {var: "TEST_VAR2", default: "foo" } ],
             api_key: "hi$TEST_VAR2",
           }
         """)
 
         os.environ['TEST_VAR2'] = ''
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hifoo')
 
     def test_api_key_override_no_override(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'abcd1234')
 
     def test_api_key_override_empty_override(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
           }
         """)
         os.environ['scalyr_api_key'] = ''
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'abcd1234')
 
     def test_api_key_overridden_by_config_file(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
           }
         """)
         os.environ['SCALYR_API_KEY'] = "xyz"
         mock_logger = Mock()
-        config = self.__create_test_configuration_instance(logger=mock_logger)
+        config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
         self.assertEquals(config.api_key, 'abcd1234')
@@ -830,13 +825,13 @@ class TestConfiguration(ScalyrTestCase):
         mock_logger.debug.assert_not_called()
 
     def test_api_key_use_env(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
           }
         """)
         os.environ['SCALYR_API_KEY'] = "xyz"
         mock_logger = Mock()
-        config = self.__create_test_configuration_instance(logger=mock_logger)
+        config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
         self.assertEquals(config.api_key, 'xyz')
@@ -847,21 +842,26 @@ class TestConfiguration(ScalyrTestCase):
         )
 
     def test_duplicate_api_key(self):
-        self.__write_file_with_separator_conversion("""{
+        self._write_file_with_separator_conversion("""{
             api_key: "abcd1234",
         }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion("apikey.json", """{
+        self._write_config_fragment_file_with_separator_conversion("apikey.json", """{
             api_key: "abcd1234",
         }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
-    @parameterized.expand([(True,), (False,)])
-    def test_environment_aware_global_params(self, uppercase):
+    def test_environment_aware_global_params_true(self):
+        self._test_environment_aware_global_params(True)
+
+    def test_environment_aware_global_params_false(self):
+        self._test_environment_aware_global_params(True)
+
+    def _test_environment_aware_global_params(self, uppercase):
         """Tests config params that have environment variable overrides as follows:
 
         1. Ensure params are "environment variable aware" -- meaning code exists to look for corresponding environment
@@ -879,9 +879,9 @@ class TestConfiguration(ScalyrTestCase):
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
         }
-        self.__write_file_with_separator_conversion(serialize_json(JsonObject(config_file_dict)))
+        self._write_file_with_separator_conversion(serialize_json(JsonObject(config_file_dict)))
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
 
         # Parse config files once to capture all environment-aware variables in Configuration._environment_aware_map
         config.parse()
@@ -1005,145 +1005,8 @@ class TestConfiguration(ScalyrTestCase):
                     self.assertNotEquals(value, config_file_value)
         patch_and_start_test()
 
-    @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
-    def test_environment_aware_module_params(self, mock_docker):
-
-        # Define test values here for all k8s and k8s_event monitor config params that are environment aware.
-        # Be sure to use non-default test values
-        TEST_INT = 123456789
-        TEST_FLOAT = 1234567.89
-        TEST_STRING = 'dummy string'
-        TEST_PARSE_FORMAT = 'cri'
-        TEST_ARRAY_OF_STRINGS = ['s1', 's2', 's3']
-        STANDARD_PREFIX = '_STANDARD_PREFIX_'  # env var is SCALYR_<param_name>
-
-        # The following map contains config params to be tested
-        # config_param_name: (custom_env_name, test_value)
-        k8s_testmap = {
-            "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
-            "docker_max_parallel_stats": (STANDARD_PREFIX, TEST_INT, int),
-            "container_globs": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
-            "report_container_metrics": (STANDARD_PREFIX, False, bool),
-            "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
-            "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
-            "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
-            "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, str),
-            "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
-            "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
-            "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
-        }
-
-        k8s_events_testmap = {
-            "max_log_size": ("SCALYR_K8S_MAX_LOG_SIZE", TEST_INT, int),
-            "max_log_rotations": ("SCALYR_K8S_MAX_LOG_ROTATIONS", TEST_INT, int),
-            "log_flush_delay": ("SCALYR_K8S_LOG_FLUSH_DELAY", TEST_FLOAT, float),
-            "message_log": ("SCALYR_K8S_MESSAGE_LOG", TEST_STRING, str),
-            "event_object_filter": ("SCALYR_K8S_EVENT_OBJECT_FILTER", TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
-            "leader_check_interval": ("SCALYR_K8S_LEADER_CHECK_INTERVAL", TEST_INT, int),
-            "leader_node": ("SCALYR_K8S_LEADER_NODE", TEST_STRING, str),
-            "check_labels": ("SCALYR_K8S_CHECK_LABELS", True, bool),
-            "ignore_master": ("SCALYR_K8S_IGNORE_MASTER", False, bool),
-        }
-
-        # Fake the environment varaibles
-        for map in [k8s_testmap, k8s_events_testmap]:
-            for key, value in map.items():
-                custom_name = value[0]
-                env_name = ('SCALYR_%s' % key).upper() if custom_name == STANDARD_PREFIX else custom_name.upper()
-                envar_value = str(value[1])
-                if value[2] == ArrayOfStrings:
-                    # Array of strings should be entered into environment in the user-preferred format
-                    # which is without square brackets and quotes around each element
-                    envar_value = envar_value[1:-1]  # strip square brackets
-                    envar_value = envar_value.replace("'", '')
-                else:
-                    envar_value = envar_value.lower()  # lower() needed for proper bool encoding
-                os.environ[env_name] = envar_value
-
-        self.__write_file_with_separator_conversion(""" {
-            logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
-            api_key: "abcd1234",
-        }      
-        """)
-        self.__write_config_fragment_file_with_separator_conversion('k8s.json',  """ {
-            "monitors": [
-                {
-                    "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
-                    "report_k8s_metrics": false,                    
-                },
-                {
-                    "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor"
-                }            
-            ]
-        }
-        """)
-
-        config = self.__create_test_configuration_instance()
-        config.parse()
-
-        # echee TODO: once AGENT-40 docker PR merges in, some of the test-setup code below can be eliminated and
-        # reused from that PR (I moved common code into scalyr_agent/test_util
-        def fake_init(self):
-            # Initialize some requisite variables so that the k8s monitor loop can run
-            self._KubernetesMonitor__container_checker = None
-            self._KubernetesMonitor__namespaces_to_ignore = []
-            self._KubernetesMonitor__include_controller_info = None
-            self._KubernetesMonitor__report_container_metrics = None
-            self._KubernetesMonitor__metric_fetcher = None
-
-        with patch.object(KubernetesMonitor, '_initialize', fake_init):
-
-            mock_logger = Mock()
-            scalyr_monitor.log = mock_logger
-
-            monitors_manager = MonitorsManager(config, FakePlatform([]))
-            k8s_monitor = monitors_manager.monitors[0]
-            k8s_events_monitor = monitors_manager.monitors[1]
-
-            # All environment-aware params defined in the k8s and k8s_events monitors must be tested
-            self.assertEquals(
-                set(k8s_testmap.keys()),
-                set(k8s_monitor._config._environment_aware_map.keys()))
-
-            self.assertEquals(
-                set(k8s_events_testmap.keys()),
-                set(k8s_events_monitor._config._environment_aware_map.keys()))
-
-            # Verify module-level conflicts between env var and config file are logged at module-creation time
-            mock_logger.warn.assert_called_with(
-                'Conflicting values detected between scalyr_agent.builtin_monitors.kubernetes_monitor config file '
-                'parameter `report_k8s_metrics` and the environment variable `SCALYR_REPORT_K8S_METRICS`. '
-                'Ignoring environment variable.',
-                limit_once_per_x_secs=300,
-                limit_key='config_conflict_scalyr_agent.builtin_monitors.kubernetes_monitor_report_k8s_metrics_SCALYR_REPORT_K8S_METRICS',
-            )
-
-            CopyingManager(config, monitors_manager.monitors)
-            # Override Agent Logger to prevent writing to disk
-            for monitor in monitors_manager.monitors:
-                monitor._logger = FakeAgentLogger('fake_agent_logger')
-
-            # Verify environment variable values propagate into kubernetes monitor MonitorConfig
-            monitor_2_testmap = {
-                k8s_monitor: k8s_testmap,
-                k8s_events_monitor: k8s_events_testmap,
-            }
-            for monitor, testmap in monitor_2_testmap.items():
-                for key, value in testmap.items():
-                    test_val, convert_to = value[1:]
-                    if key in ['report_k8s_metrics', 'api_key']:
-                        # Keys were defined in config files so should not have changed
-                        self.assertNotEquals(test_val, monitor._config.get(key, convert_to=convert_to))
-                    else:
-                        # Keys were empty in config files so they take on environment values
-                        materialized_value = monitor._config.get(key, convert_to=convert_to)
-                        if hasattr(test_val, '__iter__'):
-                            self.assertEquals([x1 for x1 in test_val], [x2 for x2 in materialized_value])
-                        else:
-                            self.assertEquals(test_val, materialized_value)
-
     def test_log_excludes_from_config(self):
-        self.__write_file_with_separator_conversion(""" { 
+        self._write_file_with_separator_conversion(""" { 
             api_key: "hi there",
             logs: [
                 { 
@@ -1153,65 +1016,14 @@ class TestConfiguration(ScalyrTestCase):
             ],
           }
         """)
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
         excludes = config.log_configs[0]['exclude']
         self.assertEquals(type(excludes), JsonArray)
         self.assertEquals(list(excludes), ["*.[0-9]*", "*.bak"])
 
-    def test_k8s_event_object_filter_from_config(self):
-        self.__write_file_with_separator_conversion(""" { 
-            api_key: "hi there",
-            logs: [ { path:"/var/log/tomcat6/access.log" }],
-            monitors: [
-                {
-                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
-                    event_object_filter: ["CronJob", "DaemonSet", "Deployment"]
-                }
-            ]
-          }
-        """)
-        config = self.__create_test_configuration_instance()
-        config.parse()
-
-        test_manager = MonitorsManager(config, FakePlatform([]))
-        k8s_event_monitor = test_manager.monitors[0]
-        event_object_filter = k8s_event_monitor._config.get('event_object_filter')
-        elems = ["CronJob", "DaemonSet", "Deployment"]
-        self.assertNotEquals(elems, event_object_filter)  # list != JsonArray
-        self.assertEquals(elems, [x for x in event_object_filter])
-
-    @parameterized.expand([
-        '["CronJob", "DaemonSet", "Deployment"]',
-        '"CronJob", "DaemonSet", "Deployment"',
-        'CronJob, DaemonSet, Deployment',
-        'CronJob,DaemonSet,Deployment',
-    ])
-    def test_k8s_event_object_filter_from_environment(self, environment_value):
-        elems = ["CronJob", "DaemonSet", "Deployment"]
-        os.environ['SCALYR_K8S_EVENT_OBJECT_FILTER'] = environment_value
-        self.__write_file_with_separator_conversion(""" { 
-            api_key: "hi there",
-            logs: [ { path:"/var/log/tomcat6/access.log" }],
-            monitors: [
-                {
-                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",                    
-                }
-            ]
-          }
-        """)
-        config = self.__create_test_configuration_instance()
-        config.parse()
-
-        test_manager = MonitorsManager(config, FakePlatform([]))
-        k8s_event_monitor = test_manager.monitors[0]
-        event_object_filter = k8s_event_monitor._config.get('event_object_filter')
-        self.assertNotEquals(elems, event_object_filter)  # list != ArrayOfStrings
-        self.assertEquals(type(event_object_filter), ArrayOfStrings)
-        self.assertEquals(elems, list(event_object_filter))
-
     def test_global_options_in_fragments(self):
-        self.__write_config_fragment_file_with_separator_conversion("fragment.json", """{
+        self._write_config_fragment_file_with_separator_conversion("fragment.json", """{
             api_key: "abcdefg",
             agent_log_path: "/var/silly1",
             http_proxy: "http://foo.com",
@@ -1219,11 +1031,11 @@ class TestConfiguration(ScalyrTestCase):
         }
         """)
 
-        self.__write_file_with_separator_conversion("""{
+        self._write_file_with_separator_conversion("""{
         }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals( config.api_key, "abcdefg" )
@@ -1231,7 +1043,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertEqual(config.network_proxies, {"http": "http://foo.com", 'https': 'https://bar.com'})
 
     def test_global_duplicate_options_in_fragments(self):
-        self.__write_config_fragment_file_with_separator_conversion("fragment.json", """{
+        self._write_config_fragment_file_with_separator_conversion("fragment.json", """{
             api_key: "abcdefg",
             agent_log_path: "/var/silly1",
             http_proxy: "http://foo.com",
@@ -1239,17 +1051,17 @@ class TestConfiguration(ScalyrTestCase):
         }
         """)
 
-        self.__write_file_with_separator_conversion("""{
+        self._write_file_with_separator_conversion("""{
             agent_log_path: "/var/silly1",
         }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         self.assertRaises( BadConfiguration, config.parse )
 
 
     def test_json_array_substitution(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ "TEST_VAR", "DIR_VAR" ],
             api_key: "hi$TEST_VAR",
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }]
@@ -1259,40 +1071,40 @@ class TestConfiguration(ScalyrTestCase):
         os.environ['TEST_VAR'] = 'bye'
         os.environ['DIR_VAR'] = 'ok'
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hibye')
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/ok.log')
 
     def test_empty_substitution(self):
-        self.__write_file_with_separator_conversion(""" {
+        self._write_file_with_separator_conversion(""" {
             import_vars: [ "UNDEFINED_VAR" ],
             api_key: "hi$UNDEFINED_VAR",
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(config.api_key, 'hi')
 
     def test_import_vars_in_configuration_directory(self):
         os.environ['TEST_VAR'] = 'bye'
-        self.__write_file_with_separator_conversion(""" { api_key: "hi there"
+        self._write_file_with_separator_conversion(""" { api_key: "hi there"
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             server_attributes: {  serverHost:"foo.com" }
           }
         """)
 
-        self.__write_config_fragment_file_with_separator_conversion('nginx.json', """ {
+        self._write_config_fragment_file_with_separator_conversion('nginx.json', """ {
            import_vars: [ "TEST_VAR" ],
            logs: [ { path: "/var/log/nginx/$TEST_VAR.log" } ],
            server_attributes: { webServer:"true"}
           }
         """)
 
-        config = self.__create_test_configuration_instance()
+        config = self._create_test_configuration_instance()
         config.parse()
 
         self.assertEquals(len(config.additional_file_paths), 1)
@@ -1329,14 +1141,14 @@ class TestConfiguration(ScalyrTestCase):
                 self.__convert_separators(contents[i])
         return contents
 
-    def __write_file_with_separator_conversion(self, contents):
+    def _write_file_with_separator_conversion(self, contents):
         contents = serialize_json(self.__convert_separators(parse_json(contents)))
 
         fp = open(self.__config_file, 'w')
         fp.write(contents)
         fp.close()
 
-    def __write_config_fragment_file_with_separator_conversion(self, file_path, contents):
+    def _write_config_fragment_file_with_separator_conversion(self, file_path, contents):
         contents = serialize_json(self.__convert_separators(parse_json(contents)))
 
         full_path = os.path.join(self.__config_fragments_dir, file_path)
@@ -1355,7 +1167,7 @@ class TestConfiguration(ScalyrTestCase):
             self.config = config
             self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
 
-    def __create_test_configuration_instance(self, logger=None):
+    def _create_test_configuration_instance(self, logger=None):
         """Creates an instance of a Configuration file for testing.
 
         @return:  The test instance

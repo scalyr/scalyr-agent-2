@@ -30,10 +30,9 @@ import os
 import errno
 import re
 import time
-from collections import defaultdict, namedtuple
-from datetime import datetime, timedelta
 from subprocess import Popen, PIPE
 
+from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration
 from scalyr_agent import define_config_option, define_metric, define_log_field
 
@@ -106,14 +105,23 @@ define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.
 define_log_field(__monitor__, 'value', 'The metric value.')
 
 
-class Metric(namedtuple('Metric', ['name', 'type'])):
+class Metric(object):
     """
     This class is an abstraction for a linux metric that contains the
     metric name eg. CPU and type eg. system/user etc. A combination of the
     two make the metric unique.
     """
+    __slots__ = 'name', 'type', '_frozen'
 
-    __slots__ = ()
+    def __init__(self, name, _type):
+        self.name = name
+        self.type = _type
+        self._frozen = True
+
+    def __setattr__(self, name, value):
+        if getattr(self, '_frozen', False):
+            raise AttributeError("can't set attribute")
+        super(Metric, self).__setattr__(name, value)
 
     @property
     def is_cumulative(self):
@@ -715,7 +723,7 @@ class ProcessTracker(object):
                 stats = gather.run_single_cycle(collector=collector)
                 if stats:
                     collector.update( stats )
-            except Exception as ex:
+            except Exception, ex:
                 self._logger.exception(
                     'Exception while collecting metrics for PID: %s of type: %s. Details: %s',
                     self.pid, type(gather), repr(ex)

@@ -17,7 +17,7 @@
 
 __author__ = 'saurabh@scalyr.com'
 
-import unittest2 as unittest
+import unittest
 import mock
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.scalyr_monitor import MonitorConfig
@@ -106,5 +106,4 @@ class UrlMonitorTestRequest(unittest.TestCase):
         }
 
         config = MonitorConfig(content=config_data)
-        with self.assertRaises(Exception):
-            _ = UrlMonitor(monitor_config=config, logger=mock_logger)
+        self.assertRaises(Exception, lambda: UrlMonitor(monitor_config=config, logger=mock_logger))

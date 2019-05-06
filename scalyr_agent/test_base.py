@@ -19,16 +19,70 @@
 __author__ = 'czerwin@scalyr.com'
 
 import sys
-import unittest2 as unittest
+import unittest
 
 
-if sys.version_info < (2, 5, 0):
+PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
+
+
+def _noop_skip(reason):
+    def decorator(test_func_or_obj):
+        if not isinstance(test_func_or_obj, type):
+            def skip_wrapper(*args, **kwargs):
+                print('Skipping test %s. Reason: "%s"' % (test_func_or_obj.__name__, reason))
+            return skip_wrapper
+        else:
+            test_func_or_obj.__unittest_skip__ = True
+            test_func_or_obj.__unittest_skip_why__ = reason
+            return test_func_or_obj
+    return decorator
+
+
+def _id(obj):
+    return obj
+
+
+def _noop_skip_if(condition, reason):
+    if condition:
+        return _noop_skip(reason)
+    return _id
+
+
+def _noop_skip_unless(condition, reason):
+    if not condition:
+        return _noop_skip(reason)
+    return _id
+
+
+skip = _noop_skip
+if hasattr(unittest, 'skip'):
+    skip = unittest.skip
+
+
+skipUnless = _noop_skip_unless
+if hasattr(unittest, 'skipUnless'):
+    skipUnless = unittest.skipUnless
+
+
+skipIf = _noop_skip_if
+if hasattr(unittest, 'skipIf'):
+    skipIf = unittest.skipIf
+
+
+if sys.version_info[:2] < (2, 7):
     class ScalyrTestCase(unittest.TestCase):
         """The base class for Scalyr tests.
 
         This is used mainly to hide differences between the test fixtures available in the various Python
         versions
         """
+        def assertIs(self, obj1, obj2, msg=None):
+            """Just like self.assertTrue(a is b), but with a nicer default message."""
+            if obj1 is not obj2:
+                if msg is None:
+                    msg = '%s is not %s' % (obj1, obj2)
+                self.fail(msg)
+
         def assertIsNone(self, obj, msg=None):
             """Same as self.assertTrue(obj is None), with a nicer default message."""
             if msg is not None:
@@ -56,6 +110,8 @@ else:
         This is used mainly to hide differences between the test fixtures available in the various Python
         versions
         """
+        def assertIs(self, obj1, obj2, msg=None):
+            unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
 
         def assertIsNone(self, obj, msg=None):
             unittest.TestCase.assertIsNone(self, obj, msg=msg)

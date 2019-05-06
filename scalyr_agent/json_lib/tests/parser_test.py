@@ -17,7 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
-import unittest2 as unittest
+import unittest
 
 from scalyr_agent.json_lib.parser import ByteScanner, JsonParser, JsonParseException
 

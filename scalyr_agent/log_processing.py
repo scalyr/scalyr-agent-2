@@ -2427,8 +2427,8 @@ class LogMatcher(object):
                 try:
                     values = {}
                     sections = self.__split_path( matched_file )
-                    for index, section in enumerate(sections, 1):
-                        values["PATH%d"%index] = section
+                    for index, section in enumerate(sections):
+                        values["PATH%d" % (index+1)] = section
 
                     basename = os.path.basename( matched_file )
                     values['BASENAME'] = basename

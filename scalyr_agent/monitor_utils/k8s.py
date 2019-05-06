@@ -1088,9 +1088,12 @@ class KubernetesApi( object ):
         try:
             # using with is ok here, because we need to be running
             # a recent version of python for various 3rd party libs
-            with open( token_file, 'r' ) as f:
+            f = open(token_file, 'r')
+            try:
                 token = f.read()
-        except IOError, e:
+            finally:
+                f.close()
+        except IOError:
             pass
 
         #get the namespace this pod is running on
@@ -1098,9 +1101,12 @@ class KubernetesApi( object ):
         try:
             # using with is ok here, because we need to be running
             # a recent version of python for various 3rd party libs
-            with open( namespace_file, 'r' ) as f:
+            f = open( namespace_file, 'r' )
+            try:
                 self.namespace = f.read()
-        except IOError, e:
+            finally:
+                f.close()
+        except IOError:
             pass
 
         self._standard_headers["Authorization"] = "Bearer %s" % (token)

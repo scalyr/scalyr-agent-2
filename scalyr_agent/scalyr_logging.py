@@ -603,7 +603,15 @@ class AgentLogger(logging.Logger):
                 continue
             rv = (filename, f.f_lineno, co.co_name)
             break
-        return rv
+
+        if sys.version_info[:3] < (2, 4, 2):
+            # Python 2.4.2 and below expects 2-tuple instead of 3-tuple.
+            # Note however that the docs are imprecise. E.g. the following link suggests 2.4.4 expects a 2 tuple.
+            # https://docs.python.org/release/2.4.4/lib/node341.html.
+            # TODO: for python 3, return a 4 tuple !
+            return rv[:2]
+        else:
+            return rv
 
 # To help with a hack of extending the Logger class, we need a thread local storage
 # to store the last error status code and metric information seen by this thread.

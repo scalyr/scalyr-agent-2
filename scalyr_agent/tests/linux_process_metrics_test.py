@@ -17,11 +17,28 @@
 
 __author__ = 'saurabh@scalyr.com'
 
-from collections import defaultdict
+from scalyr_agent.compat import custom_defaultdict as defaultdict
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessMonitor, Metric, ProcessList
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
 
+
+class TestMetricClass(ScalyrTestCase):
+    def test_basic_namedtuple_access(self):
+
+        m = Metric('abc', 123)
+
+        # Ensure name and type fields are present
+        self.assertEquals(m.name, 'abc')
+        self.assertEquals(m.type, 123)
+
+        # Non-existent
+        self.assertRaises(AttributeError, lambda: m.asdf)
+
+        # Ensure cannot mutate
+        def mutate():
+            m.name = 'mutated value'
+        self.assertRaises(AttributeError, lambda: mutate())
 
 class TestProcessMonitorInitialize(ScalyrTestCase):
     def setUp(self):
