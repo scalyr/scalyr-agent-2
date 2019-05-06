@@ -21,6 +21,7 @@ class TestConfigurationK8s(TestConfiguration):
         TEST_INT = 123456789
         TEST_FLOAT = 1234567.89
         TEST_STRING = 'dummy string'
+        TEST_PARSE_FORMAT = 'cri'
         TEST_ARRAY_OF_STRINGS = ['s1', 's2', 's3']
         STANDARD_PREFIX = '_STANDARD_PREFIX_'  # env var is SCALYR_<param_name>
 
@@ -34,7 +35,11 @@ class TestConfigurationK8s(TestConfiguration):
             "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
             "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
             "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
-            "k8s_parse_json": (STANDARD_PREFIX, False, bool),
+            "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
+            "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
+            "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, str),
+            "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
+            "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
             "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
         }
 
