@@ -102,11 +102,13 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 else:
                     return version2
 
+            container_runtime = 'cri'
             @patch.object(k8s_mon, 'get_user_agent_fragment')
             @patch.object(k8s_mon, '_KubernetesMonitor__get_k8s_cache')  # return Mock obj instead of a KubernetesCache)
             def start_test(m2, m1):
                 m1.side_effect = fake_get_user_agent_fragment
                 m2.return_value.get_api_server_version.side_effect = fake_get_api_server_version
+                m2.return_value.get_container_runtime.side_effect = lambda: container_runtime
                 manager.set_user_agent_augment_callback(augment_user_agent)
 
                 manager.start_manager()
@@ -117,9 +119,9 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 self.assertEqual(fragment_polls.count(), 40)
                 self.assertEqual(counter['callback_invocations'], 3)
                 self.assertEquals(detected_fragment_changes, [
-                    'k8s=true',
-                    'k8s=%s' % version1,
-                    'k8s=%s' % version2,
+                    'k8s=true;k8s-runtime=%s' % container_runtime,
+                    'k8s=%s;k8s-runtime=%s' % (version1, container_runtime),
+                    'k8s=%s;k8s-runtime=%s' % (version2, container_runtime),
                 ])
 
                 manager.stop_manager(wait_on_join=False)
