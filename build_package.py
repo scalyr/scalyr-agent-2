@@ -88,7 +88,7 @@ def build_package(package_type, variant, no_versioned_file_name):
             # backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
             # with the eventual migration.
             artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile',
+                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile.syslog',
                                                          'docker/docker-syslog-config',
                                                          'scalyr-docker-agent-syslog',
                                                          ['scalyr/scalyr-agent-docker-syslog',
