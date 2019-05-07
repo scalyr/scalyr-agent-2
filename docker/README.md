@@ -65,7 +65,7 @@ you reference the actual socket and not a symlink to it.  Use `ls -l` to determi
 Here is an example of the complete command:
 
     docker run -d --name scalyr-docker-agent-json \
-    -v /tmp/api_key.json:/etc/scalyr-agent-2/agent.d/api_key.json \ 
+    -v /tmp/api_key.json:/etc/scalyr-agent-2/agent.d/api_key.json \
     -v /run/docker.sock:/var/scalyr/docker.sock \
     -v /var/lib/docker/containers:/var/lib/docker/containers \
     scalyr/scalyr-docker-agent-json
@@ -75,17 +75,20 @@ Or if setting API key via environment:
     docker run -d --name scalyr-docker-agent-json \
     -e SCALYR_API_KEY=<Your api key> \ 
     -v /run/docker.sock:/var/scalyr/docker.sock \
-    -v /var/lib/docker/containers:/var/lib/docker/containers   
+    -v /var/lib/docker/containers:/var/lib/docker/containers \
+    scalyr/scalyr-docker-agent-json
 
 #### scalyr-docker-agent-syslog
 
-To run the Syslog version, steps (1) and (2) are the same, but for step (3), you instead map the 
+To run the Syslog version, steps (1) and (2) are the same, but for step (3), you instead map the
 Syslog port:
 
     docker run -d --name scalyr-docker-agent-syslog \
     -e SCALYR_API_KEY=<Your api key> \
     -v /run/docker.sock:/var/scalyr/docker.sock \
-    -p 601:601
+    -p 601:601 \
+    scalyr/scalyr-docker-agent-syslog
+
 
 ## Configuring local containers to send their logs to Scalyr
 

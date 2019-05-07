@@ -15,4 +15,11 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 COPY --from=scalyr-dependencies  /tmp/dependencies/ /
 ADD scalyr-docker-agent.tar.gz /
 
+# expose syslog ports
+EXPOSE 601/tcp
+
+# Please note Syslog UDP 1024 max packet length (rfc3164)
+EXPOSE 514/udp
+
+
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
