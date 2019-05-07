@@ -24,6 +24,7 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
 
 import scalyr_agent.util as scalyr_util
 
@@ -106,6 +107,12 @@ class ScalyrTestUtils(object):
         if fake_clock:
             for monitor in test_manager.monitors + [test_manager]:
                 monitor._run_state = scalyr_util.RunState(fake_clock=fake_clock)
+
+        # AGENT-113 set all monitors and the monitors_manager threads to daemon to eliminate occasionally hanging tests
+        test_manager.setDaemon(True)
+        for monitor in test_manager.monitors:
+            if isinstance(monitor, threading.Thread):
+                monitor.setDaemon(True)
 
         return test_manager
 
