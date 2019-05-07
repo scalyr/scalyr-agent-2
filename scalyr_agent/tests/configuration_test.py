@@ -25,10 +25,7 @@ from mock import patch, Mock
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
-from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.platform_controller import DefaultPaths
-from scalyr_agent.json_lib.objects import ArrayOfStrings
-from scalyr_agent.test_util import FakePlatform
 
 from scalyr_agent.test_base import ScalyrTestCase
 

@@ -953,15 +953,15 @@ class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
 
     This helps reduce the disk requests for high syslog traffic.
     """
-    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, encoding=None, delay=0, flushDelay=0.0):
+    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, delay=0, flushDelay=0.0):
         # We handle delay specially because it is not a valid option for the Python 2.4 logging libraries, so we
         # really only pass it if the caller is really trying to set it to something other than the default.
         if delay != 0:
             logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
-                                                          backupCount=backupCount, encoding=encoding, delay=delay)
+                                                          backupCount=backupCount, delay=delay)
         else:
             logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
-                                                          backupCount=backupCount, encoding=encoding)
+                                                          backupCount=backupCount)
 
         self.__flushDelay = flushDelay
         # If this is not None, then it is set to a timer that when it expires will flush the log handler.

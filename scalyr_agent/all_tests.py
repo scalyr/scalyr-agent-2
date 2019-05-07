@@ -52,6 +52,10 @@ def find_all_tests(directory=None, base_path=None):
     return result
 
 
+PYTHON24_WHITELIST = [
+    'scalyr_agent.tests.url_monitor_test',
+]
+
 PRE_PYTHON27_WHITELIST = [
     'scalyr_agent.tests.configuration_k8s_test',
     'scalyr_agent.builtin_monitors.tests.docker_monitor_test',
@@ -74,7 +78,11 @@ def run_all_tests():
             try:
                 suites.append(test_loader.loadTestsFromName(test_case))
             except Exception, ex:
-                if sys.version_info[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
+                if sys.version_info[:2] < (2, 5) and test_case in PYTHON24_WHITELIST:
+                    print("Warning. Skipping unloadable module '%s'.\n"
+                          "This module was whitelisted as non-critical for Python 2.4 testing.\n"
+                          "Module-load exception message: '%s'\n" % (test_case, ex))
+                elif sys.version_info[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
                     print("Warning. Skipping unloadable module '%s'.\n"
                           "This module was whitelisted as non-critical for pre-2.7 testing.\n"
                           "Module-load exception message: '%s'\n" % (test_case, ex))
