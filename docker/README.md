@@ -80,15 +80,15 @@ Or if setting API key via environment:
 
 #### scalyr-docker-agent-syslog
 
-To run the Syslog version, steps (1) and (2) are the same, but for step (3), you don't map in the
-containers directory.
+To run the Syslog version, steps (1) and (2) are the same, but for step (3), you instead map the
+Syslog port:
 
     docker run -d --name scalyr-docker-agent-syslog \
     -e SCALYR_API_KEY=<Your api key> \
     -v /run/docker.sock:/var/scalyr/docker.sock \
+    -p 601:601 \
     scalyr/scalyr-docker-agent-syslog
 
-Note: by default, the scalyr-agent-syslog container exposes tcp port 601 and udp port 501
 
 ## Configuring local containers to send their logs to Scalyr
 
