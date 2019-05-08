@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.47 "Zatnikatel" - May 8, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on May 8, 2019 16:00 -0700
+--->
+
+Features
+* ContainerD support
+* Reduced Agent docker image sizes (using Alpine)
+
+Bugs
+* Fix bug where if hashing is used with redaction, non-matching lines are not uploaded
+* Fixed code bugs causing Agent not to start in versions of Python < 2.7
+* Fixed github issue #180
+* Updated docker/README.md
+
+
 ## 2.0.46 "Yadera" - Apr 24, 2019
 
 <!---
