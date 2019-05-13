@@ -110,8 +110,15 @@ define_config_option( __monitor__, 'metrics_only',
                      convert_to=bool, default=False)
 
 define_config_option( __monitor__, 'container_globs',
-                     'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
-                     'match one of the glob patterns will be monitored.',
+                     'Optional (defaults to None). A whitelist of container name glob patterns to monitor.  Only containers whose name '
+                     'matches one of the glob patterns will be monitored.  If `None`, all container names are matched.  This value '
+                     'is applied *before* `container_globs_exclude`',
+                      convert_to=ArrayOfStrings, default=None)
+
+define_config_option( __monitor__, 'container_globs_exclude',
+                     'Optional (defaults to None). A blacklist of container name glob patterns to exclude from monitoring.  Any container whose name '
+                     'matches one of the glob patterns will not be monitored.  If `None`, all container names matched by `container_globs` are monitored.  This value '
+                     'is applied *after* `container_globs`',
                       convert_to=ArrayOfStrings, default=None)
 
 define_config_option( __monitor__, 'report_container_metrics',
@@ -290,6 +297,12 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
     if logger is None:
         logger = global_log
 
+    if glob_list is None:
+        glob_list = {}
+
+    include_globs = glob_list.get( 'include', None )
+    exclude_globs = glob_list.get( 'exclude', None )
+
     result = {}
     try:
         filters = {"id": restrict_to_container} if restrict_to_container is not None else None
@@ -305,12 +318,24 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
 
                 add_container = True
 
-                if glob_list:
+                # see if this container name should be included
+                if include_globs:
                     add_container = False
-                    for glob in glob_list:
+                    for glob in include_globs:
                         if fnmatch.fnmatch( name, glob ):
                             add_container = True
-                            break;
+                            break
+
+                    if not add_container:
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s', because it does not match any glob in `container_globs`" % name )
+
+                # see if this container name should be excluded
+                if add_container and exclude_globs is not None:
+                    for glob in exclude_globs:
+                        if fnmatch.fnmatch( name, glob ):
+                            add_container = False
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s', because it matches '%s' in `container_globs_exclude`" % (name, glob) )
+                            break
 
                 if add_container:
                     log_path = None
@@ -452,7 +477,10 @@ class ContainerChecker( StoppableThread ):
 
         self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
-        self.__glob_list = config.get( 'container_globs' )
+        self.__glob_list = {
+            'include': self._config.get( 'container_globs' ),
+            'exclude': self._config.get( 'container_globs_exclude' ),
+        }
 
         self.containers = {}
         self.__checkpoints = {}
@@ -474,6 +502,9 @@ class ContainerChecker( StoppableThread ):
         self.docker_logs = self.__get_docker_logs( self.containers )
         self.docker_loggers = []
         self.raw_logs = []
+
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "container_globs: %s" % self.__glob_list['include'] )
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "container_globs_exclude: %s" % self.__glob_list['exclude'] )
 
         #create and start the DockerLoggers
         self.__start_docker_logs( self.docker_logs )
@@ -1435,7 +1466,10 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.__glob_list = self._config.get( 'container_globs' )
+        self.__glob_list = {
+            'include': self._config.get( 'container_globs' ),
+            'exclude': self._config.get( 'container_globs_exclude' ),
+        }
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
 

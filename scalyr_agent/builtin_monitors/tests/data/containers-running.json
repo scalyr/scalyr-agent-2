@@ -1,0 +1,50 @@
+[
+  {
+    "Id": "87d533137e70601d17a4bf9d563b11d528ba81e31e2299eb8d4ab2ef5a54f0c0",
+    "Names": [
+      "/scalyr"
+    ]
+  },
+  {
+    "Id": "84afc8ee4d726544e77dcfe22c6f5be04f36b115ea99c0510d612666f83da1ce",
+    "Names": [
+      "/include3-exclude"
+    ]
+  },
+  {
+    "Id": "e511aaf76add81d41c1536b2a93a17448d9f9d3c6a3f8a5abab1d9a582c397fc",
+    "Names": [
+      "/include2-exclude"
+    ]
+  },
+  {
+    "Id": "cfcb7f7d1481c805f91fd6c8c120300a586978fa2541a58026bd930eeeda3e36",
+    "Names": [
+      "/include1-exclude"
+    ]
+  },
+  {
+    "Id": "b8757266fd6a9efcb40a2881215d8d3642e6f8a0cfdcbb941382d002f31dcca4",
+    "Names": [
+      "/include4-yes"
+    ]
+  },
+  {
+    "Id": "343c05b55c1b0cebca6df0309a4892974c5ed3013731433461ffe7442223659a",
+    "Names": [
+      "/include3-yes"
+    ]
+  },
+  {
+    "Id": "58ded582ebf14063bff3b15cd3962035be9904b73318796f1119d71472801d23",
+    "Names": [
+      "/include2-yes"
+    ]
+  },
+  {
+    "Id": "c4eacccbf687f408c708b12fa875ab55f4d6d0aad8e2eec489ba9712e041bd14",
+    "Names": [
+      "/include1-yes"
+    ]
+  }
+]
