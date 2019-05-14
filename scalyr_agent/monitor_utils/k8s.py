@@ -103,6 +103,8 @@ def cache( config ):
     cache_config = _CacheConfig( api_url=config.k8s_api_url,
                                  verify_api_queries=config.k8s_verify_api_queries,
                                  cache_expiry_secs=config.k8s_cache_expiry_secs,
+                                 cache_expiry_fuzz_secs=config.k8s_cache_expiry_fuzz_secs,
+                                 cache_start_fuzz_secs=config.k8s_cache_start_fuzz_secs,
                                  cache_purge_secs=config.k8s_cache_purge_secs,
                                  namespaces_to_ignore=namespaces_to_ignore )
 
@@ -590,22 +592,29 @@ class _CacheConfig( object ):
     Internal configuration options for the Kubernetes cache
     """
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None ):
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
+                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None ):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
         @param cache_expiry_secs: the number of secs to wait before updating the cache
+        @param cache_expiry_fuzz_secs: if greater than zero, the number of seconds to fuzz the expiration time to avoid query stampede
+        @param cache_start_fuzz_secs: if greater than zero, the number of seconds to fuzz the start time to avoid query stampede
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
         @param namespaces_to_ignore: a list of namespaces to ignore
         @type api_url: str
         @type verify_api_queries: bool
         @type cache_expiry_secs: int or float
+        @type cache_expiry_fuzz_secs: int or float
+        @type cache_start_fuzz_secs: int or float
         @type cache_purge_secs: int or float
         @type namespaces_to_ignore: list[str]
         """
         self.api_url = api_url
         self.verify_api_queries = verify_api_queries
         self.cache_expiry_secs = cache_expiry_secs
+        self.cache_expiry_fuzz_secs = cache_expiry_fuzz_secs
+        self.cache_start_fuzz_secs = cache_start_fuzz_secs
         self.cache_purge_secs = cache_purge_secs
         self.namespaces_to_ignore = namespaces_to_ignore
 
@@ -614,6 +623,8 @@ class _CacheConfig( object ):
         return (self.api_url == other.api_url and
                 self.verify_api_queries == other.verify_api_queries and
                 self.cache_expiry_secs == other.cache_expiry_secs and
+                self.cache_expiry_fuzz_secs == other.cache_expiry_fuzz_secs and
+                self.cache_start_fuzz_secs == other.cache_start_fuzz_secs and
                 self.cache_purge_secs == other.cache_purge_secs and
                 self.namespaces_to_ignore == other.namespaces_to_ignore)
 
@@ -626,8 +637,8 @@ class _CacheConfig( object ):
 
 
     def __str__( self ):
-        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n" % ( str(self.api_url),
-            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ) )
+        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_expiry_fuzz_secs: %d\n\tcache_start_fuzz_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n" % ( str(self.api_url),
+            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_expiry_fuzz_secs, self.cache_start_fuzz_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ) )
 
     def need_new_k8s_object( self, new_config ):
         """
@@ -670,6 +681,8 @@ class _CacheConfigState( object ):
             self.node_filter = state.node_filter
             self.cache_expiry_secs = state.config.cache_expiry_secs
             self.cache_purge_secs = state.config.cache_purge_secs
+            self.cache_expiry_fuzz_secs = state.config.cache_expiry_fuzz_secs
+            self.cache_start_fuzz_secs = state.config.cache_start_fuzz_secs
 
     def __init__( self, config ):
         """Set default values"""
@@ -791,13 +804,15 @@ class _CacheConfigState( object ):
 
 class KubernetesCache( object ):
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True ):
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True ):
 
         self._lock = threading.Lock()
 
         new_config = _CacheConfig( api_url=api_url,
                                    verify_api_queries=verify_api_queries,
                                    cache_expiry_secs=cache_expiry_secs,
+                                   cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
+                                   cache_start_fuzz_secs=cache_start_fuzz_secs,
                                    cache_purge_secs=cache_purge_secs,
                                    namespaces_to_ignore=namespaces_to_ignore )
         # set the initial state
@@ -914,6 +929,14 @@ class KubernetesCache( object ):
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
 
+            # Delay the start of this cache if we have fuzzing turned on.  This will reduce the stampede of
+            # agents all querying the API master at the same time on large clusters (when the agents are started
+            # at the same time.)
+            if local_state.cache_start_fuzz_secs > 0:
+                run_state.sleep_but_awaken_if_stopped(random.uniform(0, local_state.cache_start_fuzz_secs))
+                if not run_state.is_running() or self.is_initialized():
+                    continue
+
             try:
                 # we only pre warm the pod cache and the cluster name
                 # controllers are cached on an as needed basis
@@ -971,7 +994,13 @@ class KubernetesCache( object ):
             except Exception, e:
                 global_log.warn( "Exception occurred when updating k8s cache - %s\n%s" % (str( e ), traceback.format_exc()) )
 
-            run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs )
+            # Fuzz how much time we spend until the next cycle.  This should spread out when the agents query the
+            # API master over time in clusters with a larger number of agents.
+            if local_state.cache_expiry_fuzz_secs > 0:
+                fuzz_factor = random.uniform(0, local_state.cache_expiry_fuzz_secs)
+            else:
+                fuzz_factor = 0
+            run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )
 
 
     def pod( self, namespace, name, current_time=None ):
