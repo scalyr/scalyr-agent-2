@@ -882,6 +882,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'api_key', '', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'compression_type', '', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
                                              description, apply_defaults, env_aware=True)
