@@ -20,8 +20,51 @@ __author__ = 'czerwin@scalyr.com'
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
+from scalyr_agent.monitor_utils.k8s import _K8sCache
 
 import logging
+import time
+import mock
+
+from mock import Mock
+
+class Test_K8sCache( ScalyrTestCase ):
+    """ Tests the _K8sCache
+    """
+
+    class DummyObject(object):
+        def __init__( self, access_time ):
+            self.access_time = access_time
+
+    def test_purge_expired( self ):
+
+        processor = Mock()
+        cache = _K8sCache( processor, 'foo', perform_full_updates=False )
+
+        current_time = time.time()
+        obj1 = self.DummyObject( current_time - 10 )
+        obj2 = self.DummyObject( current_time + 15 )
+        obj3 = self.DummyObject( current_time - 20 )
+
+        objects = {
+            'default': {
+                'obj1': obj1,
+                'obj2': obj2,
+                'obj3': obj3
+            }
+        }
+
+        # we should probably look at using actual values returned from k8s here
+        # and loading them via 'cache.update'
+        cache._objects = objects
+
+        cache.purge_expired( current_time )
+
+        objects = cache._objects.get('default', {})
+        self.assertEquals( 1, len( objects ) )
+        self.assertTrue( 'obj2' in objects )
+        self.assertTrue( objects['obj2'] is obj2 )
+
 
 
 class TestDockerMetricFetcher(ScalyrTestCase):
