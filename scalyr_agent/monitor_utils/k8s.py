@@ -997,7 +997,7 @@ class KubernetesCache( object ):
             # Fuzz how much time we spend until the next cycle.  This should spread out when the agents query the
             # API master over time in clusters with a larger number of agents.
             if local_state.cache_expiry_fuzz_secs > 0:
-                fuzz_factor = random.uniform(0, local_state.cache_expiry_fuzz_secs)
+                fuzz_factor = max(random.uniform(0, local_state.cache_expiry_fuzz_secs), 0)
             else:
                 fuzz_factor = 0
             run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )

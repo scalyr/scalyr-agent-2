@@ -275,7 +275,7 @@ class Configuration(object):
 
     @property
     def k8s_cache_expiry_fuzz_secs(self):
-        return self.__get_config().get_int('k8s_fuzz_cache_expiry_fuzz_secs')
+        return self.__get_config().get_int('k8s_cache_expiry_fuzz_secs')
 
     @property
     def k8s_cache_start_fuzz_secs(self):
