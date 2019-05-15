@@ -281,7 +281,7 @@ class _K8sCache( object ):
             for namespace, objs in self._objects.iteritems():
                 for obj_name, obj in objs.iteritems():
                     if hasattr( obj, 'access_time' ):
-                        if obj.access_time is None or obj.access_obj.access_time < access_time:
+                        if obj.access_time is None or obj.access_time < access_time:
                             stale.append( (namespace, obj_name) )
 
             for (namespace, obj_name) in stale:
@@ -457,7 +457,7 @@ class _K8sProcessor( object ):
                     the k8s API for a specific object type.
         @return a python object relevant to the
         """
-        pass
+        raise NotImplementedError( "process_object not implemented for _K8sProcessor" )
 
 class PodProcessor( _K8sProcessor ):
 
