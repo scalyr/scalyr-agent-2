@@ -183,6 +183,12 @@ class Configuration(object):
             if agent_log is not None:
                 self.__log_configs.append(agent_log)
 
+            # add in the profile log if we have enabled profiling
+            if self.enable_profiling:
+                profile_config = JsonObject(path=self.profile_log_name, copy_from_start=True, staleness_threshold_secs=20*60, parser='scalyrAgentProfiling')
+                self.__verify_log_entry_and_set_defaults(profile_config, description='profile log config')
+                self.__log_configs.append( profile_config )
+
             self.__monitor_configs = list(self.__config.get_json_array('monitors'))
 
         except BadConfiguration, e:
@@ -285,6 +291,27 @@ class Configuration(object):
     def k8s_cache_purge_secs(self):
         return self.__get_config().get_int('k8s_cache_purge_secs')
 
+    @property
+    def enable_profiling( self ):
+        return self.__get_config().get_bool( 'enable_profiling' )
+
+    @property
+    def max_profile_interval_minutes( self ):
+        return self.__get_config().get_int( 'max_profile_interval_minutes' )
+
+    @property
+    def profile_duration_minutes( self ):
+        return self.__get_config().get_int( 'profile_duration_minutes' )
+
+    @property
+    def profile_clock( self ):
+        return self.__get_config().get_string( 'profile_clock' )
+
+    @property
+    def profile_log_name( self ):
+        return self.__get_config().get_string( 'profile_log_name' )
+
+    # Debug leak flags
     @property
     def disable_send_requests(self):
         return self.__get_config().get_bool('disable_send_requests')
@@ -1017,6 +1044,12 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
+
+        self.__verify_or_set_optional_bool(config, 'enable_profiling', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'max_profile_interval_minutes', 60, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 2, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'profile_clock', 'random', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'profile_log_name', 'agent.callgrind', description, apply_defaults, env_aware=True)
 
         #Debug leak flags
         self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description, apply_defaults)

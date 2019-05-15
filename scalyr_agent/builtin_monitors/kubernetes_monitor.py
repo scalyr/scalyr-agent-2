@@ -1119,7 +1119,7 @@ class ContainerChecker( StoppableThread ):
     def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
             if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                log['log_config'] = self.__log_watcher.add_log_config( self.__module.module_name, log['log_config'] )
 
             self.raw_logs.append( log )
 
@@ -1845,6 +1845,8 @@ class KubernetesMonitor( ScalyrMonitor ):
                 if k8s_extra is not None:
                     k8s_extra.update( cluster_info )
                     k8s_extra.update({'pod_uid': info['name']})
+                else:
+                    k8s_extra = {}
             self.__gather_metrics_from_api_for_container( info['name'], k8s_extra )
 
     def __gather_k8s_metrics_for_node( self, node, extra ):
