@@ -1045,7 +1045,7 @@ class Configuration(object):
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_bool(config, 'enable_profiling', False, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'enable_profiling', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'max_profile_interval_minutes', 60, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 2, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'profile_clock', 'random', description, apply_defaults, env_aware=True)
