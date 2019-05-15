@@ -62,6 +62,7 @@ scalyr_logging.set_log_destination(use_stdout=True)
 
 from optparse import OptionParser
 
+from scalyr_agent.profiler import Profiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
@@ -757,10 +758,14 @@ class ScalyrAgent(object):
 
                 prev_server = scalyr_server
 
+                profiler = Profiler( self.__config )
+
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
 
                     current_time = time.time()
                     self.__last_config_check_time = current_time
+
+                    profiler.update( self.__config, current_time )
 
                     if self.__config.disable_overall_stats:
                         log.log( scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled" )
