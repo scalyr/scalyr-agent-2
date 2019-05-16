@@ -141,9 +141,7 @@ define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
                       'names.  This may be used to fix breakages when you relied on the v1 attribute names',
                       convert_to=bool, default=False)
 
-define_config_option( __monitor__, 'k8s_api_url',
-                      'Optional (defaults to "https://kubernetes.default"). The URL for the Kubernetes API server for '
-                      'this cluster.', convert_to=str, default='https://kubernetes.default')
+define_config_option( __monitor__, 'k8s_api_url', 'DEPRECATED.', convert_to=str, default='https://kubernetes.default')
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
@@ -197,9 +195,6 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
 define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
                       convert_to=bool, default=True)
-
-define_config_option( __monitor__, 'k8s_disable_api_server', 'Disable k8s api server', convert_to=bool, default=False, env_aware=True)
-
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -594,7 +589,10 @@ class CRIEnumerator( ContainerEnumerator ):
     def __init__( self, container_id, k8s_api_url, query_filesystem ):
         super( CRIEnumerator, self).__init__( container_id )
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi( k8s )
+        if k8s_api_url:
+            self._kubelet = KubeletApi( k8s )
+        else:
+            self._kubelet = None
         self._query_filesystem = query_filesystem
 
         self._log_base = '/var/log/containers'
@@ -861,11 +859,14 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            k8s_api_url = self._config.get('k8s_api_url')
+            k8s_api_url = None
+            if not self._global_config.k8s_disable_api_server:
+                k8s_api_url = self._global_config.k8s_api_url
+            self._logger.info("k8s_api_url = %s" % k8s_api_url)
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            if self._config.get('k8s_disable_api_server'):
+            if self._global_config.k8s_disable_api_server:
                 self.k8s_cache = None
             else:
                 self.k8s_cache = k8s_utils.cache( self._global_config )
@@ -898,7 +899,7 @@ class ContainerChecker( StoppableThread ):
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.k8s_cache and self.k8s_cache.get_cluster_name() is not None:
+            if not self._global_config.k8s_disable_api_server and self.k8s_cache.get_cluster_name() is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
@@ -1566,7 +1567,10 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-        self.__k8s_api_url = self._config.get('k8s_api_url')
+        self.__k8s_api_url = None
+        if not self._global_config.k8s_disable_api_server:
+            self.__k8s_api_url = self._global_config.k8s_api_url
+        self._logger.info("k8s_api_url = %s" % self.__k8s_api_url)
         self.__docker_max_parallel_stats = self._config.get('docker_max_parallel_stats')
         self.__client = None
         self.__metric_fetcher = None
@@ -1960,7 +1964,7 @@ class KubernetesMonitor( ScalyrMonitor ):
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
         """
-        if self._config.get('k8s_disable_api_server'):
+        if self._global_config.k8s_disable_api_server:
             return None
 
         k8s_cache = self.__get_k8s_cache()
@@ -2056,7 +2060,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         try:
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
+            if not self._config.get('k8s_disable_api_server') and self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics

@@ -264,6 +264,10 @@ class Configuration(object):
 
     # k8s cache options
     @property
+    def k8s_disable_api_server(self):
+        return self.__get_config().get_bool('k8s_disable_api_server')
+
+    @property
     def k8s_ignore_namespaces(self):
         return self.__get_config().get_string('k8s_ignore_namespaces')
 
@@ -1036,7 +1040,7 @@ class Configuration(object):
 
 
         self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults, env_aware=True)
-        self.__verify_or_set_optional_string(config, 'k8s_api_url', None, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
@@ -1075,6 +1079,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_monitors_manager', None, description, apply_defaults)
         self.__verify_or_set_optional_int(config, 'disable_leak_verify_config_create_copying_manager', None, description, apply_defaults)
         self.__verify_or_set_optional_bool(config, 'disable_leak_verify_config_cache_config', False, description, apply_defaults)
+        self.__verify_or_set_optional_bool(config, 'k8s_disable_api_server', False, description, apply_defaults, env_aware=True)
 
     def __get_config_or_environment_val(self, config_object, param_name, param_type, env_aware, custom_env_name):
         """Returns a type-converted config param value or if not found, a matching environment value.
