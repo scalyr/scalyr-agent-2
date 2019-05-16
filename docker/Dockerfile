@@ -5,7 +5,7 @@ FROM python:2.7-alpine3.9 as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apk --update add build-base python-dev gcc
-RUN pip --no-cache-dir install --root /tmp/dependencies ujson
+RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi
 
 # main image - copies dependencies from scalyr-dependencies and extracts
 # the tar-zipped file containing the scalyr-agent code
