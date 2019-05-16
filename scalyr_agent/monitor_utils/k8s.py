@@ -1211,6 +1211,7 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
+        # raise Exception  # echee
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -1352,7 +1353,6 @@ class KubeletApi( object ):
     def query_api( self, path ):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
-        raise Exception
         url = self._http_host + path
         response = self._session.get( url, timeout=self._timeout )
         response.encoding = "utf-8"
