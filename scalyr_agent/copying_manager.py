@@ -369,6 +369,13 @@ class CopyingManager(StoppableThread, LogWatcher):
                     self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
                     self.__logs_pending_removal.pop( log_path, None )
 
+            # check to see if we are removing a path that matches a glob
+            elif self.__path_in_globs( log_path, self.__all_paths.keys() ):
+                # if we are here, it means there was a dynamically added log path that also matched
+                # a glob pattern specified in the config file, and now we are dynamically removing
+                # that log path. The config file overrides the dynamic addition/removals so the glob pattern
+                # needs to stay, but we do need to remove the dynamic path from the list of pending removals
+                self.__logs_pending_removal.pop( log_path, None )
             else:
                 log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor_name, log_path) )
         finally:
@@ -388,6 +395,16 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
+    def logs_pending_removal_count( self ):
+        """
+            Used for testing - returns the number of logs pending removal
+        """
+
+        self.__lock.acquire()
+        try:
+            return len( self.__logs_pending_removal )
+        finally:
+            self.__lock.release()
     def __create_log_matches(self, configuration, monitors ):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
