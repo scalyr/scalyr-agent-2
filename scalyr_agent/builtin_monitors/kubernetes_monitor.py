@@ -198,6 +198,9 @@ define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
                       convert_to=bool, default=True)
 
+define_config_option( __monitor__, 'k8s_disable_api_server', 'Disable k8s api server', convert_to=bool, default=False, env_aware=True)
+
+
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
@@ -862,7 +865,10 @@ class ContainerChecker( StoppableThread ):
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            self.k8s_cache = k8s_utils.cache( self._global_config )
+            if self._config.get('k8s_disable_api_server'):
+                self.k8s_cache = None
+            else:
+                self.k8s_cache = k8s_utils.cache( self._global_config )
 
             delay = 0.5
             message_delay = 5
@@ -871,35 +877,36 @@ class ContainerChecker( StoppableThread ):
             abort = False
 
             # wait until the k8s_cache is initialized before aborting
-            while not self.k8s_cache.is_initialized():
-                time.sleep( delay )
-                current_time = time.time()
-                # see if we need to print a message
-                elapsed = current_time - message_time
-                if elapsed > message_delay:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
-                    message_time = current_time
+            if self.k8s_cache:
+                while not self.k8s_cache.is_initialized():
+                    time.sleep( delay )
+                    current_time = time.time()
+                    # see if we need to print a message
+                    elapsed = current_time - message_time
+                    if elapsed > message_delay:
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
+                        message_time = current_time
 
-                # see if we need to abort the monitor because we've been waiting too long for init
-                elapsed = current_time - start_time
-                if elapsed > self.__k8s_cache_init_abort_delay:
-                    abort = True
-                    break
+                    # see if we need to abort the monitor because we've been waiting too long for init
+                    elapsed = current_time - start_time
+                    if elapsed > self.__k8s_cache_init_abort_delay:
+                        abort = True
+                        break
 
             if abort:
                 raise K8sInitException( "Unable to initialize kubernetes cache" )
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.k8s_cache.get_cluster_name() is not None:
+            if self.k8s_cache and self.k8s_cache.get_cluster_name() is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-            self.container_id = self.k8s_cache.get_agent_container_id() or 'unknown'
-            self._container_runtime = self.k8s_cache.get_container_runtime() or 'unknown'
+            self.container_id = (self.k8s_cache and self.k8s_cache.get_agent_container_id()) or 'unknown'
+            self._container_runtime = (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
             if self._container_runtime == 'docker' and not self.__always_use_cri:
@@ -977,7 +984,7 @@ class ContainerChecker( StoppableThread ):
         """
 
         # Assert that the cache has been initialized
-        if not self.k8s_cache.is_initialized():
+        if self.k8s_cache and not self.k8s_cache.is_initialized():
             self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'container_checker - Kubernetes cache not initialized' )
             raise K8sInitException( "check_container - Kubernetes cache not initialized. Aborting" )
 
@@ -1209,7 +1216,7 @@ class ContainerChecker( StoppableThread ):
             pod_name = k8s_info.get('pod_name', 'invalid_pod')
             pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (short_cid, pod_namespace, pod_name) )
-            pod = k8s_cache.pod( pod_namespace, pod_name )
+            pod = k8s_cache and k8s_cache.pod( pod_namespace, pod_name )
             if pod:
                 rename_vars['pod_name'] = pod.name
                 rename_vars['namespace'] = pod.namespace
@@ -1953,6 +1960,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
         """
+        if self._config.get('k8s_disable_api_server'):
+            return None
+
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
