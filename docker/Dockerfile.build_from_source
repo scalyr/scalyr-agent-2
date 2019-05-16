@@ -10,7 +10,7 @@ RUN apk --update add build-base python-dev gcc git bash
 RUN mkdir -p /tmp/scalyr/src
 
 # install python dependencies
-RUN pip --no-cache-dir install --root /tmp/dependencies ujson
+RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi
 
 # clone the source from the master branch of the main scalyr repository
 WORKDIR /tmp/scalyr
