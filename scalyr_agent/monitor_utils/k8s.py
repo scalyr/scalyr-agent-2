@@ -1211,7 +1211,7 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
-        # raise Exception  # echee
+        raise Exception # echee
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -1220,6 +1220,10 @@ class KubernetesApi( object ):
             pretty = '?%s' % pretty
 
         url = self._http_host + path + pretty
+
+        import traceback
+        global_log.info('k8s api get %s, %s' % (url, traceback.format_exc()))
+
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         response.encoding = "utf-8"
         if response.status_code != 200:
@@ -1334,7 +1338,7 @@ class KubeletApi( object ):
                 # Don't raise exception for now
                 # if host_ip is None:
                 #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
-            except TypeError:
+            except Exception:
                 pass
 
         self._session = requests.Session()
