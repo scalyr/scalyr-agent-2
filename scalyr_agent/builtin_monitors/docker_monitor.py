@@ -702,7 +702,7 @@ class ContainerChecker( StoppableThread ):
         for log in docker_logs:
             if self.__log_watcher:
                 try:
-                    log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                    log['log_config'] = self.__log_watcher.add_log_config( self.__module.module_name, log['log_config'] )
                 except Exception, e:
                     global_log.info( "Error adding log '%s' to log watcher - %s" % (log['log_config']['path'], e) )
 
