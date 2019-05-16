@@ -141,9 +141,7 @@ define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
                       'names.  This may be used to fix breakages when you relied on the v1 attribute names',
                       convert_to=bool, default=False)
 
-define_config_option( __monitor__, 'k8s_api_url',
-                      'Optional (defaults to "https://kubernetes.default"). The URL for the Kubernetes API server for '
-                      'this cluster.', convert_to=str, default='https://kubernetes.default')
+define_config_option( __monitor__, 'k8s_api_url', 'DEPRECATED.', convert_to=str, default='https://kubernetes.default')
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
@@ -197,6 +195,11 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
 define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
                       convert_to=bool, default=True)
+
+define_config_option( __monitor__, 'k8s_kubelet_host_ip',
+                     'Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it',
+                     convert_to=str, default=None)
+
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -588,10 +591,10 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__( self, container_id, k8s_api_url, query_filesystem ):
+    def __init__( self, container_id, k8s_api_url, query_filesystem, kubelet_api_host_ip):
         super( CRIEnumerator, self).__init__( container_id )
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi( k8s )
+        self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
 
         self._log_base = '/var/log/containers'
@@ -770,7 +773,7 @@ class CRIEnumerator( ContainerEnumerator ):
                          limit_key='kubelet-api-connect' )
             self._query_filesystem = True
         except Exception, e:
-            global_log.error("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
+            global_log.exception("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
                          limit_key='kubelet-api-query-pods' )
 
         return result
@@ -858,11 +861,18 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            k8s_api_url = self._config.get('k8s_api_url')
+            k8s_api_url = None
+            if not self._global_config.k8s_disable_api_server:
+                k8s_api_url = self._global_config.k8s_api_url
+            # k8s_api_url = self._global_config.k8s_api_url  # echee 1
+            self._logger.info("k8s_api_url = %s" % k8s_api_url)
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            self.k8s_cache = k8s_utils.cache( self._global_config )
+            if self._global_config.k8s_disable_api_server:
+                self.k8s_cache = None
+            else:
+                self.k8s_cache = k8s_utils.cache( self._global_config )
 
             delay = 0.5
             message_delay = 5
@@ -871,42 +881,44 @@ class ContainerChecker( StoppableThread ):
             abort = False
 
             # wait until the k8s_cache is initialized before aborting
-            while not self.k8s_cache.is_initialized():
-                time.sleep( delay )
-                current_time = time.time()
-                # see if we need to print a message
-                elapsed = current_time - message_time
-                if elapsed > message_delay:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
-                    message_time = current_time
+            if self.k8s_cache:
+                while not self.k8s_cache.is_initialized():
+                    time.sleep( delay )
+                    current_time = time.time()
+                    # see if we need to print a message
+                    elapsed = current_time - message_time
+                    if elapsed > message_delay:
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
+                        message_time = current_time
 
-                # see if we need to abort the monitor because we've been waiting too long for init
-                elapsed = current_time - start_time
-                if elapsed > self.__k8s_cache_init_abort_delay:
-                    abort = True
-                    break
+                    # see if we need to abort the monitor because we've been waiting too long for init
+                    elapsed = current_time - start_time
+                    if elapsed > self.__k8s_cache_init_abort_delay:
+                        abort = True
+                        break
 
             if abort:
                 raise K8sInitException( "Unable to initialize kubernetes cache" )
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.k8s_cache.get_cluster_name() is not None:
+            if not self._global_config.k8s_disable_api_server and self.k8s_cache.get_cluster_name() is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-            self.container_id = self.k8s_cache.get_agent_container_id() or 'unknown'
-            self._container_runtime = self.k8s_cache.get_container_runtime() or 'unknown'
+            self.container_id = (self.k8s_cache and self.k8s_cache.get_agent_container_id()) or 'unknown'
+            self._container_runtime = (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
             if self._container_runtime == 'docker' and not self.__always_use_cri:
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                 self._container_enumerator = DockerEnumerator( self.__client, self.container_id )
             else:
-                self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_filesystem=self.__cri_query_filesystem )
+                query_fs = not self.k8s_cache or self.__cri_query_filesystem
+                self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
 
             if self.__parse_format == 'auto':
                 # parse in json if we detect the container runtime to be 'docker' or if we detect
@@ -977,7 +989,7 @@ class ContainerChecker( StoppableThread ):
         """
 
         # Assert that the cache has been initialized
-        if not self.k8s_cache.is_initialized():
+        if self.k8s_cache and not self.k8s_cache.is_initialized():
             self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'container_checker - Kubernetes cache not initialized' )
             raise K8sInitException( "check_container - Kubernetes cache not initialized. Aborting" )
 
@@ -1209,7 +1221,7 @@ class ContainerChecker( StoppableThread ):
             pod_name = k8s_info.get('pod_name', 'invalid_pod')
             pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (short_cid, pod_namespace, pod_name) )
-            pod = k8s_cache.pod( pod_namespace, pod_name )
+            pod = k8s_cache and k8s_cache.pod( pod_namespace, pod_name )
             if pod:
                 rename_vars['pod_name'] = pod.name
                 rename_vars['namespace'] = pod.namespace
@@ -1559,7 +1571,10 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-        self.__k8s_api_url = self._config.get('k8s_api_url')
+        self.__k8s_api_url = None
+        if not self._global_config.k8s_disable_api_server:
+            self.__k8s_api_url = self._global_config.k8s_api_url
+        self._logger.info("k8s_api_url = %s" % self.__k8s_api_url)
         self.__docker_max_parallel_stats = self._config.get('docker_max_parallel_stats')
         self.__client = None
         self.__metric_fetcher = None
@@ -1953,6 +1968,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
         """
+        if self._global_config.k8s_disable_api_server:
+            return None
+
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
@@ -2046,7 +2064,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         try:
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
+            if not self._config.get('k8s_disable_api_server') and self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics
@@ -2062,7 +2080,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     self.__metric_fetcher = DockerMetricFetcher(self.__client, self.__docker_max_parallel_stats )
 
                 k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
-                self.__kubelet_api = KubeletApi( k8s )
+                self.__kubelet_api = KubeletApi( k8s, kubelet_api_host_ip=self._config.get('k8s_kubelet_host_ip') )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
