@@ -981,13 +981,35 @@ class TestLogLineRedactor(ScalyrTestCase):
             True
         )
 
+    def test_single_regular_expression_redaction_with_multiple_hashes(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret(.*)=([a-z]+) ([a-z]+) ([a-z]+)', 'secret\\1=\\H2 \\H3 \\H4')
+        self._run_case(
+            redactor,
+            "sometext.... secretoption=czerwin abc def",
+            "sometext.... secretoption=%s %s %s" % (md5_hexdigest("czerwin"), md5_hexdigest("abc"), md5_hexdigest("def")),
+            True
+        )
+
+    def test_single_regular_expression_redaction_with_multiple_hashes_including_h1(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('([a-z]+)=([a-z]+) ([a-z]+) ([a-z]+)', '\\H1=\\H2 \\H3 \\H4')
+        self._run_case(
+            redactor,
+            "sometext.... xxx=yyy abc def",
+            "sometext.... %s=%s %s %s" % (
+                md5_hexdigest("xxx"), md5_hexdigest("yyy"), md5_hexdigest("abc"), md5_hexdigest("def")),
+            True
+        )
+
+
     def test_multiple_regular_expression_redaction_with_hash_single_group(self):
         redactor = LogLineRedacter('/var/fake_log')
         redactor.add_redaction_rule('secret(.*?)=([a-z]+\s?)', 'secret\\1=\\H2')
         self._run_case(
             redactor,
-            "sometext.... secretoption=czerwin moretextsecretbar=xxx andsecret123=saurabh",
-            "sometext.... secretoption=%smoretextsecretbar=%sandsecret123=%s" % (
+            "sometext.... secretoption=czerwin ,moretextsecretbar=xxx ,andsecret123=saurabh",
+            "sometext.... secretoption=%s,moretextsecretbar=%s,andsecret123=%s" % (
                 md5_hexdigest("czerwin "),
                 md5_hexdigest("xxx "),
                 md5_hexdigest("saurabh"),
@@ -1000,13 +1022,49 @@ class TestLogLineRedactor(ScalyrTestCase):
         redactor.add_redaction_rule('secret(.*?)=([a-z]+\s?)', 'secret\\2=\\H1')
         self._run_case(
             redactor,
-            "sometext.... secretoption=czerwin andsecret123=saurabh",
-            "sometext.... secretczerwin =%sandsecretsaurabh=%s" % (
+            "sometext.... secretoption=czerwin ,andsecret123=saurabh",
+            "sometext.... secretczerwin =%s,andsecretsaurabh=%s" % (
                 md5_hexdigest("option"),
                 md5_hexdigest("123"),
             ),
             True
         )
+
+    def test_multiple_regular_expression_redaction_with_hash_multiple_groups(self):
+        redactor = LogLineRedacter('/var/fake_log')
+        redactor.add_redaction_rule('secret_([\w]+)=([\w]+)__([\w]+)', 'secret_\\H1=\\H2__\\H3')
+        self._run_case(
+            redactor,
+            "sometext.... secret_a1=a2__a3 , secret_b1=b2__b3 , secret_c1=c2__c3",
+            "sometext.... secret_%s=%s__%s , secret_%s=%s__%s , secret_%s=%s__%s" % (
+                md5_hexdigest("a1"),
+                md5_hexdigest("a2"),
+                md5_hexdigest("a3"),
+                md5_hexdigest("b1"),
+                md5_hexdigest("b2"),
+                md5_hexdigest("b3"),
+                md5_hexdigest("c1"),
+                md5_hexdigest("c2"),
+                md5_hexdigest("c3"),
+            ),
+            True
+        )
+
+    def test_multiple_regular_expression_AGENT_140(self):
+
+        lead_text = '2019-05-14 17:54:41 192.168.1.45 GET /main/Service/MyKastleAjaxService.svc/js - 443 '
+        trail_text = ' 178.211.3.102 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64)+AppleWebKit/537.36+(KHTML,+like+Gecko)+Chrome/52.0.2743.116+Safari/537.36+Edge/15.15063 304 0 0 277 1192 93'
+        redactor = LogLineRedacter('/var/fake_log')
+        lead_text = ''
+        trail_text = ''
+        redactor.add_redaction_rule('([\w\.]+)@([\w\.]+)\.([\w]{2,4})', "\\H1 \\H2 \\H3")
+        self._run_case(
+            redactor,
+            lead_text + 'xxx.yyy@aaa.bbb.com' + trail_text,
+            lead_text + '%s %s %s' % (md5_hexdigest('xxx.yyy'), md5_hexdigest('aaa.bbb'), md5_hexdigest('com')) + trail_text,
+            True
+        )
+
 
     def test_single_regular_expression_redaction_with_hash_no_indicator(self):
         redactor = LogLineRedacter('/var/fake_log')
