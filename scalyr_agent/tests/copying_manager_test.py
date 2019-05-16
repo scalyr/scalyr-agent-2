@@ -23,6 +23,7 @@ import os
 import tempfile
 
 import logging
+import shutil
 import sys
 import unittest
 
@@ -43,8 +44,87 @@ from scalyr_agent.test_base import skip, ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent import json_lib
+import scalyr_agent.util as scalyr_util
 
 ONE_MB = 1024 * 1024
+
+
+class DynamicLogPathTest(ScalyrTestCase):
+
+    def setUp(self):
+        self._temp_dir = tempfile.mkdtemp()
+        self._data_dir = os.path.join(self._temp_dir, 'data')
+        self._log_dir = os.path.join(self._temp_dir, 'log')
+        self._config_dir = os.path.join(self._temp_dir, 'config')
+        self._config_file = os.path.join(self._config_dir, 'agentConfig.json')
+        self._config_fragments_dir = os.path.join(self._config_dir, 'configs.d')
+
+        os.makedirs(self._config_fragments_dir)
+        os.makedirs(self._data_dir)
+        os.makedirs(self._log_dir)
+
+        self._controller = None
+
+    def tearDown(self):
+        if self._controller is not None:
+            self._controller.stop()
+        shutil.rmtree(self._config_dir)
+
+
+    def create_copying_manager( self, config ):
+
+        if 'api_key' not in config:
+            config['api_key'] = 'fake'
+
+        f = open( self._config_file, "w" )
+        if f:
+
+            f.write( scalyr_util.json_encode( config ) )
+            f.close()
+
+        default_paths = DefaultPaths(self._log_dir, self._config_file, self._data_dir)
+
+        configuration = Configuration(self._config_file, default_paths, None)
+        configuration.parse()
+        self._manager = TestableCopyingManager(configuration, [])
+        self._controller = self._manager.controller
+
+    def test_remove_path(self):
+
+        glob_root = os.path.join(self._temp_dir, 'containers')
+        os.makedirs( glob_root )
+        config = {
+            "logs": [
+                { "path": "%s/*/*" % glob_root }
+            ]
+        }
+
+        path = os.path.join( glob_root, "container", "container.log" )
+        os.makedirs( os.path.dirname( path ) )
+
+        f = open( path, "w" )
+        if f:
+            f.close()
+
+        self.create_copying_manager( config )
+
+        self._controller.perform_scan()
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config );
+
+        self._controller.perform_scan()
+
+        self._manager.schedule_log_path_for_removal( 'unittest', log_config['path'] )
+
+        self.assertEquals( 1, self._manager.logs_pending_removal_count() )
+
+        self._controller.perform_scan()
+
+        self.assertEquals( 0, self._manager.logs_pending_removal_count() )
 
 
 class CopyingParamsTest(ScalyrTestCase):
