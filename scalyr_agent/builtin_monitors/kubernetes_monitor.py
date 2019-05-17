@@ -198,7 +198,7 @@ define_config_option( __monitor__, 'include_daemonsets_as_deployments',
 
 define_config_option( __monitor__, 'k8s_kubelet_host_ip',
                      'Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it',
-                     convert_to=str, default=None)
+                     convert_to=str, default=None, env_aware=True)
 
 
 # for now, always log timestamps to help prevent a race condition
@@ -598,7 +598,9 @@ class CRIEnumerator( ContainerEnumerator ):
         self._query_filesystem = query_filesystem
 
         self._log_base = '/var/log/containers'
+        self._pod_base = '/var/log/pods'
         self._container_glob = '%s/*.log' % self._log_base
+        self._pod_re = re.compile( '^%s/([^/]+)/([^/]+)/.*\.log$' % self._pod_base )
         self._info_re = re.compile( '^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$' % self._log_base )
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
@@ -641,6 +643,21 @@ class CRIEnumerator( ContainerEnumerator ):
                 k8s_info['pod_namespace'] = pod_namespace
                 k8s_info['k8s_container_name'] = cname
 
+                # build the path to the log file on disk
+                log_path = "%s/%s_%s_%s-%s.log" % (self._log_base, pod_name, pod_namespace, cname, cid)
+
+                if self._query_filesystem:
+                    # get pod uid from the path
+                    # the log path should be a link to the /var/logs/pod/<pod_uid>/N.log
+                    # so read the link.  Note, use os.readlink rather than os.path.realpath
+                    # because we only want to traverse one level of links, rather than finding
+                    # the eventual path on disk (which may not be the /var/logs/pod/<pod_uid>/N.log)
+                    if os.path.islink( log_path ):
+                        link = os.readlink( log_path )
+                        m = self._pod_re.match( link )
+                        if m and cname == m.group(2):
+                            k8s_info['pod_uid'] = m.group(1)
+
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
                     pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
@@ -662,8 +679,6 @@ class CRIEnumerator( ContainerEnumerator ):
                         k8s_info['pod_info'] = pod
                         k8s_info['pod_uid'] = pod.uid
 
-                # build the path to the log file on disk
-                log_path = "%s/%s_%s_%s-%s.log" % (self._log_base, pod_name, pod_namespace, cname, cid)
 
                 # add this container to the list of results
                 result[cid] = {'name': cname, 'log_path': log_path, 'k8s_info': k8s_info }
@@ -841,7 +856,11 @@ class ContainerChecker( StoppableThread ):
 
         self.__k8s_cache_init_abort_delay = self._config.get( 'k8s_cache_init_abort_delay' )
 
+        self.__k8s_disable_api_server = global_config.k8s_disable_api_server
+
         self.k8s_cache = None
+
+        self.__node_name = None
 
         self.__log_watcher = None
         self.__module = None
@@ -858,18 +877,75 @@ class ContainerChecker( StoppableThread ):
         # by the existence of the file /.dockerenv
         return os.path.exists( "/.dockerenv" )
 
+    def get_cluster_name( self, k8s_cache ):
+        """ Gets the cluster name that the agent is running on """
+
+        cluster_name = os.environ.get( 'SCALYR_K8S_CLUSTER_NAME' )
+        if cluster_name is not None:
+            return cluster_name
+
+        return (k8s_cache and k8s_cache.get_cluster_name()) or None
+
+    def _get_node_name( self ):
+        """ Gets the node name of the node running the agent """
+        node = os.environ.get( 'SCALYR_K8S_NODE_NAME' )
+        if node:
+            return node
+
+        result = None
+        if k8s_cache:
+            state = k8s_cache.local_state()
+            pod = state.k8s.query_pod( self.namespace, pod_name )
+            spec = pod.get( 'spec', {} )
+            node = spec.get( 'nodeName' )
+        return node
+
+    def _get_container_id( self ):
+        """ Gets the container id used by the scalyr agent pod """
+
+        container_id = None
+
+        # we can get the container id from the container log's filename
+        pod_name = os.environ.get( 'SCALYR_K8S_POD_NAME' )
+        pod_namespace = os.environ.get( 'SCALYR_K8S_POD_NAMESPACE' )
+        log_base = '/var/log/containers'
+        info_re = re.compile( '^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$' % log_base )
+        if pod_name is not None and pod_namespace is not None:
+            # build a glob out of the parts we know
+            container_glob = '/var/log/containers/%s_%s_*.log' % (pod_name, pod_namespace)
+            for filename in glob.glob( container_glob ):
+                # if we find a match, try and extract the container_id
+                m = info_re.match( filename )
+                if m:
+                    container_id = m.group(4)
+                    break
+
+        # return it if we have it
+        if container_id is not None:
+            return container_id
+
+        # try and read it from the cache if the above didn't work
+        return (self.k8s_cache and self.k8s_cache.get_agent_container_id()) or 'unknown'
+
+    def _get_container_runtime( self ):
+        """ Gets the container runtime currently in use """
+        if self.__k8s_disable_api_server:
+            return 'k8s'
+
+        return (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
+
     def start( self ):
 
         try:
             k8s_api_url = None
-            if not self._global_config.k8s_disable_api_server:
+            if not self.__k8s_disable_api_server:
                 k8s_api_url = self._global_config.k8s_api_url
             # k8s_api_url = self._global_config.k8s_api_url  # echee 1
-            self._logger.info("k8s_api_url = %s" % k8s_api_url)
+            # self._logger.info("k8s_api_url = %s" % k8s_api_url)
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            if self._global_config.k8s_disable_api_server:
+            if self.__k8s_disable_api_server:
                 self.k8s_cache = None
             else:
                 self.k8s_cache = k8s_utils.cache( self._global_config )
@@ -902,22 +978,23 @@ class ContainerChecker( StoppableThread ):
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if not self._global_config.k8s_disable_api_server and self.k8s_cache.get_cluster_name() is not None:
+            if self.get_cluster_name( self.k8s_cache ) is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-            self.container_id = (self.k8s_cache and self.k8s_cache.get_agent_container_id()) or 'unknown'
-            self._container_runtime = (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
+            self.__node_name = self._get_node_name() or 'unknown node'
+            self.container_id = self._get_container_id()
+            self._container_runtime = self._get_container_runtime()
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
             if self._container_runtime == 'docker' and not self.__always_use_cri:
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                 self._container_enumerator = DockerEnumerator( self.__client, self.container_id )
             else:
-                query_fs = not self.k8s_cache or self.__cri_query_filesystem
+                query_fs = self.__k8s_disable_api_server or self.__cri_query_filesystem
                 self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
 
             if self.__parse_format == 'auto':
@@ -1038,7 +1115,7 @@ class ContainerChecker( StoppableThread ):
                         pod_namespace = info['k8s_info'].get( 'pod_namespace', 'invalid_namespace' )
                         pod = info['k8s_info'].get( 'pod_info', None )
 
-                        if not pod:
+                        if not pod and not self.__k8s_disable_api_server:
                             self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                                                   limit_once_per_x_secs=300,
                                                   limit_key='check-container-pod-info-%s' % cid)
@@ -1198,6 +1275,7 @@ class ContainerChecker( StoppableThread ):
             container_attributes['containerId'] = cid
         elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
             container_attributes['container_id'] = cid
+
         parser = 'docker'
         common_annotations = {}
         container_annotations = {}
@@ -1215,26 +1293,36 @@ class ContainerChecker( StoppableThread ):
             'container_name' : info['name'],
         }
 
+        rename_logfile = '/%s/%s.log' % (self._container_runtime, info['name'])
+
         k8s_info = info.get( 'k8s_info', {} )
 
         if k8s_info:
             pod_name = k8s_info.get('pod_name', 'invalid_pod')
             pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (short_cid, pod_namespace, pod_name) )
+
+            rename_vars['pod_name'] = pod_name
+            rename_vars['namespace'] = pod_namespace
+            container_attributes['pod_name'] = pod_name
+            container_attributes['pod_namespace'] = pod_namespace
+            container_attributes['scalyr-category'] = 'log'
+
+            # get the cluster name
+            cluster_name = self.get_cluster_name( k8s_cache )
+            if self.__include_controller_info and cluster_name is not None:
+                container_attributes['_k8s_cn'] = cluster_name
+
             pod = k8s_cache and k8s_cache.pod( pod_namespace, pod_name )
             if pod:
-                rename_vars['pod_name'] = pod.name
-                rename_vars['namespace'] = pod.namespace
                 rename_vars['node_name'] = pod.node_name
 
-                container_attributes['pod_name'] = pod.name
-                container_attributes['pod_namespace'] = pod.namespace
                 container_attributes['pod_uid'] = pod.uid
+
                 if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes['node_name'] = pod.node_name
                 elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes['k8s_node'] = pod.node_name
-                container_attributes['scalyr-category'] = 'log'
 
                 for label, value in pod.labels.iteritems():
                     container_attributes[label] = value
@@ -1253,10 +1341,6 @@ class ContainerChecker( StoppableThread ):
                         container_attributes['_k8s_dl'] = controller.flat_labels
                         container_attributes['_k8s_ck'] = controller.kind
 
-                # get the cluster name
-                cluster_name = k8s_cache.get_cluster_name()
-                if self.__include_controller_info and cluster_name is not None:
-                    container_attributes['_k8s_cn'] = cluster_name
 
                 # get the annotations of this pod as a dict.
                 # by default all annotations will be applied to all containers
@@ -1286,6 +1370,17 @@ class ContainerChecker( StoppableThread ):
                                                   limit_key='k8s-invalid-container-config-%s' % cid)
                             container_annotations = {}
 
+            elif self.__k8s_disable_api_server:
+                rename_vars['node_name'] = self.__node_name
+                container_attributes['pod_uid'] = k8s_info.get( 'pod_uid', 'invalid_pod_uid' )
+
+                if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+                    container_attributes['node_name'] = self.__node_name
+                elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
+                    container_attributes['k8s_node'] = self.__node_name
+
+                rename_logfile = '/%s/%s/%s.log' % (self._container_runtime, pod_namespace, pod_name)
+
             else:
                 self._logger.warning( "Couldn't map container '%s' to pod '%s/%s'. Logging limited metadata from docker container labels instead." % ( short_cid, pod_namespace, pod_name ),
                                     limit_once_per_x_secs=300,
@@ -1299,7 +1394,7 @@ class ContainerChecker( StoppableThread ):
 
         if 'log_path' in info and info['log_path']:
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_format=self.__parse_format )
-            result['rename_logfile'] = '/%s/%s.log' % (self._container_runtime, info['name'])
+            result['rename_logfile'] = rename_logfile
             # This is for a hack to prevent the original log file name from being added to the attributes.
             if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
                 result['rename_no_original'] = True
@@ -1572,9 +1667,10 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
         self.__k8s_api_url = None
-        if not self._global_config.k8s_disable_api_server:
+        self.__k8s_disable_api_server = self._global_config.k8s_disable_api_server
+        if not self.__k8s_disable_api_server:
             self.__k8s_api_url = self._global_config.k8s_api_url
-        self._logger.info("k8s_api_url = %s" % self.__k8s_api_url)
+        # self._logger.info("k8s_api_url = %s" % self.__k8s_api_url)
         self.__docker_max_parallel_stats = self._config.get('docker_max_parallel_stats')
         self.__client = None
         self.__metric_fetcher = None
@@ -1968,7 +2064,7 @@ class KubernetesMonitor( ScalyrMonitor ):
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
         """
-        if self._global_config.k8s_disable_api_server:
+        if self.__k8s_disable_api_server:
             return None
 
         k8s_cache = self.__get_k8s_cache()
@@ -2056,6 +2152,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         # we can ignore the result
         tm = time.strptime( "2016-08-29", "%Y-%m-%d" )
 
+        if self.__k8s_disable_api_server:
+            self._logger.info( "Querying K8s API server has been disabled - this should only be done on large clusters" )
+
         if self.__container_checker:
             self.__container_checker.start()
 
@@ -2064,7 +2163,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         try:
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if not self._config.get('k8s_disable_api_server') and self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
+            if self.__container_checker and self.__container_checker.get_cluster_name( self.__container_checker.k8s_cache ) is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics

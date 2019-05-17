@@ -1211,7 +1211,7 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
-        raise Exception # echee
+        raise Exception( "K8s api queries disabled" ) # echee
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -1339,6 +1339,7 @@ class KubeletApi( object ):
                 # if host_ip is None:
                 #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
             except Exception:
+                global_log.exception( "couldn't get host ip" )
                 pass
 
         self._session = requests.Session()
