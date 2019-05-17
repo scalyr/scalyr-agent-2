@@ -758,14 +758,15 @@ class ScalyrAgent(object):
 
                 prev_server = scalyr_server
 
-                profiler = Profiler( self.__config )
+                profiler = Profiler( self.__config ) if self.__config.enable_profiling else None
 
                 while not self.__run_state.sleep_but_awaken_if_stopped( config_change_check_interval ):
 
                     current_time = time.time()
                     self.__last_config_check_time = current_time
 
-                    profiler.update( self.__config, current_time )
+                    if profiler:
+                        profiler.update( self.__config, current_time )
 
                     if self.__config.disable_overall_stats:
                         log.log( scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled" )
