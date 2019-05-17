@@ -858,6 +858,12 @@ class ContainerChecker( StoppableThread ):
 
         self.__k8s_disable_api_server = global_config.k8s_disable_api_server
 
+        # disable controller info when k8s queries are disabled
+        # enable v2 attributes if k8s queries are disabled
+        if self.__k8s_disable_api_server:
+            self.__include_controller_info = False
+            self.__use_v2_attributes = True
+
         self.k8s_cache = None
 
         self.__node_name = None
@@ -982,6 +988,12 @@ class ContainerChecker( StoppableThread ):
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
+
+            # disable controller info if k8s queries are disabled
+            # enable v2 attributes if k8s queries are disabled
+            if self.__k8s_disable_api_server:
+                self.__use_v2_attributes = True
+                self.__include_controller_info = False
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
@@ -1374,10 +1386,8 @@ class ContainerChecker( StoppableThread ):
                 rename_vars['node_name'] = self.__node_name
                 container_attributes['pod_uid'] = k8s_info.get( 'pod_uid', 'invalid_pod_uid' )
 
-                if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
-                    container_attributes['node_name'] = self.__node_name
-                elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
-                    container_attributes['k8s_node'] = self.__node_name
+                # always use v2 attributes here
+                container_attributes['k8s_node'] = self.__node_name
 
                 rename_logfile = '/%s/%s/%s.log' % (self._container_runtime, pod_namespace, pod_name)
 
@@ -1688,6 +1698,10 @@ class KubernetesMonitor( ScalyrMonitor ):
         # Including controller information for every event uploaded about  a pod (cluster name, controller name,
         # controller labels)
         self.__include_controller_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
+
+        # disable controller info if k8s queries are disabled
+        if self.__k8s_disable_api_server:
+            self.__include_controller_info = False
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
@@ -2167,6 +2181,10 @@ class KubernetesMonitor( ScalyrMonitor ):
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics
+
+            # disable controller info if k8s queries are disabled
+            if self.__k8s_disable_api_server:
+                self.__include_controller_info = False
 
             if self.__report_k8s_metrics:
 
