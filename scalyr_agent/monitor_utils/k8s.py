@@ -106,7 +106,8 @@ def cache( config ):
                                  cache_expiry_fuzz_secs=config.k8s_cache_expiry_fuzz_secs,
                                  cache_start_fuzz_secs=config.k8s_cache_start_fuzz_secs,
                                  cache_purge_secs=config.k8s_cache_purge_secs,
-                                 namespaces_to_ignore=namespaces_to_ignore )
+                                 namespaces_to_ignore=namespaces_to_ignore,
+                                 batch_pod_updates=config.k8s_cache_batch_pod_updates )
 
     #update the config and return current cache
     _k8s_cache.update_config( cache_config )
@@ -603,7 +604,8 @@ class _CacheConfig( object ):
     """
 
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
-                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None ):
+                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None,
+                  batch_pod_updates=True ):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -612,6 +614,7 @@ class _CacheConfig( object ):
         @param cache_start_fuzz_secs: if greater than zero, the number of seconds to fuzz the start time to avoid query stampede
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
         @param namespaces_to_ignore: a list of namespaces to ignore
+        @param batch_pod_updates: whether or not to perform batch queries to the k8s api server for pod updates - used for stress testing
         @type api_url: str
         @type verify_api_queries: bool
         @type cache_expiry_secs: int or float
@@ -619,6 +622,7 @@ class _CacheConfig( object ):
         @type cache_start_fuzz_secs: int or float
         @type cache_purge_secs: int or float
         @type namespaces_to_ignore: list[str]
+        @type batch_pod_updates: bool
         """
         self.api_url = api_url
         self.verify_api_queries = verify_api_queries
@@ -627,6 +631,7 @@ class _CacheConfig( object ):
         self.cache_start_fuzz_secs = cache_start_fuzz_secs
         self.cache_purge_secs = cache_purge_secs
         self.namespaces_to_ignore = namespaces_to_ignore
+        self.batch_pod_updates = batch_pod_updates
 
     def __eq__( self, other ):
         """Equivalence method for _CacheConfig objects so == testing works """
@@ -636,6 +641,7 @@ class _CacheConfig( object ):
                 self.cache_expiry_fuzz_secs == other.cache_expiry_fuzz_secs and
                 self.cache_start_fuzz_secs == other.cache_start_fuzz_secs and
                 self.cache_purge_secs == other.cache_purge_secs and
+                self.batch_pod_updates == other.batch_pod_updates and
                 self.namespaces_to_ignore == other.namespaces_to_ignore)
 
     def __ne__( self, other ):
@@ -647,8 +653,8 @@ class _CacheConfig( object ):
 
 
     def __str__( self ):
-        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_expiry_fuzz_secs: %d\n\tcache_start_fuzz_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n" % ( str(self.api_url),
-            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_expiry_fuzz_secs, self.cache_start_fuzz_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ) )
+        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_expiry_fuzz_secs: %d\n\tcache_start_fuzz_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n\tbatch_pod_updates: %s\n" % ( str(self.api_url),
+            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_expiry_fuzz_secs, self.cache_start_fuzz_secs, self.cache_purge_secs, str( self.namespaces_to_ignore), self.batch_pod_updates )
 
     def need_new_k8s_object( self, new_config ):
         """
@@ -693,6 +699,7 @@ class _CacheConfigState( object ):
             self.cache_purge_secs = state.config.cache_purge_secs
             self.cache_expiry_fuzz_secs = state.config.cache_expiry_fuzz_secs
             self.cache_start_fuzz_secs = state.config.cache_start_fuzz_secs
+            self.batch_pod_updates = state.config.batch_pod_updates
 
     def __init__( self, config ):
         """Set default values"""
@@ -738,6 +745,7 @@ class _CacheConfigState( object ):
         namespace_filter = self._build_namespace_filter( namespaces_to_ignore )
         result = None
         pod_name = '<unknown>'
+
         try:
             pod_name = k8s.get_pod_name()
             node_name = k8s.get_node_name( pod_name )
@@ -814,7 +822,7 @@ class _CacheConfigState( object ):
 
 class KubernetesCache( object ):
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True ):
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True, batch_pod_updates=True ):
 
         self._lock = threading.Lock()
 
@@ -824,7 +832,8 @@ class KubernetesCache( object ):
                                    cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
                                    cache_start_fuzz_secs=cache_start_fuzz_secs,
                                    cache_purge_secs=cache_purge_secs,
-                                   namespaces_to_ignore=namespaces_to_ignore )
+                                   namespaces_to_ignore=namespaces_to_ignore,
+                                   batch_pod_updates=batch_pod_updates )
         # set the initial state
         self._state = _CacheConfigState( new_config )
 
@@ -949,7 +958,8 @@ class KubernetesCache( object ):
             try:
                 # we only pre warm the pod cache and the cluster name
                 # controllers are cached on an as needed basis
-                self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
+                if local_state.batch_pod_updates:
+                    self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
                 self._update_cluster_name( local_state.k8s )
                 self._update_api_server_version(local_state.k8s)
 
@@ -987,7 +997,8 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
+                if local_state.batch_pod_updates:
+                    self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
                 self._update_cluster_name( local_state.k8s )
                 self._update_api_server_version(local_state.k8s)
 
