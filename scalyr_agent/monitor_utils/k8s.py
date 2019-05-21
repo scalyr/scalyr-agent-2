@@ -132,6 +132,16 @@ class KubeletApiException( Exception ):
     """
     pass
 
+
+class QualifiedName(object):
+    """
+    Represents a fully qualified name for a Kubernetes object using both its name and namespace.
+    """
+    def __init__(self, name, namespace):
+        self.name = name
+        self.namespace = namespace
+
+
 class PodInfo( object ):
     """
         A collection class that stores label and other information about a kubernetes pod
@@ -832,7 +842,6 @@ class KubernetesCache( object ):
         self._last_full_update = time.time() - cache_expiry_secs - 1
 
         self._container_runtime = None
-        self._agent_container_id = None
         self._initialized = False
 
         self._thread = None
@@ -900,11 +909,11 @@ class KubernetesCache( object ):
         finally:
             self._lock.release()
 
-    def _get_scalyr_container_id_and_runtime( self, k8s ):
+    def _get_runtime( self, k8s ):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod( k8s.namespace, pod_name )
         if pod is None:
-            return None, None
+            return None
 
         status = pod.get( 'status', {} )
         containers = status.get( 'containerStatuses', [] )
@@ -914,9 +923,9 @@ class KubernetesCache( object ):
                 containerId = container.get( 'containerID', '' )
                 m = _CID_RE.match( containerId )
                 if m:
-                    return m.group(2), m.group(1)
+                    return m.group(1)
 
-        return None, None
+        return None
 
     def update_cache( self, run_state ):
         """
@@ -944,12 +953,11 @@ class KubernetesCache( object ):
                 self._update_cluster_name( local_state.k8s )
                 self._update_api_server_version(local_state.k8s)
 
-                cid, runtime = self._get_scalyr_container_id_and_runtime( local_state.k8s )
+                runtime = self._get_runtime( local_state.k8s )
 
                 self._lock.acquire()
                 try:
                     self._container_runtime = runtime
-                    self._agent_container_id = cid
                     self._initialized = True
                 finally:
                     self._lock.release()
@@ -1041,17 +1049,6 @@ class KubernetesCache( object ):
         self._lock.acquire()
         try:
             result = self._cluster_name
-        finally:
-            self._lock.release()
-
-        return result
-
-    def get_agent_container_id( self ):
-        """Returns the id of the container running the agent"""
-        result = None
-        self._lock.acquire()
-        try:
-            result = self._agent_container_id
         finally:
             self._lock.release()
 
