@@ -1739,6 +1739,25 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__verify_required_env_var('SCALYR_K8S_POD_NAMESPACE')
         self.__verify_required_env_var('SCALYR_K8S_NODE_NAME')
 
+        envars_to_log = [
+            'SCALYR_K8S_NODE_NAME',
+            'SCALYR_K8S_POD_NAME',
+            'SCALYR_K8S_POD_NAMESPACE',
+            'SCALYR_K8S_POD_UID',
+            'SCALYR_K8S_KUBELET_HOST_IP',
+            'SCALYR_K8S_CLUSTER_NAME',
+            'SCALYR_K8S_DISABLE_API_SERVER',
+            'SCALYR_K8S_CACHE_EXPIRY_SECS',
+            'SCALYR_K8S_CACHE_START_FUZZ_SECS',
+            'SCALYR_K8S_CACHE_EXPIRY_FUZZ_SECS',
+            'SCALYR_COMPRESSION_TYPE',
+            'SCALYR_ENABLE_PROFILING',
+            'SCALYR_PROFILE_DURATION_MINUTES',
+            'SCALYR_MAX_PROFILE_INTERVAL_MINUTES',
+        ]
+        for envar in envars_to_log:
+            self._logger.info("Environment variable %s = %s" % (envar, os.environ.get(envar, '<Not set>')))
+
         self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
         # disable controller info if k8s queries are disabled
