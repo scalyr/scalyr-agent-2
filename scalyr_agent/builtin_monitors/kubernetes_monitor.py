@@ -589,7 +589,6 @@ class DockerEnumerator( ContainerEnumerator ):
         self._client = client
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
-        #TODO(czerwin): Remove ignore_container
         return _get_containers(
             self._client,
             ignore_pod=self._ignore_pod,
@@ -739,7 +738,7 @@ class CRIEnumerator( ContainerEnumerator ):
                 continue
 
             # ignore the scalyr-agent container
-            if pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
+            if self._ignore_pod is not None and pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
                 global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % _get_short_cid( cid ) )
                 continue
 
@@ -791,7 +790,7 @@ class CRIEnumerator( ContainerEnumerator ):
                     short_cid = _get_short_cid( cid )
 
                     # ignore the scalyr-agent container
-                    if pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
+                    if self._ignore_pod is not None and pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
                         global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % short_cid )
                         continue
 
@@ -1732,7 +1731,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__verify_required_env_var('SCALYR_K8S_POD_NAMESPACE')
         self.__verify_required_env_var('SCALYR_K8S_NODE_NAME')
 
-        self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAME'), os.getenv('SCALYR_K8S_POD_NAMESPACE'))
+        self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
         # disable controller info if k8s queries are disabled
         if self.__k8s_disable_api_server:

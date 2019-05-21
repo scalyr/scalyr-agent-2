@@ -137,9 +137,9 @@ class QualifiedName(object):
     """
     Represents a fully qualified name for a Kubernetes object using both its name and namespace.
     """
-    def __init__(self, name, namespace):
-        self.name = name
+    def __init__(self, namespace, name):
         self.namespace = namespace
+        self.name = name
 
 
 class PodInfo( object ):
