@@ -44,6 +44,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
         def fake_init(self):
             # Initialize variables that would have been
             self._KubernetesMonitor__container_checker = None
+            self._KubernetesMonitor__k8s_disable_api_server = False
             self._KubernetesMonitor__namespaces_to_ignore = []
             self._KubernetesMonitor__include_controller_info = None
             self._KubernetesMonitor__report_container_metrics = None
