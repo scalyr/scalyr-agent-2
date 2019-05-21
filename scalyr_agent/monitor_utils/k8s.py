@@ -1190,26 +1190,33 @@ class KubernetesApi( object ):
             pretty = '?%s' % pretty
 
         url = self._http_host + path + pretty
-        response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
-        response.encoding = "utf-8"
-        if response.status_code != 200:
-            if response.status_code == 401 or response.status_code == 403:
-                raise K8sApiAuthorizationException( path )
 
-            global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
-            raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
+        try:
+            # echee: save api json to disk
+            kapi = '/var/log/scalyr-agent-2/kapi'
+            if not os.path.exists(kapi):
+                os.mkdir(kapi, 0755)
+            fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
+            f = open('%s/%s' % (kapi, fname), 'w')
 
-        # echee: save api json to disk
-        kapi = '/var/log/scalyr-agent-2/kapi'
-        if not os.path.exists(kapi):
-            os.mkdir(kapi, 0755)
-        fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
-        f = open('%s/%s' % (kapi, fname), 'w')
-        f.write(response.text)
-        f.close()
+            response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
+            response.encoding = "utf-8"
+            if response.status_code != 200:
+                if response.status_code == 401 or response.status_code == 403:
+                    raise K8sApiAuthorizationException( path )
 
-        return util.json_decode( response.text )
+                global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                    % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
+                raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
+
+            f.write(response.text)
+            return util.json_decode(response.text)
+
+        except Exception:
+            f.write(traceback.format_exc())
+            raise
+        finally:
+            f.close()
 
     def query_object( self, kind, namespace, name ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
@@ -1327,23 +1334,30 @@ class KubeletApi( object ):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
         url = self._http_host + path
-        response = self._session.get( url, timeout=self._timeout )
-        response.encoding = "utf-8"
-        if response.status_code != 200:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
-            raise KubeletApiException( "Invalid response from Kubelet API when querying '%s': %s" %( path, str( response ) ) )
 
-        # echee: save kublet api json to disk
-        kapi = '/var/log/scalyr-agent-2/kupi'
-        if not os.path.exists(kapi):
-            os.mkdir(kapi, 0755)
-        fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
-        f = open('%s/%s' % (kapi, fname), 'w')
-        f.write(response.text)
-        f.close()
+        try:
+            # echee: save kublet api json to disk
+            kapi = '/var/log/scalyr-agent-2/kupi'
+            if not os.path.exists(kapi):
+                os.mkdir(kapi, 0755)
+            fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
+            f = open('%s/%s' % (kapi, fname), 'w')
 
-        return util.json_decode( response.text )
+            response = self._session.get( url, timeout=self._timeout )
+            response.encoding = "utf-8"
+            if response.status_code != 200:
+                global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                    % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='kubelet_api_query' )
+                raise KubeletApiException( "Invalid response from Kubelet API when querying '%s': %s" %( path, str( response ) ) )
+
+            f.write(response.text)
+            return util.json_decode( response.text )
+
+        except Exception:
+            f.write(traceback.format_exc())
+            raise
+        finally:
+            f.close()
 
     def query_pods( self ):
         return self.query_api( '/pods' )
