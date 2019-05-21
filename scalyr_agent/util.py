@@ -192,9 +192,9 @@ def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
     """Write a dict to a JSON encoded file
     The file is first completely written to tmp_path, and then renamed to file_path
 
-    @param: file_path: The final path of the file
-    @param: tmp_path: A temporary path to write the file to
-    @param: info: A dict containing the JSON object to write
+    @param file_path: The final path of the file
+    @param tmp_path: A temporary path to write the file to
+    @param info: A dict containing the JSON object to write
     """
     fp = None
     try:
