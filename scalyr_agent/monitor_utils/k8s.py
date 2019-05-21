@@ -1090,7 +1090,7 @@ class KubernetesApi( object ):
         self._http_host = k8s_api_url
 
         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host )
-        self._timeout = 10.0
+        self._timeout = 120.0
 
         self._session = None
 
