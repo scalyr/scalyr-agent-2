@@ -29,6 +29,7 @@ __author__ = 'czerwin@scalyr.com'
 import os
 import errno
 import re
+import sys
 import time
 from subprocess import Popen, PIPE
 
@@ -114,7 +115,8 @@ class Metric(object):
     __slots__ = 'name', 'type', '_frozen'
 
     def __hash__(self):
-        return hash(self.name) + 13 * hash(self.type)
+        x = hash(self.name) + 13 * hash(self.type)
+        return x % sys.maxint
 
     def __eq__(self, other):
         return other.name == self.name and other.type == self.type
