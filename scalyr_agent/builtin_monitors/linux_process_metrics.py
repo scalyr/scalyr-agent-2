@@ -113,6 +113,12 @@ class Metric(object):
     """
     __slots__ = 'name', 'type', '_frozen'
 
+    def __hash__(self):
+        return hash(self.name) + 13 * hash(self.type)
+
+    def __eq__(self, other):
+        return other.name == self.name and other.type == self.type
+
     def __init__(self, name, _type):
         self.name = name
         self.type = _type
