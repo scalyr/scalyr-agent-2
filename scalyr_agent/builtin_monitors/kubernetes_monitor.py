@@ -412,13 +412,13 @@ def _ignore_old_dead_container( container, created_before=None ):
 
     return False
 
-def _get_containers(client, ignore_container=None, ignore_pod=None, restrict_to_container=None, logger=None,
+def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to_container=None, logger=None,
                     only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, k8s_cache=None,
                     k8s_include_by_default=True, k8s_namespaces_to_exclude=None, ignore_pod_sandboxes=True, current_time=None):
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
         @param client: A docker.Client object
         @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
-        @param ignore_container: QualifiedPod, a pod name and namespace to exclude from results (useful for ignoring the scalyr_agent container)
+        @param ignored_pod: QualifiedPod, a pod name and namespace to exclude from results (useful for ignoring the scalyr_agent container)
         @param restrict_to_container: String, a single continer id that will be the only returned result
         @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
             logger is used.
@@ -514,7 +514,7 @@ def _get_containers(client, ignore_container=None, ignore_pod=None, restrict_to_
                                     logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
                                 if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
-                                    if ignore_pod is not None and k8s_info['pod_namespace'] == ignore_pod.namespace and k8s_info['pod_name'] == ignore_pod.name:
+                                    if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
                                         continue
                                     if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
                                         logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based excluded namespaces" % short_cid)
@@ -566,13 +566,13 @@ class ContainerEnumerator( object):
     Base class that defines an api for enumerating all containers running on a node
     """
 
-    def __init__( self, ignore_pod ):
+    def __init__(self, ignored_pod):
         """
-        @param ignore_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
-        @type ignore_pod QualifiedName
+        @type ignored_pod QualifiedName
         """
-        self._ignore_pod = ignore_pod
+        self._ignored_pod = ignored_pod
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         raise NotImplementedError()
@@ -582,21 +582,21 @@ class DockerEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the docker remote API over the docker socket by usin
     a docker.Client
     """
-    def __init__( self, client, ignore_pod ):
+    def __init__(self, client, ignored_pod):
         """
         @param client The docker client to use for accessing docker
-        @param ignore_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
         @type client DockerClient
-        @type ignore_pod QualifiedName
+        @type ignored_pod QualifiedName
         """
-        super( DockerEnumerator, self).__init__( ignore_pod )
+        super( DockerEnumerator, self).__init__(ignored_pod)
         self._client = client
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         return _get_containers(
             self._client,
-            ignore_pod=self._ignore_pod,
+            ignored_pod=self._ignored_pod,
             running_or_created_after=running_or_created_after,
             glob_list=glob_list,
             include_log_path=True,
@@ -611,19 +611,19 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__( self, ignore_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
+    def __init__(self, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
         """
-        @param ignore_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
         @param k8s_api_url The URL to use for accessing the API
         @param query_filesystem Whether or not to get the container list using the filesystem-based approach
         @param kubelet_api_host_ip The HOST IP to use for accessing the Kubelet API
-        @type ignore_pod QualifiedName
+        @type ignored_pod QualifiedName
         @type k8s_api_url str
         @type query_filesystem bool
         @type kubelet_api_host_ip str
         """
-        super( CRIEnumerator, self).__init__( ignore_pod )
+        super( CRIEnumerator, self).__init__(ignored_pod)
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
         self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
@@ -743,8 +743,11 @@ class CRIEnumerator( ContainerEnumerator ):
                 continue
 
             # ignore the scalyr-agent container
-            if self._ignore_pod is not None and pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
-                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % _get_short_cid( cid ) )
+            if self._ignored_pod is not None and pod_name == self._ignored_pod.name and pod_namespace == self._ignored_pod.namespace:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Excluding container because pod_name '%s' in namespace '%s' is ignored" % (pod_name, pod_namespace)
+                )
                 continue
 
             result.append( (pod_name, pod_namespace, cname, cid) )
@@ -795,8 +798,11 @@ class CRIEnumerator( ContainerEnumerator ):
                     short_cid = _get_short_cid( cid )
 
                     # ignore the scalyr-agent container
-                    if self._ignore_pod is not None and pod_name == self._ignore_pod.name and pod_namespace == self._ignore_pod.namespace:
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % short_cid )
+                    if self._ignored_pod is not None and pod_name == self._ignored_pod.name and pod_namespace == self._ignored_pod.namespace:
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Excluding container because pod_name '%s' in namespace '%s' is ignored" % (pod_name, pod_namespace)
+                        )
                         continue
 
                     # make sure the container has a name
@@ -953,18 +959,8 @@ class ContainerChecker( StoppableThread ):
         return (k8s_cache and k8s_cache.get_cluster_name()) or None
 
     def _get_node_name( self ):
-        """ Gets the node name of the node running the agent """
-        node = os.environ.get( 'SCALYR_K8S_NODE_NAME' )
-        if node:
-            return node
-
-        result = None
-        if k8s_cache:
-            state = k8s_cache.local_state()
-            pod = state.k8s.query_pod( self.namespace, pod_name )
-            spec = pod.get( 'spec', {} )
-            node = spec.get( 'nodeName' )
-        return node
+        """ Gets the node name of the node running the agent from downward API """
+        return os.environ.get( 'SCALYR_K8S_NODE_NAME' )
 
 
     def _get_container_runtime( self ):
@@ -1756,7 +1752,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'SCALYR_MAX_PROFILE_INTERVAL_MINUTES',
         ]
         for envar in envars_to_log:
-            self._logger.info("Environment variable %s = %s" % (envar, os.environ.get(envar, '<Not set>')))
+            self._logger.info("Environment variable %s : %s" % (envar, os.environ.get(envar, '<Not set>')))
 
         self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
@@ -1867,8 +1863,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         if len(os.environ.get(env_var_name, '')) == 0:
             self._logger.error('ERROR: Missing required environment variable for kubenetes_monitor: %s' % env_var_name)
             self._logger.error('Please restart with up-to-date Scalyr Agent Daemonset manifest (YAML) file.')
-            raise BadMonitorConfiguration('Required environment variables not set for kubernetes_monitor.',
-                                          env_var_name)
+            raise BadMonitorConfiguration(
+                'Required environment variable "%s" is not set for kubernetes_monitor.' % env_var_name,
+                env_var_name)
 
     def __log_metrics( self, monitor_override, metrics_to_emit, metrics, extra=None ):
         if metrics is None:
@@ -2266,7 +2263,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     self.__metric_fetcher = DockerMetricFetcher(self.__client, self.__docker_max_parallel_stats )
 
                 k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
-                self.__kubelet_api = KubeletApi( k8s, kubelet_api_host_ip=self._config.get('k8s_kubelet_host_ip') )
+                self.__kubelet_api = KubeletApi( k8s, host_ip=self._config.get('k8s_kubelet_host_ip') )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False

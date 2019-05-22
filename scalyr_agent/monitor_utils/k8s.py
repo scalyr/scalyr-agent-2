@@ -1208,7 +1208,6 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
-        raise Exception( "K8s api queries disabled" ) # echee
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -1218,8 +1217,7 @@ class KubernetesApi( object ):
 
         url = self._http_host + path + pretty
 
-        import traceback
-        global_log.info('k8s api get %s, %s' % (url, traceback.format_exc()))
+        global_log.info('query_api: %s \n %s' % (url, traceback.format_exc()))
 
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         response.encoding = "utf-8"
