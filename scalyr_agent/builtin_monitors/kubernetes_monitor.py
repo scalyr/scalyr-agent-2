@@ -866,7 +866,6 @@ class ContainerChecker( StoppableThread ):
         @type: namespaces_to_ignore [str]
         @type: ignore_pod_sandboxes bool
         """
-        StoppableThread.__init__(self, name='container checker thread')
         self._config = config
         self._global_config = global_config
         self._logger = logger
