@@ -1217,7 +1217,7 @@ class KubernetesApi( object ):
 
         url = self._http_host + path + pretty
 
-        global_log.info('query_api: %s \n %s' % (url, traceback.format_exc()))
+        global_log.info('query_api: %s \n %s' % (url, traceback.format_stack()))
 
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         response.encoding = "utf-8"
