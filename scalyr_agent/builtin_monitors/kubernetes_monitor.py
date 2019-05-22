@@ -840,31 +840,31 @@ class ContainerChecker( StoppableThread ):
                   ignore_pod_sandboxes ):
         """
 
-        :param config: The configuration for the monitor which includes options for the container checker
-        :param global_config: The global configuration file
-        :param logger: The logger instance to use
-        :param socket_file: The docker socket file
-        :param docker_api_version: The API version to use for docker
-        :param agent_pod: The pod name and namespace for the agent
-        :param host_hostname: The hostname for this node
-        :param log_path: The path to the container logs
-        :param include_all: Whether or not include all container by default
-        :param include_controller_info: Whether or not to include the controller information for all pods upload
-        :param namespaces_to_ignore: The namespaces whose pods should not be uploaded
-        :param ignore_pod_sandboxes: Whether or not to recognize pod sandboxes
+        @param: config The configuration for the monitor which includes options for the container checker
+        @param: global_config The global configuration file
+        @param: logger The logger instance to use
+        @param: socket_file The docker socket file
+        @param: docker_api_version The API version to use for docker
+        @param: agent_pod The pod name and namespace for the agent
+        @param: host_hostname The hostname for this node
+        @param: log_path The path to the container logs
+        @param: include_all Whether or not include all container by default
+        @param: include_controller_info Whether or not to include the controller information for all pods upload
+        @param: namespaces_to_ignore The namespaces whose pods should not be uploaded
+        @param: ignore_pod_sandboxes Whether or not to recognize pod sandboxes
 
-        :type config: dict
-        :type global_config: Configuration
-        :type logger: Logger
-        :type socket_file: str
-        :type docker_api_version: str
-        :type agent_pod: QualifiedName
-        :type host_hostname: str
-        :type log_path: str
-        :type include_all: bool
-        :type include_controller_info: bool
-        :type namespaces_to_ignore: [str]
-        :type ignore_pod_sandboxes: bool
+        @type: config dict
+        @type: global_config Configuration
+        @type: logger Logger
+        @type: socket_file str
+        @type: docker_api_versio: str
+        @type: agent_pod QualifiedName
+        @type: host_hostname str
+        @type: log_path str
+        @type: include_all bool
+        @type: include_controller_info bool
+        @type: namespaces_to_ignore [str]
+        @type: ignore_pod_sandboxes bool
         """
         StoppableThread.__init__(self, name='container checker thread')
         self._config = config
