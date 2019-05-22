@@ -2235,6 +2235,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'SCALYR_ENABLE_PROFILING',
             'SCALYR_PROFILE_DURATION_MINUTES',
             'SCALYR_MAX_PROFILE_INTERVAL_MINUTES',
+            'SCALYR_K8S_ALWAYS_USE_DOCKER',
         ]
         for envar in envars_to_log:
             self._logger.info("Environment variable %s : %s" % (envar, os.environ.get(envar, '<Not set>')))
