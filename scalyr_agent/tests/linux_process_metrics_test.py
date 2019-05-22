@@ -24,6 +24,41 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 
 class TestMetricClass(ScalyrTestCase):
+    def test_metric_as_object_key(self):
+        """
+        This protects against a bug introduced in v2.0.47 whereby the Metric object didn't implement __hash__ and
+        __eq__ dunder methods.  Metric is repeatedly used as a key during linux process metrics generation.
+        Without those dunder methods, the key/val is never replaced and the dictionary keeps growing.
+        (Reference AGENT-142)
+        """
+        dd = {}
+        for x in range(1000):
+            dd[Metric('name1a', 'name1b')] = x
+            dd[Metric('name2a', 'name2b')] = x
+            dd[Metric('name3a', 'name3b')] = x
+            dd[Metric('name4a', 'name4b')] = x
+            dd[Metric('name5a', 'name5b')] = x
+        self.assertEqual(len(dd), 5)
+        self.assertEqual(dd[Metric('name1a', 'name1b')], 999)
+        self.assertEqual(dd[Metric('name2a', 'name2b')], 999)
+        self.assertEqual(dd[Metric('name3a', 'name3b')], 999)
+        self.assertEqual(dd[Metric('name4a', 'name4b')], 999)
+        self.assertEqual(dd[Metric('name5a', 'name5b')], 999)
+
+        dd = {}
+        for x in range(1000):
+            dd[Metric('name1a', 'name1b')] = 1
+            dd[Metric('name2a', 'name2b')] = 1
+            dd[Metric('name3a', 'name3b')] = 1
+            dd[Metric('name4a', 'name4b')] = 1
+            dd[Metric('name5a', 'name5b')] = 1
+        self.assertEqual(len(dd), 5)
+        self.assertEqual(dd[Metric('name1a', 'name1b')], 1)
+        self.assertEqual(dd[Metric('name2a', 'name2b')], 1)
+        self.assertEqual(dd[Metric('name3a', 'name3b')], 1)
+        self.assertEqual(dd[Metric('name4a', 'name4b')], 1)
+        self.assertEqual(dd[Metric('name5a', 'name5b')], 1)
+
     def test_basic_namedtuple_access(self):
 
         m = Metric('abc', 123)
