@@ -1009,6 +1009,9 @@ class KubernetesCache( object ):
                 current_time = time.time()
                 if local_state.batch_pod_updates:
                     self._pods.update( local_state.k8s, local_state.node_filter, 'Pod' )
+                else:
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
+                    self._pods.purge_expired( access_time=current_time )
                 self._update_cluster_name( local_state.k8s )
                 self._update_api_server_version(local_state.k8s)
 
