@@ -830,7 +830,7 @@ class CRIEnumerator( ContainerEnumerator ):
 
         return result
 
-class ContainerChecker( StoppableThread ):
+class ContainerChecker(object):
     """
         Monitors containers to check when they start and stop running.
     """
