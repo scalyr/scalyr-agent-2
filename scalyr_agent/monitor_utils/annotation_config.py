@@ -186,8 +186,8 @@ def _process_annotation_items( items, hyphens_as_underscores ):
         This function means the code that processes the labels/annotations doesn't need to care
         if it is running under docker or k8s, because the root caller decides whether or not hyphens
         need converting.
-        @param: key - string - a key for an annotation/label
-        @param: convert_hyphens - bool - if True, any hyphens in the `key` parameter will be
+        @param key: string - a key for an annotation/label
+        @param convert_hyphens: bool - if True, any hyphens in the `key` parameter will be
                 converted to underscores
         """
         if convert_hyphens:

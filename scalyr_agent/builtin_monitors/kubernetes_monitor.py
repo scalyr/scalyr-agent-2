@@ -416,23 +416,23 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                     only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, k8s_cache=None,
                     k8s_include_by_default=True, k8s_namespaces_to_exclude=None, ignore_pod_sandboxes=True, current_time=None):
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
-        @param: client: A docker.Client object
-        @param: ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
-        @param: ignored_pod: QualifiedPod, a pod name and namespace to exclude from results (useful for ignoring the scalyr_agent container)
-        @param: restrict_to_container: String, a single continer id that will be the only returned result
-        @param: logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
+        @param client: A docker.Client object
+        @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
+        @param ignored_pod: QualifiedPod, a pod name and namespace to exclude from results (useful for ignoring the scalyr_agent container)
+        @param restrict_to_container: String, a single continer id that will be the only returned result
+        @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
             logger is used.
-        @param: only_running_containers: Boolean.  If true, will only return currently running containers
-        @param: running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
+        @param only_running_containers: Boolean.  If true, will only return currently running containers
+        @param running_or_created_after: Unix timestamp.  If specified, the results will include any currently running containers *and* any
             dead containers that were created after the specified time.  Used to pick up short-lived containers.
-        @param: glob_list: List of strings.  A glob string limits results to containers whose container names match the glob
-        @param: include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
-        @param: k8s_cache: KubernetesCache.  If not None, k8s information (if it exists) for the container will be added as part of the extra info mapped to the container id
-        @param: k8s_include_by_default: Boolean.  If True, then all k8s containers are included by default, unless an include/exclude annotation excludes them.
+        @param glob_list: List of strings.  A glob string limits results to containers whose container names match the glob
+        @param include_log_path: Boolean.  If true include the path to the raw log file on disk as part of the extra info mapped to the container id.
+        @param k8s_cache: KubernetesCache.  If not None, k8s information (if it exists) for the container will be added as part of the extra info mapped to the container id
+        @param k8s_include_by_default: Boolean.  If True, then all k8s containers are included by default, unless an include/exclude annotation excludes them.
             If False, then all k8s containers are excluded by default, unless an include/exclude annotation includes them.
-        @param: k8s_namespaces_to_exclude: List  The of namespaces whose containers should be excluded.
-        @param: ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
-        @param: current_time.  Timestamp since the epoch
+        @param k8s_namespaces_to_exclude: List  The of namespaces whose containers should be excluded.
+        @param ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
+        @param current_time: Timestamp since the epoch
     """
     if logger is None:
         logger = global_log
@@ -568,9 +568,9 @@ class ContainerEnumerator( object):
 
     def __init__(self, ignored_pod):
         """
-        @param: ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
-        @type: ignored_pod QualifiedName
+        @type ignored_pod: QualifiedName
         """
         self._ignored_pod = ignored_pod
 
@@ -584,11 +584,11 @@ class DockerEnumerator( ContainerEnumerator ):
     """
     def __init__(self, client, ignored_pod):
         """
-        @param: client The docker client to use for accessing docker
-        @param: ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param client: The docker client to use for accessing docker
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
-        @type: client DockerClient
-        @type: ignored_pod QualifiedName
+        @type client: DockerClient
+        @type ignored_pod: QualifiedName
         """
         super( DockerEnumerator, self).__init__(ignored_pod)
         self._client = client
@@ -613,15 +613,15 @@ class CRIEnumerator( ContainerEnumerator ):
     """
     def __init__(self, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
         """
-        @param: ignored_pod A pod whose containers should not be included in the returned list.  Typically, this
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
-        @param: k8s_api_url The URL to use for accessing the API
-        @param: query_filesystem Whether or not to get the container list using the filesystem-based approach
-        @param: kubelet_api_host_ip The HOST IP to use for accessing the Kubelet API
-        @type: ignored_pod QualifiedName
-        @type: k8s_api_url str
-        @type: query_filesystem bool
-        @type: kubelet_api_host_ip str
+        @param k8s_api_url: The URL to use for accessing the API
+        @param query_filesystem: Whether or not to get the container list using the filesystem-based approach
+        @param kubelet_api_host_ip: The HOST IP to use for accessing the Kubelet API
+        @type ignored_pod: QualifiedName
+        @type k8s_api_url: str
+        @type query_filesystem: bool
+        @type kubelet_api_host_ip: str
         """
         super( CRIEnumerator, self).__init__(ignored_pod)
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
@@ -840,31 +840,31 @@ class ContainerChecker( StoppableThread ):
                   ignore_pod_sandboxes ):
         """
 
-        @param: config The configuration for the monitor which includes options for the container checker
-        @param: global_config The global configuration file
-        @param: logger The logger instance to use
-        @param: socket_file The docker socket file
-        @param: docker_api_version The API version to use for docker
-        @param: agent_pod The pod name and namespace for the agent
-        @param: host_hostname The hostname for this node
-        @param: log_path The path to the container logs
-        @param: include_all Whether or not include all container by default
-        @param: include_controller_info Whether or not to include the controller information for all pods upload
-        @param: namespaces_to_ignore The namespaces whose pods should not be uploaded
-        @param: ignore_pod_sandboxes Whether or not to recognize pod sandboxes
+        @param config: The configuration for the monitor which includes options for the container checker
+        @param global_config: The global configuration file
+        @param logger: The logger instance to use
+        @param socket_file: The docker socket file
+        @param docker_api_version: The API version to use for docker
+        @param agent_pod: The pod name and namespace for the agent
+        @param host_hostname: The hostname for this node
+        @param log_path: The path to the container logs
+        @param include_all: Whether or not include all container by default
+        @param include_controller_info: Whether or not to include the controller information for all pods upload
+        @param namespaces_to_ignore: The namespaces whose pods should not be uploaded
+        @param ignore_pod_sandboxes: Whether or not to recognize pod sandboxes
 
-        @type: config dict
-        @type: global_config Configuration
-        @type: logger Logger
-        @type: socket_file str
-        @type: docker_api_versio: str
-        @type: agent_pod QualifiedName
-        @type: host_hostname str
-        @type: log_path str
-        @type: include_all bool
-        @type: include_controller_info bool
-        @type: namespaces_to_ignore [str]
-        @type: ignore_pod_sandboxes bool
+        @type config: dict
+        @type global_config: Configuration
+        @type logger: Logger
+        @type socket_file: str
+        @type docker_api_version: str
+        @type agent_pod: QualifiedName
+        @type host_hostname: str
+        @type log_path: str
+        @type include_all: bool
+        @type include_controller_info: bool
+        @type namespaces_to_ignore: [str]
+        @type ignore_pod_sandboxes: bool
         """
         self._config = config
         self._global_config = global_config
@@ -1218,7 +1218,7 @@ class ContainerChecker( StoppableThread ):
     def __stop_loggers( self, stopping ):
         """
         Stops any DockerLoggers in the 'stopping' dict
-        @param: stopping - a dict of container ids => container names. Any running containers that have
+        @param stopping:  a dict of container ids => container names. Any running containers that have
         the same container-id as a key in the dict will be stopped.
         """
         if stopping:
@@ -1239,7 +1239,7 @@ class ContainerChecker( StoppableThread ):
     def __start_loggers( self, starting, k8s_cache ):
         """
         Starts a list of DockerLoggers
-        @param: starting - a list of DockerLoggers to start
+        @param starting:  a list of DockerLoggers to start
         """
         if starting:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Starting all docker loggers')
@@ -1862,10 +1862,10 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_network_interface_metrics( self, container, metrics, interface=None, k8s_extra={} ):
         """ Logs network interface metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: interface - an optional interface value to associate with each metric value emitted
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container:  name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param interface: an optional interface value to associate with each metric value emitted
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         extra = None
         if interface:
@@ -1881,9 +1881,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_memory_stats_metrics( self, container, metrics, k8s_extra ):
         """ Logs memory stats metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         if 'stats' in metrics:
             self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'], k8s_extra )
@@ -1893,9 +1893,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_cpu_stats_metrics( self, container, metrics, k8s_extra ):
         """ Logs cpu stats metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
@@ -1922,9 +1922,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_json_metrics( self, container, metrics, k8s_extra ):
         """ Log docker metrics based on the JSON response returned from querying the Docker API
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         for key, value in metrics.iteritems():
             if value is None:
@@ -1943,8 +1943,8 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __gather_metrics_from_api_for_container( self, container, k8s_extra ):
         """ Query the Docker API for container metrics
 
-            @param: container - name of the container to query
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container to query
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         result = self.__metric_fetcher.get_metrics(container)
         if result is not None:
@@ -1954,7 +1954,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Builds a dict containing information about the controller settings for a given pod
 
-            @param: pod - a PodInfo object containing basic information (namespace/name) about the pod to query
+            @param pod: a PodInfo object containing basic information (namespace/name) about the pod to query
 
             @return: a dict containing the controller name for the controller running
                      the specified pod, or an empty dict if the pod is not part of a controller
@@ -1984,7 +1984,7 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __get_k8s_controller_info( self, container ):
         """
             Gets information about the kubernetes controller of a given container
-            @param: container - a dict containing information about a container, returned by _get_containers
+            @param container: a dict containing information about a container, returned by _get_containers
         """
         k8s_info = container.get( 'k8s_info', {} )
         pod = k8s_info.get( 'pod_info', None )
@@ -2023,8 +2023,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers metrics from a Kubelet API response for a specific pod
 
-            @param: node_metrics - A JSON Object from a response to a Kubelet API query
-            @param: extra - Extra fields to append to each metric
+            @param node_metrics: A JSON Object from a response to a Kubelet API query
+            @param extra: Extra fields to append to each metric
         """
 
         name = node.get( "nodeName", None )
@@ -2044,9 +2044,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers metrics from a Kubelet API response for a specific pod
 
-            @param: pod_metrics - A JSON Object from a response to a Kubelet API query
-            @param: pod_info - A PodInfo structure regarding the pod in question
-            @param: k8s_extra - Extra k8s specific fields to append to each metric
+            @param pod_metrics: A JSON Object from a response to a Kubelet API query
+            @param pod_info: A PodInfo structure regarding the pod in question
+            @param k8s_extra: Extra k8s specific fields to append to each metric
         """
 
         extra = {
@@ -2063,9 +2063,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers k8s metrics from a response to a stats query of the Kubelet API
 
-            @param: containers - a dict returned by _get_containers with info for all containers we are interested in
-            @param: kubelet_api - a KubeletApi object for querying the KubeletApi
-            @param: cluster_name - the name of the k8s cluster
+            @param containers: a dict returned by _get_containers with info for all containers we are interested in
+            @param kubelet_api: a KubeletApi object for querying the KubeletApi
+            @param cluster_name: the name of the k8s cluster
 
         """
 

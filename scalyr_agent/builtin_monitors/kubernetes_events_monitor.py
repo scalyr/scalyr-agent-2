@@ -366,7 +366,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             Checks all nodes on the cluster to see which one has the oldest creationTime
             If `self._ignore_master` is True then any node with the label `node-role.kubernetes.io/master`
             is ignored.
-            @param: k8s - a KubernetesApi object for querying the k8s api
+            @param k8s: a KubernetesApi object for querying the k8s api
             @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
         response = k8s.query_api( '/api/v1/nodes%s' % query_fields )
@@ -394,7 +394,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             Check to see if the leader is specified as a node label.
             If not, then if there is not a current leader node, or if the current leader node no longer exists
             then query all nodes for the leader
-            @param: k8s - a KubernetesApi object for querying the k8s api
+            @param k8s: a KubernetesApi object for querying the k8s api
         """
 
         try:
@@ -463,7 +463,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
     def _is_resource_expired( self, response ):
         """
             Checks to see if the resource identified in `response` is expired or not.
-            @param: response - a response from querying the k8s api for a resource
+            @param response: a response from querying the k8s api for a resource
         """
         obj = response.get( "object", JsonObject() )
 
@@ -475,7 +475,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             Processes an object returned from querying the k8s api, and determines whether the object
             has an `involvedObject` and if so returns a tuple containing the kind, namespace and name of the involved object.
             Otherwise returns (None, None, None)
-            @param: obj - an object returned from querying th k8s api
+            @param obj: an object returned from querying th k8s api
         """
         involved = obj.get( "involvedObject", JsonObject())
         kind = involved.get( 'kind', None, none_if_missing=True )
