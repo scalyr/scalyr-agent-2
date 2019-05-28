@@ -89,7 +89,7 @@ _OBJECT_ENDPOINTS = {
 def cache( config ):
     """
         Returns the global k8s cache, configured using the options in `config`
-        @param config: - The configuration
+        @param config: The configuration
         @type config: A Scalyr Configuration object
     """
 
@@ -447,7 +447,7 @@ class _K8sProcessor( object ):
             Processes a list of items, searching to see if one of them
             is a 'managing controller', which is determined by the 'controller' field
 
-            @param: items - an array containing 'ownerReferences' metadata for an object
+            @param items: an array containing 'ownerReferences' metadata for an object
                             returned from the k8s api
 
             @return: A dict containing the managing controller of type `kind` or None if no such controller exists
@@ -1208,7 +1208,6 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0 ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
-        raise Exception( "K8s api queries disabled" ) # echee
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
@@ -1218,8 +1217,7 @@ class KubernetesApi( object ):
 
         url = self._http_host + path + pretty
 
-        import traceback
-        global_log.info('k8s api get %s, %s' % (url, traceback.format_exc()))
+        global_log.info('query_api: %s \n %s' % (url, traceback.format_stack()))
 
         response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
         response.encoding = "utf-8"
@@ -1237,9 +1235,9 @@ class KubernetesApi( object ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
             An empty dict is returned if the object kind is unknown, or if there is an error generating
             an appropriate query string
-            @param: kind - the kind of the object
-            @param: namespace - the namespace to query in
-            @param: name - the name of the object
+            @param kind: the kind of the object
+            @param namespace: the namespace to query in
+            @param name: the name of the object
             @return - a dict returned by the query
         """
         if kind not in _OBJECT_ENDPOINTS:
