@@ -107,14 +107,14 @@ class Profiler( object ):
         try:
             for line in f:
                 lines += 1
-        except:
+        finally:
             f.close()
 
         # write a status message to make it easy to find the end of each profile session
         f = open( path, "a" )
         try:
             f.write( "\n# %s, %s clock, total lines: %d\n" % (path, self._profile_clock, lines) )
-        except:
+        finally:
             f.close()
 
         yappi.clear_stats()
