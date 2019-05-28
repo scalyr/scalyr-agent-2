@@ -1,6 +1,16 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.48 "Asgard" - May 22, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on May 22, 2019 14:00 -0700
+--->
+
+Bugs
+* Fix memory leak in linux process metrics introduced in v2.0.47 which manifests as high CPU or memory use.
+
+
 ## 2.0.47 "Zatnikatel" - May 8, 2019
 
 <!---
