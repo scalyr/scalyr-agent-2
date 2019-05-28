@@ -8,7 +8,7 @@ import string
 from string import Template
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
-import scalyr_agent.third_party.requests as requests
+import requests
 import scalyr_agent.util as util
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
@@ -1227,14 +1227,14 @@ class KubernetesApi( object ):
 
         url = self._http_host + path + pretty
 
-        try:
-            # echee: save api json to disk
-            kapi = '/var/log/scalyr-agent-2/kapi'
-            if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
-            fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
-            f = open('%s/%s' % (kapi, fname), 'w')
+        # echee: save api json to disk
+        kapi = '/var/log/scalyr-agent-2/kapi'
+        if not os.path.exists(kapi):
+            os.mkdir(kapi, 0755)
+        fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
+        f = open('%s/%s' % (kapi, fname), 'w')
 
+        try:
             response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
             response.encoding = "utf-8"
             if response.status_code != 200:
@@ -1374,14 +1374,14 @@ class KubeletApi( object ):
         """
         url = self._http_host + path
 
-        try:
-            # echee: save kublet api json to disk
-            kapi = '/var/log/scalyr-agent-2/kupi'
-            if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
-            fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
-            f = open('%s/%s' % (kapi, fname), 'w')
+        # echee: save kublet api json to disk
+        kapi = '/var/log/scalyr-agent-2/kupi'
+        if not os.path.exists(kapi):
+            os.mkdir(kapi, 0755)
+        fname = '%.20f_%s_%s' % (time.time(), random.randint(1, 100), urllib.quote_plus(path))
+        f = open('%s/%s' % (kapi, fname), 'w')
 
+        try:
             response = self._session.get( url, timeout=self._timeout )
             response.encoding = "utf-8"
             if response.status_code != 200:

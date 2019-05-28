@@ -20,7 +20,7 @@ __author__ = 'imron@scalyr.com'
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
-from scalyr_agent.third_party.requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError
 
 import datetime
 import os

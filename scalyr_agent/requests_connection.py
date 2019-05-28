@@ -17,7 +17,7 @@
 
 __author__ = 'imron@scalyr.com'
 
-import scalyr_agent.third_party.requests as requests
+import requests
 
 from scalyr_agent.connection import Connection
 
