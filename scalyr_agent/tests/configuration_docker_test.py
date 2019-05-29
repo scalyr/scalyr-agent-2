@@ -13,6 +13,26 @@ from scalyr_agent.tests.configuration_test import TestConfiguration
 class TestConfigurationDocker(TestConfiguration):
     """This test subclasses from TestConfiguration for easier exclusion in python 2.5 and below"""
 
+    def _make_monitors_manager(self, config):
+        def fake_init(self):
+            # Initialize some requisite variables so that the k8s monitor loop can run
+            self._DockerMonitor__socket_file = None
+            self._DockerMonitor__container_checker = None
+            self._DockerMonitor__namespaces_to_ignore = []
+            self._DockerMonitor__include_controller_info = None
+            self._DockerMonitor__report_container_metrics = None
+            self._DockerMonitor__metric_fetcher = None
+
+        mock_logger = Mock()
+
+        @patch.object(DockerMonitor, '_initialize', new=fake_init)
+        def create_manager():
+            scalyr_monitor.log = mock_logger
+            return MonitorsManager(config, FakePlatform([]))
+
+        monitors_manager = create_manager()
+        return monitors_manager, mock_logger
+
     @patch('scalyr_agent.builtin_monitors.docker_monitor.docker')
     def test_environment_aware_module_params(self, mock_docker):
 
@@ -76,25 +96,7 @@ class TestConfigurationDocker(TestConfiguration):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        # echee TODO: once AGENT-40 docker PR merges in, some of the test-setup code below can be eliminated and
-        # reused from that PR (I moved common code into scalyr_agent/test_util
-        def fake_init(self):
-            # Initialize some requisite variables so that the k8s monitor loop can run
-            self._DockerMonitor__socket_file = None
-            self._DockerMonitor__container_checker = None
-            self._DockerMonitor__namespaces_to_ignore = []
-            self._DockerMonitor__include_controller_info = None
-            self._DockerMonitor__report_container_metrics = None
-            self._DockerMonitor__metric_fetcher = None
-
-        mock_logger = Mock()
-
-        @patch.object(DockerMonitor, '_initialize', new=fake_init)
-        def create_manager():
-            scalyr_monitor.log = mock_logger
-            return MonitorsManager(config, FakePlatform([]))
-
-        monitors_manager = create_manager()
+        monitors_manager, mock_logger = self._make_monitors_manager(config)
         docker_monitor = monitors_manager.monitors[0]
 
         # All environment-aware params defined in the docker monitor must be gested
@@ -110,8 +112,6 @@ class TestConfigurationDocker(TestConfiguration):
             limit_once_per_x_secs=300,
             limit_key='config_conflict_scalyr_agent.builtin_monitors.docker_monitor_docker_raw_logs_SCALYR_DOCKER_RAW_LOGS',
         )
-
-
 
         CopyingManager(config, monitors_manager.monitors)
         # Override Agent Logger to prevent writing to disk
@@ -152,19 +152,20 @@ class TestConfigurationDocker(TestConfiguration):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        test_manager = MonitorsManager(config, FakePlatform([]))
-        k8s_event_monitor = test_manager.monitors[0]
-        event_object_filter = k8s_event_monitor._config.get('label_include_globs')
+        test_manager, _ = self._make_monitors_manager(config)
+        docker_monitor = test_manager.monitors[0]
+        include_globs = docker_monitor._config.get('label_include_globs')
         elems = ["*glob1*", "*glob2*", "*glob3*"]
-        self.assertNotEquals(elems, event_object_filter)  # list != JsonArray
-        self.assertEquals(elems, [x for x in event_object_filter])
+        self.assertNotEquals(elems, include_globs)  # list != JsonArray
+        self.assertEquals(elems, [x for x in include_globs])
 
-    def test_label_include_globs_from_environment_0(self):
-        self.test_label_include_globs_from_environment('["*env_glob1*", "*env_glob2*"]')
+    def test_label_include_globs_from_environment(self):
 
-    def test_label_include_globs_from_environment(self, environment_value):
-        elems = ["*env_glob1*", "*env_glob2*"]
-        os.environ['DOCKER_LABEL_INCLUDE_GLOBS'] = environment_value
+        include_elems = ['*env_glob1*', '*env_glob2*']
+        exclude_elems = ['*env_glob1_exclude_1', '*env_glob1_exclude_2', '*env_glob1_exclude_3']
+
+        os.environ['SCALYR_LABEL_INCLUDE_GLOBS'] = '*env_glob1*, *env_glob2*'
+        os.environ['SCALYR_LABEL_EXCLUDE_GLOBS'] = '*env_glob1_exclude_1, *env_glob1_exclude_2, *env_glob1_exclude_3'
         self._write_file_with_separator_conversion(""" { 
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
@@ -179,9 +180,13 @@ class TestConfigurationDocker(TestConfiguration):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        test_manager = MonitorsManager(config, FakePlatform([]))
+        test_manager, _ = self._make_monitors_manager(config)
         docker_monitor = test_manager.monitors[0]
-        globs_list = docker_monitor._config.get('label_include_globs')
-        self.assertNotEquals(elems, globs_list)  # list != ArrayOfStrings
-        self.assertEquals(type(globs_list), ArrayOfStrings)
-        self.assertEquals(elems, list(globs_list))
+        include_globs = docker_monitor._config.get('label_include_globs')
+        exclude_globs = docker_monitor._config.get('label_exclude_globs')
+        self.assertNotEquals(include_elems, include_globs)  # list != ArrayOfStrings
+        self.assertNotEquals(exclude_elems, exclude_globs)  # list != ArrayOfStrings
+        self.assertEquals(type(include_globs), ArrayOfStrings)
+        self.assertEquals(type(exclude_globs), ArrayOfStrings)
+        self.assertEquals(include_elems, list(include_globs))
+        self.assertEquals(exclude_elems, list(exclude_globs))
