@@ -141,9 +141,7 @@ define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
                       'names.  This may be used to fix breakages when you relied on the v1 attribute names',
                       convert_to=bool, default=False)
 
-define_config_option( __monitor__, 'k8s_api_url',
-                      'Optional (defaults to "https://kubernetes.default"). The URL for the Kubernetes API server for '
-                      'this cluster.', convert_to=str, default='https://kubernetes.default')
+define_config_option( __monitor__, 'k8s_api_url', 'DEPRECATED.', convert_to=str, default='https://kubernetes.default')
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
@@ -197,6 +195,11 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
 define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
                       convert_to=bool, default=True)
+
+define_config_option( __monitor__, 'k8s_kubelet_host_ip',
+                     'Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it',
+                     convert_to=str, default=None)
+
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -588,10 +591,10 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__( self, container_id, k8s_api_url, query_filesystem ):
+    def __init__( self, container_id, k8s_api_url, query_filesystem, kubelet_api_host_ip):
         super( CRIEnumerator, self).__init__( container_id )
         k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi( k8s )
+        self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
 
         self._log_base = '/var/log/containers'
@@ -770,7 +773,7 @@ class CRIEnumerator( ContainerEnumerator ):
                          limit_key='kubelet-api-connect' )
             self._query_filesystem = True
         except Exception, e:
-            global_log.error("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
+            global_log.exception("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
                          limit_key='kubelet-api-query-pods' )
 
         return result
@@ -858,7 +861,7 @@ class ContainerChecker( StoppableThread ):
     def start( self ):
 
         try:
-            k8s_api_url = self._config.get('k8s_api_url')
+            k8s_api_url = self._global_config.k8s_api_url
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
@@ -1559,7 +1562,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-        self.__k8s_api_url = self._config.get('k8s_api_url')
+        self.__k8s_api_url = self._global_config.k8s_api_url
         self.__docker_max_parallel_stats = self._config.get('docker_max_parallel_stats')
         self.__client = None
         self.__metric_fetcher = None
@@ -2062,7 +2065,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     self.__metric_fetcher = DockerMetricFetcher(self.__client, self.__docker_max_parallel_stats )
 
                 k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
-                self.__kubelet_api = KubeletApi( k8s )
+                self.__kubelet_api = KubeletApi( k8s, host_ip=self._config.get('k8s_kubelet_host_ip') )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
