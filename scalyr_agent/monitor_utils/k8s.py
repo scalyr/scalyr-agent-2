@@ -1320,19 +1320,21 @@ class KubeletApi( object ):
         A class for querying the kubelet API
     """
 
-    def __init__( self, k8s, port=10255 ):
+    def __init__( self, k8s, port=10255, host_ip=None ):
         """
         @param k8s - a KubernetesApi object
         """
-        pod_name = k8s.get_pod_name()
-        pod = k8s.query_pod( k8s.namespace, pod_name )
-        spec = pod.get( 'spec', {} )
-        status = pod.get( 'status', {} )
-
-        host_ip = status.get( 'hostIP', None )
-
         if host_ip is None:
-            raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
+            try:
+                pod_name = k8s.get_pod_name()
+                pod = k8s.query_pod( k8s.namespace, pod_name )
+                status = pod.get( 'status', {} )
+                host_ip = status.get( 'hostIP', None )
+                # Don't raise exception for now
+                # if host_ip is None:
+                #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
+            except Exception:
+                pass
 
         self._session = requests.Session()
         headers = {
@@ -1340,7 +1342,11 @@ class KubeletApi( object ):
         }
         self._session.headers.update( headers )
 
-        self._http_host = "http://%s:%d" % ( host_ip, port )
+        global_log.info('KubeletApi host ip = %s' % host_ip)
+        if host_ip:
+            self._http_host = "http://%s:%d" % ( host_ip, port )
+        else:
+            self._http_host = None
         self._timeout = 10.0
 
     def query_api( self, path ):
