@@ -16,10 +16,8 @@
 
 __author__ = 'imron@scalyr.com'
 
-import errno
 import os
 import random
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 import time
 import traceback
@@ -105,13 +103,19 @@ class Profiler( object ):
         lines = 0
 
         # count the lines
-        with open(path) as f:
+        f = open(path)
+        try:
             for line in f:
                 lines += 1
+        finally:
+            f.close()
 
         # write a status message to make it easy to find the end of each profile session
-        with open( path, "a" ) as f:
+        f = open( path, "a" )
+        try:
             f.write( "\n# %s, %s clock, total lines: %d\n" % (path, self._profile_clock, lines) )
+        finally:
+            f.close()
 
         yappi.clear_stats()
         del stats
