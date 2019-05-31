@@ -1295,7 +1295,6 @@ class ContainerChecker( StoppableThread ):
             rename_vars['namespace'] = pod_namespace
             container_attributes['pod_name'] = pod_name
             container_attributes['pod_namespace'] = pod_namespace
-            container_attributes['scalyr-category'] = 'log'
 
             # get the cluster name
             cluster_name = self.get_cluster_name( k8s_cache )
@@ -1306,6 +1305,7 @@ class ContainerChecker( StoppableThread ):
             if pod:
                 rename_vars['node_name'] = pod.node_name
 
+                container_attributes['scalyr-category'] = 'log'
                 container_attributes['pod_uid'] = pod.uid
 
                 if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
