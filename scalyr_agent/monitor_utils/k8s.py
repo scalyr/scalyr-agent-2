@@ -1334,6 +1334,7 @@ class KubeletApi( object ):
                 # if host_ip is None:
                 #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
             except Exception:
+                global_log.exception( "couldn't get host ip" )
                 pass
 
         self._session = requests.Session()
