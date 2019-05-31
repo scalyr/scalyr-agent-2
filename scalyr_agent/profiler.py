@@ -16,10 +16,8 @@
 
 __author__ = 'imron@scalyr.com'
 
-import errno
 import os
 import random
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 import time
 import traceback
