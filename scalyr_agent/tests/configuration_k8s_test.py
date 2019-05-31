@@ -40,6 +40,8 @@ class TestConfigurationK8s(TestConfiguration):
             "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, str),
             "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
             "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
+            "k8s_always_use_docker": (STANDARD_PREFIX, True, bool),
+            "k8s_kubelet_host_ip": (STANDARD_PREFIX, False, bool),
             "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
         }
 
