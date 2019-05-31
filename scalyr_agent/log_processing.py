@@ -716,7 +716,7 @@ class LogFileIterator(object):
         then it will return the next smallest valid position in the buffer, or None if the end of buffer is reached.
 
         @param mark_position:  The position
-        @type: int
+        @type int:
 
         @return:  The index of the position into the buffer, or None.
         """
@@ -740,7 +740,7 @@ class LogFileIterator(object):
         """Returns the position (relative to mark) represented by the specified index in the buffer.
 
         @param buffer_index: The index into the buffer
-        @type: int
+        @type int:
 
         @return: The position relative to the last mark.
         """

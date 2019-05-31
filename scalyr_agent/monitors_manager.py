@@ -61,7 +61,7 @@ class MonitorsManager(StoppableThread):
 
     def find_monitor( self, module_name ):
         """Finds a monitor with a specific name
-           @param: module_name - the module name of the monitor to find
+           @param module_name: the module name of the monitor to find
            @return: a monitor object if a monitor matches `module_name`, or None
         """
         for monitor in self.__monitors:
