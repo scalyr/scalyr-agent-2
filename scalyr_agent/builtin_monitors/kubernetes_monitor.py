@@ -172,6 +172,11 @@ define_config_option( __monitor__, 'k8s_always_use_cri',
                      'even when the runtime is detected as docker',
                      convert_to=bool, default=False, env_aware=True)
 
+define_config_option( __monitor__, 'k8s_always_use_docker',
+                     'Optional (defaults to False). If True, the kubernetes monitor will always try to get the list of running '
+                     'containers using docker even when the runtime is detected to be something different.',
+                     convert_to=bool, default=False, env_aware=True)
+
 define_config_option( __monitor__, 'k8s_cri_query_filesystem',
                      'Optional (defaults to False). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.',
                      convert_to=bool, default=False, env_aware=True)
@@ -879,6 +884,7 @@ class ContainerChecker( StoppableThread ):
         self.__docker_api_version = docker_api_version
         self.__client = None
         self.__always_use_cri = self._config.get( 'k8s_always_use_cri' )
+        self.__always_use_docker = self._config.get( 'k8s_always_use_docker' )
         self.__cri_query_filesystem = self._config.get( 'k8s_cri_query_filesystem' )
 
         self.__agent_pod = agent_pod
@@ -999,11 +1005,13 @@ class ContainerChecker( StoppableThread ):
             self._container_runtime = self._get_container_runtime()
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
-            if self._container_runtime == 'docker' and not self.__always_use_cri:
+            if self.__always_use_docker or (self._container_runtime == 'docker' and not self.__always_use_cri):
+                global_log.info('kubernetes_monitor is using docker for listing containers')
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                 self._container_enumerator = DockerEnumerator( self.__client, self.__agent_pod )
             else:
                 query_fs = self.__cri_query_filesystem
+                global_log.info('kubernetes_monitor is using CRI with fs=%s for listing containers' % str(query_fs))
                 self._container_enumerator = CRIEnumerator( self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
 
             if self.__parse_format == 'auto':
@@ -2177,6 +2185,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
                 runtime = None
                 if k8s_cache:
+                    # TODO(czerwin):  If the api server has been disabled, we need to decide what to do here.
                     runtime = k8s_cache.get_container_runtime()
 
                 if runtime == 'docker':
