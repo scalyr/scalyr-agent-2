@@ -252,8 +252,8 @@ class NewApi( Api ):
     def _open_remote_session_if_necessary( self, server, config ):
         """
             Opens a session to a remote server if `server` is not localhost or None
-            @param: server - string containing the server to connect to (can be None)
-            @param: config - a log config object
+            @param server: string containing the server to connect to (can be None)
+            @param config: a log config object
             @return: a valid session to a remote machine, or None if no remote session was needed
         """
         session = None

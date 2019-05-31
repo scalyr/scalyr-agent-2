@@ -367,8 +367,8 @@ def get_attributes_and_config_from_labels( labels, docker_options ):
     """
         Takes a dict of labels and splits it in to two separate attributes and config dicts.
 
-        @param labels: - All the Docker labels for a container
-        @param docker_options: - Options for determining which labels to use for the attributes and config items
+        @param labels: All the Docker labels for a container
+        @param docker_options: Options for determining which labels to use for the attributes and config items
         @type labels: dict
         @type docker_options: DockerOptions
 
@@ -660,7 +660,7 @@ class ContainerChecker( StoppableThread ):
     def __stop_loggers( self, stopping ):
         """
         Stops any DockerLoggers in the 'stopping' dict
-        @param stopping: - a dict of container ids => container names. Any running containers that have
+        @param stopping: a dict of container ids => container names. Any running containers that have
         the same container-id as a key in the dict will be stopped.
         @type stopping: dict
         """
@@ -832,7 +832,7 @@ class ContainerChecker( StoppableThread ):
     def __create_docker_logger( self, log, last_request ):
         """Creates a new DockerLogger object, based on the parameters passed in in the 'log' param.
 
-        @param log: - a dict consisting of:
+        @param log: a dict consisting of:
                         cid - the container id
                         stream - whether this is the stdout or stderr stream
                         log_config - the log config used by the scalyr-agent for this log file
@@ -1276,7 +1276,7 @@ class DockerOptions( object ):
     def configure_from_monitor( self, monitor ):
         """
         Configures the options based on the values from the docker monitor
-        @param monitor: - a docker monitor that can be used to configure the options
+        @param monitor: a docker monitor that can be used to configure the options
         @type monitor: DockerMonitor
         """
 
