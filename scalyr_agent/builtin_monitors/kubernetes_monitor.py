@@ -857,8 +857,6 @@ class ContainerChecker( StoppableThread ):
 
         self.__k8s_cache_init_abort_delay = self._config.get( 'k8s_cache_init_abort_delay' )
 
-        self.__k8s_disable_api_server = global_config.k8s_disable_api_server
-
         self.k8s_cache = None
 
         self.__node_name = None
@@ -930,9 +928,6 @@ class ContainerChecker( StoppableThread ):
 
     def _get_container_runtime( self ):
         """ Gets the container runtime currently in use """
-        if self.__k8s_disable_api_server:
-            return 'k8s'
-
         return (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
 
     def start( self ):
@@ -1108,10 +1103,12 @@ class ContainerChecker( StoppableThread ):
                         pod_namespace = info['k8s_info'].get( 'pod_namespace', 'invalid_namespace' )
                         pod = info['k8s_info'].get( 'pod_info', None )
 
-                        if not pod and not self.__k8s_disable_api_server:
-                            self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
-                                                  limit_once_per_x_secs=300,
-                                                  limit_key='check-container-pod-info-%s' % cid)
+                        if not pod:
+                            pass
+                            # Don't log any warnings here for now
+                            #self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
+                            #                      limit_once_per_x_secs=300,
+                            #                      limit_key='check-container-pod-info-%s' % cid)
 
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
@@ -1362,17 +1359,6 @@ class ContainerChecker( StoppableThread ):
                                                   limit_once_per_x_secs=300,
                                                   limit_key='k8s-invalid-container-config-%s' % cid)
                             container_annotations = {}
-
-            elif self.__k8s_disable_api_server:
-                rename_vars['node_name'] = self.__node_name
-                container_attributes['pod_uid'] = k8s_info.get( 'pod_uid', 'invalid_pod_uid' )
-
-                if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
-                    container_attributes['node_name'] = self.__node_name
-                elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
-                    container_attributes['k8s_node'] = self.__node_name
-
-                rename_logfile = '/%s/%s/%s.log' % (self._container_runtime, pod_namespace, pod_name)
 
             else:
                 self._logger.warning( "Couldn't map container '%s' to pod '%s/%s'. Logging limited metadata from docker container labels instead." % ( short_cid, pod_namespace, pod_name ),
@@ -2138,9 +2124,6 @@ class KubernetesMonitor( ScalyrMonitor ):
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
         tm = time.strptime( "2016-08-29", "%Y-%m-%d" )
-
-        if self.__k8s_disable_api_server:
-            self._logger.info( "Querying K8s API server has been disabled - this should only be done on large clusters" )
 
         if self.__container_checker:
             self.__container_checker.start()
