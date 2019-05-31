@@ -280,6 +280,14 @@ class Configuration(object):
         return self.__get_config().get_bool('k8s_cache_batch_pod_updates')
 
     @property
+    def k8s_cache_query_timeout_secs(self):
+        return self.__get_config().get_int('k8s_cache_query_timeout_secs')
+
+    @property
+    def k8s_cache_expiry_secs(self):
+        return self.__get_config().get_int('k8s_cache_expiry_secs')
+
+    @property
     def k8s_cache_disable_node_filter(self):
         return self.__get_config().get_bool('k8s_cache_disable_node_filter')
 
@@ -1053,6 +1061,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_cache_batch_pod_updates', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_cache_disable_node_filter', False, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'k8s_cache_query_timeout_secs', 20, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
