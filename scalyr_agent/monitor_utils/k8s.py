@@ -107,7 +107,8 @@ def cache( config ):
                                  cache_start_fuzz_secs=config.k8s_cache_start_fuzz_secs,
                                  cache_purge_secs=config.k8s_cache_purge_secs,
                                  namespaces_to_ignore=namespaces_to_ignore,
-                                 batch_pod_updates=config.k8s_cache_batch_pod_updates )
+                                 batch_pod_updates=config.k8s_cache_batch_pod_updates,
+                                 query_timeout=config.k8s_cache_query_timeout_secs)
 
     #update the config and return current cache
     _k8s_cache.update_config( cache_config )
@@ -605,7 +606,7 @@ class _CacheConfig( object ):
 
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
                   cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None,
-                  batch_pod_updates=True ):
+                  batch_pod_updates=True, query_timeout=20 ):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -615,6 +616,7 @@ class _CacheConfig( object ):
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
         @param namespaces_to_ignore: a list of namespaces to ignore
         @param batch_pod_updates: whether or not to perform batch queries to the k8s api server for pod updates - used for stress testing
+        @param query_timeout: The number of seconds to wait before a query to the API server times out
         @type api_url: str
         @type verify_api_queries: bool
         @type cache_expiry_secs: int or float
@@ -623,6 +625,7 @@ class _CacheConfig( object ):
         @type cache_purge_secs: int or float
         @type namespaces_to_ignore: list[str]
         @type batch_pod_updates: bool
+        @type query_timeout: int
         """
         self.api_url = api_url
         self.verify_api_queries = verify_api_queries
@@ -632,6 +635,7 @@ class _CacheConfig( object ):
         self.cache_purge_secs = cache_purge_secs
         self.namespaces_to_ignore = namespaces_to_ignore
         self.batch_pod_updates = batch_pod_updates
+        self.query_timeout = query_timeout
 
     def __eq__( self, other ):
         """Equivalence method for _CacheConfig objects so == testing works """
@@ -642,6 +646,7 @@ class _CacheConfig( object ):
                 self.cache_start_fuzz_secs == other.cache_start_fuzz_secs and
                 self.cache_purge_secs == other.cache_purge_secs and
                 self.batch_pod_updates == other.batch_pod_updates and
+                self.query_timeout == other.query_timeout and
                 self.namespaces_to_ignore == other.namespaces_to_ignore)
 
     def __ne__( self, other ):
@@ -653,8 +658,8 @@ class _CacheConfig( object ):
 
 
     def __str__( self ):
-        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_expiry_fuzz_secs: %d\n\tcache_start_fuzz_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n\tbatch_pod_updates: %s\n" % ( str(self.api_url),
-            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_expiry_fuzz_secs, self.cache_start_fuzz_secs, self.cache_purge_secs, str( self.namespaces_to_ignore), self.batch_pod_updates )
+        return "\n\tapi_url: %s\n\tverify_api_queries: %s\n\tcache_expiry_secs: %d\n\tcache_purge_secs: %d\n\tnamespaces_to_ignore: %s\n\tbatch_pod_updates: %s\n\tquery_timeout: %d\n" % ( str(self.api_url),
+            str( self.verify_api_queries), self.cache_expiry_secs, self.cache_purge_secs, str( self.namespaces_to_ignore ), self.batch_pod_updates, self.query_timeout )
 
     def need_new_k8s_object( self, new_config ):
         """
@@ -790,10 +795,14 @@ class _CacheConfigState( object ):
         # create a new k8s api object if we need one
         k8s = old_state.k8s
         if need_new_k8s:
-            if new_config.verify_api_queries:
-                k8s = KubernetesApi(k8s_api_url=new_config.api_url)
-            else:
-                k8s = KubernetesApi( ca_file=None, k8s_api_url=new_config.k8s_api_url)
+            args = {
+                'k8s_api_url': new_config.api_url,
+                'query_timeout': new_config.query_timeout
+            }
+            if not new_config.verify_api_queries:
+                params['ca_file'] = None
+
+            k8s = KubernetesApi( **args )
 
         # create new filters if we need them
         node_filter = old_state.node_filter
@@ -810,6 +819,7 @@ class _CacheConfigState( object ):
             # not if the objects are semantically identical
             if new_config is self._pending_config:
                 self.k8s = k8s
+                self.k8s.query_timeout = new_config.query_timeout
                 self.node_filter = node_filter
                 self.config = new_config
                 self._pending_config = None
@@ -1092,7 +1102,8 @@ class KubernetesApi( object ):
     """
 
     def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
-                  k8s_api_url="https://kubernetes.default"):
+                  k8s_api_url="https://kubernetes.default",
+                  query_timeout=20):
         """Init the kubernetes object
         """
 
@@ -1106,7 +1117,8 @@ class KubernetesApi( object ):
         self._http_host = k8s_api_url
 
         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Kubernetes API host: %s", self._http_host )
-        self._timeout = 120.0
+
+        self.query_timeout = query_timeout
 
         self._session = None
 
@@ -1227,8 +1239,7 @@ class KubernetesApi( object ):
             pretty = '?%s' % pretty
 
         url = self._http_host + path + pretty
-
-        response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout )
+        response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
         response.encoding = "utf-8"
         if response.status_code != 200:
             if response.status_code == 401 or response.status_code == 403:
@@ -1314,7 +1325,7 @@ class KubernetesApi( object ):
 
             url += resource
 
-        response = self._session.get( url, verify=self._verify_connection(), timeout=self._timeout, stream=True )
+        response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout, stream=True )
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_stream_events' )
@@ -1357,7 +1368,7 @@ class KubeletApi( object ):
             self._http_host = "http://%s:%d" % ( host_ip, port )
         else:
             self._http_host = None
-        self._timeout = 10.0
+        self._timeout = 20.0
 
     def query_api( self, path ):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
