@@ -867,7 +867,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             [t.join(1) for t in threads]
             at_least_one_client_thread_incomplete = False
             for t in threads:
-                if t.is_alive():
+                if t.isAlive():
                     at_least_one_client_thread_incomplete = True
                     break
 
