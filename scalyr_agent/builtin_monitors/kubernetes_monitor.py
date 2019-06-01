@@ -933,6 +933,9 @@ class ContainerChecker(object):
         self._container_enumerator = None
         self._container_runtime = 'unknown'
 
+        # give this an initial empty value
+        self.raw_logs = []
+
     def _is_running_in_docker( self ):
         """
         Checks to see if the agent is running inside a docker container
