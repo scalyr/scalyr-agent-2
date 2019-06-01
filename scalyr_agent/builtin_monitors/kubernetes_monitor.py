@@ -97,6 +97,11 @@ define_config_option( __monitor__, 'log_mode',
                      'legacy behavior.\n',
                      convert_to=str, default="docker_api")
 
+define_config_option( __monitor__, 'metrics_only',
+                     'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
+                     'about running containers.\n',
+                     convert_to=bool, default=False)
+
 define_config_option( __monitor__, 'container_globs',
                      'Optional (defaults to None). If true, a list of glob patterns for container names.  Only containers whose names '
                      'match one of the glob patterns will be monitored.',
