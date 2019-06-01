@@ -119,14 +119,23 @@ class K8sApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
     exceptions
     """
-    pass
+    def __init__( self, message, status_code=0 ):
+        super(K8sApiException, self).__init__( message )
+        self.status_code = status_code
 
 class K8sApiAuthorizationException( K8sApiException ):
-    """A wrapper around Exception that makes it easier to catch k8s specific
+    """A wrapper around Exception that makes it easier to catch k8s authorization
     exceptions
     """
-    def __init__( self, path ):
-        super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path )
+    def __init__( self, path, status_code=0 ):
+        super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path, status_code=status_code )
+
+class K8sApiNotFoundException( K8sApiException ):
+    """
+    A wrapper around Exception that makes it easier to catch not found errors when querying the k8s api
+    """
+    def __init__( self, path, status_code=0 ):
+        super(K8sApiNotFoundException, self).__init__( "The resource at location `%s` was not found" % path, status_code=status_code )
 
 class KubeletApiException( Exception ):
     """A wrapper around Exception that makes it easier to catch k8s specific
@@ -1242,15 +1251,22 @@ class KubernetesApi( object ):
             pretty = '?%s' % pretty
 
         url = self._http_host + path + pretty
-        response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
-        response.encoding = "utf-8"
+        response = None
+        try:
+            response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
+            response.encoding = "utf-8"
+        except Exception, e:
+            raise
+
         if response.status_code != 200:
             if response.status_code == 401 or response.status_code == 403:
-                raise K8sApiAuthorizationException( path )
+                raise K8sApiAuthorizationException( path, status_code=response.status_code )
+            elif response.status_code == 404:
+                raise K8sApiNotFoundException( path, status_code=response.status_code )
 
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
-            raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ) )
+            raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
 
         return util.json_decode( response.text )
 
@@ -1332,7 +1348,7 @@ class KubernetesApi( object ):
         if response.status_code != 200:
             global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_stream_events' )
-            raise K8sApiException( "Invalid response from Kubernetes API when querying %d - '%s': %s" % ( response.status_code, path, str( response ) ) )
+            raise K8sApiException( "Invalid response from Kubernetes API when querying %d - '%s': %s" % ( response.status_code, path, str( response ) ), status_code=response.status_code )
 
         for line in response.iter_lines():
             if line:
