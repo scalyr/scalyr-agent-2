@@ -55,7 +55,7 @@ class TestConfigurationK8s(TestConfiguration):
             "ignore_master": ("SCALYR_K8S_IGNORE_MASTER", False, bool),
         }
 
-        # Fake the environment varaibles
+        # Fake the environment variables
         for map in [k8s_testmap, k8s_events_testmap]:
             for key, value in map.items():
                 custom_name = value[0]
@@ -210,3 +210,39 @@ class TestConfigurationK8s(TestConfiguration):
         self.assertNotEquals(elems, event_object_filter)  # list != ArrayOfStrings
         self.assertEquals(type(event_object_filter), ArrayOfStrings)
         self.assertEquals(elems, list(event_object_filter))
+
+    def test_k8s_events_disable(self):
+        def _assert_environment_variable(env_var_name, env_var_value, expected_value):
+            os.environ[env_var_name] = env_var_value
+            self._write_file_with_separator_conversion(""" { 
+                api_key: "hi there",
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
+                    }
+                ]
+              }
+            """)
+            config = self._create_test_configuration_instance()
+            config.parse()
+
+            test_manager = MonitorsManager(config, FakePlatform([]))
+            k8s_event_monitor = test_manager.monitors[0]
+            self.assertEquals(expected_value, k8s_event_monitor._KubernetesEventsMonitor__disable_monitor)
+
+        # Legacy env variable is supported
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 't', True)
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 'T', True)
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 'true', True)
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 'True', True)
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 'TRUE', True)
+        _assert_environment_variable('K8S_EVENTS_DISABLE', 'X', False)
+
+        # And new environment variable likewise
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'true', True)
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'True', True)
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'T', False)
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'false', False)
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'False', False)
+        _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'F', False)
