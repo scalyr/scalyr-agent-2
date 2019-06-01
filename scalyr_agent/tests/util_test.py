@@ -828,7 +828,6 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
         test_state = {
             'count': 0,
-            'outcomes': []
         }
         test_state_lock = threading.Lock()
         outcome_generator_lock = threading.Lock()
@@ -857,11 +856,20 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         threads = [threading.Thread(target=consume_token_blocking) for _ in range(max_concurrency)]
         [t.setDaemon(True) for t in threads]
         [t.start() for t in threads]
-        # All client threads are likely blocking on the token queue at this point
-        # The experiment will never start until at least one token is granted (and waiting threads notified)
-        # To jump start this, simply advance fake clock to the ripe_time.
-        self._fake_clock.advance_time(increment_by=rate_limiter._ripe_time - self._fake_clock.time())
-        [t.join() for t in threads]
+
+        at_least_one_client_thread_incomplete = True
+        while at_least_one_client_thread_incomplete:
+            # All client threads are likely blocking on the token queue at this point
+            # The experiment will never start until at least one token is granted (and waiting threads notified)
+            # To jump start this, simply advance fake clock to the ripe_time.
+            self._fake_clock.advance_time(increment_by=rate_limiter._ripe_time - self._fake_clock.time())
+            # Wake up after 1 second just in case and trigger another advance
+            [t.join(1) for t in threads]
+            at_least_one_client_thread_incomplete = False
+            for t in threads:
+                if t.is_alive():
+                    at_least_one_client_thread_incomplete = True
+                    break
 
         test_state_lock.acquire()
         try:
