@@ -1373,7 +1373,7 @@ class BlockingRateLimiter(object):
     INCREASE_STRATEGY_RESET_THEN_MULTIPLY = 'reset_then_multiply'
 
     def __init__(self, num_agents, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
-                 consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=2.0,
+                 consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=0.5,
                  max_concurrency=1, fake_clock=None):
         """
         @param num_agents: Number of agents in the cluster
@@ -1383,7 +1383,7 @@ class BlockingRateLimiter(object):
         @param consecutive_success_threshold: number of consecutive successes to trigger a rate increase
         @param increase_strategy: strategy for increasing the rate (multiply by increase_factor or reset to initial)
         @param increase_factor: multiplicative factor for increasing rate
-        @param backoff_factor: divisive factor for decreasing rate
+        @param backoff_factor: multiplicative factor for decreasing rate
         @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
 
         @type num_agents: int
@@ -1427,9 +1427,9 @@ class BlockingRateLimiter(object):
             raise ValueError('Increase strategy must be one of %s' % strategies)
 
         if self._max_concurrency < 1:
-            raise ValueError('max_concurrency must be greater than 1')
+            raise ValueError('max_concurrency must be greater than 0')
 
-        if self._consecutive_success_threshold <= 1:
+        if self._consecutive_success_threshold < 1:
             raise ValueError(
                 'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
 
@@ -1477,7 +1477,7 @@ class BlockingRateLimiter(object):
                 # Failure case: halve the rate
                 self._current_cluster_rate = max(
                     self._lower_cluster_rate,
-                    self._current_cluster_rate / self._backoff_factor
+                    self._current_cluster_rate * self._backoff_factor
                 )
             else:
                 # Success case: If current rate can be increased, do so based on strategy
@@ -1506,8 +1506,7 @@ class BlockingRateLimiter(object):
         """
         agent_interval = float(self._num_agents) / self._current_cluster_rate
         delta = random.uniform(0, 2 * agent_interval)
-        t = self._time() + delta
-        return t
+        return max(self._ripe_time, self._time()) + delta
 
     def _time(self):
         """Returns absolute time in UTC epoch seconds"""
@@ -1563,7 +1562,9 @@ class BlockingRateLimiter(object):
                     self._token_queue_cv.wait()
                 else:
                     # queue contained at least one token so sleep until the head token becomes ripe
-                    self._token_queue_cv.wait(max(0, self._ripe_time - self._time()))
+                    sleep_time = max(0, self._ripe_time - self._time())
+                    if sleep_time > 0:
+                        self._token_queue_cv.wait()
 
             # Head token is ripe.
             token = self._token_queue.popleft()

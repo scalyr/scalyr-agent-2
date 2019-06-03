@@ -634,8 +634,7 @@ def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
     """
     last = True
     consecutive_true = 0
-    count = 0
-    backoff_increase_ratio = float(backoff_rate) / increase_rate
+    backoff_increase_ratio = float(backoff_rate) * increase_rate
     required_consecutive_successes = int(consecutive_success_threshold * backoff_increase_ratio)
 
     while True:
@@ -753,7 +752,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         min_rate_multiplier = 0.1
         max_rate_multiplier = 10
         consecutive_success_threshold = 5
-        backoff_factor = 2.0
+        backoff_factor = 0.5
         increase_factor = 2.0
 
         # Expected behavior
@@ -786,7 +785,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         experiment_duration, max_concurrency, expected_requests, allowed_variance,
         reported_outcome_generator=always_true(),
         increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_MULTIPLY,
-        backoff_factor=2.0, increase_factor=2.0,
+        backoff_factor=0.5, increase_factor=2.0,
     ):
         """Main test logic that runs max_concurrency client threads for a defined experiment duration.
         
