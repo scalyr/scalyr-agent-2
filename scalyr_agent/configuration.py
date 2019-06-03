@@ -278,6 +278,10 @@ class Configuration(object):
         return self.__get_config().get_int('k8s_cache_purge_secs')
 
     @property
+    def k8s_events_disable(self):
+        return self.__get_config().get_bool('k8s_events_disable')
+
+    @property
     def disable_send_requests(self):
         return self.__get_config().get_bool('disable_send_requests')
 
@@ -1006,6 +1010,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'k8s_events_disable', False, description, apply_defaults, env_aware=True)
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 

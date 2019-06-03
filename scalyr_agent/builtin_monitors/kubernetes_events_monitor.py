@@ -263,11 +263,16 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
         if self.__max_log_rotations is None:
             self.__max_log_rotations = default_rotation_count
 
-        # TODO: This should be a config option but we will wait until we have general support for options set via
-        # K8s ConfigMap
-        disable = str(os.environ.get('K8S_EVENTS_DISABLE', "false")).lower()
+        # Support legacy disabling of k8s_events via the K8S_EVENTS_DISABLE environment variable
+        k8s_events_disable_envar = os.environ.get('K8S_EVENTS_DISABLE')
+        if k8s_events_disable_envar is not None:
+            global_log.warn('The K8S_EVENTS_DISABLE environment variable is deprecated. Please use SCALYR_K8S_EVENTS_DISABLE instead.')
+            legacy_disable = str(k8s_events_disable_envar).lower()
+        else:
+            legacy_disable = 'false'
+
         # Note, accepting just a single `t` here due to K8s ConfigMap issues with having a value of `true`
-        self.__disable_monitor = disable == 'true' or disable == 't'
+        self.__disable_monitor = legacy_disable == 'true' or legacy_disable == 't' or self._global_config.k8s_events_disable
 
     def open_metric_log( self ):
         """Override open_metric_log to prevent a metric log from being created for the Kubernetes Events Monitor
