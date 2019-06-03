@@ -123,14 +123,30 @@ class K8sApiException( Exception ):
         super(K8sApiException, self).__init__( message )
         self.status_code = status_code
 
-class K8sApiAuthorizationException( K8sApiException ):
+
+# TODO: Wire this up
+class K8sApiTemporaryError(K8sApiException):
+    """The base class for all temporary errors where a retry may result in success (timeouts, too many requests,
+    etc) returned when issuing requests to the K8s API server
+    """
+    pass
+
+
+class K8sApiPermanentError(K8sApiException):
+    """The base class for all permanent errors where a retry will always fail until human action is taken
+    (authorization errors, object not found) returned when issuing requests to the K8s API server
+    """
+    pass
+
+
+class K8sApiAuthorizationException( K8sApiPermanentError ):
     """A wrapper around Exception that makes it easier to catch k8s authorization
     exceptions
     """
     def __init__( self, path, status_code=0 ):
         super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path, status_code=status_code )
 
-class K8sApiNotFoundException( K8sApiException ):
+class K8sApiNotFoundException( K8sApiPermanentError ):
     """
     A wrapper around Exception that makes it easier to catch not found errors when querying the k8s api
     """
@@ -407,6 +423,8 @@ class _K8sCache( object ):
         exists within the cached data.
 
         Return the object info, or None if not found
+
+        @param current_time If not None, update the last access time for the object to this value.
         """
         result = None
         self._lock.acquire()
@@ -415,7 +433,7 @@ class _K8sCache( object ):
             result = objects.get( name, None )
 
             # update access time
-            if result is not None:
+            if result is not None and current_time is not None:
                 result.access_time = current_time
 
         finally:
@@ -423,6 +441,18 @@ class _K8sCache( object ):
 
         return result
 
+    def is_cached(self, namespace, name):
+        """Returns true if the specified object is in the cache.
+
+        @param namespace: The object's namespace
+        @param name: The object's name
+        @type namespace: str
+        @type name: str
+
+        @return: True if the object is cached.
+        @rtype: bool
+        """
+        return self._lookup_object(namespace, name, None) is not None
 
     def lookup( self, k8s, namespace, name, kind=None, current_time=None ):
         """ returns info for the object specified by namespace and name
@@ -1057,6 +1087,19 @@ class KubernetesCache( object ):
             return
 
         return self._pods.lookup( local_state.k8s, namespace, name, kind='Pod', current_time=current_time )
+
+    def is_pod_cached(self, namespace, name):
+        """Returns true if the specified pod is in the cache.
+
+        @param namespace: The pod's namespace
+        @param name: The pod's name
+        @type namespace: str
+        @type name: str
+
+        @return: True if the pod is cached.
+        @rtype: bool
+        """
+        return self._pods.is_cached(namespace, name)
 
     def controller( self, namespace, name, kind, current_time=None ):
         """ returns controller info for the controller specified by namespace and name

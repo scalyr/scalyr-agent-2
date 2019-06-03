@@ -862,8 +862,17 @@ class StoppableThread(threading.Thread):
         @param join_timeout: The maximum number of seconds to block for the join.
         """
         self._run_state.stop()
+        self._prepare_to_stop()
         if wait_on_join:
             self.join(join_timeout)
+
+    def _prepare_to_stop(self):
+        """Invoked when the thread has been asked to stop.  It is called after the run state has been updated
+        to indicate the thread should no longer be running.
+
+        Derived classes may override this method to perform work when the thread is about to be stopped.
+        """
+        pass
 
     def join(self, timeout=None):
         """Blocks until the thread has finished.
