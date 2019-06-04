@@ -40,6 +40,8 @@ from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 
 
+DEBUG = False
+
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
 try:
     from hashlib import sha1
@@ -1407,19 +1409,22 @@ class BlockingRateLimiter(object):
 
         self._current_cluster_rate = self._initial_cluster_rate
         self._consecutive_successes = 0
-        self._cluster_rate_lock = threading.Lock()
 
         self._max_concurrency = max_concurrency
 
-        # A queue of tokens
+        # The next ripe time and and lock to synchronize access to it
         self._ripe_time = None
+        self._ripe_time_lock = threading.Lock()
+
+        # A queue of tokens
         self._token_queue = deque()
         # Condition variable to synchronize access to token queue
         self._token_queue_cv = threading.Condition()
 
         # fake clock for testing
         self._fake_clock = fake_clock
-        self._test_mode_lock = threading.Lock()
+        self._test_queue_cv = threading.Condition()
+        self._test_queue = deque()
 
         # Validate input
         strategies = [self.INCREASE_STRATEGY_MULTIPLY, self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY]
@@ -1448,14 +1453,32 @@ class BlockingRateLimiter(object):
     def current_agent_rate(self):
         return float(self._current_cluster_rate) / self._num_agents
 
+    @property
+    def ripe_time(self):
+        self._ripe_time_lock.acquire()
+        try:
+            return self._ripe_time
+        finally:
+            self._ripe_time_lock.release()
+
     def _initialize_token_queue(self):
         """Initialize a queue with max_concurrency tokens."""
         self._token_queue_cv.acquire()
         for num in range(self._max_concurrency):
             token = RateLimiterToken(num)
             self._token_queue.append(token)
-        self._ripe_time = self._get_next_ripe_time()
+        next_ripe_time = self._get_next_ripe_time()
+        self._ripe_time = next_ripe_time
         self._token_queue_cv.release()
+
+        # # enqueue an initial time-advancement delta if in test mode
+        # if self._fake_clock:
+        #     delta = next_ripe_time - self._time()
+        #     self._test_mode_lock.acquire()
+        #     try:
+        #         self._test_mode_queue.append(delta)
+        #     finally:
+        #         self._test_mode_lock.release()
 
     def _adjust_cluster_rate(self, success):
         """Adjust cluster rate, backing off on failure or increasing on enough consecutive successes.
@@ -1467,7 +1490,11 @@ class BlockingRateLimiter(object):
         @param success: Whether an operation was successful
         @type success: bool
         """
-        self._cluster_rate_lock.acquire()
+
+        # Cluster rate affects next ripe_time calculation.  Therefore, we should acquire
+        # the same lock used by _get_next_ripe_time
+        self._ripe_time_lock.acquire()
+
         try:
             if success:
                 self._consecutive_successes += 1
@@ -1491,22 +1518,24 @@ class BlockingRateLimiter(object):
                                 self._upper_cluster_rate, self._current_cluster_rate * self._increase_factor)
                     self._consecutive_successes = 0
         finally:
-            self._cluster_rate_lock.release()
+            self._ripe_time_lock.release()
 
     def _get_next_ripe_time(self):
-        """Get the absolute time for when this token becomes next available
+        """Increment and return the next absolute time for when a token can become available.
 
-        A token contains state representing the last time it was acquired.
-        In order to achieve a uniform cluster-wide average rate of R, the next time is calculated as:
-
-        current_time + delta
+        delta will be added to the max of current time or existing ripe_time, whichever is greater.
 
         where delta = random number between (0, 2 * T)
         where T is the per-agent interval or num_agents / cluster rate
         """
-        agent_interval = float(self._num_agents) / self._current_cluster_rate
-        delta = random.uniform(0, 2 * agent_interval)
-        return max(self._ripe_time, self._time()) + delta
+        self._ripe_time_lock.acquire()
+        try:
+            agent_interval = float(self._num_agents) / self._current_cluster_rate
+            delta = random.uniform(0, 2 * agent_interval)
+            self._ripe_time = max(self._ripe_time, self._time()) + delta
+            return self._ripe_time
+        finally:
+            self._ripe_time_lock.release()
 
     def _time(self):
         """Returns absolute time in UTC epoch seconds"""
@@ -1515,29 +1544,40 @@ class BlockingRateLimiter(object):
         else:
             return time.time()
 
-    def _simulate_acquire_token(self):
-        self._test_mode_lock.acquire()
+    def _simulate_sleeping_until_ripe(self, token_ripe_time):
+        # simulate waiting until token_ripe_time is reached
+        cur_time = None
+        self._test_queue_cv.acquire()
         try:
-            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
-                self._test_mode_lock.release()
-                self._fake_clock.simulate_waiting()
-                self._test_mode_lock.acquire()
-
-            # Head token is ripe
-            token = self._token_queue.popleft()
-            self._ripe_time = self._get_next_ripe_time()
-            return token
+            # append time-delta into test queue
+            # then wait for a token release() to advance the fake clock and wake us
+            delta = token_ripe_time - self._time()
+            self._test_queue.append(delta)
+            # record current time before notifyAll
+            cur_time = self._time()
+            self._test_queue_cv.notifyAll()
         finally:
-            self._test_mode_lock.release()
+            self._test_queue_cv.release()
 
-    def _simulate_release_token(self, token, success):
-        self._adjust_cluster_rate(success)
-        self._test_mode_lock.acquire()
+        while True:
+            if cur_time >= token_ripe_time:
+                break
+            self._fake_clock.simulate_waiting()
+            cur_time = self._time()
+
+    def _simulate_advancing_time_to_next_ripe(self):
+        # Waits until the test queue has at least one time-delta.
+        # Then advance the fake clock by the time-delta (from the head of the queue).
+        # advance_time() also awakens all acquire() threads blocking on fake_clock.simulate_waiting()
+        self._test_queue_cv.acquire()
         try:
-            self._token_queue.append(token)
+            while len(self._test_queue) == 0:
+                self._test_queue_cv.wait()
+            delta = self._test_queue.popleft()
         finally:
-            self._test_mode_lock.release()
-        self._fake_clock.advance_time(increment_by=self._ripe_time - self._fake_clock.time())
+            self._test_queue_cv.release()
+
+        self._fake_clock.advance_time(increment_by=delta)
 
     def acquire_token(self):
         """Acquires a token, blocking until a token becomes available.
@@ -1548,31 +1588,29 @@ class BlockingRateLimiter(object):
         @return: a token object
         @rtype: RateLimiterToken
         """
-        if self._fake_clock:
-            return self._simulate_acquire_token()
-
         # block until a token is available from the token heap
         self._token_queue_cv.acquire()
 
+        # acquire token, waiting until one is available
         try:
-            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
-                # no tokens available so sleep for a while
-                if len(self._token_queue) == 0:
-                    # queue contained no tokens so wait indefinitely
-                    self._token_queue_cv.wait()
-                else:
-                    # queue contained at least one token so sleep until the head token becomes ripe
-                    sleep_time = max(0, self._ripe_time - self._time())
-                    if sleep_time > 0:
-                        self._token_queue_cv.wait()
-
-            # Head token is ripe.
+            while len(self._token_queue) == 0:
+                self._token_queue_cv.wait()
             token = self._token_queue.popleft()
-            self._ripe_time = self._get_next_ripe_time()
-            return token
-
         finally:
             self._token_queue_cv.release()
+
+        # now that a token has been acquired, get next ripe time
+        token_ripe_time = self._get_next_ripe_time()
+
+        if not self._fake_clock:
+            # sleep until the token is ripe
+            while self._time() < token_ripe_time:
+                time.sleep(token_ripe_time - self._time())
+        else:
+            self._simulate_sleeping_until_ripe(token_ripe_time)
+
+        return token
+
 
     def release_token(self, token, success):
         """Release a token back to the rate limiter.  Adjusts the rate based on success/failure and then re-inserts
@@ -1587,20 +1625,14 @@ class BlockingRateLimiter(object):
         if not isinstance(token, RateLimiterToken):
             raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
 
-        if self._fake_clock:
-            return self._simulate_release_token(token, success)
-
         self._token_queue_cv.acquire()
-
         try:
-            # potentially adjust rate depending on reported outcome
-            self._adjust_cluster_rate(success)
-
             # re-insert token
             self._token_queue.append(token)
-
             # awaken threads waiting for tokens
             self._token_queue_cv.notifyAll()
-
         finally:
             self._token_queue_cv.release()
+
+        # potentially adjust rate depending on reported outcome
+        self._adjust_cluster_rate(success)

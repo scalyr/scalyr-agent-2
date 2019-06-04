@@ -657,6 +657,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
     def setUp(self):
         self._fake_clock = scalyr_util.FakeClock()
+        self._experiment_running = False
 
     def test_fixed_rate_single_concurrency(self):
         """Longer experiment"""
@@ -668,7 +669,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         """Multiple clients should not affect overall rate"""
         # 1 rps x 100 simulated seconds => 100 increments
         # Higher concurrency has more variance
-        self._test_fixed_rate(desired_agent_rate=1.0, experiment_duration=10000, concurrency=3, expected_requests=10000,
+        self._test_fixed_rate(desired_agent_rate=3.0, experiment_duration=10000, concurrency=3, expected_requests=10000,
                               allowed_variance=(0.8, 1.2))
 
     def _test_fixed_rate(self, desired_agent_rate, experiment_duration, concurrency, expected_requests, allowed_variance):
@@ -852,23 +853,37 @@ class BlockingRateLimiterTest(ScalyrTestCase):
                 finally:
                     outcome_generator_lock.release()
 
+        self._experiment_running = True
         threads = [threading.Thread(target=consume_token_blocking) for _ in range(max_concurrency)]
         [t.setDaemon(True) for t in threads]
         [t.start() for t in threads]
 
-        at_least_one_client_thread_incomplete = True
-        while at_least_one_client_thread_incomplete:
-            # All client threads are likely blocking on the token queue at this point
-            # The experiment will never start until at least one token is granted (and waiting threads notified)
-            # To jump start this, simply advance fake clock to the ripe_time.
-            self._fake_clock.advance_time(increment_by=rate_limiter._ripe_time - self._fake_clock.time())
-            # Wake up after 1 second just in case and trigger another advance
-            [t.join(1) for t in threads]
-            at_least_one_client_thread_incomplete = False
+        def fake_clock_advancer():
+            while self._experiment_running:
+                # All client threads are likely blocking on the token queue at this point
+                # The experiment will never start until at least one token is granted (and waiting threads notified)
+                # To jump start this, simply advance fake clock to the ripe_time.
+                rate_limiter._simulate_advancing_time_to_next_ripe()
+
+        advancer_thread = threading.Thread(target=fake_clock_advancer)
+        advancer_thread.setDaemon(True)
+        advancer_thread.start()
+
+        while self._experiment_running:
+            # Wake up after 0.1 second just in case and trigger another advance
+            # This is needed because the coordination between rate_limiter._simulate_sleeping_until_ripe()
+            # and rate_limiter._simulate_advancing_time_to_next_ripe() is not perfect and there can be race conditions.
+            # These race conditions lead to situations where the thread calling _simulate_advancing_time_to_next_ripe()
+            # gets notified too quickly before it blocks on simulate_waiting()
+            [t.join(0.01) for t in threads]
+
+            # check if any client threads are still alive.  If so, experiment hasn't ended.
+            self._experiment_running = False
             for t in threads:
                 if t.isAlive():
-                    at_least_one_client_thread_incomplete = True
+                    self._experiment_running = True
                     break
+            self._fake_clock.wake_all_threads()
 
         test_state_lock.acquire()
         try:
