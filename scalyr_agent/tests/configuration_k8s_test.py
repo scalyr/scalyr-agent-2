@@ -11,7 +11,7 @@ from scalyr_agent.tests.configuration_test import TestConfiguration
 
 
 class TestConfigurationK8s(TestConfiguration):
-    """This test is subclasses from TestConfiguration for easier exclusion in python 2.5 and below"""
+    """This test subclasses from TestConfiguration for easier exclusion in python 2.5 and below"""
 
     @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
     def test_environment_aware_module_params(self, mock_docker):
