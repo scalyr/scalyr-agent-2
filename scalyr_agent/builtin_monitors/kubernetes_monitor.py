@@ -2201,7 +2201,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         if self._config.get('k8s_use_controlled_warmer'):
             self.__controlled_warmer = ControlledCacheWarmer(
                 max_failure_count=self._config.get('k8s_controlled_warmer_max_attempts'),
-                blacklist_time_secs=self._config.get('k8s_controlled_warmer_blacklist_time'))
+                blacklist_time_secs=self._config.get('k8s_controlled_warmer_blacklist_time'),
+                logger=global_log)
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
