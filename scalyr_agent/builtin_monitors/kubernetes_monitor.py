@@ -868,7 +868,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
         @param ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
         @param current_time: Timestamp since the epoch
         @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
-            strategry, then the warmer instance to use.
+            strategy, then the warmer instance to use.
     """
     if logger is None:
         logger = global_log
@@ -965,7 +965,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                         # on out is guaranteed to not invoke issue an API request if the pod is
                                         # cached.
                                         if controlled_warmer is not None:
-                                            controlled_warmer.mark_to_warm(container, k8s_info['pod_namespace'],
+                                            controlled_warmer.mark_to_warm(cid, k8s_info['pod_namespace'],
                                                                            k8s_info['pod_name'])
                                             if not controlled_warmer.is_warm(k8s_info['pod_namespace'],
                                                                              k8s_info['pod_name']):
