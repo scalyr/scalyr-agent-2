@@ -124,19 +124,20 @@ class K8sApiException( Exception ):
         self.status_code = status_code
 
 
-# TODO: Wire this up
 class K8sApiTemporaryError(K8sApiException):
     """The base class for all temporary errors where a retry may result in success (timeouts, too many requests,
     etc) returned when issuing requests to the K8s API server
     """
-    pass
+    def __init__( self, message, status_code=0 ):
+        super(K8sApiTemporaryError, self).__init__( message, status_code=status_code )
 
 
 class K8sApiPermanentError(K8sApiException):
     """The base class for all permanent errors where a retry will always fail until human action is taken
     (authorization errors, object not found) returned when issuing requests to the K8s API server
     """
-    pass
+    def __init__( self, message, status_code=0 ):
+        super(K8sApiPermanentError, self).__init__( message, status_code=status_code )
 
 
 class K8sApiAuthorizationException( K8sApiPermanentError ):
@@ -267,6 +268,19 @@ class Controller( object ):
 
         self.flat_labels = ','.join( flat_labels )
 
+
+class ApiQueryOptions(object):
+    """Options to use when querying the K8s Api server.
+    """
+    def __init__(self, max_retries=3, return_temp_errors=True):
+        """
+        @param max_retries:  The number of times we will retry a query if it receives a temporary error before failing.
+        @param return_temp_errors:  If true, all non-known errors will automatically be categorized as temporary errors.
+        """
+        self.max_retries = max_retries
+        self.return_temp_errors = return_temp_errors
+
+
 class _K8sCache( object ):
     """
         A cached store of objects from a k8s api query
@@ -357,13 +371,13 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def _update_object( self, k8s, kind, namespace, name, current_time ):
+    def _update_object( self, k8s, kind, namespace, name, current_time, query_options=None ):
         """ update a single object, returns the object if found, otherwise return None """
         result = None
         try:
             # query k8s api and process objects
-            obj = k8s.query_object( kind, namespace, name )
-            result = self._processor.process_object( k8s, obj )
+            obj = k8s.query_object( kind, namespace, name, query_options=query_options )
+            result = self._processor.process_object( k8s, obj, query_options=query_options )
         except K8sApiException, e:
             # Don't do anything here.  This means the object we are querying doensn't exist
             # and it's up to the caller to handle this by detecting a None result
@@ -454,7 +468,7 @@ class _K8sCache( object ):
         """
         return self._lookup_object(namespace, name, None) is not None
 
-    def lookup( self, k8s, namespace, name, kind=None, current_time=None ):
+    def lookup( self, k8s, namespace, name, kind=None, current_time=None, query_options=None ):
         """ returns info for the object specified by namespace and name
         or None if no object is found in the cache.
 
@@ -473,7 +487,7 @@ class _K8sCache( object ):
 
         # we have a cache miss so query the object individually
         global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
-        result = self._update_object( k8s, kind, namespace, name, current_time )
+        result = self._update_object( k8s, kind, namespace, name, current_time, query_options=query_options )
 
         return result
 
@@ -500,7 +514,7 @@ class _K8sProcessor( object ):
 
         return None
 
-    def process_object( self, k8s, obj ):
+    def process_object( self, k8s, obj, query_options=None ):
         """
         Creates a python object based of a dict
         @param k8s: a KubernetesApi object
@@ -516,7 +530,7 @@ class PodProcessor( _K8sProcessor ):
         super( PodProcessor, self).__init__()
         self._controllers = controllers
 
-    def _get_controller_from_owners( self, k8s, owners, namespace ):
+    def _get_controller_from_owners( self, k8s, owners, namespace, query_options=None ):
         """
             Processes a list of owner references returned from a Pod's metadata to see
             if it is eventually owned by a Controller, and if so, returns the Controller object
@@ -541,7 +555,7 @@ class PodProcessor( _K8sProcessor ):
 
         # walk the parent until we get to the root controller
         # Note: Parent controllers will always be in the same namespace as the child
-        controller = self._controllers.lookup( k8s, namespace, name, kind=kind )
+        controller = self._controllers.lookup( k8s, namespace, name, kind=kind, query_options=query_options )
         while controller:
             if controller.parent_name is None:
                 global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent name' % controller.name )
@@ -552,7 +566,8 @@ class PodProcessor( _K8sProcessor ):
                 break
 
             # get the parent controller
-            parent_controller = self._controllers.lookup( k8s, namespace, controller.parent_name, kind=controller.parent_kind )
+            parent_controller = self._controllers.lookup( k8s, namespace, controller.parent_name,
+                                                          kind=controller.parent_kind, query_options=query_options )
             # if the parent controller doesn't exist, assume the current controller
             # is the root controller
             if parent_controller is None:
@@ -564,7 +579,7 @@ class PodProcessor( _K8sProcessor ):
         return controller
 
 
-    def process_object( self, k8s, obj ):
+    def process_object( self, k8s, obj, query_options=None ):
         """ Generate a PodInfo object from a JSON object
         @param k8s: a KubernetesApi object
         @param pod: The JSON object returned as a response to querying
@@ -584,7 +599,7 @@ class PodProcessor( _K8sProcessor ):
         pod_name = metadata.get( "name", '' )
         namespace = metadata.get( "namespace", '' )
 
-        controller = self._get_controller_from_owners( k8s, owners, namespace )
+        controller = self._get_controller_from_owners( k8s, owners, namespace, query_options=query_options )
 
         container_names = []
         for container in spec.get( 'containers', [] ):
@@ -613,7 +628,7 @@ class PodProcessor( _K8sProcessor ):
 
 class ControllerProcessor( _K8sProcessor ):
 
-    def process_object( self, k8s, obj ):
+    def process_object( self, k8s, obj, query_options=None ):
         """ Generate a Controller object from a JSON object
         @param k8s: a KubernetesApi object
         @param obj: The JSON object returned as a response to querying
@@ -1074,7 +1089,7 @@ class KubernetesCache( object ):
             run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )
 
 
-    def pod( self, namespace, name, current_time=None ):
+    def pod( self, namespace, name, current_time=None, query_options=None ):
         """ returns pod info for the pod specified by namespace and name
         or None if no pad matches.
 
@@ -1086,7 +1101,8 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._pods.lookup( local_state.k8s, namespace, name, kind='Pod', current_time=current_time )
+        return self._pods.lookup( local_state.k8s, namespace, name, kind='Pod', current_time=current_time,
+                                  query_options=query_options )
 
     def is_pod_cached(self, namespace, name):
         """Returns true if the specified pod is in the cache.
@@ -1283,7 +1299,7 @@ class KubernetesApi( object ):
 
         return None
 
-    def query_api( self, path, pretty=0 ):
+    def query_api( self, path, pretty=0, return_temp_errors=False ):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
         self._ensure_session()
@@ -1299,7 +1315,10 @@ class KubernetesApi( object ):
             response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
             response.encoding = "utf-8"
         except Exception, e:
-            raise
+            if return_temp_errors:
+                raise K8sApiTemporaryError('Temporary error seen while accessing api: %s' % str(e))
+            else:
+                raise
 
         if response.status_code != 200:
             if response.status_code == 401 or response.status_code == 403:
@@ -1309,11 +1328,14 @@ class KubernetesApi( object ):
 
             global_log.log(scalyr_logging.DEBUG_LEVEL_3, "Invalid response from K8S API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
                 % ( url, response.status_code, len(response.text)), limit_once_per_x_secs=300, limit_key='k8s_api_query' )
-            raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
+            if return_temp_errors:
+                raise K8sApiTemporaryError( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
+            else:
+                raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
 
         return util.json_decode( response.text )
 
-    def query_object( self, kind, namespace, name ):
+    def query_object( self, kind, namespace, name, query_options=None ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
             An empty dict is returned if the object kind is unknown, or if there is an error generating
             an appropriate query string
@@ -1335,7 +1357,19 @@ class KubernetesApi( object ):
                              limit_once_per_x_secs=300, limit_key='k8s_api_build_query-%s' % kind )
             return {}
 
-        return self.query_api( query )
+        if query_options is not None:
+            retries_left = query_options.max_retries
+            while True:
+                try:
+                    return self.query_api(query, return_temp_errors=query_options.return_temp_errors)
+                except K8sApiTemporaryError, e:
+                    if retries_left <= 0:
+                        raise e
+                    retries_left -= 1
+                    global_log.warn( 'k8s API - retrying temporary error: %s, %s, %s' % (
+                        kind, namespace, name), limit_once_per_x_secs=300, limit_key='k8s_api_retry-%s' % kind )
+        else:
+            return self.query_api( query )
 
     def query_objects( self, kind, namespace=None, filter=None ):
         """ Queries a list of objects from the k8s api based on an object kind, optionally limited by
