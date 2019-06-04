@@ -669,7 +669,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         """Multiple clients should not affect overall rate"""
         # 1 rps x 100 simulated seconds => 100 increments
         # Higher concurrency has more variance
-        self._test_fixed_rate(desired_agent_rate=3.0, experiment_duration=10000, concurrency=3, expected_requests=10000,
+        self._test_fixed_rate(desired_agent_rate=1.0, experiment_duration=10000, concurrency=3, expected_requests=10000,
                               allowed_variance=(0.8, 1.2))
 
     def _test_fixed_rate(self, desired_agent_rate, experiment_duration, concurrency, expected_requests, allowed_variance):
