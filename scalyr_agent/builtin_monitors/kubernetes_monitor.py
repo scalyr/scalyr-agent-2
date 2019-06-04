@@ -33,7 +33,7 @@ import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
-from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName
+from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName, ApiQueryOptions
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
@@ -189,6 +189,11 @@ define_config_option( __monitor__, 'k8s_controlled_warmer_max_attempts',
                      'Optional (defaults to 5). The maximum number of temporary errors that may occur when warming '
                      'a pod\'s entry, before the warmer blacklists it',
                       convert_to=int, default=5, env_aware=True)
+
+define_config_option( __monitor__, 'k8s_controlled_warmer_max_query_retries',
+                     'Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod '
+                     'if it fails due to a temporary error.',
+                      convert_to=int, default=3, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_controlled_warmer_blacklist_time',
                      'Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is '
@@ -435,17 +440,20 @@ class ControlledCacheWarmer(StoppableThread):
     errors are seen.  While on the blacklist, a pod's information will not be fetched in order to
     populate the cache.
     """
-    def __init__(self, max_failure_count=5, blacklist_time_secs=300, logger=None):
+    def __init__(self, max_failure_count=5, blacklist_time_secs=300, max_query_retries=3, logger=None):
         """Initializes the thread.
 
         @param max_failure_count: If this number of temporary failures is experienced when fetching a single
             pod's information, that pod will be placed on the blacklist.  Note, any permanent error will result
             in the pod being moved to the blacklist.
         @param blacklist_time_secs: The amount of time a pod will remain on the blacklist once it is moved there.
+        @param max_query_retries:  The number of times we will retry a query to warm the pod when it fails due to
+            a temporary error
         @param logger:  The logger to use when reporting results
 
         @type max_failure_count: int
         @type blacklist_time_secs: double
+        @type max_query_retries: int
         @type logger: Logger
         """
         StoppableThread.__init__(self, name='cache warmer and filter')
@@ -462,6 +470,7 @@ class ControlledCacheWarmer(StoppableThread):
         self.__containers_to_warm = []
         self.__max_failure_count = max_failure_count
         self.__blacklist_time_secs = blacklist_time_secs
+        self.__max_query_retries = max_query_retries
         self.__logger = logger
         # The wallclock of when the last periodic report was written to the logger
         self.__last_report_time = None
@@ -806,11 +815,8 @@ class ControlledCacheWarmer(StoppableThread):
                     continue
 
                 try:
-                    # TODO: Go down this path and make sure everything throws an exception fitting the model
-                    # below.
-                    # TODO: Add in a retries argument that specifies how many times API calls will be re-attempted
-                    # before giving up and actually raising an exception that bubbles up here.
-                    self.__k8s_cache.pod(pod_namespace, pod_name)
+                    options = ApiQueryOptions(max_retries=self.__max_query_retries)
+                    self.__k8s_cache.pod(pod_namespace, pod_name, query_options=options)
                     self.__record_warming_result(container_id, success=True)
                 except K8sApiPermanentError, e:
                     self.__record_warming_result(container_id, permanent_error=e,
@@ -2178,6 +2184,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__controlled_warmer = ControlledCacheWarmer(
                 max_failure_count=self._config.get('k8s_controlled_warmer_max_attempts'),
                 blacklist_time_secs=self._config.get('k8s_controlled_warmer_blacklist_time'),
+                max_query_retries=self._config.get('k8s_controlled_warmer_max_query_retries'),
                 logger=global_log)
 
         self.__container_checker = None
