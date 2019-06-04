@@ -80,13 +80,13 @@ define_config_option( __monitor__, 'docker_log_prefix',
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
                      'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
-                     convert_to=int, default=5000, env_aware=True, env_name='SCALYR_DOCKER_MAX_PREVIOUS_LINES')
+                     convert_to=int, default=5000)
 
 define_config_option( __monitor__, 'readback_buffer_size',
                      'Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n'
                      'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file '
                      'was sent to Scalyr.',
-                     convert_to=int, default=5*1024, env_aware=True, env_name='SCALYR_DOCKER_READBACK_BUFFER_SIZE')
+                     convert_to=int, default=5*1024)
 
 define_config_option( __monitor__, 'log_mode',
                      'Optional (defaults to "docker_api"). Determine which method is used to gather logs from the '

@@ -49,8 +49,6 @@ class TestConfigurationDocker(TestConfiguration):
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
             "docker_api_version": (STANDARD_PREFIX, TEST_STRING, str),
             "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, str),
-            "max_previous_lines": ('SCALYR_DOCKER_MAX_PREVIOUS_LINES', TEST_INT, int),
-            "readback_buffer_size": ('SCALYR_DOCKER_READBACK_BUFFER_SIZE', TEST_INT, int),
             "log_mode": ('SCALYR_DOCKER_LOG_MODE', TEST_STRING, str),
             "docker_raw_logs": (STANDARD_PREFIX, False, bool),  # test config file is set to True
             "metrics_only": ('SCALYR_DOCKER_METRICS_ONLY', True, bool),
