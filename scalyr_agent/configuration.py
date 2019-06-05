@@ -329,6 +329,10 @@ class Configuration(object):
 
     # Debug leak flags
     @property
+    def k8s_events_disable(self):
+        return self.__get_config().get_bool('k8s_events_disable')
+
+    @property
     def disable_send_requests(self):
         return self.__get_config().get_bool('disable_send_requests')
 
@@ -934,6 +938,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'compression_type', '', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'compression_level', 9, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
                                              description, apply_defaults, env_aware=True)
@@ -1061,6 +1066,7 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'k8s_events_disable', False, description, apply_defaults, env_aware=True)
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 

@@ -20,13 +20,13 @@ __author__ = 'czerwin@scalyr.com'
 import datetime
 import os
 import tempfile
-import unittest
 import struct
 import threading
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator
+from scalyr_agent.util import JsonReadFileException, RateLimiter, BlockingRateLimiter, FakeRunState, ScriptEscalator
+from scalyr_agent.util import FakeClockCounter
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.json_lib import JsonObject
 
@@ -618,3 +618,265 @@ class FakeSys(object):
             self._condition.acquire()
             self._condition.wait(timeout)
             self._condition.release()
+
+
+def always_true():
+    while True:
+        yield True
+
+def always_false():
+    while True:
+        yield False
+
+
+def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
+    """Returns a generator that maintains the rate at a constant level by balancing failures with successes
+    """
+    last = True
+    consecutive_true = 0
+    backoff_increase_ratio = float(backoff_rate) * increase_rate
+    required_consecutive_successes = int(consecutive_success_threshold * backoff_increase_ratio)
+
+    while True:
+        if last:
+            if consecutive_true == required_consecutive_successes:
+                last = False
+                consecutive_true = 0
+            else:
+                # stay True
+                consecutive_true += 1
+        else:
+            last = True
+            consecutive_true += 1
+        yield last
+
+
+class BlockingRateLimiterTest(ScalyrTestCase):
+
+    DEFAULT_FAKE_CLOCK_INCREMENT = 0.001
+
+    def setUp(self):
+        self._fake_clock = scalyr_util.FakeClock()
+
+    def test_fixed_rate_single_concurrency(self):
+        """Longer experiment"""
+        # 1 rps x 1000 simulated seconds => 1000 increments
+        self._test_fixed_rate(desired_agent_rate=1.0, experiment_duration=10000, concurrency=1, expected_requests=10000,
+                              allowed_variance=(0.95, 1.05))
+
+    def test_fixed_rate_multiple_concurrency(self):
+        """Multiple clients should not affect overall rate"""
+        # 1 rps x 100 simulated seconds => 100 increments
+        # Higher concurrency has more variance
+        self._test_fixed_rate(desired_agent_rate=1.0, experiment_duration=10000, concurrency=3, expected_requests=10000,
+                              allowed_variance=(0.8, 1.2))
+
+    def _test_fixed_rate(self, desired_agent_rate, experiment_duration, concurrency, expected_requests, allowed_variance):
+        """A utility pass-through that fixes the initial, upper and lower rates"""
+        num_agents = 1000
+        cluster_rate = num_agents * desired_agent_rate
+        self._test_rate_limiter(
+            num_agents=num_agents,
+            initial_cluster_rate=cluster_rate, upper_cluster_rate=cluster_rate, lower_cluster_rate=cluster_rate,
+            consecutive_success_threshold=5, experiment_duration=experiment_duration, max_concurrency=concurrency,
+            expected_requests=expected_requests, allowed_variance=allowed_variance
+        )
+
+    def test_variable_rate_single_concurrency_all_successes(self):
+        """Rate should quickly max out at upper_cluster_rate"""
+
+        # Test variables
+        initial_agent_rate = 1
+        experiment_duration = 1000
+        concurrency = 1
+        max_rate_multiplier = 10
+
+        # Expected behavior
+        # 3 rps * 300s (since it saturates at upper rate given all successes)
+        expected_requests = max_rate_multiplier * experiment_duration
+        allowed_variance = (0.8, 1.2)
+
+        # Derived values
+        num_agents = 10
+        initial_cluster_rate = num_agents * initial_agent_rate
+        upper_cluster_rate = max_rate_multiplier * initial_cluster_rate
+
+        self._test_rate_limiter(
+            num_agents=10,
+            initial_cluster_rate=initial_cluster_rate, upper_cluster_rate=upper_cluster_rate, lower_cluster_rate=0,
+            experiment_duration=experiment_duration, max_concurrency=concurrency,
+            consecutive_success_threshold=5, increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            expected_requests=expected_requests, allowed_variance=allowed_variance,
+        )
+
+    def test_variable_rate_single_concurrency_all_failures(self):
+        """Rate should quickly decrease to lower_cluster_rate"""
+
+        # Test variables
+        initial_agent_rate = 1
+        experiment_duration = 1000000
+        concurrency = 1
+        min_rate_multiplier = 0.01  # min rate should be at least an order of magnitude lower than initial rate.
+
+        # Expected behavior
+        expected_requests = min_rate_multiplier * experiment_duration
+        allowed_variance = (0.8, 1.2)
+
+        # Derived values
+        num_agents = 10
+        initial_cluster_rate = num_agents * initial_agent_rate
+        upper_cluster_rate = initial_cluster_rate
+        lower_cluster_rate = min_rate_multiplier * initial_cluster_rate
+
+        self._test_rate_limiter(
+            num_agents=num_agents,
+            initial_cluster_rate=initial_cluster_rate,
+            upper_cluster_rate=upper_cluster_rate,
+            lower_cluster_rate=lower_cluster_rate,
+            experiment_duration=experiment_duration,
+            max_concurrency=concurrency,
+            consecutive_success_threshold=5,
+            increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            expected_requests=expected_requests,
+            allowed_variance=allowed_variance,
+            reported_outcome_generator=always_false(),
+        )
+
+    def test_variable_rate_single_concurrency_push_pull(self):
+        """Rate should fluctuate closely around initial rate because of equal successes/failures"""
+
+        # Test variables
+        initial_agent_rate = 1
+        experiment_duration = 10000
+        concurrency = 1
+        min_rate_multiplier = 0.1
+        max_rate_multiplier = 10
+        consecutive_success_threshold = 5
+        backoff_factor = 0.5
+        increase_factor = 2.0
+
+        # Expected behavior
+        # 1 * 1 rps * 100s
+        expected_requests = 1 * experiment_duration
+        allowed_variance = (0.8, 1.2)  # variance increases as difference between backoffs increase
+
+        # Derived values
+        num_agents = 100
+        initial_cluster_rate = num_agents * initial_agent_rate
+
+        self._test_rate_limiter(
+            num_agents=num_agents,
+            initial_cluster_rate=initial_cluster_rate,
+            upper_cluster_rate=max_rate_multiplier * initial_cluster_rate,
+            lower_cluster_rate=min_rate_multiplier * initial_cluster_rate,
+            experiment_duration=experiment_duration,
+            max_concurrency=concurrency,
+            consecutive_success_threshold=consecutive_success_threshold,
+            increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            expected_requests=expected_requests,
+            allowed_variance=allowed_variance,
+            reported_outcome_generator=rate_maintainer(consecutive_success_threshold, backoff_factor, increase_factor),
+            backoff_factor=backoff_factor,
+            increase_factor=increase_factor,
+        )
+
+    def _test_rate_limiter(
+        self, num_agents, consecutive_success_threshold, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
+        experiment_duration, max_concurrency, expected_requests, allowed_variance,
+        reported_outcome_generator=always_true(),
+        increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_MULTIPLY,
+        backoff_factor=0.5, increase_factor=2.0,
+    ):
+        """Main test logic that runs max_concurrency client threads for a defined experiment duration.
+        
+        The experiment is driven off a fake_clock (so it can complete in seconds, not minutes or hours).
+        
+        Each time a successful acquire() completes, a counter is incremented.  At experiment end, this counter
+        should be close enough to a calculated expected value, based on the specified rate.
+        
+        Concurrency should not affect the overall rate of allowed acquisitions.
+        
+        The reported outcome by acquiring clients is determined by invoking the callable `reported_outcome_callable`.
+
+
+        @param num_agents: Num agents in cluster (to derive agent rate from cluster rate)
+        @param consecutive_success_threshold: 
+        @param initial_cluster_rate: Initial cluster rate
+        @param upper_cluster_rate:  Upper bound on cluster rate
+        @param lower_cluster_rate: Lower bound on cluster rate
+        @param increase_strategy: Strategy for increasing rate
+        @param experiment_duration: Experiment duration in seconds
+        @param max_concurrency: Number of tokens to create
+        @param expected_requests: Expected number of requests at the end of experiment
+        @param allowed_variance: Allowed variance between expected and actual number of requests. (e.g. 0.1 = 10%)
+        @param reported_outcome_generator: Generator to get reported outcome boolean value
+        @param fake_clock_increment: Fake clock increment by (seconds)
+        """
+        rate_limiter = BlockingRateLimiter(
+            num_agents=num_agents,
+            initial_cluster_rate=initial_cluster_rate,
+            upper_cluster_rate=upper_cluster_rate,
+            lower_cluster_rate=lower_cluster_rate,
+            consecutive_success_threshold=consecutive_success_threshold,
+            increase_strategy=increase_strategy,
+            increase_factor=increase_factor,
+            backoff_factor=backoff_factor,
+            max_concurrency=max_concurrency,
+            fake_clock=self._fake_clock,
+        )
+
+        test_state = {
+            'count': 0,
+        }
+        test_state_lock = threading.Lock()
+        outcome_generator_lock = threading.Lock()
+        experiment_end_time = self._fake_clock.time() + experiment_duration
+
+        def consume_token_blocking():
+            """Client threads will keep acquiring tokens until experiment end time"""
+            while self._fake_clock.time() < experiment_end_time:
+                # A simple loop at acquires token, updates a counter, then releases token with an outcome
+                # provided by reported_outcome_generator()
+                token = rate_limiter.acquire_token()
+                # update test state
+                test_state_lock.acquire()
+                try:
+                    test_state['count'] += 1
+                finally:
+                    test_state_lock.release()
+
+                outcome_generator_lock.acquire()
+                try:
+                    outcome = reported_outcome_generator.next()
+                    rate_limiter.release_token(token, outcome)
+                finally:
+                    outcome_generator_lock.release()
+
+        threads = [threading.Thread(target=consume_token_blocking) for _ in range(max_concurrency)]
+        [t.setDaemon(True) for t in threads]
+        [t.start() for t in threads]
+
+        at_least_one_client_thread_incomplete = True
+        while at_least_one_client_thread_incomplete:
+            # All client threads are likely blocking on the token queue at this point
+            # The experiment will never start until at least one token is granted (and waiting threads notified)
+            # To jump start this, simply advance fake clock to the ripe_time.
+            self._fake_clock.advance_time(increment_by=rate_limiter._ripe_time - self._fake_clock.time())
+            # Wake up after 1 second just in case and trigger another advance
+            [t.join(1) for t in threads]
+            at_least_one_client_thread_incomplete = False
+            for t in threads:
+                if t.isAlive():
+                    at_least_one_client_thread_incomplete = True
+                    break
+
+        test_state_lock.acquire()
+        try:
+            requests = test_state['count']
+        finally:
+            test_state_lock.release()
+
+        # Assert that count is close enough to the expected count
+        observed_ratio = float(requests) / expected_requests
+        self.assertGreater(observed_ratio, allowed_variance[0])
+        self.assertLess(observed_ratio, allowed_variance[1])

@@ -31,6 +31,7 @@ import os
 import random
 import threading
 import time
+from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
@@ -634,6 +635,7 @@ class FakeClock(object):
 
         @param set_to: The absolute time in seconds past epoch to set the time.
         @param increment_by: The number of seconds to advance the current time by.
+        @param notify_all: Whether to notifyAll() threads waiting on the time_condition
 
         @type set_to: float|None
         @type increment_by: float|None
@@ -647,12 +649,14 @@ class FakeClock(object):
         self._time_condition.release()
 
     def simulate_waiting(self):
-        """Will block the current thread until either the current time is changed or `wall_all_threads` is invoked.
+        """Will block the current thread until notified or until max_wait seconds has elapsed
+
+        Notification can occur if another thread invokes `advance_time` or `wake_all_threads`
 
         Since this can return even when the fake clock time has not changed, it is up to the calling thread to check
         to see if time has advanced far enough for any condition they wish.  However, it is typically expected that
         they will not only be waiting for a particular time but also on some other condition, such as whether or not
-        a condition is has been notified.
+        a condition has been notified.
         """
         self._time_condition.acquire()
         self._increment_waiting_count(1)
@@ -697,12 +701,12 @@ class FakeClock(object):
 class FakeClockCounter(object):
     """Helper class for multithreaded testing. Provides a method for a thread to block until a count has reached target
     value.  Moreover, for every successfully observed increment, it will advance the fake_clock and wait for all
-    other threads (driven the fake clock) to wait on the clock.  For example usage, see MonitorsManagerTest.
+    other threads (driven by the fake clock) to wait on the clock.  For example usage, see MonitorsManagerTest.
     """
 
     def __init__(self, fake_clock, num_waiters):
         """
-        @param fake_clock: FakeClock that will be advanced on every
+        @param fake_clock: FakeClock that will be advanced on every sleep_until_count_or_maxwait() call
         @param num_waiters: Number of threads that wait on fake clock
         """
         self.__fake_clock = fake_clock
@@ -747,8 +751,8 @@ class FakeClockCounter(object):
         """
         deadline = time.time() + maxwait
         while self.count() < target and time.time() < deadline:
-            # Important: wait for monitor thread & all monitor loops to complete
-            # Failing to do so leads to non-deterministic test hangs
+            # Important: wait for all participant threads to arrive and block.
+            # Failing to do so leads to non-deterministic test hangs.
             self.__fake_clock.block_until_n_waiting_threads(self.__num_waiters)
             old_count = self.count()
             self.__fake_clock.advance_time(increment_by=fake_increment_sec)
@@ -1346,3 +1350,266 @@ class RedirectorClient(StoppableThread):
             """Closes the channel to the server.
             """
             pass
+
+
+class RateLimiterToken(object):
+    def __init__(self, token_id):
+        self._token_id = token_id
+
+    @property
+    def token_id(self):
+        """Integer ID"""
+        return self._token_id
+
+    def __repr__(self):
+        return 'Token #%s' % self._token_id
+
+
+class BlockingRateLimiter(object):
+    """A Rate Limiter that blocks for a random time interval such that over time, the average rate of acquire() calls
+    is R where R varies between a max upper and min lower bound. R is a "cluster" rate where the semantics are
+    each of num_agents Scalyr Agents instantiates one of these rate limiters such that the aggregate access rate over
+    all agents is R.  (Therefore, the per-agent rate is R / num_agents).
+
+    Whenever a certain number of consecutive successes are seen, the rate is increased up until upper_cluster_rate.
+    Likewise, whenever a failure is reported (on token release()), the rate is lowered up until a lower_cluster_rate.
+    Cluster rate is reduced by dividing current rate by backoff_factor.  Cluster rate is increased either by
+    multiplying by increase_factor or resetting to initial rate, depending on the increase_strategy.
+    (Note: if cluster rate is already greater or equal to initial rate, it will be multiplied by the increase factor)
+    """
+
+    INCREASE_STRATEGY_MULTIPLY = 'multiply'
+    INCREASE_STRATEGY_RESET_THEN_MULTIPLY = 'reset_then_multiply'
+
+    def __init__(self, num_agents, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
+                 consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=0.5,
+                 max_concurrency=1, fake_clock=None):
+        """
+        @param num_agents: Number of agents in the cluster
+        @param initial_cluster_rate: initial cluster rate (requests/sec)
+        @param upper_cluster_rate: upper bound on cluster rate (requests/sec)
+        @param lower_cluster_rate: lower bound on cluster rate (requests/sec)
+        @param consecutive_success_threshold: number of consecutive successes to trigger a rate increase
+        @param increase_strategy: strategy for increasing the rate (multiply by increase_factor or reset to initial)
+        @param increase_factor: multiplicative factor for increasing rate
+        @param backoff_factor: multiplicative factor for decreasing rate
+        @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
+
+        @type num_agents: int
+        @type initial_cluster_rate: float
+        @type upper_cluster_rate: float
+        @type lower_cluster_rate: float
+        @type consecutive_success_threshold: int
+        @type increase_strategy: str
+        @type increase_factor: float
+        @type backoff_factor: float
+        @type max_concurrency: int
+        """
+        self._num_agents = num_agents
+        self._initial_cluster_rate = initial_cluster_rate
+        self._upper_cluster_rate = upper_cluster_rate
+        self._lower_cluster_rate = lower_cluster_rate
+        self._consecutive_success_threshold = consecutive_success_threshold
+        self._increase_strategy = increase_strategy
+        self._increase_factor = increase_factor
+        self._backoff_factor = backoff_factor
+
+        self._current_cluster_rate = self._initial_cluster_rate
+        self._consecutive_successes = 0
+        self._cluster_rate_lock = threading.Lock()
+
+        self._max_concurrency = max_concurrency
+
+        # A queue of tokens
+        self._ripe_time = None
+        self._token_queue = deque()
+        # Condition variable to synchronize access to token queue
+        self._token_queue_cv = threading.Condition()
+
+        # fake clock for testing
+        self._fake_clock = fake_clock
+        self._test_mode_lock = threading.Lock()
+
+        # Validate input
+        strategies = [self.INCREASE_STRATEGY_MULTIPLY, self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY]
+        if increase_strategy not in strategies:
+            raise ValueError('Increase strategy must be one of %s' % strategies)
+
+        if self._max_concurrency < 1:
+            raise ValueError('max_concurrency must be greater than 0')
+
+        if self._consecutive_success_threshold < 1:
+            raise ValueError(
+                'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
+
+        if self._initial_cluster_rate < self._lower_cluster_rate or self._initial_cluster_rate > self._upper_cluster_rate:
+            raise ValueError(
+                'Initial cluster rate must be between lower and upper rates. Initial=%s, Lower=%s, Upper=%s.' % (
+                    initial_cluster_rate, lower_cluster_rate, upper_cluster_rate))
+
+        self._initialize_token_queue()
+
+    @property
+    def current_cluster_rate(self):
+        return self._current_cluster_rate
+
+    @property
+    def current_agent_rate(self):
+        return float(self._current_cluster_rate) / self._num_agents
+
+    def _initialize_token_queue(self):
+        """Initialize a queue with max_concurrency tokens."""
+        self._token_queue_cv.acquire()
+        for num in range(self._max_concurrency):
+            token = RateLimiterToken(num)
+            self._token_queue.append(token)
+        self._ripe_time = self._get_next_ripe_time()
+        self._token_queue_cv.release()
+
+    def _adjust_cluster_rate(self, success):
+        """Adjust cluster rate, backing off on failure or increasing on enough consecutive successes.
+
+        Any failure will cause backoff.
+        A success will accumulate until self._consecutive_success_threshold is reached, at which point the rate will be
+            increased according to self._increase_strategy.  When this happens, the success accumulator resets to 0
+
+        @param success: Whether an operation was successful
+        @type success: bool
+        """
+        self._cluster_rate_lock.acquire()
+        try:
+            if success:
+                self._consecutive_successes += 1
+            else:
+                self._consecutive_successes = 0
+            if not success:
+                # Failure case: halve the rate
+                self._current_cluster_rate = max(
+                    self._lower_cluster_rate,
+                    self._current_cluster_rate * self._backoff_factor
+                )
+            else:
+                # Success case: If current rate can be increased, do so based on strategy
+                if self._consecutive_successes >= self._consecutive_success_threshold:
+                    if self._current_cluster_rate < self._upper_cluster_rate:
+                        if (self._increase_strategy == self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY and
+                                self._current_cluster_rate < self._initial_cluster_rate):
+                            self._current_cluster_rate = self._initial_cluster_rate
+                        else:
+                            self._current_cluster_rate = min(
+                                self._upper_cluster_rate, self._current_cluster_rate * self._increase_factor)
+                    self._consecutive_successes = 0
+        finally:
+            self._cluster_rate_lock.release()
+
+    def _get_next_ripe_time(self):
+        """Get the absolute time for when this token becomes next available
+
+        A token contains state representing the last time it was acquired.
+        In order to achieve a uniform cluster-wide average rate of R, the next time is calculated as:
+
+        current_time + delta
+
+        where delta = random number between (0, 2 * T)
+        where T is the per-agent interval or num_agents / cluster rate
+        """
+        agent_interval = float(self._num_agents) / self._current_cluster_rate
+        delta = random.uniform(0, 2 * agent_interval)
+        return max(self._ripe_time, self._time()) + delta
+
+    def _time(self):
+        """Returns absolute time in UTC epoch seconds"""
+        if self._fake_clock:
+            return self._fake_clock.time()
+        else:
+            return time.time()
+
+    def _simulate_acquire_token(self):
+        self._test_mode_lock.acquire()
+        try:
+            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
+                self._test_mode_lock.release()
+                self._fake_clock.simulate_waiting()
+                self._test_mode_lock.acquire()
+
+            # Head token is ripe
+            token = self._token_queue.popleft()
+            self._ripe_time = self._get_next_ripe_time()
+            return token
+        finally:
+            self._test_mode_lock.release()
+
+    def _simulate_release_token(self, token, success):
+        self._adjust_cluster_rate(success)
+        self._test_mode_lock.acquire()
+        try:
+            self._token_queue.append(token)
+        finally:
+            self._test_mode_lock.release()
+        self._fake_clock.advance_time(increment_by=self._ripe_time - self._fake_clock.time())
+
+    def acquire_token(self):
+        """Acquires a token, blocking until a token becomes available.
+
+        The primary state used to determine token availability is self._ripe_time. Until that time is reached,
+        all client threads are blocked.
+
+        @return: a token object
+        @rtype: RateLimiterToken
+        """
+        if self._fake_clock:
+            return self._simulate_acquire_token()
+
+        # block until a token is available from the token heap
+        self._token_queue_cv.acquire()
+
+        try:
+            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
+                # no tokens available so sleep for a while
+                if len(self._token_queue) == 0:
+                    # queue contained no tokens so wait indefinitely
+                    self._token_queue_cv.wait()
+                else:
+                    # queue contained at least one token so sleep until the head token becomes ripe
+                    sleep_time = max(0, self._ripe_time - self._time())
+                    if sleep_time > 0:
+                        self._token_queue_cv.wait()
+
+            # Head token is ripe.
+            token = self._token_queue.popleft()
+            self._ripe_time = self._get_next_ripe_time()
+            return token
+
+        finally:
+            self._token_queue_cv.release()
+
+    def release_token(self, token, success):
+        """Release a token back to the rate limiter.  Adjusts the rate based on success/failure and then re-inserts
+        token back into the queue
+
+        @param token: Token to release
+        @param success: Whether or not the client operation was successful
+
+        @type token: RateLimiterToken
+        @type success: bool
+        """
+        if not isinstance(token, RateLimiterToken):
+            raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
+
+        if self._fake_clock:
+            return self._simulate_release_token(token, success)
+
+        self._token_queue_cv.acquire()
+
+        try:
+            # potentially adjust rate depending on reported outcome
+            self._adjust_cluster_rate(success)
+
+            # re-insert token
+            self._token_queue.append(token)
+
+            # awaken threads waiting for tokens
+            self._token_queue_cv.notifyAll()
+
+        finally:
+            self._token_queue_cv.release()

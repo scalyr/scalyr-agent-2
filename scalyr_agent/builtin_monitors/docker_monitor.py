@@ -57,7 +57,7 @@ define_config_option( __monitor__, 'container_name',
 
 define_config_option( __monitor__, 'container_check_interval',
                      'Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.',
-                     convert_to=int, default=5)
+                     convert_to=int, default=5, env_aware=True)
 
 define_config_option( __monitor__, 'api_socket',
                      'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
@@ -71,11 +71,11 @@ define_config_option( __monitor__, 'docker_api_version',
                      'Optional (defaults to \'auto\'). The version of the Docker API to use.  WARNING, if you have '
                      '`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the '
                      'syslog monitor to this same value\n',
-                     convert_to=str, default='auto')
+                     convert_to=str, default='auto', env_aware=True)
 
 define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
-                     convert_to=str, default='docker')
+                     convert_to=str, default='docker', env_aware=True)
 
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
@@ -95,64 +95,63 @@ define_config_option( __monitor__, 'log_mode',
                      'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
                      'preferred method due to bugs/issues found with the docker API (To protect legacy behavior, '
                      'the default method is "docker_api").',
-                     convert_to=str, default="docker_api")
+                     convert_to=str, default="docker_api", env_aware=True, env_name='SCALYR_DOCKER_LOG_MODE')
 
 define_config_option( __monitor__, 'docker_raw_logs',
                      'Optional (defaults to False). If True, the docker monitor will use the raw log files on disk to read logs.'
                      'The location of the raw log file is obtained by querying the path from the Docker API. '
                      'If false, the logs will be streamed over the Docker API.',
-                     convert_to=bool,
-                     default=False)
+                     convert_to=bool, default=False, env_aware=True)
 
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
                      'about running containers.  If set to true, this value overrides the config item \'report_container_metrics\'\n',
-                     convert_to=bool, default=False)
+                     convert_to=bool, default=False, env_aware=True, env_name='SCALYR_DOCKER_METRICS_ONLY')
 
 define_config_option( __monitor__, 'container_globs',
                      'Optional (defaults to None). A whitelist of container name glob patterns to monitor.  Only containers whose name '
                      'matches one of the glob patterns will be monitored.  If `None`, all container names are matched.  This value '
                      'is applied *before* `container_globs_exclude`',
-                      convert_to=ArrayOfStrings, default=None)
+                      convert_to=ArrayOfStrings, default=None, env_aware=True)
 
 define_config_option( __monitor__, 'container_globs_exclude',
                      'Optional (defaults to None). A blacklist of container name glob patterns to exclude from monitoring.  Any container whose name '
                      'matches one of the glob patterns will not be monitored.  If `None`, all container names matched by `container_globs` are monitored.  This value '
                      'is applied *after* `container_globs`',
-                      convert_to=ArrayOfStrings, default=None)
+                      convert_to=ArrayOfStrings, default=None, env_aware=True)
 
 define_config_option( __monitor__, 'report_container_metrics',
                       'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
-                      'to Scalyr.', convert_to=bool, default=True)
+                      'to Scalyr.', convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'label_include_globs',
                      'Optional (defaults to [\'*\']). If `labels_as_attributes` is True then this option is a list of glob strings used to '
-                     'include labels that should be uploadeded as log attributes.  The docker monitor first gets all container labels that '
+                     'include labels that should be uploaded as log attributes.  The docker monitor first gets all container labels that '
                      'match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then '
                      'uploaded as log attributes. ',
-                      default=['*'])
+                      convert_to=ArrayOfStrings, default=['*'], env_aware=True)
 
 define_config_option( __monitor__, 'label_exclude_globs',
                      'Optional (defaults to [\'com.scalyr.config.*\']). If `labels_as_attributes` is True, then this is a list of glob strings used to '
                      'exclude labels from being uploaded as log attributes.  Any label whose key matches any glob on this list will not be added as a '
                      'log attribute.  Note: the globs in this list are applied *after* `label_include_globs`',
-                      default=['com.scalyr.config.*'])
+                      convert_to=ArrayOfStrings, default=['com.scalyr.config.*'], env_aware=True)
 
 define_config_option( __monitor__, 'labels_as_attributes',
                      'Optional (defaults to False). If true, the docker monitor will add any labels found on the container as log attributes, after '
                      'applying `label_include_globs` and `label_exclude_globs`.',
-                     convert_to=bool, default=False)
+                     convert_to=bool, default=False, env_aware=True)
 
 define_config_option( __monitor__, 'label_prefix',
                      'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
                      'adding it to the log attributes ',
-                     convert_to=str, default="")
+                     convert_to=str, default="", env_aware=True)
 
 define_config_option( __monitor__, 'use_labels_for_log_config',
                      'Optional (defaults to True). If true, the docker monitor will check each container for any labels that begin with '
                      '`com.scalyr.config.log.` and use those labels (minus the prefix) as fields in the containers log_config.  Keys that '
                      'contain hyphens will automatically be converted to underscores.',
-                     convert_to=bool, default=True)
+                     convert_to=bool, default=True, env_aware=True)
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',

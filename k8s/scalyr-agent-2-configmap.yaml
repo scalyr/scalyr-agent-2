@@ -6,7 +6,7 @@ data:
   # Most environment variables start with SCALYR_
   # See https://www.scalyr.com/help/scalyr-agent#environmentAware for more details.
   # Examples:
-  # K8S_EVENTS_DISABLE: "true"
+  # SCALYR_K8S_EVENTS_DISABLE: "true"
 metadata:
   name: scalyr-config
   namespace: default
