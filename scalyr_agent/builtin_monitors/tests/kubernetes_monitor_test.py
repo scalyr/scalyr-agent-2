@@ -474,7 +474,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
             warmer.end_marking()
 
-            # Have to have 5 permanent errors before it is blacklisted.
+            # Have to have 5 temporary errors before it is blacklisted.
             for i in range(0, 4):
                 fake_cache.set_response(self.NAMESPACE_1, self.POD_1, temporary_error=True)
                 fake_cache.wait_until_request_finished(self.NAMESPACE_1, self.POD_1)
@@ -502,7 +502,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             self.assertFalse(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
             # To test that the entry was properly reset to error count = 0, see if it gets blacklisted after
-            # 5 new temporary errirs.
+            # 5 new temporary errors.
             for i in range(0, 4):
                 fake_cache.set_response(self.NAMESPACE_1, self.POD_1, temporary_error=True)
                 fake_cache.wait_until_request_finished(self.NAMESPACE_1, self.POD_1)
