@@ -21,6 +21,7 @@ import docker
 import fnmatch
 import glob
 import traceback
+import json
 import os
 import random
 import re
@@ -644,6 +645,7 @@ class ControlledCacheWarmer(StoppableThread):
         self.__lock.acquire()
         try:
             while self._run_state.is_running() and len(self.__containers_to_warm) > 0:
+                print 'List is %s' % json.dumps(self.__containers_to_warm)
                 self.__condition_var.wait()
         finally:
             self.__lock.release()
