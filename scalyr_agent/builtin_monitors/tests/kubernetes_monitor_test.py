@@ -297,11 +297,11 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         @staticmethod
         def _raise_temp_error(pod_namespace, pod_name):
-            raise K8sApiTemporaryError()
+            raise K8sApiTemporaryError('Temporary error')
 
         @staticmethod
         def _raise_perm_error(pod_namespace, pod_name):
-            raise K8sApiPermanentError()
+            raise K8sApiPermanentError('Permanent error')
 
         @staticmethod
         def __pod_key(pod_namespace, pod_name):
