@@ -761,6 +761,7 @@ class ControlledCacheWarmer(StoppableThread):
         try:
             if container_id in self.__active_pods:
                 entry = self.__active_pods[container_id]
+                print 'Found it'
                 if success:
                     entry.is_warm = True
                     entry.failure_count = 0
@@ -769,6 +770,7 @@ class ControlledCacheWarmer(StoppableThread):
                     result_type = 'success'
                 else:
                     if permanent_error:
+                        print 'Yes here it is'
                         result_type = 'perm_error'
                         exception_to_report = permanent_error
                     elif temporary_error:
