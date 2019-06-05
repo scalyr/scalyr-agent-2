@@ -309,6 +309,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         @staticmethod
         def _raise_perm_error(pod_namespace, pod_name):
+            print 'Here is the raising of the error'
             raise K8sApiPermanentError()
 
         @staticmethod

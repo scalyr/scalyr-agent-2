@@ -834,6 +834,9 @@ class ControlledCacheWarmer(StoppableThread):
                     self.__record_warming_result(container_id, temporary_error=e,
                                                  traceback_report=traceback.format_exc())
                 except Exception, e:
+                    print 'Unknown error was %s' % str(e)
+                    print 'Traceback was %s' % traceback.format_exc()
+
                     self.__record_warming_result(container_id, unknown_error=e,
                                                  traceback_report=traceback.format_exc())
 
