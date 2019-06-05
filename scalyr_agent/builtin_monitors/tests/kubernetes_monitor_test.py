@@ -429,7 +429,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertTrue(warmer.is_warm(request_a_pod_namespace, request_a_pod_name))
         self.assertTrue(warmer.is_warm(request_b_pod_namespace, request_b_pod_name))
 
-    def test_permanent_error(self):
+    def foo_test_permanent_error(self):
         print 'test_permanent_error'
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
