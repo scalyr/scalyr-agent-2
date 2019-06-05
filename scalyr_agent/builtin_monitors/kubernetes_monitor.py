@@ -783,6 +783,7 @@ class ControlledCacheWarmer(StoppableThread):
                     entry.failure_count += 1
                     if permanent_error or entry.failure_count >= self.__max_failure_count:
                         entry.blacklisted_until = current_time + self.__blacklist_time_secs
+                        print 'The blacklist time is %ld' % entry.blacklisted_until
                         entry.blacklist_reason = result_type
                 self.__update_containers_to_warm()
 
