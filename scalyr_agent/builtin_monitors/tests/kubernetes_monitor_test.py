@@ -25,9 +25,11 @@ import threading
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor, ControlledCacheWarmer
 from scalyr_agent.monitor_utils.k8s import K8sApiTemporaryError, K8sApiPermanentError
+from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
+from scalyr_agent.tests.copying_manager_test import CopyingManagerInitializationTest
 
 
 class KubernetesMonitorTest(ScalyrTestCase):
@@ -55,7 +57,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
 
             manager_poll_interval = 30
             fake_clock = FakeClock()
-            manager = ScalyrTestUtils.create_test_monitors_manager(
+            manager, _ = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
                     {
                         'module': "scalyr_agent.builtin_monitors.kubernetes_monitor",
@@ -515,3 +517,38 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             self.assertEqual(warmer.warming_containers(), [])
             self.assertEqual(warmer.blacklisted_containers(), [self.CONTAINER_1])
             self.assertFalse(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
+
+class TestExtraServerAttributes(CopyingManagerInitializationTest):
+
+    def test_no_extra_server_attributes(self):
+        copying_manager = self._create_test_instance([], [])
+        attribs = copying_manager._CopyingManager__expanded_server_attributes
+        self.assertIsNone(attribs.get('_k8s_ver', none_if_missing=True))
+
+    def test_extra_server_attributes(self):
+
+        def fake_init(self):
+            # Initialize variables that would have been
+            self._KubernetesMonitor__container_checker = None
+            self._KubernetesMonitor__namespaces_to_ignore = []
+            self._KubernetesMonitor__include_controller_info = None
+            self._KubernetesMonitor__report_container_metrics = None
+            self._KubernetesMonitor__metric_fetcher = None
+
+        @mock.patch.object(KubernetesMonitor, '_initialize', fake_init)
+        def run_test():
+            manager_poll_interval = 30
+            fake_clock = FakeClock()
+            monitors_manager, config = ScalyrTestUtils.create_test_monitors_manager(
+                config_monitors=[
+                    {
+                        'module': "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                    }
+                ],
+                extra_toplevel_config={'user_agent_refresh_interval': manager_poll_interval},
+                null_logger=True,
+                fake_clock=fake_clock,
+            )
+            copying_manager = CopyingManager(config, monitors_manager.monitors)
+            self.assertEquals(copying_manager._CopyingManager__expanded_server_attributes.get('_k8s_ver'), 'star')
+        run_test()

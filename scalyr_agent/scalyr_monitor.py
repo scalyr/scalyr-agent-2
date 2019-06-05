@@ -251,6 +251,16 @@ class ScalyrMonitor(StoppableThread):
             # right now join on the monitor threads, so no one would catch it.  We should change that.
             self._logger.exception('Monitor died from due to exception:', error_code='failedMonitor')
 
+    def get_extra_server_attributes(self):
+        """Derived classes may optionally return a dict of server attributes to be added to the main config
+        server attributes.  Keys already defined by server attributes or other monitors will be dropped with a warning.
+
+        You must ensure that this method is thread-safe as it will be invoked by a different thread (MonitorsManager).
+
+        @return: A dict or None
+        """
+        return None
+
     def get_user_agent_fragment(self):
         """Derived classes may optionally return a string fragment to be appended to the User-Agent header for all
         data sent to Scalyr.  Note: User-Agent augmentation applies to all data (not restricted to data from this
