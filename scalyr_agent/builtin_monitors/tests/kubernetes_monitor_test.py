@@ -192,7 +192,9 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
                     # Notify any thread waiting to see if __pending_request is set.
                     self.__condition_var.notify_all()
                     # This should be awoken up by `set_response`
-                    self.__condition_var.wait()
+                    self.__condition_var.wait(timeout=10)
+                if key not in self.__pending_responses:
+                    raise AssertionError('Never got a response for the pod')
 
                 self.__pending_responses.pop(key)(pod_namespace, pod_name)
             finally:
@@ -266,10 +268,14 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             try:
                 if target_key is not None:
                     while target_key != self.__pending_request:
-                        self.__condition_var.wait()
+                        self.__condition_var.wait(timeout=10)
+                    if target_key != self.__pending_request:
+                        raise AssertionError('Failed to get it as pending')
                 else:
                     while self.__pending_request is None:
-                        self.__condition_var.wait()
+                        self.__condition_var.wait(timeout=10)
+                    if self.__pending_request is None:
+                        raise AssertionError('Pending request is still none')
                 return self.__split_pod_key(self.__pending_request)
             finally:
                 self.__lock.release()
@@ -287,7 +293,9 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             self.__lock.acquire()
             try:
                 while target_key in self.__pending_responses:
-                    self.__condition_var.wait()
+                    self.__condition_var.wait(timeout=10)
+                if target_key in self.__pending_responses:
+                    raise AssertionError('The request never finished')
             finally:
                 self.__lock.release()
 
