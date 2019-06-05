@@ -326,8 +326,10 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         # noinspection PyTypeChecker
         self.__warmer_test_instance.set_k8s_cache(self.__fake_cache)
         self.__warmer_test_instance.start()
+        print 'Starting a test!!!'
 
     def tearDown(self):
+        print 'Ending test a test!!!'
         self.__warmer_test_instance.stop(wait_on_join=False)
         self.__fake_cache.stop()
 
