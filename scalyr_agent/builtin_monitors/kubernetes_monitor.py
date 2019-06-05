@@ -750,6 +750,7 @@ class ControlledCacheWarmer(StoppableThread):
         @type unknown_error: Exception or None
         @type traceback_report: str or None
         """
+        print 'Finished request for %s' % container_id
         current_time = self._get_current_time()
         result_type = 'not_set'
         exception_to_report = None
