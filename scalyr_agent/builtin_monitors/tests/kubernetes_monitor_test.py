@@ -334,6 +334,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.__fake_cache.stop()
 
     def test_basic_case(self):
+        print 'test_basic_case'
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
@@ -362,6 +363,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
     def test_remove_inactive(self):
+        print 'test_remove_inactive'
         warmer = self.__warmer_test_instance
 
         warmer.begin_marking()
@@ -376,6 +378,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertEqual(warmer.active_containers(), [])
 
     def test_multiple_pods(self):
+        print 'test_multiple_node'
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
@@ -427,6 +430,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertTrue(warmer.is_warm(request_b_pod_namespace, request_b_pod_name))
 
     def test_permanent_error(self):
+        print 'test_permanent_error'
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
@@ -444,6 +448,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertFalse(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
     def test_temporary_error(self):
+        print 'test_temporary_error'
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
@@ -470,6 +475,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertFalse(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
     def test_retry_from_blacklist(self):
+        print 'test_retry_from_blacklist'
         fake_time = 5
 
         def fake_get_current_time(_):
