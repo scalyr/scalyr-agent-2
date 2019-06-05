@@ -28,7 +28,7 @@ import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings
-from scalyr_agent.util import JsonReadFileException
+from scalyr_agent.util import JsonReadFileException, BlockingRateLimiter
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from __scalyr__ import get_install_root
@@ -310,6 +310,42 @@ class Configuration(object):
     @property
     def k8s_events_disable(self):
         return self.__get_config().get_bool('k8s_events_disable')
+    
+    @property
+    def k8s_ratelimit_cluster_num_agents(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_num_agents')
+
+    @property
+    def k8s_ratelimit_cluster_rps_init(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_rps_init')
+
+    @property
+    def k8s_ratelimit_cluster_rps_min(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_rps_min')
+
+    @property
+    def k8s_ratelimit_cluster_rps_max(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_rps_max')
+
+    @property
+    def k8s_ratelimit_consecutive_increase_threshold(self):
+        return self.__get_config().get_int('k8s_ratelimit_consecutive_increase_threshold')
+
+    @property
+    def k8s_ratelimit_increase_strategy(self):
+        return self.__get_config().get_int('k8s_ratelimit_increase_strategy')
+
+    @property
+    def k8s_ratelimit_increase_factor(self):
+        return self.__get_config().get_int('k8s_ratelimit_increase_factor')
+
+    @property
+    def k8s_ratelimit_backoff_factor(self):
+        return self.__get_config().get_int('k8s_ratelimit_backoff_factor')
+
+    @property
+    def k8s_ratelimit_max_concurrency(self):
+        return self.__get_config().get_int('k8s_ratelimit_max_concurrency')
 
     @property
     def enable_profiling( self ):
@@ -1055,7 +1091,6 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
-
         self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
@@ -1067,6 +1102,36 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_events_disable', False, description, apply_defaults, env_aware=True)
+
+        # Agent-wide k8s rate limiter settings
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_cluster_num_agents', 1, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_init', 1.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_min', 1.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_max', 1.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_increase_strategy', BlockingRateLimiter.INCREASE_STRATEGY_MULTIPLY,
+            description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_increase_factor', 2.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_backoff_factor', 0.5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_max_concurrency', 1, description, apply_defaults, env_aware=True
+        )
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 
