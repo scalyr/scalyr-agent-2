@@ -653,8 +653,6 @@ def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
 
 class BlockingRateLimiterTest(ScalyrTestCase):
 
-    DEFAULT_FAKE_CLOCK_INCREMENT = 0.001
-
     def setUp(self):
         self._fake_clock = scalyr_util.FakeClock()
 
