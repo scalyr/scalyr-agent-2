@@ -191,7 +191,7 @@ define_config_option( __monitor__, 'k8s_controlled_warmer_max_attempts',
                       convert_to=int, default=5, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_controlled_warmer_blacklist_time',
-                     'Optional (defaults to 300). When a pod is blacklist, how many secs it must wait until it is '
+                     'Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is '
                      'tried again for warming.',
                       convert_to=int, default=300, env_aware=True)
 
@@ -455,10 +455,10 @@ class ControlledCacheWarmer(StoppableThread):
         # Used to notify threads of changes to the containers_to_warm state.
         self.__condition_var = threading.Condition(self.__lock)
         # Tracks the active pods.  Active pods are those docker or some other CRI has recently indicated is
-        # running.  This variable paps container id to a WarmingEntry for the pod.
+        # running.  This variable maps container id to a WarmingEntry for the pod.
         self.__active_pods = dict()
         # The list of containers whose pods are eligible to be warmed in the cache.  Essentially, the active_pods
-        # minus those already warmed and any one the blacklist.
+        # minus those already warmed or blacklisted.
         self.__containers_to_warm = []
         self.__max_failure_count = max_failure_count
         self.__blacklist_time_secs = blacklist_time_secs
@@ -526,7 +526,7 @@ class ControlledCacheWarmer(StoppableThread):
     def end_marking(self):
         """Indicates the end of marking all active containers has finished.
 
-        Any container that was not marked since the last call to `begin_marking`, will no longer be consider active
+        Any container that was not marked since the last call to `begin_marking`, will no longer be considered active
         and therefore its pod's information will not be populated into the cache.
         """
         current_time = self._get_current_time()
@@ -537,7 +537,7 @@ class ControlledCacheWarmer(StoppableThread):
                 if value.is_recently_marked:
                     new_active_pods[key] = value
             self.__active_pods = new_active_pods
-            # We also take the time to opportunity to see if any blacklisted containers should be moved back to
+            # We also take the opportunity to see if any blacklisted containers should be moved back to
             # active.
             self.__update_containers_to_warm(check_blacklisted=True, current_time=current_time)
             self.__emit_report_if_necessary(current_time=current_time)
@@ -789,7 +789,7 @@ class ControlledCacheWarmer(StoppableThread):
     def _get_current_time():
         """Returns the current time.
 
-        This is used for testing.
+        This method exists so it can be overridden during testing.
         """
         return time.time()
 
@@ -960,7 +960,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
 
                                         # If we are warming the cache using the controlled strategy, then skip this
                                         # container if it is not yet warmed in the pod.  That way, all code from here
-                                        # on out is guaranteed to not invoke issue an API request if the pod is
+                                        # on out is guaranteed to not issue an API request if the pod is
                                         # cached.
                                         if controlled_warmer is not None:
                                             controlled_warmer.mark_to_warm(cid, k8s_info['pod_namespace'],
@@ -1042,7 +1042,7 @@ class DockerEnumerator( ContainerEnumerator ):
         @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
         @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
-            strategry, then the warmer instance to use.
+            strategy, then the warmer instance to use.
         @type client: DockerClient
         @type ignored_pod: QualifiedName
         @type controlled_warmer: ControlledCacheWarmer or None
