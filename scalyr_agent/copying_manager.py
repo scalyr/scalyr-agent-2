@@ -18,6 +18,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import copy
 import datetime
 import fnmatch
 import os
@@ -198,6 +199,26 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__config = configuration
         # Keep track of monitors
         self.__monitors = monitors
+
+        # collect monitor-specific extra server-attributes
+        self.__monitor_2_extra_server_attribs = dict(
+            (monitor, monitor.get_extra_server_attributes()) for monitor in monitors
+        )
+
+        self.__expanded_server_attributes = copy.deepcopy(self.__config.server_attributes)
+        for monitor in self.__monitor_2_extra_server_attribs:
+            monitor_attribs = self.__monitor_2_extra_server_attribs.get(monitor)
+            if not monitor_attribs:
+                continue
+            for key, value in monitor_attribs.items():
+                if key in self.__config.server_attributes:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0,
+                            "Extra server attribute already defined. Cannot add extra server attribute from monitor %s"
+                            % monitor.module_name,
+                            limit_once_per_x_secs=300,
+                            limit_key='extra-server-attrib-%s' % key)
+                else:
+                    self.__expanded_server_attributes[key] = value
 
         # We keep track of which paths we have configs for so that when we add in the configuration for the monitor
         # log files we don't re-add in the same path.  This can easily happen if a monitor is used multiple times
@@ -895,7 +916,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Whether or not the max bytes allowed to send has been reached.
         buffer_filled = False
 
-        add_events_request = self._create_add_events_request(session_info=self.__config.server_attributes,
+        add_events_request = self._create_add_events_request(session_info=self.__expanded_server_attributes,
                                                              max_size=bytes_allowed_to_send)
 
         if for_pipelining:
