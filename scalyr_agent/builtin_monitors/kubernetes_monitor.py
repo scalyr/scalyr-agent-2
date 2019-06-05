@@ -617,6 +617,7 @@ class ControlledCacheWarmer(StoppableThread):
         # We see if the count changes.  If so, we need to notify listeners on __containers_to_warm.
         # The main listener is the background thread that waits to warm newly discovered containers.
         original_to_warm_count = len(self.__containers_to_warm)
+        print 'Original was %s ' % json.dumps(self.__containers_to_warm)
         self.__containers_to_warm = []
         if check_blacklisted:
             if current_time is not None:
@@ -624,6 +625,7 @@ class ControlledCacheWarmer(StoppableThread):
             for value in self.__active_pods.itervalues():
                 if value.blacklisted_until is not None and value.blacklisted_until < current_time:
                     # After coming off the blacklist, the pod gets a fresh start.  Reset all counters.
+                    print 'Removing one from blacklist'
                     value.blacklisted_until = None
                     value.blacklist_reason = None
                     value.failure_count = 0
@@ -632,6 +634,7 @@ class ControlledCacheWarmer(StoppableThread):
             if not value.is_warm and value.blacklisted_until is None:
                 self.__containers_to_warm.append(key)
 
+        print 'Last was %s ' % json.dumps(self.__containers_to_warm)
         if len(self.__containers_to_warm) != original_to_warm_count:
             self.__condition_var.notify_all()
 
