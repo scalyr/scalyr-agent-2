@@ -331,7 +331,7 @@ class ReaderThread(threading.Thread):
         parsed = re.match('^([-_./a-zA-Z0-9]+)\s+' # Metric name.
                           '(\d+)\s+'               # Timestamp.
                           '(\S+?)'                 # Value (int or float).
-                          '((?:\s+[-_./a-zA-Z0-9]+=[-_./a-zA-Z0-9]+)*)$', # Tags
+                          '((?:\s+[-_./a-zA-Z0-9]+=[-~_./a-zA-Z0-9]+)*)$', # Tags
                           line)
         if parsed is None:
             LOG.warning('%s sent invalid data: %s', col.name, line)
