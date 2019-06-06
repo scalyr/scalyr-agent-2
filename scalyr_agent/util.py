@@ -698,6 +698,24 @@ class FakeClock(object):
         self._waiting_condition.release()
 
 
+class RealFakeClock(FakeClock):
+
+    def time(self):
+        return time.time()
+
+    def advance_time(self, set_to=None, increment_by=None):
+        self._time_condition.acquire()
+        if set_to is not None:
+            increment_by = set_to - time.time()
+        if increment_by is None:
+            raise ValueError('Either set_to or increment_by must be supplied')
+        increment_by = max(0, increment_by)
+        print('sleeping for %s seconds' % increment_by)
+        time.sleep(increment_by)
+        self._time_condition.notifyAll()
+        self._time_condition.release()
+
+
 class FakeClockCounter(object):
     """Helper class for multithreaded testing. Provides a method for a thread to block until a count has reached target
     value.  Moreover, for every successfully observed increment, it will advance the fake_clock and wait for all
@@ -1690,31 +1708,3 @@ class BlockingRateLimiter(object):
 
         finally:
             self._token_queue_cv.release()
-
-
-class SingletonBlockingRateLimiter(object):
-    __lock = threading.Lock()
-    __instances = {}
-
-    @classmethod
-    def get_instance(cls, key, config):
-        cls.__lock.acquire()
-        try:
-            inst = cls.__instances.get(key)
-            if inst:
-                return inst
-            else:
-                cls.__instances[key] = BlockingRateLimiter(
-                    config.k8s_ratelimit_cluster_num_agents,
-                    config.k8s_ratelimit_cluster_rps_init,
-                    config.k8s_ratelimit_cluster_rps_max,
-                    config.k8s_ratelimit_cluster_rps_min,
-                    config.k8s_ratelimit_consecutive_increase_threshold,
-                    config.k8s_ratelimit_increase_strategy,
-                    config.k8s_ratelimit_increase_factor,
-                    config.k8s_ratelimit_backoff_factor,
-                    config.k8s_ratelimit_max_concurrency,
-                )
-                return cls.__instances[key]
-        finally:
-            cls.__lock.release()
