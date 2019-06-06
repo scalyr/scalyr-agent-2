@@ -37,7 +37,7 @@ from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFet
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
-from scalyr_agent.util import StoppableThread, SingletonBlockingRateLimiter
+from scalyr_agent.util import StoppableThread, BlockingRateLimiter
 
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -456,7 +456,7 @@ class ControlledCacheWarmer(StoppableThread):
         @type max_failure_count: int
         @type blacklist_time_secs: double
         @type max_query_retries: int
-        @type rate_limiter: SingletonBlockingRateLimiter
+        @type rate_limiter: BlockingRateLimiter
         @type logger: Logger
         """
         StoppableThread.__init__(self, name='cache warmer and filter')
@@ -2117,6 +2117,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         return api_socket
 
     def _initialize( self ):
+        """This method gets called every 30 seconds regardless"""
         data_path = ""
         log_path = ""
         host_hostname = ""
@@ -2181,7 +2182,17 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
-        self.__rate_limiter = SingletonBlockingRateLimiter.get_instance('K8S_RATE_LIMITER', self._global_config)
+        self.__rate_limiter = BlockingRateLimiter(
+            self._global_config.k8s_ratelimit_cluster_num_agents,
+            self._global_config.k8s_ratelimit_cluster_rps_init,
+            self._global_config.k8s_ratelimit_cluster_rps_max,
+            self._global_config.k8s_ratelimit_cluster_rps_min,
+            self._global_config.k8s_ratelimit_consecutive_increase_threshold,
+            self._global_config.k8s_ratelimit_increase_strategy,
+            self._global_config.k8s_ratelimit_increase_factor,
+            self._global_config.k8s_ratelimit_backoff_factor,
+            self._global_config.k8s_ratelimit_max_concurrency,
+        )
 
         self.__controlled_warmer = None
         if self._config.get('k8s_use_controlled_warmer'):
