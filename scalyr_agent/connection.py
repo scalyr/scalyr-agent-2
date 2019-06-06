@@ -140,7 +140,7 @@ class Connection( object ):
     def get( self, request_path ):
         """Get requests"""
         self.__check_ssl()
-        self._get( request_path, body )
+        self._get( request_path )
 
     def _post( self, request_path, body ):
         """Subclasses override to handle specifics of post requests """
