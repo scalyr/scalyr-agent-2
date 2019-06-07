@@ -1,6 +1,30 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.49 "Bratac" - Jun 7, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on Jun 7, 2019 11:00 -0700
+--->
+
+Features
+* Add `container_globs_exclude` option to docker monitor for blacklisting containers by name.
+* Many `docker_monitor` plugin config variables are now environment-aware.
+* The global `compression_level` config variable is now environment-aware.
+* Add SCALYR_K8S_EVENTS_DISABLE in addition to K8S_EVENTS_DISABLE, but either will work.
+* Allow tilde (~) character in `linux_system_metrics` tags (e.g. mounted file names may contain it).
+* Incorporate profiler into agent for runtime performance analysis.
+* Add random skew to k8s api queries to lessen peak load on k8s api masters.
+
+Bugs
+* Fix Dockerfile.custom_k8s_config to use correct image
+* Fix bug in Windows upgrade utility
+* Fix attribute error in k8s controller object
+
+Miscellaneous changes
+* `scalyr-agent-2.yaml` now exports SCALYR_K8S_EVENTS_DISABLE instead of K8S_EVENTS_DISABLE
+
+
 ## 2.0.48 "Asgard" - May 22, 2019
 
 <!---
