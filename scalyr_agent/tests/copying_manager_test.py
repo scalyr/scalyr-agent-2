@@ -271,6 +271,37 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         # check that removing a non-existent path runs without throwing an exception
         test_manager.remove_log_path( 'test_monitor', 'blahblah.log' )
 
+    def test_get_server_attribute(self):
+        logs_json_array = JsonArray()
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
+        self.__monitor_fake_instances = []
+        monitor_a = FakeMonitor1({'path': 'testA.log'}, id='a', attribute_key='KEY_a')
+        monitor_b = FakeMonitor1({'path': 'testB.log'}, id='b', attribute_key='KEY_b')
+        self.__monitor_fake_instances.append(monitor_a)
+        self.__monitor_fake_instances.append(monitor_b)
+        copy_manager = CopyingManager(config, self.__monitor_fake_instances)
+        attribs = copy_manager.expanded_server_attributes
+        self.assertEquals(attribs['KEY_a'], monitor_a.attribute_value)
+        self.assertEquals(attribs['KEY_b'], monitor_b.attribute_value)
+
+    def test_get_server_attribute_no_override(self):
+        logs_json_array = JsonArray()
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
+        self.__monitor_fake_instances = []
+        monitor_a = FakeMonitor1({'path': 'testA.log'}, id='a', attribute_key='common_key')
+        monitor_b = FakeMonitor1({'path': 'testB.log'}, id='b', attribute_key='common_key')
+        self.__monitor_fake_instances.append(monitor_a)
+        self.__monitor_fake_instances.append(monitor_b)
+        copy_manager = CopyingManager(config, self.__monitor_fake_instances)
+        if monitor_a.access_order < monitor_b.access_order:
+            first_accessed = monitor_a
+            second_accessed = monitor_b
+        else:
+            first_accessed = monitor_b
+            second_accessed = monitor_a
+        self.assertLess(first_accessed.access_order, second_accessed.access_order)
+        self.assertEquals(copy_manager.expanded_server_attributes['common_key'], first_accessed.attribute_value)
+
     def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
         logs_json_array = JsonArray()
         for entry in configuration_logs_entry:
@@ -852,3 +883,25 @@ class FakeMonitor(object):
 
     def get_extra_server_attributes(self):
         return None
+
+
+class FakeMonitor1(object):
+    order = 0
+    def __init__(self, monitor_log_config, id=None, attribute_key='extra_attrib'):
+        self.id = id
+        self.module_name = 'fake_monitor_%s' % id
+        self.log_config = monitor_log_config
+        self.access_order = None
+        self.attribute_key = attribute_key
+
+    def set_log_watcher(self, log_watcher):
+        pass
+
+    @property
+    def attribute_value(self):
+        return 'VALUE_%s' % self.id
+
+    def get_extra_server_attributes(self):
+        self.access_order = FakeMonitor1.order
+        FakeMonitor1.order += 1
+        return {self.attribute_key: self.attribute_value}
