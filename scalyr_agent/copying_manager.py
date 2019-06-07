@@ -201,20 +201,20 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__monitors = monitors
 
         # collect monitor-specific extra server-attributes
-        self.__monitor_2_extra_server_attribs = dict(
+        monitor_to_extra_server_attribs = dict(
             (monitor, monitor.get_extra_server_attributes()) for monitor in monitors
         )
 
         self.__expanded_server_attributes = copy.deepcopy(self.__config.server_attributes)
-        for monitor in self.__monitor_2_extra_server_attribs:
-            monitor_attribs = self.__monitor_2_extra_server_attribs.get(monitor)
+        for monitor in monitors:
+            monitor_attribs = monitor.get_extra_server_attributes()
             if not monitor_attribs:
                 continue
             for key, value in monitor_attribs.items():
-                if key in self.__config.server_attributes:
+                if key in self.__expanded_server_attributes:
                     log.log(scalyr_logging.DEBUG_LEVEL_0,
-                            "Extra server attribute already defined. Cannot add extra server attribute from monitor %s"
-                            % monitor.module_name,
+                            "Extra server attribute already defined. Cannot add extra server attribute '%s' from monitor %s"
+                            % (key, monitor.module_name),
                             limit_once_per_x_secs=300,
                             limit_key='extra-server-attrib-%s' % key)
                 else:
@@ -290,6 +290,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__disable_new_file_matches = configuration.disable_new_file_matches
         self.__disable_scan_for_new_bytes = configuration.disable_scan_for_new_bytes
         self.__disable_copying_thread = configuration.disable_copying_thread
+
+    @property
+    def expanded_server_attributes(self):
+        """Return deepcopy of expanded server attributes"""
+        return copy.deepcopy(self.__expanded_server_attributes)
 
     @property
     def log_matchers(self):
