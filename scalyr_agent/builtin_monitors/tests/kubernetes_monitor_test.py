@@ -26,10 +26,11 @@ import threading
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor, ControlledCacheWarmer
 from scalyr_agent.monitor_utils.k8s import K8sApiTemporaryError, K8sApiPermanentError
 from scalyr_agent.copying_manager import CopyingManager
+from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
-from scalyr_agent.tests.copying_manager_test import CopyingManagerInitializationTest
+from scalyr_agent.tests.copying_manager_test import FakeMonitor
 
 
 class KubernetesMonitorTest(ScalyrTestCase):
@@ -518,7 +519,22 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             self.assertEqual(warmer.blacklisted_containers(), [self.CONTAINER_1])
             self.assertFalse(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
-class TestExtraServerAttributes(CopyingManagerInitializationTest):
+
+class TestExtraServerAttributes(ScalyrTestCase):
+
+    def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
+        logs_json_array = JsonArray()
+        for entry in configuration_logs_entry:
+            logs_json_array.add(JsonObject(content=entry))
+
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
+
+        self.__monitor_fake_instances = []
+        for monitor_log_config in monitors_log_configs:
+            self.__monitor_fake_instances.append(FakeMonitor(monitor_log_config))
+
+        # noinspection PyTypeChecker
+        return CopyingManager(config, self.__monitor_fake_instances)
 
     def test_no_extra_server_attributes(self):
         copying_manager = self._create_test_instance([], [])
