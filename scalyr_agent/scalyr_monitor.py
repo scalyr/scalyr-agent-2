@@ -255,7 +255,8 @@ class ScalyrMonitor(StoppableThread):
         """Derived classes may optionally return a dict of server attributes to be added to the main config
         server attributes.  Keys already defined by server attributes or other monitors will be dropped with a warning.
 
-        You must ensure that this method is thread-safe as it will be invoked by a different thread (MonitorsManager).
+        You must ensure that this method is thread-safe as it will be invoked by a different thread than the monitor
+        itself.
 
         @return: A dict or None
         """
