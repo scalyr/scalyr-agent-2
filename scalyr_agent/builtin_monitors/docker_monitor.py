@@ -357,7 +357,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                 result[cid] = {'name': cid, 'log_path': None, 'labels': None }
 
     except Exception, e:  # container querying failed
-        logger.error("Error querying running containers", limit_once_per_x_secs=300,
+        logger.exception("Error querying running containers", limit_once_per_x_secs=300,
                      limit_key='docker-api-running-containers' )
         result = None
 
