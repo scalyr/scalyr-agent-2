@@ -731,7 +731,7 @@ def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
 class BlockingRateLimiterTest(ScalyrTestCase):
 
     def setUp(self):
-        self._fake_clock = scalyr_util.RealFakeClock()
+        self._fake_clock = scalyr_util.FakeClock()
 
     def test_fixed_rate_single_concurrency(self):
         """Longer experiment"""

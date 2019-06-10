@@ -554,7 +554,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
                     if k8s_cache is None:
                         # create the k8s cache
-                        k8s_cache = k8s_utils.cache( self._global_config )
+                        k8s_cache = k8s_utils.cache(self._global_config)
 
                     # start streaming events
                     lines = k8s.stream_events( last_event=last_event )
