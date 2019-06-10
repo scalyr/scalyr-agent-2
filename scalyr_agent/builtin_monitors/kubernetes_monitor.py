@@ -180,26 +180,6 @@ define_config_option( __monitor__, 'k8s_always_use_docker',
                      'containers using docker even when the runtime is detected to be something different.',
                      convert_to=bool, default=False, env_aware=True)
 
-define_config_option( __monitor__, 'k8s_use_controlled_warmer',
-                     'Optional (defaults to False). If true, will use the controlled warmer strategy to warm the pod '
-                     'cache.  This only applies when docker is being used as the container system.',
-                      convert_to=bool, default=False, env_aware=True)
-
-define_config_option( __monitor__, 'k8s_controlled_warmer_max_attempts',
-                     'Optional (defaults to 5). The maximum number of temporary errors that may occur when warming '
-                     'a pod\'s entry, before the warmer blacklists it',
-                      convert_to=int, default=5, env_aware=True)
-
-define_config_option( __monitor__, 'k8s_controlled_warmer_max_query_retries',
-                     'Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod '
-                     'if it fails due to a temporary error.',
-                      convert_to=int, default=3, env_aware=True)
-
-define_config_option( __monitor__, 'k8s_controlled_warmer_blacklist_time',
-                     'Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is '
-                     'tried again for warming.',
-                      convert_to=int, default=300, env_aware=True)
-
 define_config_option( __monitor__, 'k8s_cri_query_filesystem',
                      'Optional (defaults to False). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.',
                      convert_to=bool, default=False, env_aware=True)
@@ -483,6 +463,9 @@ class ControlledCacheWarmer(StoppableThread):
         self.__warming_attempts = dict()
         self.__last_reported_warming_attempts = dict()
 
+    def start(self):
+        super(ControlledCacheWarmer, self).start()
+
     def set_k8s_cache(self, k8s_cache):
         """Sets the cache to use.
 
@@ -532,6 +515,9 @@ class ControlledCacheWarmer(StoppableThread):
         try:
             if not container_id in self.__active_pods:
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name)
+            else:
+                warming_entry = self.__active_pods[container_id]
+                warming_entry.is_warm = self.is_warm(pod_namespace, pod_name)
             self.__active_pods[container_id].is_recently_marked = True
         finally:
             self.__lock.release()
@@ -573,6 +559,7 @@ class ControlledCacheWarmer(StoppableThread):
 
         WARNING:  The caller must have already acquired _lock.
         """
+        global_log.info('echee: __emit_report_if_necessary : logger={}, current_time={}, self.__warming_attempts = {}'.format(self.__logger, current_time, self.__warming_attempts))
         if self.__logger is None:
             return
 
@@ -582,12 +569,20 @@ class ControlledCacheWarmer(StoppableThread):
         if self.__last_report_time is None or current_time > self.__last_report_time + 300:
             self.__last_report_time = current_time
 
+            global_log.info('echee: __emit_report_if_necessary : emitting')
             warm_attempts_info = ''
             for category in ['total', 'success', 'temp_error', 'perm_error', 'unknown_error', 'unhandled_error']:
                 current_amount = self.__warming_attempts.get(category, 0)
+                global_log.info('echee: category={}, current_amount={}'.format(category, current_amount))
                 previous_amount = self.__last_reported_warming_attempts.get(category, 0)
+                global_log.info('echee: category={}, current_amount={}'.format(category, previous_amount))
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
-            self.__logger.info('controlled_cache_warmer pending_warming=%d %blacklisted=%d %s',
+                global_log.info('echee: category={}, current_amount={}'.format(category, previous_amount))
+            self.__logger.info('controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
+                               len(self.__containers_to_warm),
+                               self.__count_blacklisted(),
+                               warm_attempts_info)
+            self.__logger.info('echee: controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
                                len(self.__containers_to_warm),
                                self.__count_blacklisted(),
                                warm_attempts_info)
@@ -816,6 +811,7 @@ class ControlledCacheWarmer(StoppableThread):
             if container_id is not None:
                 if self.is_warm(pod_namespace, pod_name):
                     # Something else warmed the pod before we got a chance.  Just take the win.
+                    self._run_state.sleep_but_awaken_if_stopped(1)
                     continue
 
                 try:
@@ -831,6 +827,7 @@ class ControlledCacheWarmer(StoppableThread):
                 except Exception, e:
                     self.__record_warming_result(container_id, unknown_error=e,
                                                  traceback_report=traceback.format_exc())
+
 
     class WarmingEntry(object):
         """Used to represent an active container whose pod information should be warmed in the cache.
@@ -851,6 +848,17 @@ class ControlledCacheWarmer(StoppableThread):
             self.blacklisted_until = None
             # The reason for the blacklisting.
             self.blacklist_reason = None
+
+        def __repr__(self):
+            return 'WarmingEntry:\n\tpod_namespace=%s\n\tpod_name=%s\n\tis_warm=%s\n\tis_recently_marked=%s\n\tfailure_count=%s\n\tblacklisted_until=%s\n\tblacklist_reason=%s\n' % (
+                self.pod_namespace,
+                self.pod_name,
+                self.is_warm,
+                self.is_recently_marked,
+                self.failure_count,
+                self.blacklisted_until,
+                self.blacklist_reason,
+            )
 
 
 def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to_container=None, logger=None,
@@ -1017,7 +1025,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                 controlled_warmer.end_marking()
 
     except Exception, e:  # container querying failed
-        logger.error("Error querying running containers", limit_once_per_x_secs=300,
+        logger.exception("Error querying running containers", limit_once_per_x_secs=300,
                      limit_key='docker-api-running-containers' )
         result = None
 
@@ -1437,7 +1445,7 @@ class ContainerChecker(object):
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            self.k8s_cache = k8s_utils.cache( self._global_config )
+            self.k8s_cache = k8s_utils.cache(self._global_config)
 
             if self.__controlled_warmer is not None:
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
@@ -1449,22 +1457,23 @@ class ContainerChecker(object):
             message_time = start_time
             abort = False
 
-            # wait until the k8s_cache is initialized before aborting
-            # TODO: Ensure there is a way to disable blocking for the cache initialization.
-            while not self.k8s_cache.is_initialized():
-                time.sleep( delay )
-                current_time = time.time()
-                # see if we need to print a message
-                elapsed = current_time - message_time
-                if elapsed > message_delay:
-                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
-                    message_time = current_time
+            if not self._global_config.k8s_use_controlled_warmer:
+                # wait until the k8s_cache is initialized before aborting
+                # TODO: Ensure there is a way to disable blocking for the cache initialization.
+                while not self.k8s_cache.is_initialized():
+                    time.sleep( delay )
+                    current_time = time.time()
+                    # see if we need to print a message
+                    elapsed = current_time - message_time
+                    if elapsed > message_delay:
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
+                        message_time = current_time
 
-                # see if we need to abort the monitor because we've been waiting too long for init
-                elapsed = current_time - start_time
-                if elapsed > self.__k8s_cache_init_abort_delay:
-                    abort = True
-                    break
+                    # see if we need to abort the monitor because we've been waiting too long for init
+                    elapsed = current_time - start_time
+                    if elapsed > self.__k8s_cache_init_abort_delay:
+                        abort = True
+                        break
 
             if abort:
                 raise K8sInitException( "Unable to initialize kubernetes cache" )
@@ -2195,11 +2204,11 @@ class KubernetesMonitor( ScalyrMonitor ):
         )
 
         self.__controlled_warmer = None
-        if self._config.get('k8s_use_controlled_warmer'):
+        if self._global_config.k8s_use_controlled_warmer:
             self.__controlled_warmer = ControlledCacheWarmer(
-                max_failure_count=self._config.get('k8s_controlled_warmer_max_attempts'),
-                blacklist_time_secs=self._config.get('k8s_controlled_warmer_blacklist_time'),
-                max_query_retries=self._config.get('k8s_controlled_warmer_max_query_retries'),
+                max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+                blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+                max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
                 rate_limiter=self.__rate_limiter,
                 logger=global_log)
 
@@ -2594,12 +2603,12 @@ class KubernetesMonitor( ScalyrMonitor ):
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
-        if k8s_cache:
-           ver = k8s_cache.get_api_server_version()
-           runtime = k8s_cache.get_container_runtime()
+        if k8s_cache and not self._global_config.k8s_use_controlled_warmer:
+            ver = k8s_cache.get_api_server_version()
+            runtime = k8s_cache.get_container_runtime()
         ver = 'k8s=%s' % (ver if ver else 'true')
         if runtime:
-           ver += ';k8s-runtime=%s' % runtime
+            ver += ';k8s-runtime=%s' % runtime
 
         return ver
 

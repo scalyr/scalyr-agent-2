@@ -793,7 +793,7 @@ class StoppableThread(threading.Thread):
 
         You must invoke `start` to actually have the thread begin running.
 
-        Note, if you set `target` to None, then the thread will invoked `run_and_propagate` instead of `run` to
+        Note, if you set `target` to None, then the thread will invoke `run_and_propagate` instead of `run` to
         execute the work for the thread.  You must override `run_and_propagate` instead of `run`.
 
         @param name: The name to give the thread.
@@ -1591,11 +1591,12 @@ class BlockingRateLimiter(object):
                     # queue contained at least one token so sleep until the head token becomes ripe
                     sleep_time = max(0, self._ripe_time - self._time())
                     if sleep_time > 0:
-                        self._token_queue_cv.wait()
+                         self._token_queue_cv.wait(sleep_time)
 
             # Head token is ripe.
             token = self._token_queue.popleft()
             self._ripe_time = self._get_next_ripe_time()
+
             return token
 
         finally:
