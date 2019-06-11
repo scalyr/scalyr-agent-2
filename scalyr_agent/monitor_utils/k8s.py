@@ -387,7 +387,6 @@ class _K8sCache( object ):
         except K8sApiException, e:
             # Don't do anything here.  This means the object we are querying doesn't exist
             # and it's up to the caller to handle this by detecting a None result
-            global_log.info('echee: _update_object K8sApiException = %s' % traceback.format_exc())
             pass
 
         # update our cache if we have a result
@@ -1348,7 +1347,7 @@ class KubernetesApi( object ):
 
         response = None
 
-        # echee: save api json to disk
+        # Optionally save api json to disk
         if self.log_api_responses_to_disk:
             kapi = '/var/log/scalyr-agent-2/kapi/'
             if not os.path.exists(kapi):
