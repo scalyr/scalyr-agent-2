@@ -850,15 +850,10 @@ class ControlledCacheWarmer(StoppableThread):
             self.blacklist_reason = None
 
         def __repr__(self):
-            return 'WarmingEntry:\n\tpod_namespace=%s\n\tpod_name=%s\n\tis_warm=%s\n\tis_recently_marked=%s\n\tfailure_count=%s\n\tblacklisted_until=%s\n\tblacklist_reason=%s\n' % (
-                self.pod_namespace,
-                self.pod_name,
-                self.is_warm,
-                self.is_recently_marked,
-                self.failure_count,
-                self.blacklisted_until,
-                self.blacklist_reason,
-            )
+            s = 'WarmingEntry:'
+            for key, val in self.__dict__.items():
+                s += '\n\t%s: %s' % (key, val)
+            return s + '\n'
 
 
 def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to_container=None, logger=None,
