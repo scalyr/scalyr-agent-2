@@ -2189,6 +2189,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             self._global_config.k8s_ratelimit_increase_factor,
             self._global_config.k8s_ratelimit_backoff_factor,
             self._global_config.k8s_ratelimit_max_concurrency,
+            logger=global_log,
         )
 
         self.__controlled_warmer = None
