@@ -508,7 +508,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             k8s_cache = None
 
             if self.__log_watcher:
-                self.log_config = self.__log_watcher.add_log_config( self, self.log_config )
+                self.log_config = self.__log_watcher.add_log_config( self.module_name, self.log_config )
 
             k8s = None
             if k8s_verify_api_queries:
