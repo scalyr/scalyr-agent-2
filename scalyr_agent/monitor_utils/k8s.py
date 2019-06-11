@@ -328,11 +328,6 @@ class _K8sCache( object ):
 
         return result
 
-    def invalidate(self):
-        global_log.info('echee: invalidate before = {}'.format(self._objects))
-        for namespace, objs in self._objects.iteritems():
-            self._objects[namespace] = {}
-
     def purge_expired( self, access_time ):
         """
             removes any items from the store who haven't been accessed since `access_time`
@@ -1091,23 +1086,20 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                if not self._state.cache_config.use_controlled_warmer:
-                    if local_state.batch_pod_updates:
-                        self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
-                    else:
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
-                        self._pods_cache.purge_expired(access_time=current_time)
-                    self._update_cluster_name( local_state.k8s )
-                    if not self._state.cache_config.use_controlled_warmer:
-                        self._update_api_server_version(local_state.k8s)
-
-                    if last_purge + local_state.cache_purge_secs < current_time:
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
-                        self._controllers.purge_expired( last_purge )
-                        last_purge = current_time
+                if not self._state.cache_config.use_controlled_warmer and local_state.batch_pod_updates:
+                    self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 else:
-                    # If using a CacheWarmer, invalidate the entire cache on every cache_expiry_secs
-                    self._pods_cache.invalidate()
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
+                    self._pods_cache.purge_expired(access_time=current_time)
+
+                self._update_cluster_name( local_state.k8s )
+                if not self._state.cache_config.use_controlled_warmer:
+                    self._update_api_server_version(local_state.k8s)
+
+                if last_purge + local_state.cache_purge_secs < current_time:
+                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
+                    self._controllers.purge_expired( last_purge )
+                    last_purge = current_time
 
             except K8sApiException, e:
                 global_log.warn( "Exception occurred when updating k8s cache - %s" % (str( e ) ),
