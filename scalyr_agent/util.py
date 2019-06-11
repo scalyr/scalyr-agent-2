@@ -37,6 +37,7 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
+import scalyr_agent.scalyr_logging as scalyr_logging
 
 
 
@@ -1401,7 +1402,7 @@ class BlockingRateLimiter(object):
 
     def __init__(self, num_agents, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
                  consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=0.5,
-                 max_concurrency=1, fake_clock=None):
+                 max_concurrency=1, logger=None, fake_clock=None):
         """
         @param num_agents: Number of agents in the cluster
         @param initial_cluster_rate: initial cluster rate (requests/sec)
@@ -1412,6 +1413,7 @@ class BlockingRateLimiter(object):
         @param increase_factor: multiplicative factor for increasing rate
         @param backoff_factor: multiplicative factor for decreasing rate
         @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
+        @param logger: If supplied, will log messages for debugging
 
         @type num_agents: int
         @type initial_cluster_rate: float
@@ -1422,6 +1424,7 @@ class BlockingRateLimiter(object):
         @type increase_factor: float
         @type backoff_factor: float
         @type max_concurrency: int
+        @type logger: Logger
         """
         self._num_agents = num_agents
         self._initial_cluster_rate = initial_cluster_rate
@@ -1437,6 +1440,8 @@ class BlockingRateLimiter(object):
         self._cluster_rate_lock = threading.Lock()
 
         self._max_concurrency = max_concurrency
+
+        self._logger = logger
 
         # A queue of tokens
         self._ripe_time = None
@@ -1484,6 +1489,7 @@ class BlockingRateLimiter(object):
         self._ripe_time = self._get_next_ripe_time()
         self._token_queue_cv.release()
 
+
     def _adjust_cluster_rate(self, success):
         """Adjust cluster rate, backing off on failure or increasing on enough consecutive successes.
 
@@ -1501,14 +1507,22 @@ class BlockingRateLimiter(object):
             else:
                 self._consecutive_successes = 0
             if not success:
-                # Failure case: halve the rate
+                # Failure case: backoff
+                orig_cluster_rate = self._current_cluster_rate
                 self._current_cluster_rate = max(
                     self._lower_cluster_rate,
                     self._current_cluster_rate * self._backoff_factor
                 )
+                if self._logger:
+                    self._logger.log(
+                        scalyr_logging.DEBUG_LEVEL_3,
+                        'RateLimiter: decrease cluster rate %s x %s = %s' %
+                        (orig_cluster_rate, self._backoff_factor, self._current_cluster_rate)
+                    )
             else:
                 # Success case: If current rate can be increased, do so based on strategy
                 if self._consecutive_successes >= self._consecutive_success_threshold:
+                    orig_cluster_rate = self._current_cluster_rate
                     if self._current_cluster_rate < self._upper_cluster_rate:
                         if (self._increase_strategy == self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY and
                                 self._current_cluster_rate < self._initial_cluster_rate):
@@ -1516,6 +1530,12 @@ class BlockingRateLimiter(object):
                         else:
                             self._current_cluster_rate = min(
                                 self._upper_cluster_rate, self._current_cluster_rate * self._increase_factor)
+                    if self._logger:
+                        self._logger.log(
+                            scalyr_logging.DEBUG_LEVEL_3,
+                            'RateLimiter: increase cluster rate %s x %s = %s' %
+                            (orig_cluster_rate, self._backoff_factor, self._current_cluster_rate)
+                        )
                     self._consecutive_successes = 0
         finally:
             self._cluster_rate_lock.release()
