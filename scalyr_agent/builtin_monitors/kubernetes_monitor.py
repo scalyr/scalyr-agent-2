@@ -559,7 +559,6 @@ class ControlledCacheWarmer(StoppableThread):
 
         WARNING:  The caller must have already acquired _lock.
         """
-        global_log.info('echee: __emit_report_if_necessary : logger={}, current_time={}, self.__warming_attempts = {}'.format(self.__logger, current_time, self.__warming_attempts))
         if self.__logger is None:
             return
 
@@ -569,20 +568,12 @@ class ControlledCacheWarmer(StoppableThread):
         if self.__last_report_time is None or current_time > self.__last_report_time + 300:
             self.__last_report_time = current_time
 
-            global_log.info('echee: __emit_report_if_necessary : emitting')
             warm_attempts_info = ''
             for category in ['total', 'success', 'temp_error', 'perm_error', 'unknown_error', 'unhandled_error']:
                 current_amount = self.__warming_attempts.get(category, 0)
-                global_log.info('echee: category={}, current_amount={}'.format(category, current_amount))
                 previous_amount = self.__last_reported_warming_attempts.get(category, 0)
-                global_log.info('echee: category={}, current_amount={}'.format(category, previous_amount))
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
-                global_log.info('echee: category={}, current_amount={}'.format(category, previous_amount))
             self.__logger.info('controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
-                               len(self.__containers_to_warm),
-                               self.__count_blacklisted(),
-                               warm_attempts_info)
-            self.__logger.info('echee: controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
                                len(self.__containers_to_warm),
                                self.__count_blacklisted(),
                                warm_attempts_info)
