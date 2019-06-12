@@ -58,7 +58,7 @@ class Test_K8sCache( ScalyrTestCase ):
         # and loading them via 'cache.update'
         cache._objects = objects
 
-        cache.purge_expired( current_time )
+        cache.purge_unused(current_time)
 
         objects = cache._objects.get('default', {})
         self.assertEquals( 1, len( objects ) )
