@@ -448,6 +448,7 @@ class ControlledCacheWarmer(StoppableThread):
         # Tracks the active pods.  Active pods are those docker or some other CRI has recently indicated is
         # running.  This variable maps container id to a WarmingEntry for the pod.
         self.__active_pods = dict()
+
         # The list of containers whose pods are eligible to be warmed in the cache.  Essentially, the active_pods
         # minus those already warmed or blacklisted.
         self.__containers_to_warm = []
@@ -514,10 +515,12 @@ class ControlledCacheWarmer(StoppableThread):
         self.__lock.acquire()
         try:
             if not container_id in self.__active_pods:
+                # Create new warming entry for the container
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name)
             else:
+                # Update existing warming entry with state from pod k8s cache
                 warming_entry = self.__active_pods[container_id]
-                warming_entry.is_warm = self.is_warm(pod_namespace, pod_name)
+                warming_entry.set_warm(self.is_warm(pod_namespace, pod_name))
             self.__active_pods[container_id].is_recently_marked = True
         finally:
             self.__lock.release()
@@ -540,6 +543,25 @@ class ControlledCacheWarmer(StoppableThread):
             # active.
             self.__update_containers_to_warm(check_blacklisted=True, current_time=current_time)
             self.__emit_report_if_necessary(current_time=current_time)
+        finally:
+            self.__lock.release()
+
+    def is_cold_for_duration(self, container_id, duration):
+        """
+        Returns True if the container has been cold for at least duration (seconds).
+
+        @param container_id:  The id of the container
+        @param duration: Time duration in seconds
+
+        @type container_id: str
+        @type duration: float
+
+        @rtype: bool
+        """
+        self.__lock.acquire()
+        try:
+            warming_entry = self.__active_pods[container_id]
+            return warming_entry.is_cold_for_duration(duration)
         finally:
             self.__lock.release()
 
@@ -614,15 +636,15 @@ class ControlledCacheWarmer(StoppableThread):
         if check_blacklisted:
             if current_time is not None:
                 current_time = self._get_current_time()
-            for value in self.__active_pods.itervalues():
-                if value.blacklisted_until is not None and value.blacklisted_until < current_time:
+            for warming_entry in self.__active_pods.itervalues():
+                if warming_entry.blacklisted_until is not None and warming_entry.blacklisted_until < current_time:
                     # After coming off the blacklist, the pod gets a fresh start.  Reset all counters.
-                    value.blacklisted_until = None
-                    value.blacklist_reason = None
-                    value.failure_count = 0
+                    warming_entry.blacklisted_until = None
+                    warming_entry.blacklist_reason = None
+                    warming_entry.failure_count = 0
 
-        for key, value in self.__active_pods.iteritems():
-            if not value.is_warm and value.blacklisted_until is None:
+        for key, warming_entry in self.__active_pods.iteritems():
+            if not warming_entry.is_warm and warming_entry.blacklisted_until is None:
                 self.__containers_to_warm.append(key)
 
         if len(self.__containers_to_warm) != original_to_warm_count:
@@ -750,7 +772,7 @@ class ControlledCacheWarmer(StoppableThread):
             if container_id in self.__active_pods:
                 entry = self.__active_pods[container_id]
                 if success:
-                    entry.is_warm = True
+                    entry.set_warm(True)
                     entry.failure_count = 0
                     entry.blacklisted_until = None
                     entry.blacklist_reason = None
@@ -819,8 +841,9 @@ class ControlledCacheWarmer(StoppableThread):
                 else:
                     # Something else warmed the pod before we got a chance.  Just take the win.
                     consecutive_warm_pods += 1
-                    if consecutive_warm_pods == 100:
-                        global_log.warn('echee: 100 consecutive warms in a row. Sleeping for 1 sec.')
+                    if consecutive_warm_pods == 10:
+                        # A certain number of multiple wins at a time suggests this thread is being awakened
+                        # even though there are no pods to warm.  To avoid infinite looping, sleep for a bit.
                         self._run_state.sleep_but_awaken_if_stopped(1)
                         consecutive_warm_pods = 0
             except:
@@ -835,10 +858,17 @@ class ControlledCacheWarmer(StoppableThread):
             self.pod_namespace = pod_namespace
             # The associated pod's name.
             self.pod_name = pod_name
+
             # Whether or not it has been successfully warmed.
-            self.is_warm = False
+            self.__warm = False
+            # Last updated time for the _warm bool.  Initialize to zero since new entries are truly cold.
+            self.__warm_set_time = 0
+            # Lock for synchronizing access to __warm
+            self.__warm_lock = threading.Lock()
+
             # Used to indicate if it is been marked in the most recent marking run started by `begin_marking`.
             self.is_recently_marked = False
+
             # The number of consecutive failures seen while trying to warm the pod's information.
             self.failure_count = 0
             # If not none, this container has been blacklisted.  It will not be warmed again until the wallclock
@@ -846,6 +876,44 @@ class ControlledCacheWarmer(StoppableThread):
             self.blacklisted_until = None
             # The reason for the blacklisting.
             self.blacklist_reason = None
+
+        @property
+        def is_warm(self):
+            self.__warm_lock.acquire()
+            try:
+                return self.__warm
+            finally:
+                self.__warm_lock.release()
+
+        def set_warm(self, is_warm):
+            """The value is different, set value and update set-time
+
+            This method is not thread-safe.
+            """
+            self.__warm_lock.acquire()
+            try:
+                if self.__warm != is_warm:
+                    self.__warm = is_warm
+                    self.__warm_set_time = time.time()
+            finally:
+                self.__warm_lock.release()
+
+        def is_cold_for_duration(self, duration):
+            """Returns True if this warming entry has been cold for at least a certain time duration
+
+            This method is not thread-safe.
+
+            @param duration: Time duration in seconds
+            @type duration: float
+            @rtype: bool
+            """
+            self.__warm_lock.acquire()
+            try:
+                t = time.time()
+                cold = not self.__warm and (t - self.__warm_set_time) > duration
+                return cold
+            finally:
+                self.__warm_lock.release()
 
         def __repr__(self):
             s = 'WarmingEntry:'
@@ -975,14 +1043,17 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
 
                                         # If we are warming the cache using the controlled strategy, then skip this
                                         # container if it is not yet warmed in the pod.  That way, all code from here
-                                        # on out is guaranteed to not issue an API request if the pod is
-                                        # cached.
+                                        # on out is guaranteed to not issue an API request if the pod is cached.
                                         if controlled_warmer is not None:
                                             controlled_warmer.mark_to_warm(cid, k8s_info['pod_namespace'],
                                                                            k8s_info['pod_name'])
-                                            if not controlled_warmer.is_warm(k8s_info['pod_namespace'],
-                                                                             k8s_info['pod_name']):
-                                                logger.log(scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because not in cache warmer" % short_cid)
+                                            cold_duration = k8s_cache.local_state().cache_expiry_secs
+                                            if controlled_warmer.is_cold_for_duration(cid, cold_duration):
+                                                # Just because a pod isn't warm in the cache doesn't mean it's no longer
+                                                # active.  E.g. periodic cache expiration could cause the pod to be cold
+                                                # yet we should NOT exclude the pod from the result unless "enough time"
+                                                # has elapsed to give the re-querying a chance.
+                                                logger.log(scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because it has been cold for longer than %s seconds" % (short_cid, cold_duration))
                                                 continue
 
                                         pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
