@@ -797,27 +797,34 @@ class ControlledCacheWarmer(StoppableThread):
         """
         assert self.__k8s_cache is not None
 
+        consecutive_warm_pods = 0
         while self._run_state.is_running():
-            container_id, pod_namespace, pod_name = self.__pick_next_pod()
-            if container_id is not None:
-                if self.is_warm(pod_namespace, pod_name):
+            try:
+                container_id, pod_namespace, pod_name = self.__pick_next_pod()
+                if container_id is not None and not self.is_warm(pod_namespace, pod_name):
+                    consecutive_warm_pods = 0
+                    try:
+                        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
+                        self.__k8s_cache.pod(pod_namespace, pod_name, query_options=options)
+                        self.__record_warming_result(container_id, success=True)
+                    except K8sApiPermanentError, e:
+                        self.__record_warming_result(container_id, permanent_error=e,
+                                                     traceback_report=traceback.format_exc())
+                    except K8sApiTemporaryError, e:
+                        self.__record_warming_result(container_id, temporary_error=e,
+                                                     traceback_report=traceback.format_exc())
+                    except Exception, e:
+                        self.__record_warming_result(container_id, unknown_error=e,
+                                                     traceback_report=traceback.format_exc())
+                else:
                     # Something else warmed the pod before we got a chance.  Just take the win.
-                    self._run_state.sleep_but_awaken_if_stopped(1)
-                    continue
-
-                try:
-                    options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
-                    self.__k8s_cache.pod(pod_namespace, pod_name, query_options=options)
-                    self.__record_warming_result(container_id, success=True)
-                except K8sApiPermanentError, e:
-                    self.__record_warming_result(container_id, permanent_error=e,
-                                                 traceback_report=traceback.format_exc())
-                except K8sApiTemporaryError, e:
-                    self.__record_warming_result(container_id, temporary_error=e,
-                                                 traceback_report=traceback.format_exc())
-                except Exception, e:
-                    self.__record_warming_result(container_id, unknown_error=e,
-                                                 traceback_report=traceback.format_exc())
+                    consecutive_warm_pods += 1
+                    if consecutive_warm_pods == 100:
+                        global_log.warn('echee: 100 consecutive warms in a row. Sleeping for 1 sec.')
+                        self._run_state.sleep_but_awaken_if_stopped(1)
+                        consecutive_warm_pods = 0
+            except:
+                global_log.exception('cacher warmer uncaught exception')
 
 
     class WarmingEntry(object):
@@ -959,7 +966,11 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                         if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
                                             continue
                                         if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
-                                            logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based excluded namespaces" % short_cid)
+                                            logger.log(
+                                                scalyr_logging.DEBUG_LEVEL_2,
+                                                "Excluding container '%s' based excluded namespaces: %s in %s" %
+                                                (short_cid, k8s_info['pod_namespace'], k8s_namespaces_to_exclude)
+                                            )
                                             continue
 
                                         # If we are warming the cache using the controlled strategy, then skip this
@@ -971,6 +982,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                                                            k8s_info['pod_name'])
                                             if not controlled_warmer.is_warm(k8s_info['pod_namespace'],
                                                                              k8s_info['pod_name']):
+                                                logger.log(scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because not in cache warmer" % short_cid)
                                                 continue
 
                                         pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
