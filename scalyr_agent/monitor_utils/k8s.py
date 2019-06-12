@@ -438,13 +438,15 @@ class _K8sCache( object ):
 
         return result
 
-    def _lookup_object( self, namespace, name, current_time ):
-        """ Look to see if the object specified by the namespace and name
-        exists within the cached data.
+    def _lookup_object( self, namespace, name, current_time, kind=None ):
+        """ Look to see if the object specified by the namespace and name exists within the cached data.
+
+        Note: current_time must be provided (otherwise, the access_time-based revalidation of cache won't work correctly,
+        for example, manifesting as unnecssary re-queries of controller metadata)
 
         Return the object info, or None if not found
 
-        @param current_time If not None, update the last access time for the object to this value.
+        @param current_time last access time for the object to this value.
         """
         result = None
         self._lock.acquire()
@@ -474,19 +476,18 @@ class _K8sCache( object ):
         """
         return self._lookup_object(namespace, name, None) is not None
 
-    def lookup( self, k8s, namespace, name, kind=None, current_time=None, query_options=None ):
+    def lookup( self, k8s, current_time, namespace, name, kind=None, query_options=None ):
         """ returns info for the object specified by namespace and name
         or None if no object is found in the cache.
 
         Querying the information is thread-safe, but the returned object should
         not be written to.
         """
-
         if kind is None:
             kind = self._object_type
 
         # see if the object exists in the cache and return it if so
-        result = self._lookup_object( namespace, name, current_time )
+        result = self._lookup_object( namespace, name, current_time, kind=kind )
         if result:
             global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
             return result
@@ -561,7 +562,9 @@ class PodProcessor( _K8sProcessor ):
 
         # walk the parent until we get to the root controller
         # Note: Parent controllers will always be in the same namespace as the child
-        controller = self._controllers.lookup( k8s, namespace, name, kind=kind, query_options=query_options )
+        current_time = time.time()
+        controller = self._controllers.lookup(k8s, current_time, namespace, name, kind=kind,
+                                              query_options=query_options)
         while controller:
             if controller.parent_name is None:
                 global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'controller %s has no parent name' % controller.name )
@@ -572,8 +575,8 @@ class PodProcessor( _K8sProcessor ):
                 break
 
             # get the parent controller
-            parent_controller = self._controllers.lookup( k8s, namespace, controller.parent_name,
-                                                          kind=controller.parent_kind, query_options=query_options )
+            parent_controller = self._controllers.lookup(k8s, current_time, namespace, controller.parent_name,
+                                                         kind=controller.parent_kind, query_options=query_options)
             # if the parent controller doesn't exist, assume the current controller
             # is the root controller
             if parent_controller is None:
@@ -1096,7 +1099,11 @@ class KubernetesCache( object ):
                     self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
+                    global_log.log(
+                        scalyr_logging.DEBUG_LEVEL_1,
+                        "Purging unused controllers last_purge=%s cache_purge_secs=%s current_time=%s"
+                        % (last_purge, local_state.cache_purge_secs, current_time)
+                    )
                     self._controllers.purge_expired( last_purge )
                     last_purge = current_time
 
@@ -1127,7 +1134,7 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._pods_cache.lookup(local_state.k8s, namespace, name, kind='Pod', current_time=current_time,
+        return self._pods_cache.lookup(local_state.k8s, current_time, namespace, name, kind='Pod',
                                        query_options=query_options)
 
     def is_pod_cached(self, namespace, name):
@@ -1155,7 +1162,7 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._controllers.lookup( local_state.k8s, namespace, name, kind=kind, current_time=current_time )
+        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind)
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
