@@ -393,7 +393,7 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def _update_object( self, k8s, kind, namespace, name, query_options=None ):
+    def _update_object( self, k8s, kind, namespace, name, current_time, query_options=None ):
         """ update a single object, returns the object if found, otherwise return None """
         result = None
         try:
@@ -530,7 +530,7 @@ class _K8sCache( object ):
 
         # we have a cache miss so query the object individually
         global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
-        result = self._update_object( k8s, kind, namespace, name, query_options=query_options )
+        result = self._update_object( k8s, kind, namespace, name, current_time, query_options=query_options )
 
         return result
 
@@ -792,7 +792,6 @@ class _CacheConfig( object ):
                  False otherwise
         """
         return self.namespaces_to_ignore != new_config.namespaces_to_ignore
-
 
 class _CacheConfigState( object ):
     """
