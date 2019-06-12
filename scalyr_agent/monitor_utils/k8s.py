@@ -300,17 +300,26 @@ class _K8sCache( object ):
 
     def __init__( self, processor, object_type, perform_full_updates=True ):
         """
-            Initialises a Kubernees Cache
+            Initialises a Kubernetes Cache
             @param processor: a _K8sProcessor object for querying/processing the k8s api
             @param object_type: a string containing a textual name of the objects being cached, for use in log messages
             @param perform_full_updates: If False no attempts will be made to fully update the cache (only single items will be cached)
         """
-        # protects self.objects
+        # protects self._objects and self._objects_expired
         self._lock = threading.Lock()
 
         # dict of object dicts.  The outer dict is hashed by namespace,
         # and the inner dict is hashed by object name
         self._objects = {}
+
+        # Identical to self._objects but contains optional expired booleans for corresponding object
+        # New object won't have an entry.  Only older objects that have been "soft purged" will be marked
+        # with a boolean (True).
+        # Note:
+        #   Expirations should ideally be stored in the _objects dict itself alongside objects.  However,
+        #   the long-term direction for this feature is uncertain and so this is a temporary implementation
+        #   needed to support the notion of a "soft purge".
+        self._objects_expired = {}
 
         self._processor = processor
         self._object_type = object_type
@@ -328,9 +337,11 @@ class _K8sCache( object ):
 
         return result
 
-    def purge_expired( self, access_time ):
-        """
-            removes any items from the store who haven't been accessed since `access_time`
+    def purge_unused(self, access_time, soft_purge=False):
+        """Removes any items from the store who haven't been accessed since `access_time`
+
+        @param access_time:  Any objects last accessed before access_time will be purged
+        @param soft_purge: If true, do not remove from cache but merely mark as expired.
         """
         self._lock.acquire()
         stale = []
@@ -343,8 +354,12 @@ class _K8sCache( object ):
 
             for (namespace, obj_name) in stale:
                 global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name) )
-                self._objects[namespace].pop( obj_name, None )
-
+                if soft_purge:
+                    expired_set = self._objects_expired.setdefault(namespace, {})
+                    expired_set.setdefault(obj_name, True)
+                else:
+                    self._objects[namespace].pop(obj_name, None)
+                    self._objects_expired.get(namespace, {}).pop(obj_name, None)
         finally:
             self._lock.release()
 
@@ -373,6 +388,7 @@ class _K8sCache( object ):
         self._lock.acquire()
         try:
             self._objects = objects
+            self._objects_expired = {}  # clear all expiration times
         finally:
             self._lock.release()
 
@@ -394,11 +410,13 @@ class _K8sCache( object ):
             global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Processing single %s: %s/%s" % (self._object_type, result.namespace, result.name) )
             self._lock.acquire()
             try:
-                if result.namespace not in self._objects:
-                    self._objects[result.namespace] = {}
-                current = self._objects[result.namespace]
-                current[result.name] = result
+                # update the object
+                objects = self._objects.setdefault(result.namespace, {})
+                objects[result.name] = result
 
+                # remove expired flag
+                expired_dict = self._objects_expired.setdefault(result.namespace, {})
+                expired_dict.pop(result.name, None)
             finally:
                 self._lock.release()
 
@@ -438,19 +456,34 @@ class _K8sCache( object ):
 
         return result
 
-    def _lookup_object( self, namespace, name, current_time, kind=None ):
+
+    def _lookup_object(self, namespace, name, current_time, none_if_expired=False):
         """ Look to see if the object specified by the namespace and name exists within the cached data.
 
-        Note: current_time must be provided (otherwise, the access_time-based revalidation of cache won't work correctly,
-        for example, manifesting as unnecssary re-queries of controller metadata)
+        Note: current_time should be provided (otherwise, access_time-based revalidation of cache won't work correctly,
+        for example, manifesting as unnecessary re-queries of controller metadata)
 
         Return the object info, or None if not found
 
+        @param namespace: The object's namespace
+        @param name: The object's name
         @param current_time last access time for the object to this value.
+        @param none_if_expired: Return None if the object is expired, even if it still exists in the cache.
+
+        @type namespace: str
+        @type name: str
+        @type current_time: epoch seconds
+        @type none_if_expired: bool
         """
         result = None
         self._lock.acquire()
         try:
+            # Optionally check if the object has been marked as expired. If so, return None.
+            if none_if_expired:
+                expired = self._objects_expired.setdefault(namespace, {}).get(name, False)
+                if expired:
+                    return None
+
             objects = self._objects.get( namespace, {} )
             result = objects.get( name, None )
 
@@ -464,30 +497,33 @@ class _K8sCache( object ):
         return result
 
     def is_cached(self, namespace, name):
-        """Returns true if the specified object is in the cache.
+        """Returns true if the specified object is in the cache and not marked expired.
 
         @param namespace: The object's namespace
         @param name: The object's name
+
         @type namespace: str
         @type name: str
 
-        @return: True if the object is cached.
+        @return: True if the object is cached.  If check_expiration is True and an expiration
+            time exists for the object, then return True only if not expired
         @rtype: bool
         """
-        return self._lookup_object(namespace, name, None) is not None
+        return self._lookup_object(namespace, name, None, none_if_expired=True) is not None
 
-    def lookup( self, k8s, current_time, namespace, name, kind=None, query_options=None ):
-        """ returns info for the object specified by namespace and name
-        or None if no object is found in the cache.
+    def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
+        """Returns info for the object specified by namespace and name or None if no object is found in the cache.
 
-        Querying the information is thread-safe, but the returned object should
-        not be written to.
+        Querying the information is thread-safe, but the returned object should not be written to.
+
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+        @type allow_expired: bool
         """
         if kind is None:
             kind = self._object_type
 
         # see if the object exists in the cache and return it if so
-        result = self._lookup_object( namespace, name, current_time, kind=kind )
+        result = self._lookup_object(namespace, name, current_time, none_if_expired=not allow_expired)
         if result:
             global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
             return result
@@ -497,6 +533,7 @@ class _K8sCache( object ):
         result = self._update_object( k8s, kind, namespace, name, query_options=query_options )
 
         return result
+
 
 class _K8sProcessor( object ):
     """
@@ -1089,11 +1126,12 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                if not self._state.cache_config.use_controlled_warmer and local_state.batch_pod_updates:
+                has_warmer = self._state.cache_config.use_controlled_warmer
+                if not has_warmer and local_state.batch_pod_updates:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 else:
                     global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
-                    self._pods_cache.purge_expired(access_time=current_time)
+                    self._pods_cache.purge_unused(access_time=current_time, soft_purge=has_warmer)
 
                 self._update_cluster_name( local_state.k8s )
                 if not self._state.cache_config.use_controlled_warmer:
@@ -1105,7 +1143,7 @@ class KubernetesCache( object ):
                         "Purging unused controllers last_purge=%s cache_purge_secs=%s current_time=%s"
                         % (last_purge, local_state.cache_purge_secs, current_time)
                     )
-                    self._controllers.purge_expired( last_purge )
+                    self._controllers.purge_unused(last_purge, soft_purge=has_warmer)
                     last_purge = current_time
 
             except K8sApiException, e:
@@ -1123,12 +1161,17 @@ class KubernetesCache( object ):
             run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )
 
 
-    def pod( self, namespace, name, current_time=None, query_options=None ):
-        """ returns pod info for the pod specified by namespace and name
-        or None if no pad matches.
+    def pod(self, namespace, name, current_time=None, allow_expired=True, query_options=None):
+        """Returns pod info for the pod specified by namespace and name or None if no pad matches.
+
+        Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
+        lead to these objects being refreshed prematurely (potential source of bugs)
 
         Querying the pod information is thread-safe, but the returned object should
         not be written to.
+
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+        @type allow_expired: bool
         """
         local_state = self._state.copy_state()
 
@@ -1136,10 +1179,13 @@ class KubernetesCache( object ):
             return
 
         return self._pods_cache.lookup(local_state.k8s, current_time, namespace, name, kind='Pod',
-                                       query_options=query_options)
+                                       allow_expired=allow_expired, query_options=query_options)
 
     def is_pod_cached(self, namespace, name):
-        """Returns true if the specified pod is in the cache.
+        """Returns true if the specified pod is in the cache and isn't expired.
+
+        Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
+        lead to these objects being refreshed prematurely (potential source of bugs)
 
         @param namespace: The pod's namespace
         @param name: The pod's name
@@ -1152,8 +1198,11 @@ class KubernetesCache( object ):
         return self._pods_cache.is_cached(namespace, name)
 
     def controller( self, namespace, name, kind, current_time=None ):
-        """ returns controller info for the controller specified by namespace and name
+        """Returns controller info for the controller specified by namespace and name
         or None if no controller matches.
+
+        Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
+        lead to these objects being refreshed prematurely (potential source of bugs)
 
         Querying the controller information is thread-safe, but the returned object should
         not be written to.
