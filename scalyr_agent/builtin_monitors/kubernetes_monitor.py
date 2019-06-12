@@ -568,6 +568,8 @@ class ControlledCacheWarmer(StoppableThread):
     def is_warm(self, pod_namespace, pod_name):
         """Returns true if the specified pod's information is cached.
 
+        Note that expired items will return False even if the item is in the cache.
+
         @param pod_namespace: The namespace for the pod
         @param pod_name: The name for the pod
         @type pod_namespace: str
@@ -827,7 +829,7 @@ class ControlledCacheWarmer(StoppableThread):
                     consecutive_warm_pods = 0
                     try:
                         options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
-                        self.__k8s_cache.pod(pod_namespace, pod_name, query_options=options)
+                        self.__k8s_cache.pod(pod_namespace, pod_name, allow_expired=False, query_options=options)
                         self.__record_warming_result(container_id, success=True)
                     except K8sApiPermanentError, e:
                         self.__record_warming_result(container_id, permanent_error=e,
