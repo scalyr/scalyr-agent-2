@@ -543,18 +543,20 @@ class ControlledCacheWarmer(StoppableThread):
         finally:
             self.__lock.release()
 
-    def is_warm(self, pod_namespace, pod_name):
+    def is_warm(self, pod_namespace, pod_name, allow_expired=False):
         """Returns true if the specified pod's information is cached.
-
-        Note that expired items will return False even if the item is in the cache.
 
         @param pod_namespace: The namespace for the pod
         @param pod_name: The name for the pod
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+
         @type pod_namespace: str
         @type pod_name: str
+        @type allow_expired: bool
+
         @rtype bool
         """
-        return self.__k8s_cache.is_pod_cached(pod_namespace, pod_name)
+        return self.__k8s_cache.is_pod_cached(pod_namespace, pod_name, allow_expired)
 
     def __emit_report_if_necessary(self, current_time=None):
         """Emit the periodic reporting lines if sufficient time has passed.
@@ -979,15 +981,22 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                         # container if it is not yet warmed in the pod.  That way, all code from here
                                         # on out is guaranteed to not issue an API request if the pod is
                                         # cached.
+                                        namespace = k8s_info['pod_namespace']
+                                        pod_name = k8s_info['pod_name']
+
                                         if controlled_warmer is not None:
-                                            controlled_warmer.mark_to_warm(cid, k8s_info['pod_namespace'],
-                                                                           k8s_info['pod_name'])
-                                            if not controlled_warmer.is_warm(k8s_info['pod_namespace'],
-                                                                             k8s_info['pod_name']):
-                                                logger.log(scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' because not in cache warmer" % short_cid)
+                                            controlled_warmer.mark_to_warm(cid, namespace, pod_name)
+                                            # Must not exclude this pod if it's expired but still present in cache.
+                                            # Otherwise, the pod's logfile will be dropped and re-watched repeatedly
+                                            # resulting in continuous thrashing.
+                                            if not controlled_warmer.is_warm(namespace, pod_name, allow_expired=True):
+                                                logger.log(
+                                                    scalyr_logging.DEBUG_LEVEL_2,
+                                                    "Excluding container '%s' because not in cache warmer" % short_cid
+                                                )
                                                 continue
 
-                                        pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
+                                        pod = k8s_cache.pod(namespace, pod_name, current_time)
                                         if pod:
                                             k8s_info['pod_info'] = pod
 
