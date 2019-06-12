@@ -173,7 +173,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             finally:
                 self.__lock.release()
 
-        def pod(self, pod_namespace, pod_name):
+        def pod(self, pod_namespace, pod_name, current_time=None, query_options=None ):
             """Faked KubernetesCache method that simulates blocking for the specified pod's cached entry.
 
             @param pod_namespace: The namespace for the pod
