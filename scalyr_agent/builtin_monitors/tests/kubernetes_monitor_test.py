@@ -162,13 +162,18 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             # The set of pods that have been warmed, identified by pod key
             self.__warmed_pods = set()
 
-        def is_pod_cached(self, pod_namespace, pod_name):
+        def is_pod_cached(self, pod_namespace, pod_name, allow_expired):
             """Faked KubernetesCache method that returns if the pod has been warmed from the cache's perspective.
             @param pod_namespace: The namespace for the pod
             @param pod_name:  The name for the pod
+            @param allow_expired: If True, an object is considered present in cache even if it is expired.
+
             @type pod_namespace: str
             @type pod_name: str
+            @type allow_expired: bool
+
             @return True if the pod has been warmed.
+            @rtype: bool
             """
             self.__lock.acquire()
             try:
