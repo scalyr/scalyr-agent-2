@@ -496,20 +496,22 @@ class _K8sCache( object ):
 
         return result
 
-    def is_cached(self, namespace, name):
-        """Returns true if the specified object is in the cache and not marked expired.
+    def is_cached(self, namespace, name, allow_expired):
+        """Returns true if the specified object is in the cache and (optionally) not expired.
 
         @param namespace: The object's namespace
         @param name: The object's name
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
 
         @type namespace: str
         @type name: str
+        @type allow_expired: bool
 
         @return: True if the object is cached.  If check_expiration is True and an expiration
             time exists for the object, then return True only if not expired
         @rtype: bool
         """
-        return self._lookup_object(namespace, name, None, none_if_expired=True) is not None
+        return self._lookup_object(namespace, name, None, none_if_expired=not allow_expired) is not None
 
     def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
         """Returns info for the object specified by namespace and name or None if no object is found in the cache.
@@ -1180,7 +1182,7 @@ class KubernetesCache( object ):
         return self._pods_cache.lookup(local_state.k8s, current_time, namespace, name, kind='Pod',
                                        allow_expired=allow_expired, query_options=query_options)
 
-    def is_pod_cached(self, namespace, name):
+    def is_pod_cached(self, namespace, name, allow_expired):
         """Returns true if the specified pod is in the cache and isn't expired.
 
         Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
@@ -1188,13 +1190,16 @@ class KubernetesCache( object ):
 
         @param namespace: The pod's namespace
         @param name: The pod's name
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+
         @type namespace: str
         @type name: str
+        @type allow_expired: bool
 
         @return: True if the pod is cached.
         @rtype: bool
         """
-        return self._pods_cache.is_cached(namespace, name)
+        return self._pods_cache.is_cached(namespace, name, allow_expired)
 
     def controller( self, namespace, name, kind, current_time=None ):
         """Returns controller info for the controller specified by namespace and name
