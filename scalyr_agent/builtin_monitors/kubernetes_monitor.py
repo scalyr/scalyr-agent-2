@@ -2636,7 +2636,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         if self.__report_container_metrics and self.__client:
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
                                          k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
-                                         k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
+                                         k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                                         controlled_warmer=self.__controlled_warmer)
         try:
             if containers:
                 if self.__report_container_metrics:
