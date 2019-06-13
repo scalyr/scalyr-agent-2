@@ -43,10 +43,6 @@ class TestConfigurationK8s(TestConfigurationBase):
             "k8s_always_use_docker": (STANDARD_PREFIX, True, bool),
             "k8s_kubelet_host_ip": (STANDARD_PREFIX, False, bool),
             "gather_k8s_pod_info": (STANDARD_PREFIX, True, bool),
-            "k8s_use_controlled_warmer": (STANDARD_PREFIX, False, bool),
-            "k8s_controlled_warmer_max_attempts": (STANDARD_PREFIX, TEST_INT, int),
-            "k8s_controlled_warmer_max_query_retries": (STANDARD_PREFIX, TEST_INT, int),
-            "k8s_controlled_warmer_blacklist_time": (STANDARD_PREFIX, TEST_INT, int),
         }
 
         k8s_events_testmap = {
