@@ -353,11 +353,12 @@ class _K8sCache( object ):
                             stale.append( (namespace, obj_name) )
 
             for (namespace, obj_name) in stale:
-                global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name) )
                 if soft_purge:
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Mark object %s/%s as expired in cache" % (namespace, obj_name))
                     expired_set = self._objects_expired.setdefault(namespace, {})
                     expired_set.setdefault(obj_name, True)
                 else:
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name))
                     self._objects[namespace].pop(obj_name, None)
                     self._objects_expired.get(namespace, {}).pop(obj_name, None)
         finally:
