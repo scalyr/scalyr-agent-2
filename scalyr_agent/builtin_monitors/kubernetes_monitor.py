@@ -2573,16 +2573,15 @@ class KubernetesMonitor( ScalyrMonitor ):
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
         """
-        #disable version for now
-        #k8s_cache = self.__get_k8s_cache()
+        k8s_cache = self.__get_k8s_cache()
         ver = None
-        #runtime = None
-        #if k8s_cache:
-        #    ver = k8s_cache.get_api_server_version()
-        #    runtime = k8s_cache.get_container_runtime()
+        runtime = None
+        if k8s_cache:
+           ver = k8s_cache.get_api_server_version()
+           runtime = k8s_cache.get_container_runtime()
         ver = 'k8s=%s' % (ver if ver else 'true')
-        #if runtime:
-        #    ver += ';k8s-runtime=%s' % runtime
+        if runtime:
+           ver += ';k8s-runtime=%s' % runtime
 
         return ver
 
