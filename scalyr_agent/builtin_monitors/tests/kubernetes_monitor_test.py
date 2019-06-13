@@ -162,10 +162,12 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             # The set of pods that have been warmed, identified by pod key
             self.__warmed_pods = set()
 
-        def is_pod_cached(self, pod_namespace, pod_name):
+        def is_pod_cached(self, pod_namespace, pod_name, current_time):
             """Faked KubernetesCache method that returns if the pod has been warmed from the cache's perspective.
             @param pod_namespace: The namespace for the pod
             @param pod_name:  The name for the pod
+            @param current_time:  The current time since the epoch - not used for testing, but listed here to maintain compatibility
+                                  with the actual method definition
             @type pod_namespace: str
             @type pod_name: str
             @return True if the pod has been warmed.
@@ -176,11 +178,12 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             finally:
                 self.__lock.release()
 
-        def pod(self, pod_namespace, pod_name, current_time=None, query_options=None ):
+        def pod(self, pod_namespace, pod_name, current_time=None, query_options=None, force_lookup=False ):
             """Faked KubernetesCache method that simulates blocking for the specified pod's cached entry.
 
             @param pod_namespace: The namespace for the pod
             @param pod_name:  The name for the pod
+            @param force_lookup: Not used for testing.  Added to keep method signature consistent with actual code
 
             @type pod_namespace: str
             @type pod_name: str
