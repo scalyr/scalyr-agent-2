@@ -37,7 +37,6 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
-import scalyr_agent.scalyr_logging as scalyr_logging
 
 
 
@@ -1500,6 +1499,7 @@ class BlockingRateLimiter(object):
         @param success: Whether an operation was successful
         @type success: bool
         """
+        import scalyr_agent.scalyr_logging as scalyr_logging
         self._cluster_rate_lock.acquire()
         try:
             if success:
@@ -1595,10 +1595,13 @@ class BlockingRateLimiter(object):
         @return: a token object
         @rtype: RateLimiterToken
         """
+        import scalyr_agent.scalyr_logging as scalyr_logging
         if self._fake_clock:
             return self._simulate_acquire_token()
 
         # block until a token is available from the token heap
+        if self._logger:
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: before token acquire'.format(threading.current_thread().name))
         self._token_queue_cv.acquire()
 
         try:
@@ -1606,17 +1609,23 @@ class BlockingRateLimiter(object):
                 # no tokens available so sleep for a while
                 if len(self._token_queue) == 0:
                     # queue contained no tokens so wait indefinitely
+                    if self._logger:
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: waiting on token q'.format(threading.current_thread().name))
                     self._token_queue_cv.wait()
                 else:
                     # queue contained at least one token so sleep until the head token becomes ripe
                     sleep_time = max(0, self._ripe_time - self._time())
                     if sleep_time > 0:
-                         self._token_queue_cv.wait(sleep_time)
+                        if self._logger:
+                            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: waiting on token q for {}'.format(threading.current_thread().name, sleep_time))
+                        self._token_queue_cv.wait(sleep_time)
 
             # Head token is ripe.
             token = self._token_queue.popleft()
             self._ripe_time = self._get_next_ripe_time()
 
+            if self._logger:
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: returning token {}'.format(threading.current_thread().name, token))
             return token
 
         finally:
@@ -1632,12 +1641,15 @@ class BlockingRateLimiter(object):
         @type token: RateLimiterToken
         @type success: bool
         """
+        import scalyr_agent.scalyr_logging as scalyr_logging
         if not isinstance(token, RateLimiterToken):
             raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
 
         if self._fake_clock:
             return self._simulate_release_token(token, success)
 
+        if self._logger:
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: before token acquire (for release)'.format(threading.current_thread().name))
         self._token_queue_cv.acquire()
 
         try:
@@ -1648,6 +1660,8 @@ class BlockingRateLimiter(object):
             self._token_queue.append(token)
 
             # awaken threads waiting for tokens
+            if self._logger:
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: token release notifyAll()'.format(threading.current_thread().name))
             self._token_queue_cv.notifyAll()
 
         finally:
