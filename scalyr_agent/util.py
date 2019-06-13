@@ -37,9 +37,6 @@ import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
-import scalyr_agent.scalyr_logging as scalyr_logging
-
-
 
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
 try:
@@ -1502,6 +1499,8 @@ class BlockingRateLimiter(object):
         """
         self._cluster_rate_lock.acquire()
         try:
+            import scalyr_agent.scalyr_logging as scalyr_logging
+
             if success:
                 self._consecutive_successes += 1
             else:

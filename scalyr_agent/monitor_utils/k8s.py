@@ -444,7 +444,7 @@ class _K8sCache( object ):
 
         Return the object info, or None if not found
 
-        @param current_time If not None, update the last access time for the object to this value.
+        @param current_time: If not None, update the last access time for the object to this value.
         """
         result = None
         self._lock.acquire()
@@ -461,38 +461,49 @@ class _K8sCache( object ):
 
         return result
 
-    def is_cached(self, namespace, name):
+    def is_cached(self, namespace, name, current_time ):
         """Returns true if the specified object is in the cache.
 
         @param namespace: The object's namespace
         @param name: The object's name
+        @param current_time: The current time in seconds since the epoch
         @type namespace: str
         @type name: str
+        @type current_time: float
 
         @return: True if the object is cached.
         @rtype: bool
         """
-        return self._lookup_object(namespace, name, None) is not None
+        return self._lookup_object(namespace, name, current_time) is not None
 
-    def lookup( self, k8s, namespace, name, kind=None, current_time=None, query_options=None ):
+    def lookup( self, k8s, namespace, name, kind=None, current_time=None, query_options=None, force_lookup=False ):
         """ returns info for the object specified by namespace and name
         or None if no object is found in the cache.
 
         Querying the information is thread-safe, but the returned object should
         not be written to.
+
+        @param force_lookup: If True, then don't look up the object in the cache, always query out to
+                             the API.
         """
 
         if kind is None:
             kind = self._object_type
 
-        # see if the object exists in the cache and return it if so
-        result = self._lookup_object( namespace, name, current_time )
-        if result:
-            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
-            return result
+        if not force_lookup:
+            # see if the object exists in the cache and return it if so
+            result = self._lookup_object( namespace, name, current_time )
+            if result:
+                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
+                return result
 
-        # we have a cache miss so query the object individually
-        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
+        if force_lookup:
+            # we are manually forcing a lookup from the api
+            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "forced lookup for %s %s/%s" % (kind, namespace, name) )
+        else:
+            # we have a cache miss so query the object individually
+            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache miss for %s %s/%s" % (kind, namespace, name) )
+
         result = self._update_object( k8s, kind, namespace, name, current_time, query_options=query_options )
 
         return result
@@ -1044,10 +1055,10 @@ class KubernetesCache( object ):
             try:
                 # we only pre warm the pod cache and the cluster name
                 # controllers are cached on an as needed basis
-                if local_state.batch_pod_updates and not self._state.cache_config.use_controlled_warmer:
+                if local_state.batch_pod_updates and not local_state.use_controlled_warmer:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 self._update_cluster_name( local_state.k8s )
-                if not self._state.cache_config.use_controlled_warmer:
+                if not local_state.use_controlled_warmer:
                     self._update_api_server_version(local_state.k8s)
                     runtime = self._get_runtime( local_state.k8s )
                 else:
@@ -1085,19 +1096,33 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                if not self._state.cache_config.use_controlled_warmer and local_state.batch_pod_updates:
-                    self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
-                else:
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
-                    self._pods_cache.purge_expired(access_time=current_time)
+
+                # if we aren't using the controlled warmer
+                if not local_state.use_controlled_warmer:
+
+                    # update everything if we are doing batch updates
+                    if local_state.batch_pod_updates:
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Updating pods" )
+                        self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
+                    else:
+                        # expire everything if we are doing individual queries
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
+                        self._pods_cache.purge_expired(access_time=current_time)
 
                 self._update_cluster_name( local_state.k8s )
-                if not self._state.cache_config.use_controlled_warmer:
+                if not local_state.use_controlled_warmer:
                     self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused controllers" )
                     self._controllers.purge_expired( last_purge )
+
+                    # if we are using the controlled warmer then purge any pods
+                    # that haven't been queried within the cache_purge_secs
+                    if local_state.use_controlled_warmer:
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods" )
+                        self._pods_cache.purge_expired( last_purge )
+
                     last_purge = current_time
 
             except K8sApiException, e:
@@ -1115,7 +1140,7 @@ class KubernetesCache( object ):
             run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )
 
 
-    def pod( self, namespace, name, current_time=None, query_options=None ):
+    def pod( self, namespace, name, current_time=None, query_options=None, force_lookup=False ):
         """ returns pod info for the pod specified by namespace and name
         or None if no pad matches.
 
@@ -1128,20 +1153,22 @@ class KubernetesCache( object ):
             return
 
         return self._pods_cache.lookup(local_state.k8s, namespace, name, kind='Pod', current_time=current_time,
-                                       query_options=query_options)
+                                       query_options=query_options, force_lookup=False )
 
-    def is_pod_cached(self, namespace, name):
+    def is_pod_cached(self, namespace, name, current_time ):
         """Returns true if the specified pod is in the cache.
 
         @param namespace: The pod's namespace
         @param name: The pod's name
+        @param current_time: current time in seconds since the epoch
         @type namespace: str
         @type name: str
+        @type current_time: float
 
         @return: True if the pod is cached.
         @rtype: bool
         """
-        return self._pods_cache.is_cached(namespace, name)
+        return self._pods_cache.is_cached(namespace, name, current_time)
 
     def controller( self, namespace, name, kind, current_time=None ):
         """ returns controller info for the controller specified by namespace and name
