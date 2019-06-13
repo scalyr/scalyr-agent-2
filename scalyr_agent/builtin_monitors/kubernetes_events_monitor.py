@@ -17,7 +17,7 @@ import scalyr_agent.json_lib.objects
 
 __author__ = 'imron@scalyr.com'
 
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, K8sApiException, K8sApiAuthorizationException, ApiQueryOptions
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
@@ -273,6 +273,21 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         # Note, accepting just a single `t` here due to K8s ConfigMap issues with having a value of `true`
         self.__disable_monitor = legacy_disable == 'true' or legacy_disable == 't' or self._global_config.k8s_events_disable
+
+        # Create rate limiter
+        self.__max_query_retries = self._global_config.k8s_controlled_warmer_max_query_retries
+        self.__rate_limiter = scalyr_util.BlockingRateLimiter(
+            self._global_config.k8s_ratelimit_cluster_num_agents,
+            self._global_config.k8s_ratelimit_cluster_rps_init,
+            self._global_config.k8s_ratelimit_cluster_rps_max,
+            self._global_config.k8s_ratelimit_cluster_rps_min,
+            self._global_config.k8s_ratelimit_consecutive_increase_threshold,
+            self._global_config.k8s_ratelimit_increase_strategy,
+            self._global_config.k8s_ratelimit_increase_factor,
+            self._global_config.k8s_ratelimit_backoff_factor,
+            self._global_config.k8s_ratelimit_max_concurrency,
+            logger=global_log,
+        )
 
     def open_metric_log( self ):
         """Override open_metric_log to prevent a metric log from being created for the Kubernetes Events Monitor
@@ -613,7 +628,9 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                             if kind == 'Pod':
                                 extra_fields['pod_name'] = name
                                 extra_fields['pod_namespace'] = namespace
-                                pod = k8s_cache.pod( namespace, name, current_time )
+                                options = ApiQueryOptions(max_retries=self.__max_query_retries,
+                                                          rate_limiter=self.__rate_limiter)
+                                pod = k8s_cache.pod(namespace, name, current_time, query_options=options)
                                 if pod and pod.controller:
                                     extra_fields['k8s-controller'] = pod.controller.name
                                     extra_fields['k8s-kind'] = pod.controller.kind
