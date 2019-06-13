@@ -147,7 +147,12 @@ class K8sApiAuthorizationException( K8sApiPermanentError ):
     def __init__( self, path, status_code=0 ):
         super(K8sApiAuthorizationException, self).__init__( "You don't have permission to access %s.  Please ensure you have correctly configured the RBAC permissions for the scalyr-agent's service account" % path, status_code=status_code )
 
-class K8sApiNotFoundException( K8sApiPermanentError ):
+# K8sApiNotFoundException needs to be a TemporaryError because there are cases
+# when a pod is starting up that querying the pods endpoint will return 404 Not Found
+# but then the same query a few seconds later (once the pod is up and running) will return
+# 200 - Ok.  Having it derive from PermanentError would put it on a blacklist, when all we
+# might want is to back off for a few seconds and try again
+class K8sApiNotFoundException( K8sApiTemporaryError ):
     """
     A wrapper around Exception that makes it easier to catch not found errors when querying the k8s api
     """
