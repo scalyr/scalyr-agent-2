@@ -162,6 +162,13 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             # The set of pods that have been warmed, identified by pod key
             self.__warmed_pods = set()
 
+        class FakeState( object ):
+            def __init__(self):
+                self.cache_expiry_secs = 300
+
+        def local_state( self ):
+            return self.FakeState()
+
         def is_pod_cached(self, pod_namespace, pod_name, current_time):
             """Faked KubernetesCache method that returns if the pod has been warmed from the cache's perspective.
             @param pod_namespace: The namespace for the pod
