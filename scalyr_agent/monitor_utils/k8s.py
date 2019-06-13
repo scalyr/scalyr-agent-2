@@ -511,7 +511,7 @@ class _K8sCache( object ):
             time exists for the object, then return True only if not expired
         @rtype: bool
         """
-        return self._lookup_object(namespace, name, None, none_if_expired=not allow_expired) is not None
+        return self._lookup_object(namespace, name, time.time(), none_if_expired=not allow_expired) is not None
 
     def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
         """Returns info for the object specified by namespace and name or None if no object is found in the cache.
@@ -1086,7 +1086,7 @@ class KubernetesCache( object ):
             try:
                 # we only pre warm the pod cache and the cluster name
                 # controllers are cached on an as needed basis
-                if local_state.batch_pod_updates and not self._state.cache_config.use_controlled_warmer:
+                if local_state.batch_pod_updates and not local_state.use_controlled_warmer:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 self._update_cluster_name( local_state.k8s )
                 if not self._state.cache_config.use_controlled_warmer:
@@ -1127,7 +1127,7 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                has_warmer = self._state.cache_config.use_controlled_warmer
+                has_warmer = local_state.use_controlled_warmer
                 if not has_warmer and local_state.batch_pod_updates:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 else:
@@ -1135,7 +1135,7 @@ class KubernetesCache( object ):
                     self._pods_cache.purge_unused(access_time=current_time, soft_purge=has_warmer)
 
                 self._update_cluster_name( local_state.k8s )
-                if not self._state.cache_config.use_controlled_warmer:
+                if not local_state.use_controlled_warmer:
                     self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
@@ -1144,7 +1144,12 @@ class KubernetesCache( object ):
                         "Purging unused controllers last_purge=%s cache_purge_secs=%s current_time=%s"
                         % (last_purge, local_state.cache_purge_secs, current_time)
                     )
-                    self._controllers.purge_unused(last_purge, soft_purge=has_warmer)
+                    self._controllers.purge_unused(last_purge, soft_purge=False)
+                    # if we are using the controlled warmer then purge any pods
+                    # that haven't been queried within the cache_purge_secs
+                    if local_state.use_controlled_warmer:
+                        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods")
+                        self._pods_cache.purge_unused(last_purge, soft_purge=False)
                     last_purge = current_time
 
             except K8sApiException, e:
