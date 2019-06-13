@@ -536,10 +536,14 @@ class ControlledCacheWarmer(StoppableThread):
                 if value.is_recently_marked:
                     new_active_pods[key] = value
             self.__active_pods = new_active_pods
-            # We also take the opportunity to see if any blacklisted containers should be moved back to
-            # active.
+            # We also take the opportunity to see if any blacklisted containers should be moved back to active.
             self.__update_containers_to_warm(check_blacklisted=True, current_time=current_time)
             self.__emit_report_if_necessary(current_time=current_time)
+        except Exception:
+            global_log.warn(
+                "Unexpected exception in end_marking()\n%s\n" % traceback.format_exc(),
+                limit_once_per_x_secs=300, limit_key="end-marking-exception"
+            )
         finally:
             self.__lock.release()
 
@@ -823,8 +827,10 @@ class ControlledCacheWarmer(StoppableThread):
                 else:
                     # Something else warmed the pod before we got a chance.  Just take the win.
                     consecutive_warm_pods += 1
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'echee: {} consecutive warms in a row. Sleeping for 1 sec. {} {} {}'.format(
+                        consecutive_warm_pods, container_id, pod_namespace, pod_name
+                    ))
                     if consecutive_warm_pods == 100:
-                        global_log.warn('echee: 100 consecutive warms in a row. Sleeping for 1 sec.')
                         self._run_state.sleep_but_awaken_if_stopped(1)
                         consecutive_warm_pods = 0
             except:
@@ -968,11 +974,16 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
 
                                     if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
                                         if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
+                                            logger.log(
+                                                scalyr_logging.DEBUG_LEVEL_2,
+                                                "Excluding container '%s' for ignored_pod: %s/%s" %
+                                                (short_cid, k8s_info['pod_namespace'], k8s_info['pod_name'])
+                                            )
                                             continue
                                         if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
                                             logger.log(
                                                 scalyr_logging.DEBUG_LEVEL_2,
-                                                "Excluding container '%s' based excluded namespaces: %s in %s" %
+                                                "Excluding container '%s' based on excluded namespaces: %s in %s" %
                                                 (short_cid, k8s_info['pod_namespace'], k8s_namespaces_to_exclude)
                                             )
                                             continue
