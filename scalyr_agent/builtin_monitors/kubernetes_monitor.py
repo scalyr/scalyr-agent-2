@@ -860,10 +860,12 @@ class ControlledCacheWarmer(StoppableThread):
                     # Something else warmed the pod before we got a chance.  Just take the win.
                     self.__record_warming_result(container_id, already_warm=True)
                     consecutive_warm_pods += 1
-                    self.__record_warming_result(container_id, success=True)
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'echee: {} consecutive warms in a row: {} {} {}'.format(
-                        consecutive_warm_pods, container_id, pod_namespace, pod_name
-                    ))
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_3,
+                                   'CacheWarmer.run_and_propagate: %s consecutive warms in a row: %s %s %s'
+                                   % (consecutive_warm_pods, container_id, pod_namespace, pod_name))
+                    if consecutive_warm_pods == 10:
+                        # TODO: Do not remove this circuit breaker until this issue is fully understood.
+                        self._run_state.sleep_but_awaken_if_stopped(0.1)
             except:
                 global_log.exception('cacher warmer uncaught exception')
 
@@ -1085,8 +1087,10 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                 controlled_warmer.end_marking()
 
     except Exception, e:  # container querying failed
-        logger.exception("Error querying running containers", limit_once_per_x_secs=300,
-                     limit_key='docker-api-running-containers' )
+        logger.exception(
+            "Error querying running containers", limit_once_per_x_secs=300,
+            limit_key='docker-api-running-containers'
+        )
         result = None
 
     return result

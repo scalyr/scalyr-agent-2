@@ -1601,7 +1601,8 @@ class BlockingRateLimiter(object):
 
         # block until a token is available from the token heap
         if self._logger:
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: before token acquire'.format(threading.current_thread().name))
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                             '[%s] RateLimiter.acquire_token : acquire()    ' % threading.current_thread().name)
         self._token_queue_cv.acquire()
 
         try:
@@ -1610,14 +1611,17 @@ class BlockingRateLimiter(object):
                 if len(self._token_queue) == 0:
                     # queue contained no tokens so wait indefinitely
                     if self._logger:
-                        self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: waiting on token q'.format(threading.current_thread().name))
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                         '[%s] RateLimiter.acquire_token : wait()' % threading.current_thread().name)
                     self._token_queue_cv.wait()
                 else:
                     # queue contained at least one token so sleep until the head token becomes ripe
                     sleep_time = max(0, self._ripe_time - self._time())
                     if sleep_time > 0:
                         if self._logger:
-                            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: waiting on token q for {}'.format(threading.current_thread().name, sleep_time))
+                            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                             '[%s] RateLimiter.acquire_token : wait(%s)'
+                                             % (threading.current_thread().name, sleep_time))
                         self._token_queue_cv.wait(sleep_time)
 
             # Head token is ripe.
@@ -1625,7 +1629,9 @@ class BlockingRateLimiter(object):
             self._ripe_time = self._get_next_ripe_time()
 
             if self._logger:
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: returning token {}'.format(threading.current_thread().name, token))
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                 '[%s] RateLimiter.acquire_token : returning token %s'
+                                 % (threading.current_thread().name, token))
             return token
 
         finally:
@@ -1649,7 +1655,8 @@ class BlockingRateLimiter(object):
             return self._simulate_release_token(token, success)
 
         if self._logger:
-            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: before token acquire (for release)'.format(threading.current_thread().name))
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                             '[%s] RateLimiter.release_token : before acquire' % threading.current_thread().name)
         self._token_queue_cv.acquire()
 
         try:
@@ -1661,7 +1668,8 @@ class BlockingRateLimiter(object):
 
             # awaken threads waiting for tokens
             if self._logger:
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_3, '{} RateLimiter: token release notifyAll()'.format(threading.current_thread().name))
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                 '[%s] RateLimiter.release_token : notifyAll()' % threading.current_thread().name)
             self._token_queue_cv.notifyAll()
 
         finally:
