@@ -475,7 +475,7 @@ class _K8sCache( object ):
         return result
 
 
-    def _lookup_object(self, namespace, name, current_time, none_if_expired=False):
+    def _lookup_object(self, namespace, name, current_time, allow_expired=True):
         """ Look to see if the object specified by the namespace and name exists within the cached data.
 
         Note: current_time should be provided (otherwise, access_time-based revalidation of cache won't work correctly,
@@ -486,18 +486,19 @@ class _K8sCache( object ):
         @param namespace: The object's namespace
         @param name: The object's name
         @param current_time last access time for the object to this value.
-        @param none_if_expired: Return None if the object is expired, even if it still exists in the cache.
+        @param allow_expired: If true, return the object if it exists in the cache even if expired.
+            If false, return None if the object exists but is expired.
 
         @type namespace: str
         @type name: str
         @type current_time: epoch seconds
-        @type none_if_expired: bool
+        @type allow_expired: bool
         """
         result = None
         self._lock.acquire()
         try:
             # Optionally check if the object has been marked as expired. If so, return None.
-            if none_if_expired:
+            if not allow_expired:
                 expired = self._objects_expired.setdefault(namespace, {}).get(name, False)
                 if expired:
                     return None
@@ -529,7 +530,7 @@ class _K8sCache( object ):
             time exists for the object, then return True only if not expired
         @rtype: bool
         """
-        return self._lookup_object(namespace, name, time.time(), none_if_expired=not allow_expired) is not None
+        return self._lookup_object(namespace, name, time.time(), allow_expired=allow_expired) is not None
 
     def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
         """Returns info for the object specified by namespace and name or None if no object is found in the cache.
@@ -543,7 +544,7 @@ class _K8sCache( object ):
             kind = self._object_type
 
         # see if the object exists in the cache and return it if so
-        result = self._lookup_object(namespace, name, current_time, none_if_expired=not allow_expired)
+        result = self._lookup_object(namespace, name, current_time, allow_expired=allow_expired)
         if result:
             global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
             return result
