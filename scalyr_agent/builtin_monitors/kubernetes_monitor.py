@@ -1017,13 +1017,6 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                         logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
                                     if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
-                                        if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
-                                            logger.log(
-                                                scalyr_logging.DEBUG_LEVEL_2,
-                                                "Excluding container '%s' for ignored_pod: %s/%s" %
-                                                (short_cid, k8s_info['pod_namespace'], k8s_info['pod_name'])
-                                            )
-                                            continue
                                         if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
                                             logger.log(
                                                 scalyr_logging.DEBUG_LEVEL_2,
@@ -1050,6 +1043,14 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                                     "Excluding container '%s' because not in cache warmer" % short_cid
                                                 )
                                                 continue
+
+                                        if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
+                                            logger.log(
+                                                scalyr_logging.DEBUG_LEVEL_2,
+                                                "Excluding container '%s' for ignored_pod: %s/%s" %
+                                                (short_cid, k8s_info['pod_namespace'], k8s_info['pod_name'])
+                                            )
+                                            continue
 
                                         pod = k8s_cache.pod(namespace, pod_name, current_time)
                                         if pod:
