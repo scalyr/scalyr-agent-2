@@ -607,7 +607,7 @@ class ControlledCacheWarmer(StoppableThread):
             self.__last_report_time = current_time
 
             warm_attempts_info = ''
-            stats = __gather_report_stats()
+            stats = self.__gather_report_stats()
             for category, (current_amount, previous_amount) in stats.iteritems():
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
             self.__logger.info('controlled_cache_warmer pending_warming=%d blacklisted=%d %s',

@@ -301,7 +301,11 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             finally:
                 self.__lock.release()
 
-        def add_pod_to_cache( self, pod_namespace, pod_name ):
+        def simulate_add_pod_to_cache( self, pod_namespace, pod_name ):
+            """
+            Simulates adding a pod to the cache so that we can populate the
+            cache for testing purposes without going through the regular interface
+            """
             self.__lock.acquire()
             try:
                 self.__warmed_pods.add(self.__pod_key(pod_namespace, pod_name))
@@ -378,13 +382,16 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
         warmer.end_marking()
-        fake_cache.add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
+        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
+
+        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
+        self.assertEqual(warmer.warming_containers(), [self.CONTAINER_1])
 
         warmer.block_until_idle()
 
         stats = warmer.get_report_stats()
 
-        success_count = stats.get( 'success', (0, 0) )
+        success_count = stats.get( 'success', (1, 1) )
         already_warm_count = stats.get( 'already_warm', (0, 0) )
 
         self.assertEqual( success_count[0], 0 )
