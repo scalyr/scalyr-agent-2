@@ -1090,7 +1090,7 @@ class KubernetesCache( object ):
                 if local_state.batch_pod_updates and not local_state.use_controlled_warmer:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 self._update_cluster_name( local_state.k8s )
-                if not self._state.cache_config.use_controlled_warmer:
+                if not local_state.use_controlled_warmer:
                     self._update_api_server_version(local_state.k8s)
                     runtime = self._get_runtime( local_state.k8s )
                 else:
@@ -1207,7 +1207,7 @@ class KubernetesCache( object ):
         """
         return self._pods_cache.is_cached(namespace, name, allow_expired)
 
-    def controller( self, namespace, name, kind, current_time=None ):
+    def controller(self, namespace, name, kind, current_time=None, query_options=None):
         """Returns controller info for the controller specified by namespace and name
         or None if no controller matches.
 
@@ -1222,7 +1222,8 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind)
+        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind,
+                                        query_options=query_options)
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
@@ -1400,6 +1401,45 @@ class KubernetesApi( object ):
 
         return None
 
+    def query_api_with_retries(self, query, query_options, retry_error_context=None, retry_error_limit_key=None):
+        """Invoke query api through rate limiter with retries
+
+        @param query: Query string
+        @param query_options: ApiQueryOptions containing retries and rate_limiter
+        @param retry_error_context: context string to be logged upon failure (if None)
+        @param retry_error_limit_key: key for limiting retry logging
+
+        @type query: str
+        @type query_options: ApiQueryOptions
+        @type retry_error_context: str
+        @type retry_error_limit_key: str
+
+        @return: json-decoded response of the query api call
+        @rtype: dict or a scalyr_agent.json_lib.objects.JsonObject
+        """
+        retries_left = query_options.max_retries
+        rate_limiter = query_options.rate_limiter
+        while True:
+            t = time.time()
+            token = rate_limiter.acquire_token()
+            rate_limit_outcome = True
+            try:
+                result = self.query_api(query, return_temp_errors=query_options.return_temp_errors, rate_limited=True)
+                global_log.log(scalyr_logging.DEBUG_LEVEL_3,
+                               'Rate limited k8s api query took %s seconds' % (time.time() - t))
+                return result
+            except K8sApiTemporaryError, e:
+                rate_limit_outcome = False
+                if retries_left <= 0:
+                    raise e
+                retries_left -= 1
+                if retry_error_context:
+                    global_log.warn('k8s API - retrying temporary error: %s' % retry_error_context,
+                                    limit_once_per_x_secs=300,
+                                    limit_key='k8s_api_retry-%s' % retry_error_limit_key)
+            finally:
+                rate_limiter.release_token(token, rate_limit_outcome)
+
     def query_api( self, path, pretty=0, return_temp_errors=False, rate_limited=False):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
@@ -1483,26 +1523,9 @@ class KubernetesApi( object ):
             return {}
 
         if query_options is not None:
-            retries_left = query_options.max_retries
-            rate_limiter = query_options.rate_limiter
-            while True:
-                t = time.time()
-                token = rate_limiter.acquire_token()
-                rate_limit_outcome = True
-                try:
-                    result = self.query_api(query, return_temp_errors=query_options.return_temp_errors, rate_limited=True)
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_3,
-                                   'Rate limited k8s api query took %s seconds' % (time.time() - t))
-                    return result
-                except K8sApiTemporaryError, e:
-                    rate_limit_outcome = False
-                    if retries_left <= 0:
-                        raise e
-                    retries_left -= 1
-                    global_log.warn( 'k8s API - retrying temporary error: %s, %s, %s' % (
-                        kind, namespace, name), limit_once_per_x_secs=300, limit_key='k8s_api_retry-%s' % kind )
-                finally:
-                    rate_limiter.release_token(token, rate_limit_outcome)
+            self.query_api_with_retries(query, query_options,
+                                        retry_error_context='%s, %s, %s' % (kind, namespace, name),
+                                        retry_error_limit_key='query_object-%s' % kind)
         else:
             return self.query_api( query )
 
