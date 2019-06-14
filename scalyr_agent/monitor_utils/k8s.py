@@ -288,6 +288,7 @@ class ApiQueryOptions(object):
         self.max_retries = max_retries
         self.return_temp_errors = return_temp_errors
         self.rate_limiter = rate_limiter
+        self.raise_exception_on_cache_query_error = True
 
     def __repr__(self):
         return 'ApiQueryOptions\n\tmax_retries=%s\n\treturn_temp_errors=%s\n\trate_limiter=%s\n' % (
@@ -424,9 +425,11 @@ class _K8sCache( object ):
             obj = k8s.query_object( kind, namespace, name, query_options=query_options )
             result = self._processor.process_object( k8s, obj, query_options=query_options )
         except K8sApiException, e:
-            # Don't do anything here.  This means the object we are querying doesn't exist
-            # and it's up to the caller to handle this by detecting a None result
-            pass
+            # An exception occurred while querying the cache.
+            # Check the options to see whether we should continue (and return None) or
+            # re-raise the exception
+            if query_options is not None and query_options.raise_exception_on_cache_query_error:
+                raise
 
         self._add_to_cache( result )
 
@@ -1474,6 +1477,13 @@ class KubernetesApi( object ):
                 global_log.log(scalyr_logging.DEBUG_LEVEL_3,
                                'Rate limited k8s api query took %s seconds' % (time.time() - t))
                 return result
+            except K8sApiNotFoundException:
+                # catch and re-raise this before any other temporary errors, because we need to
+                # handle this one separately.  Rather than immediately retrying, we won't do anything,
+                # rather, if the agent wants to query this endpoint again later then it will.
+                # This is useful for when a pod hasn't fully started up yet and querying its endpoint
+                # will return a 404.  Then if you query again a few seconds later everything works.
+                raise
             except K8sApiTemporaryError, e:
                 rate_limit_outcome = False
                 if retries_left <= 0:
