@@ -758,7 +758,7 @@ class ControlledCacheWarmer(StoppableThread):
         finally:
             self.__condition_var.release()
 
-    def __record_warming_result(self, container_id, success=None, permanent_error=None, temporary_error=None,
+    def __record_warming_result(self, container_id, success=None, already_warm=None, permanent_error=None, temporary_error=None,
                                 unknown_error=None, traceback_report=None):
         """Updates the state based on the result of warming the pod associated with the specified container.
         Only one of the result params (success, permanent_error, temporary_error, or unknown_error) should be
@@ -766,6 +766,8 @@ class ControlledCacheWarmer(StoppableThread):
 
         @param container_id: The id of the container associated with the pod
         @param success:  If True, the pod's information was successfully added to the cache.
+        @param already_warm: If True, the pod's information was added to the cache between being marked to warm
+            and when we were going to query the cache.
         @param permanent_error: The exception generated while warming the pod that indicated a permanent error.
             Permanent errors results in the pod being immediately blacklisted.
         @param temporary_error:  The exception generated while warming the pod that indicated a temporary error.
@@ -776,6 +778,7 @@ class ControlledCacheWarmer(StoppableThread):
 
         @type container_id: str
         @type success: bool or None
+        @type already_warm: bool or None
         @type permanent_error: Exception or None
         @type temporary_error: Exception or None
         @type unknown_error: Exception or None
@@ -794,6 +797,12 @@ class ControlledCacheWarmer(StoppableThread):
                     entry.blacklisted_until = None
                     entry.blacklist_reason = None
                     result_type = 'success'
+                elif already_warm:
+                    # make sure warm is set - normally redundant, but needed for tests
+                    # don't update failure counts or blacklists, as they would have been
+                    # set by a previous 'success'.
+                    entry.is_warm = True
+                    result_type = 'already_warm'
                 else:
                     if permanent_error:
                         result_type = 'perm_error'
@@ -857,6 +866,7 @@ class ControlledCacheWarmer(StoppableThread):
                                                      traceback_report=traceback.format_exc())
                 else:
                     # Something else warmed the pod before we got a chance.  Just take the win.
+                    self.__record_warming_result(container_id, already_warm=True)
                     consecutive_warm_pods += 1
                     global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'echee: {} consecutive warms in a row. Sleeping for 1 sec. {} {} {}'.format(
                         consecutive_warm_pods, container_id, pod_namespace, pod_name
