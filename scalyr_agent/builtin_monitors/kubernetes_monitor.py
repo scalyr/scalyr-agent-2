@@ -1475,6 +1475,7 @@ class ContainerChecker(object):
         """
         Checks to see if the agent is running inside a docker container
         """
+
         # whether or not we are running inside docker can be determined
         # by the existence of the file /.dockerenv
         return os.path.exists( "/.dockerenv" )
