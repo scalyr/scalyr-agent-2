@@ -13,6 +13,7 @@ from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 import threading
 import time
+from time import strftime, gmtime
 import traceback
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -108,7 +109,8 @@ def cache(global_config):
                                  batch_pod_updates=global_config.k8s_cache_batch_pod_updates,
                                  query_timeout=global_config.k8s_cache_query_timeout_secs,
                                  use_controlled_warmer=global_config.k8s_use_controlled_warmer,
-                                 log_api_responses_to_disk=global_config.k8s_log_api_responses_to_disk)
+                                 log_api_responses_to_disk=global_config.k8s_log_api_responses_to_disk,
+                                 agent_log_path=global_config.agent_log_path)
 
     #update the config and return current cache
     _k8s_cache.update_config( cache_config )
@@ -337,30 +339,45 @@ class _K8sCache( object ):
 
         return result
 
-    def purge_unused(self, access_time, soft_purge=False):
+
+    def __get_stale_objects(self, access_time):
+        """Get all stale objects.  Caller should first obtain lock on self._objects"""
+        stale = []
+        for namespace, objs in self._objects.iteritems():
+            for obj_name, obj in objs.iteritems():
+                if hasattr(obj, 'access_time'):
+                    if obj.access_time is None or obj.access_time < access_time:
+                        stale.append((namespace, obj_name))
+        return stale
+
+    def mark_as_expired(self, access_time):
+        """Mark all stale cache objects as expired
+
+        @param access_time:  Any objects last accessed before access_time will be purged
+        """
+        self._lock.acquire()
+        try:
+            stale = self.__get_stale_objects(access_time)
+            for (namespace, obj_name) in stale:
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1,
+                               "Mark object %s/%s as expired in cache" % (namespace, obj_name))
+                expired_set = self._objects_expired.setdefault(namespace, {})
+                expired_set.setdefault(obj_name, True)
+        finally:
+            self._lock.release()
+
+    def purge_unused(self, access_time):
         """Removes any items from the store who haven't been accessed since `access_time`
 
         @param access_time:  Any objects last accessed before access_time will be purged
-        @param soft_purge: If true, do not remove from cache but merely mark as expired.
         """
         self._lock.acquire()
-        stale = []
         try:
-            for namespace, objs in self._objects.iteritems():
-                for obj_name, obj in objs.iteritems():
-                    if hasattr( obj, 'access_time' ):
-                        if obj.access_time is None or obj.access_time < access_time:
-                            stale.append( (namespace, obj_name) )
-
+            stale = self.__get_stale_objects(access_time)
             for (namespace, obj_name) in stale:
-                if soft_purge:
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Mark object %s/%s as expired in cache" % (namespace, obj_name))
-                    expired_set = self._objects_expired.setdefault(namespace, {})
-                    expired_set.setdefault(obj_name, True)
-                else:
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name))
-                    self._objects[namespace].pop(obj_name, None)
-                    self._objects_expired.get(namespace, {}).pop(obj_name, None)
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name))
+                self._objects[namespace].pop(obj_name, None)
+                self._objects_expired.get(namespace, {}).pop(obj_name, None)
         finally:
             self._lock.release()
 
@@ -657,8 +674,10 @@ class PodProcessor( _K8sProcessor ):
         try:
             annotations = annotation_config.process_annotations( annotations )
         except BadAnnotationConfig, e:
-            global_log.warning( "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str( e )),
-                                  limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s' % id(obj))
+            global_log.warning(
+                "Bad Annotation config for %s/%s.  All annotations ignored. %s" % (namespace, pod_name, str(e)),
+                limit_once_per_x_secs=300, limit_key='bad-annotation-config-%s' % metadata.get('uid', 'invalid-uid')
+            )
             annotations = JsonObject()
 
 
@@ -710,7 +729,7 @@ class _CacheConfig( object ):
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
                   cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None,
                   batch_pod_updates=True, query_timeout=20,
-                  use_controlled_warmer=False, log_api_responses_to_disk=False):
+                  use_controlled_warmer=False, log_api_responses_to_disk=False, agent_log_path=None):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -723,6 +742,7 @@ class _CacheConfig( object ):
         @param query_timeout: The number of seconds to wait before a query to the API server times out
         @param use_controlled_warmer: Whether to use a controlled cache warmer
         @param log_api_responses_to_disk: whether to log k8s api calls to disk (for debugging)
+        @param agent_log_path: directory where agent.log is locatedd
 
         @type api_url: str
         @type verify_api_queries: bool
@@ -735,6 +755,7 @@ class _CacheConfig( object ):
         @type query_timeout: int
         @type use_controlled_warmer: bool
         @type log_api_responses_to_disk: bool
+        @type agent_log_path: str
         """
 
         # NOTE: current implementations of __eq__ expects that fields set in contructor are only true state
@@ -750,6 +771,7 @@ class _CacheConfig( object ):
         self.query_timeout = query_timeout
         self.use_controlled_warmer = use_controlled_warmer
         self.log_api_responses_to_disk = log_api_responses_to_disk
+        self.agent_log_path = agent_log_path
 
     def __eq__( self, other ):
         """Equivalence method for _CacheConfig objects so == testing works """
@@ -779,8 +801,10 @@ class _CacheConfig( object ):
         @return: True if a new KubernetesApi object should be created based on the differences between the
                  current and the new config.  False otherwise.
         """
-        # echee TODO: does self.use_controlled_warmer affect this?
-        relevant_fields = ['api_url', 'verify_api_queries', 'log_api_responses_to_disk']
+        relevant_fields = [
+            'api_url', 'verify_api_queries', 'query_timeout',
+            'log_api_responses_to_disk', 'agent_log_path',
+        ]
         for field in relevant_fields:
             if getattr(self, field) != getattr(new_config, field):
                 return True
@@ -915,6 +939,7 @@ class _CacheConfigState( object ):
                 'k8s_api_url': new_cache_config.api_url,
                 'query_timeout': new_cache_config.query_timeout,
                 'log_api_responses_to_disk': new_cache_config.log_api_responses_to_disk,
+                'agent_log_path': new_cache_config.agent_log_path
             }
             if not new_cache_config.verify_api_queries:
                 args['ca_file'] = None
@@ -953,16 +978,20 @@ class KubernetesCache( object ):
 
         self._lock = threading.Lock()
 
-        new_cache_config = _CacheConfig( api_url=api_url,
-                                   verify_api_queries=verify_api_queries,
-                                   cache_expiry_secs=cache_expiry_secs,
-                                   cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
-                                   cache_start_fuzz_secs=cache_start_fuzz_secs,
-                                   cache_purge_secs=cache_purge_secs,
-                                   namespaces_to_ignore=namespaces_to_ignore,
-                                   batch_pod_updates=batch_pod_updates,
-                                   use_controlled_warmer=False,
-                                   log_api_responses_to_disk=False)
+        new_cache_config = _CacheConfig(
+            api_url=api_url,
+            verify_api_queries=verify_api_queries,
+            cache_expiry_secs=cache_expiry_secs,
+            cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
+            cache_start_fuzz_secs=cache_start_fuzz_secs,
+            cache_purge_secs=cache_purge_secs,
+            namespaces_to_ignore=namespaces_to_ignore,
+            batch_pod_updates=batch_pod_updates,
+            use_controlled_warmer=False,
+            log_api_responses_to_disk=False,
+            agent_log_path=None
+        )
+
         # set the initial state
         self._state = _CacheConfigState( new_cache_config )
 
@@ -1129,14 +1158,18 @@ class KubernetesCache( object ):
             try:
                 current_time = time.time()
                 has_warmer = local_state.use_controlled_warmer
-                if not has_warmer and local_state.batch_pod_updates:
+
+                if has_warmer:
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Marking unused pods as expired")
+                    self._pods_cache.mark_as_expired(current_time)
+                elif local_state.batch_pod_updates:
                     self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 else:
                     global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
-                    self._pods_cache.purge_unused(access_time=current_time, soft_purge=has_warmer)
+                    self._pods_cache.purge_unused(current_time)
 
                 self._update_cluster_name( local_state.k8s )
-                if not local_state.use_controlled_warmer:
+                if not has_warmer:
                     self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
@@ -1145,12 +1178,12 @@ class KubernetesCache( object ):
                         "Purging unused controllers last_purge=%s cache_purge_secs=%s current_time=%s"
                         % (last_purge, local_state.cache_purge_secs, current_time)
                     )
-                    self._controllers.purge_unused(last_purge, soft_purge=False)
+                    self._controllers.purge_unused(last_purge)
                     # if we are using the controlled warmer then purge any pods
                     # that haven't been queried within the cache_purge_secs
-                    if local_state.use_controlled_warmer:
+                    if has_warmer:
                         global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods")
-                        self._pods_cache.purge_unused(last_purge, soft_purge=False)
+                        self._pods_cache.purge_unused(last_purge)
                     last_purge = current_time
 
             except K8sApiException, e:
@@ -1274,7 +1307,7 @@ class KubernetesApi( object ):
     def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                   k8s_api_url="https://kubernetes.default",
                   query_timeout=20,
-                  log_api_responses_to_disk=False):
+                  log_api_responses_to_disk=False, agent_log_path=None):
         """Init the kubernetes object
         """
 
@@ -1286,6 +1319,7 @@ class KubernetesApi( object ):
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
         self.log_api_responses_to_disk = log_api_responses_to_disk
+        self.agent_log_path = agent_log_path
 
         self._http_host = k8s_api_url
 
@@ -1454,20 +1488,21 @@ class KubernetesApi( object ):
 
         response = None
 
+
         # Optionally save api json to disk
-        if self.log_api_responses_to_disk:
-            kapi = '/var/log/scalyr-agent-2/kapi/'
+        log_responses = self.log_api_responses_to_disk and self.agent_log_path
+        if log_responses:
+            kapi = os.path.join(self.agent_log_path, 'kapi')
             if not os.path.exists(kapi):
                 os.mkdir(kapi, 0755)
             if rate_limited:
-                kapi += 'limited'
+                kapi = os.path.join(kapi, 'limited')
             else:
-                kapi += 'not_limited'
+                kapi = os.path.join(kapi, 'limited')
             if not os.path.exists(kapi):
                 os.mkdir(kapi, 0755)
-            from time import strftime, gmtime
             fname = '%s_%.20f_%s_%s' % (strftime('%Y%m%d:%H:%M:%S', gmtime()), time.time(), random.randint(1, 100), path.replace('/', '--'))
-            logged_response_file = open('%s/%s' % (kapi, fname), 'w')
+            logged_response_file = open(os.path.join(kapi, fname), 'w')
             traceback.print_stack(file=logged_response_file)
 
         try:
@@ -1493,11 +1528,11 @@ class KubernetesApi( object ):
                 else:
                     raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
 
-            if self.log_api_responses_to_disk:
+            if log_responses:
                 logged_response_file.write(response.text)
             return util.json_decode( response.text )
         finally:
-            if self.log_api_responses_to_disk:
+            if log_responses:
                 logged_response_file.close()
 
     def query_object( self, kind, namespace, name, query_options=None ):
