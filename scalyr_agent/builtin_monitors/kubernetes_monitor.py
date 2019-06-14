@@ -862,12 +862,10 @@ class ControlledCacheWarmer(StoppableThread):
                     # Something else warmed the pod before we got a chance.  Just take the win.
                     self.__record_warming_result(container_id, already_warm=True)
                     consecutive_warm_pods += 1
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'echee: {} consecutive warms in a row. Sleeping for 1 sec. {} {} {}'.format(
+                    self.__record_warming_result(container_id, success=True)
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'echee: {} consecutive warms in a row: {} {} {}'.format(
                         consecutive_warm_pods, container_id, pod_namespace, pod_name
                     ))
-                    if consecutive_warm_pods == 100:
-                        self._run_state.sleep_but_awaken_if_stopped(1)
-                        consecutive_warm_pods = 0
             except:
                 global_log.exception('cacher warmer uncaught exception')
 
