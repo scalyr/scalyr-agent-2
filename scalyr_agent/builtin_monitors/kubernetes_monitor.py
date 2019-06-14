@@ -412,7 +412,6 @@ def _ignore_old_dead_container( container, created_before=None ):
 
     return False
 
-
 class ControlledCacheWarmer(StoppableThread):
     """A background thread that does a controlled warming of the pod cache.
 
@@ -461,7 +460,7 @@ class ControlledCacheWarmer(StoppableThread):
         # The wallclock of when the last periodic report was written to the logger
         self.__last_report_time = None
         # Summarizes information about warming attempts.  There is an entry recording the running totals for
-        # `total`, `success`, `temp_error`, `perm_error`, `unknown_error`.
+        # `total`, `success`, `already_warm`, `temp_error`, `perm_error`, `unknown_error`.
         self.__warming_attempts = dict()
         self.__last_reported_warming_attempts = dict()
 
@@ -564,6 +563,37 @@ class ControlledCacheWarmer(StoppableThread):
         """
         return self.__k8s_cache.is_pod_cached(pod_namespace, pod_name, allow_expired)
 
+    def get_report_stats( self ):
+        """
+        Gathers stats of warming calls
+
+        Used for testing
+
+        @return: a dict of tuples containing current and previous warming attempt counts, keyed by result category
+        @rtype: dict  (int, int)
+        """
+        self.__lock.acquire()
+        result = {}
+        try:
+            return self.__gather_report_stats()
+        finally:
+            self.__lock.release()
+
+    def __gather_report_stats( self ):
+        """
+        Gathers stats of results of warming calls
+
+        WARNING:  The caller must have already acquired _lock.
+
+        @return: a dict of result counts keyed by result category
+        """
+        result = {}
+        for category in ['total', 'success', 'already_warm', 'temp_error', 'perm_error', 'unknown_error', 'unhandled_error']:
+            current_amount = self.__warming_attempts.get(category, 0)
+            previous_amount = self.__last_reported_warming_attempts.get(category, 0)
+            result[category] = (current_amount, previous_amount)
+        return result
+
     def __emit_report_if_necessary(self, current_time=None):
         """Emit the periodic reporting lines if sufficient time has passed.
 
@@ -579,9 +609,8 @@ class ControlledCacheWarmer(StoppableThread):
             self.__last_report_time = current_time
 
             warm_attempts_info = ''
-            for category in ['total', 'success', 'temp_error', 'perm_error', 'unknown_error', 'unhandled_error']:
-                current_amount = self.__warming_attempts.get(category, 0)
-                previous_amount = self.__last_reported_warming_attempts.get(category, 0)
+            stats = __gather_report_stats()
+            for category, (current_amount, previous_amount) in stats.iteritems():
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
             self.__logger.info('controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
                                len(self.__containers_to_warm),
