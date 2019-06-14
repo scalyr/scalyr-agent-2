@@ -2500,7 +2500,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         k8s_extra = {}
         if pod is not None:
 
-            # default key and controlle name
+            # default key and controller name
             key = 'k8s-controller'
             name = 'none'
 
