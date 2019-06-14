@@ -428,22 +428,28 @@ class _K8sCache( object ):
             # and it's up to the caller to handle this by detecting a None result
             pass
 
-        # update our cache if we have a result
-        if result:
-            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Processing single %s: %s/%s" % (self._object_type, result.namespace, result.name) )
+        self._add_to_cache( result )
+
+        return result
+
+    def _add_to_cache( self, obj ):
+        """
+        Adds the object `obj` to the cache.
+        """
+        # update our cache if we have an obj
+        if obj:
+            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Processing single %s: %s/%s" % (self._object_type, obj.namespace, obj.name) )
             self._lock.acquire()
             try:
                 # update the object
-                objects = self._objects.setdefault(result.namespace, {})
-                objects[result.name] = result
+                objects = self._objects.setdefault(obj.namespace, {})
+                objects[obj.name] = obj
 
                 # remove expired flag
-                expired_dict = self._objects_expired.setdefault(result.namespace, {})
-                expired_dict.pop(result.name, None)
+                expired_dict = self._objects_expired.setdefault(obj.namespace, {})
+                expired_dict.pop(obj.name, None)
             finally:
                 self._lock.release()
-
-        return result
 
     def _process_objects( self, k8s, kind, objects ):
         """

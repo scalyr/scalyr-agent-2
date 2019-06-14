@@ -667,17 +667,22 @@ class ControlledCacheWarmer(StoppableThread):
         if len(self.__containers_to_warm) != original_to_warm_count:
             self.__condition_var.notify_all()
 
-    def block_until_idle(self):
+    def block_until_idle(self, timeout=None):
         """Blocks the calling thread until the cache warming thread no longer has any containers that
         should be immediately warmed (either they are already warmed in the cache or they are on the blacklist
         so should not be warmed immediately).
 
+        Takes an optional timeout as a parameter so that test code does not hang indefinitely
+
         WARNING:  Only used for tests.
         """
+        start_time = time.time()
         self.__lock.acquire()
         try:
             while self._run_state.is_running() and len(self.__containers_to_warm) > 0:
-                self.__condition_var.wait()
+                if timeout is not None and time.time() - start_time > timeout:
+                    raise Exception( "block_until_idle timed out" )
+                self.__condition_var.wait( timeout )
         finally:
             self.__lock.release()
 
