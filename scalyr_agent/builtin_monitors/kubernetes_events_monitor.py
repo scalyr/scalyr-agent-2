@@ -335,8 +335,10 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         result = {}
         try:
+            options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
             # this call will throw an exception on failure
-            result = k8s.query_api( '/api/v1/nodes/%s' % node )
+            result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node, options,
+                                                retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
         except Exception, e:
             return False
 
@@ -389,7 +391,10 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             @param k8s: a KubernetesApi object for querying the k8s api
             @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
-        response = k8s.query_api( '/api/v1/nodes%s' % query_fields )
+        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
+        response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields, options,
+                                              retry_error_context='nodes%s' % query_fields,
+                                              retry_error_limit_key='k8se_check_nodes_for_leader')
         nodes = response.get( 'items', [] )
 
         if len(nodes) > 100:
@@ -635,7 +640,8 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                                     extra_fields['k8s-controller'] = pod.controller.name
                                     extra_fields['k8s-kind'] = pod.controller.kind
                             elif kind != 'Node':
-                                controller = k8s_cache.controller( namespace, name, kind, current_time )
+                                controller = k8s_cache.controller(namespace, name, kind, current_time,
+                                                                  query_options=options)
                                 if controller:
                                     extra_fields['k8s-controller'] = controller.name
                                     extra_fields['k8s-kind'] = controller.kind
