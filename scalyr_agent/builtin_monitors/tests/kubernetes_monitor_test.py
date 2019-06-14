@@ -207,7 +207,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
                 self.__pending_request = None
                 self.__lock.release()
 
-        def set_response(self, pod_namespace, pod_name, success=None, temporary_error=None, permanent_error=None):
+        def set_response(self, pod_namespace, pod_name, success=None, already_warm=None, temporary_error=None, permanent_error=None):
             """Sets what response should be returned for the next call `pod` for the specified pod.
 
             @param pod_namespace: The namespace for the pod
@@ -224,6 +224,8 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             """
             if success:
                 response = self._return_success
+            elif already_warm:
+                response = self._return_already_warm
             elif temporary_error:
                 response = self._raise_temp_error
             elif permanent_error:
@@ -299,8 +301,18 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
             finally:
                 self.__lock.release()
 
+        def add_pod_to_cache( self, pod_namespace, pod_name ):
+            self.__lock.acquire()
+            try:
+                self.__warmed_pods.add(self.__pod_key(pod_namespace, pod_name))
+            finally:
+                self.__lock.release()
+
         def _return_success(self, pod_namespace, pod_name):
             self.__warmed_pods.add(self.__pod_key(pod_namespace, pod_name))
+            return 'fake pod'
+
+        def _return_already_warm(self, pod_namespace, pod_name):
             return 'fake pod'
 
         @staticmethod
@@ -357,6 +369,30 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         self.assertEqual(warmer.warming_containers(), [])
 
+        self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
+
+    def test_already_warm(self):
+        warmer = self.__warmer_test_instance
+        fake_cache = self.__fake_cache
+
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.end_marking()
+        fake_cache.add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
+
+        warmer.block_until_idle()
+
+        stats = warmer.get_report_stats()
+
+        success_count = stats.get( 'success', (0, 0) )
+        already_warm_count = stats.get( 'already_warm', (0, 0) )
+
+        self.assertEqual( success_count[0], 0 )
+        self.assertEqual( already_warm_count[0], 1 )
+
+        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
+        self.assertEqual(warmer.warming_containers(), [])
+        self.assertEqual(warmer.blacklisted_containers(), [])
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
     def test_remove_inactive(self):
