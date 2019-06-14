@@ -1516,16 +1516,16 @@ class KubernetesApi( object ):
 
         query = None
         try:
-           query =  _OBJECT_ENDPOINTS[kind]['single'].substitute( name=name, namespace=namespace )
+            query = _OBJECT_ENDPOINTS[kind]['single'].substitute( name=name, namespace=namespace )
         except Exception, e:
             global_log.warn( 'k8s API - failed to build query string - %s' % (str(e)),
                              limit_once_per_x_secs=300, limit_key='k8s_api_build_query-%s' % kind )
             return {}
 
         if query_options is not None:
-            self.query_api_with_retries(query, query_options,
-                                        retry_error_context='%s, %s, %s' % (kind, namespace, name),
-                                        retry_error_limit_key='query_object-%s' % kind)
+            return self.query_api_with_retries(query, query_options,
+                                               retry_error_context='%s, %s, %s' % (kind, namespace, name),
+                                               retry_error_limit_key='query_object-%s' % kind)
         else:
             return self.query_api( query )
 
