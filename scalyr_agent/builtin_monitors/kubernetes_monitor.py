@@ -792,16 +792,10 @@ class ControlledCacheWarmer(StoppableThread):
             if container_id in self.__active_pods:
                 entry = self.__active_pods[container_id]
                 if success:
-                    entry.is_warm = True
-                    entry.failure_count = 0
-                    entry.blacklisted_until = None
-                    entry.blacklist_reason = None
+                    entry.set_warm()
                     result_type = 'success'
                 elif already_warm:
-                    # make sure warm is set - normally redundant, but needed for tests
-                    # don't update failure counts or blacklists, as they would have been
-                    # set by a previous 'success'.
-                    entry.is_warm = True
+                    entry.set_warm()
                     result_type = 'already_warm'
                 else:
                     if permanent_error:
@@ -903,6 +897,15 @@ class ControlledCacheWarmer(StoppableThread):
             for key, val in self.__dict__.items():
                 s += '\n\t%s: %s' % (key, val)
             return s + '\n'
+
+        def set_warm( self ):
+            """
+            Sets the entry to warm, and resets failure count and black list status.
+            """
+            self.is_warm = True
+            self.failure_count = 0
+            self.blacklisted_until = None
+            self.blacklist_reason = None
 
 
 def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to_container=None, logger=None,
