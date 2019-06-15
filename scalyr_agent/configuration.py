@@ -1158,16 +1158,16 @@ class Configuration(object):
             config, 'k8s_ratelimit_cluster_num_agents', 1, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
-            config, 'k8s_ratelimit_cluster_rps_init', 1.0, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_cluster_rps_init', 40.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
             config, 'k8s_ratelimit_cluster_rps_min', 1.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
-            config, 'k8s_ratelimit_cluster_rps_max', 1.0, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_cluster_rps_max', 20000.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_int(
-            config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_consecutive_increase_threshold', 10, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_string(
             config, 'k8s_ratelimit_strategy', BlockingRateLimiter.STRATEGY_MULTIPLY,
