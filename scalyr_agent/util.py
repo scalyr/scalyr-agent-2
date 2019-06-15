@@ -1508,6 +1508,7 @@ class BlockingRateLimiter(object):
                 if self._initial_cluster_rate > self._max_cluster_rate:
                     old_initial_cluster_rate = self._initial_cluster_rate
                     self._initial_cluster_rate = self._max_cluster_rate
+                    self._current_cluster_rate = self._initial_cluster_rate
                     self._logger.warn(
                         'RateLimiter: initial cluster rate of %.2f is too high.  Decreasing to %.2f.'
                         % (old_initial_cluster_rate, self._initial_cluster_rate)
@@ -1515,6 +1516,7 @@ class BlockingRateLimiter(object):
                 if self._initial_cluster_rate < self._min_cluster_rate:
                     old_initial_cluster_rate = self._initial_cluster_rate
                     self._initial_cluster_rate = self._min_cluster_rate
+                    self._current_cluster_rate = self._initial_cluster_rate
                     self._logger.warn(
                         'RateLimiter: initial cluster rate of %.2f is too low.  Increasing to %.2f.'
                         % (old_initial_cluster_rate, self._initial_cluster_rate)
