@@ -2267,7 +2267,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             self._global_config.k8s_ratelimit_cluster_rps_max,
             self._global_config.k8s_ratelimit_cluster_rps_min,
             self._global_config.k8s_ratelimit_consecutive_increase_threshold,
-            self._global_config.k8s_ratelimit_increase_strategy,
+            self._global_config.k8s_ratelimit_strategy,
             self._global_config.k8s_ratelimit_increase_factor,
             self._global_config.k8s_ratelimit_backoff_factor,
             self._global_config.k8s_ratelimit_max_concurrency,

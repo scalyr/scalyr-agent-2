@@ -352,8 +352,8 @@ class Configuration(object):
         return self.__get_config().get_int('k8s_ratelimit_consecutive_increase_threshold')
 
     @property
-    def k8s_ratelimit_increase_strategy(self):
-        return self.__get_config().get_string('k8s_ratelimit_increase_strategy')
+    def k8s_ratelimit_strategy(self):
+        return self.__get_config().get_string('k8s_ratelimit_strategy')
 
     @property
     def k8s_ratelimit_increase_factor(self):
@@ -1167,7 +1167,7 @@ class Configuration(object):
             config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_string(
-            config, 'k8s_ratelimit_increase_strategy', BlockingRateLimiter.INCREASE_STRATEGY_MULTIPLY,
+            config, 'k8s_ratelimit_strategy', BlockingRateLimiter.STRATEGY_MULTIPLY,
             description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
