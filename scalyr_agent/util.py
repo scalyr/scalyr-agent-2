@@ -20,7 +20,6 @@ import sys
 import struct
 import thread
 
-import scalyr_agent.json_lib.objects
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -31,7 +30,6 @@ import os
 import random
 import threading
 import time
-from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
@@ -793,7 +791,7 @@ class StoppableThread(threading.Thread):
     # A prefix to add to all threads.  This is used for testing.
     __name_prefix = None
 
-    def __init__(self, name=None, target=None, fake_clock=None):
+    def __init__(self, name=None, target=None, fake_clock=None, is_daemon=False):
         """Creates a new thread.
 
         You must invoke `start` to actually have the thread begin running.
@@ -807,10 +805,13 @@ class StoppableThread(threading.Thread):
             the work for the thread.  This function should accept a single argument, the `RunState` instance
             that will signal when the thread should stop work.
         @param fake_clock:  A fake clock to control the time and when threads wake up for tests.
+        @param is_daemon: If True, will set this thread to Daemon (useful for stopping test threads quicker).
+            Use this cautiously as it may result in resources not being freed up properly.
 
         @type name: str
         @type target: None|func
         @type fake_clock: FakeClock|None
+
         """
         name_prefix = StoppableThread._get_name_prefix()
         if name_prefix is not None:
@@ -819,6 +820,8 @@ class StoppableThread(threading.Thread):
             else:
                 name = name_prefix
         threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        if is_daemon:
+            self.setDaemon(True)
         self.__target = target
         self.__exception_info = None
         # Tracks whether or not the thread should still be running.
