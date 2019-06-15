@@ -1489,24 +1489,59 @@ class KubernetesApi( object ):
 
         response = None
 
-
         # Optionally save api json to disk
         log_responses = self.log_api_responses_to_disk and self.agent_log_path
+        logged_response_file = None
         if log_responses:
-            kapi = os.path.join(self.agent_log_path, 'kapi')
-            if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
-            if rate_limited:
-                kapi = os.path.join(kapi, 'limited')
-            else:
-                kapi = os.path.join(kapi, 'limited')
-            if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
-            fname = '%s_%.20f_%s_%s' % (strftime('%Y%m%d:%H:%M:%S', gmtime()), time.time(), random.randint(1, 100), path.replace('/', '--'))
-            logged_response_file = open(os.path.join(kapi, fname), 'w')
-            traceback.print_stack(file=logged_response_file)
+            # try to open the logged_response_file
+            try:
+                kapi = os.path.join(self.agent_log_path, 'kapi')
+                if not os.path.exists(kapi):
+                    os.mkdir(kapi, 0755)
+                if rate_limited:
+                    kapi = os.path.join(kapi, 'limited')
+                else:
+                    kapi = os.path.join(kapi, 'limited')
+                if not os.path.exists(kapi):
+                    os.mkdir(kapi, 0755)
+                fname = '%s_%.20f_%s_%s' % (strftime('%Y%m%d:%H:%M:%S', gmtime()), time.time(), random.randint(1, 100), path.replace('/', '--'))
+
+                # if logging responses to disk, always prepend the stack trace for easier debugging
+                logged_response_file = open(os.path.join(kapi, fname), 'w')
+            except IOError:
+                pass
 
         try:
+            # Optionally prepend stack trace into logged response file
+            if logged_response_file:
+                traceback.print_stack(file=logged_response_file)
+                logged_response_file.write('\n\n')
+
+            # echee: TODO: remove this before shipping
+            # If logging responses, also check for a local "simfile" to simulate API master timeout.
+            # The simfile is a textfile that contains the HTTP error code we want to simulate.
+            if log_responses:
+                fake_response_file = os.path.join(self.agent_log_path, 'simfile')
+                if os.path.isfile(fake_response_file):
+                    fake_response_code = None
+                    try:
+                        fake_f = open(fake_response_file, 'r')
+                        try:
+                            fake_response_code = fake_f.read().strip()
+                        finally:
+                            fake_f.close()
+                    except Exception:
+                        if logged_response_file:
+                            logged_response_file.write(
+                                'Error encountered while attempting to fake a response code:\n%s\n\n'
+                                % traceback.format_exc())
+                    if fake_response_code in ['404', '503', '429']:
+                        global_log.log(scalyr_logging.DEBUG_LEVEL_3,
+                                       "Faking api master temporary error (%s) for url: %s",
+                                       limit_once_per_x_secs=300, limit_key='k8s_api_query_fake_temporary_error')
+                        raise K8sApiTemporaryError('Fake %s' % fake_response_code)
+
+            # Make actual API call
             try:
                 response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
                 response.encoding = "utf-8"
@@ -1529,11 +1564,14 @@ class KubernetesApi( object ):
                 else:
                     raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
 
-            if log_responses:
+            # Optionally append response text into logged response file
+            if logged_response_file:
                 logged_response_file.write(response.text)
+
             return util.json_decode( response.text )
+
         finally:
-            if log_responses:
+            if logged_response_file:
                 logged_response_file.close()
 
     def query_object( self, kind, namespace, name, query_options=None ):
