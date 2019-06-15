@@ -35,6 +35,7 @@ import logging.handlers
 from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
 from scalyr_agent.scalyr_logging import BaseFormatter
 import scalyr_agent.json_lib as json_lib
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
@@ -276,7 +277,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         # Create rate limiter
         self.__max_query_retries = self._global_config.k8s_controlled_warmer_max_query_retries
-        self.__rate_limiter = scalyr_util.BlockingRateLimiter(
+        self.__rate_limiter = BlockingRateLimiter(
             self._global_config.k8s_ratelimit_cluster_num_agents,
             self._global_config.k8s_ratelimit_cluster_rps_init,
             self._global_config.k8s_ratelimit_cluster_rps_max,
