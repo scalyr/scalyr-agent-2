@@ -20,6 +20,7 @@ __author__ = 'czerwin@scalyr.com'
 import datetime
 import os
 import tempfile
+from mock import patch
 import struct
 import threading
 from mock import patch, MagicMock
@@ -27,7 +28,6 @@ from mock import patch, MagicMock
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.util import JsonReadFileException, RateLimiter, BlockingRateLimiter, FakeRunState, ScriptEscalator
-from scalyr_agent.util import FakeClockCounter
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.util import verify_and_get_compress_func
 from scalyr_agent.json_lib import JsonObject
@@ -733,6 +733,44 @@ class BlockingRateLimiterTest(ScalyrTestCase):
     def setUp(self):
         self._fake_clock = scalyr_util.FakeClock()
 
+    def __test_rate_adjustment(self):
+
+        rl = BlockingRateLimiter(
+            num_agents=1,
+            initial_cluster_rate=10.0,
+            max_cluster_rate=100.0,
+            min_cluster_rate=1.0,
+            consecutive_success_threshold=5,
+            strategy=BlockingRateLimiter.STRATEGY_MULTIPLY,
+            increase_factor=2.0,
+            backoff_factor=0.5,
+            max_concurrency=1,
+            fake_clock=self._fake_clock
+        )
+
+        @patch.object(rl, '_get_next_ripe_time')
+        def simulate_very_fast_actual_rate(mock_rate_limiter):
+            """Simulate number of required successes one short of what's required to alter the rate"""
+
+            # make the rate limiter choose very small increments between token grants
+            def mock_get_next_ripe_time(*args, **kwargs):
+                self._fake_clock.advance_time(0.00000000000001)
+            mock_rate_limiter.side_effect = mock_get_next_ripe_time
+
+            rl.acquire_token()
+            for x in range(4):
+                rl.release_token(True)
+                rl.acquire_token()
+
+            old_rate = rl._current_cluster_rate
+            # actual rate would always be high because of simulated short times between token grants
+            self.assertGreater(rl._get_actual_cluster_rate(), old_rate)
+            rl.release_token(True)
+            # assert that the new rate is no higher than old rate x 2
+            self.assertEqual(rl._current_cluster_rate, 2.0 * old_rate)
+        simulate_very_fast_actual_rate()
+
+
     def test_fixed_rate_single_concurrency(self):
         """Longer experiment"""
         # 1 rps x 1000 simulated seconds => 1000 increments
@@ -752,13 +790,13 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         cluster_rate = num_agents * desired_agent_rate
         self._test_rate_limiter(
             num_agents=num_agents,
-            initial_cluster_rate=cluster_rate, upper_cluster_rate=cluster_rate, lower_cluster_rate=cluster_rate,
+            initial_cluster_rate=cluster_rate, max_cluster_rate=cluster_rate, min_cluster_rate=cluster_rate,
             consecutive_success_threshold=5, experiment_duration=experiment_duration, max_concurrency=concurrency,
             expected_requests=expected_requests, allowed_variance=allowed_variance
         )
 
     def test_variable_rate_single_concurrency_all_successes(self):
-        """Rate should quickly max out at upper_cluster_rate"""
+        """Rate should quickly max out at max_cluster_rate"""
 
         # Test variables
         initial_agent_rate = 1
@@ -766,26 +804,25 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         concurrency = 1
         max_rate_multiplier = 10
 
-        # Expected behavior
-        # 3 rps * 300s (since it saturates at upper rate given all successes)
+        # Expected behavior (saturates at upper rate given all successes)
         expected_requests = max_rate_multiplier * experiment_duration
         allowed_variance = (0.8, 1.2)
 
         # Derived values
         num_agents = 10
         initial_cluster_rate = num_agents * initial_agent_rate
-        upper_cluster_rate = max_rate_multiplier * initial_cluster_rate
+        max_cluster_rate = max_rate_multiplier * initial_cluster_rate
 
         self._test_rate_limiter(
             num_agents=10,
-            initial_cluster_rate=initial_cluster_rate, upper_cluster_rate=upper_cluster_rate, lower_cluster_rate=0,
+            initial_cluster_rate=initial_cluster_rate, max_cluster_rate=max_cluster_rate, min_cluster_rate=0,
             experiment_duration=experiment_duration, max_concurrency=concurrency,
-            consecutive_success_threshold=5, increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            consecutive_success_threshold=5, increase_strategy=BlockingRateLimiter.STRATEGY_RESET_THEN_MULTIPLY,
             expected_requests=expected_requests, allowed_variance=allowed_variance,
         )
 
     def test_variable_rate_single_concurrency_all_failures(self):
-        """Rate should quickly decrease to lower_cluster_rate"""
+        """Rate should quickly decrease to min_cluster_rate"""
 
         # Test variables
         initial_agent_rate = 1
@@ -800,18 +837,18 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         # Derived values
         num_agents = 10
         initial_cluster_rate = num_agents * initial_agent_rate
-        upper_cluster_rate = initial_cluster_rate
-        lower_cluster_rate = min_rate_multiplier * initial_cluster_rate
+        max_cluster_rate = initial_cluster_rate
+        min_cluster_rate = min_rate_multiplier * initial_cluster_rate
 
         self._test_rate_limiter(
             num_agents=num_agents,
             initial_cluster_rate=initial_cluster_rate,
-            upper_cluster_rate=upper_cluster_rate,
-            lower_cluster_rate=lower_cluster_rate,
+            max_cluster_rate=max_cluster_rate,
+            min_cluster_rate=min_cluster_rate,
             experiment_duration=experiment_duration,
             max_concurrency=concurrency,
             consecutive_success_threshold=5,
-            increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            increase_strategy=BlockingRateLimiter.STRATEGY_RESET_THEN_MULTIPLY,
             expected_requests=expected_requests,
             allowed_variance=allowed_variance,
             reported_outcome_generator=always_false(),
@@ -842,12 +879,12 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         self._test_rate_limiter(
             num_agents=num_agents,
             initial_cluster_rate=initial_cluster_rate,
-            upper_cluster_rate=max_rate_multiplier * initial_cluster_rate,
-            lower_cluster_rate=min_rate_multiplier * initial_cluster_rate,
+            max_cluster_rate=max_rate_multiplier * initial_cluster_rate,
+            min_cluster_rate=min_rate_multiplier * initial_cluster_rate,
             experiment_duration=experiment_duration,
             max_concurrency=concurrency,
             consecutive_success_threshold=consecutive_success_threshold,
-            increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_RESET_THEN_MULTIPLY,
+            increase_strategy=BlockingRateLimiter.STRATEGY_RESET_THEN_MULTIPLY,
             expected_requests=expected_requests,
             allowed_variance=allowed_variance,
             reported_outcome_generator=rate_maintainer(consecutive_success_threshold, backoff_factor, increase_factor),
@@ -856,10 +893,10 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         )
 
     def _test_rate_limiter(
-        self, num_agents, consecutive_success_threshold, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
+        self, num_agents, consecutive_success_threshold, initial_cluster_rate, max_cluster_rate, min_cluster_rate,
         experiment_duration, max_concurrency, expected_requests, allowed_variance,
         reported_outcome_generator=always_true(),
-        increase_strategy=BlockingRateLimiter.INCREASE_STRATEGY_MULTIPLY,
+        increase_strategy=BlockingRateLimiter.STRATEGY_MULTIPLY,
         backoff_factor=0.5, increase_factor=2.0,
     ):
         """Main test logic that runs max_concurrency client threads for a defined experiment duration.
@@ -877,8 +914,8 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         @param num_agents: Num agents in cluster (to derive agent rate from cluster rate)
         @param consecutive_success_threshold: 
         @param initial_cluster_rate: Initial cluster rate
-        @param upper_cluster_rate:  Upper bound on cluster rate
-        @param lower_cluster_rate: Lower bound on cluster rate
+        @param max_cluster_rate:  Upper bound on cluster rate
+        @param min_cluster_rate: Lower bound on cluster rate
         @param increase_strategy: Strategy for increasing rate
         @param experiment_duration: Experiment duration in seconds
         @param max_concurrency: Number of tokens to create
@@ -890,10 +927,10 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         rate_limiter = BlockingRateLimiter(
             num_agents=num_agents,
             initial_cluster_rate=initial_cluster_rate,
-            upper_cluster_rate=upper_cluster_rate,
-            lower_cluster_rate=lower_cluster_rate,
+            max_cluster_rate=max_cluster_rate,
+            min_cluster_rate=min_cluster_rate,
             consecutive_success_threshold=consecutive_success_threshold,
-            increase_strategy=increase_strategy,
+            strategy=increase_strategy,
             increase_factor=increase_factor,
             backoff_factor=backoff_factor,
             max_concurrency=max_concurrency,
@@ -902,6 +939,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
         test_state = {
             'count': 0,
+            'times': [],
         }
         test_state_lock = threading.Lock()
         outcome_generator_lock = threading.Lock()
@@ -910,13 +948,15 @@ class BlockingRateLimiterTest(ScalyrTestCase):
         def consume_token_blocking():
             """Client threads will keep acquiring tokens until experiment end time"""
             while self._fake_clock.time() < experiment_end_time:
-                # A simple loop at acquires token, updates a counter, then releases token with an outcome
+                # A simple loop that acquires token, updates a counter, then releases token with an outcome
                 # provided by reported_outcome_generator()
+                t1 = self._fake_clock.time()
                 token = rate_limiter.acquire_token()
                 # update test state
                 test_state_lock.acquire()
                 try:
                     test_state['count'] += 1
+                    test_state['times'].append(int(t1))
                 finally:
                     test_state_lock.release()
 
@@ -950,6 +990,9 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             requests = test_state['count']
         finally:
             test_state_lock.release()
+
+        print(requests)
+        print(test_state['times'])
 
         # Assert that count is close enough to the expected count
         observed_ratio = float(requests) / expected_requests
