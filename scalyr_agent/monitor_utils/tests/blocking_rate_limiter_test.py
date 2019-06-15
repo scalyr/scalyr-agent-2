@@ -274,7 +274,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             """Examine rate-increasing behavior in the context of very high actual rates"""
             mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_leads(rl)
 
-            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.current_thread()])
+            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.currentThread()])
             advancer.start()
 
             while True:
@@ -308,7 +308,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             """Examine rate-increasing behavior in the context of very high actual rates"""
             mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_lags(rl)
 
-            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.current_thread()])
+            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.currentThread()])
             advancer.start()
 
             while True:
@@ -347,7 +347,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             """Examine rate-decreasing behavior in the context of very high actual rates"""
             mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_lags(rl)
 
-            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.current_thread()])
+            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.currentThread()])
             advancer.start()
 
             counter = 0
@@ -387,7 +387,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
             """Examine rate-decreasing behavior in the context of very high actual rates"""
             mock_get_next_ripe_time.side_effect = _mock_get_next_ripe_time_actual_rate_leads(rl)
 
-            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.current_thread()])
+            advancer = self.__create_fake_clock_advancer_thread(rl, [threading.currentThread()])
             advancer.start()
 
             counter = 0
