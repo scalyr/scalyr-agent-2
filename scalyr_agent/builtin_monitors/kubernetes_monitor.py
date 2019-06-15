@@ -2671,6 +2671,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         ver = None
         runtime = None
         if k8s_cache and not self._global_config.k8s_use_controlled_warmer:
+            # echee TODO: currently, if k8s_use_controlled_warmer is True, version checks are disabled.
+            # This issue should be resolved before merging.
             ver = k8s_cache.get_api_server_version()
             runtime = k8s_cache.get_container_runtime()
         ver = 'k8s=%s' % (ver if ver else 'true')

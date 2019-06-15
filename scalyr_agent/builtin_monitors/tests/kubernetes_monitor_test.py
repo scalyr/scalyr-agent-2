@@ -64,7 +64,13 @@ class KubernetesMonitorTest(ScalyrTestCase):
                         'module': "scalyr_agent.builtin_monitors.kubernetes_monitor",
                     }
                 ],
-                extra_toplevel_config={'user_agent_refresh_interval': manager_poll_interval},
+                extra_toplevel_config={
+                    'user_agent_refresh_interval': manager_poll_interval,
+                    # echee TODO: currently, if k8s_use_controlled_warmer is True, version checks are disabled.
+                    # This issue should be resolved before merging.
+                    # So for this test, we should not enable controlled warmer.
+                    'k8s_use_controlled_warmer': False,
+                },
                 null_logger=True,
                 fake_clock=fake_clock,
             )
