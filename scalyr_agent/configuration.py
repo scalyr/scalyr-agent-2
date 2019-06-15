@@ -1130,7 +1130,7 @@ class Configuration(object):
         # Optional (defaults to False). If true, will use the controlled warmer strategy to warm the pod
         # cache.  This only applies when docker is being used as the container system
         self.__verify_or_set_optional_bool(
-            config, 'k8s_use_controlled_warmer', False, description, apply_defaults, env_aware=True
+            config, 'k8s_use_controlled_warmer', True, description, apply_defaults, env_aware=True
         )
         # Optional (defaults to 5). The maximum number of temporary errors that may occur when warming a pod\'s entry,
         # before the warmer blacklists it
@@ -1164,7 +1164,7 @@ class Configuration(object):
             config, 'k8s_ratelimit_cluster_rps_max', 20000.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_int(
-            config, 'k8s_ratelimit_consecutive_increase_threshold', 10, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_string(
             config, 'k8s_ratelimit_strategy', BlockingRateLimiter.STRATEGY_MULTIPLY,
