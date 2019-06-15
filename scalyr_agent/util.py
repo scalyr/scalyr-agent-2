@@ -710,7 +710,6 @@ class RealFakeClock(FakeClock):
         if increment_by is None:
             raise ValueError('Either set_to or increment_by must be supplied')
         increment_by = max(0, increment_by)
-        print('sleeping for %s seconds' % increment_by)
         time.sleep(increment_by)
         self._time_condition.notifyAll()
         self._time_condition.release()
@@ -1466,26 +1465,28 @@ class BlockingRateLimiter(object):
     each of num_agents Scalyr Agents instantiates one of these rate limiters such that the aggregate access rate over
     all agents is R.  (Therefore, the per-agent rate is R / num_agents).
 
-    Whenever a certain number of consecutive successes are seen, the rate is increased up until upper_cluster_rate.
-    Likewise, whenever a failure is reported (on token release()), the rate is lowered up until a lower_cluster_rate.
+    Whenever a certain number of consecutive successes are seen, the rate is increased up until max_cluster_rate.
+    Likewise, whenever a failure is reported (on token release()), the rate is lowered up until a min_cluster_rate.
     Cluster rate is reduced by dividing current rate by backoff_factor.  Cluster rate is increased either by
-    multiplying by increase_factor or resetting to initial rate, depending on the increase_strategy.
+    multiplying by increase_factor or resetting to initial rate, depending on the strategy.
     (Note: if cluster rate is already greater or equal to initial rate, it will be multiplied by the increase factor)
     """
 
-    INCREASE_STRATEGY_MULTIPLY = 'multiply'
-    INCREASE_STRATEGY_RESET_THEN_MULTIPLY = 'reset_then_multiply'
+    STRATEGY_MULTIPLY = 'multiply'
+    STRATEGY_RESET_THEN_MULTIPLY = 'reset_then_multiply'
+    HARD_LIMIT_MAX_CLUSTER_RATE = 20000
+    HARD_LIMIT_MIN_CLUSTER_RATE = 1
 
-    def __init__(self, num_agents, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
-                 consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=0.5,
+    def __init__(self, num_agents, initial_cluster_rate, max_cluster_rate, min_cluster_rate,
+                 consecutive_success_threshold, strategy, increase_factor=2.0, backoff_factor=0.5,
                  max_concurrency=1, logger=None, fake_clock=None):
         """
         @param num_agents: Number of agents in the cluster
         @param initial_cluster_rate: initial cluster rate (requests/sec)
-        @param upper_cluster_rate: upper bound on cluster rate (requests/sec)
-        @param lower_cluster_rate: lower bound on cluster rate (requests/sec)
+        @param max_cluster_rate: upper bound on cluster rate (requests/sec)
+        @param min_cluster_rate: lower bound on cluster rate (requests/sec)
         @param consecutive_success_threshold: number of consecutive successes to trigger a rate increase
-        @param increase_strategy: strategy for increasing the rate (multiply by increase_factor or reset to initial)
+        @param strategy: strategy for changing rate (multiply or reset-then-multiply)
         @param increase_factor: multiplicative factor for increasing rate
         @param backoff_factor: multiplicative factor for decreasing rate
         @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
@@ -1493,21 +1494,28 @@ class BlockingRateLimiter(object):
 
         @type num_agents: int
         @type initial_cluster_rate: float
-        @type upper_cluster_rate: float
-        @type lower_cluster_rate: float
+        @type max_cluster_rate: float
+        @type min_cluster_rate: float
         @type consecutive_success_threshold: int
-        @type increase_strategy: str
+        @type strategy: str
         @type increase_factor: float
         @type backoff_factor: float
         @type max_concurrency: int
         @type logger: Logger
         """
+        self._logger = logger
         self._num_agents = num_agents
         self._initial_cluster_rate = initial_cluster_rate
-        self._upper_cluster_rate = upper_cluster_rate
-        self._lower_cluster_rate = lower_cluster_rate
+
+        self._max_cluster_rate = max_cluster_rate
+        self._min_cluster_rate = min_cluster_rate
+        # A flag that when set to True signifies that a one-time adjustment has been made to min/max
+        # cluster rates.  This is needed to avoid repeat warning messages being logged every time
+        # __init__ is called on a redundant instance of this class (e.g. when created by k8s_monitor_initialize()
+        self._min_max_lazy_adjusted = False
+
         self._consecutive_success_threshold = consecutive_success_threshold
-        self._increase_strategy = increase_strategy
+        self._strategy = strategy
         self._increase_factor = increase_factor
         self._backoff_factor = backoff_factor
 
@@ -1517,7 +1525,11 @@ class BlockingRateLimiter(object):
 
         self._max_concurrency = max_concurrency
 
-        self._logger = logger
+        # state for tracking actual rate
+        self._action_rate_lock = threading.Lock()
+        self._first_action_time = None
+        self._last_action_time = None
+        self._num_actions = 0
 
         # A queue of tokens
         self._ripe_time = None
@@ -1530,8 +1542,8 @@ class BlockingRateLimiter(object):
         self._test_mode_lock = threading.Lock()
 
         # Validate input
-        strategies = [self.INCREASE_STRATEGY_MULTIPLY, self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY]
-        if increase_strategy not in strategies:
+        strategies = [self.STRATEGY_MULTIPLY, self.STRATEGY_RESET_THEN_MULTIPLY]
+        if strategy not in strategies:
             raise ValueError('Increase strategy must be one of %s' % strategies)
 
         if self._max_concurrency < 1:
@@ -1541,12 +1553,83 @@ class BlockingRateLimiter(object):
             raise ValueError(
                 'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
 
-        if self._initial_cluster_rate < self._lower_cluster_rate or self._initial_cluster_rate > self._upper_cluster_rate:
+        if self._initial_cluster_rate < self._min_cluster_rate or self._initial_cluster_rate > self._max_cluster_rate:
             raise ValueError(
                 'Initial cluster rate must be between lower and upper rates. Initial=%s, Lower=%s, Upper=%s.' % (
-                    initial_cluster_rate, lower_cluster_rate, upper_cluster_rate))
+                    initial_cluster_rate, min_cluster_rate, max_cluster_rate))
 
         self._initialize_token_queue()
+
+    def _lazy_adjust_min_max_rates(self):
+        """Adjust min/max cluster rates to hard limits"""
+
+        if self._logger:
+            self._cluster_rate_lock.acquire()
+            try:
+                if self._min_max_lazy_adjusted:
+                    return
+                if self._max_cluster_rate > self.HARD_LIMIT_MAX_CLUSTER_RATE:
+                    old_max_cluster_rate = self._max_cluster_rate
+                    self._max_cluster_rate = self.HARD_LIMIT_MAX_CLUSTER_RATE
+                    self._logger.warn(
+                        'RateLimiter: max cluster rate of %.2f is too high.  Limiting to %.2f.'
+                        % (old_max_cluster_rate, self._max_cluster_rate)
+                    )
+                if self._min_cluster_rate < self.HARD_LIMIT_MIN_CLUSTER_RATE:
+                    old_min_cluster_rate = self._min_cluster_rate
+                    self._min_cluster_rate = self.HARD_LIMIT_MIN_CLUSTER_RATE
+                    self._logger.warn(
+                        'RateLimiter: min cluster rate of %.2f is too low.  Increasing to %.2f.'
+                        % (old_min_cluster_rate, self._min_cluster_rate)
+                    )
+                if self._initial_cluster_rate > self._max_cluster_rate:
+                    old_initial_cluster_rate = self._initial_cluster_rate
+                    self._initial_cluster_rate = self._max_cluster_rate
+                    self._logger.warn(
+                        'RateLimiter: initial cluster rate of %.2f is too high.  Decreasing to %.2f.'
+                        % (old_initial_cluster_rate, self._initial_cluster_rate)
+                    )
+                if self._initial_cluster_rate < self._min_cluster_rate:
+                    old_initial_cluster_rate = self._initial_cluster_rate
+                    self._initial_cluster_rate = self._min_cluster_rate
+                    self._logger.warn(
+                        'RateLimiter: initial cluster rate of %.2f is too low.  Increasing to %.2f.'
+                        % (old_initial_cluster_rate, self._initial_cluster_rate)
+                    )
+                self._min_max_lazy_adjusted = True
+            finally:
+                self._cluster_rate_lock.release()
+
+    def _get_actual_cluster_rate(self):
+        """Calculate actual rate based on recorded actions.  If fewer than 2 actions, returns None"""
+        self._action_rate_lock.acquire()
+        try:
+            if self._num_actions < 2:
+                return None
+            return float(self._num_actions) * self._num_agents / (self._last_action_time - self._first_action_time)
+        finally:
+            self._action_rate_lock.release()
+
+    def _record_actual_rate(self):
+        """Record a completed action in order to keep track of actual rate"""
+        t = self._time()
+        self._action_rate_lock.acquire()
+        try:
+            self._num_actions += 1
+            if self._num_actions == 1:
+                self._first_action_time = t
+            self._last_action_time = t
+        finally:
+            self._action_rate_lock.release()
+
+    def _reset_actual_rate(self):
+        self._action_rate_lock.acquire()
+        try:
+            self._num_actions = 0
+            self._first_action_time = None
+            self._last_action_time = None
+        finally:
+            self._action_rate_lock.release()
 
     @property
     def current_cluster_rate(self):
@@ -1565,6 +1648,75 @@ class BlockingRateLimiter(object):
         self._ripe_time = self._get_next_ripe_time()
         self._token_queue_cv.release()
 
+    
+    def _increase_cluster_rate(self):
+        """Increase cluster rate but no higher than configured max and no lower than current cluster rate.
+
+        If actual rate was calculated, then the new rate is calculated off the lower of actual & current target rate.
+        Otherwise, new rate is calculated off the existing target rate.
+
+        Note: this method is not thread-safe. Callers should pre-acquire cluster_rate_lock.
+        """
+        import scalyr_agent.scalyr_logging as scalyr_logging
+        current_target_rate = self._current_cluster_rate
+
+        actual_rate = self._get_actual_cluster_rate()
+        if actual_rate is not None:
+            # new rate should be based off the lower of actual & target rates
+            new_rate = min(actual_rate, current_target_rate) * self._increase_factor
+        else:
+            new_rate = current_target_rate * self._increase_factor
+
+        # new rate cannot be higher than configured higher bound
+        new_rate = min(new_rate, self._max_cluster_rate)
+
+        # new rate cannot be lower than existing rate (which may happen if actual rate was really low)
+        new_rate = max(new_rate, current_target_rate)
+
+        self._current_cluster_rate = new_rate
+
+        if self._logger:
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_3,
+                'RateLimiter: increase cluster rate %s (%s) x %s -> %s' %
+                (current_target_rate, actual_rate, self._increase_factor, new_rate)
+            )
+
+        self._reset_actual_rate()
+
+    def _decrease_cluster_rate(self):
+        """Decrease cluster rate but no lower than configured min and no higher than current cluster rate.
+
+        If actual rate was calculated, then the new rate is calculated off the higher of actual & current target rate.
+        Otherwise, new rate is calculated off the existing target rate.
+
+        Note: this method is not thread-safe. Callers should pre-acquire cluster_rate_lock.
+        """
+        import scalyr_agent.scalyr_logging as scalyr_logging
+        current_target_rate = self._current_cluster_rate
+
+        actual_rate = self._get_actual_cluster_rate()
+        if actual_rate is not None:
+            # new rate should be based off the higher of actual & target rates
+            new_rate = max(actual_rate, current_target_rate) * self._backoff_factor
+        else:
+            new_rate = current_target_rate * self._backoff_factor
+
+        # new rate cannot be lower than configured lower bound
+        new_rate = max(new_rate, self._min_cluster_rate)
+
+        # new rate cannot be higher than existing rate (which may happen if actual rate was really high)
+        new_rate = min(new_rate, current_target_rate)
+
+        self._current_cluster_rate = new_rate
+
+        if self._logger:
+            self._logger.log(
+                scalyr_logging.DEBUG_LEVEL_3,
+                'RateLimiter: decrease cluster rate %s (%s) x %s -> %s' %
+                (current_target_rate, actual_rate, self._backoff_factor, new_rate)
+            )
+        self._reset_actual_rate()
 
     def _adjust_cluster_rate(self, success):
         """Adjust cluster rate, backing off on failure or increasing on enough consecutive successes.
@@ -1576,44 +1728,39 @@ class BlockingRateLimiter(object):
         @param success: Whether an operation was successful
         @type success: bool
         """
-        import scalyr_agent.scalyr_logging as scalyr_logging
         self._cluster_rate_lock.acquire()
         try:
             if success:
-                self._consecutive_successes += 1
-            else:
-                self._consecutive_successes = 0
-            if not success:
-                # Failure case: backoff
-                orig_cluster_rate = self._current_cluster_rate
-                self._current_cluster_rate = max(
-                    self._lower_cluster_rate,
-                    self._current_cluster_rate * self._backoff_factor
-                )
-                if self._logger:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_3,
-                        'RateLimiter: decrease cluster rate %s x %s = %s' %
-                        (orig_cluster_rate, self._backoff_factor, self._current_cluster_rate)
-                    )
-            else:
                 # Success case: If current rate can be increased, do so based on strategy
-                if self._consecutive_successes >= self._consecutive_success_threshold:
-                    orig_cluster_rate = self._current_cluster_rate
-                    if self._current_cluster_rate < self._upper_cluster_rate:
-                        if (self._increase_strategy == self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY and
-                                self._current_cluster_rate < self._initial_cluster_rate):
+                self._consecutive_successes += 1
+
+                # not enough consecutive successes
+                if self._consecutive_successes < self._consecutive_success_threshold:
+                    return
+
+                self._consecutive_successes = 0
+                if self._current_cluster_rate < self._max_cluster_rate:
+                    if self._strategy == self.STRATEGY_RESET_THEN_MULTIPLY:
+                        if self._current_cluster_rate < self._initial_cluster_rate:
                             self._current_cluster_rate = self._initial_cluster_rate
                         else:
-                            self._current_cluster_rate = min(
-                                self._upper_cluster_rate, self._current_cluster_rate * self._increase_factor)
-                    if self._logger:
-                        self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_3,
-                            'RateLimiter: increase cluster rate %s x %s = %s' %
-                            (orig_cluster_rate, self._backoff_factor, self._current_cluster_rate)
-                        )
-                    self._consecutive_successes = 0
+                            self._increase_cluster_rate()
+                    else:
+                        self._increase_cluster_rate()
+            else:
+                # Failure case: backoff
+                self._consecutive_successes = 0
+
+                # currently, a single failure will cause backoff
+
+                if self._current_cluster_rate > self._min_cluster_rate:
+                    if self._strategy == self.STRATEGY_RESET_THEN_MULTIPLY:
+                        if self._current_cluster_rate > self._initial_cluster_rate:
+                            self._current_cluster_rate = self._initial_cluster_rate
+                        else:
+                            self._decrease_cluster_rate()
+                    else:
+                        self._decrease_cluster_rate()
         finally:
             self._cluster_rate_lock.release()
 
@@ -1630,7 +1777,8 @@ class BlockingRateLimiter(object):
         """
         agent_interval = float(self._num_agents) / self._current_cluster_rate
         delta = random.uniform(0, 2 * agent_interval)
-        return max(self._ripe_time, self._time()) + delta
+        next_ripe = max(self._ripe_time, self._time()) + delta
+        return next_ripe
 
     def _time(self):
         """Returns absolute time in UTC epoch seconds"""
@@ -1673,6 +1821,9 @@ class BlockingRateLimiter(object):
         @rtype: RateLimiterToken
         """
         import scalyr_agent.scalyr_logging as scalyr_logging
+
+        self._lazy_adjust_min_max_rates()
+
         if self._fake_clock:
             return self._simulate_acquire_token()
 
@@ -1703,6 +1854,12 @@ class BlockingRateLimiter(object):
 
             # Head token is ripe.
             token = self._token_queue.popleft()
+            if self._logger:
+                import scalyr_agent.scalyr_logging as scalyr_logging
+                self._logger.log(
+                    scalyr_logging.DEBUG_LEVEL_5,
+                    '[%s] RateLimiter grant token %s at %.2f' % (threading.current_thread().name, token, self._time())
+                )
             self._ripe_time = self._get_next_ripe_time()
 
             if self._logger:
@@ -1727,6 +1884,8 @@ class BlockingRateLimiter(object):
         import scalyr_agent.scalyr_logging as scalyr_logging
         if not isinstance(token, RateLimiterToken):
             raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
+
+        self._record_actual_rate()
 
         if self._fake_clock:
             return self._simulate_release_token(token, success)
