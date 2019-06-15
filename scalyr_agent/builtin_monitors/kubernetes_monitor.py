@@ -32,12 +32,13 @@ from scalyr_agent import ScalyrMonitor, define_config_option, define_metric, Bad
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
 from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName, ApiQueryOptions
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
-from scalyr_agent.util import StoppableThread, BlockingRateLimiter
+from scalyr_agent.util import StoppableThread
 
 
 global_log = scalyr_logging.getLogger(__name__)
