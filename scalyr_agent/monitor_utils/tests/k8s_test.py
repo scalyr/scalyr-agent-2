@@ -346,6 +346,13 @@ class FakeK8s( object ):
     def _raise_perm_error(pod_namespace, pod_name):
         raise K8sApiPermanentError('Permanent error')
 
+    def _raise_exception_if_timeout( self, start_time, message=None ):
+        if message is None:
+            message = "Timeout - waiting too long"
+
+        if time.time() - start_time > self.wait_timeout:
+            raise Exception( message )
+
     def query_object( self, kind, namespace, name, query_options=None ):
         """Faked KubernetesApi method that simulates blocking for querying the specified object.
 
@@ -442,14 +449,11 @@ class FakeK8s( object ):
         try:
             if target_key is not None:
                 while target_key != self.__pending_request:
-                    if time.time() - start_time > self.wait_timeout:
-                        raise Exception( "waiting too long for pending request" )
+                    self._raise_exception_if_timeout( start_time, "waiting too long for pending request" )
                     self.__condition_var.wait( self.wait_timeout )
-
             else:
                 while self.__pending_request is None:
-                    if time.time() - start_time > self.wait_timeout:
-                        raise Exception( "waiting too long for pending request" )
+                    self._raise_exception_if_timeout( start_time, "waiting too long for pending request" )
                     self.__condition_var.wait( self.wait_timeout )
             return self.__split_obj_key(self.__pending_request)
         finally:
@@ -469,8 +473,7 @@ class FakeK8s( object ):
         self.__lock.acquire()
         try:
             while target_key in self.__pending_responses:
-                if time.time() - start_time > self.wait_timeout:
-                    raise Exception( "waiting too long for request to finish" )
+                self._raise_exception_if_timeout( start_time, "waiting too long for request to finish" )
                 self.__condition_var.wait( self.wait_timeout )
         finally:
             self.__lock.release()
@@ -547,6 +550,5 @@ class FakeCache(object):
         Simulates adding a pod to the cache so that we can populate the
         cache for testing purposes without going through the regular interface
         """
-        self.k8s.set_response( pod_namespace, pod_name, success=True )
         obj = create_object_from_dict( { 'namespace': pod_namespace, 'name': pod_name } )
         self.__pod_cache._add_to_cache( obj )
