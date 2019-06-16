@@ -1503,13 +1503,16 @@ class KubernetesApi( object ):
             finally:
                 rate_limiter.release_token(token, rate_limit_outcome)
 
-    def __open_api_response_log(self, rate_limited):
+    def __open_api_response_log(self, path, rate_limited):
         """Opens a file for logging the api response
 
         The file will be located in agent_log_dir/kapi/(limited/not_limited) depending on whether the
         api call is rate limited or not.
 
+        @param path: The URL path to be queried (also embedded in the filename)
         @param rate_limited: Whether the response is rate limited or not
+
+        @type path: str
         @type rate_limited: bool
 
         @returns File handle to the api response log file or None upon failure.
@@ -1526,8 +1529,7 @@ class KubernetesApi( object ):
                 kapi = os.path.join(kapi, 'limited')
             if not os.path.exists(kapi):
                 os.mkdir(kapi, 0755)
-            fname = '%s_%.20f_%s_%s' % (
-            strftime('%Y%m%d:%H:%M:%S', gmtime()), time.time(), random.randint(1, 100), path.replace('/', '--'))
+            fname = '%s_%.20f_%s_%s' % (strftime('%Y%m%d-%H-%M-%S', gmtime()), time.time(), random.randint(1, 100), path.replace('/', '--'))
 
             # if logging responses to disk, always prepend the stack trace for easier debugging
             return open(os.path.join(kapi, fname), 'w')
@@ -1586,7 +1588,7 @@ class KubernetesApi( object ):
         log_responses = self.log_api_responses_to_disk and self.agent_log_path
         logged_response_file = None
         if log_responses:
-            logged_response_file = self.__open_api_response_log(rate_limited)
+            logged_response_file = self.__open_api_response_log(path, rate_limited)
         try:
             # Optionally prepend stack trace into logged response file
             if logged_response_file:
