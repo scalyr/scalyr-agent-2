@@ -288,6 +288,13 @@ class ApiQueryOptions(object):
         self.max_retries = max_retries
         self.return_temp_errors = return_temp_errors
         self.rate_limiter = rate_limiter
+
+        # By default, allow exceptions to be thrown when querying the cache
+        # if an error occurs during the query.  If this is False, or if
+        # no query options are passed down, then exceptions will be swallowed
+        # and None will be returned instead.
+        # We have this flag because some code paths rely on returning None and
+        # other code paths rely on exceptions being thrown.
         self.raise_exception_on_cache_query_error = True
 
     def __repr__(self):
