@@ -1478,9 +1478,10 @@ class KubernetesApi( object ):
         while True:
             t = time.time()
             token = rate_limiter.acquire_token()
-            rate_limit_outcome = True
+            rate_limit_outcome = False
             try:
                 result = self.query_api(query, return_temp_errors=query_options.return_temp_errors, rate_limited=True)
+                rate_limit_outcome = True
                 global_log.log(scalyr_logging.DEBUG_LEVEL_3,
                                'Rate limited k8s api query took %s seconds' % (time.time() - t))
                 return result
@@ -1490,6 +1491,7 @@ class KubernetesApi( object ):
                 # rather, if the agent wants to query this endpoint again later then it will.
                 # This is useful for when a pod hasn't fully started up yet and querying its endpoint
                 # will return a 404.  Then if you query again a few seconds later everything works.
+                rate_limit_outcome = True
                 raise
             except K8sApiTemporaryError, e:
                 rate_limit_outcome = False
@@ -1501,6 +1503,7 @@ class KubernetesApi( object ):
                                     limit_once_per_x_secs=300,
                                     limit_key='k8s_api_retry-%s' % retry_error_limit_key)
             finally:
+                # Any uncaught exceptions will result in an outcome of False
                 rate_limiter.release_token(token, rate_limit_outcome)
 
     def __open_api_response_log(self, path, rate_limited):
