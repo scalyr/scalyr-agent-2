@@ -20,7 +20,8 @@ __author__ = 'czerwin@scalyr.com'
 
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
-from scalyr_agent.monitor_utils.k8s import _K8sCache, _K8sProcessor, K8sApiTemporaryError, K8sApiPermanentError, ApiQueryOptions
+from scalyr_agent.monitor_utils.k8s import _K8sCache, _K8sProcessor, KubernetesApi, K8sApiNotFoundException, K8sApiTemporaryError, K8sApiPermanentError, ApiQueryOptions
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import FakeClock
 import logging
 import time
@@ -123,6 +124,71 @@ class Test_K8sCache( ScalyrTestCase ):
         obj = self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1 )
         self.assertIsNone( obj )
 
+class TestKubernetesApi( ScalyrTestCase ):
+    """
+    Tests the Kubernetes API
+    """
+
+    def test_query_api_with_retries_success_not_rate_limited( self ):
+        with mock.patch.object( KubernetesApi, "query_api" ) as mock_query:
+            mock_query.return_value = { "success": "success" }
+
+            k8s = KubernetesApi()
+            rate_limiter = BlockingRateLimiter(
+                num_agents=1, initial_cluster_rate=100, max_cluster_rate=1000, min_cluster_rate=1,
+                consecutive_success_threshold=1,
+                strategy='multiply',
+            )
+            options = ApiQueryOptions( rate_limiter=rate_limiter )
+            result = k8s.query_api_with_retries( "/foo/bar", options )
+            self.assertEqual( result, { "success": "success" } )
+            self.assertEqual( rate_limiter.current_cluster_rate, 200.0 )
+
+    def test_query_api_with_retries_not_found_not_rate_limited( self ):
+        with mock.patch.object( KubernetesApi, "query_api" ) as mock_query:
+            mock_query.side_effect = K8sApiNotFoundException( "/foo/bar" )
+
+            k8s = KubernetesApi()
+            rate_limiter = BlockingRateLimiter(
+                num_agents=1, initial_cluster_rate=100, max_cluster_rate=1000, min_cluster_rate=1,
+                consecutive_success_threshold=1,
+                strategy='multiply',
+            )
+            options = ApiQueryOptions( rate_limiter=rate_limiter )
+            self.assertRaises( K8sApiNotFoundException, lambda: k8s.query_api_with_retries( "/foo/bar", options ) )
+            self.assertEqual( rate_limiter.current_cluster_rate, 200.0 )
+
+    def test_query_api_with_retries_temp_error_rate_limited( self ):
+        with mock.patch.object( KubernetesApi, "query_api" ) as mock_query:
+            mock_query.side_effect = K8sApiTemporaryError( "Temporary Error" )
+
+            k8s = KubernetesApi()
+            rate_limiter = BlockingRateLimiter(
+                num_agents=1, initial_cluster_rate=100, max_cluster_rate=1000, min_cluster_rate=1,
+                consecutive_success_threshold=1,
+                strategy='multiply',
+            )
+            options = ApiQueryOptions( rate_limiter=rate_limiter, max_retries=0 )
+            self.assertRaises( K8sApiTemporaryError, lambda: k8s.query_api_with_retries( "/foo/bar", options ) )
+            self.assertEqual( rate_limiter.current_cluster_rate, 50.0 )
+
+    def test_query_api_with_retries_other_error_rate_limited( self ):
+        with mock.patch.object( KubernetesApi, "query_api" ) as mock_query:
+            mock_query.side_effect = K8sApiPermanentError( "Permanent Error" )
+
+            k8s = KubernetesApi()
+            rate_limiter = BlockingRateLimiter(
+                num_agents=1, initial_cluster_rate=100, max_cluster_rate=1000, min_cluster_rate=1,
+                consecutive_success_threshold=1,
+                strategy='multiply',
+            )
+            options = ApiQueryOptions( rate_limiter=rate_limiter, max_retries=0 )
+            self.assertRaises( K8sApiPermanentError, lambda: k8s.query_api_with_retries( "/foo/bar", options ) )
+            self.assertEqual( rate_limiter.current_cluster_rate, 50.0 )
+
+            mock_query.side_effect = Exception( "Some other exception" )
+            self.assertRaises( Exception, lambda: k8s.query_api_with_retries( "/foo/bar", options ) )
+            self.assertEqual( rate_limiter.current_cluster_rate, 25.0 )
 
 class TestDockerMetricFetcher(ScalyrTestCase):
     """Tests the DockerMetricFetch abstraction.
