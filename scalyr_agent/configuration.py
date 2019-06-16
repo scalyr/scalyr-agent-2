@@ -1128,7 +1128,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config, 'k8s_log_api_responses_to_disk', False, description, apply_defaults, env_aware=True
         )
-        # Optional (defaults to False). If true, will use the controlled warmer strategy to warm the pod
+        # Optional (defaults to True). If true, will use the controlled warmer strategy to warm the pod
         # cache.  This only applies when docker is being used as the container system
         self.__verify_or_set_optional_bool(
             config, 'k8s_use_controlled_warmer', True, description, apply_defaults, env_aware=True
