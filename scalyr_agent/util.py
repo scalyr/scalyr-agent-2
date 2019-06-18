@@ -1371,3 +1371,70 @@ class RedirectorClient(StoppableThread):
             """
             pass
 
+
+class HistogramTracker(object):
+    def __init__(self, bucket_boundaries):
+        # An array of the histogram bucket boundaries, such as 1, 10, 30, 100
+        self.__boundaries = bucket_boundaries.copy()
+        self.__boundaries.sort()
+        self.__num_buckets = len(self.__boundaries)
+        # Index i holds the total number of values we have seen <= to __boundaries[i].
+        # The last index holds the number of values greater than the last boundary
+        self.__counts = [0] * (self.__num_buckets + 1)
+        # The total number of samples.
+        self.__total_count = 0
+        # The sum of the values.
+        self.__total_values = 0
+
+    def add_sample(self, value):
+        index = None
+        # Find the first index whose bounardy is greater than the value.
+        for i in range(0, len(self.__boundaries)):
+            if self.__boundaries[i] >= value:
+                index = i
+                break
+
+        # Increment that histogram bucket count.
+        if index is not None:
+            self.__counts[index] += 1
+        else:
+            # Otherwise, we increment the overflow bucket.
+            self.__counts[self.__num_buckets] += 1
+        self.__total_count += 1
+        self.__total_values += value
+
+    def buckets(self):
+        """
+        Iterator that yields each bucket, desribed by the number of occurences in that
+        bucket, whether the value is '<=' or '>' than that bucket, and the bucket boundary.
+        :return:
+        :rtype:
+        """
+        for i in range(0, len(self.__boundaries)):
+            yield self.__counts[i], '<=', self.__boundaries[i]
+        yield self.__counts[self.__num_buckets], '>', self.__boundaries[self.__num_buckets - 1]
+
+    def average(self):
+        return self.__total_values / self.__total_count
+
+    def count(self):
+        return self.__total_count
+
+    def reset(self):
+        for i in range(0, len(self.__counts)):
+            self.__counts[i] = 0
+        self.__total_count = 0
+        self.__total_values = 0
+
+    def summarize(self):
+        """
+        Returns a string summarizing the histogram.
+        :return:
+        :rtype:
+        """
+        bucket_list = []
+        for count, operator, boundary in self.buckets():
+            bucket_list.append('%s%ld=%ld' % (operator, boundary, count))
+
+        return 'avg=%lf count=%ld weighted=%lf buckets=[%s]' % (self.average(), self.count(), self.__total_values,
+                                                                ','.join(bucket_list))
