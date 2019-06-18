@@ -153,14 +153,17 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
     def setUp(self):
         self.__fake_cache = FakeCache()
         self.__warmer_test_instance = ControlledCacheWarmer(max_failure_count=5, blacklist_time_secs=300)
+        self.assertFalse(self.__warmer_test_instance.is_running())
         # noinspection PyTypeChecker
         self.__warmer_test_instance.set_k8s_cache(self.__fake_cache)
         self.__warmer_test_instance.start()
+        self.assertTrue(self.__warmer_test_instance.is_running())
         self.timeout = 5
 
     def tearDown(self):
         self.__warmer_test_instance.stop(wait_on_join=False)
         self.__fake_cache.stop()
+        self.assertFalse(self.__warmer_test_instance.is_running())
 
     def test_basic_case(self):
         warmer = self.__warmer_test_instance
