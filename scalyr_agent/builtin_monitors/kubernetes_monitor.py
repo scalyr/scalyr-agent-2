@@ -38,7 +38,7 @@ from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFet
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
-from scalyr_agent.util import StoppableThread
+from scalyr_agent.util import StoppableThread, HistogramTracker
 
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -462,6 +462,7 @@ class ControlledCacheWarmer(StoppableThread):
         # `total`, `success`, `already_warm`, `temp_error`, `perm_error`, `unknown_error`.
         self.__warming_attempts = dict()
         self.__last_reported_warming_attempts = dict()
+        self.__warming_times = HistogramTracker([1, 5, 30, 60, 120, 300, 600])
 
     def start(self):
         super(ControlledCacheWarmer, self).start()
@@ -511,10 +512,11 @@ class ControlledCacheWarmer(StoppableThread):
         @type pod_namespace: str
         @type pod_name: str
         """
+        start_time = time.time()
         self.__lock.acquire()
         try:
             if not container_id in self.__active_pods:
-                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name)
+                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name, start_time)
             else:
                 warming_entry = self.__active_pods[container_id]
                 warming_entry.is_warm = self.is_warm(pod_namespace, pod_name)
@@ -616,6 +618,9 @@ class ControlledCacheWarmer(StoppableThread):
                                self.__count_blacklisted(),
                                warm_attempts_info)
             self.__last_reported_warming_attempts = self.__warming_attempts.copy()
+
+            self.__loger.info('controlled_cache_warmer warming_times %s', self.__warming_times.summarize())
+            self.__warming_times.reset()
 
     def __count_blacklisted(self):
         """Counts and returns the total number of blacklisted containers.
@@ -789,6 +794,7 @@ class ControlledCacheWarmer(StoppableThread):
         @type traceback_report: str or None
         """
         current_time = self._get_current_time()
+        warm_time = None
         result_type = 'not_set'
         exception_to_report = None
         self.__lock.acquire()
@@ -796,6 +802,7 @@ class ControlledCacheWarmer(StoppableThread):
             if container_id in self.__active_pods:
                 entry = self.__active_pods[container_id]
                 if success:
+                    warm_time = current_time - entry.start_time
                     entry.set_warm()
                     result_type = 'success'
                 elif already_warm:
@@ -823,6 +830,9 @@ class ControlledCacheWarmer(StoppableThread):
         finally:
             self.__warming_attempts['total'] = self.__warming_attempts.get('total', 0) + 1
             self.__warming_attempts[result_type] = self.__warming_attempts.get(result_type, 0) + 1
+
+            if warm_time is not None:
+                self.__warming_times.add_sample(warm_time)
 
             self.__lock.release()
             if exception_to_report is not None and self.__logger is not None:
@@ -879,11 +889,13 @@ class ControlledCacheWarmer(StoppableThread):
     class WarmingEntry(object):
         """Used to represent an active container whose pod information should be warmed in the cache.
         """
-        def __init__(self, pod_namespace, pod_name):
+        def __init__(self, pod_namespace, pod_name, start_time):
             # The associated pod's namespace.
             self.pod_namespace = pod_namespace
             # The associated pod's name.
             self.pod_name = pod_name
+            # The time when this pod was first requested to be warmed
+            self.start_time = start_time
             # Whether or not it has been successfully warmed.
             self.is_warm = False
             # Used to indicate if it is been marked in the most recent marking run started by `begin_marking`.
