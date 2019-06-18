@@ -413,6 +413,7 @@ def _ignore_old_dead_container( container, created_before=None ):
 
     return False
 
+
 class ControlledCacheWarmer(StoppableThread):
     """A background thread that does a controlled warming of the pod cache.
 
@@ -422,10 +423,11 @@ class ControlledCacheWarmer(StoppableThread):
     errors are seen.  While on the blacklist, a pod's information will not be fetched in order to
     populate the cache.
     """
-    def __init__(self, max_failure_count=5, blacklist_time_secs=300, max_query_retries=3, rate_limiter=None,
-                 logger=None):
+    def __init__(self, name='warmer', max_failure_count=5, blacklist_time_secs=300, max_query_retries=3,
+                 rate_limiter=None, logger=None):
         """Initializes the thread.
 
+        @param name:  The name of this warmer, used when it logs its stats.
         @param max_failure_count: If this number of temporary failures is experienced when fetching a single
             pod's information, that pod will be placed on the blacklist.  Note, any permanent error will result
             in the pod being moved to the blacklist.
@@ -435,6 +437,7 @@ class ControlledCacheWarmer(StoppableThread):
         @param rate_limiter:  Rate limiter for api calls
         @param logger:  The logger to use when reporting results
 
+        @type name: str
         @type max_failure_count: int
         @type blacklist_time_secs: double
         @type max_query_retries: int
@@ -442,9 +445,11 @@ class ControlledCacheWarmer(StoppableThread):
         @type logger: Logger
         """
         StoppableThread.__init__(self, name='cache warmer and filter')
+        self.__name = name
         self.__k8s_cache = None
         # Protects most fields, such as active_pods and containers_to_warm
         self.__lock = threading.Lock()
+        self.__is_running = False
         # Used to notify threads of changes to the containers_to_warm state.
         self.__condition_var = threading.Condition(self.__lock)
         # Tracks the active pods.  Active pods are those docker or some other CRI has recently indicated is
@@ -466,7 +471,23 @@ class ControlledCacheWarmer(StoppableThread):
         self.__last_reported_warming_attempts = dict()
 
     def start(self):
-        super(ControlledCacheWarmer, self).start()
+        self.__lock.acquire()
+        try:
+            super(ControlledCacheWarmer, self).start()
+            self.__is_running = True
+        finally:
+            self.__lock.release()
+
+    def is_running(self):
+        """
+        @return True if `start` has been invoked on this instance
+        @rtype: bool
+        """
+        self.__lock.acquire()
+        try:
+            return self.__is_running
+        finally:
+            self.__lock.release()
 
     def set_k8s_cache(self, k8s_cache):
         """Sets the cache to use.
@@ -485,6 +506,7 @@ class ControlledCacheWarmer(StoppableThread):
         # get it to wake up and notice the thread has stopped.
         self.__condition_var.acquire()
         try:
+            self.__is_running = False
             self.__condition_var.notify_all()
         finally:
             self.__condition_var.release()
@@ -613,7 +635,8 @@ class ControlledCacheWarmer(StoppableThread):
             stats = self.__gather_report_stats()
             for category, (current_amount, previous_amount) in stats.iteritems():
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
-            self.__logger.info('controlled_cache_warmer pending_warming=%d blacklisted=%d %s',
+            self.__logger.info('controlled_cache_warmer[%s] pending_warming=%d blacklisted=%d %s',
+                               self.__name,
                                len(self.__containers_to_warm),
                                self.__count_blacklisted(),
                                warm_attempts_info)
@@ -2299,9 +2322,16 @@ class KubernetesMonitor( ScalyrMonitor ):
             logger=global_log,
         )
 
-        self.__controlled_warmer = None
+        self.__logs_controlled_warmer = None
+        self.__metrics_controlled_warmer = None
         if self._global_config.k8s_use_controlled_warmer:
-            self.__controlled_warmer = ControlledCacheWarmer(
+            self.__logs_controlled_warmer = ControlledCacheWarmer(
+                max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+                blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+                max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+                rate_limiter=self.__rate_limiter,
+                logger=global_log)
+            self.__metrics_controlled_warmer = ControlledCacheWarmer(
                 max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
                 blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
                 max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
@@ -2314,7 +2344,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                                                          self.__docker_api_version, self.__agent_pod, host_hostname,
                                                          log_path,self.__include_all, self.__include_controller_info,
                                                          self.__namespaces_to_ignore, self.__ignore_pod_sandboxes,
-                                                         controlled_warmer=self.__controlled_warmer)
+                                                         controlled_warmer=self.__logs_controlled_warmer)
 
         # Metrics provided by the kubelet API.
         self.__k8s_pod_network_metrics = {
@@ -2720,10 +2750,13 @@ class KubernetesMonitor( ScalyrMonitor ):
         # gather metrics
         containers = None
         if self.__report_container_metrics and self.__client:
+            if self.__metrics_controlled_warmer is not None and not self.__metrics_controlled_warmer.is_running():
+                self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
+                self.__metrics_controlled_warmer.start()
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
                                          k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
                                          k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
-                                         controlled_warmer=self.__controlled_warmer)
+                                         controlled_warmer=self.__metrics_controlled_warmer)
         try:
             if containers:
                 if self.__report_container_metrics:
@@ -2858,6 +2891,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):
+        if self.__metrics_controlled_warmer is not None and self.__metrics_controlled_warmer.is_running():
+            self.__metrics_controlled_warmer.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
