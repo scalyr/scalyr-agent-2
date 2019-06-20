@@ -73,10 +73,15 @@ Here is an example of the complete command:
 Or if setting API key via environment:    
     
     docker run -d --name scalyr-docker-agent-json \
-    -e SCALYR_API_KEY=<Your api key> \ 
+    -e SCALYR_API_KEY=<Your api key> \
     -v /run/docker.sock:/var/scalyr/docker.sock \
     -v /var/lib/docker/containers:/var/lib/docker/containers \
     scalyr/scalyr-docker-agent-json
+
+Note: EU customers must also set the SCALYR_SERVER environment variable by adding this line:
+
+    -e SCALYR_SERVER=https://upload.eu.scalyr.com
+
 
 #### scalyr-docker-agent-syslog
 
@@ -88,6 +93,10 @@ Syslog port:
     -v /run/docker.sock:/var/scalyr/docker.sock \
     -p 601:601 \
     scalyr/scalyr-docker-agent-syslog
+
+Note: EU customers must also set the SCALYR_SERVER environment variable by adding this line:
+
+    -e SCALYR_SERVER=https://upload.eu.scalyr.com
 
 
 ## Configuring local containers to send their logs to Scalyr
