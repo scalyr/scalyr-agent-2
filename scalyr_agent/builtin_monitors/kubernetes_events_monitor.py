@@ -631,11 +631,11 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                         # get cluster and deployment information
                         extra_fields = {'k8s-cluster': cluster_name, 'watchEventType': event_type}
                         if kind:
+                            options = ApiQueryOptions(max_retries=self.__max_query_retries,
+                                                      rate_limiter=self.__rate_limiter)
                             if kind == 'Pod':
                                 extra_fields['pod_name'] = name
                                 extra_fields['pod_namespace'] = namespace
-                                options = ApiQueryOptions(max_retries=self.__max_query_retries,
-                                                          rate_limiter=self.__rate_limiter)
                                 pod = k8s_cache.pod(namespace, name, current_time, query_options=options)
                                 if pod and pod.controller:
                                     extra_fields['k8s-controller'] = pod.controller.name
