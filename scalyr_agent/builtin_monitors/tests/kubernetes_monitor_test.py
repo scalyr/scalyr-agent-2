@@ -55,6 +55,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
             self._KubernetesMonitor__include_controller_info = None
             self._KubernetesMonitor__report_container_metrics = None
             self._KubernetesMonitor__metric_fetcher = None
+            self._KubernetesMonitor__metrics_controlled_warmer = None
 
         with mock.patch.object(KubernetesMonitor, '_initialize', fake_init):
 
