@@ -1343,6 +1343,45 @@ class RedirectorClient(StoppableThread):
             pass
 
 
+COMPRESSION_TEST_STR = 'a' * 100
+
+
+def get_compress_module(compression_type):
+    if compression_type == 'zlib':
+        import zlib
+        return zlib
+    elif compression_type == 'bz2':
+        import bz2
+        return bz2
+    else:
+        raise ValueError('Unsupported compression type')
+
+
+def verify_and_get_compress_func(compression_type):
+    """Given a compression_type (bz2, zlib), verify that compression works and return the compress() function
+
+    @param compression_type: Compression type
+    @type compression_type: str
+
+    @returns: The compress() function for the specified compression_type. None, if compression_type is not supported or
+        if underlying libs are not installed properly,
+    """
+    compression_type_to_module_name = {
+        'bz2': 'bz2',
+        'deflate': 'zlib',
+    }
+    if compression_type not in compression_type_to_module_name:
+        return None
+    try:
+        compression_module = get_compress_module(compression_type_to_module_name[compression_type])
+        cdata = compression_module.compress(COMPRESSION_TEST_STR, 9)
+        if len(cdata) < len(COMPRESSION_TEST_STR):
+            return compression_module.compress
+    except Exception:
+        pass
+    return None
+
+
 class RateLimiterToken(object):
     def __init__(self, token_id):
         self._token_id = token_id
