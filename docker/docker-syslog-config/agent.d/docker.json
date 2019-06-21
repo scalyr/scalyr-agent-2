@@ -4,13 +4,13 @@
 // logs into Scalyr.  Additionally, the Scalyr Agent will collect metrics
 // on all running containers.
 {
- monitors: [
-   {
-    module: "scalyr_agent.builtin_monitors.syslog_monitor",
-    mode: "docker"
-   }, {
-    module: "scalyr_agent.builtin_monitors.docker_monitor",
-    log_mode: "syslog"
-   }
+  monitors: [
+    {
+      module: "scalyr_agent.builtin_monitors.syslog_monitor",
+      mode: "docker"
+    }, {
+      module: "scalyr_agent.builtin_monitors.docker_monitor",
+      log_mode: "syslog"
+    }
   ]
 }
