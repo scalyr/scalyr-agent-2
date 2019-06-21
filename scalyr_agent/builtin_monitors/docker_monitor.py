@@ -98,10 +98,10 @@ define_config_option( __monitor__, 'log_mode',
                      convert_to=str, default="docker_api", env_aware=True, env_name='SCALYR_DOCKER_LOG_MODE')
 
 define_config_option( __monitor__, 'docker_raw_logs',
-                     'Optional (defaults to False). If True, the docker monitor will use the raw log files on disk to read logs.'
+                     'Optional (defaults to True). If True, the docker monitor will use the raw log files on disk to read logs.'
                      'The location of the raw log file is obtained by querying the path from the Docker API. '
                      'If false, the logs will be streamed over the Docker API.',
-                     convert_to=bool, default=False, env_aware=True)
+                     convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'metrics_only',
                      'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
@@ -507,7 +507,7 @@ class ContainerChecker( StoppableThread ):
 
         #create and start the DockerLoggers
         self.__start_docker_logs( self.docker_logs )
-        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Initialization complete.  Starting docker monitor for Scalyr" )
+        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, "Starting docker monitor (raw_logs=%s)" % self._use_raw_logs)
         self.__thread.start()
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
@@ -707,6 +707,11 @@ class ContainerChecker( StoppableThread ):
                     global_log.info( "Error adding log '%s' to log watcher - %s" % (log['log_config']['path'], e) )
 
             if self._use_raw_logs:
+                log_path = log['log_config']['path']
+                if not os.path.exists(log_path):
+                    global_log.warn("Missing file detected for container log path '%s'. Please ensure that the host's "
+                                    "Docker container directory (by default /var/lib/docker/containers) has been "
+                                    "mounted in the Scalyr Agent container." % log_path)
                 self.raw_logs.append( log )
             else:
                 last_request = self.__get_last_request_for_log( log['log_config']['path'] )
