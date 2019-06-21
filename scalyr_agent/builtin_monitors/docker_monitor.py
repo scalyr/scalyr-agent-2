@@ -707,6 +707,10 @@ class ContainerChecker( StoppableThread ):
                     global_log.info( "Error adding log '%s' to log watcher - %s" % (log['log_config']['path'], e) )
 
             if self._use_raw_logs:
+                log_path = log['log_config']['path']
+                if not os.path.exists(log_path):
+                    global_log.warn("Missing file detected for container log path '%s'. Please ensure that "
+                                    "/var/lib/docker/containers (or custom storage directory) is mounted." % log_path)
                 self.raw_logs.append( log )
             else:
                 last_request = self.__get_last_request_for_log( log['log_config']['path'] )
