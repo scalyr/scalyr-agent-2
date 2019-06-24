@@ -742,9 +742,9 @@ class TestHistogramTracker(ScalyrTestCase):
                          "(count=4,avg=62.75,min=2.00,max=200.00,median=6.00)")
 
     def assertBucketEquals(self, first, second):
-        self.assertEquals(first[0], second[0], "The counts do not equal")
-        self.assertAlmostEquals(first[1], second[1], "The lower bounds do not equal")
-        self.assertAlmostEquals(first[2], second[2], "The upper bounds do not equal")
+        self.assertEquals(first[0], second[0], msg="The counts do not equal")
+        self.assertAlmostEquals(first[1], second[1], msg="The lower bounds do not equal")
+        self.assertAlmostEquals(first[2], second[2], msg="The upper bounds do not equal")
 
     def _buckets_to_list(self):
         result = []
