@@ -228,6 +228,8 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertEqual(warmer.blacklisted_containers(), [])
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
+        # TODO: Add in second warming case once the test fix has been merged in.
+
     def test_remove_inactive(self):
         warmer = self.__warmer_test_instance
 

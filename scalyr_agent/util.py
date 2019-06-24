@@ -1373,24 +1373,54 @@ class RedirectorClient(StoppableThread):
 
 
 class HistogramTracker(object):
-    def __init__(self, bucket_boundaries):
+    """Track as an approximate histogram for a set of values.  The approximation is created by
+    counting the number of values that fall into a predefined set of ranges.  The caller sets
+    the ranges so can control the granularity of the approximation.
+
+    This abstraction also tracks several other statistics for the values, including average, minimum value, and
+    maximum value.
+    """
+    def __init__(self, bucket_ranges):
+        """Creates an instance with the specified bucket ranges.  The ranges are specified as an sorted array of numbers,
+        where the first bucket will be from 0 >= to < bucket_ranges[0], the second bucket_ranges[0] >= to <
+        bucket_ranges[1], etc.
+
+        @param bucket_ranges:  The bucket ranges, specified as a sorted array of numbers where bucket_ranges[i]
+            specifies the end of ith bucket and the first bucket starts at 0.
+        @type bucket_ranges: [number]
+        """
         # An array of the histogram bucket boundaries, such as 1, 10, 30, 100
-        self.__boundaries = bucket_boundaries.copy()
-        self.__boundaries.sort()
-        self.__num_buckets = len(self.__boundaries)
-        # Index i holds the total number of values we have seen <= to __boundaries[i].
-        # The last index holds the number of values greater than the last boundary
-        self.__counts = [0] * (self.__num_buckets + 1)
-        # The total number of samples.
+        self.__bucket_ranges = list(bucket_ranges)
+        last_value = None
+        for i in self.__bucket_ranges:
+            if last_value is not None and i < last_value:
+                raise ValueError('The bucket_ranges argument must be sorted.')
+            else:
+                last_value = i
+
+        # __counts[i] holds the total number of values we have seen >= to __boundaries[i-1] and < __boundaries[i]
+        self.__counts = [0] * len(bucket_ranges)
+        # __overflows holds the number of values >= __boundaries[-1]
+        self.__overflow = 0
+        # The minimum and maximum values seen.
+        self.__min = None
+        self.__max = None
+        # The total number of values collected.
         self.__total_count = 0
-        # The sum of the values.
+        # The sum of the values collected
         self.__total_values = 0
 
     def add_sample(self, value):
+        """Adds the specified value to the values being tracked by this instance.  This value will be reflected in the
+        statistics for this instance until `reset` is invoked.
+
+        @param value: The value
+        @type value: Number
+        """
         index = None
-        # Find the first index whose bounardy is greater than the value.
-        for i in range(0, len(self.__boundaries)):
-            if self.__boundaries[i] >= value:
+        # Find the index of the bucket for this value, which is going to be first bucket range greater than the value.
+        for i in range(0, len(self.__bucket_ranges)):
+            if self.__bucket_ranges[i] > value:
                 index = i
                 break
 
@@ -1398,33 +1428,133 @@ class HistogramTracker(object):
         if index is not None:
             self.__counts[index] += 1
         else:
-            # Otherwise, we increment the overflow bucket.
-            self.__counts[self.__num_buckets] += 1
+            # Otherwise, the value must have been greater than our last boundary, so increment the overflow
+            self.__overflow += 1
+
+        if self.__min is None or value < self.__min:
+            self.__min = value
+
+        if self.__max is None or value > self.__max:
+            self.__max = value
+
         self.__total_count += 1
         self.__total_values += value
 
-    def buckets(self):
+    def buckets(self, disable_last_bucket_padding=False):
+        """An iterator that returns the tracked buckets along with the number of times a sample was added that
+        fell into that bucket since the last reset.  A bucket is only returned if it has at least one sample
+        fall into it.
+
+        Each iteration step returns a tuple describing a single bucket: the number of times a value fell into this
+        bucket, the lower end of the bucket, and the upper end of the bucket.  Note, the lower end is inclusive, while
+        the upper end is exclusive.
         """
-        Iterator that yields each bucket, desribed by the number of occurences in that
-        bucket, whether the value is '<=' or '>' than that bucket, and the bucket boundary.
-        :return:
-        :rtype:
-        """
-        for i in range(0, len(self.__boundaries)):
-            yield self.__counts[i], '<=', self.__boundaries[i]
-        yield self.__counts[self.__num_buckets], '>', self.__boundaries[self.__num_buckets - 1]
+        if self.__total_count == 0:
+            return
+
+        # We use the minimum value for the lower bound of the first bucket.
+        previous = self.__min
+        for i in range(0, len(self.__counts)):
+            if self.__counts[i] > 0:
+                yield self.__counts[i], previous, self.__bucket_ranges[i]
+            previous = self.__bucket_ranges[i]
+
+        if self.__overflow == 0:
+            return
+
+        if not disable_last_bucket_padding:
+            padding = 0.01
+        else:
+            padding = 0.0
+
+        # We use the maximum value for the upper bound of the overflow range.  Note, we added 0.01 to make sure the
+        # boundary is exclusive to the values that fell in it.
+        yield self.__overflow, self.__bucket_ranges[-1], self.__max + padding
 
     def average(self):
-        return self.__total_values / self.__total_count
+        """
+        @return: The average for all values added to this instance since the last reset, or None if no values have been
+            added.
+        @rtype: Number or None
+        """
+        if self.__total_count > 0:
+            return self.__total_values / self.__total_count
+        else:
+            return None
+
+    def estimate_median(self):
+        """Calculates an estimate for the median of all the values since the last reset.  The accuracy of this estimate
+        will depend on the granularity of the original buckets.
+
+        @return: The estimated median or None if no values have been added.
+        @rtype: Number or None
+        """
+        return self.estimate_percentile(0.5)
+
+    def estimate_percentile(self, percentile):
+        """Calculates an estimate for the percentile of the added values (such as 95%th) since the last reset.  The
+        accuracy of this estimate will depend on the granularity of the original buckets.
+
+        @param percentile:  The percentile to estimate, from 0 to 1.
+        @type percentile: Number
+
+        @return: The estimated percentile or None if no values have been added.
+        @rtype: Number or None
+        """
+        if percentile > 1.0:
+            raise ValueError("Percentile must be between 0 and 1.")
+
+        if self.__total_count == 0:
+            return None
+
+        # The first step is to calculate which bucket this percentile lands in.  We do this by calculating the "index"
+        # of what that percentile's sample would have been.  For example, if we are calculating the 75% and there were
+        # 100 values, then the 75% would be the 75th value in sorted order.
+        target_count = self.__total_count * percentile
+
+        cumulative_count = 0
+
+        # Now find the bucket by going over the buckets, keeping track of the cumulative counts across all buckets.
+        for bucket_count, lower_bound, upper_bound in self.buckets(disable_last_bucket_padding=True):
+            cumulative_count = cumulative_count + bucket_count
+            if target_count <= cumulative_count:
+                # Ok, we found the bucket.  To minimize error, we estimate the value of the percentile to be the
+                # midpoint between the lower and upper bounds.
+                return (upper_bound + lower_bound) / 2.0
+
+        # We should never get here because target_count will always be <= the total counts across all buckets.
 
     def count(self):
+        """
+        @return: The number of samples added to this instance, since the last `reset`.
+        @rtype: int
+        """
         return self.__total_count
 
+    def min(self):
+        """
+        @return: The minimum value of all samples added to this instance, since the last `reset`.
+        @rtype: Number
+        """
+        return self.__min
+
+    def max(self):
+        """
+        @return: The maximum value of all samples added to this instance, since the last `reset`.
+        @rtype: Number
+        """
+        return self.__max
+
     def reset(self):
+        """Resets all the instance, discarding all information about all previously added samples.
+        """
         for i in range(0, len(self.__counts)):
             self.__counts[i] = 0
+        self.__overflow = 0
         self.__total_count = 0
         self.__total_values = 0
+        self.__min = None
+        self.__max = None
 
     def summarize(self):
         """
@@ -1432,9 +1562,9 @@ class HistogramTracker(object):
         :return:
         :rtype:
         """
-        bucket_list = []
-        for count, operator, boundary in self.buckets():
-            bucket_list.append('%s%ld=%ld' % (operator, boundary, count))
+        if self.__total_count == 0:
+            return '(count=0)'
 
-        return 'avg=%lf count=%ld weighted=%lf buckets=[%s]' % (self.average(), self.count(), self.__total_values,
-                                                                ','.join(bucket_list))
+        # noinspection PyStringFormat
+        return '(count=%ld,avg=%.2lf,min=%.2lf,max=%.2lf,median=%.2lf)' % (self.count(), self.average(), self.min(), self.max(),
+                                                                           self.estimate_median())
