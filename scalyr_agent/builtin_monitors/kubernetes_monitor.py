@@ -467,6 +467,7 @@ class ControlledCacheWarmer(StoppableThread):
         # `total`, `success`, `already_warm`, `temp_error`, `perm_error`, `unknown_error`.
         self.__warming_attempts = dict()
         self.__last_reported_warming_attempts = dict()
+        # Gathers statistics about how long it took to warm cache entries.  The values are expressed in seconds.
         self.__warming_times = HistogramTracker([1, 5, 30, 60, 120, 300, 600])
 
     def start(self):
@@ -534,17 +535,24 @@ class ControlledCacheWarmer(StoppableThread):
         @type pod_namespace: str
         @type pod_name: str
         """
+        # This will be set to True if this entry was previously marked to be warmed but the cache indicated it
+        # has already been warmed.
+        was_warmed = False
         start_time = time.time()
         self.__lock.acquire()
         try:
             if not container_id in self.__active_pods:
-                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name, start_time)
+                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name,
+                                                                                      start_time)
             else:
                 warming_entry = self.__active_pods[container_id]
-                warming_entry.is_warm = self.is_warm(pod_namespace, pod_name)
+                was_warmed = self.__update_warming_state(warming_entry, start_time)
             self.__active_pods[container_id].is_recently_marked = True
         finally:
             self.__lock.release()
+
+            if was_warmed:
+                self.__record_warming_result(container_id, already_warm=True)
 
     def end_marking(self):
         """Indicates the end of marking all active containers has finished.
@@ -602,6 +610,33 @@ class ControlledCacheWarmer(StoppableThread):
         finally:
             self.__lock.release()
 
+    def __update_warming_state(self, warming_entry, start_time):
+        """Updates the warming state for an already existing entry based on whether it is warm in the cache.
+
+        This should only be invoked while _lock is already held.
+
+        @param warming_entry: The entry
+        @param start_time: The time to mark warming as started this update reflects a new request to warm the entry.
+
+        @type warming_entry: WarmingEntry
+        @type start_time: Number
+
+        @return: Whether or not this entry should be recorded as already warm.
+        @rtype: bool
+        """
+
+        was_warm = warming_entry.is_warm
+        warming_entry.is_warm = self.is_warm(warming_entry.pod_namespace, warming_entry.pod_name)
+
+        if was_warm and not warming_entry.is_warm:
+            warming_entry.start_time = start_time
+        elif not was_warm and warming_entry.is_warm:
+            # This entry was not warm but now it is.. this means we noticed via the cache the entry is actually warm,
+            # so we should mark it as already_warmed
+            return True
+
+        return False
+
     def __gather_report_stats( self ):
         """
         Gathers stats of results of warming calls
@@ -635,14 +670,13 @@ class ControlledCacheWarmer(StoppableThread):
             stats = self.__gather_report_stats()
             for category, (current_amount, previous_amount) in stats.iteritems():
                 warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
-            self.__logger.info('controlled_cache_warmer[%s] pending_warming=%d blacklisted=%d %s',
+            self.__logger.info('controlled_cache_warmer[%s] pending_warming=%d blacklisted=%d %s warming_times=%s',
                                self.__name,
                                len(self.__containers_to_warm),
                                self.__count_blacklisted(),
-                               warm_attempts_info)
+                               warm_attempts_info,
+                               self.__warming_times.summarize())
             self.__last_reported_warming_attempts = self.__warming_attempts.copy()
-
-            self.__loger.info('controlled_cache_warmer warming_times %s', self.__warming_times.summarize())
             self.__warming_times.reset()
 
     def __count_blacklisted(self):
