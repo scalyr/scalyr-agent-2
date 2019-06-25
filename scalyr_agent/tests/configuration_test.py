@@ -30,13 +30,14 @@ from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.test_base import ScalyrTestCase
 
 
-class TestConfiguration(ScalyrTestCase):
+class TestConfigurationBase(ScalyrTestCase):
+
     def setUp(self):
         self.original_os_env = dict([(k, v) for k, v in os.environ.iteritems()])
-        self.__config_dir = tempfile.mkdtemp()
-        self.__config_file = os.path.join(self.__config_dir, 'agent.json')
-        self.__config_fragments_dir = os.path.join(self.__config_dir, 'agent.d')
-        os.makedirs(self.__config_fragments_dir)
+        self._config_dir = tempfile.mkdtemp()
+        self._config_file = os.path.join(self._config_dir, 'agent.json')
+        self._config_fragments_dir = os.path.join(self._config_dir, 'agent.d')
+        os.makedirs(self._config_fragments_dir)
         for key in os.environ.keys():
             if 'scalyr' in key.lower():
                 del os.environ[key]
@@ -45,6 +46,123 @@ class TestConfiguration(ScalyrTestCase):
         """Restore the pre-test os environment"""
         os.environ.clear()
         os.environ.update(self.original_os_env)
+
+    def __convert_separators(self, contents):
+        """Recursively converts all path values for fields in a JsonObject that end in 'path'.
+
+        If this is a JsonArray, iterators over the elements.
+        @param contents: The contents to convert in a valid Json atom (JsonObject, JsonArray, or primitive)
+        @return: The passed in object.
+        """
+        contents_type = type(contents)
+        if contents_type is dict or contents_type is JsonObject:
+            for key in contents:
+                value = contents[key]
+                value_type = type(value)
+                if key.endswith('path') and (value_type is str or value_type is unicode):
+                    contents[key] = self.convert_path(contents[key])
+                elif value_type in (dict, JsonObject, list, JsonArray):
+                    self.__convert_separators(value)
+        elif contents_type is list or contents_type is JsonArray:
+            for i in range(len(contents)):
+                self.__convert_separators(contents[i])
+        return contents
+
+    def _write_file_with_separator_conversion(self, contents):
+        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+
+        fp = open(self._config_file, 'w')
+        fp.write(contents)
+        fp.close()
+
+    def _write_config_fragment_file_with_separator_conversion(self, file_path, contents):
+        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+
+        full_path = os.path.join(self._config_fragments_dir, file_path)
+        fp = open(full_path, 'w')
+        fp.write(contents)
+        fp.close()
+
+    class LogObject(object):
+        def __init__(self, config):
+            self.config = config
+            self.log_path = config['path']
+
+    class MonitorObject(object):
+        def __init__(self, config):
+            self.module_name = config['module']
+            self.config = config
+            self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
+
+    def _create_test_configuration_instance(self, logger=None):
+        """Creates an instance of a Configuration file for testing.
+
+        @return:  The test instance
+        @rtype: Configuration
+        """
+        default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),
+                                     self.convert_path('/etc/scalyr-agent-2/agent.json'),
+                                     self.convert_path('/var/lib/scalyr-agent-2'))
+
+        return Configuration(self._config_file, default_paths, logger)
+
+    # noinspection PyPep8Naming
+    def assertPathEquals(self, actual_path, expected_path):
+        """Similar to `assertEquals` but the expected path is converted to the underlying system's dir separators
+        before comparison.
+
+        @param actual_path:  The actual path.  This should already be using the correct separator characters.
+        @param expected_path:  The expected path.  This should use `/`'s as the separator character.  It will be
+            converted to this system's actual separators.
+
+        @type actual_path: str
+        @type expected_path: str
+        """
+        self.assertEquals(actual_path, self.convert_path(expected_path))
+
+    def make_path(self, parent_directory, path):
+        """Returns the full path created by joining path to parent_directory.
+
+        This method is a convenience function because it allows path to use forward slashes
+        to separate path components rather than the platform's separator character.
+
+        @param parent_directory: The parent directory. This argument must use the system's separator character. This may
+            be None if path is relative to the current working directory.
+        @param path: The path to add to parent_directory. This should use forward slashes as the separator character,
+            regardless of the platform's character.
+
+        @return:  The path created by joining the two with using the system's separator character.
+        """
+        if parent_directory is None and os.path.sep == '/':
+            return path
+
+        if parent_directory is None:
+            result = ''
+        elif path.startswith('/'):
+            result = ''
+        else:
+            result = parent_directory
+
+        for path_part in path.split('/'):
+            if len(path_part) > 0:
+                result = os.path.join(result, path_part)
+
+        if os.path.sep == '\\':
+            result = 'C:\\%s' % result
+        return result
+
+    def convert_path(self, path):
+        """Converts the forward slashes in path to the platform's separator and returns the value.
+
+        @param path: The path to convert. This should use forward slashes as the separator character, regardless of the
+            platform's character.
+
+        @return: The path created by converting the forward slashes to the platform's separator.
+        """
+        return self.make_path(None, path)
+
+
+class TestConfiguration(TestConfigurationBase):
 
     def test_basic_case(self):
         self._write_file_with_separator_conversion(""" {
@@ -58,7 +176,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertPathEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
         self.assertPathEquals(config.agent_data_path, '/var/lib/scalyr-agent-2')
         self.assertEquals(config.additional_monitor_module_paths, '')
-        self.assertEquals(config.config_directory, self.__config_fragments_dir)
+        self.assertEquals(config.config_directory, self._config_fragments_dir)
         self.assertEquals(config.implicit_metric_monitor, True)
         self.assertEquals(config.implicit_agent_log_collection, True)
         self.assertFalse(config.use_unsafe_debugging)
@@ -189,7 +307,7 @@ class TestConfiguration(ScalyrTestCase):
         self.assertPathEquals(config.agent_log_path, '/var/silly1')
         self.assertPathEquals(config.agent_data_path, '/var/silly2')
         self.assertEquals(config.additional_monitor_module_paths, 'silly3')
-        self.assertEquals(config.config_directory, os.path.join(self.__config_dir, 'silly4'))
+        self.assertEquals(config.config_directory, os.path.join(self._config_dir, 'silly4'))
         self.assertEquals(config.implicit_metric_monitor, False)
         self.assertEquals(config.implicit_agent_log_collection, False)
         self.assertTrue(config.use_unsafe_debugging)
@@ -1116,117 +1234,3 @@ class TestConfiguration(ScalyrTestCase):
 
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
-
-    def __convert_separators(self, contents):
-        """Recursively converts all path values for fields in a JsonObject that end in 'path'.
-
-        If this is a JsonArray, iterators over the elements.
-        @param contents: The contents to convert in a valid Json atom (JsonObject, JsonArray, or primitive)
-        @return: The passed in object.
-        """
-        contents_type = type(contents)
-        if contents_type is dict or contents_type is JsonObject:
-            for key in contents:
-                value = contents[key]
-                value_type = type(value)
-                if key.endswith('path') and (value_type is str or value_type is unicode):
-                    contents[key] = self.convert_path(contents[key])
-                elif value_type in (dict, JsonObject, list, JsonArray):
-                    self.__convert_separators(value)
-        elif contents_type is list or contents_type is JsonArray:
-            for i in range(len(contents)):
-                self.__convert_separators(contents[i])
-        return contents
-
-    def _write_file_with_separator_conversion(self, contents):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
-
-        fp = open(self.__config_file, 'w')
-        fp.write(contents)
-        fp.close()
-
-    def _write_config_fragment_file_with_separator_conversion(self, file_path, contents):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
-
-        full_path = os.path.join(self.__config_fragments_dir, file_path)
-        fp = open(full_path, 'w')
-        fp.write(contents)
-        fp.close()
-
-    class LogObject(object):
-        def __init__(self, config):
-            self.config = config
-            self.log_path = config['path']
-
-    class MonitorObject(object):
-        def __init__(self, config):
-            self.module_name = config['module']
-            self.config = config
-            self.log_config = {'path': self.module_name.split('.')[-1] + '.log'}
-
-    def _create_test_configuration_instance(self, logger=None):
-        """Creates an instance of a Configuration file for testing.
-
-        @return:  The test instance
-        @rtype: Configuration
-        """
-        default_paths = DefaultPaths(self.convert_path('/var/log/scalyr-agent-2'),
-                                     self.convert_path('/etc/scalyr-agent-2/agent.json'),
-                                     self.convert_path('/var/lib/scalyr-agent-2'))
-
-        return Configuration(self.__config_file, default_paths, logger)
-
-    # noinspection PyPep8Naming
-    def assertPathEquals(self, actual_path, expected_path):
-        """Similar to `assertEquals` but the expected path is converted to the underlying system's dir separators
-        before comparison.
-
-        @param actual_path:  The actual path.  This should already be using the correct separator characters.
-        @param expected_path:  The expected path.  This should use `/`'s as the separator character.  It will be
-            converted to this system's actual separators.
-
-        @type actual_path: str
-        @type expected_path: str
-        """
-        self.assertEquals(actual_path, self.convert_path(expected_path))
-
-    def make_path(self, parent_directory, path):
-        """Returns the full path created by joining path to parent_directory.
-
-        This method is a convenience function because it allows path to use forward slashes
-        to separate path components rather than the platform's separator character.
-
-        @param parent_directory: The parent directory. This argument must use the system's separator character. This may
-            be None if path is relative to the current working directory.
-        @param path: The path to add to parent_directory. This should use forward slashes as the separator character,
-            regardless of the platform's character.
-
-        @return:  The path created by joining the two with using the system's separator character.
-        """
-        if parent_directory is None and os.path.sep == '/':
-            return path
-
-        if parent_directory is None:
-            result = ''
-        elif path.startswith('/'):
-            result = ''
-        else:
-            result = parent_directory
-
-        for path_part in path.split('/'):
-            if len(path_part) > 0:
-                result = os.path.join(result, path_part)
-
-        if os.path.sep == '\\':
-            result = 'C:\\%s' % result
-        return result
-
-    def convert_path(self, path):
-        """Converts the forward slashes in path to the platform's separator and returns the value.
-
-        @param path: The path to convert. This should use forward slashes as the separator character, regardless of the
-            platform's character.
-
-        @return: The path created by converting the forward slashes to the platform's separator.
-        """
-        return self.make_path(None, path)

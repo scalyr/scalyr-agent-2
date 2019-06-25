@@ -7,10 +7,10 @@ from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
-from scalyr_agent.tests.configuration_test import TestConfiguration
+from scalyr_agent.tests.configuration_test import TestConfigurationBase
 
 
-class TestConfigurationK8s(TestConfiguration):
+class TestConfigurationK8s(TestConfigurationBase):
     """This test subclasses from TestConfiguration for easier exclusion in python 2.5 and below"""
 
     @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
