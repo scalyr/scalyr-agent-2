@@ -526,6 +526,7 @@ class JsonParser(object):
         """Parse a numeric literal."""
         literal_buffer = []
         all_digits = True
+        sign = 1
     
         while not self.__scanner.at_end:
             peek = self.__scanner.peek_next_ubyte()
@@ -538,27 +539,32 @@ class JsonParser(object):
                 self.__error("numeric literal too long (limit 100 characters)")
       
             next_char = self.__scanner.read_ubyte()
-            all_digits = all_digits and '0' <= next_char <= '9'
-            literal_buffer.append(next_char)
+
+            # Never append a leading minus sign to literal_buffers, merely record the sign
+            if next_char == '-' and len(literal_buffer) == 0:
+                sign = -1
+            else:
+                all_digits = all_digits and '0' <= next_char <= '9'
+                literal_buffer.append(next_char)
     
         if all_digits and len(literal_buffer) <= 18:
             value = 0
             for digit in literal_buffer:
                 value = (value * 10) + ord(digit) - ord('0')
-            return value
+            return sign * value
 
         number_string = ''.join(literal_buffer)
         if (number_string.find('.') < 0 and
                 number_string.find('e') < 0 and
                 number_string.find('E') < 0):
             try:
-                return long(number_string)
+                return sign * long(number_string)
             except ValueError:
                 self.__error(
                     "Could not parse number as long '%s'" % number_string)
         else:
             try:
-                return float(number_string)
+                return sign * float(number_string)
             except ValueError:
                 self.__error(
                     "Could not parse number as float '%s'" % number_string)
