@@ -296,6 +296,7 @@ class ApiQueryOptions(object):
         # We have this flag because some code paths rely on returning None and
         # other code paths rely on exceptions being thrown.
         self.raise_exception_on_cache_query_error = True
+        # TODO-163 : investigate getting rid of this
 
     def __repr__(self):
         return 'ApiQueryOptions\n\tmax_retries=%s\n\treturn_temp_errors=%s\n\trate_limiter=%s\n' % (
@@ -335,6 +336,7 @@ class _K8sCache( object ):
         #   the long-term direction for this feature is uncertain and so this is a temporary implementation
         #   needed to support the notion of a "soft purge".
         self._objects_expired = {}
+        # TODO-163: investigate making a separate entry object
 
         self._processor = processor
         self._object_type = object_type
@@ -551,6 +553,7 @@ class _K8sCache( object ):
             time exists for the object, then return True only if not expired
         @rtype: bool
         """
+        # TODO-163: Look at passing down a consistent time from layers above
         return self._lookup_object(namespace, name, time.time(), allow_expired=allow_expired) is not None
 
     def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
@@ -1143,6 +1146,7 @@ class KubernetesCache( object ):
                 self._update_cluster_name( local_state.k8s )
                 if not local_state.use_controlled_warmer:
                     self._update_api_server_version(local_state.k8s)
+                    # TODO-163: investigate how to get rate limiter in here
                     runtime = self._get_runtime( local_state.k8s )
                 else:
                     runtime = 'docker'
@@ -1181,6 +1185,7 @@ class KubernetesCache( object ):
                 current_time = time.time()
                 has_warmer = local_state.use_controlled_warmer
 
+                # TODO-163: consolidate different code paths
                 if has_warmer:
                     global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Marking unused pods as expired")
                     self._pods_cache.mark_as_expired(current_time)
@@ -1301,9 +1306,8 @@ class KubernetesCache( object ):
         self._lock.acquire()
         try:
             if self._state.cache_config.use_controlled_warmer:
-                # TODO: For now, controlled_warmer usage directly implies/requires 'docker' runtime
-                # this is needed because update_cache() is not called when use_controlled_warmer=True
-                # and therefore, _container_runtime is not set
+                # TODO-163: For now, controlled_warmer usage directly implies/requires 'docker' runtime
+                # Change to support other runtimes. Need to rate limit
                 return 'docker'
             result = self._container_runtime
         finally:
@@ -1521,6 +1525,7 @@ class KubernetesApi( object ):
         @returns File handle to the api response log file or None upon failure.
         @rtype: file handle
         """
+        # TODO-163: Refactor to support various use cases and to write to agent_debug.log as discussed
         # try to open the logged_response_file
         try:
             kapi = os.path.join(self.agent_log_path, 'kapi')
@@ -1598,7 +1603,6 @@ class KubernetesApi( object ):
                 traceback.print_stack(file=logged_response_file)
                 logged_response_file.write('\n\n')
 
-            # echee: TODO: remove this before merging
             if logged_response_file:
                 self.__check_for_fake_response(logged_response_file)
 

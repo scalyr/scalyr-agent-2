@@ -277,6 +277,10 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         # Create rate limiter
         self.__max_query_retries = self._global_config.k8s_controlled_warmer_max_query_retries
+        # TODO-163:
+        # Refactor so it can be shared between k8s_events and k8s monitors.
+        # k8s_events should have 2 rate limiters - one for leader election which is shared with k8s monitor.
+        # ANother exclusive one for itself
         self.__rate_limiter = BlockingRateLimiter(
             self._global_config.k8s_ratelimit_cluster_num_agents,
             self._global_config.k8s_ratelimit_cluster_rps_init,
@@ -341,6 +345,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node, options,
                                                 retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
         except Exception, e:
+            # TODO-163: add debug statement
             return False
 
         # if we are here, then the above node exists so return True
