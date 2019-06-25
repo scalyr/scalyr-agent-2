@@ -200,12 +200,18 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+
+        # In order to simulate already warm, we need to add the cache entry right after we mark it to be warmed (it is
+        # in the marking that we determine it is not yet warmed).
+        # We need to do it before end_marking because once we invoke end_marking, the ControlledCacheWarmer thread
+        # will try to request it via the api and will not get a chance to see it is already in the cache.  The test
+        # thread will be racing with it.
+        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
+
+        # Now end the marking.
         warmer.end_marking()
 
         self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
-        self.assertEqual(warmer.warming_containers(), [self.CONTAINER_1])
-
-        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
 
         warmer.block_until_idle( self.timeout )
 
