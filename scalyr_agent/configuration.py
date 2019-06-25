@@ -314,6 +314,7 @@ class Configuration(object):
 
     @property
     def k8s_use_controlled_warmer(self):
+        # TODO-163: Remove
         return self.__get_config().get_bool('k8s_use_controlled_warmer')
 
     @property
@@ -1133,6 +1134,7 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config, 'k8s_use_controlled_warmer', True, description, apply_defaults, env_aware=True
         )
+        # TODO-163 : get rid k8s_use_controlled_warmer and make other settings more aggressive
         # Optional (defaults to 5). The maximum number of temporary errors that may occur when warming a pod\'s entry,
         # before the warmer blacklists it
         self.__verify_or_set_optional_int(
