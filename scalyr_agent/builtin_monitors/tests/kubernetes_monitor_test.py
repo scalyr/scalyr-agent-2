@@ -228,7 +228,23 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertEqual(warmer.blacklisted_containers(), [])
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
-        # TODO: Add in second warming case once the test fix has been merged in.
+        # Second case type of already_warmed.  This occurs when the pod is found in cache the second time you
+        # try to mark it as active.
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_2, self.NAMESPACE_2, self.POD_2)
+        warmer.end_marking()
+
+        warmer.begin_marking()
+        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_2, self.POD_2)
+        warmer.mark_to_warm(self.CONTAINER_2, self.NAMESPACE_2, self.POD_2)
+        warmer.end_marking()
+
+        stats = warmer.get_report_stats()
+        success_count = stats.get('success', (1, 1))
+        already_warm_count = stats.get('already_warm', (0, 0))
+
+        self.assertEqual(success_count[0], 0)
+        self.assertEqual(already_warm_count[0], 2)
 
     def test_remove_inactive(self):
         warmer = self.__warmer_test_instance
