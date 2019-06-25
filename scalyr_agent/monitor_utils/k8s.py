@@ -361,6 +361,9 @@ class _K8sCache( object ):
                 if hasattr(obj, 'access_time'):
                     if obj.access_time is None or obj.access_time < access_time:
                         stale.append((namespace, obj_name))
+                else:
+                    # never-accessed objects should also be considered stale
+                    stale.append((namespace, obj_name))
         return stale
 
     def mark_as_expired(self, access_time):

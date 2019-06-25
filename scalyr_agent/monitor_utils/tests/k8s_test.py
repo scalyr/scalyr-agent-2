@@ -618,3 +618,9 @@ class FakeCache(object):
         """
         obj = create_object_from_dict( { 'namespace': pod_namespace, 'name': pod_name } )
         self.__pod_cache._add_to_cache( obj )
+
+    def simulate_expire_all_pods_in_cache(self):
+        """
+        Simulates time-expiration of all pods in a cache
+        """
+        self.__pod_cache.mark_as_expired(time.time())

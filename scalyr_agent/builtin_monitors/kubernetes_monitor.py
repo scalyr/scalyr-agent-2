@@ -542,11 +542,11 @@ class ControlledCacheWarmer(StoppableThread):
         self.__lock.acquire()
         try:
             if not container_id in self.__active_pods:
-                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name,
-                                                                                      start_time)
+                warming_entry = self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(
+                    pod_namespace, pod_name, start_time)
             else:
                 warming_entry = self.__active_pods[container_id]
-                was_warmed = self.__update_warming_state(warming_entry, start_time)
+            was_warmed = self.__update_warming_state(warming_entry, start_time)
             self.__active_pods[container_id].is_recently_marked = True
         finally:
             self.__lock.release()

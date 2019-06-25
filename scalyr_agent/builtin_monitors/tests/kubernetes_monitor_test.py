@@ -194,18 +194,61 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
-    def test_already_warm(self):
+    def test_already_warm_before_marking(self):
+        warmer = self.__warmer_test_instance
+        fake_cache = self.__fake_cache
+
+        # Round 1: WarmingEntry does not exist case
+        warmer.begin_marking()
+        fake_cache.simulate_add_pod_to_cache(self.NAMESPACE_1, self.POD_1)
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.end_marking()
+
+        fake_cache.set_response(self.NAMESPACE_1, self.POD_1, success=True)
+        warmer.block_until_idle(self.timeout)
+
+        stats = warmer.get_report_stats()
+        success_count = stats.get('success', (1, 1))
+        self.assertEqual(success_count[0], 0)
+        already_warm_count = stats.get('already_warm', (0, 0))
+        self.assertEqual(already_warm_count[0], 1)
+
+        # Round 2: WarmingEntry already exists case
+
+        # First expire all pods
+        fake_cache.simulate_expire_all_pods_in_cache()
+
+        # Then perform one round of marking to set warming_entry.is_warm = False
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.end_marking()
+
+        # Next simulate the race condition where another thread pre-warms the cache
+        warmer.begin_marking()
+        fake_cache.simulate_add_pod_to_cache(self.NAMESPACE_1, self.POD_1)
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.end_marking()
+
+        # Finally confirm that mark_to_warm records the already_warm stat
+        stats = warmer.get_report_stats()
+        success_count = stats.get('success', (1, 1))
+        self.assertEqual(success_count[0], 0)
+        already_warm_count = stats.get('already_warm', (0, 0))
+        self.assertEqual(already_warm_count[0], 2)
+
+
+    def test_already_warm_after_marking(self):
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
         warmer.end_marking()
 
         self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
         self.assertEqual(warmer.warming_containers(), [self.CONTAINER_1])
 
-        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
 
         warmer.block_until_idle( self.timeout )
 
