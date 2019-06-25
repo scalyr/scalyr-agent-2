@@ -111,6 +111,7 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'to Scalyr.  Note, metrics are only collected from those containers whose logs are being collected',
                       convert_to=bool, default=True, env_aware=True)
 
+# TODO-163: Change this back to True
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
                       'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True, env_aware=True)
@@ -893,7 +894,7 @@ class ControlledCacheWarmer(StoppableThread):
                                    'CacheWarmer.run_and_propagate: %s consecutive warms in a row: %s %s %s'
                                    % (consecutive_warm_pods, container_id, pod_namespace, pod_name))
                     if consecutive_warm_pods == 10:
-                        # TODO: Do not remove this circuit breaker until this issue is fully understood.
+                        # TODO-163: Get rid of circuit breaker.
                         self._run_state.sleep_but_awaken_if_stopped(0.1)
             except:
                 global_log.exception('cacher warmer uncaught exception')
@@ -1553,7 +1554,7 @@ class ContainerChecker(object):
 
             if not self._global_config.k8s_use_controlled_warmer:
                 # wait until the k8s_cache is initialized before aborting
-                # TODO: Ensure there is a way to disable blocking for the cache initialization.
+                # TODO-163: Get rid of idea of cache being initialized
                 while not self.k8s_cache.is_initialized():
                     time.sleep( delay )
                     current_time = time.time()
@@ -2285,6 +2286,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
+        # TODO-163: Refactor to have single global blocking rate limiter
         self.__rate_limiter = BlockingRateLimiter(
             self._global_config.k8s_ratelimit_cluster_num_agents,
             self._global_config.k8s_ratelimit_cluster_rps_init,
@@ -2706,8 +2708,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         ver = None
         runtime = None
         if k8s_cache and not self._global_config.k8s_use_controlled_warmer:
-            # echee TODO: currently, if k8s_use_controlled_warmer is True, version checks are disabled.
-            # This issue should be resolved before merging.
+            # TODO-163: Re-enable version checks
             ver = k8s_cache.get_api_server_version()
             runtime = k8s_cache.get_container_runtime()
         ver = 'k8s=%s' % (ver if ver else 'true')
