@@ -667,9 +667,6 @@ class TestableCopyingManager(CopyingManager):
         self.__advance_requests_cv.release()
 
         CopyingManager.stop_manager(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
-        if self.isAlive():
-            print 'The copying manager did not stop!!!!!!!!!'
-            raise AssertionError('The copy manager did not stop in time')
 
     @property
     def test_state(self):

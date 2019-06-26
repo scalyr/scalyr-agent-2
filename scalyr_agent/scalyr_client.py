@@ -908,7 +908,6 @@ class AddEventsRequest(object):
             timestamp = long(time.time() * 1000000000L)
 
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
-            print 'Adjusting last timestamp %ld' % __last_time_stamp__
             timestamp = __last_time_stamp__ + 1L
         __last_time_stamp__ = timestamp
 
@@ -1529,8 +1528,6 @@ def _set_last_timestamp( val ):
     """
     global __last_time_stamp__
     __last_time_stamp__ = val
-
-    print 'Setting last timestamp %ld' % __last_time_stamp__
 
 
 class HTTPConnectionWithTimeout(httplib.HTTPConnection):
