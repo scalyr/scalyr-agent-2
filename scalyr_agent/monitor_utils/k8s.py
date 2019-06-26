@@ -1049,6 +1049,7 @@ class KubernetesCache( object ):
 
         # start the main update loop
         last_purge = time.time()
+        last_version_check_time = None
         while run_state.is_running():
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
@@ -1060,9 +1061,11 @@ class KubernetesCache( object ):
                 self._pods_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name( local_state.k8s )
-                # TODO-163: Don't call this every time through the loop
-                # Maybe once an hour or once a day
-                self._update_api_server_version(local_state.k8s)
+
+                # Update the api server version every hour
+                if last_version_check_time is None or current_time - last_version_check_time > 3600:
+                    self._update_api_server_version(local_state.k8s)
+                    last_version_check_time = current_time
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log(
