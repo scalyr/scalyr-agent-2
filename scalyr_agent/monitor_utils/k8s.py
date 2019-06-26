@@ -1465,9 +1465,6 @@ class KubernetesApi( object ):
                 traceback.print_stack(file=logged_response_file)
                 logged_response_file.write('\n\n')
 
-            if logged_response_file:
-                self.__check_for_fake_response(logged_response_file)
-
             # Make actual API call
             try:
                 response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
