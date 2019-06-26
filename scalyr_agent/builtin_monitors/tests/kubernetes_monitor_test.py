@@ -195,48 +195,71 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
 
     def test_already_warm(self):
+        # Test case where a pod was put into the warming list, but when it is returned by `pick_next_pod`, it is
+        # already warmed in the cache.
+        # This is a difficult one to test, so we do a little trickery.  We first have the thread that is invoking
+        # `pick_next_pod` get tied up blocking for a request for another pod.  That gives us time to manipulate the
+        # the caching state for another pod (i.e., get it added to the warming list but then put it into cache before
+        # it is returned by `pick_next_pod`)
+
+        warmer = self.__warmer_test_instance
+        fake_cache = self.__fake_cache
+
+        # Only add in one container so that the ControlledCacheWarmer thread is blocked on getting it.
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.end_marking()
+
+        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
+        self.assertEqual(warmer.warming_containers(), [self.CONTAINER_1])
+
+        # Guarantee that the thread is blocked.
+        fake_cache.wait_until_request_pending()
+
+        # Now introduce the other pod.
+        warmer.begin_marking()
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
+        warmer.mark_to_warm(self.CONTAINER_2, self.NAMESPACE_2, self.POD_2)
+        warmer.end_marking()
+
+        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1, self.CONTAINER_2])
+        self.assertEqual(warmer.warming_containers(), [self.CONTAINER_1, self.CONTAINER_2])
+
+        # Simulate adding the second one to the cache.  This will trigger it to be `already_warm`
+        fake_cache.simulate_add_pod_to_cache(self.NAMESPACE_2, self.POD_2)
+
+        # Ok, now let the ControlledCacheWarmer thread go and try to process everything.
+        fake_cache.set_response(self.NAMESPACE_1, self.POD_1, success=True)
+
+        warmer.block_until_idle(self.timeout)
+
+        stats = warmer.get_report_stats()
+
+        success_count = stats.get('success', (0, 0))
+        already_warm_count = stats.get('already_warm', (0, 0))
+
+        self.assertEqual(success_count[0], 1)
+        self.assertEqual(already_warm_count[0], 1)
+
+        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1, self.CONTAINER_2])
+        self.assertEqual(warmer.warming_containers(), [])
+        self.assertEqual(warmer.blacklisted_containers(), [])
+        self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
+        self.assertTrue(warmer.is_warm(self.NAMESPACE_2, self.POD_2))
+
+    def test_already_warm_two(self):
+        # Second case type of already_warmed.  This occurs when the pod is found in cache the second time you
+        # try to mark it as active.
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
-
-        # In order to simulate already warm, we need to add the cache entry right after we mark it to be warmed (it is
-        # in the marking that we determine it is not yet warmed).
-        # We need to do it before end_marking because once we invoke end_marking, the ControlledCacheWarmer thread
-        # will try to request it via the api and will not get a chance to see it is already in the cache.  The test
-        # thread will be racing with it.
-        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_1, self.POD_1 )
-
-        # Now end the marking.
-        warmer.end_marking()
-
-        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
-
-        warmer.block_until_idle( self.timeout )
-
-        stats = warmer.get_report_stats()
-
-        success_count = stats.get( 'success', (1, 1) )
-        already_warm_count = stats.get( 'already_warm', (0, 0) )
-
-        self.assertEqual( success_count[0], 0 )
-        self.assertEqual( already_warm_count[0], 1 )
-
-        self.assertEqual(warmer.active_containers(), [self.CONTAINER_1])
-        self.assertEqual(warmer.warming_containers(), [])
-        self.assertEqual(warmer.blacklisted_containers(), [])
-        self.assertTrue(warmer.is_warm(self.NAMESPACE_1, self.POD_1))
-
-        # Second case type of already_warmed.  This occurs when the pod is found in cache the second time you
-        # try to mark it as active.
-        warmer.begin_marking()
-        warmer.mark_to_warm(self.CONTAINER_2, self.NAMESPACE_2, self.POD_2)
         warmer.end_marking()
 
         warmer.begin_marking()
-        fake_cache.simulate_add_pod_to_cache( self.NAMESPACE_2, self.POD_2)
-        warmer.mark_to_warm(self.CONTAINER_2, self.NAMESPACE_2, self.POD_2)
+        fake_cache.simulate_add_pod_to_cache(self.NAMESPACE_1, self.POD_1)
+        warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
         warmer.end_marking()
 
         stats = warmer.get_report_stats()
@@ -244,7 +267,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         already_warm_count = stats.get('already_warm', (0, 0))
 
         self.assertEqual(success_count[0], 0)
-        self.assertEqual(already_warm_count[0], 2)
+        self.assertEqual(already_warm_count[0], 1)
 
     def test_remove_inactive(self):
         warmer = self.__warmer_test_instance
