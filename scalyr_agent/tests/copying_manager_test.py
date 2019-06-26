@@ -629,7 +629,7 @@ class TestableCopyingManager(CopyingManager):
         self.__test_state_cv.acquire()
         original_count = self.__test_state_changes
 
-        deadline = time.time() + 5.0
+        #deadline = time.time() + 5.0
         # We have to keep incrementing the __advanced_requests count so that the copying manager thread keeps
         # advancing.  We wait on the test_state_cv because everytime the CopyingManager blocks, it notifies that cv.
         while self.__test_state_changes <= original_count or self.__test_state != final_state:
@@ -638,8 +638,8 @@ class TestableCopyingManager(CopyingManager):
             self.__advance_requests_cv.notifyAll()
             self.__advance_requests_cv.release()
             self.__test_state_cv.wait(timeout=5.1)
-            if time.time() > deadline:
-                raise AssertionError("Did not get to final state %s in time" % final_state)
+            #if time.time() > deadline:
+            #    raise AssertionError("Did not get to final state %s in time" % final_state)
 
         self.__test_state_cv.release()
 
@@ -665,6 +665,8 @@ class TestableCopyingManager(CopyingManager):
         self.__advance_requests_cv.release()
 
         CopyingManager.stop_manager(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
+        if self.is_alive():
+            raise AssertionError('The copy manager did not stop in time')
 
     @property
     def test_state(self):
