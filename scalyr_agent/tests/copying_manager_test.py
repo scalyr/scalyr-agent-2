@@ -24,6 +24,7 @@ import tempfile
 
 import logging
 import sys
+import time
 import unittest
 
 root = logging.getLogger()
@@ -215,7 +216,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         if self._controller is not None:
             self._controller.stop()
 
-    @skip("@czerwin to investigate")
     def test_single_log_file(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
@@ -228,7 +228,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         responder_callback('success')
 
-    @skip("@czerwin to investigate")
     def test_multiple_scans_of_log_file(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
@@ -248,7 +247,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(1, len(lines))
         self.assertEquals('Third line', lines[0])
 
-    @skip("@czerwin to investigate")
     def test_normal_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
@@ -269,7 +267,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals('First line', lines[0])
         self.assertEquals('Second line', lines[1])
 
-    @skip("@czerwin to investigate")
     def test_drop_request_due_to_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
@@ -289,7 +286,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(1, len(lines))
         self.assertEquals('Third line', lines[0])
 
-    @skip("@czerwin to investigate")
     def test_request_too_large_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
@@ -311,7 +307,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals('Second line', lines[1])
         self.assertEquals('Third line', lines[2])
 
-    @skip("@czerwin to investigate")
     def test_pipelined_requests(self):
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines('First line', 'Second line')
@@ -341,7 +336,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         responder_callback('success')
 
-    @skip("@czerwin to investigate")
     def test_pipelined_requests_with_normal_error(self):
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines('First line', 'Second line')
@@ -382,7 +376,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         responder_callback('success')
 
-    @skip("@czerwin to investigate")
     def test_pipelined_requests_with_retry_error(self):
         controller = self.__create_test_instance(use_pipelining=True)
         self.__append_log_lines('First line', 'Second line')
@@ -636,6 +629,7 @@ class TestableCopyingManager(CopyingManager):
         self.__test_state_cv.acquire()
         original_count = self.__test_state_changes
 
+        deadline = time.time() + 5.0
         # We have to keep incrementing the __advanced_requests count so that the copying manager thread keeps
         # advancing.  We wait on the test_state_cv because everytime the CopyingManager blocks, it notifies that cv.
         while self.__test_state_changes <= original_count or self.__test_state != final_state:
@@ -643,7 +637,9 @@ class TestableCopyingManager(CopyingManager):
             self.__advance_requests += 1
             self.__advance_requests_cv.notifyAll()
             self.__advance_requests_cv.release()
-            self.__test_state_cv.wait()
+            self.__test_state_cv.wait(timeout=5.1)
+            if time.time() > deadline:
+                raise AssertionError("Did not get to final state %s in time" % final_state)
 
         self.__test_state_cv.release()
 
