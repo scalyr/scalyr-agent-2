@@ -211,10 +211,12 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
     def setUp(self):
         self._controller = None
+        print 'Starting e2e test'
 
     def tearDown(self):
         if self._controller is not None:
             self._controller.stop()
+        print 'Done in e2e test'
 
     def test_single_log_file(self):
         controller = self.__create_test_instance()
