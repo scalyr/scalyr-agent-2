@@ -26,7 +26,7 @@ from mock import patch, MagicMock
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator
+from scalyr_agent.util import JsonReadFileException, RateLimiter, FakeRunState, ScriptEscalator, HistogramTracker
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
 from scalyr_agent.util import verify_and_get_compress_func
 from scalyr_agent.json_lib import JsonObject
@@ -695,3 +695,138 @@ class FakeSys(object):
             self._condition.acquire()
             self._condition.wait(timeout)
             self._condition.release()
+
+
+class TestHistogramTracker(ScalyrTestCase):
+    """Tests the HistogramTracker abstraction.
+    """
+    def setUp(self):
+        self._testing = HistogramTracker([10, 25, 50, 100])
+
+    def test_count(self):
+        self.assertEqual(self._testing.count(), 0)
+
+        self._testing.add_sample(1)
+        self._testing.add_sample(11)
+        self.assertEqual(self._testing.count(), 2)
+
+        self._testing.reset()
+        self.assertEqual(self._testing.count(), 0)
+
+    def test_average(self):
+        self._testing.add_sample(1)
+        self._testing.add_sample(11)
+        self.assertAlmostEqual(self._testing.average(), 6.0)
+
+        self._testing.reset()
+        self.assertIsNone(self._testing.average())
+
+        self._testing.add_sample(6)
+        self.assertAlmostEqual(self._testing.average(), 6.0)
+
+    def test_min(self):
+        self._testing.add_sample(1)
+        self._testing.add_sample(11)
+        self.assertAlmostEqual(self._testing.min(), 1.0)
+
+        self._testing.add_sample(15)
+        self.assertAlmostEqual(self._testing.min(), 1.0)
+
+        self._testing.add_sample(0.5)
+        self.assertAlmostEqual(self._testing.min(), 0.5)
+
+        self._testing.reset()
+        self.assertIsNone(self._testing.min())
+
+        self._testing.add_sample(15)
+        self.assertAlmostEqual(self._testing.min(), 15.0)
+
+    def test_max(self):
+        self._testing.add_sample(1)
+        self._testing.add_sample(11)
+        self.assertAlmostEqual(self._testing.max(), 11.0)
+
+        self._testing.add_sample(15)
+        self.assertAlmostEqual(self._testing.max(), 15.0)
+
+        self._testing.add_sample(0.5)
+        self.assertAlmostEqual(self._testing.max(), 15.0)
+
+        self._testing.reset()
+        self.assertIsNone(self._testing.max())
+
+        self._testing.add_sample(0)
+        self.assertAlmostEqual(self._testing.max(), 0)
+
+    def test_buckets(self):
+        buckets = self._buckets_to_list()
+        self.assertEqual(len(buckets), 0)
+
+        self._testing.add_sample(2)
+        buckets = self._buckets_to_list()
+        self.assertEqual(len(buckets), 1)
+        self.assertBucketEquals(buckets[0], (1, 2, 10))
+
+        self._testing.add_sample(50)
+        buckets = self._buckets_to_list()
+        self.assertEqual(len(buckets), 2)
+        self.assertBucketEquals(buckets[0], (1, 2, 10))
+        self.assertBucketEquals(buckets[1], (1, 50, 100))
+
+        self._testing.add_sample(5)
+        buckets = self._buckets_to_list()
+        self.assertEqual(len(buckets), 2)
+        self.assertBucketEquals(buckets[0], (2, 2, 10))
+        self.assertBucketEquals(buckets[1], (1, 50, 100))
+
+        self._testing.add_sample(200)
+        buckets = self._buckets_to_list()
+        self.assertEqual(len(buckets), 3)
+        self.assertBucketEquals(buckets[0], (2, 2, 10))
+        self.assertBucketEquals(buckets[1], (1, 50, 100))
+        self.assertBucketEquals(buckets[2], (1, 100, 200.01))
+
+    def test_estimate_percentile(self):
+        self.assertIsNone(self._testing.estimate_median())
+
+        self._testing.add_sample(0)
+        self._testing.add_sample(3)
+        self._testing.add_sample(4)
+        # Since all of the values fall into the first bucket, the estimate of the percentile will be the same for all
+        # percentiles.
+        self.assertAlmostEqual(self._testing.estimate_percentile(0.1), 5.0)
+        self.assertAlmostEqual(self._testing.estimate_percentile(0.5), 5.0)
+        self.assertAlmostEqual(self._testing.estimate_percentile(1.0), 5.0)
+
+        self._testing.add_sample(11)
+        self._testing.add_sample(12)
+        self._testing.add_sample(13)
+        self._testing.add_sample(55)
+
+        self.assertAlmostEqual(self._testing.estimate_percentile(0.1), 5.0)
+        self.assertAlmostEqual(self._testing.estimate_percentile(0.5), 17.5)
+        self.assertAlmostEqual(self._testing.estimate_percentile(1.0), 75.0)
+
+    def test_summarize(self):
+        self.assertEqual(self._testing.summarize(), "(count=0)")
+
+        self._testing.add_sample(2)
+        self._testing.add_sample(4)
+        self._testing.add_sample(45)
+        self._testing.add_sample(200)
+
+        self.assertEqual(self._testing.summarize(),
+                         "(count=4,avg=62.75,min=2.00,max=200.00,median=6.00)")
+
+    def assertBucketEquals(self, first, second):
+        self.assertEquals(first[0], second[0], msg="The counts do not equal")
+        self.assertAlmostEquals(first[1], second[1], msg="The lower bounds do not equal")
+        self.assertAlmostEquals(first[2], second[2], msg="The upper bounds do not equal")
+
+    def _buckets_to_list(self):
+        result = []
+        for count, lower, upper in self._testing.buckets():
+            result.append((count, lower, upper))
+        return result
+
+
