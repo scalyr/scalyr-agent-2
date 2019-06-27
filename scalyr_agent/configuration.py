@@ -316,11 +316,6 @@ class Configuration(object):
         return self.__get_config().get_bool('k8s_log_api_responses_to_disk')
 
     @property
-    def k8s_use_controlled_warmer(self):
-        # TODO-163: Remove
-        return self.__get_config().get_bool('k8s_use_controlled_warmer')
-
-    @property
     def k8s_controlled_warmer_max_attempts(self):
         return self.__get_config().get_int('k8s_controlled_warmer_max_attempts')
 
@@ -1132,12 +1127,8 @@ class Configuration(object):
         self.__verify_or_set_optional_bool(
             config, 'k8s_log_api_responses_to_disk', False, description, apply_defaults, env_aware=True
         )
-        # Optional (defaults to True). If true, will use the controlled warmer strategy to warm the pod
-        # cache.  This only applies when docker is being used as the container system
-        self.__verify_or_set_optional_bool(
-            config, 'k8s_use_controlled_warmer', True, description, apply_defaults, env_aware=True
-        )
-        # TODO-163 : get rid k8s_use_controlled_warmer and make other settings more aggressive
+
+        # TODO-163 : make controlled cache warmer settings more aggressive
         # Optional (defaults to 5). The maximum number of temporary errors that may occur when warming a pod\'s entry,
         # before the warmer blacklists it
         self.__verify_or_set_optional_int(

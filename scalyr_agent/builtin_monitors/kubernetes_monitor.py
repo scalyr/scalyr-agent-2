@@ -1611,23 +1611,21 @@ class ContainerChecker(object):
             message_time = start_time
             abort = False
 
-            if not self._global_config.k8s_use_controlled_warmer:
-                # wait until the k8s_cache is initialized before aborting
-                # TODO-163: Get rid of idea of cache being initialized
-                while not self.k8s_cache.is_initialized():
-                    time.sleep( delay )
-                    current_time = time.time()
-                    # see if we need to print a message
-                    elapsed = current_time - message_time
-                    if elapsed > message_delay:
-                        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
-                        message_time = current_time
+            # wait until the k8s_cache is initialized before aborting
+            while not self.k8s_cache.is_initialized():
+                time.sleep( delay )
+                current_time = time.time()
+                # see if we need to print a message
+                elapsed = current_time - message_time
+                if elapsed > message_delay:
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_0, 'start() - waiting for Kubernetes cache to be initialized' )
+                    message_time = current_time
 
-                    # see if we need to abort the monitor because we've been waiting too long for init
-                    elapsed = current_time - start_time
-                    if elapsed > self.__k8s_cache_init_abort_delay:
-                        abort = True
-                        break
+                # see if we need to abort the monitor because we've been waiting too long for init
+                elapsed = current_time - start_time
+                if elapsed > self.__k8s_cache_init_abort_delay:
+                    abort = True
+                    break
 
             if abort:
                 raise K8sInitException( "Unable to initialize kubernetes cache" )
@@ -2381,21 +2379,20 @@ class KubernetesMonitor( ScalyrMonitor ):
             logger=global_log,
         )
 
-        self.__logs_controlled_warmer = None
-        self.__metrics_controlled_warmer = None
-        if self._global_config.k8s_use_controlled_warmer:
-            self.__logs_controlled_warmer = ControlledCacheWarmer(
-                max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
-                blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
-                max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
-                rate_limiter=self.__rate_limiter,
-                logger=global_log)
-            self.__metrics_controlled_warmer = ControlledCacheWarmer(
-                max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
-                blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
-                max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
-                rate_limiter=self.__rate_limiter,
-                logger=global_log)
+        # create controlled cache warmers for logs and metrics
+        self.__logs_controlled_warmer = ControlledCacheWarmer(
+            max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+            blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+            max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+            rate_limiter=self.__rate_limiter,
+            logger=global_log)
+
+        self.__metrics_controlled_warmer = ControlledCacheWarmer(
+            max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+            blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+            max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+            rate_limiter=self.__rate_limiter,
+            logger=global_log)
 
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
@@ -2788,7 +2785,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
-        if k8s_cache and not self._global_config.k8s_use_controlled_warmer:
+        if k8s_cache:
             # TODO-163: Re-enable version checks
             ver = k8s_cache.get_api_server_version()
             runtime = k8s_cache.get_container_runtime()
