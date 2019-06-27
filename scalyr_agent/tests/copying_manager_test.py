@@ -25,7 +25,6 @@ import tempfile
 import logging
 import sys
 import time
-import unittest
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -486,6 +485,9 @@ class TestableCopyingManager(CopyingManager):
     SENDING = 'sending'
     RESPONDING = 'responding'
 
+    # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
+    WAIT_TIMEOUT = 5.0
+
     def __init__(self, configuration, monitors):
         CopyingManager.__init__(self, configuration, monitors)
         # Approach:  We will override key methods of CopyingManager, blocking them from returning until the controller
@@ -617,6 +619,7 @@ class TestableCopyingManager(CopyingManager):
         # 'all'  -- indicating it should stop at the first state it sees.
         # None -- indicating the test is shutting down and the CopyingManger thread should just run until it finishes
         # One of `SLEEPING`, `SENDING`, and `RESPONDING` -- indicating where we should next block the CopyingManager.
+        start_time = time.time()
         while self.__test_stop_state == 'all' or current_point == self.__test_stop_state:
             self.__test_is_stopped = True
             if self.__test_required_transition is not None:
@@ -627,7 +630,7 @@ class TestableCopyingManager(CopyingManager):
             self.__test_state_cv.notifyAll()
             # We need to wait until some other state is set as the stop state.  The `notifyAll` in `run_and_stop_at_at`
             # method will wake us up.
-            self.__test_state_cv.wait()
+            self.__test_state_cv_wait_with_timeout(start_time)
 
         self.__test_is_stopped = False
 
@@ -668,12 +671,25 @@ class TestableCopyingManager(CopyingManager):
             # This will wake up threads in `__block_if_should_stop_at` which are waiting for a new stopping point.
             self.__test_state_cv.notifyAll()
 
+            start_time = time.time()
             # Wait until we get to this point.
             while not self.__test_is_stopped:
                 # This will be woken up by the notify in `__block_if_should_stop_at` method.
-                self.__test_state_cv.wait()
+                self.__test_state_cv_wait_with_timeout(start_time)
         finally:
             self.__test_state_cv.release()
+
+    def __test_state_cv_wait_with_timeout(self, start_time):
+        """Waits on the `__test_state_cv` condition variable, but will also throw an AssertionError if the wait
+        time exceeded the `start_time` plus `WAIT_TIMEOUT`.
+
+        @param start_time:  The start time when we first began waiting on this condition, in seconds past epoch.
+        @type start_time: Number
+        """
+        deadline = start_time + TestableCopyingManager.WAIT_TIMEOUT
+        self.__test_state_cv.wait(timeout=(deadline - time.time()) + 0.5)
+        if time.time() > deadline:
+            raise AssertionError('Deadline exceeded while waiting on condition variable')
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops the manager's thread.
