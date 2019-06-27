@@ -108,7 +108,6 @@ def cache(global_config):
                                  namespaces_to_ignore=namespaces_to_ignore,
                                  batch_pod_updates=global_config.k8s_cache_batch_pod_updates,
                                  query_timeout=global_config.k8s_cache_query_timeout_secs,
-                                 use_controlled_warmer=global_config.k8s_use_controlled_warmer,
                                  log_api_responses_to_disk=global_config.k8s_log_api_responses_to_disk,
                                  agent_log_path=global_config.agent_log_path)
 
@@ -754,7 +753,7 @@ class _CacheConfig( object ):
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
                   cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None,
                   batch_pod_updates=True, query_timeout=20,
-                  use_controlled_warmer=False, log_api_responses_to_disk=False, agent_log_path=None):
+                  log_api_responses_to_disk=False, agent_log_path=None):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -765,7 +764,6 @@ class _CacheConfig( object ):
         @param namespaces_to_ignore: a list of namespaces to ignore
         @param batch_pod_updates: whether or not to perform batch queries to the k8s api server for pod updates - used for stress testing
         @param query_timeout: The number of seconds to wait before a query to the API server times out
-        @param use_controlled_warmer: Whether to use a controlled cache warmer
         @param log_api_responses_to_disk: whether to log k8s api calls to disk (for debugging)
         @param agent_log_path: directory where agent.log is locatedd
 
@@ -778,7 +776,6 @@ class _CacheConfig( object ):
         @type namespaces_to_ignore: list[str]
         @type batch_pod_updates: bool
         @type query_timeout: int
-        @type use_controlled_warmer: bool
         @type log_api_responses_to_disk: bool
         @type agent_log_path: str
         """
@@ -794,7 +791,6 @@ class _CacheConfig( object ):
         self.namespaces_to_ignore = namespaces_to_ignore
         self.batch_pod_updates = batch_pod_updates
         self.query_timeout = query_timeout
-        self.use_controlled_warmer = use_controlled_warmer
         self.log_api_responses_to_disk = log_api_responses_to_disk
         self.agent_log_path = agent_log_path
 
@@ -869,7 +865,6 @@ class _CacheConfigState( object ):
             self.cache_expiry_fuzz_secs = state.cache_config.cache_expiry_fuzz_secs
             self.cache_start_fuzz_secs = state.cache_config.cache_start_fuzz_secs
             self.batch_pod_updates = state.cache_config.batch_pod_updates
-            self.use_controlled_warmer = state.cache_config.use_controlled_warmer
 
     def __init__( self, cache_config ):
         """Set default values"""
@@ -1012,7 +1007,6 @@ class KubernetesCache( object ):
             cache_purge_secs=cache_purge_secs,
             namespaces_to_ignore=namespaces_to_ignore,
             batch_pod_updates=batch_pod_updates,
-            use_controlled_warmer=False,
             log_api_responses_to_disk=False,
             agent_log_path=None
         )
@@ -1139,17 +1133,10 @@ class KubernetesCache( object ):
                     continue
 
             try:
-                # we only pre warm the pod cache and the cluster name
-                # controllers are cached on an as needed basis
-                if local_state.batch_pod_updates and not local_state.use_controlled_warmer:
-                    self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
                 self._update_cluster_name( local_state.k8s )
-                if not local_state.use_controlled_warmer:
-                    self._update_api_server_version(local_state.k8s)
-                    # TODO-163: investigate how to get rate limiter in here
-                    runtime = self._get_runtime( local_state.k8s )
-                else:
-                    runtime = 'docker'
+                self._update_api_server_version(local_state.k8s)
+                # TODO-163: investigate how to get rate limiter in here
+                runtime = self._get_runtime( local_state.k8s )
 
                 self._lock.acquire()
                 try:
@@ -1183,21 +1170,14 @@ class KubernetesCache( object ):
 
             try:
                 current_time = time.time()
-                has_warmer = local_state.use_controlled_warmer
 
-                # TODO-163: consolidate different code paths
-                if has_warmer:
-                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Marking unused pods as expired")
-                    self._pods_cache.mark_as_expired(current_time)
-                elif local_state.batch_pod_updates:
-                    self._pods_cache.update(local_state.k8s, local_state.node_filter, 'Pod')
-                else:
-                    global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Purging unused pods" )
-                    self._pods_cache.purge_unused(current_time)
+                global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Marking unused pods as expired")
+                self._pods_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name( local_state.k8s )
-                if not has_warmer:
-                    self._update_api_server_version(local_state.k8s)
+                # TODO-163: Don't call this every time through the loop
+                # Maybe once an hour or once a day
+                self._update_api_server_version(local_state.k8s)
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log(
@@ -1206,11 +1186,9 @@ class KubernetesCache( object ):
                         % (last_purge, local_state.cache_purge_secs, current_time)
                     )
                     self._controllers.purge_unused(last_purge)
-                    # if we are using the controlled warmer then purge any pods
-                    # that haven't been queried within the cache_purge_secs
-                    if has_warmer:
-                        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods")
-                        self._pods_cache.purge_unused(last_purge)
+                    # purge any pods that haven't been queried within the cache_purge_secs
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Purging stale pods")
+                    self._pods_cache.purge_unused(last_purge)
                     last_purge = current_time
 
             except K8sApiException, e:
@@ -1305,10 +1283,6 @@ class KubernetesCache( object ):
         result = None
         self._lock.acquire()
         try:
-            if self._state.cache_config.use_controlled_warmer:
-                # TODO-163: For now, controlled_warmer usage directly implies/requires 'docker' runtime
-                # Change to support other runtimes. Need to rate limit
-                return 'docker'
             result = self._container_runtime
         finally:
             self._lock.release()
