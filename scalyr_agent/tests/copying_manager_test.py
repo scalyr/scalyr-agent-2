@@ -606,7 +606,7 @@ class TestableCopyingManager(CopyingManager):
             print 'Blocking because test stop state is %s vs %s' % (self.__test_stop_state, current_point)
             self.__test_state_cv.wait()
             self.__test_is_stopped = self.__test_is_stopped == 'all' or current_point == self.__test_stop_state
-            self.__test_state_cv.notify_all()
+            self.__test_state_cv.notifyAll()
 
     def run_and_stop_at(self, stopping_at, required_transition_state=None):
         self.__test_state_cv.acquire()
@@ -621,7 +621,7 @@ class TestableCopyingManager(CopyingManager):
             self.__test_stop_state = stopping_at
             self.__test_is_stopped = False
             print 'Setting stop state to %s' % stopping_at
-            self.__test_state_cv.notify_all()
+            self.__test_state_cv.notifyAll()
 
             while not self.__test_is_stopped:
                 self.__test_state_cv.wait()
@@ -645,7 +645,7 @@ class TestableCopyingManager(CopyingManager):
         # We need to tell it to keep running.
         self.__test_state_cv.acquire()
         self.__test_stop_state = None
-        self.__test_state_cv.notify_all()
+        self.__test_state_cv.notifyAll()
         self.__test_state_cv.release()
 
         CopyingManager.stop_manager(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
