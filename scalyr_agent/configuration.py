@@ -301,8 +301,24 @@ class Configuration(object):
         return self.__get_config().get_int('k8s_cache_purge_secs')
 
     @property
-    def k8s_log_api_responses_to_disk(self):
-        return self.__get_config().get_bool('k8s_log_api_responses_to_disk')
+    def k8s_log_api_responses(self):
+        return self.__get_config().get_bool('k8s_log_api_responses')
+
+    @property
+    def k8s_log_api_exclude_200s(self):
+        return self.__get_config().get_bool('k8s_log_api_exclude_200s')
+
+    @property
+    def k8s_log_api_min_response_len(self):
+        return self.__get_config().get_int('k8s_log_api_min_response_len')
+
+    @property
+    def k8s_log_api_min_latency(self):
+        return self.__get_config().get_float('k8s_log_api_min_latency')
+
+    @property
+    def k8s_log_api_ratelimit_interval(self):
+        return self.__get_config().get_float('k8s_log_api_ratelimit_interval')
 
     @property
     def k8s_controlled_warmer_max_attempts(self):
@@ -1109,13 +1125,30 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
 
-        # Whether to log api responses to disk (warning: this should be turned on only for debugging as it will
-        # fill up local disk over time
+        # Whether to log api responses to agent_debug.log
         self.__verify_or_set_optional_bool(
-            config, 'k8s_log_api_responses_to_disk', False, description, apply_defaults, env_aware=True
+            config, 'k8s_log_api_responses', False, description, apply_defaults, env_aware=True
         )
 
-        # TODO-163 : make controlled cache warmer settings more aggressive
+        # If set to True, do not log successes (response code 2xx)
+        self.__verify_or_set_optional_bool(
+            config, 'k8s_log_api_exclude_200s', False, description, apply_defaults, env_aware=True
+        )
+        # Minimum response length of api responses to be logged.  Responses smaller than this limit are not logged.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_min_response_len', 0, description, apply_defaults, env_aware=True
+        )
+        # Minimum latency of responses to be logged.  Responses faster than this limit are not logged.
+        self.__verify_or_set_optional_float(
+            config, 'k8s_log_api_min_latency', 0.0, description, apply_defaults, env_aware=True
+        )
+        # If positive, api calls with the same path will be rate-limited to a message every interval seconds
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_ratelimit_interval', 0, description, apply_defaults, env_aware=True
+        )
+
+        # TODO-163 : make other settings more aggressive
+
         # Optional (defaults to 5). The maximum number of temporary errors that may occur when warming a pod\'s entry,
         # before the warmer blacklists it
         self.__verify_or_set_optional_int(
