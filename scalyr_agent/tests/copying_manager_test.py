@@ -482,22 +482,34 @@ class TestableCopyingManager(CopyingManager):
 
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
+    # The different points at which the CopyingManager can be stopped.  See below.
+    SLEEPING = 'sleeping'
+    SENDING = 'sending'
+    RESPONDING = 'responding'
+
     def __init__(self, configuration, monitors):
         CopyingManager.__init__(self, configuration, monitors)
         # Approach:  We will override key methods of CopyingManager, blocking them from returning until the controller
         # tells it to proceed.  This allows us to then do things like write new log lines while the CopyingManager is
-        # blocked.   Coordinating the communication between the two threads is done using two condition variables.
+        # blocked.   Coordinating the communication between the two threads is done using one condition variable.
         # We changed the CopyingManager to block in three places: while it is sleeping before it starts a new loop,
-        # when it invokes ``_send_events`` to send a new request, and when it blocks to receive the response.
-        # These three states or referred to as "sleeping", "blocked_on_send", "blocked_on_receive".
+        # when it invokes `_send_events` to send a new request, and when it blocks to receive the response.
+        # These three states are referred to as 'sleeping', 'sending', 'responding'.
+        #
+        # The CopyingManager will have state to record where it should next block (i.e., if it should block at
+        # 'sleeping' when it attempts to sleep).  The test controller will manipulate this state, notifying changes on
+        # the condition variable. The CopyingManager will block in this state (and indicate it is blocked) until the
+        # test controller sets a new state to block at.
         #
         # This cv protects all of the variables written by the CopyingManager thread.
         self.__test_state_cv = threading.Condition()
-        # Which state the CopyingManager is currently blocked in -- "sleeping", "sending", "responding"
+        # Which state the CopyingManager should block in -- "sleeping", "sending", "responding"
+        # We initialize it to a special value "all" so that it stops as soon the CopyingManager starts up.
         self.__test_stop_state = 'all'
-        # If not none, a state the test must pass through before it tried to stop at `__test_stop_state`.
+        # If not none, a state the test must pass through before it tries to stop at `__test_stop_state`.
+        # If this transition is not observed by the time it does get to the stop state, an assertion is thrown.
         self.__test_required_transition = None
-        # Whether or not the CopyingManager should stop.
+        # Whether or not the CopyingManager is stopped at __test_stop_state.
         self.__test_is_stopped = False
         # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
         self.__captured_request = None
@@ -515,7 +527,7 @@ class TestableCopyingManager(CopyingManager):
         """
         self.__test_state_cv.acquire()
         try:
-            self.__block_if_should_stop_at('sleeping')
+            self.__block_if_should_stop_at(TestableCopyingManager.SLEEPING)
         finally:
             self.__test_state_cv.release()
 
@@ -536,7 +548,7 @@ class TestableCopyingManager(CopyingManager):
         # First, block even returning from this method until the controller advances us.
         self.__test_state_cv.acquire()
         try:
-            self.__block_if_should_stop_at('sending')
+            self.__block_if_should_stop_at(TestableCopyingManager.SENDING)
             self.__captured_request = add_events_task.add_events_request
         finally:
             self.__test_state_cv.release()
@@ -546,7 +558,7 @@ class TestableCopyingManager(CopyingManager):
             # Block on return the response until the state is advanced.
             self.__test_state_cv.acquire()
             try:
-                self.__block_if_should_stop_at('responding')
+                self.__block_if_should_stop_at(TestableCopyingManager.RESPONDING)
 
                 # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
                 # requests will just be processed.
@@ -600,7 +612,7 @@ class TestableCopyingManager(CopyingManager):
                 current_point, self.__test_required_transition))
 
         if self.__test_is_stopped:
-            self.__test_state_cv.notify_all()
+            self.__test_state_cv.notifyAll()
 
         while self.__test_is_stopped:
             print 'Blocking because test stop state is %s vs %s' % (self.__test_stop_state, current_point)
@@ -629,8 +641,6 @@ class TestableCopyingManager(CopyingManager):
         finally:
             self.__test_state_cv.release()
 
-
-
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops the manager's thread.
 
@@ -650,19 +660,6 @@ class TestableCopyingManager(CopyingManager):
 
         CopyingManager.stop_manager(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-    @property
-    def test_state(self):
-        """
-        @return:  Returns the name of the state the CopyingManager thread is currently blocked in, such as
-            "sleeping", "blocked_on_send", "blocked_on_receive".
-        @rtype: str
-        """
-        self.__test_state_cv.acquire()
-        try:
-            return self.__test_state
-        finally:
-            self.__test_state_cv.release()
-
     class TestController(object):
         """Used to control the TestableCopyingManager.
 
@@ -674,7 +671,7 @@ class TestableCopyingManager(CopyingManager):
             # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
             #copying_manager.run_and_stop_at('sleeping')
             copying_manager.start_manager(dict(fake_client=True))
-            copying_manager.run_and_stop_at('sleeping')
+            copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
         def perform_scan(self):
             """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
@@ -682,7 +679,8 @@ class TestableCopyingManager(CopyingManager):
 
             At this point, the CopyingManager should have a request ready to be sent.
             """
-            self.__copying_manager.run_and_stop_at('sending', required_transition_state='sleeping')
+            self.__copying_manager.run_and_stop_at(TestableCopyingManager.SENDING,
+                                                   required_transition_state=TestableCopyingManager.SLEEPING)
 
         def perform_pipeline_scan(self):
             """Tells the CopyingManager thread to advance far enough where it has performed the file system scan
@@ -690,7 +688,8 @@ class TestableCopyingManager(CopyingManager):
 
             This is only valid to call immediately after a ``perform_scan``
             """
-            self.__copying_manager.run_and_stop_at('responding', required_transition_state='sending')
+            self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING,
+                                                   required_transition_state=TestableCopyingManager.SENDING)
 
         def wait_for_rpc(self):
             """Tells the CopyingManager thread to advance to the point where it has emulated sending an RPC.
@@ -699,12 +698,12 @@ class TestableCopyingManager(CopyingManager):
                 when invoked will return the passed in status message as the response to the AddEventsRequest.
             @rtype: (AddEventsRequest, func)
             """
-            self.__copying_manager.run_and_stop_at('responding')
+            self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING)
             request = self.__copying_manager.captured_request()
 
             def send_response(status_message):
                 self.__copying_manager.set_response(status_message)
-                self.__copying_manager.run_and_stop_at('sleeping')
+                self.__copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
             return request, send_response
 
