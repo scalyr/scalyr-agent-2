@@ -602,42 +602,77 @@ class TestableCopyingManager(CopyingManager):
         self.__test_state_cv.release()
 
     def __block_if_should_stop_at(self, current_point):
+        """Invoked by the CopyManager thread to report it has transitioned to the specified state and will block if
+        `run_and_stop_at` has been invoked with `current_point` as the stopping point.
+
+        @param current_point: The point reached by the CopyingManager thread, only valid values are
+            `SLEEPING`, `SENDING`, and `RESPONDING`.
+        @type current_point: str
+        """
+        # If we are passing through the required_transition state, consume it to signal we have accomplished
+        # the transition.
         if current_point == self.__test_required_transition:
             self.__test_required_transition = None
-        self.__test_is_stopped = self.__test_is_stopped == 'all' or current_point == self.__test_stop_state
 
-        print 'Transition through %s' % current_point
-        if self.__test_is_stopped and self.__test_required_transition is not None:
-            raise AssertionError('Stopped at %s state but did not transition through %s' % (
-                current_point, self.__test_required_transition))
-
-        if self.__test_is_stopped:
+        # Block if it has been requested that we block here.  Note, __test_stop_state can only be:
+        # 'all'  -- indicating it should stop at the first state it sees.
+        # None -- indicating the test is shutting down and the CopyingManger thread should just run until it finishes
+        # One of `SLEEPING`, `SENDING`, and `RESPONDING` -- indicating where we should next block the CopyingManager.
+        while self.__test_stop_state == 'all' or current_point == self.__test_stop_state:
+            self.__test_is_stopped = True
+            if self.__test_required_transition is not None:
+                raise AssertionError('Stopped at %s state but did not transition through %s' % (
+                    current_point, self.__test_required_transition))
+            # This notifies any threads waiting in the `run_and_stop_at` method.  They would be blocking waiting for
+            # the CopyingManager thread to stop at this point.
             self.__test_state_cv.notifyAll()
-
-        while self.__test_is_stopped:
-            print 'Blocking because test stop state is %s vs %s' % (self.__test_stop_state, current_point)
+            # We need to wait until some other state is set as the stop state.  The `notifyAll` in `run_and_stop_at_at`
+            # method will wake us up.
             self.__test_state_cv.wait()
-            self.__test_is_stopped = self.__test_is_stopped == 'all' or current_point == self.__test_stop_state
-            self.__test_state_cv.notifyAll()
+
+        self.__test_is_stopped = False
 
     def run_and_stop_at(self, stopping_at, required_transition_state=None):
+        """Invoked by the testing thread to indicate the CopyingManager thread should run and keep running until
+        it enters the specified state.  If `required_transition_state` is specified, then the CopyingManager thread
+        must transition through the specified state before it stops, otherwise an AssertionError will be raised.
+
+        Note, if the CopyingManager thread is already stopping in the `stopping_at` thread, then this call will
+        immediately return.  It does not wait for the next occurrence of that state.
+
+        @param stopping_at: The state to stop at.  Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
+        @param required_transition_state: If not None, requires that the CopyingManager transitions through the
+            specified state before it gets to `stopping_at`.  Otherwise an AssertionError will be thrown.
+              Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
+
+        @type stopping_at: str
+        @type required_transition_state: str or None
+        """
         self.__test_state_cv.acquire()
         try:
+            # Just to avoid mistakes in testing, make sure we successfully consumed any require transitions before
+            # we tell it to stop anywhere else.
             if self.__test_required_transition is not None:
                 raise AssertionError('Setting new stop state %s with pending required transition %s' % (
                     stopping_at, self.__test_required_transition))
+            # If we are already in the required_transition_state, consume it.
             if self.__test_is_stopped and self.__test_stop_state == required_transition_state:
                 self.__test_required_transition = None
             else:
                 self.__test_required_transition = required_transition_state
+
+            if self.__test_is_stopped and self.__test_stop_state == stopping_at:
+                return
+
             self.__test_stop_state = stopping_at
             self.__test_is_stopped = False
-            print 'Setting stop state to %s' % stopping_at
+            # This will wake up threads in `__block_if_should_stop_at` which are waiting for a new stopping point.
             self.__test_state_cv.notifyAll()
 
+            # Wait until we get to this point.
             while not self.__test_is_stopped:
+                # This will be woken up by the notify in `__block_if_should_stop_at` method.
                 self.__test_state_cv.wait()
-                print 'Waiting for test_is_stopped %s' % str(self.__test_is_stopped)
         finally:
             self.__test_state_cv.release()
 
@@ -667,10 +702,9 @@ class TestableCopyingManager(CopyingManager):
         """
         def __init__(self, copying_manager):
             self.__copying_manager = copying_manager
+            copying_manager.start_manager(dict(fake_client=True))
             # To do a proper initialization where the copying manager has scanned the current log file and is ready
             # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
-            #copying_manager.run_and_stop_at('sleeping')
-            copying_manager.start_manager(dict(fake_client=True))
             copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
         def perform_scan(self):
@@ -679,6 +713,7 @@ class TestableCopyingManager(CopyingManager):
 
             At this point, the CopyingManager should have a request ready to be sent.
             """
+            # We guarantee it has scanned by making sure it has gone from sleeping to sending.
             self.__copying_manager.run_and_stop_at(TestableCopyingManager.SENDING,
                                                    required_transition_state=TestableCopyingManager.SLEEPING)
 
@@ -688,6 +723,7 @@ class TestableCopyingManager(CopyingManager):
 
             This is only valid to call immediately after a ``perform_scan``
             """
+            # We guarantee it has done the pipeline scan by making sure it has gone through responding to sending.
             self.__copying_manager.run_and_stop_at(TestableCopyingManager.RESPONDING,
                                                    required_transition_state=TestableCopyingManager.SENDING)
 
