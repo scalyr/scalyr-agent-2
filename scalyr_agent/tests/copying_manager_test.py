@@ -270,7 +270,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
     def test_drop_request_due_to_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
-        # It is hanging here.. waiting for the rpc
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
