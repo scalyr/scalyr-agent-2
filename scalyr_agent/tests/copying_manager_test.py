@@ -211,12 +211,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
     def setUp(self):
         self._controller = None
-        print 'Starting e2e test'
 
     def tearDown(self):
         if self._controller is not None:
             self._controller.stop()
-        print 'Done in e2e test'
 
     def test_single_log_file(self):
         controller = self.__create_test_instance()
@@ -272,6 +270,7 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
     def test_drop_request_due_to_error(self):
         controller = self.__create_test_instance()
         self.__append_log_lines('First line', 'Second line')
+        # It is hanging here.. waiting for the rpc
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
@@ -494,22 +493,16 @@ class TestableCopyingManager(CopyingManager):
         #
         # This cv protects all of the variables written by the CopyingManager thread.
         self.__test_state_cv = threading.Condition()
-        # Which state the CopyingManager is currently blocked in -- "sleeping", "blocked_on_send", "blocked_on_receive"
-        self.__test_state = None
-        # The number of times the CopyingManager has blocked.
-        self.__test_state_changes = 0
+        # Which state the CopyingManager is currently blocked in -- "sleeping", "sending", "responding"
+        self.__test_stop_state = 'all'
+        # If not none, a state the test must pass through before it tried to stop at `__test_stop_state`.
+        self.__test_required_transition = None
         # Whether or not the CopyingManager should stop.
-        self.__test_stopping = False
+        self.__test_is_stopped = False
         # Written by CopyingManager.  The last AddEventsRequest request passed into ``_send_events``.
         self.__captured_request = None
         # Protected by __test_state_cv.  The status message to return for the next call to ``_send_events``.
         self.__pending_response = None
-
-        # This cv protects __advance_requests and is used mainly by the testing thread.
-        self.__advance_requests_cv = threading.Condition()
-        # This is incremented everytime the controller wants the CopyingManager to advance to the next blocking state,
-        # regardless of which state it is in.
-        self.__advance_requests = 0
 
         self.__controller = TestableCopyingManager.TestController(self)
 
@@ -521,8 +514,10 @@ class TestableCopyingManager(CopyingManager):
         """Blocks the CopyingManager thread until the controller tells it to proceed.
         """
         self.__test_state_cv.acquire()
-        self.__wait_until_advance_received('sleeping')
-        self.__test_state_cv.release()
+        try:
+            self.__block_if_should_stop_at('sleeping')
+        finally:
+            self.__test_state_cv.release()
 
     def _create_add_events_request(self, session_info=None, max_size=None):
         # Need to override this to return an AddEventsRequest even though we don't have a real scalyr client instance.
@@ -540,21 +535,25 @@ class TestableCopyingManager(CopyingManager):
         """
         # First, block even returning from this method until the controller advances us.
         self.__test_state_cv.acquire()
-        self.__wait_until_advance_received('blocked_on_send')
-        self.__captured_request = add_events_task.add_events_request
-        self.__test_state_cv.release()
+        try:
+            self.__block_if_should_stop_at('sending')
+            self.__captured_request = add_events_task.add_events_request
+        finally:
+            self.__test_state_cv.release()
 
         # Create a method that we can return that will (when invoked) return the response
         def emit_response():
             # Block on return the response until the state is advanced.
             self.__test_state_cv.acquire()
-            self.__wait_until_advance_received('blocked_on_receive')
+            try:
+                self.__block_if_should_stop_at('responding')
 
-            # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
-            # requests will just be processed.
-            result = self.__pending_response
-            self.__pending_response = None
-            self.__test_state_cv.release()
+                # Use the pending response if there is one.  Otherwise, we just say "success" which means all add event
+                # requests will just be processed.
+                result = self.__pending_response
+                self.__pending_response = None
+            finally:
+                self.__test_state_cv.release()
 
             if result is not None:
                 return result, 0, 'fake'
@@ -562,37 +561,6 @@ class TestableCopyingManager(CopyingManager):
                 return 'success', 0, 'fake'
 
         return emit_response
-
-    def __wait_until_advance_received(self, new_state):
-        """Helper method for blocking the thread until the controller thread has indicated this one should advance
-        to its next state.
-
-        You must be holding the self.__test_state_cv lock to invoke this method.
-
-        @param new_state: The name of the blocking state the CopyingManager is in until it is advanced.
-        @type new_state: str
-        """
-        if self.__test_stopping:
-            return
-        # We are about to block, so be sure to increment the count.  We make use of this to detect when state changes
-        # are made.  This is broadcasted to the controller thread.
-        self.__test_state_changes += 1
-        self.__test_state = new_state
-        self.__test_state_cv.notifyAll()
-        self.__test_state_cv.release()
-
-        # Now we have to wait until we see another advance request.  To do that, we just note when the number of
-        # advances has increased.  Of course, we need to get the __advance_requests_cv lock to look at that var.
-        self.__advance_requests_cv.acquire()
-        original_advance_requests = self.__advance_requests
-
-        while self.__advance_requests == original_advance_requests:
-            self.__advance_requests_cv.wait()
-        self.__advance_requests_cv.release()
-
-        # Get the lock again so that we have it when the method returns.
-        self.__test_state_cv.acquire()
-        self.__test_state = 'running'
 
     def captured_request(self):
         """Returns the last request that was passed into ``_send_events`` by the CopyingManager, or None if there
@@ -621,29 +589,47 @@ class TestableCopyingManager(CopyingManager):
         self.__pending_response = status_message
         self.__test_state_cv.release()
 
-    def advance_until(self, final_state):
-        """Instructs the CopyingManager thread to keep advancing through its blocking states until it reaches the
-        named one.
+    def __block_if_should_stop_at(self, current_point):
+        if current_point == self.__test_required_transition:
+            self.__test_required_transition = None
+        self.__test_is_stopped = self.__test_is_stopped == 'all' or current_point == self.__test_stop_state
 
-        @param final_state:  The name of the state to wait for (such as "sleeping", "blocked_on_receive", etc.
-        @type final_state: str
-        """
+        print 'Transition through %s' % current_point
+        if self.__test_is_stopped and self.__test_required_transition is not None:
+            raise AssertionError('Stopped at %s state but did not transition through %s' % (
+                current_point, self.__test_required_transition))
+
+        if self.__test_is_stopped:
+            self.__test_state_cv.notify_all()
+
+        while self.__test_is_stopped:
+            print 'Blocking because test stop state is %s vs %s' % (self.__test_stop_state, current_point)
+            self.__test_state_cv.wait()
+            self.__test_is_stopped = self.__test_is_stopped == 'all' or current_point == self.__test_stop_state
+            self.__test_state_cv.notify_all()
+
+    def run_and_stop_at(self, stopping_at, required_transition_state=None):
         self.__test_state_cv.acquire()
-        original_count = self.__test_state_changes
+        try:
+            if self.__test_required_transition is not None:
+                raise AssertionError('Setting new stop state %s with pending required transition %s' % (
+                    stopping_at, self.__test_required_transition))
+            if self.__test_is_stopped and self.__test_stop_state == required_transition_state:
+                self.__test_required_transition = None
+            else:
+                self.__test_required_transition = required_transition_state
+            self.__test_stop_state = stopping_at
+            self.__test_is_stopped = False
+            print 'Setting stop state to %s' % stopping_at
+            self.__test_state_cv.notify_all()
 
-        #deadline = time.time() + 5.0
-        # We have to keep incrementing the __advanced_requests count so that the copying manager thread keeps
-        # advancing.  We wait on the test_state_cv because everytime the CopyingManager blocks, it notifies that cv.
-        while self.__test_state_changes <= original_count or self.__test_state != final_state:
-            self.__advance_requests_cv.acquire()
-            self.__advance_requests += 1
-            self.__advance_requests_cv.notifyAll()
-            self.__advance_requests_cv.release()
-            self.__test_state_cv.wait(timeout=5.1)
-            #if time.time() > deadline:
-            #    raise AssertionError("Did not get to final state %s in time" % final_state)
+            while not self.__test_is_stopped:
+                self.__test_state_cv.wait()
+                print 'Waiting for test_is_stopped %s' % str(self.__test_is_stopped)
+        finally:
+            self.__test_state_cv.release()
 
-        self.__test_state_cv.release()
+
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops the manager's thread.
@@ -656,15 +642,11 @@ class TestableCopyingManager(CopyingManager):
         @rtype:
         """
         # We need to do some extra work here in case the CopyingManager thread is currently in a blocked state.
-        # We need to tell it to advance.
+        # We need to tell it to keep running.
         self.__test_state_cv.acquire()
-        self.__test_stopping = True
+        self.__test_stop_state = None
+        self.__test_state_cv.notify_all()
         self.__test_state_cv.release()
-
-        self.__advance_requests_cv.acquire()
-        self.__advance_requests += 1
-        self.__advance_requests_cv.notifyAll()
-        self.__advance_requests_cv.release()
 
         CopyingManager.stop_manager(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
 
@@ -688,11 +670,11 @@ class TestableCopyingManager(CopyingManager):
         """
         def __init__(self, copying_manager):
             self.__copying_manager = copying_manager
-            copying_manager.start_manager(dict(fake_client=True))
-
             # To do a proper initialization where the copying manager has scanned the current log file and is ready
             # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
-            self.__copying_manager.advance_until('sleeping')
+            #copying_manager.run_and_stop_at('sleeping')
+            copying_manager.start_manager(dict(fake_client=True))
+            copying_manager.run_and_stop_at('sleeping')
 
         def perform_scan(self):
             """Tells the CopyingManager thread to go through the process loop until far enough where it has performed
@@ -700,8 +682,7 @@ class TestableCopyingManager(CopyingManager):
 
             At this point, the CopyingManager should have a request ready to be sent.
             """
-            self.__copying_manager.captured_request()
-            self.__copying_manager.advance_until('blocked_on_send')
+            self.__copying_manager.run_and_stop_at('sending', required_transition_state='sleeping')
 
         def perform_pipeline_scan(self):
             """Tells the CopyingManager thread to advance far enough where it has performed the file system scan
@@ -709,7 +690,7 @@ class TestableCopyingManager(CopyingManager):
 
             This is only valid to call immediately after a ``perform_scan``
             """
-            self.__copying_manager.advance_until('blocked_on_receive')
+            self.__copying_manager.run_and_stop_at('responding', required_transition_state='sending')
 
         def wait_for_rpc(self):
             """Tells the CopyingManager thread to advance to the point where it has emulated sending an RPC.
@@ -718,13 +699,12 @@ class TestableCopyingManager(CopyingManager):
                 when invoked will return the passed in status message as the response to the AddEventsRequest.
             @rtype: (AddEventsRequest, func)
             """
-            if self.__copying_manager.test_state != 'blocked_on_receive':
-                self.__copying_manager.advance_until('blocked_on_receive')
+            self.__copying_manager.run_and_stop_at('responding')
             request = self.__copying_manager.captured_request()
 
             def send_response(status_message):
                 self.__copying_manager.set_response(status_message)
-                self.__copying_manager.advance_until('sleeping')
+                self.__copying_manager.run_and_stop_at('sleeping')
 
             return request, send_response
 
