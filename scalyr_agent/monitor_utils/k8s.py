@@ -92,21 +92,12 @@ def cache(global_config):
         @param config: The configuration
         @type config: A Scalyr Configuration object
     """
-
-    # split comma delimited string of namespaces to ignore in to a list
-    # of strings
-    namespaces_to_ignore = []
-    for x in global_config.k8s_ignore_namespaces.split():
-        namespaces_to_ignore.append(x.strip())
-
     cache_config = _CacheConfig( api_url=global_config.k8s_api_url,
                                  verify_api_queries=global_config.k8s_verify_api_queries,
                                  cache_expiry_secs=global_config.k8s_cache_expiry_secs,
                                  cache_expiry_fuzz_secs=global_config.k8s_cache_expiry_fuzz_secs,
                                  cache_start_fuzz_secs=global_config.k8s_cache_start_fuzz_secs,
                                  cache_purge_secs=global_config.k8s_cache_purge_secs,
-                                 namespaces_to_ignore=namespaces_to_ignore,
-                                 batch_pod_updates=global_config.k8s_cache_batch_pod_updates,
                                  query_timeout=global_config.k8s_cache_query_timeout_secs,
                                  log_api_responses_to_disk=global_config.k8s_log_api_responses_to_disk,
                                  agent_log_path=global_config.agent_log_path)
@@ -313,12 +304,11 @@ class _K8sCache( object ):
         from querying the cache are never written to.
     """
 
-    def __init__( self, processor, object_type, perform_full_updates=True ):
+    def __init__( self, processor, object_type ):
         """
             Initialises a Kubernetes Cache
             @param processor: a _K8sProcessor object for querying/processing the k8s api
             @param object_type: a string containing a textual name of the objects being cached, for use in log messages
-            @param perform_full_updates: If False no attempts will be made to fully update the cache (only single items will be cached)
         """
         # protects self._objects and self._objects_expired
         self._lock = threading.Lock()
@@ -339,7 +329,6 @@ class _K8sCache( object ):
 
         self._processor = processor
         self._object_type = object_type
-        self._perform_full_updates=perform_full_updates
 
     def shallow_copy(self):
         """Returns a shallow copy of all the cached objects dict"""
@@ -392,35 +381,6 @@ class _K8sCache( object ):
                 global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Removing object %s/%s from cache" % (namespace, obj_name))
                 self._objects[namespace].pop(obj_name, None)
                 self._objects_expired.get(namespace, {}).pop(obj_name, None)
-        finally:
-            self._lock.release()
-
-
-    def update( self, k8s, filter, kind ):
-        """ do a full update of all information from the API
-        """
-        if not self._perform_full_updates:
-            return
-
-        objects = {}
-        try:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_1, 'Attempting to update k8s %s data from API' % kind )
-            query_result = k8s.query_objects( kind, filter=filter)
-            objects = self._process_objects( k8s, kind, query_result )
-        except K8sApiException, e:
-            global_log.warn( "Error accessing the k8s API: %s" % (str( e ) ),
-                             limit_once_per_x_secs=300, limit_key='k8s_cache_update' )
-            # early return because we don't want to update our cache with bad data
-            return
-        except Exception, e:
-            global_log.warning( "Exception occurred when updating k8s %s cache.  Cache was not updated %s\n%s" % (kind, str( e ), traceback.format_exc()) )
-            # early return because we don't want to update our cache with bad data
-            return
-
-        self._lock.acquire()
-        try:
-            self._objects = objects
-            self._objects_expired = {}  # clear all expiration times
         finally:
             self._lock.release()
 
@@ -751,9 +711,8 @@ class _CacheConfig( object ):
     """
 
     def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
-                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, namespaces_to_ignore=None,
-                  batch_pod_updates=True, query_timeout=20,
-                  log_api_responses_to_disk=False, agent_log_path=None):
+                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0,
+                  query_timeout=20, log_api_responses_to_disk=False, agent_log_path=None):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -761,8 +720,6 @@ class _CacheConfig( object ):
         @param cache_expiry_fuzz_secs: if greater than zero, the number of seconds to fuzz the expiration time to avoid query stampede
         @param cache_start_fuzz_secs: if greater than zero, the number of seconds to fuzz the start time to avoid query stampede
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
-        @param namespaces_to_ignore: a list of namespaces to ignore
-        @param batch_pod_updates: whether or not to perform batch queries to the k8s api server for pod updates - used for stress testing
         @param query_timeout: The number of seconds to wait before a query to the API server times out
         @param log_api_responses_to_disk: whether to log k8s api calls to disk (for debugging)
         @param agent_log_path: directory where agent.log is locatedd
@@ -773,8 +730,6 @@ class _CacheConfig( object ):
         @type cache_expiry_fuzz_secs: int or float
         @type cache_start_fuzz_secs: int or float
         @type cache_purge_secs: int or float
-        @type namespaces_to_ignore: list[str]
-        @type batch_pod_updates: bool
         @type query_timeout: int
         @type log_api_responses_to_disk: bool
         @type agent_log_path: str
@@ -788,8 +743,6 @@ class _CacheConfig( object ):
         self.cache_expiry_fuzz_secs = cache_expiry_fuzz_secs
         self.cache_start_fuzz_secs = cache_start_fuzz_secs
         self.cache_purge_secs = cache_purge_secs
-        self.namespaces_to_ignore = namespaces_to_ignore
-        self.batch_pod_updates = batch_pod_updates
         self.query_timeout = query_timeout
         self.log_api_responses_to_disk = log_api_responses_to_disk
         self.agent_log_path = agent_log_path
@@ -831,16 +784,6 @@ class _CacheConfig( object ):
                 return True
         return False
 
-    def need_new_filters( self, new_config ):
-        """
-        Determines if new node and namespace filters need to be created based on the new config
-        @param new_config: The new config options
-        @type new_config: _CacheConfig
-        @return: True if new filters need to be created based on the differences between the current and the new config.
-                 False otherwise
-        """
-        return self.namespaces_to_ignore != new_config.namespaces_to_ignore
-
 class _CacheConfigState( object ):
     """
     Class holding cache config related state
@@ -859,19 +802,16 @@ class _CacheConfigState( object ):
             @type state: _CacheConfigState
             """
             self.k8s = state.k8s
-            self.node_filter = state.node_filter
             self.cache_expiry_secs = state.cache_config.cache_expiry_secs
             self.cache_purge_secs = state.cache_config.cache_purge_secs
             self.cache_expiry_fuzz_secs = state.cache_config.cache_expiry_fuzz_secs
             self.cache_start_fuzz_secs = state.cache_config.cache_start_fuzz_secs
-            self.batch_pod_updates = state.cache_config.batch_pod_updates
 
     def __init__( self, cache_config ):
         """Set default values"""
         self._lock = threading.Lock()
         self.k8s = None
-        self.node_filter = None
-        self.cache_config = _CacheConfig(api_url='', namespaces_to_ignore=[])
+        self.cache_config = _CacheConfig(api_url='')
         self._pending_config = None
         self.configure( cache_config )
 
@@ -887,50 +827,6 @@ class _CacheConfigState( object ):
         finally:
             self._lock.release()
 
-    def _build_namespace_filter( self, namespaces_to_ignore ):
-        """Builds a field selector to ignore the namespaces in `namespaces_to_ignore`"""
-        result = ''
-        if namespaces_to_ignore:
-
-            for n in namespaces_to_ignore:
-                result += 'metadata.namespace!=%s,' % n
-
-            result = result[:-1]
-
-        return result
-
-    def _build_node_filter( self, k8s, namespaces_to_ignore ):
-        """Builds a fieldSelector filter to be used when querying pods the k8s api, limiting them to the current node,
-           and also ignoring any excluded namespaces
-           @param k8s: a KubernetesApi object for querying the api
-           @param namespaces: a list of namespaces to ignore
-           @type k8s: KubernetesApi
-           @type namespaces_to_ignore: list[str]
-        """
-        namespace_filter = self._build_namespace_filter( namespaces_to_ignore )
-        result = None
-        pod_name = '<unknown>'
-
-        try:
-            pod_name = k8s.get_pod_name()
-            node_name = k8s.get_node_name( pod_name )
-
-            if node_name:
-                result = 'spec.nodeName=%s' % node_name
-            else:
-                global_log.warning( "Unable to get node name for pod '%s'.  This will have negative performance implications for clusters with a large number of pods.  Please consider setting the environment variable SCALYR_K8S_NODE_NAME to valueFrom:fieldRef:fieldPath:spec.nodeName in your yaml file" )
-        except K8sApiException, e:
-            global_log.warn( "Failed to build k8s filter -- %s" % (str( e ) ) )
-        except Exception, e:
-            global_log.warn( "Failed to build k8s filter - %s\n%s" % (str(e), traceback.format_exc() ))
-
-        if result is not None and namespace_filter:
-            result += ",%s" % namespace_filter
-
-        global_log.log( scalyr_logging.DEBUG_LEVEL_1, "k8s node filter for pod '%s' is '%s'" % (pod_name, result) )
-
-        return result
-
     def configure(self, new_cache_config):
         """
         Configures the state based on any changes in the configuration
@@ -940,7 +836,6 @@ class _CacheConfigState( object ):
         # get old state values
         old_state = self.copy_state()
         need_new_k8s = False
-        need_new_filters = False
         self._lock.acquire()
         try:
             if self.cache_config == new_cache_config:
@@ -948,7 +843,6 @@ class _CacheConfigState( object ):
 
             self._pending_config = new_cache_config
             need_new_k8s = (old_state.k8s is None or self.cache_config.need_new_k8s_object(new_cache_config))
-            need_new_filters = self.cache_config.need_new_filters(new_cache_config)
         finally:
             self._lock.release()
 
@@ -966,11 +860,6 @@ class _CacheConfigState( object ):
 
             k8s = KubernetesApi( **args )
 
-        # create new filters if we need them
-        node_filter = old_state.node_filter
-        if need_new_filters:
-            node_filter = self._build_node_filter(k8s, new_cache_config.namespaces_to_ignore)
-
         # update with new values
         self._lock.acquire()
         try:
@@ -982,7 +871,6 @@ class _CacheConfigState( object ):
             if new_cache_config is self._pending_config:
                 self.k8s = k8s
                 self.k8s.query_timeout = new_cache_config.query_timeout
-                self.node_filter = node_filter
                 self.cache_config = new_cache_config
                 self._pending_config = None
 
@@ -994,7 +882,7 @@ class _CacheConfigState( object ):
 
 class KubernetesCache( object ):
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, namespaces_to_ignore=None, start_caching=True, batch_pod_updates=True ):
+    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, start_caching=True ):
 
         self._lock = threading.Lock()
 
@@ -1005,8 +893,6 @@ class KubernetesCache( object ):
             cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
             cache_start_fuzz_secs=cache_start_fuzz_secs,
             cache_purge_secs=cache_purge_secs,
-            namespaces_to_ignore=namespaces_to_ignore,
-            batch_pod_updates=batch_pod_updates,
             log_api_responses_to_disk=False,
             agent_log_path=None
         )
@@ -1016,8 +902,7 @@ class KubernetesCache( object ):
 
         # create the controller cache
         self._controller_processor = ControllerProcessor()
-        self._controllers = _K8sCache( self._controller_processor, '<controller>',
-                               perform_full_updates=False )
+        self._controllers = _K8sCache( self._controller_processor, '<controller>' )
 
         # create the pod cache
         self._pod_processor = PodProcessor( self._controllers )
