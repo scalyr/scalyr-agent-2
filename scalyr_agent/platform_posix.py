@@ -273,7 +273,10 @@ class PosixPlatformController(PlatformController):
             os.chdir("/")
             # noinspection PyArgumentList
             os.setsid()
-            os.umask(0)
+            # set umask to be consistent with common settings on linux systems.  This makes the standalone agent
+            # created-file permissions consistent with that of docker/k8s agents (no write permissions for group and
+            # others)
+            os.umask(0022)
 
             # do second fork
             pid = os.fork()
