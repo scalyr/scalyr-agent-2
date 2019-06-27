@@ -44,7 +44,7 @@ class Test_K8sCache( ScalyrTestCase ):
         self.k8s = FakeK8s()
         self.clock = FakeClock()
         self.processor = FakeProcessor()
-        self.cache = _K8sCache( self.processor, 'foo', perform_full_updates=False )
+        self.cache = _K8sCache( self.processor, 'foo' )
 
     def tearDown(self):
         self.k8s.stop()
@@ -52,7 +52,7 @@ class Test_K8sCache( ScalyrTestCase ):
     def test_purge_expired( self ):
 
         processor = Mock()
-        cache = _K8sCache( processor, 'foo', perform_full_updates=False )
+        cache = _K8sCache( processor, 'foo' )
 
         current_time = time.time()
         obj1 = self.DummyObject( current_time - 10 )
@@ -565,7 +565,7 @@ class FakeCache(object):
     def __init__(self):
 
         self.__processor = FakeProcessor()
-        self.__pod_cache = _K8sCache( self.__processor, 'Pod', perform_full_updates=False )
+        self.__pod_cache = _K8sCache( self.__processor, 'Pod' )
         self.wait_timeout = 5
         self.k8s = FakeK8s( wait_timeout=self.wait_timeout )
         self.__clock = FakeClock()

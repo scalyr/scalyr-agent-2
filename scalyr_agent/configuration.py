@@ -280,20 +280,12 @@ class Configuration(object):
         return self.__get_config().get_bool('k8s_verify_api_queries')
 
     @property
-    def k8s_cache_batch_pod_updates(self):
-        return self.__get_config().get_bool('k8s_cache_batch_pod_updates')
-
-    @property
     def k8s_cache_query_timeout_secs(self):
         return self.__get_config().get_int('k8s_cache_query_timeout_secs')
 
     @property
     def k8s_cache_expiry_secs(self):
         return self.__get_config().get_int('k8s_cache_expiry_secs')
-
-    @property
-    def k8s_cache_disable_node_filter(self):
-        return self.__get_config().get_bool('k8s_cache_disable_node_filter')
 
     @property
     def k8s_cache_expiry_secs(self):
@@ -1114,8 +1106,6 @@ class Configuration(object):
         self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', Configuration.DEFAULT_K8S_IGNORE_NAMESPACES, description, apply_defaults, separators=[None, ','], env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
-        self.__verify_or_set_optional_bool(config, 'k8s_cache_batch_pod_updates', True, description, apply_defaults, env_aware=True)
-        self.__verify_or_set_optional_bool(config, 'k8s_cache_disable_node_filter', False, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_query_timeout_secs', 20, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
