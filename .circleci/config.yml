@@ -50,7 +50,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.5 scalyr/scalyr-agent-ci-unittest:1 /tmp/unittest.sh
+          command: for i in {1..20}; do docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.5 scalyr/scalyr-agent-ci-unittest:1 /tmp/unittest.sh; done
 
   unittest-24:
     docker:

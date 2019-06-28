@@ -19,6 +19,8 @@
 __author__ = 'czerwin@scalyr.com'
 
 import sys
+import threading
+import time
 import unittest
 
 
@@ -68,6 +70,38 @@ skipIf = _noop_skip_if
 if hasattr(unittest, 'skipIf'):
     skipIf = unittest.skipIf
 
+# Global state as to whether or not we've started the thread watcher.  We only want one instance of this
+# started per entire test suite run.
+__thread_watcher_started = False
+
+def _thread_watcher():
+    """Used to detect what threads are still alive after the tests should be finished running.  In particular, this
+    helps detect cases where the tests have run successfully but some thread spawned by a test case did not
+    properly stop.  Since it is not a daemon thread, it will block the exit of the entire process.
+
+    """
+    # Sleep for 60 seconds since our test suites typically run in less than 15 seconds.
+    time.sleep(60.0)
+
+    # If we are still alive after 60 seconds, it means some test is hung or didn't join
+    # its threads properly.  Let's get some information on them.
+    print 'Detected hung test run.  Active threads are:'
+    for t in threading.enumerate():
+        print 'Active thread %s daemon=%s' % (t.getName(), str(t.isDaemon()))
+    print 'Done'
+
+
+def _start_thread_watcher_if_necessary():
+    """Starts the thread watcher if it hasn't already been started.
+    """
+    global __thread_watcher_started
+
+    if not __thread_watcher_started:
+        thread = threading.Thread(target=_thread_watcher)
+        thread.setDaemon(True)
+        thread.start()
+        __thread_watcher_started = True
+
 
 if sys.version_info[:2] < (2, 7):
     class ScalyrTestCase(unittest.TestCase):
@@ -109,6 +143,9 @@ if sys.version_info[:2] < (2, 7):
             else:
                 self.assertTrue(a < b, '%s is greater than %s' % (str(a), str(b)))
 
+        def run(self, result=None):
+            _start_thread_watcher_if_necessary()
+            return unittest.TestCase.run(self, result=result)
 
 else:
     class ScalyrTestCase(unittest.TestCase):
@@ -131,3 +168,7 @@ else:
 
         def assertLess(self, a, b, msg=None):
             unittest.TestCase.assertLess(self, a, b, msg=msg)
+
+        def run(self, result=None):
+            _start_thread_watcher_if_necessary()
+            return unittest.TestCase.run(self, result=result)
