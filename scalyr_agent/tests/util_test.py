@@ -231,7 +231,28 @@ class TestStoppableThread(ScalyrTestCase):
         self._run_counter = 0
 
     def test_basic_use(self):
+        # Since the ScalyrTestCase sets the name prefix, we need to set it back to None to get an unmolested name.
+        StoppableThread.set_name_prefix(None)
         test_thread = StoppableThread('Testing', self._run_method)
+        self.assertEqual(test_thread.getName(), 'Testing')
+        test_thread.start()
+        test_thread.stop()
+
+        self.assertTrue(self._run_counter > 0)
+
+    def test_name_prefix(self):
+        StoppableThread.set_name_prefix('test_name_prefix: ')
+        test_thread = StoppableThread('Testing', self._run_method)
+        self.assertEqual(test_thread.getName(), 'test_name_prefix: Testing')
+        test_thread.start()
+        test_thread.stop()
+
+        self.assertTrue(self._run_counter > 0)
+
+    def test_name_prefix_with_none(self):
+        StoppableThread.set_name_prefix('test_name_prefix: ')
+        test_thread = StoppableThread(target=self._run_method)
+        self.assertEqual(test_thread.getName(), 'test_name_prefix: ')
         test_thread.start()
         test_thread.stop()
 
