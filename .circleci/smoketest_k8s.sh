@@ -30,11 +30,11 @@
 smoketest_image=$1
 
 # Max seconds before the test hard fails
-max_wait=$3
+max_wait=$2
 
 
 # Smoketest code (built into smoketest image)
-smoketest_script="/usr/bin/python3 /tmp/smoketest.py"
+smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
 
 # Create service account
 kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
@@ -82,12 +82,13 @@ echo "Agent pod == ${agent_hostname}"
 # Launch Uploader container (only writes to stdout, but needs to query Scalyr to verify agent liveness)
 # You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
 # query to work (uploader container waits for agent to be alive before uploading data)
-kubectl run ${contname_uploader} --image=${smoketest_image} -- ${smoketest_script} \
+kubectl run ${contname_uploader} --image=${smoketest_image} -- \
+bash -c "${smoketest_script} \
 ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
---agent_hostname ${agent_hostname}
+--agent_hostname ${agent_hostname}"
 # Capture uploader pod
 uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
@@ -95,10 +96,12 @@ echo "Uploader pod == ${uploader_hostname}"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
-kubectl run ${contname_verifier} --image=${smoketest_image} -- ${smoketest_script} \
+kubectl run -it ${contname_verifier} --image=${smoketest_image} -- \
+bash -c "${smoketest_script} \
 ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
 --agent_hostname ${agent_hostname} \
---uploader_hostname ${uploader_hostname}
+--uploader_hostname ${uploader_hostname} \
+--debug true"
