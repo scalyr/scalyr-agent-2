@@ -1152,15 +1152,15 @@ class Configuration(object):
 
         # TODO-163 : make other settings more aggressive
 
-        # Optional (defaults to 5). The maximum number of temporary errors that may occur when warming a pod\'s entry,
-        # before the warmer blacklists it
-        self.__verify_or_set_optional_int(
-            config, 'k8s_controlled_warmer_max_attempts', 5, description, apply_defaults, env_aware=True
-        )
-        # Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod if it fails due to
-        # a temporary error.
+        # Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod before giving up and
+        # classifying it as a Temporary Error
         self.__verify_or_set_optional_int(
             config, 'k8s_controlled_warmer_max_query_retries', 3, description, apply_defaults, env_aware=True
+        )
+        # Optional (defaults to 5). The maximum number of Temporary Errors that may occur when warming a pod's entry,
+        # before the warmer blacklists it.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_max_attempts', 5, description, apply_defaults, env_aware=True
         )
         # Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is
         # tried again for warming.
@@ -1175,13 +1175,13 @@ class Configuration(object):
             config, 'k8s_ratelimit_cluster_num_agents', 1, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
-            config, 'k8s_ratelimit_cluster_rps_init', 40.0, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_cluster_rps_init', 1000.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
             config, 'k8s_ratelimit_cluster_rps_min', 1.0, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_float(
-            config, 'k8s_ratelimit_cluster_rps_max', 20000.0, description, apply_defaults, env_aware=True
+            config, 'k8s_ratelimit_cluster_rps_max', 1E9, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_int(
             config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
