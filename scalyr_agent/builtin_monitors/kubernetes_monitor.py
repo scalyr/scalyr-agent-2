@@ -111,10 +111,9 @@ define_config_option( __monitor__, 'report_container_metrics',
                       'to Scalyr.  Note, metrics are only collected from those containers whose logs are being collected',
                       convert_to=bool, default=True, env_aware=True)
 
-# TODO-163: Change this back to True
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
-                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True, env_aware=True)
+                      'collected from the k8s and reported to Scalyr.', convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
