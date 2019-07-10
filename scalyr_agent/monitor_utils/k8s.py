@@ -100,22 +100,7 @@ def cache(global_config):
                                 cache_start_fuzz_secs=global_config.k8s_cache_start_fuzz_secs,
                                 cache_purge_secs=global_config.k8s_cache_purge_secs,
                                 query_timeout=global_config.k8s_cache_query_timeout_secs,
-                                log_api_responses=global_config.k8s_log_api_responses,
-                                log_api_exclude_200s=global_config.k8s_log_api_exclude_200s,
-                                log_api_min_response_len=global_config.k8s_log_api_min_response_len,
-                                log_api_min_latency=global_config.k8s_log_api_min_latency,
-                                log_api_ratelimit_interval=global_config.k8s_log_api_ratelimit_interval,
-                                agent_log_path=global_config.agent_log_path,
-                                rate_limiter_max_query_retries=global_config.k8s_controlled_warmer_max_query_retries,
-                                rate_limiter_num_agents=global_config.k8s_ratelimit_cluster_num_agents,
-                                rate_limiter_initial_cluster_rate=global_config.k8s_ratelimit_cluster_rps_init,
-                                rate_limiter_max_cluster_rate=global_config.k8s_ratelimit_cluster_rps_max,
-                                rate_limiter_min_cluster_rate=global_config.k8s_ratelimit_cluster_rps_min,
-                                rate_limiter_consecutive_success_threshold=global_config.k8s_ratelimit_consecutive_increase_threshold,
-                                rate_limiter_strategy=global_config.k8s_ratelimit_strategy,
-                                rate_limiter_increase_factor=global_config.k8s_ratelimit_increase_factor,
-                                rate_limiter_backoff_factor=global_config.k8s_ratelimit_backoff_factor,
-                                rate_limiter_max_concurrency=global_config.k8s_ratelimit_max_concurrency)
+                                global_config=global_config)
 
     # update the config and return current cache
     _k8s_cache.update_config( cache_config )
@@ -400,13 +385,13 @@ class _K8sCache( object ):
             self._lock.release()
 
 
-    def _update_object( self, k8s, kind, namespace, name, current_time, query_options=None ):
+    def _update_object(self, k8s, kind, namespace, name, current_time, query_options=None):
         """ update a single object, returns the object if found, otherwise return None """
         result = None
         try:
             # query k8s api and process objects
-            obj = k8s.query_object( kind, namespace, name, query_options=query_options )
-            result = self._processor.process_object( k8s, obj, query_options=query_options )
+            obj = k8s.query_object(kind, namespace, name, query_options=query_options)
+            result = self._processor.process_object(k8s, obj, query_options=query_options)
         except K8sApiException, e:
             # An exception occurred while querying the cache.
             # Check the options to see whether we should continue (and return None) or
@@ -438,7 +423,7 @@ class _K8sCache( object ):
                 self._lock.release()
 
 
-    def _lookup_object(self, namespace, name, current_time, allow_expired=True):
+    def _lookup_object(self, namespace, name, current_time, allow_expired=True, query_options=None):
         """ Look to see if the object specified by the namespace and name exists within the cached data.
 
         Note: current_time should be provided (otherwise, access_time-based revalidation of cache won't work correctly,
@@ -508,7 +493,7 @@ class _K8sCache( object ):
             kind = self._object_type
 
         # see if the object exists in the cache and return it if so
-        result = self._lookup_object(namespace, name, current_time, allow_expired=allow_expired)
+        result = self._lookup_object(namespace, name, current_time, allow_expired=allow_expired, query_options=None)
         if result:
             global_log.log( scalyr_logging.DEBUG_LEVEL_2, "cache hit for %s %s/%s" % (kind, namespace, name) )
             return result
@@ -694,22 +679,7 @@ class _CacheConfig( object ):
     def __init__(self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0,
                  query_timeout=20,
-                 log_api_responses=False,
-                 log_api_exclude_200s=False,
-                 log_api_min_response_len=0,
-                 log_api_min_latency=0.0,
-                 log_api_ratelimit_interval=300,
-                 agent_log_path=None,
-                 rate_limiter_max_query_retries=3,
-                 rate_limiter_num_agents=1,
-                 rate_limiter_initial_cluster_rate=20000,
-                 rate_limiter_max_cluster_rate=1E9,
-                 rate_limiter_min_cluster_rate=1,
-                 rate_limiter_consecutive_success_threshold=5,
-                 rate_limiter_strategy=BlockingRateLimiter.MULTIPLY,
-                 rate_limiter_increase_factor=2.0,
-                 rate_limiter_backoff_factor=0.5,
-                 rate_limiter_max_concurrency=1):
+                 global_config=None):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -718,22 +688,7 @@ class _CacheConfig( object ):
         @param cache_start_fuzz_secs: if greater than zero, the number of seconds to fuzz the start time to avoid query stampede
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
         @param query_timeout: The number of seconds to wait before a query to the API server times out
-        @param log_api_responses: whether to log k8s api calls to disk (for debugging)
-        @param log_api_exclude_200s: If True, do not log successes (response code 2xx)
-        @param log_api_min_response_len: Minimum response length of api responses to be logged.
-        @param log_api_min_latency: Minimum latency of responses to be logged.
-        @param log_api_ratelimit_interval: If positive, api calls with the same path will be rate-limited to a message every interval sec.
-        @param agent_log_path: directory where agent.log is located
-        @param rate_limiter_max_query_retries: Number of times to retry each rate-limited query
-        @param rate_limiter_num_agents: Number of agents in the cluster
-        @param rate_limiter_initial_cluster_rate: initial cluster rate (requests/sec)
-        @param rate_limiter_max_cluster_rate: upper bound on cluster rate (requests/sec)
-        @param rate_limiter_min_cluster_rate: lower bound on cluster rate (requests/sec)
-        @param rate_limiter_consecutive_success_threshold: number of consecutive successes to trigger a rate increase
-        @param rate_limiter_strategy: strategy for changing rate (multiply or reset-then-multiply)
-        @param rate_limiter_increase_factor: multiplicative factor for increasing rate
-        @param rate_limiter_backoff_factor: multiplicative factor for decreasing rate
-        @param rate_limiter_max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
+        @param global_config: Global configuration object
 
         @type api_url: str
         @type verify_api_queries: bool
@@ -742,22 +697,7 @@ class _CacheConfig( object ):
         @type cache_start_fuzz_secs: int or float
         @type cache_purge_secs: int or float
         @type query_timeout: int
-        @type log_api_responses: bool
-        @type log_api_exclude_200s: bool
-        @type log_api_min_response_len: int
-        @type log_api_min_latency: float
-        @type log_api_ratelimit_interval: int
-        @type agent_log_path: str
-        @type rate_limiter_max_query_retries: int
-        @type rate_limiter_num_agents: int
-        @type rate_limiter_initial_cluster_rate: float
-        @type rate_limiter_max_cluster_rate: float
-        @type rate_limiter_min_cluster_rate: float
-        @type rate_limiter_consecutive_success_threshold: int
-        @type rate_limiter_strategy: str
-        @type rate_limiter_increase_factor: float
-        @type rate_limiter_backoff_factor: float
-        @type rate_limiter_max_concurrency: int
+        @type global_config: Configurtion
         """
 
         # NOTE: current implementations of __eq__ expects that fields set in contructor are only true state
@@ -769,23 +709,7 @@ class _CacheConfig( object ):
         self.cache_start_fuzz_secs = cache_start_fuzz_secs
         self.cache_purge_secs = cache_purge_secs
         self.query_timeout = query_timeout
-        self.log_api_responses = log_api_responses
-        self.log_api_exclude_200s = log_api_exclude_200s
-        self.log_api_min_response_len = log_api_min_response_len
-        self.log_api_min_latency = log_api_min_latency
-        self.log_api_ratelimit_interval = log_api_ratelimit_interval
-        self.agent_log_path = agent_log_path
-
-        self.rate_limiter_max_query_retries = rate_limiter_max_query_retries
-        self.rate_limiter_num_agents = rate_limiter_num_agents
-        self.rate_limiter_initial_cluster_rate = rate_limiter_initial_cluster_rate
-        self.rate_limiter_max_cluster_rate = rate_limiter_max_cluster_rate
-        self.rate_limiter_min_cluster_rate = rate_limiter_min_cluster_rate
-        self.rate_limiter_consecutive_success_threshold = rate_limiter_consecutive_success_threshold
-        self.rate_limiter_strategy = rate_limiter_strategy
-        self.rate_limiter_increase_factor = rate_limiter_increase_factor
-        self.rate_limiter_backoff_factor = rate_limiter_backoff_factor
-        self.rate_limiter_max_concurrency = rate_limiter_max_concurrency
+        self.global_config = global_config
 
     def __eq__( self, other ):
         """Equivalence method for _CacheConfig objects so == testing works """
@@ -816,13 +740,31 @@ class _CacheConfig( object ):
                  current and the new config.  False otherwise.
         """
         relevant_fields = [
-            'api_url', 'verify_api_queries', 'query_timeout', 'agent_log_path',
-            'log_api_responses', 'log_api_exclude_200s', 'log_api_min_response_len',
-            'log_api_min_latency', 'log_api_ratelimit_interval',
+            'api_url', 'verify_api_queries', 'query_timeout'
         ]
+        relevant_global_config_fields = [
+            'agent_log_path',
+            'k8s_log_api_responses',
+            'k8s_log_api_exclude_200s',
+            'k8s_log_api_min_response_len',
+            'k8s_log_api_min_latency',
+            'k8s_log_api_ratelimit_interval',
+        ]
+
+        # Verify the relevant CacheConfig fields are equal
         for field in relevant_fields:
             if getattr(self, field) != getattr(new_config, field):
                 return True
+
+        # If one of the sub global-config is null and the other isn't, return True
+        if bool(self.global_config) ^ bool(new_config.global_config):
+            return True
+
+        # If both sub global-configs are present, verify their relevant fields are equal
+        if self.global_config and new_config:
+            for field in relevant_global_config_fields:
+                if getattr(self.global_config, field) != getattr(new_config.global_config, field):
+                    return True
         return False
 
 class _CacheConfigState( object ):
@@ -897,19 +839,18 @@ class _CacheConfigState( object ):
         # create a new k8s api object if we need one
         k8s = old_state.k8s
         if need_new_k8s:
-            rate_limiter = BlockingRateLimiter.get_instance('MAIN_K8S_RATELIMITER', global_config)
-            query_options = ApiQueryOptions(max_retries=new_cache_config.rate_limiter_max_query_retries,
-                                            rate_limiter=rate_limiter)
             args = {
                 'k8s_api_url': new_cache_config.api_url,
                 'query_timeout': new_cache_config.query_timeout,
-                'log_api_responses': new_cache_config.log_api_responses,
-                'log_api_exclude_200s': new_cache_config.log_api_exclude_200s,
-                'log_api_min_response_len': new_cache_config.log_api_min_response_len,
-                'log_api_min_latency': new_cache_config.log_api_min_latency,
-                'log_api_ratelimit_interval': new_cache_config.log_api_ratelimit_interval,
-                'agent_log_path': new_cache_config.agent_log_path,
-                'query_options': query_options,
+                'log_api_responses': new_cache_config.global_config.log_api_responses,
+                'log_api_exclude_200s': new_cache_config.global_config.log_api_exclude_200s,
+                'log_api_min_response_len': new_cache_config.global_config.log_api_min_response_len,
+                'log_api_min_latency': new_cache_config.global_config.log_api_min_latency,
+                'log_api_ratelimit_interval': new_cache_config.global_config.log_api_ratelimit_interval,
+                'agent_log_path': new_cache_config.global_config.agent_log_path,
+                'query_options_max_retries': new_cache_config.global_config.k8s_controlled_warmer_max_query_retries,
+                'rate_limiter': BlockingRateLimiter.get_instance('K8S_CACHE_MAIN_RATELIMITER',
+                                                                 global_config, logger=global_log),
             }
             if not new_cache_config.verify_api_queries:
                 args['ca_file'] = None
@@ -951,7 +892,7 @@ class KubernetesCache( object ):
             cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
             cache_start_fuzz_secs=cache_start_fuzz_secs,
             cache_purge_secs=cache_purge_secs,
-            agent_log_path=None
+            global_config=global_config,
         )
 
         # set the initial state
@@ -1077,11 +1018,9 @@ class KubernetesCache( object ):
                     continue
 
             try:
-                self._update_cluster_name( local_state.k8s )
-                # TODO-163: investigate how to get rate limiter in here
+                self._update_cluster_name(local_state.k8s)
                 self._update_api_server_version(local_state.k8s)
-                # TODO-163: investigate how to get rate limiter in here
-                runtime = self._get_runtime( local_state.k8s )
+                runtime = self._get_runtime(local_state.k8s)
 
                 self._lock.acquire()
                 try:
@@ -1193,7 +1132,7 @@ class KubernetesCache( object ):
         """
         return self._pods_cache.is_cached(namespace, name, allow_expired)
 
-    def controller(self, namespace, name, kind, current_time=None, query_option=None):
+    def controller(self, namespace, name, kind, current_time=None, query_options=None):
         """Returns controller info for the controller specified by namespace and name
         or None if no controller matches.
 
@@ -1208,7 +1147,8 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind)
+        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind,
+                                        query_options=query_options)
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
@@ -1250,7 +1190,6 @@ class KubernetesCache( object ):
 class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
     """
-
     def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                   k8s_api_url="https://kubernetes.default",
                   query_timeout=20,
@@ -1260,7 +1199,8 @@ class KubernetesApi( object ):
                   log_api_min_latency=0.0,
                   log_api_ratelimit_interval=300,
                   agent_log_path=None,
-                  query_options=None):
+                  query_options_max_retries=3,
+                  rate_limiter=None):
         """Init the kubernetes object"""
 
         # fixed well known location for authentication token required to
@@ -1325,9 +1265,16 @@ class KubernetesApi( object ):
         self._standard_headers["Authorization"] = "Bearer %s" % (token)
 
         # A rate limiter should normally be passed unless no rate limiting is desired.
-        self._query_options = query_options
-        if not self._query_options or not self._query_options.rate_limiter:
-            global_log.warn("KubernetesAPI created without query options or rate limiter!\n%s" % traceback.format_exc())
+        self._query_options_max_retries = query_options_max_retries
+        self._rate_limiter = rate_limiter
+        if not self._rate_limiter:
+            global_log.warn("KubernetesAPI created without rate limiter!\n%s" % traceback.format_exc())
+
+    @property
+    def _default_query_options(self):
+        if not self._rate_limiter:
+            return None 
+        return ApiQueryOptions(max_retries=self._query_options_max_retries, rate_limiter=self._rate_limiter)
 
     def _verify_connection( self ):
         """ Return whether or not to use SSL verification
@@ -1363,7 +1310,7 @@ class KubernetesApi( object ):
         @return: The gitVersion extracted from /version JSON
         @rtype: str
         """
-        version_map = self.query_api_with_retries('/version', self._query_options,
+        version_map = self.query_api_with_retries('/version', self._default_query_options,
                                                   retry_error_context='get_api_server_version',
                                                   retry_error_limit_key='get_api_server_version')
         return version_map.get('gitVersion')
@@ -1604,7 +1551,7 @@ class KubernetesApi( object ):
                                        limit_once_per_x_secs=self.log_api_ratelimit_interval,
                                        limit_key="query-api-log-resp-%s" % util.md5_hexdigest(path))
 
-    def query_object( self, kind, namespace, name ):
+    def query_object( self, kind, namespace, name, query_options=None ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
             An empty dict is returned if the object kind is unknown, or if there is an error generating
             an appropriate query string
@@ -1626,7 +1573,7 @@ class KubernetesApi( object ):
                              limit_once_per_x_secs=300, limit_key='k8s_api_build_query-%s' % kind )
             return {}
 
-        return self.query_api_with_retries(query, self._query_options,
+        return self.query_api_with_retries(query, query_options or self._default_query_options,
                                            retry_error_context='%s, %s, %s' % (kind, namespace, name),
                                            retry_error_limit_key='query_object-%s' % kind)
 
@@ -1652,7 +1599,7 @@ class KubernetesApi( object ):
         if filter:
             query = "%s?fieldSelector=%s" % (query, urllib.quote( filter ))
 
-        return self.query_api_with_retries(query, self._query_options,
+        return self.query_api_with_retries(query, self._default_query_options,
                                            retry_error_context='%s, %s' % (kind, namespace),
                                            retry_error_limit_key='query_objects-%s' % kind)
 
@@ -1666,7 +1613,7 @@ class KubernetesApi( object ):
 
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
-        return self.query_api_with_retries('/api/v1/namespaces', self._query_options,
+        return self.query_api_with_retries('/api/v1/namespaces', self._default_query_options,
                                            retry_error_context='query_pods',
                                            retry_error_limit_key='query_pods')
 
@@ -1743,12 +1690,12 @@ class KubeletApi( object ):
         return util.json_decode( response.text )
 
     def query_pods( self ):
-        return self.query_api_with_retries('/pods', self._query_options,
+        return self.query_api_with_retries('/pods', self._default_query_options,
                                            retry_error_context='query_pods',
                                            retry_error_limit_key='query_pods')
 
     def query_stats( self ):
-        return self.query_api_with_retries('/stats/summary', self._query_options,
+        return self.query_api_with_retries('/stats/summary', self._default_query_options,
                                            retry_error_context='stats_summary',
                                            retry_error_limit_key='stats_summary')
 

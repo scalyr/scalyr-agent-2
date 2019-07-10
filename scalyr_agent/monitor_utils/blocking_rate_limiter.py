@@ -69,7 +69,7 @@ class BlockingRateLimiter(object):
     registry_lock = threading.Lock()
 
     @staticmethod
-    def get_instance(self, key, global_config):
+    def get_instance(self, key, global_config, logger=None):
         """Returned a named instance of a rate limiter so that it can be shared by multiple threads/code areas
 
         If a named instance does not exist, create one, based on the global configuration settings.
@@ -87,6 +87,7 @@ class BlockingRateLimiter(object):
                     global_config.k8s_ratelimit_increase_factor,
                     global_config.k8s_ratelimit_backoff_factor,
                     global_config.k8s_ratelimit_max_concurrency,
+                    logger=logger,
                 )
             return self.registry[key]
         finally:
