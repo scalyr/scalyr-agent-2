@@ -22,12 +22,14 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.k8s import DockerMetricFetcher
 from scalyr_agent.monitor_utils.k8s import _K8sCache, _K8sProcessor, KubernetesApi, K8sApiNotFoundException, K8sApiTemporaryError, K8sApiPermanentError, ApiQueryOptions
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
-from scalyr_agent.util import FakeClock
-import logging
+import scalyr_agent.third_party.requests as requests
+from scalyr_agent.util import FakeClock, md5_hexdigest
+import scalyr_agent.scalyr_logging as scalyr_logging
 import time
 import mock
 
-from mock import Mock
+from mock import Mock, patch, call
+
 
 class Test_K8sCache( ScalyrTestCase ):
     """ Tests the _K8sCache
@@ -124,11 +126,144 @@ class Test_K8sCache( ScalyrTestCase ):
         obj = self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1 )
         self.assertIsNone( obj )
 
-class TestKubernetesApi( ScalyrTestCase ):
+
+class TestKubernetesApi(ScalyrTestCase):
     """
     Tests the Kubernetes API
     """
+    def setUp(self):
+        self._path = '/foo'
 
+    def _get_expected_log_mesg(self, path, stack_trace_lines, response_content):
+        """This helper method also serves as a assertion on the format for the log messages"""
+        lines = ''
+        for l in stack_trace_lines:
+            lines += l.replace('\n', '\\n')
+        return 'k8s.query_api (rate limited): %s\\n\\n\\n%s\\n\\n%s' % (path, lines, response_content)
+
+    def _get_debug_call(self, expected_log_msg):
+        """Return a mock call object that captures the param values of the log() call"""
+        debug_log_call = call.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            expected_log_msg,
+            limit_once_per_x_secs=300,
+            limit_key='query-api-log-resp-%s' % md5_hexdigest(self._path))
+        return debug_log_call
+
+    def _assert_logged(self, mock_logger, expected_log_msg):
+        """Assert that the log() method was called on the mock_logger with expected params"""
+        mock_logger.log.assert_called_with(
+            scalyr_logging.DEBUG_LEVEL_1,
+            expected_log_msg,
+            limit_once_per_x_secs=300,
+            limit_key='query-api-log-resp-%s' % md5_hexdigest(self._path))
+
+    def _assert_not_logged(self, mock_logger, expected_log_msg):
+        """Assert that the log() method was not called on the mock_logger (with expected params)"""
+        expected_call = self._get_debug_call(expected_log_msg)
+        for mock_call in mock_logger.mock_calls:
+            self.assertNotEquals(mock_call, expected_call)
+
+    @patch('scalyr_agent.monitor_utils.k8s.global_log')
+    @patch('traceback.format_stack')
+    @patch.object(requests.Session, 'get')
+    def _simulate_response(self, kapi, response_code_or_exception, mock_get, mock_stack_list, mock_logger):
+        """Simulate a query to self._path and return expected log message that would have been logged if all criteria
+        for logging were met.  (The caller is responsible for knowing if criteria were met.)
+
+        This method fakes the stack trace and API query, thus making it possible to deterministically calculate the
+        log message that would have been logged.
+        """
+        if isinstance(response_code_or_exception, Exception):
+            mock_get.side_effect = response_code_or_exception
+        else:
+            resp = requests.Response()
+            resp.status_code = response_code_or_exception
+            resp._content = '{}'
+            mock_get.return_value = resp
+
+        stack_trace_lines = ['stack_trace_line_1\n', 'stack_trace_line_2\n']
+        mock_stack_list.return_value = stack_trace_lines
+
+        kapi.query_api(self._path, rate_limited=True)
+        # Return the log message that should have been logged if all criteria are met
+        return mock_logger, self._get_expected_log_mesg(self._path, stack_trace_lines, resp._content)
+
+    def test_query_api_log_format(self):
+        """Logging is turned on.  Asserts proper debug-logging (url + stacktrace + response content)"""
+        kapi = KubernetesApi(log_api_responses=True)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        self._assert_logged(mock_logger, expected_log_msg)
+
+    def test_query_api_no_log(self):
+        """Logging is turned off"""
+        kapi = KubernetesApi(log_api_responses=False)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        self._assert_not_logged(mock_logger, expected_log_msg)
+
+    def test_query_api_min_response_len(self):
+        """Fails to satisfy minimum response len.  Not logged"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_min_response_len=3)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        self._assert_not_logged(mock_logger, expected_log_msg)
+
+    def test_query_api_min_latency(self):
+        """Fails to satisfy minimum latency.  Not logged"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=10)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        self._assert_not_logged(mock_logger, expected_log_msg)
+
+    def test_query_api_ratelimit(self):
+        """Fails to satisfy minimum latency.  Not logged"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_ratelimit_interval=77)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger.log.assert_called_with(
+            scalyr_logging.DEBUG_LEVEL_1,
+            expected_log_msg,
+            limit_once_per_x_secs=77,
+            limit_key='query-api-log-resp-%s' % md5_hexdigest(self._path))
+
+    def test_query_api_200s_not_logged(self):
+        """200 response not logged when 200s are excluded"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        self._assert_not_logged(mock_logger, expected_log_msg)
+
+    def test_query_api_non_200_always_logged(self):
+        """Non-200 response logged when 200s are excluded"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
+
+        def func():
+            mock_logger, expected_log_msg = self._simulate_response(kapi, 404)
+            self._assert_logged(mock_logger, expected_log_msg)
+
+        self.assertRaises(K8sApiNotFoundException, lambda: func())
+
+    def test_query_api_exception_logged(self):
+        """Exception response are logged in general"""
+        kapi = KubernetesApi(log_api_responses=True)
+
+        def func():
+            mock_logger, expected_log_msg = self._simulate_response(kapi, requests.ReadTimeout())
+            self._assert_logged(mock_logger, expected_log_msg)
+
+        self.assertRaises(requests.ReadTimeout, lambda: func())
+
+    def test_query_api_exception_obey_criteria(self):
+        """Exception response obeys criteria (such as latency)"""
+        kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=100)
+
+        def func():
+            mock_logger, expected_log_msg = self._simulate_response(kapi, requests.ReadTimeout())
+            self._assert_not_logged(mock_logger, expected_log_msg)
+
+        self.assertRaises(requests.ReadTimeout, lambda: func())
+
+
+class TestKubernetesApiRateLimited( ScalyrTestCase ):
+    """
+    Tests the Rate Limited Kubernetes API calls
+    """
     def test_query_api_with_retries_success_not_rate_limited( self ):
         with mock.patch.object( KubernetesApi, "query_api" ) as mock_query:
             mock_query.return_value = { "success": "success" }
@@ -189,6 +324,7 @@ class TestKubernetesApi( ScalyrTestCase ):
             mock_query.side_effect = Exception( "Some other exception" )
             self.assertRaises( Exception, lambda: k8s.query_api_with_retries( "/foo/bar", options ) )
             self.assertEqual( rate_limiter.current_cluster_rate, 25.0 )
+
 
 class TestDockerMetricFetcher(ScalyrTestCase):
     """Tests the DockerMetricFetch abstraction.

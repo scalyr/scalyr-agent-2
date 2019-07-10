@@ -2780,13 +2780,11 @@ class KubernetesMonitor( ScalyrMonitor ):
         return {'_k8s_ver': 'star'}
 
     def get_user_agent_fragment(self):
-        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
-        """
+        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe."""
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
         if k8s_cache:
-            # TODO-163: Re-enable version checks
             ver = k8s_cache.get_api_server_version()
             runtime = k8s_cache.get_container_runtime()
         ver = 'k8s=%s' % (ver if ver else 'true')
