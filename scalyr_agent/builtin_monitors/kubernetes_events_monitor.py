@@ -275,25 +275,6 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
         # Note, accepting just a single `t` here due to K8s ConfigMap issues with having a value of `true`
         self.__disable_monitor = legacy_disable == 'true' or legacy_disable == 't' or self._global_config.k8s_events_disable
 
-        # Create rate limiter
-        self.__max_query_retries = self._global_config.k8s_controlled_warmer_max_query_retries
-        # TODO-163:
-        # Refactor so it can be shared between k8s_events and k8s monitors.
-        # k8s_events should have 2 rate limiters - one for leader election which is shared with k8s monitor.
-        # ANother exclusive one for itself
-        self.__rate_limiter = BlockingRateLimiter(
-            self._global_config.k8s_ratelimit_cluster_num_agents,
-            self._global_config.k8s_ratelimit_cluster_rps_init,
-            self._global_config.k8s_ratelimit_cluster_rps_max,
-            self._global_config.k8s_ratelimit_cluster_rps_min,
-            self._global_config.k8s_ratelimit_consecutive_increase_threshold,
-            self._global_config.k8s_ratelimit_strategy,
-            self._global_config.k8s_ratelimit_increase_factor,
-            self._global_config.k8s_ratelimit_backoff_factor,
-            self._global_config.k8s_ratelimit_max_concurrency,
-            logger=global_log,
-        )
-
     def open_metric_log( self ):
         """Override open_metric_log to prevent a metric log from being created for the Kubernetes Events Monitor
         and instead create our own logger which will log raw messages out to disk.
@@ -340,12 +321,11 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         result = {}
         try:
-            options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
             # this call will throw an exception on failure
-            result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node, options,
+            result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node,
                                                 retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
         except Exception, e:
-            # TODO-163: add debug statement
+            global_log.log(scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node)
             return False
 
         # if we are here, then the above node exists so return True
@@ -382,6 +362,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             #convert to datetime
             create_time = scalyr_util.rfc3339_to_datetime( create_time )
 
+
             # if we are older than the previous oldest datetime, then update the oldest time
             if create_time is not None and create_time < oldest_time:
                 oldest_time = create_time
@@ -397,8 +378,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             @param k8s: a KubernetesApi object for querying the k8s api
             @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
-        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
-        response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields, options,
+        response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields,
                                               retry_error_context='nodes%s' % query_fields,
                                               retry_error_limit_key='k8se_check_nodes_for_leader')
         nodes = response.get( 'items', [] )
@@ -526,6 +506,25 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             global_log.info('kubernetes_events_monitor exiting because it has been disabled.')
             return
 
+        def _create_k8s_api(rate_limiter_key):
+            _k8s = None
+            kwargs = {
+                'k8s_api_url': k8s_api_url,
+                'log_api_responses': self._global_config.log_api_responses,
+                'log_api_exclude_200s': self._global_config.log_api_exclude_200s,
+                'log_api_min_response_len': self._global_config.log_api_min_response_len,
+                'log_api_min_latency': self._global_config.log_api_min_latency,
+                'log_api_ratelimit_interval': self._global_config.log_api_ratelimit_interval,
+                'agent_log_path': self._global_config.agent_log_path,
+                'query_options_max_retries': self._global_config.k8s_controlled_warmer_max_query_retries,
+                'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, self._global_config,
+                                                                 logger=global_log),
+            }
+            if not k8s_verify_api_queries:
+                kwargs['ca_file'] = None
+            _k8s = KubernetesApi(**kwargs)
+            return _k8s
+
         try:
             k8s_api_url = self._global_config.k8s_api_url
             k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
@@ -536,15 +535,14 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self.module_name, self.log_config )
 
-            k8s = None
-            if k8s_verify_api_queries:
-                k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-            else:
-                k8s = KubernetesApi( ca_file=None, k8s_api_url=k8s_api_url)
+            k8s_with_main_ratelimiter = _create_k8s_api('K8S_CACHE_MAIN_RATELIMITER')
+            k8s_with_events_ratelimiter = _create_k8s_api('K8S_EVENTS_RATELIMITER')
+            k8s_events_query_options = ApiQueryOptions(max_retries=self.__max_query_retries,
+                                                       rate_limiter=k8s_with_events_ratelimiter)
 
-            pod_name = k8s.get_pod_name()
-            self._node_name = k8s.get_node_name( pod_name )
-            cluster_name = k8s.get_cluster_name()
+            pod_name = k8s_with_main_ratelimiter.get_pod_name()
+            self._node_name = k8s_with_main_ratelimiter.get_node_name( pod_name )
+            cluster_name = k8s_with_main_ratelimiter.get_cluster_name()
 
             last_event = None
             last_resource = 0
@@ -560,7 +558,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                 if last_check + self._leader_check_interval <= current_time:
                     last_check = current_time
                     # check if we are the leader
-                    if not self._is_leader( k8s ):
+                    if not self._is_leader( k8s_with_main_ratelimiter ):
                         #if not, then sleep and try again
                         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader is %s" % (str(self._current_leader)) )
                         if self._current_leader is not None and last_reported_leader != self._current_leader:
@@ -583,7 +581,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                         k8s_cache = k8s_utils.cache(self._global_config)
 
                     # start streaming events
-                    lines = k8s.stream_events( last_event=last_event )
+                    lines = k8s_with_events_ratelimiter.stream_events( last_event=last_event )
 
                     json = {}
                     for line in lines:
@@ -636,18 +634,17 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                         # get cluster and deployment information
                         extra_fields = {'k8s-cluster': cluster_name, 'watchEventType': event_type}
                         if kind:
-                            options = ApiQueryOptions(max_retries=self.__max_query_retries,
-                                                      rate_limiter=self.__rate_limiter)
                             if kind == 'Pod':
                                 extra_fields['pod_name'] = name
                                 extra_fields['pod_namespace'] = namespace
-                                pod = k8s_cache.pod(namespace, name, current_time, query_options=options)
+                                pod = k8s_cache.pod(namespace, name, current_time,
+                                                    query_options=k8s_events_query_options)
                                 if pod and pod.controller:
                                     extra_fields['k8s-controller'] = pod.controller.name
                                     extra_fields['k8s-kind'] = pod.controller.kind
                             elif kind != 'Node':
                                 controller = k8s_cache.controller(namespace, name, kind, current_time,
-                                                                  query_options=options)
+                                                                  query_options=k8s_events_query_options)
                                 if controller:
                                     extra_fields['k8s-controller'] = controller.name
                                     extra_fields['k8s-kind'] = controller.kind
