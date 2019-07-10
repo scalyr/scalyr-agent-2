@@ -1239,9 +1239,9 @@ class KubernetesApi( object ):
             finally:
                 f.close()
         except IOError:
-            pass
+            global_log.warn("KubernetesAPI IOError token_file: %s\n%s" % (token_file, traceback.format_exc()))
 
-        #get the namespace this pod is running on
+        # get the namespace this pod is running on
         self.namespace = 'default'
         try:
             # using with is ok here, because we need to be running
@@ -1252,7 +1252,7 @@ class KubernetesApi( object ):
             finally:
                 f.close()
         except IOError:
-            pass
+            global_log.warn("KubernetesAPI IOError namespace_file: %s\n%s" % (token_file, traceback.format_exc()))
 
         self._standard_headers["Authorization"] = "Bearer %s" % (token)
 
@@ -1362,6 +1362,7 @@ class KubernetesApi( object ):
 
         if query_options == 'not-set':
             query_options = self._default_query_options
+        global_log.info('query_api_with_retries url=%s, rl=%s, source = \n%s\n' % (query, query_options.rate_limiter, traceback.format_stack()))
 
         retries_left = query_options.max_retries
         rate_limiter = query_options.rate_limiter
@@ -1466,8 +1467,6 @@ class KubernetesApi( object ):
     def query_api( self, path, pretty=0, return_temp_errors=False, rate_limited=False):
         """ Queries the k8s API at 'path', and converts OK responses to JSON objects
         """
-        if not rate_limited:
-            global_log.info('NOT rate limited: %s' % path)
         self._ensure_session()
         pretty='pretty=%d' % pretty
         if "?" in path:
