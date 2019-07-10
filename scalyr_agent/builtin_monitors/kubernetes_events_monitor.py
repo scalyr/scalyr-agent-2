@@ -321,12 +321,11 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         result = {}
         try:
-            options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self._events_rate_limiter)
             # this call will throw an exception on failure
-            result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node, options,
+            result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node,
                                                 retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
         except Exception, e:
-            # TODO-163: add debug statement
+            global_log.log(scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node)
             return False
 
         # if we are here, then the above node exists so return True
@@ -379,8 +378,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             @param k8s: a KubernetesApi object for querying the k8s api
             @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
-        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self._events_rate_limiter)
-        response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields, options,
+        response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields,
                                               retry_error_context='nodes%s' % query_fields,
                                               retry_error_limit_key='k8se_check_nodes_for_leader')
         nodes = response.get( 'items', [] )

@@ -1132,7 +1132,6 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                             )
                                             continue
 
-                                        # TODO-163 query options
                                         pod = k8s_cache.pod(namespace, pod_name, current_time)
                                         if pod:
                                             k8s_info['pod_info'] = pod
@@ -1314,7 +1313,6 @@ class CRIEnumerator( ContainerEnumerator ):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
-                    # TODO-163 query optionn
                     pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
                     if pod:
                         # check to see if we should exclude this container
@@ -1968,7 +1966,6 @@ class ContainerChecker(object):
             if self.__include_controller_info and cluster_name is not None:
                 container_attributes['_k8s_cn'] = cluster_name
 
-            # TODO-163 feed query options
             pod = k8s_cache.pod( pod_namespace, pod_name )
             if pod:
                 rename_vars['node_name'] = pod.node_name

@@ -279,15 +279,6 @@ class ApiQueryOptions(object):
         self.return_temp_errors = return_temp_errors
         self.rate_limiter = rate_limiter
 
-        # By default, allow exceptions to be thrown when querying the cache
-        # if an error occurs during the query.  If this is False, or if
-        # no query options are passed down, then exceptions will be swallowed
-        # and None will be returned instead.
-        # We have this flag because some code paths rely on returning None and
-        # other code paths rely on exceptions being thrown.
-        self.raise_exception_on_cache_query_error = True
-        # TODO-163 : investigate getting rid of this
-
     def __repr__(self):
         return 'ApiQueryOptions\n\tmax_retries=%s\n\treturn_temp_errors=%s\n\trate_limiter=%s\n' % (
             self.max_retries, self.return_temp_errors, self.rate_limiter
@@ -325,8 +316,6 @@ class _K8sCache( object ):
         #   the long-term direction for this feature is uncertain and so this is a temporary implementation
         #   needed to support the notion of a "soft purge".
         self._objects_expired = {}
-        # TODO-163: investigate making a separate entry object
-
         self._processor = processor
         self._object_type = object_type
 
@@ -396,7 +385,7 @@ class _K8sCache( object ):
             # An exception occurred while querying the cache.
             # Check the options to see whether we should continue (and return None) or
             # re-raise the exception
-            if query_options is not None and query_options.raise_exception_on_cache_query_error:
+            if query_options is not None:
                 raise
 
         self._add_to_cache( result )
@@ -478,7 +467,7 @@ class _K8sCache( object ):
             time exists for the object, then return True only if not expired
         @rtype: bool
         """
-        # TODO-163: Look at passing down a consistent time from layers above
+        # TODO: Look at passing down a consistent time from layers above
         return self._lookup_object(namespace, name, time.time(), allow_expired=allow_expired) is not None
 
     def lookup( self, k8s, current_time, namespace, name, kind=None, allow_expired=True, query_options=None ):
@@ -1310,7 +1299,7 @@ class KubernetesApi( object ):
         @return: The gitVersion extracted from /version JSON
         @rtype: str
         """
-        version_map = self.query_api_with_retries('/version', self._default_query_options,
+        version_map = self.query_api_with_retries('/version',
                                                   retry_error_context='get_api_server_version',
                                                   retry_error_limit_key='get_api_server_version')
         return version_map.get('gitVersion')
@@ -1346,11 +1335,14 @@ class KubernetesApi( object ):
 
         return None
 
-    def query_api_with_retries(self, query, query_options, retry_error_context=None, retry_error_limit_key=None):
+    def query_api_with_retries(self, query, query_options='not-set',
+                               retry_error_context=None, retry_error_limit_key=None):
         """Invoke query api through rate limiter with retries
 
         @param query: Query string
-        @param query_options: ApiQueryOptions containing retries and rate_limiter
+        @param query_options: ApiQueryOptions containing retries and rate_limiter.
+            Explicit None signifies no rate limiting.
+            Default 'not-set' signifies "use k8s-instance specific rate limiter and query options
         @param retry_error_context: context object whose string representation is logged upon failure (if None)
         @param retry_error_limit_key: key for limiting retry logging
 
@@ -1364,6 +1356,9 @@ class KubernetesApi( object ):
         """
         if not query_options:
             return self.query_api(query)
+
+        if query_options == 'not-set':
+            query_options = self._default_query_options
 
         retries_left = query_options.max_retries
         rate_limiter = query_options.rate_limiter
@@ -1413,7 +1408,6 @@ class KubernetesApi( object ):
         @returns File handle to the api response log file or None upon failure.
         @rtype: file handle
         """
-        # TODO-163: Refactor to support various use cases and to write to agent_debug.log as discussed
         # try to open the logged_response_file
         try:
             kapi = os.path.join(self.agent_log_path, 'kapi')
@@ -1573,7 +1567,7 @@ class KubernetesApi( object ):
                              limit_once_per_x_secs=300, limit_key='k8s_api_build_query-%s' % kind )
             return {}
 
-        return self.query_api_with_retries(query, query_options or self._default_query_options,
+        return self.query_api_with_retries(query,
                                            retry_error_context='%s, %s, %s' % (kind, namespace, name),
                                            retry_error_limit_key='query_object-%s' % kind)
 
@@ -1599,7 +1593,7 @@ class KubernetesApi( object ):
         if filter:
             query = "%s?fieldSelector=%s" % (query, urllib.quote( filter ))
 
-        return self.query_api_with_retries(query, self._default_query_options,
+        return self.query_api_with_retries(query,
                                            retry_error_context='%s, %s' % (kind, namespace),
                                            retry_error_limit_key='query_objects-%s' % kind)
 
@@ -1613,7 +1607,7 @@ class KubernetesApi( object ):
 
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
-        return self.query_api_with_retries('/api/v1/namespaces', self._default_query_options,
+        return self.query_api_with_retries('/api/v1/namespaces',
                                            retry_error_context='query_pods',
                                            retry_error_limit_key='query_pods')
 
@@ -1690,12 +1684,12 @@ class KubeletApi( object ):
         return util.json_decode( response.text )
 
     def query_pods( self ):
-        return self.query_api_with_retries('/pods', self._default_query_options,
+        return self.query_api_with_retries('/pods',
                                            retry_error_context='query_pods',
                                            retry_error_limit_key='query_pods')
 
     def query_stats( self ):
-        return self.query_api_with_retries('/stats/summary', self._default_query_options,
+        return self.query_api_with_retries('/stats/summary',
                                            retry_error_context='stats_summary',
                                            retry_error_limit_key='stats_summary')
 
