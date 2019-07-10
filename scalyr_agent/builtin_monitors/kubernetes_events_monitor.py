@@ -277,11 +277,11 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         # Create rate limiter
         self.__max_query_retries = self._global_config.k8s_controlled_warmer_max_query_retries
-        # TODO-163:
-        # Refactor so it can be shared between k8s_events and k8s monitors.
-        # k8s_events should have 2 rate limiters - one for leader election which is shared with k8s monitor.
-        # ANother exclusive one for itself
-        self.__rate_limiter = BlockingRateLimiter(
+        # k8s_events uses its own rate limiter for most API calls except for leader-election related calls.
+        # Leader-election calls should go through the same rate limiter instance that the k8s monitor uses.
+        # (This rate limiter instance is instantiated within the k8s_cache and is used by default unless overridden
+        # via query_options)
+        self._events_rate_limiter = BlockingRateLimiter(
             self._global_config.k8s_ratelimit_cluster_num_agents,
             self._global_config.k8s_ratelimit_cluster_rps_init,
             self._global_config.k8s_ratelimit_cluster_rps_max,
@@ -340,7 +340,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         result = {}
         try:
-            options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
+            options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self._events_rate_limiter)
             # this call will throw an exception on failure
             result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node, options,
                                                 retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
@@ -382,6 +382,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             #convert to datetime
             create_time = scalyr_util.rfc3339_to_datetime( create_time )
 
+
             # if we are older than the previous oldest datetime, then update the oldest time
             if create_time is not None and create_time < oldest_time:
                 oldest_time = create_time
@@ -397,7 +398,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             @param k8s: a KubernetesApi object for querying the k8s api
             @query_fields - optional query string appended to the node endpoint to allow for filtering
         """
-        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
+        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self._events_rate_limiter)
         response = k8s.query_api_with_retries('/api/v1/nodes%s' % query_fields, options,
                                               retry_error_context='nodes%s' % query_fields,
                                               retry_error_limit_key='k8se_check_nodes_for_leader')
@@ -637,7 +638,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                         extra_fields = {'k8s-cluster': cluster_name, 'watchEventType': event_type}
                         if kind:
                             options = ApiQueryOptions(max_retries=self.__max_query_retries,
-                                                      rate_limiter=self.__rate_limiter)
+                                                      rate_limiter=self._events_rate_limiter)
                             if kind == 'Pod':
                                 extra_fields['pod_name'] = name
                                 extra_fields['pod_namespace'] = namespace

@@ -32,9 +32,8 @@ from scalyr_agent import ScalyrMonitor, define_config_option, define_metric, Bad
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
-from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
-from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName, ApiQueryOptions
+from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
@@ -422,8 +421,7 @@ class ControlledCacheWarmer(StoppableThread):
     errors are seen.  While on the blacklist, a pod's information will not be fetched in order to
     populate the cache.
     """
-    def __init__(self, name='warmer', max_failure_count=5, blacklist_time_secs=300, max_query_retries=3,
-                 rate_limiter=None, logger=None):
+    def __init__(self, name='warmer', max_failure_count=5, blacklist_time_secs=300, max_query_retries=3, logger=None):
         """Initializes the thread.
 
         @param name:  The name of this warmer, used when it logs its stats.
@@ -440,7 +438,6 @@ class ControlledCacheWarmer(StoppableThread):
         @type max_failure_count: int
         @type blacklist_time_secs: double
         @type max_query_retries: int
-        @type rate_limiter: BlockingRateLimiter
         @type logger: Logger
         """
         StoppableThread.__init__(self, name='cache warmer and filter')
@@ -460,7 +457,6 @@ class ControlledCacheWarmer(StoppableThread):
         self.__max_failure_count = max_failure_count
         self.__blacklist_time_secs = blacklist_time_secs
         self.__max_query_retries = max_query_retries
-        self.__rate_limiter = rate_limiter
         self.__logger = logger
         # The wallclock of when the last periodic report was written to the logger
         self.__last_report_time = None
@@ -929,8 +925,7 @@ class ControlledCacheWarmer(StoppableThread):
                 if container_id is not None and not self.is_warm(pod_namespace, pod_name):
                     consecutive_warm_pods = 0
                     try:
-                        options = ApiQueryOptions(max_retries=self.__max_query_retries, rate_limiter=self.__rate_limiter)
-                        self.__k8s_cache.pod(pod_namespace, pod_name, allow_expired=False, query_options=options)
+                        self.__k8s_cache.pod(pod_namespace, pod_name, allow_expired=False)
                         self.__record_warming_result(container_id, success=True)
                     except K8sApiPermanentError, e:
                         self.__record_warming_result(container_id, permanent_error=e,
@@ -1137,6 +1132,7 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                             )
                                             continue
 
+                                        # TODO-163 query options
                                         pod = k8s_cache.pod(namespace, pod_name, current_time)
                                         if pod:
                                             k8s_info['pod_info'] = pod
@@ -1318,6 +1314,7 @@ class CRIEnumerator( ContainerEnumerator ):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
+                    # TODO-163 query optionn
                     pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
                     if pod:
                         # check to see if we should exclude this container
@@ -1971,6 +1968,7 @@ class ContainerChecker(object):
             if self.__include_controller_info and cluster_name is not None:
                 container_attributes['_k8s_cn'] = cluster_name
 
+            # TODO-163 feed query options
             pod = k8s_cache.pod( pod_namespace, pod_name )
             if pod:
                 rename_vars['node_name'] = pod.node_name
@@ -2341,33 +2339,17 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
 
-        # TODO-163: Refactor to have single global blocking rate limiter
-        self.__rate_limiter = BlockingRateLimiter(
-            self._global_config.k8s_ratelimit_cluster_num_agents,
-            self._global_config.k8s_ratelimit_cluster_rps_init,
-            self._global_config.k8s_ratelimit_cluster_rps_max,
-            self._global_config.k8s_ratelimit_cluster_rps_min,
-            self._global_config.k8s_ratelimit_consecutive_increase_threshold,
-            self._global_config.k8s_ratelimit_strategy,
-            self._global_config.k8s_ratelimit_increase_factor,
-            self._global_config.k8s_ratelimit_backoff_factor,
-            self._global_config.k8s_ratelimit_max_concurrency,
-            logger=global_log,
-        )
-
         # create controlled cache warmers for logs and metrics
         self.__logs_controlled_warmer = ControlledCacheWarmer(
             max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
             blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
             max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
-            rate_limiter=self.__rate_limiter,
             logger=global_log)
 
         self.__metrics_controlled_warmer = ControlledCacheWarmer(
             max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
             blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
             max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
-            rate_limiter=self.__rate_limiter,
             logger=global_log)
 
         self.__container_checker = None

@@ -65,6 +65,33 @@ class BlockingRateLimiter(object):
 
     HARD_LIMIT_MIN_CLUSTER_RATE = 1
 
+    registry = {}
+    registry_lock = threading.Lock()
+
+    @staticmethod
+    def get_instance(self, key, global_config):
+        """Returned a named instance of a rate limiter so that it can be shared by multiple threads/code areas
+
+        If a named instance does not exist, create one, based on the global configuration settings.
+        """
+        self.registry_lock.acquire()
+        try:
+            if key not in self.registry:
+                self.registry[key] = BlockingRateLimiter(
+                    global_config.k8s_ratelimit_cluster_num_agents,
+                    global_config.k8s_ratelimit_cluster_rps_init,
+                    global_config.k8s_ratelimit_cluster_rps_max,
+                    global_config.k8s_ratelimit_cluster_rps_min,
+                    global_config.k8s_ratelimit_consecutive_increase_threshold,
+                    global_config.k8s_ratelimit_strategy,
+                    global_config.k8s_ratelimit_increase_factor,
+                    global_config.k8s_ratelimit_backoff_factor,
+                    global_config.k8s_ratelimit_max_concurrency,
+                )
+            return self.registry[key]
+        finally:
+            self.registry_lock.release()
+
     def __init__(self, num_agents, initial_cluster_rate, max_cluster_rate, min_cluster_rate,
                  consecutive_success_threshold,
                  strategy=MULTIPLY, increase_factor=2.0, backoff_factor=0.5,

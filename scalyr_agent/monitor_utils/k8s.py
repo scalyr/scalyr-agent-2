@@ -7,6 +7,7 @@ from string import Template
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
 import scalyr_agent.util as util
 from scalyr_agent.util import StoppableThread
@@ -104,9 +105,19 @@ def cache(global_config):
                                 log_api_min_response_len=global_config.k8s_log_api_min_response_len,
                                 log_api_min_latency=global_config.k8s_log_api_min_latency,
                                 log_api_ratelimit_interval=global_config.k8s_log_api_ratelimit_interval,
-                                agent_log_path=global_config.agent_log_path)
+                                agent_log_path=global_config.agent_log_path,
+                                rate_limiter_max_query_retries=global_config.k8s_controlled_warmer_max_query_retries,
+                                rate_limiter_num_agents=global_config.k8s_ratelimit_cluster_num_agents,
+                                rate_limiter_initial_cluster_rate=global_config.k8s_ratelimit_cluster_rps_init,
+                                rate_limiter_max_cluster_rate=global_config.k8s_ratelimit_cluster_rps_max,
+                                rate_limiter_min_cluster_rate=global_config.k8s_ratelimit_cluster_rps_min,
+                                rate_limiter_consecutive_success_threshold=global_config.k8s_ratelimit_consecutive_increase_threshold,
+                                rate_limiter_strategy=global_config.k8s_ratelimit_strategy,
+                                rate_limiter_increase_factor=global_config.k8s_ratelimit_increase_factor,
+                                rate_limiter_backoff_factor=global_config.k8s_ratelimit_backoff_factor,
+                                rate_limiter_max_concurrency=global_config.k8s_ratelimit_max_concurrency)
 
-    #update the config and return current cache
+    # update the config and return current cache
     _k8s_cache.update_config( cache_config )
     return _k8s_cache
 
@@ -426,40 +437,6 @@ class _K8sCache( object ):
             finally:
                 self._lock.release()
 
-    def _process_objects( self, k8s, kind, objects ):
-        """
-            Processes the dict returned from querying the objects and calls the _K8sProcessor to create relevant objects for caching,
-
-            @param k8s: a KubernetesApi object
-            @param kind: The kind of the objects
-            @param objects: The JSON object returned as a response from quering all objects.  This JSON object should contain an
-                         element called 'items', which is an array of dicts
-
-            @return: a dict keyed by namespace, whose values are a dict of objects inside that namespace, keyed by objects name
-        """
-
-        # get all objects
-        items = objects.get( 'items', [] )
-
-        # iterate over all objects, getting Info objects and storing them in the result
-        # dict, hashed by namespace and object name
-        result = {}
-        for obj in items:
-            info = self._processor.process_object( k8s, obj )
-            global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Processing %s: %s:%s" % (kind, info.namespace, info.name) )
-
-            if info.namespace not in result:
-                result[info.namespace] = {}
-
-            current = result[info.namespace]
-            if info.name in current:
-                global_log.warning( "Duplicate %s '%s' found in namespace '%s', overwriting previous values" % (kind, info.name, info.namespace),
-                                      limit_once_per_x_secs=300, limit_key='duplicate-%s-%s' % (kind, info.uid) )
-
-            current[info.name] = info
-
-        return result
-
 
     def _lookup_object(self, namespace, name, current_time, allow_expired=True):
         """ Look to see if the object specified by the namespace and name exists within the cached data.
@@ -722,7 +699,17 @@ class _CacheConfig( object ):
                  log_api_min_response_len=0,
                  log_api_min_latency=0.0,
                  log_api_ratelimit_interval=300,
-                 agent_log_path=None):
+                 agent_log_path=None,
+                 rate_limiter_max_query_retries=3,
+                 rate_limiter_num_agents=1,
+                 rate_limiter_initial_cluster_rate=20000,
+                 rate_limiter_max_cluster_rate=1E9,
+                 rate_limiter_min_cluster_rate=1,
+                 rate_limiter_consecutive_success_threshold=5,
+                 rate_limiter_strategy=BlockingRateLimiter.MULTIPLY,
+                 rate_limiter_increase_factor=2.0,
+                 rate_limiter_backoff_factor=0.5,
+                 rate_limiter_max_concurrency=1):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -736,7 +723,17 @@ class _CacheConfig( object ):
         @param log_api_min_response_len: Minimum response length of api responses to be logged.
         @param log_api_min_latency: Minimum latency of responses to be logged.
         @param log_api_ratelimit_interval: If positive, api calls with the same path will be rate-limited to a message every interval sec.
-        @param agent_log_path: directory where agent.log is locatedd
+        @param agent_log_path: directory where agent.log is located
+        @param rate_limiter_max_query_retries: Number of times to retry each rate-limited query
+        @param rate_limiter_num_agents: Number of agents in the cluster
+        @param rate_limiter_initial_cluster_rate: initial cluster rate (requests/sec)
+        @param rate_limiter_max_cluster_rate: upper bound on cluster rate (requests/sec)
+        @param rate_limiter_min_cluster_rate: lower bound on cluster rate (requests/sec)
+        @param rate_limiter_consecutive_success_threshold: number of consecutive successes to trigger a rate increase
+        @param rate_limiter_strategy: strategy for changing rate (multiply or reset-then-multiply)
+        @param rate_limiter_increase_factor: multiplicative factor for increasing rate
+        @param rate_limiter_backoff_factor: multiplicative factor for decreasing rate
+        @param rate_limiter_max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
 
         @type api_url: str
         @type verify_api_queries: bool
@@ -751,6 +748,16 @@ class _CacheConfig( object ):
         @type log_api_min_latency: float
         @type log_api_ratelimit_interval: int
         @type agent_log_path: str
+        @type rate_limiter_max_query_retries: int
+        @type rate_limiter_num_agents: int
+        @type rate_limiter_initial_cluster_rate: float
+        @type rate_limiter_max_cluster_rate: float
+        @type rate_limiter_min_cluster_rate: float
+        @type rate_limiter_consecutive_success_threshold: int
+        @type rate_limiter_strategy: str
+        @type rate_limiter_increase_factor: float
+        @type rate_limiter_backoff_factor: float
+        @type rate_limiter_max_concurrency: int
         """
 
         # NOTE: current implementations of __eq__ expects that fields set in contructor are only true state
@@ -768,6 +775,17 @@ class _CacheConfig( object ):
         self.log_api_min_latency = log_api_min_latency
         self.log_api_ratelimit_interval = log_api_ratelimit_interval
         self.agent_log_path = agent_log_path
+
+        self.rate_limiter_max_query_retries = rate_limiter_max_query_retries
+        self.rate_limiter_num_agents = rate_limiter_num_agents
+        self.rate_limiter_initial_cluster_rate = rate_limiter_initial_cluster_rate
+        self.rate_limiter_max_cluster_rate = rate_limiter_max_cluster_rate
+        self.rate_limiter_min_cluster_rate = rate_limiter_min_cluster_rate
+        self.rate_limiter_consecutive_success_threshold = rate_limiter_consecutive_success_threshold
+        self.rate_limiter_strategy = rate_limiter_strategy
+        self.rate_limiter_increase_factor = rate_limiter_increase_factor
+        self.rate_limiter_backoff_factor = rate_limiter_backoff_factor
+        self.rate_limiter_max_concurrency = rate_limiter_max_concurrency
 
     def __eq__( self, other ):
         """Equivalence method for _CacheConfig objects so == testing works """
@@ -789,7 +807,7 @@ class _CacheConfig( object ):
             s += '\n\t%s: %s' % (key, val)
         return s + '\n'
 
-    def need_new_k8s_object( self, new_config ):
+    def need_new_k8s_object(self, new_config):
         """
         Determines if a new KubernetesApi object needs to created for the cache based on the new config
         @param new_config: The new config options
@@ -800,7 +818,7 @@ class _CacheConfig( object ):
         relevant_fields = [
             'api_url', 'verify_api_queries', 'query_timeout', 'agent_log_path',
             'log_api_responses', 'log_api_exclude_200s', 'log_api_min_response_len',
-            'log_api_min_latency', 'log_api_ratelimit_interval'
+            'log_api_min_latency', 'log_api_ratelimit_interval',
         ]
         for field in relevant_fields:
             if getattr(self, field) != getattr(new_config, field):
@@ -830,13 +848,13 @@ class _CacheConfigState( object ):
             self.cache_expiry_fuzz_secs = state.cache_config.cache_expiry_fuzz_secs
             self.cache_start_fuzz_secs = state.cache_config.cache_start_fuzz_secs
 
-    def __init__( self, cache_config ):
+    def __init__(self, cache_config, global_config):
         """Set default values"""
         self._lock = threading.Lock()
         self.k8s = None
         self.cache_config = _CacheConfig(api_url='')
         self._pending_config = None
-        self.configure( cache_config )
+        self.configure(cache_config, global_config)
 
     def copy_state( self ):
         """
@@ -850,11 +868,18 @@ class _CacheConfigState( object ):
         finally:
             self._lock.release()
 
-    def configure(self, new_cache_config):
+    def configure(self, new_cache_config, global_config):
         """
-        Configures the state based on any changes in the configuration
+        Configures the state based on any changes in the configuration.
+
+        Whenever a new configuration is detected, a new instance of KubernetesApi will be created.
+        The KubernetesApi however, will reference a named BlockingRateLimiter since we need to share
+        BlockingRateLimiters across monitors.
+
         @param new_cache_config: the new configuration
+        @param global_config: global configuration object
         @type new_cache_config: _CacheConfig
+        @type global_config: Configuration object
         """
         # get old state values
         old_state = self.copy_state()
@@ -872,6 +897,9 @@ class _CacheConfigState( object ):
         # create a new k8s api object if we need one
         k8s = old_state.k8s
         if need_new_k8s:
+            rate_limiter = BlockingRateLimiter.get_instance('MAIN_K8S_RATELIMITER', global_config)
+            query_options = ApiQueryOptions(max_retries=new_cache_config.rate_limiter_max_query_retries,
+                                            rate_limiter=rate_limiter)
             args = {
                 'k8s_api_url': new_cache_config.api_url,
                 'query_timeout': new_cache_config.query_timeout,
@@ -880,12 +908,13 @@ class _CacheConfigState( object ):
                 'log_api_min_response_len': new_cache_config.log_api_min_response_len,
                 'log_api_min_latency': new_cache_config.log_api_min_latency,
                 'log_api_ratelimit_interval': new_cache_config.log_api_ratelimit_interval,
-                'agent_log_path': new_cache_config.agent_log_path
+                'agent_log_path': new_cache_config.agent_log_path,
+                'query_options': query_options,
             }
             if not new_cache_config.verify_api_queries:
                 args['ca_file'] = None
 
-            k8s = KubernetesApi( **args )
+            k8s = KubernetesApi(**args)
 
         # update with new values
         self._lock.acquire()
@@ -909,7 +938,9 @@ class _CacheConfigState( object ):
 
 class KubernetesCache( object ):
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, start_caching=True ):
+    def __init__(self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
+                 cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0, cache_purge_secs=300, start_caching=True,
+                 global_config=None):
 
         self._lock = threading.Lock()
 
@@ -924,7 +955,7 @@ class KubernetesCache( object ):
         )
 
         # set the initial state
-        self._state = _CacheConfigState( new_cache_config )
+        self._state = _CacheConfigState(new_cache_config, global_config)
 
         # create the controller cache
         self._controller_processor = ControllerProcessor()
@@ -942,6 +973,8 @@ class KubernetesCache( object ):
         self._initialized = False
 
         self._thread = None
+
+        self._rate_limiter = None
 
         if start_caching:
             self.start()
@@ -964,11 +997,11 @@ class KubernetesCache( object ):
         """
         return self._state.copy_state()
 
-    def update_config(self, new_cache_config):
+    def update_config(self, new_cache_config, global_config):
         """
         Updates the cache config
         """
-        self._state.configure(new_cache_config)
+        self._state.configure(new_cache_config, global_config)
 
         self._lock.acquire()
         try:
@@ -1045,6 +1078,7 @@ class KubernetesCache( object ):
 
             try:
                 self._update_cluster_name( local_state.k8s )
+                # TODO-163: investigate how to get rate limiter in here
                 self._update_api_server_version(local_state.k8s)
                 # TODO-163: investigate how to get rate limiter in here
                 runtime = self._get_runtime( local_state.k8s )
@@ -1159,7 +1193,7 @@ class KubernetesCache( object ):
         """
         return self._pods_cache.is_cached(namespace, name, allow_expired)
 
-    def controller(self, namespace, name, kind, current_time=None, query_options=None):
+    def controller(self, namespace, name, kind, current_time=None, query_option=None):
         """Returns controller info for the controller specified by namespace and name
         or None if no controller matches.
 
@@ -1174,8 +1208,7 @@ class KubernetesCache( object ):
         if local_state.k8s is None:
             return
 
-        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind,
-                                        query_options=query_options)
+        return self._controllers.lookup(local_state.k8s, current_time, namespace, name, kind=kind)
 
     def pods_shallow_copy(self):
         """Retuns a shallow copy of the pod objects"""
@@ -1226,9 +1259,9 @@ class KubernetesApi( object ):
                   log_api_min_response_len=False,
                   log_api_min_latency=0.0,
                   log_api_ratelimit_interval=300,
-                  agent_log_path=None):
-        """Init the kubernetes object
-        """
+                  agent_log_path=None,
+                  query_options=None):
+        """Init the kubernetes object"""
 
         # fixed well known location for authentication token required to
         # query the API
@@ -1291,6 +1324,11 @@ class KubernetesApi( object ):
 
         self._standard_headers["Authorization"] = "Bearer %s" % (token)
 
+        # A rate limiter should normally be passed unless no rate limiting is desired.
+        self._query_options = query_options
+        if not self._query_options or not self._query_options.rate_limiter:
+            global_log.warn("KubernetesAPI created without query options or rate limiter!\n%s" % traceback.format_exc())
+
     def _verify_connection( self ):
         """ Return whether or not to use SSL verification
         """
@@ -1325,7 +1363,9 @@ class KubernetesApi( object ):
         @return: The gitVersion extracted from /version JSON
         @rtype: str
         """
-        version_map = self.query_api('/version')
+        version_map = self.query_api_with_retries('/version', self._query_options,
+                                                  retry_error_context='get_api_server_version',
+                                                  retry_error_limit_key='get_api_server_version')
         return version_map.get('gitVersion')
 
     def get_cluster_name( self ):
@@ -1364,17 +1404,20 @@ class KubernetesApi( object ):
 
         @param query: Query string
         @param query_options: ApiQueryOptions containing retries and rate_limiter
-        @param retry_error_context: context string to be logged upon failure (if None)
+        @param retry_error_context: context object whose string representation is logged upon failure (if None)
         @param retry_error_limit_key: key for limiting retry logging
 
         @type query: str
         @type query_options: ApiQueryOptions
-        @type retry_error_context: str
+        @type retry_error_context: object
         @type retry_error_limit_key: str
 
         @return: json-decoded response of the query api call
         @rtype: dict or a scalyr_agent.json_lib.objects.JsonObject
         """
+        if not query_options:
+            return self.query_api(query)
+
         retries_left = query_options.max_retries
         rate_limiter = query_options.rate_limiter
         while True:
@@ -1561,7 +1604,7 @@ class KubernetesApi( object ):
                                        limit_once_per_x_secs=self.log_api_ratelimit_interval,
                                        limit_key="query-api-log-resp-%s" % util.md5_hexdigest(path))
 
-    def query_object( self, kind, namespace, name, query_options=None ):
+    def query_object( self, kind, namespace, name ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
             An empty dict is returned if the object kind is unknown, or if there is an error generating
             an appropriate query string
@@ -1583,12 +1626,9 @@ class KubernetesApi( object ):
                              limit_once_per_x_secs=300, limit_key='k8s_api_build_query-%s' % kind )
             return {}
 
-        if query_options is not None:
-            return self.query_api_with_retries(query, query_options,
-                                               retry_error_context='%s, %s, %s' % (kind, namespace, name),
-                                               retry_error_limit_key='query_object-%s' % kind)
-        else:
-            return self.query_api( query )
+        return self.query_api_with_retries(query, self._query_options,
+                                           retry_error_context='%s, %s, %s' % (kind, namespace, name),
+                                           retry_error_limit_key='query_object-%s' % kind)
 
     def query_objects( self, kind, namespace=None, filter=None ):
         """ Queries a list of objects from the k8s api based on an object kind, optionally limited by
@@ -1612,11 +1652,13 @@ class KubernetesApi( object ):
         if filter:
             query = "%s?fieldSelector=%s" % (query, urllib.quote( filter ))
 
-        return self.query_api( query )
+        return self.query_api_with_retries(query, self._query_options,
+                                           retry_error_context='%s, %s' % (kind, namespace),
+                                           retry_error_limit_key='query_objects-%s' % kind)
 
-    def query_pod( self, namespace, name ):
+    def query_pod(self, namespace, name):
         """Convenience method for query a single pod"""
-        return self.query_object( 'Pod', namespace, name )
+        return self.query_object('Pod', namespace, name, query_options=self._query_options)
 
     def query_pods( self, namespace=None, filter=None ):
         """Convenience method for query a single pod"""
@@ -1624,7 +1666,9 @@ class KubernetesApi( object ):
 
     def query_namespaces( self ):
         """Wrapper to query all namespaces"""
-        return self.query_api( '/api/v1/namespaces' )
+        return self.query_api_with_retries('/api/v1/namespaces', self._query_options,
+                                           retry_error_context='query_pods',
+                                           retry_error_limit_key='query_pods')
 
     def stream_events( self, path="/api/v1/watch/events", last_event=None ):
         """Streams k8s events from location specified at path"""
@@ -1699,10 +1743,14 @@ class KubeletApi( object ):
         return util.json_decode( response.text )
 
     def query_pods( self ):
-        return self.query_api( '/pods' )
+        return self.query_api_with_retries('/pods', self._query_options,
+                                           retry_error_context='query_pods',
+                                           retry_error_limit_key='query_pods')
 
     def query_stats( self ):
-        return self.query_api( '/stats/summary')
+        return self.query_api_with_retries('/stats/summary', self._query_options,
+                                           retry_error_context='stats_summary',
+                                           retry_error_limit_key='stats_summary')
 
 
 class DockerMetricFetcher(object):
@@ -1938,7 +1986,7 @@ def _create_k8s_cache():
         creates a new k8s cache object
     """
 
-    return KubernetesCache( start_caching=False )
+    return KubernetesCache(start_caching=False)
 
 # global cache object - the module loading system guarantees this is only ever
 # initialized once, regardless of how many modules import k8s.py
