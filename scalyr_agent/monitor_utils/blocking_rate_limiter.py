@@ -68,6 +68,9 @@ class BlockingRateLimiter(object):
     registry = {}
     registry_lock = threading.Lock()
 
+    def __repr__(self):
+        return '%s/%s' % (self.__class__.__name__, self._name)
+
     @classmethod
     def get_instance(cls, key, global_config, logger=None):
         """Returned a named instance of a rate limiter so that it can be shared by multiple threads/code areas
@@ -88,6 +91,7 @@ class BlockingRateLimiter(object):
                     global_config.k8s_ratelimit_backoff_factor,
                     global_config.k8s_ratelimit_max_concurrency,
                     logger=logger,
+                    name=key,
                 )
             return cls.registry[key]
         finally:
@@ -96,7 +100,7 @@ class BlockingRateLimiter(object):
     def __init__(self, num_agents, initial_cluster_rate, max_cluster_rate, min_cluster_rate,
                  consecutive_success_threshold,
                  strategy=MULTIPLY, increase_factor=2.0, backoff_factor=0.5,
-                 max_concurrency=1, logger=None, fake_clock=None):
+                 max_concurrency=1, logger=None, fake_clock=None, name=None):
         """
         @param num_agents: Number of agents in the cluster
         @param initial_cluster_rate: initial cluster rate (requests/sec)
@@ -108,6 +112,7 @@ class BlockingRateLimiter(object):
         @param backoff_factor: multiplicative factor for decreasing rate
         @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
         @param logger: If supplied, will log messages for debugging
+        @parm name: Name string for identification purposes (optional)
 
         @type num_agents: int
         @type initial_cluster_rate: float
@@ -119,6 +124,7 @@ class BlockingRateLimiter(object):
         @type backoff_factor: float
         @type max_concurrency: int
         @type logger: Logger
+        @type name: str
         """
         # Validate input (Note: will raise exception and thus kill the agent process if invalid)
         strategies = [self.STRATEGY_MULTIPLY, self.STRATEGY_RESET_THEN_MULTIPLY]
@@ -168,6 +174,8 @@ class BlockingRateLimiter(object):
         self._cluster_rate_lock = threading.RLock()
 
         self._max_concurrency = max_concurrency
+
+        self._name = name
 
         # A queue of tokens
         self._ripe_time = None
