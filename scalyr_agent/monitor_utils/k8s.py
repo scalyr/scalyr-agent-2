@@ -16,10 +16,10 @@ import time
 from time import strftime, gmtime
 import traceback
 import scalyr_agent.scalyr_logging as scalyr_logging
-
 import urllib
 
 global_log = scalyr_logging.getLogger(__name__)
+
 
 # A regex for splitting a container id and runtime
 _CID_RE = re.compile( '^(.+)://(.+)$' )
@@ -92,15 +92,19 @@ def cache(global_config):
         @param config: The configuration
         @type config: A Scalyr Configuration object
     """
-    cache_config = _CacheConfig( api_url=global_config.k8s_api_url,
-                                 verify_api_queries=global_config.k8s_verify_api_queries,
-                                 cache_expiry_secs=global_config.k8s_cache_expiry_secs,
-                                 cache_expiry_fuzz_secs=global_config.k8s_cache_expiry_fuzz_secs,
-                                 cache_start_fuzz_secs=global_config.k8s_cache_start_fuzz_secs,
-                                 cache_purge_secs=global_config.k8s_cache_purge_secs,
-                                 query_timeout=global_config.k8s_cache_query_timeout_secs,
-                                 log_api_responses_to_disk=global_config.k8s_log_api_responses_to_disk,
-                                 agent_log_path=global_config.agent_log_path)
+    cache_config = _CacheConfig(api_url=global_config.k8s_api_url,
+                                verify_api_queries=global_config.k8s_verify_api_queries,
+                                cache_expiry_secs=global_config.k8s_cache_expiry_secs,
+                                cache_expiry_fuzz_secs=global_config.k8s_cache_expiry_fuzz_secs,
+                                cache_start_fuzz_secs=global_config.k8s_cache_start_fuzz_secs,
+                                cache_purge_secs=global_config.k8s_cache_purge_secs,
+                                query_timeout=global_config.k8s_cache_query_timeout_secs,
+                                log_api_responses=global_config.k8s_log_api_responses,
+                                log_api_exclude_200s=global_config.k8s_log_api_exclude_200s,
+                                log_api_min_response_len=global_config.k8s_log_api_min_response_len,
+                                log_api_min_latency=global_config.k8s_log_api_min_latency,
+                                log_api_ratelimit_interval=global_config.k8s_log_api_ratelimit_interval,
+                                agent_log_path=global_config.agent_log_path)
 
     #update the config and return current cache
     _k8s_cache.update_config( cache_config )
@@ -710,9 +714,15 @@ class _CacheConfig( object ):
     Internal configuration options for the Kubernetes cache
     """
 
-    def __init__( self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
-                  cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0,
-                  query_timeout=20, log_api_responses_to_disk=False, agent_log_path=None):
+    def __init__(self, api_url="https://kubernetes.default", verify_api_queries=True, cache_expiry_secs=30,
+                 cache_purge_secs=300, cache_expiry_fuzz_secs=0, cache_start_fuzz_secs=0,
+                 query_timeout=20,
+                 log_api_responses=False,
+                 log_api_exclude_200s=False,
+                 log_api_min_response_len=0,
+                 log_api_min_latency=0.0,
+                 log_api_ratelimit_interval=300,
+                 agent_log_path=None):
         """
         @param api_url: the url for querying the k8s api
         @param verify_api_queries: whether to verify queries to the k8s api
@@ -721,7 +731,11 @@ class _CacheConfig( object ):
         @param cache_start_fuzz_secs: if greater than zero, the number of seconds to fuzz the start time to avoid query stampede
         @param cache_purge_secs: the number of seconds to wait before purging old controllers from the cache
         @param query_timeout: The number of seconds to wait before a query to the API server times out
-        @param log_api_responses_to_disk: whether to log k8s api calls to disk (for debugging)
+        @param log_api_responses: whether to log k8s api calls to disk (for debugging)
+        @param log_api_exclude_200s: If True, do not log successes (response code 2xx)
+        @param log_api_min_response_len: Minimum response length of api responses to be logged.
+        @param log_api_min_latency: Minimum latency of responses to be logged.
+        @param log_api_ratelimit_interval: If positive, api calls with the same path will be rate-limited to a message every interval sec.
         @param agent_log_path: directory where agent.log is locatedd
 
         @type api_url: str
@@ -731,7 +745,11 @@ class _CacheConfig( object ):
         @type cache_start_fuzz_secs: int or float
         @type cache_purge_secs: int or float
         @type query_timeout: int
-        @type log_api_responses_to_disk: bool
+        @type log_api_responses: bool
+        @type log_api_exclude_200s: bool
+        @type log_api_min_response_len: int
+        @type log_api_min_latency: float
+        @type log_api_ratelimit_interval: int
         @type agent_log_path: str
         """
 
@@ -744,7 +762,11 @@ class _CacheConfig( object ):
         self.cache_start_fuzz_secs = cache_start_fuzz_secs
         self.cache_purge_secs = cache_purge_secs
         self.query_timeout = query_timeout
-        self.log_api_responses_to_disk = log_api_responses_to_disk
+        self.log_api_responses = log_api_responses
+        self.log_api_exclude_200s = log_api_exclude_200s
+        self.log_api_min_response_len = log_api_min_response_len
+        self.log_api_min_latency = log_api_min_latency
+        self.log_api_ratelimit_interval = log_api_ratelimit_interval
         self.agent_log_path = agent_log_path
 
     def __eq__( self, other ):
@@ -776,8 +798,9 @@ class _CacheConfig( object ):
                  current and the new config.  False otherwise.
         """
         relevant_fields = [
-            'api_url', 'verify_api_queries', 'query_timeout',
-            'log_api_responses_to_disk', 'agent_log_path',
+            'api_url', 'verify_api_queries', 'query_timeout', 'agent_log_path',
+            'log_api_responses', 'log_api_exclude_200s', 'log_api_min_response_len',
+            'log_api_min_latency', 'log_api_ratelimit_interval'
         ]
         for field in relevant_fields:
             if getattr(self, field) != getattr(new_config, field):
@@ -852,7 +875,11 @@ class _CacheConfigState( object ):
             args = {
                 'k8s_api_url': new_cache_config.api_url,
                 'query_timeout': new_cache_config.query_timeout,
-                'log_api_responses_to_disk': new_cache_config.log_api_responses_to_disk,
+                'log_api_responses': new_cache_config.log_api_responses,
+                'log_api_exclude_200s': new_cache_config.log_api_exclude_200s,
+                'log_api_min_response_len': new_cache_config.log_api_min_response_len,
+                'log_api_min_latency': new_cache_config.log_api_min_latency,
+                'log_api_ratelimit_interval': new_cache_config.log_api_ratelimit_interval,
                 'agent_log_path': new_cache_config.agent_log_path
             }
             if not new_cache_config.verify_api_queries:
@@ -893,7 +920,6 @@ class KubernetesCache( object ):
             cache_expiry_fuzz_secs=cache_expiry_fuzz_secs,
             cache_start_fuzz_secs=cache_start_fuzz_secs,
             cache_purge_secs=cache_purge_secs,
-            log_api_responses_to_disk=False,
             agent_log_path=None
         )
 
@@ -1049,6 +1075,7 @@ class KubernetesCache( object ):
 
         # start the main update loop
         last_purge = time.time()
+        last_version_check_time = 0
         while run_state.is_running():
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
@@ -1060,9 +1087,11 @@ class KubernetesCache( object ):
                 self._pods_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name( local_state.k8s )
-                # TODO-163: Don't call this every time through the loop
-                # Maybe once an hour or once a day
-                self._update_api_server_version(local_state.k8s)
+
+                # Update the api server version every hour
+                if current_time - last_version_check_time > 3600:
+                    self._update_api_server_version(local_state.k8s)
+                    last_version_check_time = current_time
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log(
@@ -1192,7 +1221,12 @@ class KubernetesApi( object ):
     def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                   k8s_api_url="https://kubernetes.default",
                   query_timeout=20,
-                  log_api_responses_to_disk=False, agent_log_path=None):
+                  log_api_responses=False,
+                  log_api_exclude_200s=False,
+                  log_api_min_response_len=False,
+                  log_api_min_latency=0.0,
+                  log_api_ratelimit_interval=300,
+                  agent_log_path=None):
         """Init the kubernetes object
         """
 
@@ -1203,7 +1237,12 @@ class KubernetesApi( object ):
         # fixed well known location for namespace file
         namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
-        self.log_api_responses_to_disk = log_api_responses_to_disk
+        self.log_api_responses = log_api_responses
+        self.log_api_exclude_200s = log_api_exclude_200s
+        self.log_api_min_response_len = log_api_min_response_len
+        self.log_api_min_latency = log_api_min_latency
+        self.log_api_ratelimit_interval = log_api_ratelimit_interval
+
         self.agent_log_path = agent_log_path
 
         self._http_host = k8s_api_url
@@ -1451,21 +1490,27 @@ class KubernetesApi( object ):
 
         response = None
 
-        # Optionally save api json to disk
-        log_responses = self.log_api_responses_to_disk and self.agent_log_path
-        logged_response_file = None
-        if log_responses:
-            logged_response_file = self.__open_api_response_log(path, rate_limited)
-        try:
-            # Optionally prepend stack trace into logged response file
-            if logged_response_file:
-                traceback.print_stack(file=logged_response_file)
-                logged_response_file.write('\n\n')
+        # Various state used logging of responses
+        log_responses = self.log_api_responses
+        logged_response = []
+        response_status_code = -1
+        response_len = 0
 
-            if logged_response_file:
-                self.__check_for_fake_response(logged_response_file)
+        try:
+            # Optionally prepend stack trace into logged response
+            if log_responses:
+                limited_txt = ''
+                if rate_limited:
+                    limited_txt = ' (rate limited)'
+                logged_response.append('k8s.query_api%s: %s' % (limited_txt, path))
+                stack_trace = ''.join(traceback.format_stack())
+                logged_response.append('\\n%s' % stack_trace.replace('\n', '\\n'))
 
             # Make actual API call
+            latency = float('inf')
+            examine_latency = log_responses and self.log_api_min_latency > 0
+            if examine_latency:
+                t1 = time.time()
             try:
                 response = self._session.get( url, verify=self._verify_connection(), timeout=self.query_timeout )
                 response.encoding = "utf-8"
@@ -1474,6 +1519,15 @@ class KubernetesApi( object ):
                     raise K8sApiTemporaryError('Temporary error seen while accessing api: %s' % str(e))
                 else:
                     raise
+            finally:
+                # conditionally record latency regardless of exception
+                if examine_latency:
+                    latency = time.time() - t1
+
+            # No exception case: record response status code and length
+            response_status_code = response.status_code
+            if response.text:
+                response_len = len(response.text)
 
             if response.status_code != 200:
                 if response.status_code == 401 or response.status_code == 403:
@@ -1488,15 +1542,24 @@ class KubernetesApi( object ):
                 else:
                     raise K8sApiException( "Invalid response from Kubernetes API when querying '%s': %s" %( path, str( response ) ), status_code=response.status_code )
 
-            # Optionally append response text into logged response file
-            if logged_response_file:
-                logged_response_file.write(response.text)
+            # Optionally prepend stack trace into logged response
+            # newlines should become literal '\n' so that the entire response is a single line
+            if log_responses and response.text:
+                logged_response.append(response.text.replace('\n', '\\n'))
 
             return util.json_decode( response.text )
 
         finally:
-            if logged_response_file:
-                logged_response_file.close()
+            # Only debug-log the response if all criteria (status code, latency, response len) are satisfied
+            if log_responses:
+                # Always log non-200 responses (using integer division to inspect first digit.
+                # For 200 responses, only log if log_api_exclude_200s is False.
+                if (response_status_code//100) != 2 or not self.log_api_exclude_200s:
+                    if response_len >= self.log_api_min_response_len and latency >= self.log_api_min_latency:
+                        # Log the url, stacktrace and response text as a single line of text
+                        global_log.log(scalyr_logging.DEBUG_LEVEL_1, '\\n\\n'.join(logged_response),
+                                       limit_once_per_x_secs=self.log_api_ratelimit_interval,
+                                       limit_key="query-api-log-resp-%s" % util.md5_hexdigest(path))
 
     def query_object( self, kind, namespace, name, query_options=None ):
         """ Queries a single object from the k8s api based on an object kind, a namespace and a name
