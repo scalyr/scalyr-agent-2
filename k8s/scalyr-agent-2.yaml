@@ -19,24 +19,29 @@ spec:
               secretKeyRef:
                 name: scalyr-api-key
                 key: scalyr-api-key
-          - name: SCALYR_K8S_CLUSTER_NAME
+          - name: SCALYR_K8S_NODE_NAME
             valueFrom:
-              configMapKeyRef:
-                 name: scalyr-config
-                 key: k8s_cluster
-                 optional: true
-          - name: SCALYR_SERVER
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: SCALYR_K8S_POD_NAME
             valueFrom:
-              configMapKeyRef:
-                 name: scalyr-config
-                 key: scalyr_server
-                 optional: true
-          - name: SCALYR_K8S_EVENTS_DISABLE
+              fieldRef:
+                fieldPath: metadata.name
+          - name: SCALYR_K8S_POD_NAMESPACE
             valueFrom:
-              configMapKeyRef:
-                 name: scalyr-config
-                 key: k8s_events_disable
-                 optional: true
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: SCALYR_K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
+          - name: SCALYR_K8S_KUBELET_HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        envFrom:
+          - configMapRef:
+              name: scalyr-config
         resources:
           limits:
             memory: 500Mi

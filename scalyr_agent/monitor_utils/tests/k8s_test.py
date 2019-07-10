@@ -112,14 +112,6 @@ class Test_K8sCache( ScalyrTestCase ):
         self.k8s.set_response( self.NAMESPACE_1, self.POD_1, permanent_error=True )
         self.assertRaises( K8sApiPermanentError, lambda: self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1, query_options=query_options ) )
 
-    def test_return_none_on_query_error_with_options( self ):
-        query_options = ApiQueryOptions()
-        query_options.raise_exception_on_cache_query_error = False
-
-        self.k8s.set_response( self.NAMESPACE_1, self.POD_1, permanent_error=True )
-        obj = self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1, query_options=query_options )
-        self.assertIsNone( obj )
-
     def test_return_none_on_query_error_without_options( self ):
 
         self.k8s.set_response( self.NAMESPACE_1, self.POD_1, permanent_error=True )
