@@ -21,18 +21,18 @@ __author__ = 'echee@scalyr.com'
 
 import mock
 from mock import patch
-import threading
-import time
+import os
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor, ControlledCacheWarmer
-from scalyr_agent.monitor_utils.k8s import K8sApiTemporaryError, K8sApiPermanentError
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.json_lib import JsonObject, JsonArray
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubernetesCache, ApiQueryOptions
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.tests.copying_manager_test import FakeMonitor
-from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache, FakeK8s
+from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache
 
 
 class KubernetesMonitorTest(ScalyrTestCase):
@@ -501,3 +501,94 @@ class TestExtraServerAttributes(ScalyrTestCase):
             self.assertEquals(copying_manager._CopyingManager__expanded_server_attributes.get('_k8s_ver'), 'star')
         run_test()
 
+
+class K8sCacheTest(ScalyrTestCase):
+
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.saved_env)
+
+    def setUp(self):
+        self.saved_env = dict(os.environ)
+        os.environ.clear()
+        os.environ['SCALYR_K8S_POD_NAME'] = 'my_pod'
+        os.environ['SCALYR_K8S_POD_NAMESPACE'] = 'my_namespace'
+        os.environ['SCALYR_K8S_NODE_NAME'] = 'my_node'
+
+    def test_create_k8s_cache(self):
+        """This test actually starts up a KubernetesMonitor and then validates that the internal KubernetesCache
+        contains the main BlockingRateLimiter, further verifying that it's settings comply with that set in the
+        global Configuration.
+        """
+
+        def do_nothing(x):
+            return
+
+        @patch.object(KubeletApi, 'query_pods')
+        @patch.object(KubernetesApi, 'query_api_with_retries')
+        @patch.object(KubernetesMonitor, '_KubernetesMonitor__get_socket_file')
+        def start_test(m1, m2, m3):
+
+            fake_clock = FakeClock()
+            manager, global_config = ScalyrTestUtils.create_test_monitors_manager(
+                config_monitors=[
+                    {
+                        'module': "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                    }
+                ],
+                extra_toplevel_config={
+                    'k8s_ratelimit_cluster_rps_init': 777.0,
+                    'api_socket': '/var/scalyr/docker.sock'
+                },
+                null_logger=True,
+                fake_clock=fake_clock,
+            )
+            k8s_mon = manager.monitors[0]
+            manager.set_user_agent_augment_callback(do_nothing)
+            manager.start_manager()
+
+            fake_clock.advance_time(increment_by=30)
+            fake_clock.block_until_n_waiting_threads(2)
+
+            # get the k8s monitor's cache
+            kubernetes_cache = k8s_mon._KubernetesMonitor__get_k8s_cache()
+
+            # verify the cache uses the main rate limiter, which gets config values from global config
+            self.assertIsNotNone(kubernetes_cache)
+            k8s_api = kubernetes_cache.local_state().k8s
+            rate_limiter = k8s_api._rate_limiter
+            self.assertEquals(rate_limiter._initial_cluster_rate, 777.0)
+            self.assertEquals(
+                rate_limiter,
+                BlockingRateLimiter.get_instance('K8S_CACHE_MAIN_RATELIMITER', global_config)
+            )
+
+            manager.stop_manager(wait_on_join=False)
+        start_test()
+
+    def test_query_options_override(self):
+        """This tests ensures query_options is passed all the way down from
+        _K8sCache.lookup() -> KubernetesApi.query_api_with_retries.
+
+        The key check is in mock_query_api_with_retries() which the mock framework will call as a side effect of
+        KubernetesApi.query_api_with_retries().  This gives us an opportunity to validate that the query_options
+        is the same as that passed in from pod()
+        """
+        rate_limiter = BlockingRateLimiter(
+            num_agents=1, initial_cluster_rate=100, max_cluster_rate=1000, min_cluster_rate=1,
+            consecutive_success_threshold=1,
+            strategy='multiply',
+        )
+
+        options = ApiQueryOptions(rate_limiter=rate_limiter)
+
+        def mock_query_api_with_retries(query, query_options='not-set', retry_error_context=None, retry_error_limit_key=None):
+            self.assertEquals(query_options, options)
+
+        with patch.object(KubernetesApi, 'query_api_with_retries') as m:
+            m.side_effect = mock_query_api_with_retries
+            kubernetes_cache = KubernetesCache(start_caching=False)
+
+            # since we aren't actually starting the full monitor/agent, we will eventually fail with an Attribute error
+            self.assertRaises(AttributeError,
+                              lambda: kubernetes_cache.pod('my_namespace', 'my_pod', query_options=options))

@@ -325,7 +325,8 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             result = k8s.query_api_with_retries('/api/v1/nodes/%s' % node,
                                                 retry_error_context=node, retry_error_limit_key='k8se_check_if_alive')
         except Exception, e:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node)
+            global_log.log(scalyr_logging.DEBUG_LEVEL_1,
+                           "_check_if_alive False for node %s. Exception: %s" % (node, e))
             return False
 
         # if we are here, then the above node exists so return True
@@ -499,6 +500,24 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         return ( kind, namespace, name )
 
+    def _create_k8s_api(self, rate_limiter_key, global_config):
+        _k8s = None
+        kwargs = {
+            'k8s_api_url': global_config.k8s_api_url,
+            'log_api_responses': global_config.k8s_log_api_responses,
+            'log_api_exclude_200s': global_config.k8s_log_api_exclude_200s,
+            'log_api_min_response_len': global_config.k8s_log_api_min_response_len,
+            'log_api_min_latency': global_config.k8s_log_api_min_latency,
+            'log_api_ratelimit_interval': global_config.k8s_log_api_ratelimit_interval,
+            'agent_log_path': global_config.agent_log_path,
+            'query_options_max_retries': global_config.k8s_controlled_warmer_max_query_retries,
+            'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, global_config, logger=global_log),
+        }
+        if not global_config.k8s_verify_api_queries:
+            kwargs['ca_file'] = None
+        _k8s = KubernetesApi(**kwargs)
+        return _k8s
+
     def run(self):
         """Begins executing the monitor, writing metric output to logger.
         """
@@ -506,39 +525,19 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             global_log.info('kubernetes_events_monitor exiting because it has been disabled.')
             return
 
-        def _create_k8s_api(rate_limiter_key):
-            _k8s = None
-            kwargs = {
-                'k8s_api_url': k8s_api_url,
-                'log_api_responses': self._global_config.log_api_responses,
-                'log_api_exclude_200s': self._global_config.log_api_exclude_200s,
-                'log_api_min_response_len': self._global_config.log_api_min_response_len,
-                'log_api_min_latency': self._global_config.log_api_min_latency,
-                'log_api_ratelimit_interval': self._global_config.log_api_ratelimit_interval,
-                'agent_log_path': self._global_config.agent_log_path,
-                'query_options_max_retries': self._global_config.k8s_controlled_warmer_max_query_retries,
-                'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, self._global_config,
-                                                                 logger=global_log),
-            }
-            if not k8s_verify_api_queries:
-                kwargs['ca_file'] = None
-            _k8s = KubernetesApi(**kwargs)
-            return _k8s
-
         try:
-            k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
-
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
 
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self.module_name, self.log_config )
 
-            k8s_with_main_ratelimiter = _create_k8s_api('K8S_CACHE_MAIN_RATELIMITER')
-            k8s_with_events_ratelimiter = _create_k8s_api('K8S_EVENTS_RATELIMITER')
-            k8s_events_query_options = ApiQueryOptions(max_retries=self.__max_query_retries,
-                                                       rate_limiter=k8s_with_events_ratelimiter)
+            k8s_with_main_ratelimiter = self._create_k8s_api('K8S_CACHE_MAIN_RATELIMITER', self._global_config)
+            k8s_with_events_ratelimiter = self._create_k8s_api('K8S_EVENTS_RATELIMITER', self._global_config)
+            k8s_events_query_options = ApiQueryOptions(
+                max_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+                rate_limiter=k8s_with_events_ratelimiter.rate_limiter
+            )
 
             pod_name = k8s_with_main_ratelimiter.get_pod_name()
             self._node_name = k8s_with_main_ratelimiter.get_node_name( pod_name )

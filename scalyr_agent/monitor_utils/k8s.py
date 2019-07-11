@@ -1093,7 +1093,8 @@ class KubernetesCache( object ):
             run_state.sleep_but_awaken_if_stopped( local_state.cache_expiry_secs - fuzz_factor )
 
 
-    def pod(self, namespace, name, current_time=None, allow_expired=True, query_options=None):
+    def pod(self, namespace, name, current_time=None, allow_expired=True, query_options=None,
+            ignore_k8s_api_exception=False):
         """Returns pod info for the pod specified by namespace and name or None if no pad matches.
 
         Warning: Failure to pass current_time leads to incorrect recording of last access times, which will
@@ -1111,7 +1112,8 @@ class KubernetesCache( object ):
             return
 
         return self._pods_cache.lookup(local_state.k8s, current_time, namespace, name, kind='Pod',
-                                       allow_expired=allow_expired, query_options=query_options)
+                                       allow_expired=allow_expired, query_options=query_options,
+                                       ignore_k8s_api_exception=ignore_k8s_api_exception)
 
     def is_pod_cached(self, namespace, name, allow_expired):
         """Returns true if the specified pod is in the cache and isn't expired.
@@ -1267,8 +1269,10 @@ class KubernetesApi( object ):
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
-        if not self._rate_limiter:
-            global_log.warn("ECHEE: KubernetesAPI created without rate limiter!\n%s" % traceback.format_exc())
+
+    @property
+    def rate_limiter(self):
+        return self._rate_limiter
 
     @property
     def default_query_options(self):
@@ -1370,7 +1374,6 @@ class KubernetesApi( object ):
 
         if query_options == 'not-set':
             query_options = self.default_query_options
-        global_log.info('ECHEE query_api_with_retries url=%s, rl=%s, source = \n%s\n' % (query, query_options.rate_limiter, traceback.format_stack()))
 
         retries_left = query_options.max_retries
         rate_limiter = query_options.rate_limiter
@@ -1580,6 +1583,7 @@ class KubernetesApi( object ):
             return {}
 
         return self.query_api_with_retries(query,
+                                           query_options=query_options,
                                            retry_error_context='%s, %s, %s' % (kind, namespace, name),
                                            retry_error_limit_key='query_object-%s' % kind)
 
