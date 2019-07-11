@@ -224,10 +224,8 @@ class ScalyrAgent(object):
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
             # status.
             if command != 'stop' and command != 'status':
-                import traceback
                 raise Exception('Error reading configuration file: %s\n'
-                                'Terminating agent, please fix the configuration file and restart agent.\n%s'
-                                % (str(e), traceback.format_exc()))
+                                'Terminating agent, please fix the configuration file and restart agent.' % str(e))
             else:
                 self.__config = None
                 print >> sys.stderr, 'Could not parse configuration file at \'%s\'' % config_file_path
