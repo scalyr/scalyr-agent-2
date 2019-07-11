@@ -115,7 +115,7 @@ class Test_K8sCache( ScalyrTestCase ):
     def test_return_none_on_query_error_without_options( self ):
 
         self.k8s.set_response( self.NAMESPACE_1, self.POD_1, permanent_error=True )
-        obj = self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1 )
+        obj = self.cache.lookup( self.k8s, self.clock.time(), self.NAMESPACE_1, self.POD_1, ignore_k8s_api_exception=True )
         self.assertIsNone( obj )
 
 
