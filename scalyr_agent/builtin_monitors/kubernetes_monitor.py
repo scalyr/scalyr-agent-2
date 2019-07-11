@@ -33,7 +33,7 @@ import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
-from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName
+from scalyr_agent.monitor_utils.k8s import K8sApiException, K8sApiPermanentError, DockerMetricFetcher, QualifiedName
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
@@ -1131,7 +1131,8 @@ def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to
                                             )
                                             continue
 
-                                        pod = k8s_cache.pod(namespace, pod_name, current_time)
+                                        pod = k8s_cache.pod(namespace, pod_name, current_time,
+                                                            ignore_k8s_api_exception=True)
                                         if pod:
                                             k8s_info['pod_info'] = pod
 
@@ -1312,7 +1313,7 @@ class CRIEnumerator( ContainerEnumerator ):
 
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
-                    pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
+                    pod = k8s_cache.pod(pod_namespace, pod_name, current_time, ignore_k8s_api_exception=True)
                     if pod:
                         # check to see if we should exclude this container
                         default_exclude = not k8s_include_by_default
@@ -1965,7 +1966,7 @@ class ContainerChecker(object):
             if self.__include_controller_info and cluster_name is not None:
                 container_attributes['_k8s_cn'] = cluster_name
 
-            pod = k8s_cache.pod( pod_namespace, pod_name )
+            pod = k8s_cache.pod(pod_namespace, pod_name, ignore_k8s_api_exception=True)
             if pod:
                 rename_vars['node_name'] = pod.node_name
 
