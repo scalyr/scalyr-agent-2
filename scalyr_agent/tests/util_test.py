@@ -693,8 +693,13 @@ class FakeSys(object):
 
         def wait_for_bytes(self, timeout):
             self._condition.acquire()
-            self._condition.wait(timeout)
-            self._condition.release()
+            try:
+                if self._last_write is not None:
+                    return
+                self._condition.wait(timeout)
+            finally:
+                self._condition.release()
+
 
 
 def always_true():
