@@ -628,7 +628,7 @@ class TestableCopyingManager(CopyingManager):
             # This notifies any threads waiting in the `run_and_stop_at` method.  They would be blocking waiting for
             # the CopyingManager thread to stop at this point.
             self.__test_state_cv.notifyAll()
-            # We need to wait until some other state is set as the stop state.  The `notifyAll` in `run_and_stop_at_at`
+            # We need to wait until some other state is set as the stop state.  The `notifyAll` in `run_and_stop_at`
             # method will wake us up.
             self.__test_state_cv_wait_with_timeout(start_time)
 
