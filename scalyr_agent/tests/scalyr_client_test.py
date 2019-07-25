@@ -32,9 +32,9 @@ class AddEventsRequestTest(ScalyrTestCase):
 
     def setUp(self):
         self.__body = {'token': 'fakeToken'}
+        scalyr_client._set_last_timestamp(0)
 
     def test_basic_case(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
@@ -80,7 +80,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_maximum_bytes_exceeded(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body, max_size=103)
         request.set_client_time(1)
 
@@ -93,7 +92,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_maximum_bytes_exceeded_from_threads(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body, max_size=100)
         request.set_client_time(1)
 
@@ -107,7 +105,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_set_position(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
         position = request.position()
@@ -124,7 +121,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_set_position_with_thread(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
         position = request.position()
@@ -144,7 +140,6 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.close()
 
     def test_set_client_time(self):
-        scalyr_client._set_last_timestamp( 0 )
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
 
