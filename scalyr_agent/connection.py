@@ -18,20 +18,25 @@
 __author__ = 'imron@scalyr.com'
 
 import httplib
+import os
 import re
+import ssl
 import socket
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+from certvalidator import CertificateValidator, ValidationContext, errors as CertValidationErrors
+from asn1crypto import x509, pem
+
 
 log = scalyr_logging.getLogger(__name__)
 
 # noinspection PyBroadException
 try:
-    import ssl
+    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
 
 
 class ConnectionFactory:
@@ -70,12 +75,13 @@ class ConnectionFactory:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
                 result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
+                log.warn('RequestsConnection uses ssl lib and is not TLS 1.2 compliant')
             except Exception, e:
                 log.warn( "Unable to load requests module '%s'.  Falling back to Httplib for connection handling" % str( e ) )
-                result = HttplibConnection( server, request_deadline, ca_file, headers )
+                result = ScalyrHttpConnection(server, request_deadline, ca_file, headers)
                 use_requests = False
         else:
-            result = HttplibConnection( server, request_deadline, ca_file, headers)
+            result = ScalyrHttpConnection(server, request_deadline, ca_file, headers)
 
         if not quiet:
             if use_requests:
@@ -116,6 +122,7 @@ class Connection( object ):
         self._full_address = server
         self._ca_file = ca_file
         self._request_deadline = request_deadline
+        self.__connection = None
             
     def __check_ssl( self ):
         """ Helper function to check if ssl is available and enabled """
@@ -169,12 +176,75 @@ class Connection( object ):
         """Subclasses override to close a connection"""
         pass
 
-class HttplibConnection( Connection ):
-    def __init__( self, server, request_deadline, ca_file, headers ):
+    @property
+    def is_pure_python_tls(self):
+        """Subclasses override to close a connection"""
+        pass
 
-        super( HttplibConnection, self ).__init__( server, request_deadline, ca_file, headers )
+
+class ScalyrHttpConnection(Connection):
+    def __init__(self, server, request_deadline, ca_file, headers):
+        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, headers)
         self.__http_response = None
+        try:
+            self._init_connection(pure_python_tls=False)
+            log.info('HttpConnection uses native os ssl')
+        except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+            self._init_connection(pure_python_tls=True)
+            log.info('HttpConnection uses pure-python TLS')
 
+    def _validate_chain(self, tlslite_connection, server, ca_file):
+        # validate server certificate chain
+        session = tlslite_connection.sock.session
+        assert type(session.serverCertChain.x509List) == list
+
+        # get the end-entity cert
+        file_bytes = session.serverCertChain.x509List[0].bytes
+        end_entity_cert = x509.Certificate.load(str(file_bytes))
+
+        cert_dir = os.path.dirname(ca_file)
+
+        def get_cert_bytes(file_names):
+            file_names = [os.path.join(cert_dir, f) for f in file_names]
+            result = []
+            for fname in file_names:
+                arr = open(fname, 'rb').read()
+                cert_bytes = pem.unarmor(arr)[2]
+                result.append(cert_bytes)
+            return result
+
+        trust_roots = None
+        intermediate_certs = get_cert_bytes([
+            'comodo_ca_intermediate.pem',
+            'sectigo_ca_intermediate.pem'
+        ])
+        extra_trust_roots = get_cert_bytes([
+            'scalyr_agent_ca_root.pem',
+            'addtrust_external_ca_root.pem'
+        ])
+
+        if trust_roots:
+            context = ValidationContext(
+                trust_roots=trust_roots,
+                extra_trust_roots=extra_trust_roots,
+                other_certs=intermediate_certs,
+                # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+            )
+        else:
+            context = ValidationContext(
+                extra_trust_roots=extra_trust_roots,
+                other_certs=intermediate_certs,
+                # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+            )
+        try:
+            validator = CertificateValidator(end_entity_cert, validation_context=context)
+            validator.validate_tls(unicode(server))
+            log.info('Scalyr server chain successfully validated')
+        except CertValidationErrors, ce:
+            log.exception('Error validating server certificate chain: %s' % ce)
+            raise  # echee TODO remove
+
+    def _init_connection(self, pure_python_tls=False):
         try:
             if self._use_ssl:
                 # If we do not have the SSL library, then we cannot do server certificate validation anyway.
@@ -182,13 +252,25 @@ class HttplibConnection( Connection ):
                     ca_file = self._ca_file
                 else:
                     ca_file = None
-                self.__connection = HTTPSConnectionWithTimeoutAndVerification(self._host, self._port,
-                                                                              self._request_deadline,
-                                                                              ca_file, __has_ssl__)
+
+                if not pure_python_tls:
+                    self.__connection = HTTPSConnectionWithTimeoutAndVerification(self._host, self._port,
+                                                                                  self._request_deadline,
+                                                                                  ca_file, __has_ssl__)
+                    self.__connection.connect()
+                else:
+                    settings = HandshakeSettings()
+                    settings.minVersion = (3, 3)  # TLS 1.2
+                    self.__connection = HTTPTLSConnection(
+                        self._host, self._port, timeout=self._request_deadline, settings=settings
+                    )
+                    self.__connection.connect()
+                    self._validate_chain(self.__connection, self._host, ca_file)
 
             else:
+                # unencrypted connection
                 self.__connection = HTTPConnectionWithTimeout(self._host, self._port, self._request_deadline)
-            self.__connection.connect()
+                self.__connection.connect()
         except (socket.error, socket.herror, socket.gaierror), error:
             if hasattr(error, 'errno'):
                 errno = error.errno
@@ -240,6 +322,11 @@ class HttplibConnection( Connection ):
     def close( self ):
         self.__connection.close()
 
+    @property
+    def is_pure_python_tls(self):
+        return isinstance(self.__connection, HTTPTLSConnection)
+
+
 class HTTPConnectionWithTimeout(httplib.HTTPConnection):
     """An HTTPConnection replacement with added support for setting a timeout on all blocking operations.
 
@@ -286,6 +373,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
                 encrypted.
             has_ssl:  True if the ssl Python library is available.
         """
+        raise Exception('ECHEE TODO: REMOVE THIS')
         if not has_ssl and ca_file is not None:
             raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
         self.__timeout = timeout
