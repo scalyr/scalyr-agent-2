@@ -531,7 +531,7 @@ class RunState(object):
         deadline = self.__fake_clock.time() + timeout
 
         def deadline_exceeded_or_not_running(current_time):
-            return current_time > deadline or not self.is_running()
+            return current_time >= deadline or not self.is_running()
 
         self.__fake_clock.simulate_waiting(exit_when=deadline_exceeded_or_not_running)
 
