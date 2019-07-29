@@ -770,6 +770,12 @@ class StoppableThread(threading.Thread):
     It is expected that the run method or target of this thread periodically calls `_run_state.is_stopped`
     to determine if the thread has been stopped.
     """
+
+    # Protects __name_prefix
+    __name_lock = threading.Lock()
+    # A prefix to add to all threads.  This is used for testing.
+    __name_prefix = None
+
     def __init__(self, name=None, target=None, fake_clock=None):
         """Creates a new thread.
 
@@ -778,7 +784,8 @@ class StoppableThread(threading.Thread):
         Note, if you set `target` to None, then the thread will invoked `run_and_propagate` instead of `run` to
         execute the work for the thread.  You must override `run_and_propagate` instead of `run`.
 
-        @param name: The name to give the thread.
+        @param name: The name to give the thread.  Note, if a prefix has been specified via `set_name_prefix`,
+            the name is created by concat'ing `name` to the prefix.
         @param target: If not None, a function that will be invoked when the thread is invoked to perform
             the work for the thread.  This function should accept a single argument, the `RunState` instance
             that will signal when the thread should stop work.
@@ -788,11 +795,42 @@ class StoppableThread(threading.Thread):
         @type target: None|func
         @type fake_clock: FakeClock|None
         """
+        name_prefix = StoppableThread._get_name_prefix()
+        if name_prefix is not None:
+            if name is not None:
+                name = '%s%s' % (name_prefix, name)
+            else:
+                name = name_prefix
         threading.Thread.__init__(self, name=name, target=self.__run_impl)
         self.__target = target
         self.__exception_info = None
         # Tracks whether or not the thread should still be running.
         self._run_state = RunState(fake_clock=fake_clock)
+
+    @staticmethod
+    def set_name_prefix(name_prefix):
+        """Sets a prefix to add to the beginning of all threads from this point forward.
+
+        @param name_prefix: The prefix or None if no prefix should be used.
+        @type name_prefix: str or None
+        """
+        StoppableThread.__name_lock.acquire()
+        try:
+            StoppableThread.__name_prefix = name_prefix
+        finally:
+            StoppableThread.__name_lock.release()
+
+    @staticmethod
+    def _get_name_prefix():
+        """
+        @return: The prefix to add to all thread names
+        @rtype: str or None
+        """
+        StoppableThread.__name_lock.acquire()
+        try:
+            return StoppableThread.__name_prefix
+        finally:
+            StoppableThread.__name_lock.release()
 
     def __run_impl(self):
         """Internal run implementation.
@@ -1341,6 +1379,45 @@ class RedirectorClient(StoppableThread):
             """Closes the channel to the server.
             """
             pass
+
+
+COMPRESSION_TEST_STR = 'a' * 100
+
+
+def get_compress_module(compression_type):
+    if compression_type == 'zlib':
+        import zlib
+        return zlib
+    elif compression_type == 'bz2':
+        import bz2
+        return bz2
+    else:
+        raise ValueError('Unsupported compression type')
+
+
+def verify_and_get_compress_func(compression_type):
+    """Given a compression_type (bz2, zlib), verify that compression works and return the compress() function
+
+    @param compression_type: Compression type
+    @type compression_type: str
+
+    @returns: The compress() function for the specified compression_type. None, if compression_type is not supported or
+        if underlying libs are not installed properly,
+    """
+    compression_type_to_module_name = {
+        'bz2': 'bz2',
+        'deflate': 'zlib',
+    }
+    if compression_type not in compression_type_to_module_name:
+        return None
+    try:
+        compression_module = get_compress_module(compression_type_to_module_name[compression_type])
+        cdata = compression_module.compress(COMPRESSION_TEST_STR, 9)
+        if len(cdata) < len(COMPRESSION_TEST_STR):
+            return compression_module.compress
+    except Exception:
+        pass
+    return None
 
 
 class RateLimiterToken(object):

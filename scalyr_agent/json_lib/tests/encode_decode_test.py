@@ -57,12 +57,24 @@ class EncodeDecodeTest(ScalyrTestCase):
     def test_int(self):
         self.__test_encode_decode(r'1', 1)
 
+    def test_negative_int(self):
+        self.__test_encode_decode(r'-1', -1)
+
+    def test_long( self ):
+        self.__test_encode_decode( r'1234567890123456789', 1234567890123456789 )
+
+    def test_negative_long( self ):
+        self.__test_encode_decode( r'-1234567890123456789', -1234567890123456789 )
+
     def test_bool(self):
         self.__test_encode_decode(r'false', False)
         self.__test_encode_decode(r'true', True)
 
     def test_float(self):
         self.__test_encode_decode(r'1.0003', 1.0003)
+
+    def test_negative_float( self ):
+        self.__test_encode_decode(r'-1.0003', -1.0003)
 
     def test_list(self):
         self.__test_encode_decode(r'[1,2,3]', [1, 2, 3])

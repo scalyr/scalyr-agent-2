@@ -24,6 +24,9 @@ import socket
 import sys
 import time
 
+from scalyr_agent.util import verify_and_get_compress_func
+
+
 # noinspection PyBroadException
 try:
     import ssl
@@ -32,15 +35,6 @@ except Exception:
     __has_ssl__ = False
     ssl = None
 
-try:
-    import bz2
-except Exception:
-    bz2 = None
-
-try:
-    import zlib
-except Exception:
-    zlib = None
 
 import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -129,12 +123,11 @@ class ScalyrClientSession(object):
         encoding = None
 
         if compression_type:
-            if compression_type == 'deflate' and zlib:
-                self.__compress = zlib.compress
-                encoding = 'deflate'
-            elif compression_type == 'bz2' and bz2:
-                self.__compress = bz2.compress
-                encoding = 'bz2'
+            if compression_type in ('deflate', 'bz2'):
+                compress_func = verify_and_get_compress_func(compression_type)
+                if compress_func:
+                    self.__compress = compress_func
+                    encoding = compression_type
 
             if not self.__compress:
                 log.warning("'%s' compression specified, but '%s' compression is not available.  No compression will be used." % (compression_type, compression_type) )

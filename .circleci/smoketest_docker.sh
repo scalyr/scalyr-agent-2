@@ -5,12 +5,13 @@
 #    - Launch agent docker image
 #    - Launch uploader docker image (writes lines to stdout)
 #    - Launch verifier docker image (polls for liveness of agent and
-#       uploader as well as verifies expected uploaded lines)
+#       uploader, as well as verifies expected uploaded lines)
 #
 # Expects the following env vars:
 #   SCALYR_API_KEY
 #   SCALYR_SERVER
 #   READ_API_KEY (Read api key. 'SCALYR_' prefix intentionally omitted to suppress in status -v)
+#   CIRCLE_BUILD_NUM
 #
 # Expects following positional args:
 #   $1 : smoketest image tag
@@ -53,9 +54,9 @@ fi
 
 # container names for all test containers
 # The suffixes MUST be one of (agent, uploader, verifier) to match verify_upload::DOCKER_CONTNAME_SUFFIXES
-contname_agent="ci_agent_docker_${syslog_or_json}_agent"
-contname_uploader="ci_agent_docker_${syslog_or_json}_uploader"
-contname_verifier="ci_agent_docker_${syslog_or_json}_verifier"
+contname_agent="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-agent"
+contname_uploader="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-uploader"
+contname_verifier="ci-agent-docker-${syslog_or_json}-${CIRCLE_BUILD_NUM}-verifier"
 
 
 # Kill leftover containers
@@ -94,32 +95,33 @@ ${jsonlog_containers_mount} ${syslog_driver_portmap} \
 ${agent_image}
 
 # Capture agent short container ID
-short_cid_agent=$(docker ps --format "{{.ID}}" --filter "name=$contname_agent")
-echo "Agent container ID == ${short_cid_agent}"
+agent_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_agent")
+echo "Agent container ID == ${agent_hostname}"
 
 # Launch Uploader container (only writes to stdout, but needs to query Scalyr to verify agent liveness)
-# You MUST provide scalyr server, api key and importantly, the short_cid_agent container ID for the agent-liveness
-# query to work
+# You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
+# query to work (uploader container waits for agent to be alive before uploading data)
 docker run ${syslog_driver_option}  -d --name ${contname_uploader} ${smoketest_image} \
 ${smoketest_script} ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
---short_cid_agent ${short_cid_agent}
+--agent_hostname ${agent_hostname}
 
 # Capture uploader short container ID
-short_cid_uploader=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
-echo "Uploader container ID == ${short_cid_uploader}"
+uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
+echo "Uploader container ID == ${uploader_hostname}"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
+# Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
 ${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
---short_cid_agent ${short_cid_agent} \
---short_cid_uploader ${short_cid_uploader}
-
+--agent_hostname ${agent_hostname} \
+--uploader_hostname ${uploader_hostname} \
+--debug true
 
 kill_and_delete_docker_test_containers
 

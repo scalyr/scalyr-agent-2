@@ -1,6 +1,23 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.50 "Chevron" - July 30, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on Jul 30, 2019 11:00 -0700
+--->
+
+Features
+* Default `docker_raw_logs` to True.
+* Default `compression_type` to `bz2` (previously compression was off).
+* Add `SCALYR_SERVER` to sample config map and docker readme.
+
+Bugs
+* Fix custom json lib handling of negative integers.
+* Fix bug to allow agent to inherits environment umask.
+* Restore default value of `report_k8s_metrics` to True.
+
+
 ## 2.0.49 "Bratac" - Jun 7, 2019
 
 <!---

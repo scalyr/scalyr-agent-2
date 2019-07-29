@@ -3,10 +3,9 @@
 // docker container log directory (which must be mounted into the
 // agent's container).
 {
- monitors: [
-   {
-    module: "scalyr_agent.builtin_monitors.docker_monitor",
-    docker_raw_logs: true
-   }
+  monitors: [
+    {
+      module: "scalyr_agent.builtin_monitors.docker_monitor"
+    }
   ]
 }

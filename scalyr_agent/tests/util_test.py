@@ -22,15 +22,71 @@ import os
 import tempfile
 import struct
 import threading
+from mock import patch, MagicMock
 
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.util import JsonReadFileException, RateLimiter, BlockingRateLimiter, FakeRunState, ScriptEscalator
 from scalyr_agent.util import FakeClockCounter
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
+from scalyr_agent.util import verify_and_get_compress_func
 from scalyr_agent.json_lib import JsonObject
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+
+class TestUtilCompression(ScalyrTestCase):
+    def setUp(self):
+        self._data = 'The rain in spain. ' * 1000
+
+    def test_zlib(self):
+        """Successful zlib compression"""
+        data = self._data
+        compress = verify_and_get_compress_func('deflate')
+        import zlib
+        self.assertEqual(data, zlib.decompress(compress(data)))
+
+    def test_bz2(self):
+        """Successful bz2 compression"""
+        data = self._data
+        compress = verify_and_get_compress_func('bz2')
+        import bz2
+        self.assertEqual(data, bz2.decompress(compress(data)))
+
+    def test_bad_compression_type(self):
+        """User enters unsupported compression type"""
+        self.assertIsNone(verify_and_get_compress_func('bad_compression_type'))
+
+    def test_bad_compression_lib_exception_on_import(self):
+        """Pretend that import bz2/zlib raises exception"""
+
+        def _mock_get_compress_module(compression_type):
+            raise Exception('Mimic exception when importing compression lib')
+
+        @patch('scalyr_agent.util.get_compress_module', new=_mock_get_compress_module)
+        def _test(compression_type):
+            self.assertIsNone(verify_and_get_compress_func(compression_type))
+
+        _test('deflate')
+        _test('bz2')
+
+    def test_bad_compression_lib_no_compression(self):
+        """Pretend that the zlib/bz2 library compress() method doesn't perform any comnpression"""
+
+        def _mock_get_compress_module(compression_type):
+            m = MagicMock()
+            # simulate module.compress() method that does not compress input data string
+            m.compress = lambda data, compression_level: data
+            return m
+
+        @patch('scalyr_agent.util.get_compress_module', new=_mock_get_compress_module)
+        def _test(compression_type):
+            self.assertIsNone(verify_and_get_compress_func(compression_type))
+
+        _test('deflate')
+        _test('bz2')
+
+
 
 class TestUtil(ScalyrTestCase):
 
@@ -231,7 +287,28 @@ class TestStoppableThread(ScalyrTestCase):
         self._run_counter = 0
 
     def test_basic_use(self):
+        # Since the ScalyrTestCase sets the name prefix, we need to set it back to None to get an unmolested name.
+        StoppableThread.set_name_prefix(None)
         test_thread = StoppableThread('Testing', self._run_method)
+        self.assertEqual(test_thread.getName(), 'Testing')
+        test_thread.start()
+        test_thread.stop()
+
+        self.assertTrue(self._run_counter > 0)
+
+    def test_name_prefix(self):
+        StoppableThread.set_name_prefix('test_name_prefix: ')
+        test_thread = StoppableThread('Testing', self._run_method)
+        self.assertEqual(test_thread.getName(), 'test_name_prefix: Testing')
+        test_thread.start()
+        test_thread.stop()
+
+        self.assertTrue(self._run_counter > 0)
+
+    def test_name_prefix_with_none(self):
+        StoppableThread.set_name_prefix('test_name_prefix: ')
+        test_thread = StoppableThread(target=self._run_method)
+        self.assertEqual(test_thread.getName(), 'test_name_prefix: ')
         test_thread.start()
         test_thread.stop()
 
