@@ -1567,9 +1567,19 @@ class KubernetesApi( object ):
             @return - a dict returned by the query
         """
         if kind not in _OBJECT_ENDPOINTS:
-            global_log.warn( 'k8s API - tried to query invalid object type: %s, %s, %s' % (kind, namespace, name),
+            global_log.warn( 'k8s API - tried to query invalid object type: %s, %s, %s.  Creating dummy object' % (kind, namespace, name),
                              limit_once_per_x_secs=300, limit_key='k8s_api_query-%s' % kind )
-            return {}
+            if kind is None:
+                kind = '<invalid>'
+
+            # return a dummy object with valid kind, namespace and name members
+            return {
+                'kind': kind,
+                'metadata': {
+                    'namespace': namespace,
+                    'name': name
+                }
+            }
 
         query = None
         try:
