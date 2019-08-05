@@ -405,7 +405,7 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
         @param client: A docker.Client object
         @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
-        @param restrict_to_container: String, a single continer id that will be the only returned result
+        @param restrict_to_container: String, a single container id that will be the only returned result
         @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
             logger is used.
         @param only_running_containers: Boolean.  If true, will only return currently running containers
@@ -524,7 +524,11 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                                             logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
 
                         except Exception, e:
-                          logger.error("Error inspecting container '%s' - %s, %s" % (cid, e, traceback.format_exc()), limit_once_per_x_secs=300,limit_key="docker-api-inspect")
+                          logger.exception(
+                              "Error inspecting container '%s' - %s, %s" % (cid, e, traceback.format_exc()),
+                              limit_once_per_x_secs=300,
+                              limit_key="docker-api-inspect"
+                          )
 
 
                     result[cid] = {'name': name, 'log_path': log_path }
@@ -539,8 +543,10 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
                 result[cid] = {'name': cid, 'log_path': None}
 
     except Exception, e:  # container querying failed
-        logger.exception("Error querying running containers", limit_once_per_x_secs=300,
-                         limit_key='docker-api-running-containers' )
+        logger.exception("Error querying running containers: %s, filters=%s, only_running_containers=%s"
+                         % (str(e), filters, only_running_containers),
+                         limit_once_per_x_secs=300,
+                         limit_key='k8s-docker-api-running-containers')
         result = None
 
     return result
