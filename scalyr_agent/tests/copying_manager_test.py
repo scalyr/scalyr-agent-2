@@ -108,7 +108,15 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         self.create_copying_manager( config )
 
-        self._controller.perform_scan()
+        # At this point, the test state = SLEEPING (after init)
+        # perform_scan() calls run_and_stop_at(SENDING, required=SLEEPING)
+        # Since the test state is already SLEEPING, the required transition is 'consumed' and the require-transition
+        # assertion passes and the next-round required transition becomes NONE
+        def _fake_scan():
+            self._controller.perform_scan()
+            _, responder_callback = self._controller.wait_for_rpc()
+            responder_callback('dummy')
+        _fake_scan()
 
         log_config = {
             "path": path
@@ -116,13 +124,13 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         self._manager.add_log_config( 'unittest', log_config );
 
-        self._controller.perform_scan()
+        _fake_scan()
 
         self._manager.schedule_log_path_for_removal( 'unittest', log_config['path'] )
 
         self.assertEquals( 1, self._manager.logs_pending_removal_count() )
 
-        self._controller.perform_scan()
+        _fake_scan()
 
         self.assertEquals( 0, self._manager.logs_pending_removal_count() )
 
@@ -592,9 +600,9 @@ class TestableCopyingManager(CopyingManager):
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
     # The different points at which the CopyingManager can be stopped.  See below.
-    SLEEPING = 'sleeping'
-    SENDING = 'sending'
-    RESPONDING = 'responding'
+    SLEEPING = 'SLEEPING'
+    SENDING = 'SENDING'
+    RESPONDING = 'RESPONDING'
 
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
     WAIT_TIMEOUT = 5.0
