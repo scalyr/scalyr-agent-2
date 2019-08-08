@@ -1587,6 +1587,7 @@ class LogFileProcessor(object):
         try:
             # Keep track of some states about the lines/events we process.
             bytes_read = 0L
+            previous_bytes_read = 0L
             lines_read = 0L
             bytes_copied = 0L
             lines_copied = 0L
@@ -1619,6 +1620,10 @@ class LogFileProcessor(object):
                 if line_len == 0:
                     break
 
+                # keep a copy of this value in case we need to reset bytes_read count
+                # See #AGENT-219
+                previous_bytes_read = bytes_read
+
                 # We have a line, process it and see what comes out.
                 bytes_read += line_len
                 lines_read += 1L
@@ -1648,6 +1653,9 @@ class LogFileProcessor(object):
 
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
+
+                        # AGENT-219 reset bytes_read count to prevent negative skipped bytes
+                        bytes_read = previous_bytes_read
                         break
 
                     #time_spent_serializing -= fast_get_time()
@@ -1661,6 +1669,9 @@ class LogFileProcessor(object):
                             add_events_request.set_position(original_events_position)
                             self.__log_file_iterator.seek(position)
                             buffer_filled = True
+
+                            # AGENT-219 reset bytes_read count to prevent negative skipped bytes
+                            bytes_read = previous_bytes_read
                             break
                         added_thread_id = True
 
