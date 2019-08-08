@@ -1733,8 +1733,6 @@ class LogFileProcessor(object):
                         self.__total_bytes_copied += bytes_copied
                         bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
                         self.__total_bytes_skipped += bytes_between_positions - bytes_read
-                        # log.info('Bytes skipped in completion callback: bytes_between_positions=%s, bytes_read=%s, bytes_skipped=%s'
-                        #          % (bytes_between_positions, bytes_read, bytes_skipped))
 
                         self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
                         self.__total_bytes_pending = self.__log_file_iterator.available
