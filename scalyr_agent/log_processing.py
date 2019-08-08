@@ -135,6 +135,10 @@ class LogLine(object):
         # attrs is a dict of optional attributes to attach to the log message
         self.attrs = None
 
+        # length of raw line (in contrast
+        self.raw_line_len = len(self.line)
+
+
 class LogFileIterator(object):
     """Reads the bytes from a log file at a particular path, returning the lines.
 
@@ -599,6 +603,7 @@ class LogFileIterator(object):
                 # something went wrong. Return the full line and log a message
                 log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line.decode( "utf-8", 'replace' )),
                          limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
+
         return result
 
     def advance_to_end(self, current_time=None):
@@ -1613,7 +1618,7 @@ class LogFileProcessor(object):
 
                 #time_spent_reading -= fast_get_time()
                 line_object = self.__log_file_iterator.readline(current_time=current_time)
-                line_len = len(line_object.line)
+                line_len = line_object.raw_line_len
                 #time_spent_reading += fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
@@ -1650,7 +1655,6 @@ class LogFileProcessor(object):
                     event = self.__create_events_object(line_object, sample_result)
                     if not add_events_request.add_event(event, timestamp=line_object.timestamp, sequence_id=sequence_id, sequence_number=sequence_number):
                         #time_spent_serializing -= fast_get_time()
-
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
 
@@ -1728,7 +1732,9 @@ class LogFileProcessor(object):
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
                         bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
-                        self.__total_bytes_skipped +=  bytes_between_positions - bytes_read
+                        self.__total_bytes_skipped += bytes_between_positions - bytes_read
+                        # log.info('Bytes skipped in completion callback: bytes_between_positions=%s, bytes_read=%s, bytes_skipped=%s'
+                        #          % (bytes_between_positions, bytes_read, bytes_skipped))
 
                         self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
                         self.__total_bytes_pending = self.__log_file_iterator.available
@@ -1753,10 +1759,12 @@ class LogFileProcessor(object):
                         self.__log_file_iterator.mark(final_position, current_time=current_time)
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         self.__total_bytes_failed += bytes_read
+                        log.info('Request failed. Dropping %d bytes of logs as per server request.' % bytes_read)
                         return False
                     elif result == LogFileProcessor.FAIL_AND_RETRY:
                         self.__log_file_iterator.seek(original_position)
                         self.__total_bytes_pending = self.__log_file_iterator.available
+                        log.info('Request failed. Retrying')
                         return False
                     else:
                         raise Exception('Invalid result %s' % str(result))
