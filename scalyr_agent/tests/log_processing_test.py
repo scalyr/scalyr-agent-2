@@ -1164,6 +1164,41 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals(0L, status.total_bytes_pending)
         self.assertEquals(34L, status.total_bytes_copied)
 
+    def test_negative_skipped_bytes_when_add_event_fails(self):
+
+        message = "a string of 20bytes\nanother string with more than 20 bytes\n"
+        self.append_file(self.__path, message)
+
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
+        events = TestLogFileProcessor.TestAddEventsRequest( limit=1 )
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback( LogFileProcessor.SUCCESS )
+        self.assertEquals(1, events.total_events())
+
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
+    def test_negative_skipped_bytes_when_add_thread_fails(self):
+
+        message = "a string of 20bytes\nanother string with more than 20 bytes\n"
+        self.append_file(self.__path, message)
+
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
+        events = TestLogFileProcessor.TestAddEventsRequest( thread_limit=0 )
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback( LogFileProcessor.SUCCESS )
+        self.assertEquals(0, events.total_events())
+
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
+
     def test_max_log_offset_size_within_max_log_offset_size_no_checkpoint(self):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
         # as the maximum readback distance.  This test checks we log messages
