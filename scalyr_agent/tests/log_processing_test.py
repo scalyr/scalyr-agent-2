@@ -1258,6 +1258,27 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         self.assertEquals(0, events.total_events())
 
+    def test_parse_as_json_does_cause_incorrect_bytes_skipped_count( self ):
+
+        config = _create_configuration()
+        log_config = {'path': self.__path, 'parse_lines_as_json': True }
+        self._set_new_log_processor(config, log_config, None)
+
+        json = '{ "abc": "def", "log": "this is a log message" }\n'
+        self.append_file(self.__path, json)
+
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = self.log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        self.assertEquals(1, events.total_events())
+
+        completion_callback( LogFileProcessor.SUCCESS )
+        status = self.log_processor.generate_status()
+        self.assertEqual( 0, status.total_bytes_skipped )
+
     def test_max_existing_log_offset_size_within_max_log_offset_size(self):
         # If a checkpoint contains pending files, then we have seen
         # this file before and, the LogFileProcessor should use max_existing_log_offset_size
