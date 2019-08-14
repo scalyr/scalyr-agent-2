@@ -202,7 +202,7 @@ jobs:
       - run:
           name: build k8s agent and run smoketest
           command: |
-            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:2 300
+            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:2 300 no_delete_existing_k8s_objs
 
   smoke-k8s-helm:
     machine:

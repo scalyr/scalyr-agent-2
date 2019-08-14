@@ -20,6 +20,7 @@
 # Expects following positional args:
 #   $1 : smoketest image tag
 #   $2 : max secs until test hard fails
+#   $3 : flag indicating whether to delete pre-existing k8s objects
 #
 # e.g. usage
 #   smoketest_k8s.sh scalyr/scalyr-agent-ci-smoketest:3 300
@@ -32,6 +33,8 @@ smoketest_image=$1
 # Max seconds before the test hard fails
 max_wait=$2
 
+# Flag indicating whether to delete pre-existing k8s objects
+delete_existing_objects=$3
 
 # Smoketest code (built into smoketest image)
 smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
@@ -45,17 +48,23 @@ contname_verifier="ci-agent-k8s-${CIRCLE_BUILD_NUM}-verifier"
 
 
 # Delete existing resources
+if [[ "$delete_existing_objects" == "delete_existing_k8s_objs" ]]; then
+    echo ""
+    echo "=================================================="
+    echo "Deleting existing k8s objects"
+    echo "=================================================="
+    kubectl delete deployment ${contname_verifier} || true
+    kubectl delete deployment ${contname_uploader} || true
+    kubectl delete daemonset scalyr-agent-2 || true
+    kubectl delete configmap scalyr-config || true
+    kubectl delete secret scalyr-api-key || true
+    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml || true
+fi
+
 echo ""
 echo "=================================================="
-echo "Deleting existing resources"
+echo "Creating k8s objects"
 echo "=================================================="
-kubectl delete deployment ${contname_verifier} || true
-kubectl delete deployment ${contname_uploader} || true
-kubectl delete daemonset scalyr-agent-2 || true
-kubectl delete configmap scalyr-config || true
-kubectl delete secret scalyr-api-key || true
-kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml || true
-
 # Create service account
 kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
 
@@ -70,19 +79,31 @@ kubectl create configmap scalyr-config \
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
 
+echo ""
+echo "=================================================="
+echo "Building agent image"
+echo "=================================================="
 # Build local image (add .ci.k8s to version)
-TEMP_DIRECTORY=~/temp_directory
-mkdir $TEMP_DIRECTORY
+pushd $CIRCLE_WORKING_DIRECTORY
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
-pwd
 python build_package.py k8s_builder
 TARBALL=$(ls scalyr-k8s-agent-*)
+
+TEMP_DIRECTORY=~/temp_directory
+mkdir $TEMP_DIRECTORY
 mv $TARBALL $TEMP_DIRECTORY
+
 pushd $TEMP_DIRECTORY
 ./${TARBALL} --extract-packages
 docker build -t local_k8s_image .
+
+popd
 popd
 
+echo ""
+echo "=================================================="
+echo "Customizing daemonset YAML & starting agent"
+echo "=================================================="
 # Create DaemonSet, referring to local image.  Launch agent.
 # Use YAML from branch
 cp k8s/scalyr-agent-2-envfrom.yaml .
