@@ -108,7 +108,7 @@ def cache(global_config):
                                 global_config=global_config)
 
     # update the config and return current cache
-    _k8s_cache.update_config(cache_config, global_config)
+    _k8s_cache.update_config(cache_config)
     return _k8s_cache
 
 
@@ -798,7 +798,7 @@ class _CacheConfigState( object ):
         self.k8s = None
         self.cache_config = _CacheConfig(api_url='', global_config=global_config)
         self._pending_config = None
-        self.configure(cache_config, global_config)
+        self.configure(cache_config)
 
     def copy_state( self ):
         """
@@ -812,7 +812,7 @@ class _CacheConfigState( object ):
         finally:
             self._lock.release()
 
-    def configure(self, new_cache_config, global_config):
+    def configure(self, new_cache_config):
         """
         Configures the state based on any changes in the configuration.
 
@@ -841,26 +841,10 @@ class _CacheConfigState( object ):
         # create a new k8s api object if we need one
         k8s = old_state.k8s
         if need_new_k8s:
-            args = {
-                'k8s_api_url': new_cache_config.api_url,
-                'query_timeout': new_cache_config.query_timeout,
-            }
-            if not new_cache_config.verify_api_queries:
-                args['ca_file'] = None
-            if new_cache_config.global_config:
-                args.update({
-                    'log_api_responses': new_cache_config.global_config.k8s_log_api_responses,
-                    'log_api_exclude_200s': new_cache_config.global_config.k8s_log_api_exclude_200s,
-                    'log_api_min_response_len': new_cache_config.global_config.k8s_log_api_min_response_len,
-                    'log_api_min_latency': new_cache_config.global_config.k8s_log_api_min_latency,
-                    'log_api_ratelimit_interval': new_cache_config.global_config.k8s_log_api_ratelimit_interval,
-                    'agent_log_path': new_cache_config.global_config.agent_log_path,
-                    'query_options_max_retries': new_cache_config.global_config.k8s_controlled_warmer_max_query_retries,
-                    'rate_limiter': BlockingRateLimiter.get_instance('K8S_CACHE_MAIN_RATELIMITER',
-                                                                     global_config, logger=global_log),
-                })
-
-            k8s = KubernetesApi(**args)
+            k8s = KubernetesApi.create_instance(new_cache_config.global_config,
+                                                k8s_api_url=new_cache_config.api_url,
+                                                query_timeout=new_cache_config.query_timeout,
+                                                verify_api_queries=new_cache_config.verify_api_queries)
 
         # update with new values
         self._lock.acquire()
@@ -943,11 +927,11 @@ class KubernetesCache( object ):
         """
         return self._state.copy_state()
 
-    def update_config(self, new_cache_config, global_config):
+    def update_config(self, new_cache_config):
         """
         Updates the cache config
         """
-        self._state.configure(new_cache_config, global_config)
+        self._state.configure(new_cache_config)
 
         self._lock.acquire()
         try:
@@ -1197,6 +1181,44 @@ class KubernetesCache( object ):
 class KubernetesApi( object ):
     """Simple wrapper class for querying the k8s api
     """
+    @staticmethod
+    def create_instance(global_config, k8s_api_url=None, query_timeout=None, verify_api_queries=None,
+                        rate_limiter_key='K8S_CACHE_MAIN_RATELIMITER'):
+        """
+        @param global_config: Global configuration
+        @param k8s_api_url: overrides global config api url
+        @param query_timeout: overrides global config query timeout
+        @param verify_api_queries: overrides global config verify_api_queries
+        @param rate_limiter_key: Allow overriding of rate limiter key, otherwise, uses the "main" k8s cache ratelimiter
+        """
+        if k8s_api_url is None:
+            k8s_api_url = global_config.k8s_api_url
+        if query_timeout is None:
+            query_timeout = global_config.k8s_cache_query_timeout_secs
+        if verify_api_queries is None:
+            verify_api_queries = global_config.k8s_verify_api_queries
+
+        kwargs = {
+            'k8s_api_url': k8s_api_url,
+            'query_timeout': query_timeout,
+        }
+
+        if not verify_api_queries:
+            kwargs['ca_file'] = None
+
+        if global_config:
+            kwargs.update({
+                'log_api_responses': global_config.k8s_log_api_responses,
+                'log_api_exclude_200s': global_config.k8s_log_api_exclude_200s,
+                'log_api_min_response_len': global_config.k8s_log_api_min_response_len,
+                'log_api_min_latency': global_config.k8s_log_api_min_latency,
+                'log_api_ratelimit_interval': global_config.k8s_log_api_ratelimit_interval,
+                'agent_log_path': global_config.agent_log_path,
+                'query_options_max_retries': global_config.k8s_controlled_warmer_max_query_retries,
+                'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, global_config, logger=global_log),
+            })
+        return KubernetesApi(**kwargs)
+
     def __init__( self, ca_file='/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                   k8s_api_url="https://kubernetes.default",
                   query_timeout=20,
@@ -1275,7 +1297,7 @@ class KubernetesApi( object ):
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
         if not self._rate_limiter:
-            global_log.warn("KubernetesAPI created without rate limiter!\n%s" % traceback.format_stack())
+            global_log.warn("KubernetesAPI created without rate limiter.\n%s" % traceback.format_stack())
 
     @property
     def default_query_options(self):
