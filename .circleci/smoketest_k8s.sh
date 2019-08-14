@@ -53,7 +53,7 @@ if [[ "$delete_existing_objects" == "delete_existing_k8s_objs" ]]; then
     echo "=================================================="
     echo "Deleting existing k8s objects"
     echo "=================================================="
-    kubectl delete deployment ${contname_verifier} || true
+    kubectl delete deployment ${contname_verifier} || truepushd
     kubectl delete deployment ${contname_uploader} || true
     kubectl delete daemonset scalyr-agent-2 || true
     kubectl delete configmap scalyr-config || true
@@ -84,7 +84,6 @@ echo "=================================================="
 echo "Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
-pushd $CIRCLE_WORKING_DIRECTORY
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 python build_package.py k8s_builder
 TARBALL=$(ls scalyr-k8s-agent-*)
@@ -97,7 +96,6 @@ pushd $TEMP_DIRECTORY
 ./${TARBALL} --extract-packages
 docker build -t local_k8s_image .
 
-popd
 popd
 
 echo ""
