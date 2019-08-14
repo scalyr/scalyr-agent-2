@@ -510,11 +510,11 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             _k8s = None
             kwargs = {
                 'k8s_api_url': k8s_api_url,
-                'log_api_responses': self._global_config.log_api_responses,
-                'log_api_exclude_200s': self._global_config.log_api_exclude_200s,
-                'log_api_min_response_len': self._global_config.log_api_min_response_len,
-                'log_api_min_latency': self._global_config.log_api_min_latency,
-                'log_api_ratelimit_interval': self._global_config.log_api_ratelimit_interval,
+                'log_api_responses': self._global_config.k8s_log_api_responses,
+                'log_api_exclude_200s': self._global_config.k8s_log_api_exclude_200s,
+                'log_api_min_response_len': self._global_config.k8s_log_api_min_response_len,
+                'log_api_min_latency': self._global_config.k8s_log_api_min_latency,
+                'log_api_ratelimit_interval': self._global_config.k8s_log_api_ratelimit_interval,
                 'agent_log_path': self._global_config.agent_log_path,
                 'query_options_max_retries': self._global_config.k8s_controlled_warmer_max_query_retries,
                 'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, self._global_config,
@@ -535,14 +535,23 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             if self.__log_watcher:
                 self.log_config = self.__log_watcher.add_log_config( self.module_name, self.log_config )
 
-            k8s_with_main_ratelimiter = _create_k8s_api('K8S_CACHE_MAIN_RATELIMITER')
-            k8s_with_events_ratelimiter = _create_k8s_api('K8S_EVENTS_RATELIMITER')
-            k8s_events_query_options = ApiQueryOptions(max_retries=self.__max_query_retries,
-                                                       rate_limiter=k8s_with_events_ratelimiter)
+            # First instance of k8s api uses the main rate limiter.  Leader election related API calls to the k8s
+            # masters will go through this api/rate limiter.
+            k8s_api_main = _create_k8s_api('K8S_CACHE_MAIN_RATELIMITER')
 
-            pod_name = k8s_with_main_ratelimiter.get_pod_name()
-            self._node_name = k8s_with_main_ratelimiter.get_node_name( pod_name )
-            cluster_name = k8s_with_main_ratelimiter.get_cluster_name()
+            # Second instance of k8s api uses an ancillary ratelimiter (for exclusive use by events monitor)
+            k8s_api_events = _create_k8s_api('K8S_EVENTS_RATELIMITER')
+
+            # k8s_cache is initialized with the main rate limiter. However, streaming-related API calls should go
+            # through the ancillary ratelimiter. This is achieved by passing ApiQueryOptions with desired rate_limiter.
+            k8s_events_query_options = ApiQueryOptions(
+                max_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+                rate_limiter=k8s_api_events.default_query_options.rate_limiter
+            )
+
+            pod_name = k8s_api_main.get_pod_name()
+            self._node_name = k8s_api_main.get_node_name(pod_name)
+            cluster_name = k8s_api_main.get_cluster_name()
 
             last_event = None
             last_resource = 0
@@ -558,7 +567,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                 if last_check + self._leader_check_interval <= current_time:
                     last_check = current_time
                     # check if we are the leader
-                    if not self._is_leader( k8s_with_main_ratelimiter ):
+                    if not self._is_leader(k8s_api_main):
                         #if not, then sleep and try again
                         global_log.log( scalyr_logging.DEBUG_LEVEL_1, "Leader is %s" % (str(self._current_leader)) )
                         if self._current_leader is not None and last_reported_leader != self._current_leader:
@@ -581,7 +590,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
                         k8s_cache = k8s_utils.cache(self._global_config)
 
                     # start streaming events
-                    lines = k8s_with_events_ratelimiter.stream_events( last_event=last_event )
+                    lines = k8s_api_events.stream_events( last_event=last_event )
 
                     json = {}
                     for line in lines:
