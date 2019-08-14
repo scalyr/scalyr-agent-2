@@ -1233,8 +1233,9 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__(self, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
+    def __init__(self, global_config, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
         """
+        @param global_config: Global configuration
         @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
         @param k8s_api_url: The URL to use for accessing the API
@@ -1246,7 +1247,7 @@ class CRIEnumerator( ContainerEnumerator ):
         @type kubelet_api_host_ip: str
         """
         super( CRIEnumerator, self).__init__(ignored_pod)
-        k8s = KubernetesApi(k8s_api_url=k8s_api_url)
+        k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
         self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
 
@@ -1644,7 +1645,7 @@ class ContainerChecker(object):
             else:
                 query_fs = self.__cri_query_filesystem
                 global_log.info('kubernetes_monitor is using CRI with fs=%s for listing containers' % str(query_fs))
-                self._container_enumerator = CRIEnumerator( self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
+                self._container_enumerator = CRIEnumerator( self._global_config, self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
 
             if self.__parse_format == 'auto':
                 # parse in json if we detect the container runtime to be 'docker' or if we detect
@@ -2884,7 +2885,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                     self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                     self.__metric_fetcher = DockerMetricFetcher(self.__client, self.__docker_max_parallel_stats )
 
-                k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
+                k8s = KubernetesApi.create_instance(self._global_config, k8s_api_url=self.__k8s_api_url)
                 self.__kubelet_api = KubeletApi( k8s, host_ip=self._config.get('k8s_kubelet_host_ip') )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )

@@ -506,25 +506,6 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
             global_log.info('kubernetes_events_monitor exiting because it has been disabled.')
             return
 
-        def _create_k8s_api(rate_limiter_key):
-            _k8s = None
-            kwargs = {
-                'k8s_api_url': k8s_api_url,
-                'log_api_responses': self._global_config.k8s_log_api_responses,
-                'log_api_exclude_200s': self._global_config.k8s_log_api_exclude_200s,
-                'log_api_min_response_len': self._global_config.k8s_log_api_min_response_len,
-                'log_api_min_latency': self._global_config.k8s_log_api_min_latency,
-                'log_api_ratelimit_interval': self._global_config.k8s_log_api_ratelimit_interval,
-                'agent_log_path': self._global_config.agent_log_path,
-                'query_options_max_retries': self._global_config.k8s_controlled_warmer_max_query_retries,
-                'rate_limiter': BlockingRateLimiter.get_instance(rate_limiter_key, self._global_config,
-                                                                 logger=global_log),
-            }
-            if not k8s_verify_api_queries:
-                kwargs['ca_file'] = None
-            _k8s = KubernetesApi(**kwargs)
-            return _k8s
-
         try:
             k8s_api_url = self._global_config.k8s_api_url
             k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
@@ -537,10 +518,12 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
             # First instance of k8s api uses the main rate limiter.  Leader election related API calls to the k8s
             # masters will go through this api/rate limiter.
-            k8s_api_main = _create_k8s_api('K8S_CACHE_MAIN_RATELIMITER')
+            k8s_api_main = KubernetesApi.create_instance(self._global_config,
+                                                         rate_limiter_key='K8S_CACHE_MAIN_RATELIMITER')
 
             # Second instance of k8s api uses an ancillary ratelimiter (for exclusive use by events monitor)
-            k8s_api_events = _create_k8s_api('K8S_EVENTS_RATELIMITER')
+            k8s_api_events = KubernetesApi.create_instance(self._global_config,
+                                                           rate_limiter_key='K8S_EVENTS_RATELIMITER')
 
             # k8s_cache is initialized with the main rate limiter. However, streaming-related API calls should go
             # through the ancillary ratelimiter. This is achieved by passing ApiQueryOptions with desired rate_limiter.
