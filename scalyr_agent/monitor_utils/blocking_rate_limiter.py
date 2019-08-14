@@ -262,6 +262,10 @@ class BlockingRateLimiter(object):
             self._cluster_rate_lock.release()
 
     @property
+    def name(self):
+        return self._name
+
+    @property
     def current_cluster_rate(self):
         return self._current_cluster_rate
 
