@@ -45,12 +45,16 @@ contname_verifier="ci-agent-k8s-${CIRCLE_BUILD_NUM}-verifier"
 
 
 # Delete existing resources
-kubectl delete deployment ${contname_verifier}
-kubectl delete deployment ${contname_uploader}
-kubectl delete daemonset scalyr-agent-2
-kubectl delete configmap scalyr-config
-kubectl delete secret scalyr-api-key
-kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
+echo ""
+echo "=================================================="
+echo "Deleting existing resources"
+echo "=================================================="
+kubectl delete deployment ${contname_verifier} || true
+kubectl delete deployment ${contname_uploader} || true
+kubectl delete daemonset scalyr-agent-2 || true
+kubectl delete configmap scalyr-config || true
+kubectl delete secret scalyr-api-key || true
+kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml || true
 
 # Create service account
 kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-service-account.yaml
@@ -69,7 +73,6 @@ kubectl create configmap scalyr-config \
 # Build local image (add .ci.k8s to version)
 TEMP_DIRECTORY=~/temp_directory
 mkdir $TEMP_DIRECTORY
-/bin/rm -rf $TEMP_DIRECTORY/*
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
 pwd
 python build_package.py k8s_builder
@@ -78,10 +81,11 @@ mv $TARBALL $TEMP_DIRECTORY
 pushd $TEMP_DIRECTORY
 ./${TARBALL} --extract-packages
 docker build -t local_k8s_image .
-
+popd
 
 # Create DaemonSet, referring to local image.  Launch agent.
-curl -Lo scalyr-agent-2-envfrom.yaml https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2-envfrom.yaml
+# Use YAML from branch
+cp k8s/scalyr-agent-2-envfrom.yaml .
 perl -pi.bak -e 's/image\:\s+(\S+)/image: local_k8s_image/' scalyr-agent-2-envfrom.yaml
 perl -pi.bak -e 's/imagePullPolicy\:\s+(\S+)/imagePullPolicy: Never/' scalyr-agent-2-envfrom.yaml
 kubectl create -f scalyr-agent-2-envfrom.yaml
