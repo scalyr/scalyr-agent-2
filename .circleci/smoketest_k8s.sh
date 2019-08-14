@@ -142,7 +142,7 @@ echo ""
 echo "=================================================="
 echo "Starting verifier"
 echo "=================================================="
-kubectl run -it ${contname_verifier} --image=${smoketest_image} -- \
+kubectl run -it --restart=Never ${contname_verifier} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
 ${contname_verifier} ${max_wait} \
 --mode verifier \
