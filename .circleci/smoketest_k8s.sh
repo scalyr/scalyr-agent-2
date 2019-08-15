@@ -119,10 +119,6 @@ echo ""
 echo "=================================================="
 echo "Starting uploader"
 echo "=================================================="
-former_uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
-if [[ -z $former_uploader_hostname ]]; then
-    former_uploader_hostname='NO_SUCH_UPLOADER'
-fi
 kubectl run ${contname_uploader} --image=${smoketest_image} -- \
 bash -c "${smoketest_script} \
 ${contname_uploader} ${max_wait} \
@@ -132,7 +128,7 @@ ${contname_uploader} ${max_wait} \
 --agent_hostname ${agent_hostname}"
 
 # Capture uploader pod
-uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | fgrep -v ${former_uploader_hostname} | awk {'print $1'})
+uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
 
 
