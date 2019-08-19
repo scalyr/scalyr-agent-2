@@ -96,7 +96,7 @@ def cache( config ):
     # split comma delimited string of namespaces to ignore in to a list
     # of strings
     namespaces_to_ignore = []
-    for x in config.k8s_ignore_namespaces.split():
+    for x in config.k8s_ignore_namespaces:
         namespaces_to_ignore.append(x.strip())
 
     # create a new cache config

@@ -265,7 +265,7 @@ class Configuration(object):
     # k8s cache options
     @property
     def k8s_ignore_namespaces(self):
-        return self.__get_config().get_string('k8s_ignore_namespaces')
+        return self.__get_config().get_json_array('k8s_ignore_namespaces')
 
     @property
     def k8s_api_url(self):
@@ -1040,7 +1040,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
 
-        self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', ['kube-system'], description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
@@ -1202,7 +1202,7 @@ class Configuration(object):
         if no_description_given:
             description = 'the entry for "%s" in the "logs" array in configuration file "%s"' % (path, config_file_path)
 
-        self.__verify_or_set_optional_array_of_strings( log_entry, 'exclude', description )
+        self.__verify_or_set_optional_array_of_strings( log_entry, 'exclude', [], description )
 
         # If a parser was specified, make sure it is a string.
         if 'parser' in log_entry:
@@ -1543,7 +1543,7 @@ class Configuration(object):
             raise BadConfiguration('The value for the required field "%s" is not an array.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonArray')
 
-    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description, apply_defaults=True,
+    def __verify_or_set_optional_array_of_strings(self, config_object, field, default_value, config_description, apply_defaults=True,
                                                   env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
@@ -1552,6 +1552,7 @@ class Configuration(object):
 
         @param config_object: The JsonObject containing the configuration information.
         @param field: The name of the field to check in config_object.
+        @param default_value: Default values (array of strings)
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
@@ -1566,7 +1567,7 @@ class Configuration(object):
 
             if array_of_strings is None:
                 if apply_defaults:
-                    config_object.put(field, ArrayOfStrings())
+                    config_object.put(field, ArrayOfStrings(*default_value))
                 return
 
             index = 0
