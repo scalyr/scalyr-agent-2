@@ -248,7 +248,7 @@ class KubernetesEventsMonitor( ScalyrMonitor ):
 
         # The namespace whose logs we should not collect.
         self.__k8s_namespaces_to_ignore = []
-        for x in self._global_config.k8s_ignore_namespaces.split():
+        for x in self._global_config.k8s_ignore_namespaces:
             self.__k8s_namespaces_to_ignore.append(x.strip())
 
         default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()

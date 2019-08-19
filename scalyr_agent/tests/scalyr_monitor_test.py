@@ -80,7 +80,7 @@ class MonitorConfigTest(ScalyrTestCase):
         test_array = ["a", "b", "c"]
 
         # str -> ArrayOfStrings (must support different variations)
-        arr = ArrayOfStrings(*test_array)
+        arr = ArrayOfStrings(test_array)
         self.assertEquals(self.get('a,b,c', convert_to=ArrayOfStrings), arr)
         self.assertEquals(self.get('a,b,  c', convert_to=ArrayOfStrings), arr)
         self.assertEquals(self.get('"a", "b", "c"', convert_to=ArrayOfStrings), arr)
@@ -143,7 +143,7 @@ class MonitorConfigTest(ScalyrTestCase):
         test_array = ["a", "b", "c"]
         self.assertEquals(
             self.get(test_array, convert_to=ArrayOfStrings),
-            ArrayOfStrings(*test_array)
+            ArrayOfStrings(test_array)
         )
 
     def test_jsonarray_conversion(self):
@@ -155,7 +155,7 @@ class MonitorConfigTest(ScalyrTestCase):
         # JsonArray -> ArrayOfStrings supported
         test_array = ["a", "b", "c"]
         json_arr = JsonArray(*test_array)
-        self.assertEquals(self.get(json_arr, convert_to=ArrayOfStrings), ArrayOfStrings(*test_array))
+        self.assertEquals(self.get(json_arr, convert_to=ArrayOfStrings), ArrayOfStrings(test_array))
 
         # JsonArray -> invalid ArrayOfStrings
         test_array = ["a", "b", 3]
@@ -165,7 +165,7 @@ class MonitorConfigTest(ScalyrTestCase):
     def test_arrayofstrings_conversion(self):
         # JsonArray -> list not supported
         test_array = ["a", "b", "c"]
-        json_arr = ArrayOfStrings(*test_array)
+        json_arr = ArrayOfStrings(test_array)
         self.assertRaises(BadMonitorConfiguration, lambda: self.get(json_arr, convert_to=list))
 
         # ArrayOfStrings -> JsonArray supported
