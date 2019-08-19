@@ -87,7 +87,10 @@ class ConnectionFactory:
             if use_requests:
                 log.info( "Using Requests for HTTP(S) connections" )
             else:
-                log.info( "Using Httplib for HTTP(S) connections" )
+                if result.is_pure_python_tls:
+                    log.info("Using ScalyrHttpConnection/tlslite for HTTP(S) connections")
+                else:
+                    log.info("Using ScalyrHttpConnection/Httplib for HTTP(S) connections")
 
         return result
 
