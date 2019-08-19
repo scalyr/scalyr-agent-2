@@ -809,8 +809,8 @@ class MonitorConfig(object):
 
             # Perform conversion again in case both config-file and environment values were absent and the default
             # value requires conversion.
-            if convert_to is not None and type(result) != convert_to:
-                result = convert_config_param(field, result, convert_to)
+            if convert_to is not None and not issubclass(convert_to, type(result)):
+                    result = convert_config_param(field, result, convert_to)
 
             if max_value is not None and result > max_value:
                 raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; maximum is %s' % (

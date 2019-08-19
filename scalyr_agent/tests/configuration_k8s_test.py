@@ -3,6 +3,8 @@ from mock import patch, Mock
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.kubernetes_monitor import KubernetesMonitor
+from scalyr_agent.config_util import BadConfiguration
+from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
@@ -12,6 +14,32 @@ from scalyr_agent.tests.configuration_test import TestConfigurationBase
 
 class TestConfigurationK8s(TestConfigurationBase):
     """This test subclasses from TestConfiguration for easier exclusion in python 2.5 and below"""
+
+    def _create_test_objects(self):
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        # echee TODO: once AGENT-40 docker PR merges in, some of the test-setup code below can be eliminated and
+        # reused from that PR (I moved common code into scalyr_agent/test_util
+        def fake_init(self):
+            # Initialize some requisite variables so that the k8s monitor loop can run
+            self._KubernetesMonitor__container_checker = None
+            self._KubernetesMonitor__namespaces_to_ignore = []
+            self._KubernetesMonitor__include_controller_info = None
+            self._KubernetesMonitor__report_container_metrics = None
+            self._KubernetesMonitor__metric_fetcher = None
+            self._set_ignore_namespaces()
+
+        mock_logger = Mock()
+
+        @patch.object(KubernetesMonitor, '_initialize', new=fake_init)
+        def create_manager():
+            scalyr_monitor.log = mock_logger
+            return MonitorsManager(config, FakePlatform([]))
+
+        monitors_manager = create_manager()
+        return monitors_manager, config, mock_logger
+
 
     @patch('scalyr_agent.builtin_monitors.kubernetes_monitor.docker')
     def test_environment_aware_module_params(self, mock_docker):
@@ -88,27 +116,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         }
         """)
 
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        # echee TODO: once AGENT-40 docker PR merges in, some of the test-setup code below can be eliminated and
-        # reused from that PR (I moved common code into scalyr_agent/test_util
-        def fake_init(self):
-            # Initialize some requisite variables so that the k8s monitor loop can run
-            self._KubernetesMonitor__container_checker = None
-            self._KubernetesMonitor__namespaces_to_ignore = []
-            self._KubernetesMonitor__include_controller_info = None
-            self._KubernetesMonitor__report_container_metrics = None
-            self._KubernetesMonitor__metric_fetcher = None
-
-        mock_logger = Mock()
-
-        @patch.object(KubernetesMonitor, '_initialize', new=fake_init)
-        def create_manager():
-            scalyr_monitor.log = mock_logger
-            return MonitorsManager(config, FakePlatform([]))
-
-        monitors_manager = create_manager()
+        monitors_manager, config, mock_logger = self._create_test_objects()
         k8s_monitor = monitors_manager.monitors[0]
         k8s_events_monitor = monitors_manager.monitors[1]
 
@@ -246,3 +254,95 @@ class TestConfigurationK8s(TestConfigurationBase):
         _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'false', False)
         _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'False', False)
         _assert_environment_variable('SCALYR_K8S_EVENTS_DISABLE', 'F', False)
+
+    def test_k8s_ignore_namespaces(self):
+
+        def _verify(expected):
+            monitors_manager, config, mock_logger = self._create_test_objects()
+            k8s_monitor = monitors_manager.monitors[0]
+            result = k8s_monitor._get_ignore_namespaces()
+            if result is None:
+                self.assertIsNone(expected)
+            else:
+                self.assertEquals(expected, result)
+
+        def _test_k8s_ignore_namespaces_local(test_str, expected):
+            self._write_file_with_separator_conversion(""" { 
+                api_key: "hi there",
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                        k8s_ignore_namespaces: %s
+                    }
+                ]
+              }
+            """ % test_str)
+            _verify(expected)
+
+        def _test_k8s_ignore_namespaces_global(test_str, expected):
+            self._write_file_with_separator_conversion(""" { 
+                api_key: "hi there",
+                k8s_ignore_namespaces: %s,
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor"
+                    }
+                ]
+              }
+            """ % test_str)
+            _verify(expected)
+
+        def _test_k8s_ignore_namespaces_environ(test_str, expected):
+            os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = test_str
+            self._write_file_with_separator_conversion(""" { 
+                api_key: "hi there",
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor"
+                    }
+                ]
+              }
+            """)
+            _verify(expected)
+
+        def _test_k8s_ignore_namespaces_supersedes(env_str, local_str, expected):
+            os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = env_str
+            self._write_file_with_separator_conversion(""" { 
+                api_key: "hi there",
+                logs: [ { path:"/var/log/tomcat6/access.log" }],
+                monitors: [
+                    {
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor",
+                        k8s_ignore_namespaces: %s
+                    }
+                ]
+              }
+            """ % local_str)
+            _verify(expected)
+
+        expected = ['a', 'b', 'c', 'd']
+        kube_system = Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
+
+        # define locally in agent.json
+        _test_k8s_ignore_namespaces_local(r'"a, b  c, d"', expected)
+        _test_k8s_ignore_namespaces_local(r'["a", "b", "c", "d"]', expected)
+        _test_k8s_ignore_namespaces_local(r'""', kube_system)
+
+        # defined globally in agent.json
+        _test_k8s_ignore_namespaces_global(r'["a", "b", "c", "d"]', expected)
+        self.assertRaises(BadConfiguration, lambda: _test_k8s_ignore_namespaces_global(r'"a, b  c, d"', expected))
+
+        # defined in environment
+        _test_k8s_ignore_namespaces_environ(r'a, b  c, d', expected)
+        _test_k8s_ignore_namespaces_environ(r'["a", "b", "c", "d"]', expected)
+        _test_k8s_ignore_namespaces_environ(r'', kube_system)
+
+        # environment supersedes local
+        _test_k8s_ignore_namespaces_supersedes("a b c d", r'"1 2 3"', expected)
+        _test_k8s_ignore_namespaces_supersedes("a b, c d", r'"1, 2 3"', expected)
+        _test_k8s_ignore_namespaces_supersedes(r'["a", "b", "c", "d"]', r'["1", "2", "3"]', expected)
+        _test_k8s_ignore_namespaces_supersedes(r'', r'"1, 2, 3"', ["1", "2", "3"])
+        _test_k8s_ignore_namespaces_supersedes(r'', r'""', kube_system)
