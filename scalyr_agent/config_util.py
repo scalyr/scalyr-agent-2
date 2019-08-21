@@ -22,7 +22,7 @@ import os
 import re
 
 from scalyr_agent import json_lib
-from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString
+from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
 
 
@@ -80,14 +80,14 @@ def parse_array_of_strings(strlist, separators=[',']):
 NUMERIC_TYPES = set([int, long, float])
 STRING_TYPES = set([str, unicode])
 PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
-SUPPORTED_TYPES = PRIMITIVE_TYPES | set([JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString])
+SUPPORTED_TYPES = PRIMITIVE_TYPES | set([JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings])
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
     int: set([str, unicode, long, float]),
     long: set([str, unicode, float]),
     float: STRING_TYPES,
-    list: set([str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString]),
-    JsonArray: set([str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString]),
+    list: set([str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]),
+    JsonArray: set([str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]),
     JsonObject: STRING_TYPES,
     str: SUPPORTED_TYPES,
     unicode: SUPPORTED_TYPES,
@@ -154,7 +154,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                     'Could not parse value %s for field "%s" as %s' % (value, field_name, convert_to),
                     field_name, 'notJsonObject')
 
-        elif convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString):
+        elif convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
             try:
                 # ArrayOfStrings and it's
                 return parse_array_of_strings(value, convert_to.separators)

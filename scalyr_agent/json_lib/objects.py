@@ -637,6 +637,6 @@ class ArrayOfStrings(JsonArray):
                 self._items.append(val)
 
 
-class SpaceAndCommaSeparatedArrayOfString(ArrayOfStrings):
+class SpaceAndCommaSeparatedArrayOfStrings(ArrayOfStrings):
     separators = [None, ',']
 

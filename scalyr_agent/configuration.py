@@ -27,7 +27,7 @@ import urlparse
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
-from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString
+from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
@@ -1116,7 +1116,7 @@ class Configuration(object):
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
         elif param_type == JsonArray:
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
-        elif param_type in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString):
+        elif param_type in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
             # ArrayOfStrings are extracted from config file as JsonArray
             # (but extracted from the environment different from JsonArray)
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
@@ -1565,7 +1565,7 @@ class Configuration(object):
         # For legacy reasons, must support space-separated array of strings
         cls = ArrayOfStrings
         if separators == [None, ',']:
-            cls = SpaceAndCommaSeparatedArrayOfString
+            cls = SpaceAndCommaSeparatedArrayOfStrings
         try:
             array_of_strings = self.__get_config_or_environment_val(config_object, field, cls, env_aware, env_name)
 
