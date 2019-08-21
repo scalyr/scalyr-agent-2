@@ -31,6 +31,7 @@ import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, DockerMetricFetcher
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
@@ -110,10 +111,6 @@ define_config_option( __monitor__, 'report_container_metrics',
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
                       'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True, env_aware=True)
-
-define_config_option( __monitor__, 'k8s_ignore_namespaces',
-                      'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
-                      'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
 
 define_config_option( __monitor__, 'k8s_ignore_pod_sandboxes',
                       'Optional (defaults to True). If True then all containers with the label '
@@ -1554,7 +1551,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         # The namespace whose logs we should not collect.
         self.__namespaces_to_ignore = []
-        for x in self._config.get('k8s_ignore_namespaces').split():
+        for x in self._global_config.k8s_ignore_namespaces:
             self.__namespaces_to_ignore.append(x.strip())
 
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
@@ -2069,10 +2066,10 @@ class KubernetesMonitor( ScalyrMonitor ):
             self.__report_k8s_metrics = False
 
 
-        global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers %s, '
-                        'report_metrics %s' % (','.join(self.__namespaces_to_ignore),
-                                                         str(self.__include_controller_info),
-                                                         str(self.__report_container_metrics)))
+        global_log.info(
+            'kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, report_metrics: %s'
+            % (self.__namespaces_to_ignore, self.__include_controller_info, self.__report_container_metrics)
+        )
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):

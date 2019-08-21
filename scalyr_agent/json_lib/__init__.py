@@ -36,7 +36,7 @@ __author__ = 'Steven Czerwinski <czerwin@scalyr.com>'
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException
 from scalyr_agent.json_lib.exceptions import JsonMissingFieldException, JsonParseException
-from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings
+from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString
 from scalyr_agent.json_lib.parser import parse
 from scalyr_agent.json_lib.serializer import serialize
 from scalyr_agent.json_lib.serializer import serialize_as_length_prefixed_string

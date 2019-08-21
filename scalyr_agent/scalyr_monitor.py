@@ -742,6 +742,7 @@ class MonitorConfig(object):
                     self._environment_aware_map[x.option_name] = env_name
 
                 if x.required_option or x.default is not None or x.option_name in self.__map:
+                    print('option_name = %s, convert to = %s, default = %s' % (x.option_name, x.convert_to, x.default))
                     self.__map[x.option_name] = self.get(x.option_name, required_field=x.required_option,
                                                          max_value=x.max_value, min_value=x.min_value,
                                                          convert_to=x.convert_to, default=x.default,
@@ -809,8 +810,8 @@ class MonitorConfig(object):
 
             # Perform conversion again in case both config-file and environment values were absent and the default
             # value requires conversion.
-            if convert_to is not None and type(result) != convert_to:
-                result = convert_config_param(field, result, convert_to)
+            if convert_to is not None and not issubclass(convert_to, type(result)):
+                    result = convert_config_param(field, result, convert_to)
 
             if max_value is not None and result > max_value:
                 raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; maximum is %s' % (

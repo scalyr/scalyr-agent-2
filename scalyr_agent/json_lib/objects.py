@@ -638,5 +638,5 @@ class ArrayOfStrings(JsonArray):
 
 
 class SpaceAndCommaSeparatedArrayOfString(ArrayOfStrings):
-    separators = [',', None]
+    separators = [None, ',']
 

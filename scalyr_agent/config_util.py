@@ -27,7 +27,7 @@ from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseE
 
 
 
-def parse_array_of_strings(strlist, allowed_delimiters=[',']):
+def parse_array_of_strings(strlist, separators=[',']):
     """Convert comma-separated string list into an ArrayOfStrings
 
     Accepts the following string representations.
@@ -38,7 +38,7 @@ def parse_array_of_strings(strlist, allowed_delimiters=[',']):
     a, b, c
 
     @param strlist: list to be converted
-    @param allowed_delimiters: list of allowed delimiters
+    @param separators: list of allowed separators
     @return: None if strlist is empty, else return a JsonArray of strings
     @raise TypeError if element_type is specified and conversion of any element fails
     """
@@ -56,7 +56,7 @@ def parse_array_of_strings(strlist, allowed_delimiters=[',']):
     elems = []
 
     split_regex = "["
-    for delim in allowed_delimiters:
+    for delim in separators:
         if delim is None:
             split_regex += r"\s+"  # None means "split by any whitespace"
         else:
