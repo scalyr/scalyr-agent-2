@@ -623,12 +623,20 @@ class JsonArray(object):
 
 class ArrayOfStrings(JsonArray):
 
-    def __init__(self, *args):
+    separators = [',']
+
+    def __init__(self, values=None):
         """Imposes additional constraint that each element must be a string
         @raise TypeError if an element is not a string
         """
         self._items = []
-        for arg in args:
-            if type(arg) not in (str, unicode):
-                raise TypeError('A non-string element was found: %s' % str(arg))
-            self._items.append(arg)
+        if values:
+            for val in values:
+                if type(val) not in (str, unicode):
+                    raise TypeError('A non-string element was found: %s' % str(val))
+                self._items.append(val)
+
+
+class SpaceAndCommaSeparatedArrayOfString(ArrayOfStrings):
+    separators = [',', None]
+

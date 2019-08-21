@@ -1071,7 +1071,7 @@ class TestConfiguration(TestConfigurationBase):
             FAKE_INT = 1234567890
             FAKE_FLOAT = 1234567.89
             FAKE_STRING = str(FAKE_INT)
-            FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(*['s1', 's2', 's3'])
+            FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(['s1', 's2', 's3'])
 
             for field in expected_aware_fields:
                 field_type = field_types[field]
@@ -1104,7 +1104,16 @@ class TestConfiguration(TestConfigurationBase):
             def fake_environment_value(field):
                 if field not in fake_env:
                     return None
-                return str(fake_env[field]).lower()
+                fake_field_val = fake_env[field]
+                if isinstance(fake_field_val, ArrayOfStrings):
+                    separator = ','
+                    # legacy whitespace separator support for 'k8s_ignore_namespaces'
+                    if field == 'k8s_ignore_namespaces':
+                        separator = ' '
+                    result = str(separator.join([x for x in fake_field_val])).lower()
+                else:
+                    result = str(fake_field_val).lower()
+                return result
             function_lookup = {'get_environment': fake_environment_value}
 
             config.parse()

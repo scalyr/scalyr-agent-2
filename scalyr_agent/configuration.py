@@ -27,7 +27,7 @@ import urlparse
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
-from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings
+from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
@@ -1039,8 +1039,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
-
-        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', ['kube-system'], description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', ['kube-system'], description, apply_defaults, separators=[',', None], env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
@@ -1094,7 +1093,7 @@ class Configuration(object):
 
         @param config_object: The JsonObject config containing the field as a key
         @param param_name: Parameter name
-        @param param_type: Parameter primitive type
+        @param param_type: Parameter type
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
@@ -1117,7 +1116,7 @@ class Configuration(object):
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
         elif param_type == JsonArray:
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
-        elif param_type == ArrayOfStrings:
+        elif param_type in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString):
             # ArrayOfStrings are extracted from config file as JsonArray
             # (but extracted from the environment different from JsonArray)
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
@@ -1544,7 +1543,7 @@ class Configuration(object):
                                    'Error is in %s' % (field, config_description), field, 'notJsonArray')
 
     def __verify_or_set_optional_array_of_strings(self, config_object, field, default_value, config_description, apply_defaults=True,
-                                                  env_aware=False, env_name=None):
+                                                  separators=[','], env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
 
@@ -1557,17 +1556,22 @@ class Configuration(object):
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param separators: list of allowed separators (An entry of None represents "any whitespace")
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         """
+        separators.sort()
+        # For legacy reasons, must support space-separated array of strings
+        cls = ArrayOfStrings
+        if separators == [None, ',']:
+            cls = SpaceAndCommaSeparatedArrayOfString
         try:
-            array_of_strings = self.__get_config_or_environment_val(config_object, field, ArrayOfStrings,
-                                                                    env_aware, env_name)
+            array_of_strings = self.__get_config_or_environment_val(config_object, field, cls, env_aware, env_name)
 
             if array_of_strings is None:
                 if apply_defaults:
-                    config_object.put(field, ArrayOfStrings(*default_value))
+                    config_object.put(field, cls(values=default_value))
                 return
 
             index = 0

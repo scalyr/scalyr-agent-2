@@ -19,14 +19,15 @@ __author__ = 'echee@scalyr.com'
 
 
 import os
+import re
 
 from scalyr_agent import json_lib
-from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings
+from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
 
 
 
-def parse_array_of_strings(strlist):
+def parse_array_of_strings(strlist, allowed_delimiters=[',']):
     """Convert comma-separated string list into an ArrayOfStrings
 
     Accepts the following string representations.
@@ -37,6 +38,7 @@ def parse_array_of_strings(strlist):
     a, b, c
 
     @param strlist: list to be converted
+    @param allowed_delimiters: list of allowed delimiters
     @return: None if strlist is empty, else return a JsonArray of strings
     @raise TypeError if element_type is specified and conversion of any element fails
     """
@@ -52,7 +54,16 @@ def parse_array_of_strings(strlist):
 
     # Extract elements, removing any surrounding quotes (Single-quotes are illegal JSON. Double quotes will be added).
     elems = []
-    items = strlist.split(',')
+
+    split_regex = "["
+    for delim in allowed_delimiters:
+        if delim is None:
+            split_regex += r"\s+"  # None means "split by any whitespace"
+        else:
+            split_regex += delim
+    split_regex += "]"
+    items = re.split(split_regex, strlist)
+
     for elem in items:
         elem = elem.strip()
         if len(elem) == 0:
@@ -63,20 +74,20 @@ def parse_array_of_strings(strlist):
             continue
         elems.append(elem)
 
-    return ArrayOfStrings(*elems)
+    return ArrayOfStrings(elems)
 
 
 NUMERIC_TYPES = set([int, long, float])
 STRING_TYPES = set([str, unicode])
 PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
-SUPPORTED_TYPES = PRIMITIVE_TYPES | set([JsonArray, JsonObject, ArrayOfStrings])
+SUPPORTED_TYPES = PRIMITIVE_TYPES | set([JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString])
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
     int: set([str, unicode, long, float]),
     long: set([str, unicode, float]),
     float: STRING_TYPES,
-    list: set([str, unicode, JsonArray, ArrayOfStrings]),
-    JsonArray: set([str, unicode, ArrayOfStrings]),
+    list: set([str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString]),
+    JsonArray: set([str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString]),
     JsonObject: STRING_TYPES,
     str: SUPPORTED_TYPES,
     unicode: SUPPORTED_TYPES,
@@ -126,7 +137,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                     'Non-string element found in value %s for field "%s"' % (value, field_name),
                     field_name, 'notArrayOfStrings')
             list_of_strings.append(item)
-        return ArrayOfStrings(*list_of_strings)
+        return ArrayOfStrings(list_of_strings)
 
     # Anything is allowed to go from string/unicode to the conversion type, as long as it can be parsed.
     # Special-case handle bool and JsonArray
@@ -143,9 +154,10 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                     'Could not parse value %s for field "%s" as %s' % (value, field_name, convert_to),
                     field_name, 'notJsonObject')
 
-        elif convert_to == ArrayOfStrings:
+        elif convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfString):
             try:
-                return parse_array_of_strings(value)
+                # ArrayOfStrings and it's
+                return parse_array_of_strings(value, convert_to.separators)
             except TypeError:
                 raise BadConfiguration(
                     'Could not parse value %s for field "%s" as %s' % (value, field_name, convert_to),
