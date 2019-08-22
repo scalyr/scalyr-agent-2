@@ -129,7 +129,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                 % (value, field_name, convert_from, convert_to),
                 field_name, 'notJsonArray')
 
-    if convert_from in (list, JsonArray) and convert_to == ArrayOfStrings:
+    if convert_from in (list, JsonArray) and convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
         list_of_strings = []
         for item in value:
             if type(item) not in STRING_TYPES:
@@ -137,7 +137,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                     'Non-string element found in value %s for field "%s"' % (value, field_name),
                     field_name, 'notArrayOfStrings')
             list_of_strings.append(item)
-        return ArrayOfStrings(list_of_strings)
+        return convert_to(list_of_strings)
 
     # Anything is allowed to go from string/unicode to the conversion type, as long as it can be parsed.
     # Special-case handle bool and JsonArray

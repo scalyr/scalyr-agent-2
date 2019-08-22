@@ -52,6 +52,9 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
+
+    DEFAULT_K8S_IGNORE_NAMESPACES = ['kube-system']
+
     def __init__(self, file_path, default_paths, logger):
         # Captures all environment aware variables for testing purposes
         self._environment_aware_map = {}
@@ -1039,7 +1042,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
-        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', ['kube-system'], description, apply_defaults, separators=[None, ','], env_aware=True)
+        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', Configuration.DEFAULT_K8S_IGNORE_NAMESPACES, description, apply_defaults, separators=[None, ','], env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
