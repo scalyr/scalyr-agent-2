@@ -904,9 +904,11 @@ class ContainerChecker( StoppableThread ):
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
             if self._container_runtime == 'docker' and not self.__always_use_cri:
+                self._logger.info( "Using docker socket to query running containers" )
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                 self._container_enumerator = DockerEnumerator( self.__client, self.container_id )
             else:
+                self._logger.info( "Using CRI to query running containers.  Filesystem querying=%s" % self.__cri_query_filesystem )
                 self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_filesystem=self.__cri_query_filesystem )
 
             if self.__parse_format == 'auto':
