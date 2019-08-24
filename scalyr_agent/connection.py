@@ -24,9 +24,6 @@ import socket
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
-from certvalidator import CertificateValidator, ValidationContext, errors as CertValidationErrors
-from asn1crypto import x509, pem
-
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -205,55 +202,61 @@ class ScalyrHttpConnection(Connection):
             log.info('HttpConnection uses pure-python TLS')
 
     def _validate_chain(self, tlslite_connection, server, ca_file):
-        # validate server certificate chain
-        session = tlslite_connection.sock.session
-        assert type(session.serverCertChain.x509List) == list
-
-        # get the end-entity cert
-        file_bytes = session.serverCertChain.x509List[0].bytes
-        end_entity_cert = x509.Certificate.load(str(file_bytes))
-
-        cert_dir = os.path.dirname(ca_file)
-
-        def get_cert_bytes(file_names):
-            file_names = [os.path.join(cert_dir, f) for f in file_names]
-            result = []
-            for fname in file_names:
-                arr = open(fname, 'rb').read()
-                cert_bytes = pem.unarmor(arr)[2]
-                result.append(cert_bytes)
-            return result
-
-        trust_roots = None
-        intermediate_certs = get_cert_bytes([
-            'comodo_ca_intermediate.pem',
-            'sectigo_ca_intermediate.pem'
-        ])
-        extra_trust_roots = get_cert_bytes([
-            'scalyr_agent_ca_root.pem',
-            'addtrust_external_ca_root.pem'
-        ])
-
-        if trust_roots:
-            context = ValidationContext(
-                trust_roots=trust_roots,
-                extra_trust_roots=extra_trust_roots,
-                other_certs=intermediate_certs,
-                # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
-            )
-        else:
-            context = ValidationContext(
-                extra_trust_roots=extra_trust_roots,
-                other_certs=intermediate_certs,
-                # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
-            )
         try:
+            from certvalidator import CertificateValidator
+            from certvalidator import ValidationContext
+            from asn1crypto import x509, pem
+            # validate server certificate chain
+            session = tlslite_connection.sock.session
+            assert type(session.serverCertChain.x509List) == list
+
+            # get the end-entity cert
+            file_bytes = session.serverCertChain.x509List[0].bytes
+            end_entity_cert = x509.Certificate.load(str(file_bytes))
+
+            cert_dir = os.path.dirname(ca_file)
+
+            def get_cert_bytes(file_names):
+                file_names = [os.path.join(cert_dir, f) for f in file_names]
+                result = []
+                for fname in file_names:
+                    arr = open(fname, 'rb').read()
+                    cert_bytes = pem.unarmor(arr)[2]
+                    result.append(cert_bytes)
+                return result
+
+            trust_roots = None
+            intermediate_certs = get_cert_bytes([
+                'comodo_ca_intermediate.pem',
+                'sectigo_ca_intermediate.pem'
+            ])
+            extra_trust_roots = get_cert_bytes([
+                'scalyr_agent_ca_root.pem',
+                'addtrust_external_ca_root.pem'
+            ])
+
+            if trust_roots:
+                context = ValidationContext(
+                    trust_roots=trust_roots,
+                    extra_trust_roots=extra_trust_roots,
+                    other_certs=intermediate_certs,
+                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+                )
+            else:
+                context = ValidationContext(
+                    extra_trust_roots=extra_trust_roots,
+                    other_certs=intermediate_certs,
+                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+                )
             validator = CertificateValidator(end_entity_cert, validation_context=context)
             validator.validate_tls(unicode(server))
             log.info('Scalyr server chain successfully validated')
-        except CertValidationErrors, ce:
+        except Exception, ce:
             log.exception('Error validating server certificate chain: %s' % ce)
-            raise  # echee TODO remove
+            # echee TODO remove traceback
+            import traceback
+            print(traceback.format_exc())
+            raise
 
     def _init_connection(self, pure_python_tls=False):
         try:
@@ -279,12 +282,11 @@ class ScalyrHttpConnection(Connection):
                     self.__connection.connect()
                     self._validate_chain(self.__connection, self._host, ca_file)
                     log.info('echee tls validated')
-
             else:
                 # unencrypted connection
                 self.__connection = HTTPConnectionWithTimeout(self._host, self._port, self._request_deadline)
                 self.__connection.connect()
-        except (socket.error, socket.herror, socket.gaierror), error:
+        except (socket.error, socket.herror, socket.gaierror    ), error:
             if hasattr(error, 'errno'):
                 errno = error.errno
             else:
