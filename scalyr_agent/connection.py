@@ -20,7 +20,6 @@ __author__ = 'imron@scalyr.com'
 import httplib
 import os
 import re
-import ssl
 import socket
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -33,10 +32,19 @@ log = scalyr_logging.getLogger(__name__)
 
 # noinspection PyBroadException
 try:
-    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+    import ssl
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
+    ssl = None
+
+
+__has_pure_python_tls__ = False
+try:
+    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+    __has_pure_python_tls__ = True
+except Exception:
+    pass
 
 
 class ConnectionFactory:
@@ -130,7 +138,7 @@ class Connection( object ):
     def __check_ssl( self ):
         """ Helper function to check if ssl is available and enabled """
         if self._use_ssl:
-            if not __has_ssl__:
+            if not __has_ssl__ and not __has_pure_python_tls__:
                 log.warn('No ssl library available so cannot verify server certificate when communicating with Scalyr. '
                          'This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. '
                          'To solve this, install the Python ssl library. '
@@ -262,6 +270,7 @@ class ScalyrHttpConnection(Connection):
                                                                                   ca_file, __has_ssl__)
                     self.__connection.connect()
                 else:
+                    log.info('echee tls')
                     settings = HandshakeSettings()
                     settings.minVersion = (3, 3)  # TLS 1.2
                     self.__connection = HTTPTLSConnection(
@@ -269,6 +278,7 @@ class ScalyrHttpConnection(Connection):
                     )
                     self.__connection.connect()
                     self._validate_chain(self.__connection, self._host, ca_file)
+                    log.info('echee tls validated')
 
             else:
                 # unencrypted connection

@@ -536,7 +536,10 @@ class ScalyrClientSession(object):
         # Include a string to indicate if python has a true ssl library available to record
         # whether or not the client is doing server certificate verification.
         if __has_ssl__:
-            ssl_str = 'tlslite' if (self.__connection and self.__connection.is_pure_python_tls) else 'ssllib'
+            ssl_str = 'ssllib'
+            log.info('echee has_ssl : conn=%s is_pure=%s' % (self.__connection, self.__connection.is_pure_python_tls))
+            if self.__connection and self.__connection.is_pure_python_tls:
+                ssl_str = 'tlslite'
         else:
             ssl_str = 'nossllib'
 
