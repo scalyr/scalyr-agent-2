@@ -35,6 +35,7 @@ FILES=/tmp
 
 # Create work directory to checkout source code
 mkdir -p /tmp/src && pushd /tmp/src
+df -kh
 if [[ ! -d "./scalyr-agent-2" ]]; then
     git clone https://github.com/scalyr/scalyr-agent-2.git
 fi
@@ -47,20 +48,21 @@ git checkout $TEST_BRANCH
 python_version_opt='--version'
 SIMULATE_TLS12_FAILURE=false
 
+echo "Input PYTHON_VERSION = $PYTHON_VERSION"
 if [[ $PYTHON_VERSION == "2.4" ]]; then
-    PYENV_VERSION="2.4.1"
+    export PYENV_VERSION="2.4.1"
     python_version_opt='-V'
 elif [[ $PYTHON_VERSION == "2.5" ]]; then
-    PYENV_VERSION="2.5.4"
+    export PYENV_VERSION="2.5.4"
 elif [[ $PYTHON_VERSION == "2.6" ]]; then
-    PYENV_VERSION="2.6.9"
+    export PYENV_VERSION="2.6.9"
 elif [[ $PYTHON_VERSION == "2.7" ]]; then
-    PYENV_VERSION="2.7.12"
+    export PYENV_VERSION="2.7.12"
 elif [[ $PYTHON_VERSION == "2.6.tls12" ]]; then
-    PYENV_VERSION="2.6.9"
+    export PYENV_VERSION="2.6.9"
     SIMULATE_TLS12_FAILURE=true
 elif [[ $PYTHON_VERSION == "2.7.tls12" ]]; then
-    PYENV_VERSION="2.7.12"
+    export PYENV_VERSION="2.7.12"
     SIMULATE_TLS12_FAILURE=true
 fi
 
@@ -75,13 +77,18 @@ fi
 export PATH=/usr/local/bin:$PATH
 
 # Build RPM with python 2.7
+echo ""
+echo "Using python 2.7 to build rpm"
+SAVED_PYENV_VERSION=$PYENV_VERSION
 source ~/.bashrc && pyenv shell 2.7.12 && pyenv version
-echo "Building agent RPM"
+echo "Building agent RPM."
 python build_package.py rpm
 RPMFILE=`ls scalyr-agent*.rpm`
 sudo -E rpm -i $RPMFILE
 
-source ~/.bashrc && pyenv shell $PYENV_VERSION && pyenv version
+echo ""
+echo "Switching to python $SAVED_PYENV_VERSION for smoke test"
+source ~/.bashrc && pyenv shell $SAVED_PYENV_VERSION && pyenv version
 
 # Make sure system python is the same as test version (for tcollector)
 pythonbin=$(which python)
@@ -93,7 +100,7 @@ ls -la /usr/bin/python
 sudo /bin/cp -f $FILES/override_files/agent.json /etc/scalyr-agent-2/agent.json
 sudo perl -pi.bak -e "s{CIRCLE_BUILD_NUM}{$CIRCLE_BUILD_NUM}" /etc/scalyr-agent-2/agent.json
 echo "Overriding contents of: /etc/scalyr-agent-2/agent.json"
-cat /etc/scalyr-agent-2/agent.jsons
+cat /etc/scalyr-agent-2/agent.json
 
 echo "{api_key: \"$SCALYR_API_KEY\"}" > /tmp/api_key.json
 sudo mv /tmp/api_key.json /etc/scalyr-agent-2/agent.d/api_key.json
