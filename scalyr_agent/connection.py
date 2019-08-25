@@ -197,7 +197,7 @@ class Connection( object ):
         pass
 
 
-class CertValidationError(ssl.SSLError):
+class CertValidationError(Exception):
     pass
 
 
@@ -336,17 +336,16 @@ class ScalyrHttpConnection(Connection):
                 errno = error.errno
             else:
                 errno = None
-            if __has_ssl__ and isinstance(error, ssl.SSLError):
-                if isinstance(error, CertValidationError):
-                    log.error('Failed to connect to "%s" because of server certificate validation error: "%s"',
-                              self._full_address, error.message, error_code='client/connectionFailed')
-                else:
-                    log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
-                              'for the root Certificate Authority could not be parsed, or we attempted to connect to '
-                              'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
-                              'changed and you should update your agent to get the new certificate).  The returned '
-                              'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
-                              self._full_address, errno, str(error), error_code='client/connectionFailed')
+            if isinstance(error, CertValidationError):
+                log.error('Failed to connect to "%s" because of server certificate validation error: "%s"',
+                          self._full_address, error.message, error_code='client/connectionFailed')
+            elif __has_ssl__ and isinstance(error, ssl.SSLError):
+                log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
+                          'for the root Certificate Authority could not be parsed, or we attempted to connect to '
+                          'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
+                          'changed and you should update your agent to get the new certificate).  The returned '
+                          'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
+                          self._full_address, errno, str(error), error_code='client/connectionFailed')
             elif errno == 61:  # Connection refused
                 log.error('Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
                           self._full_address, error_code='client/connectionFailed')
