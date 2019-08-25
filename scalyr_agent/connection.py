@@ -205,12 +205,11 @@ class ScalyrHttpConnection(Connection):
     def __init__(self, server, request_deadline, ca_file, intermediate_certs_file, headers):
         super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, intermediate_certs_file, headers)
         self.__http_response = None
-        print('CA FILE = %s, %s' % (ca_file, intermediate_certs_file))
         try:
             self._init_connection(pure_python_tls=False)
             log.info('HttpConnection uses native os ssl')
         except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
-            log.info('Exception while attempting to use openssl library.  Falling-back to pure-python implementation')
+            log.info('Exception while attempting to use openssl library.  Falling back to pure-python implementation')
             self._init_connection(pure_python_tls=True)
             log.info('HttpConnection uses pure-python TLS')
 
@@ -298,9 +297,6 @@ class ScalyrHttpConnection(Connection):
             log.info('Scalyr server cert chain successfully validated via certvalidator library')
         except Exception, ce:
             log.exception('Error validating server certificate chain: %s' % ce)
-            # echee TODO remove traceback
-            import traceback
-            print(traceback.format_exc())
             raise
 
 
@@ -441,7 +437,6 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
                 encrypted.
             has_ssl:  True if the ssl Python library is available.
         """
-        raise Exception('ECHEE TODO: REMOVE THIS')
         if not has_ssl and ca_file is not None:
             raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
         self.__timeout = timeout
