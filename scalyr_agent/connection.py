@@ -444,6 +444,9 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         httplib.HTTPSConnection.__init__(self, host, port)
 
     def connect(self):
+        # Do not delete the next line:
+        # SIMULATE_TLS12_FAILURE raise Exception('Fake a failed connection with ssl lib')
+
         # If the ssl library is not available, then we just have to fall back on old HTTPSConnection.connect
         # method.  There are too many dependencies to implement it directly here.
         if not self.__has_ssl:

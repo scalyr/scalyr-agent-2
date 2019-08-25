@@ -35,11 +35,43 @@ FILES=/tmp
 
 # Create work directory to checkout source code
 mkdir -p /tmp/src && pushd /tmp/src
-if [ ! -d "./scalyr-agent-2" ]; then
+if [[ ! -d "./scalyr-agent-2" ]]; then
     git clone https://github.com/scalyr/scalyr-agent-2.git
 fi
 cd scalyr-agent-2
 git checkout $TEST_BRANCH
+
+
+# Switch python version and set PATH.  Also symlink /usr/bin/python to Tcollector doesn't
+# inadvertently use preinstalled 2.7
+python_version_opt='--version'
+SIMULATE_TLS12_FAILURE=false
+
+if [[ $PYTHON_VERSION == "2.4" ]]; then
+    PYENV_VERSION="2.4.1"
+    python_version_opt='-V'
+elif [[ $PYTHON_VERSION == "2.5" ]]; then
+    PYENV_VERSION="2.5.4"
+elif [[ $PYTHON_VERSION == "2.6" ]]; then
+    PYENV_VERSION="2.6.9"
+elif [[ $PYTHON_VERSION == "2.7" ]]; then
+    PYENV_VERSION="2.7.12"
+elif [[ $PYTHON_VERSION == "2.6.tls12" ]]; then
+    PYENV_VERSION="2.6.9"
+    SIMULATE_TLS12_FAILURE=true
+elif [[ $PYTHON_VERSION == "2.7.tls12" ]]; then
+    PYENV_VERSION="2.7.12"
+    SIMULATE_TLS12_FAILURE=true
+fi
+
+
+# Force an Exception when HTTPSConnectionWithTimeoutAndVerification is used
+if [[ $SIMULATE_TLS12_FAILURE == "true" ]]; then
+    echo "xxxxxxx "
+    perl -pi -e 's/# SIMULATE_TLS12_FAILURE //g' scalyr_agent/connection.py
+fi
+cat scalyr_agent/connection.py
+
 
 # Make sure /usr/local/bin/fpm is runnable
 export PATH=/usr/local/bin:$PATH
@@ -51,23 +83,6 @@ python build_package.py rpm
 RPMFILE=`ls scalyr-agent*.rpm`
 sudo -E rpm -i $RPMFILE
 
-# Switch python version and set PATH.  Also symlink /usr/bin/python to Tcollector doesn't
-# inadvertently use preinstalled 2.7
-python_version_opt='--version'
-if [[ $PYTHON_VERSION == "2.4" ]]; then
-    PYENV_VERSION="2.4.1"
-    python_version_opt='-V'
-elif [[ $PYTHON_VERSION == "2.5" ]]; then
-    PYENV_VERSION="2.5.4"
-elif [[ $PYTHON_VERSION == "2.6" ]]; then
-    PYENV_VERSION="2.6.9"
-elif [[ $PYTHON_VERSION == "2.7" ]]; then
-    PYENV_VERSION="2.7.12"
-elif [[ $PYTHON_VERSION == "2.6.nossl" ]]; then
-    PYENV_VERSION="2.6.6"
-elif [[ $PYTHON_VERSION == "2.7.nossl" ]]; then
-    PYENV_VERSION="2.7.2"
-fi
 source ~/.bashrc && pyenv shell $PYENV_VERSION && pyenv version
 
 # Make sure system python is the same as test version (for tcollector)
@@ -80,7 +95,7 @@ ls -la /usr/bin/python
 sudo /bin/cp -f $FILES/override_files/agent.json /etc/scalyr-agent-2/agent.json
 sudo perl -pi.bak -e "s{CIRCLE_BUILD_NUM}{$CIRCLE_BUILD_NUM}" /etc/scalyr-agent-2/agent.json
 echo "Overriding contents of: /etc/scalyr-agent-2/agent.json"
-cat /etc/scalyr-agent-2/agent.json
+cat /etc/scalyr-agent-2/agent.jsons
 
 echo "{api_key: \"$SCALYR_API_KEY\"}" > /tmp/api_key.json
 sudo mv /tmp/api_key.json /etc/scalyr-agent-2/agent.d/api_key.json
