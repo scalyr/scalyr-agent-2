@@ -85,7 +85,33 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /tmp/smoketest_standalone.sh && \
+            docker rm dummy;
+  smoke-standalone-27-nossl:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: |
+            docker container create --name dummy -v shared_vol:/app alpine && \
+            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker rm dummy;
+  smoke-standalone-26-nossl:
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: |
+            docker container create --name dummy -v shared_vol:/app alpine && \
+            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /tmp/smoketest_standalone.sh && \
             docker rm dummy;
   smoke-standalone-25:
     docker:
@@ -321,6 +347,8 @@ workflows:
       - smoke-standalone-26
       - smoke-standalone-25
       - smoke-standalone-24
+      - smoke-standalone-27-nossl
+      - smoke-standalone-26-nossl
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s

@@ -63,6 +63,10 @@ elif [[ $PYTHON_VERSION == "2.6" ]]; then
     PYENV_VERSION="2.6.9"
 elif [[ $PYTHON_VERSION == "2.7" ]]; then
     PYENV_VERSION="2.7.12"
+elif [[ $PYTHON_VERSION == "2.6.nossl" ]]; then
+    PYENV_VERSION="2.6.6"
+elif [[ $PYTHON_VERSION == "2.7.nossl" ]]; then
+    PYENV_VERSION="2.7.2"
 fi
 source ~/.bashrc && pyenv shell $PYENV_VERSION && pyenv version
 
