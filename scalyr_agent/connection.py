@@ -440,7 +440,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         if not has_ssl and ca_file is not None:
             raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
         self.__timeout = timeout
-        self.c = ca_file
+        self.__ca_file = ca_file
         self.__has_ssl = has_ssl
         httplib.HTTPSConnection.__init__(self, host, port)
 
