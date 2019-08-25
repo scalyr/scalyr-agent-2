@@ -880,6 +880,11 @@ class Configuration(object):
         # TODO:  Support more platforms.
         return Configuration.__resolve_to_install_location('certs', 'ca_certs.crt')
 
+    @property
+    def intermediate_certs_path(self):
+        """Returns the intermediate certs path."""
+        return Configuration.__resolve_to_install_location('certs', 'intermediate_certs.pem')
+
     @staticmethod
     def __resolve_to_install_location(*paths):
         """Returns the absolute path created by joining the specified intermediate paths to

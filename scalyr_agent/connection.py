@@ -21,6 +21,9 @@ import httplib
 import os
 import re
 import socket
+import subprocess
+
+from tempfile import mkstemp
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -49,13 +52,15 @@ class ConnectionFactory:
     to handle the connection.
     """
     @staticmethod
-    def connection( server, request_deadline, ca_file, headers, use_requests, quiet=False, proxies=None):
+    def connection(server, request_deadline, ca_file, intermediate_certs_file,
+                   headers, use_requests, quiet=False, proxies=None):
         """ Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
         @param server: the server to connect to (scheme://domain:port)
         @param request_deadline: The timeout for any requests made on this connection
-        @param ca_file: the path to a certifcate bundle for ssl verification
+        @param ca_file: the path to a certificate bundle for ssl verification
+        @param intermediate_certs_file: path to certificate bundle for trusted intermediate server certificates
         @param headers: any headers to send with each request made on the connection
         @param use_requests: whether or not to use Requests for handling queries
         @param quiet:  Whether or not to emit non-error log messages.
@@ -65,6 +70,7 @@ class ConnectionFactory:
         @type server: str
         @type request_deadline: float
         @type ca_file: str
+        @type intermediate_certs_file: str
         @type headers: dict
         @type use_requests: bool
         @type quiet: bool
@@ -79,14 +85,14 @@ class ConnectionFactory:
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
-                result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
+                result = RequestsConnection( server, request_deadline, ca_file, intermediate_certs_file, headers, proxies)
                 log.warn('RequestsConnection uses ssl lib and is not TLS 1.2 compliant')
             except Exception, e:
                 log.warn( "Unable to load requests module '%s'.  Falling back to Httplib for connection handling" % str( e ) )
-                result = ScalyrHttpConnection(server, request_deadline, ca_file, headers)
+                result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers)
                 use_requests = False
         else:
-            result = ScalyrHttpConnection(server, request_deadline, ca_file, headers)
+            result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers)
 
         if not quiet:
             if use_requests:
@@ -104,7 +110,7 @@ class Connection( object ):
     An abstraction for dealing with different connection types Httplib or Requests
     """
 
-    def __init__( self, server, request_deadline, ca_file, headers ):
+    def __init__( self, server, request_deadline, ca_file, intermediate_certs_file, headers ):
 
         # Verify the server address looks right.
         parsed_server = re.match('^(http://|https://|)([^:]*)(:\d+|)$', server.lower())
@@ -129,6 +135,7 @@ class Connection( object ):
         self._standard_headers = headers
         self._full_address = server
         self._ca_file = ca_file
+        self._intermediate_certs_file = intermediate_certs_file
         self._request_deadline = request_deadline
         self.__connection = None
             
@@ -190,73 +197,48 @@ class Connection( object ):
         pass
 
 
+class CertValidationError(ssl.SSLError):
+    pass
+
+
 class ScalyrHttpConnection(Connection):
-    def __init__(self, server, request_deadline, ca_file, headers):
-        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, headers)
+    def __init__(self, server, request_deadline, ca_file, intermediate_certs_file, headers):
+        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, intermediate_certs_file, headers)
         self.__http_response = None
+        print('CA FILE = %s, %s' % (ca_file, intermediate_certs_file))
         try:
             self._init_connection(pure_python_tls=False)
             log.info('HttpConnection uses native os ssl')
         except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+            log.info('Exception while attempting to use openssl library.  Falling-back to pure-python implementation')
             self._init_connection(pure_python_tls=True)
             log.info('HttpConnection uses pure-python TLS')
 
-    def _validate_chain(self, tlslite_connection, server, ca_file):
+    def _validate_chain_ssl(self):
+        """Validate server certificate chain using openssl system callout"""
+        # fetch end-entity certificate and write to tempfile
+        end_entity_pem = ssl.get_server_certificate((self._host, self._port))
         try:
-            from certvalidator import CertificateValidator
-            from certvalidator import ValidationContext
-            from asn1crypto import x509, pem
-            # validate server certificate chain
-            session = tlslite_connection.sock.session
-            assert type(session.serverCertChain.x509List) == list
+            _, end_entity_pem_tempfile_path = mkstemp()
+            fh = open(end_entity_pem_tempfile_path, 'w')
+            fh.write(end_entity_pem)
+            fh.close()
 
-            # get the end-entity cert
-            file_bytes = session.serverCertChain.x509List[0].bytes
-            end_entity_cert = x509.Certificate.load(str(file_bytes))
-
-            cert_dir = os.path.dirname(ca_file)
-
-            def get_cert_bytes(file_names):
-                file_names = [os.path.join(cert_dir, f) for f in file_names]
-                result = []
-                for fname in file_names:
-                    arr = open(fname, 'rb').read()
-                    cert_bytes = pem.unarmor(arr)[2]
-                    result.append(cert_bytes)
-                return result
-
-            trust_roots = None
-            intermediate_certs = get_cert_bytes([
-                'comodo_ca_intermediate.pem',
-                'sectigo_ca_intermediate.pem'
-            ])
-            extra_trust_roots = get_cert_bytes([
-                'scalyr_agent_ca_root.pem',
-                'addtrust_external_ca_root.pem'
-            ])
-
-            if trust_roots:
-                context = ValidationContext(
-                    trust_roots=trust_roots,
-                    extra_trust_roots=extra_trust_roots,
-                    other_certs=intermediate_certs,
-                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
-                )
-            else:
-                context = ValidationContext(
-                    extra_trust_roots=extra_trust_roots,
-                    other_certs=intermediate_certs,
-                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
-                )
-            validator = CertificateValidator(end_entity_cert, validation_context=context)
-            validator.validate_tls(unicode(server))
-            log.info('Scalyr server chain successfully validated')
-        except Exception, ce:
-            log.exception('Error validating server certificate chain: %s' % ce)
-            # echee TODO remove traceback
-            import traceback
-            print(traceback.format_exc())
-            raise
+            # invoke openssl
+            # root_certs = '/usr/share/scalyr-agent-2/certs/ca_certs.crt'
+            # intermediate_certs = '/usr/share/scalyr-agent-2/certs/intermediate_certs.pem'
+            cmd = ['openssl', 'verify', '-CAfile', self._ca_file, '-untrusted', self._intermediate_certs_file,
+                   end_entity_pem_tempfile_path]
+            log.debug('Validating server certificate chain via: %s' % cmd)
+            proc = subprocess.Popen(args=' '.join(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            out, err = proc.communicate()
+            returncode = proc.returncode
+            if returncode != 0:
+                raise CertValidationError(err.strip())
+            return
+        finally:
+            # delete temp file
+            os.remove(end_entity_pem_tempfile_path)
 
     def _init_connection(self, pure_python_tls=False):
         try:
@@ -273,31 +255,33 @@ class ScalyrHttpConnection(Connection):
                                                                                   ca_file, __has_ssl__)
                     self.__connection.connect()
                 else:
-                    log.info('echee tls')
                     settings = HandshakeSettings()
                     settings.minVersion = (3, 3)  # TLS 1.2
                     self.__connection = HTTPTLSConnection(
                         self._host, self._port, timeout=self._request_deadline, settings=settings
                     )
                     self.__connection.connect()
-                    self._validate_chain(self.__connection, self._host, ca_file)
-                    log.info('echee tls validated')
+                    self._validate_chain_ssl()
             else:
                 # unencrypted connection
                 self.__connection = HTTPConnectionWithTimeout(self._host, self._port, self._request_deadline)
                 self.__connection.connect()
-        except (socket.error, socket.herror, socket.gaierror    ), error:
+        except Exception, error:
             if hasattr(error, 'errno'):
                 errno = error.errno
             else:
                 errno = None
             if __has_ssl__ and isinstance(error, ssl.SSLError):
-                log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
-                          'for the root Certificate Authority could not be parsed, or we attempted to connect to '
-                          'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
-                          'changed and you should update your agent to get the new certificate).  The returned '
-                          'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
-                          self._full_address, errno, str(error), error_code='client/connectionFailed')
+                if isinstance(error, CertValidationError):
+                    log.error('Failed to connect to "%s" because of server certificate validation error: "%s"',
+                              self._full_address, error.message, error_code='client/connectionFailed')
+                else:
+                    log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
+                              'for the root Certificate Authority could not be parsed, or we attempted to connect to '
+                              'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
+                              'changed and you should update your agent to get the new certificate).  The returned '
+                              'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
+                              self._full_address, errno, str(error), error_code='client/connectionFailed')
             elif errno == 61:  # Connection refused
                 log.error('Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
                           self._full_address, error_code='client/connectionFailed')

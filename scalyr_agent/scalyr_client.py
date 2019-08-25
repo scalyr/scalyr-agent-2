@@ -52,7 +52,8 @@ class ScalyrClientSession(object):
     The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
     are monotonically increasing within a session.
     """
-    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
+    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0,
+                 ca_file=None, intermediate_certs_file=None, use_requests_lib=False,
                  proxies=None, compression_type=None, compression_level=9, disable_send_requests=False):
         """Initializes the connection.
 
@@ -65,6 +66,8 @@ class ScalyrClientSession(object):
         @param request_deadline: The maximum time to wait for all requests in seconds.
         @param ca_file: The path to the file containing the certificates for the trusted certificate authority roots.
             This is used for the SSL connections to verify the connection is to Scalyr.
+        @param intermediate_certs_file: The path to the file containing the certs for the trusted intermediate
+            certificate authorities. This is used for the SSL connections to verify the connection is to Scalyr.
         @param proxies:  A dict describing the network proxies to use (such as a mapping for `https`) or None.
         @param compression_type:  A string containing the compression method to use.
             Valid options are bz2, deflate or None.  Defaults to None.
@@ -76,6 +79,7 @@ class ScalyrClientSession(object):
         @type quiet: bool
         @type request_deadline: float
         @type ca_file: str
+        @type intermediate_certs_file: str
         @type proxies: dict
         @type compression_type: str
         @type compression_level: int
@@ -166,6 +170,7 @@ class ScalyrClientSession(object):
         # connection to Scalyr.  If this is None, then server certificate verification is disabled, and we are
         # susceptible to man-in-the-middle attacks.
         self.__ca_file = ca_file
+        self.__intermediate_certs_file = intermediate_certs_file
         self.__proxies = proxies
 
         # debug flag to disable send requests
@@ -231,7 +236,8 @@ class ScalyrClientSession(object):
             try:
                 if self.__connection is None:
                     self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
-                                                                      self.__ca_file, self.__standard_headers,
+                                                                      self.__ca_file,  self.__intermediate_certs_file,
+                                                                      self.__standard_headers,
                                                                       self.__use_requests, quiet=self.__quiet,
                                                                       proxies=self.__proxies)
                     self.total_connections_created += 1
