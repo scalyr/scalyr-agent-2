@@ -67,10 +67,8 @@ fi
 
 # Force an Exception when HTTPSConnectionWithTimeoutAndVerification is used
 if [[ $SIMULATE_TLS12_FAILURE == "true" ]]; then
-    echo "xxxxxxx "
     perl -pi -e 's/# SIMULATE_TLS12_FAILURE //g' scalyr_agent/connection.py
 fi
-cat scalyr_agent/connection.py
 
 
 # Make sure /usr/local/bin/fpm is runnable

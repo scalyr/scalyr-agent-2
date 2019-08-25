@@ -325,7 +325,8 @@ class ScalyrHttpConnection(Connection):
                     if self._ca_file:
                         try:
                             self._validate_chain_certvalidator()
-                        except:
+                        except Exception, e:
+                            log.exception('Failure in _validate_chain_certvalidator()')
                             self._validate_chain_openssl()
             else:
                 # unencrypted connection
@@ -353,11 +354,11 @@ class ScalyrHttpConnection(Connection):
                 log.error('Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
                           self._full_address, error_code='client/connectionFailed')
             elif errno is not None:
-                log.error('Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
+                log.error('Failed to connect to "%s" due to errno=%d.  Exception was "%s".  Closing connection, '
                           'will re-attempt', self._full_address, errno, str(error),
                           error_code='client/connectionFailed')
             else:
-                log.error('Failed to connect to "%s" due to exception.  Exception was %s.  Closing connection, '
+                log.error('Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                           'will re-attempt', self._full_address, str(error),
                           error_code='client/connectionFailed')
             raise Exception( "client/connectionFailed" )
