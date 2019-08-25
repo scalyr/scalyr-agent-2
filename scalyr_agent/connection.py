@@ -214,7 +214,7 @@ class ScalyrHttpConnection(Connection):
             self._init_connection(pure_python_tls=True)
             log.info('HttpConnection uses pure-python TLS')
 
-    def _validate_chain_ssl(self):
+    def _validate_chain_openssl(self):
         """Validate server certificate chain using openssl system callout"""
         # fetch end-entity certificate and write to tempfile
         end_entity_pem = ssl.get_server_certificate((self._host, self._port))
@@ -235,33 +235,102 @@ class ScalyrHttpConnection(Connection):
             returncode = proc.returncode
             if returncode != 0:
                 raise CertValidationError(err.strip())
-            return
+            log.info('Scalyr server cert chain successfully validated via openssl')
         finally:
             # delete temp file
             os.remove(end_entity_pem_tempfile_path)
 
+    def _validate_chain_certvalidator(self, tlslite_connection):
+        """Validate server certificate chain using 3rd party certvalidator library which uses oscrypt/libcrypto
+        Note: oscrypt uses ctypes find_library() which does not work in certain distributions such as alpine.
+        (e.g. see https://github.com/docker-library/python/issues/111)
+        On such systems, users will have to rely on other server cert validation approaches such as using openssl
+        or turning it off completely.
+        """
+        try:
+            from certvalidator import CertificateValidator
+            from certvalidator import ValidationContext
+            from asn1crypto import x509, pem
+            # validate server certificate chain
+            session = tlslite_connection.sock.session
+            assert type(session.serverCertChain.x509List) == list
+
+            # get the end-entity cert
+            file_bytes = session.serverCertChain.x509List[0].bytes
+            end_entity_cert = x509.Certificate.load(str(file_bytes))
+
+            cert_dir = os.path.dirname(self._ca_file)
+
+            def get_cert_bytes(file_names):
+                file_names = [os.path.join(cert_dir, f) for f in file_names]
+                result = []
+                for fname in file_names:
+                    arr = open(fname, 'rb').read()
+                    cert_bytes = pem.unarmor(arr)[2]
+                    result.append(cert_bytes)
+                return result
+
+            trust_roots = None
+            intermediate_certs = get_cert_bytes([
+                'comodo_ca_intermediate.pem',
+                'sectigo_ca_intermediate.pem'
+            ])
+            extra_trust_roots = get_cert_bytes([
+                'scalyr_agent_ca_root.pem',
+                'addtrust_external_ca_root.pem'
+            ])
+
+            if trust_roots:
+                context = ValidationContext(
+                    trust_roots=trust_roots,
+                    extra_trust_roots=extra_trust_roots,
+                    other_certs=intermediate_certs,
+                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+                )
+            else:
+                context = ValidationContext(
+                    extra_trust_roots=extra_trust_roots,
+                    other_certs=intermediate_certs,
+                    # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
+                )
+            validator = CertificateValidator(end_entity_cert, validation_context=context)
+            validator.validate_tls(unicode(self._host))
+            log.info('Scalyr server cert chain successfully validated via certvalidator library')
+        except Exception, ce:
+            log.exception('Error validating server certificate chain: %s' % ce)
+            # echee TODO remove traceback
+            import traceback
+            print(traceback.format_exc())
+            raise
+
+
     def _init_connection(self, pure_python_tls=False):
         try:
             if self._use_ssl:
-                # If we do not have the SSL library, then we cannot do server certificate validation anyway.
-                if __has_ssl__:
-                    ca_file = self._ca_file
-                else:
-                    ca_file = None
-
                 if not pure_python_tls:
+                    # If we do not have the SSL library, then we cannot do server certificate validation anyway.
+                    if __has_ssl__:
+                        ca_file = self._ca_file
+                    else:
+                        ca_file = None
                     self.__connection = HTTPSConnectionWithTimeoutAndVerification(self._host, self._port,
                                                                                   self._request_deadline,
                                                                                   ca_file, __has_ssl__)
                     self.__connection.connect()
                 else:
+                    # Pure python implementation of TLS does not require ssl library
                     settings = HandshakeSettings()
                     settings.minVersion = (3, 3)  # TLS 1.2
                     self.__connection = HTTPTLSConnection(
                         self._host, self._port, timeout=self._request_deadline, settings=settings
                     )
                     self.__connection.connect()
-                    self._validate_chain_ssl()
+                    # Non-null _ca_file signifies server cert validation is requireds
+                    if self._ca_file:
+                        try:
+                            self._validate_chain_certvalidator()
+                        except:
+                            self._validate_chain_openssl()
             else:
                 # unencrypted connection
                 self.__connection = HTTPConnectionWithTimeout(self._host, self._port, self._request_deadline)
@@ -376,7 +445,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         if not has_ssl and ca_file is not None:
             raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
         self.__timeout = timeout
-        self.__ca_file = ca_file
+        self.c = ca_file
         self.__has_ssl = has_ssl
         httplib.HTTPSConnection.__init__(self, host, port)
 
