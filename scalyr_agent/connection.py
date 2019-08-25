@@ -324,7 +324,7 @@ class ScalyrHttpConnection(Connection):
                     # Non-null _ca_file signifies server cert validation is requireds
                     if self._ca_file:
                         try:
-                            self._validate_chain_certvalidator()
+                            self._validate_chain_certvalidator(self.__connection)
                         except Exception, e:
                             log.exception('Failure in _validate_chain_certvalidator()')
                             self._validate_chain_openssl()
