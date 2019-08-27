@@ -388,7 +388,7 @@ class ScalyrHttpConnection(Connection):
 
     @property
     def is_pure_python_tls(self):
-        return isinstance(self.__connection, HTTPTLSConnection)
+        return __has_pure_python_tls__ and isinstance(self.__connection, HTTPTLSConnection)
 
 
 class HTTPConnectionWithTimeout(httplib.HTTPConnection):
