@@ -103,10 +103,10 @@ class EncodeDecodeTest(ScalyrTestCase):
 
             if library == FALLBACK or not isinstance(obj, (JsonArray, JsonObject)):
                 text2 = util.json_encode(obj)
-                self.assertEquals(text, text2)
+                self.assertEqual(text, text2)
                 obj2 = util.json_decode(text2)
                 text3 = util.json_encode(obj2)
-                self.assertEquals(text, text3)
+                self.assertEqual(text, text3)
             else:
                 self.assertRaises(TypeError, lambda: util.json_encode(obj))
 

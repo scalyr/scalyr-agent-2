@@ -29,7 +29,7 @@ class TestUtil(ScalyrTestCase):
         self.assertTrue(SCALYR_VERSION.startswith('2.'))
 
     def test_get_install_root(self):
-        self.assertEquals(os.path.basename(get_install_root()), 'scalyr-agent-2')
+        self.assertEqual(os.path.basename(get_install_root()), 'scalyr-agent-2')
 
     def test_get_package_root(self):
-        self.assertEquals(os.path.basename(get_package_root()), 'scalyr_agent')
+        self.assertEqual(os.path.basename(get_package_root()), 'scalyr_agent')

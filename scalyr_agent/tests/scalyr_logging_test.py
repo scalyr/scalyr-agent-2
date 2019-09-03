@@ -37,12 +37,12 @@ class ScalyrLoggingTest(ScalyrTestCase):
         self.assertTrue(self.__log_contains('Hello world'))
 
     def test_component_name(self):
-        self.assertEquals(self.__logger.component, 'core')
-        self.assertEquals(scalyr_logging.getLogger('scalyr_agent').component, 'core')
-        self.assertEquals(scalyr_logging.getLogger('scalyr_agent.foo').component, 'core')
-        self.assertEquals(scalyr_logging.getLogger('scalyr_agent.foo.bar').component, 'core')
-        self.assertEquals(scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo').component, 'monitor:foo')
-        self.assertEquals(scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo(ok)').component,
+        self.assertEqual(self.__logger.component, 'core')
+        self.assertEqual(scalyr_logging.getLogger('scalyr_agent').component, 'core')
+        self.assertEqual(scalyr_logging.getLogger('scalyr_agent.foo').component, 'core')
+        self.assertEqual(scalyr_logging.getLogger('scalyr_agent.foo.bar').component, 'core')
+        self.assertEqual(scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo').component, 'monitor:foo')
+        self.assertEqual(scalyr_logging.getLogger('scalyr_agent.builtin_monitors.foo(ok)').component,
                           'monitor:foo(ok)')
 
     def test_formatter(self):
@@ -74,7 +74,7 @@ class ScalyrLoggingTest(ScalyrTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.emit_value('test_name', 5, {'foo': 5})
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertTrue(self.__log_contains('test_name 5', file_path=metric_file_path))
@@ -91,7 +91,7 @@ class ScalyrLoggingTest(ScalyrTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.info('foobaz is fine', emit_to_metric_log=True)
 
-        self.assertEquals(monitor_instance.reported_lines, 1)
+        self.assertEqual(monitor_instance.reported_lines, 1)
 
         # The value should only appear in the metric log file and not the main one.
         self.assertTrue(self.__log_contains('foobaz is fine', file_path=metric_file_path))
@@ -123,7 +123,7 @@ class ScalyrLoggingTest(ScalyrTestCase):
         monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
         monitor_logger.error('Foo')
 
-        self.assertEquals(monitor_instance.errors, 1)
+        self.assertEqual(monitor_instance.errors, 1)
 
         monitor_logger.closeMetricLog()
 

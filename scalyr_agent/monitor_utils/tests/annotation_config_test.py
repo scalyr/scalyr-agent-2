@@ -36,15 +36,15 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 3, len( result ) )
+        self.assertEqual( 3, len( result ) )
 
         self.assertTrue( 'someKey' in result )
         self.assertTrue( 'log_path' in result )
         self.assertTrue( 'important_field' in result )
 
-        self.assertEquals( "someValue", result['someKey'] )
-        self.assertEquals( "/var/log/access.log", result['log_path'] )
-        self.assertEquals( "important_value", result['important_field'] )
+        self.assertEqual( "someValue", result['someKey'] )
+        self.assertEqual( "/var/log/access.log", result['log_path'] )
+        self.assertEqual( "important_value", result['important_field'] )
 
     def test_dict_values(self):
         annotations = {
@@ -57,21 +57,21 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 2, len( result ) )
+        self.assertEqual( 2, len( result ) )
 
         self.assertTrue( 'attributes' in result )
         self.assertTrue( 'rename_logfile' in result )
 
         attrs = result['attributes']
-        self.assertEquals( 3, len( attrs ) )
+        self.assertEqual( 3, len( attrs ) )
 
         self.assertTrue( 'parser' in attrs )
         self.assertTrue( 'container' in attrs )
         self.assertTrue( 'amazing' in attrs )
 
-        self.assertEquals( "accessLog", attrs['parser'] )
-        self.assertEquals( "my-container", attrs['container'] )
-        self.assertEquals( "yes it is", attrs['amazing'] )
+        self.assertEqual( "accessLog", attrs['parser'] )
+        self.assertEqual( "my-container", attrs['container'] )
+        self.assertEqual( "yes it is", attrs['amazing'] )
     
     def test_list_value(self):
         annotations = {
@@ -104,20 +104,20 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 4, len( result ) )
+        self.assertEqual( 4, len( result ) )
         self.assertTrue( isinstance( result, JsonArray ) )
 
-        self.assertEquals( "first", result[0]['match_expression'] )
-        self.assertEquals( 1, result[0]['sampling_rate'] )
+        self.assertEqual( "first", result[0]['match_expression'] )
+        self.assertEqual( 1, result[0]['sampling_rate'] )
    
-        self.assertEquals( "second", result[1]['match_expression'] )
-        self.assertEquals( 2, result[1]['sampling_rate'] )
+        self.assertEqual( "second", result[1]['match_expression'] )
+        self.assertEqual( 2, result[1]['sampling_rate'] )
    
-        self.assertEquals( "third", result[2]['match_expression'] )
-        self.assertEquals( 3, result[2]['sampling_rate'] )
+        self.assertEqual( "third", result[2]['match_expression'] )
+        self.assertEqual( 3, result[2]['sampling_rate'] )
    
-        self.assertEquals( "fourth", result[3]['match_expression'] )
-        self.assertEquals( 4, result[3]['sampling_rate'] )
+        self.assertEqual( "fourth", result[3]['match_expression'] )
+        self.assertEqual( 4, result[3]['sampling_rate'] )
 
     def test_dict_with_list(self):
 
@@ -134,24 +134,24 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 1, len( result ) )
+        self.assertEqual( 1, len( result ) )
         result = result['rules']
 
-        self.assertEquals( 4, len( result ) )
+        self.assertEqual( 4, len( result ) )
         self.assertTrue( isinstance( result, JsonArray ) )
 
-        self.assertEquals( "first", result[0]['match_expression'] )
-        self.assertEquals( 1, result[0]['sampling_rate'] )
+        self.assertEqual( "first", result[0]['match_expression'] )
+        self.assertEqual( 1, result[0]['sampling_rate'] )
    
-        self.assertEquals( "second", result[1]['match_expression'] )
-        self.assertEquals( 2, result[1]['sampling_rate'] )
+        self.assertEqual( "second", result[1]['match_expression'] )
+        self.assertEqual( 2, result[1]['sampling_rate'] )
    
-        self.assertEquals( "third", result[2]['match_expression'] )
-        self.assertEquals( 3, result[2]['sampling_rate'] )
+        self.assertEqual( "third", result[2]['match_expression'] )
+        self.assertEqual( 3, result[2]['sampling_rate'] )
    
-        self.assertEquals( "fourth", result[3]['match_expression'] )
-        self.assertEquals( 4, result[3]['sampling_rate'] )
-        self.assertEquals( 4, result[3]['sampling_rate'] )
+        self.assertEqual( "fourth", result[3]['match_expression'] )
+        self.assertEqual( 4, result[3]['sampling_rate'] )
+        self.assertEqual( 4, result[3]['sampling_rate'] )
 
     def test_list_of_lists(self):
 
@@ -169,27 +169,27 @@ class TestAnnotationConfig(ScalyrTestCase):
         #import pdb; pdb.set_trace()
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 2, len( result ) )
+        self.assertEqual( 2, len( result ) )
         first = result[0]
 
-        self.assertEquals( 2, len( first ) )
+        self.assertEqual( 2, len( first ) )
         self.assertTrue( isinstance( first, JsonArray ) )
 
-        self.assertEquals( "first", first[0]['match_expression'] )
-        self.assertEquals( 1, first[0]['sampling_rate'] )
+        self.assertEqual( "first", first[0]['match_expression'] )
+        self.assertEqual( 1, first[0]['sampling_rate'] )
    
-        self.assertEquals( "second", first[1]['match_expression'] )
-        self.assertEquals( 2, first[1]['sampling_rate'] )
+        self.assertEqual( "second", first[1]['match_expression'] )
+        self.assertEqual( 2, first[1]['sampling_rate'] )
 
         second = result[1]
-        self.assertEquals( 2, len( second ) )
+        self.assertEqual( 2, len( second ) )
         self.assertTrue( isinstance( second, JsonArray ) )
    
-        self.assertEquals( "third", second[0]['match_expression'] )
-        self.assertEquals( 3, second[0]['sampling_rate'] )
+        self.assertEqual( "third", second[0]['match_expression'] )
+        self.assertEqual( 3, second[0]['sampling_rate'] )
    
-        self.assertEquals( "fourth", second[1]['match_expression'] )
-        self.assertEquals( 4, second[1]['sampling_rate'] )
+        self.assertEqual( "fourth", second[1]['match_expression'] )
+        self.assertEqual( 4, second[1]['sampling_rate'] )
    
     def test_mixed_list_and_dict_key(self):
         annotations = {
@@ -236,7 +236,7 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = annotation_config.process_annotations( annotations )
 
-        self.assertEquals( 7, len( result ) )
+        self.assertEqual( 7, len( result ) )
 
         self.assertTrue( 'path' in result )
         self.assertTrue( 'attributes' in result )
@@ -248,11 +248,11 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         attrs = result['attributes']
         self.assertTrue( isinstance( attrs, JsonObject ) )
-        self.assertEquals( 2, len( attrs ) )
+        self.assertEqual( 2, len( attrs ) )
         self.assertTrue( 'parser' in attrs )
         self.assertTrue( 'service' in attrs )
-        self.assertEquals( 'accessLog', attrs['parser'] )
-        self.assertEquals( 'memcache', attrs['service'] )
+        self.assertEqual( 'accessLog', attrs['parser'] )
+        self.assertEqual( 'memcache', attrs['service'] )
 
         sampling = result['sampling_rules']
         self.assertTrue( isinstance( sampling, JsonArray ) )

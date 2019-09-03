@@ -118,7 +118,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 m2.assert_called()
                 self.assertEqual(fragment_polls.count(), 40)
                 self.assertEqual(counter['callback_invocations'], 3)
-                self.assertEquals(detected_fragment_changes, [
+                self.assertEqual(detected_fragment_changes, [
                     'k8s=true;k8s-runtime=%s' % container_runtime,
                     'k8s=%s;k8s-runtime=%s' % (version1, container_runtime),
                     'k8s=%s;k8s-runtime=%s' % (version2, container_runtime),

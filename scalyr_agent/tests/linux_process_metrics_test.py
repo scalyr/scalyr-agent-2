@@ -64,8 +64,8 @@ class TestMetricClass(ScalyrTestCase):
         m = Metric('abc', 123)
 
         # Ensure name and type fields are present
-        self.assertEquals(m.name, 'abc')
-        self.assertEquals(m.type, 123)
+        self.assertEqual(m.name, 'abc')
+        self.assertEqual(m.type, 123)
 
         # Non-existent
         self.assertRaises(AttributeError, lambda: m.asdf)

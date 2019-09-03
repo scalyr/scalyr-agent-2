@@ -36,8 +36,8 @@ class MonitorsManagerTest(ScalyrTestCase):
                 'gauss_mean': 0
             }
         ], [])
-        self.assertEquals(len(test_manager.monitors), 1)
-        self.assertEquals(test_manager.monitors[0].monitor_name, 'test_monitor()')
+        self.assertEqual(len(test_manager.monitors), 1)
+        self.assertEqual(test_manager.monitors[0].monitor_name, 'test_monitor()')
 
     def test_multiple_modules(self):
         test_manager = ScalyrTestUtils.create_test_monitors_manager([
@@ -51,9 +51,9 @@ class MonitorsManagerTest(ScalyrTestCase):
             },
         ], [])
 
-        self.assertEquals(len(test_manager.monitors), 2)
-        self.assertEquals(test_manager.monitors[0].monitor_name, 'test_monitor(1)')
-        self.assertEquals(test_manager.monitors[1].monitor_name, 'test_monitor(2)')
+        self.assertEqual(len(test_manager.monitors), 2)
+        self.assertEqual(test_manager.monitors[0].monitor_name, 'test_monitor(1)')
+        self.assertEqual(test_manager.monitors[1].monitor_name, 'test_monitor(2)')
 
     def test_module_with_id(self):
         test_manager = ScalyrTestUtils.create_test_monitors_manager([
@@ -67,9 +67,9 @@ class MonitorsManagerTest(ScalyrTestCase):
                 'gauss_mean': 0
             },
         ], [])
-        self.assertEquals(len(test_manager.monitors), 2)
-        self.assertEquals(test_manager.monitors[0].monitor_name, 'test_monitor(first)')
-        self.assertEquals(test_manager.monitors[1].monitor_name, 'test_monitor(2)')
+        self.assertEqual(len(test_manager.monitors), 2)
+        self.assertEqual(test_manager.monitors[0].monitor_name, 'test_monitor(first)')
+        self.assertEqual(test_manager.monitors[1].monitor_name, 'test_monitor(2)')
 
     def test_user_agent_polling(self):
         """Test polling of user-agent fragments and invocation of the callback (only on change)
@@ -111,8 +111,8 @@ class MonitorsManagerTest(ScalyrTestCase):
             null_logger=True,
             fake_clock=fake_clock,
         )
-        self.assertEquals(test_manager._user_agent_refresh_interval, 30)  # ensure config setting works
-        self.assertEquals(len(test_manager.monitors), 3)
+        self.assertEqual(test_manager._user_agent_refresh_interval, 30)  # ensure config setting works
+        self.assertEqual(len(test_manager.monitors), 3)
         patched_monitor_0 = test_manager.monitors[0]
         patched_monitor_1 = test_manager.monitors[1]
         unpatched_monitor = test_manager.monitors[2]
@@ -127,14 +127,14 @@ class MonitorsManagerTest(ScalyrTestCase):
             return test_frag
         for mon in [patched_monitor_0, patched_monitor_1]:
             mon.get_user_agent_fragment = mock_get_user_agent_fragment
-            self.assertEquals(mon.get_user_agent_fragment(), test_frag)  # monkey patched
-        self.assertEquals(unpatched_monitor.get_user_agent_fragment(), None)  # not patched
+            self.assertEqual(mon.get_user_agent_fragment(), test_frag)  # monkey patched
+        self.assertEqual(unpatched_monitor.get_user_agent_fragment(), None)  # not patched
 
         # Mock the callback (that would normally be invoked on ScalyrClientSession)
         # Check that the exact fragment returned by the 2 patched monitors are deduplicated.
         def augment_user_agent(fragments):
             counter['callback_invocations'] += 1
-            self.assertEquals(fragments, [test_frag])
+            self.assertEqual(fragments, [test_frag])
         test_manager.set_user_agent_augment_callback(augment_user_agent)
 
         # We're finally ready start all threads and assert correct behavior.
@@ -144,7 +144,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         # (Note: FakeClock ensures all the above happen within a split second)
         test_manager.start_manager()
         self.assertTrue(fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 1))
-        self.assertEquals(counter['callback_invocations'], 1)
+        self.assertEqual(counter['callback_invocations'], 1)
 
         # Rerun the above test but this time have monitors return changing fragments.
         # This will cause the user agent callback to be invoked during each round of polling.
@@ -167,7 +167,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         test_manager.set_user_agent_augment_callback(augment_user_agent_2)
 
         self.assertTrue(fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 1))
-        self.assertEquals(counter['callback_invocations'], 10)
+        self.assertEqual(counter['callback_invocations'], 10)
 
         # set_daemon=True obviates the following (saves a few seconds in cleanup):
         test_manager.stop_manager(wait_on_join=False)

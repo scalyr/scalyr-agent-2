@@ -67,22 +67,22 @@ class TestOverallStats(ScalyrTestCase):
 
         c = a + b
 
-        self.assertEquals(c.total_bytes_copied, 10)
-        self.assertEquals(c.total_bytes_skipped, 12)
-        self.assertEquals(c.total_bytes_subsampled, 14)
-        self.assertEquals(c.total_bytes_failed, 16)
-        self.assertEquals(c.total_redactions, 18)
-        self.assertEquals(c.total_copy_requests_errors, 20)
-        self.assertEquals(c.total_monitor_reported_lines, 22)
-        self.assertEquals(c.total_monitor_errors, 24)
+        self.assertEqual(c.total_bytes_copied, 10)
+        self.assertEqual(c.total_bytes_skipped, 12)
+        self.assertEqual(c.total_bytes_subsampled, 14)
+        self.assertEqual(c.total_bytes_failed, 16)
+        self.assertEqual(c.total_redactions, 18)
+        self.assertEqual(c.total_copy_requests_errors, 20)
+        self.assertEqual(c.total_monitor_reported_lines, 22)
+        self.assertEqual(c.total_monitor_errors, 24)
 
-        self.assertEquals(c.total_requests_sent, 8)
-        self.assertEquals(c.total_requests_failed, 10)
-        self.assertEquals(c.total_request_bytes_sent, 12)
-        self.assertEquals(c.total_compressed_request_bytes_sent, 5)
-        self.assertEquals(c.total_response_bytes_received, 14)
-        self.assertEquals(c.total_request_latency_secs, 16)
-        self.assertEquals(c.total_connections_created, 18)
+        self.assertEqual(c.total_requests_sent, 8)
+        self.assertEqual(c.total_requests_failed, 10)
+        self.assertEqual(c.total_request_bytes_sent, 12)
+        self.assertEqual(c.total_compressed_request_bytes_sent, 5)
+        self.assertEqual(c.total_response_bytes_received, 14)
+        self.assertEqual(c.total_request_latency_secs, 16)
+        self.assertEqual(c.total_connections_created, 18)
 
 
 class TestReportStatus(ScalyrTestCase):
@@ -288,7 +288,7 @@ Running monitors:
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_bad_config(self):
         self.status.config_status.last_error = 'Bad stuff'
@@ -353,7 +353,7 @@ Running monitors:
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())
 
     def test_bad_copy_response(self):
         self.status.copying_manager_status.last_response = 'Some weird stuff'
@@ -423,4 +423,4 @@ Running monitors:
 Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
-        self.assertEquals(expected_output, output.getvalue())
+        self.assertEqual(expected_output, output.getvalue())

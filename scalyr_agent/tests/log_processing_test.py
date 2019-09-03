@@ -84,50 +84,50 @@ class TestCRILogParsing(ScalyrTestCase):
     def test_multi_tags( self ):
         line = "2019-04-08T15:18:20.56064743Z stdout P:B:D message"
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stdout", stream )
-        self.assertEquals( "P:B:D", tags )
-        self.assertEquals( "message", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stdout", stream )
+        self.assertEqual( "P:B:D", tags )
+        self.assertEqual( "message", msg )
 
     def test_missing_log( self ):
         line = "2019-04-08T15:18:20.56064743Z stdout P "
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stdout", stream )
-        self.assertEquals( "P", tags )
-        self.assertEquals( "", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stdout", stream )
+        self.assertEqual( "P", tags )
+        self.assertEqual( "", msg )
 
     def test_valid_line_stdout( self ):
         line = "2019-04-08T15:18:20.56064743Z stdout P message"
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stdout", stream )
-        self.assertEquals( "P", tags )
-        self.assertEquals( "message", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stdout", stream )
+        self.assertEqual( "P", tags )
+        self.assertEqual( "message", msg )
 
     def test_valid_line_stderr( self ):
         line = "2019-04-08T15:18:20.56064743Z stderr P message"
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stderr", stream )
-        self.assertEquals( "P", tags )
-        self.assertEquals( "message", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stderr", stream )
+        self.assertEqual( "P", tags )
+        self.assertEqual( "message", msg )
 
     def test_valid_line_single( self ):
         line = "2019-04-08T15:18:20.56064743Z stdout F message"
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stdout", stream )
-        self.assertEquals( "F", tags )
-        self.assertEquals( "message", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stdout", stream )
+        self.assertEqual( "F", tags )
+        self.assertEqual( "message", msg )
 
     def test_valid_line_partial( self ):
         line = "2019-04-08T15:18:20.56064743Z stdout P message"
         ts, stream, tags, msg = parse_cri_log( line )
-        self.assertEquals( 1554736700560647430L, ts )
-        self.assertEquals( "stdout", stream )
-        self.assertEquals( "P", tags )
-        self.assertEquals( "message", msg )
+        self.assertEqual( 1554736700560647430L, ts )
+        self.assertEqual( "stdout", stream )
+        self.assertEqual( "P", tags )
+        self.assertEqual( "message", msg )
 
 
 class TestLogFileIterator(ScalyrTestCase):
@@ -171,7 +171,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
         result = self.readline()
 
-        self.assertEquals(result.line, 'L1\n')
+        self.assertEqual(result.line, 'L1\n')
 
     def test_continue_through_matcher(self):
 
@@ -188,8 +188,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          expected_next)
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(expected, self.readline().line)
-        self.assertEquals(expected_next, self.readline().line)
+        self.assertEqual(expected, self.readline().line)
+        self.assertEqual(expected_next, self.readline().line)
 
     def test_continue_past_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_PAST)}
@@ -205,8 +205,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          expected_next)
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(expected, self.readline().line)
-        self.assertEquals(expected_next, self.readline().line)
+        self.assertEqual(expected, self.readline().line)
+        self.assertEqual(expected_next, self.readline().line)
 
     def test_halt_before_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_BEFORE)}
@@ -222,9 +222,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          expected_next)
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(expected, self.readline().line)
-        self.assertEquals("--end\n", self.readline().line)
-        self.assertEquals(expected_next, self.readline().line)
+        self.assertEqual(expected, self.readline().line)
+        self.assertEqual("--end\n", self.readline().line)
+        self.assertEqual(expected_next, self.readline().line)
 
     def test_halt_with_matcher(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_HALT_WITH)}
@@ -240,8 +240,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          expected_next)
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(expected, self.readline().line)
-        self.assertEquals(expected_next, self.readline().line)
+        self.assertEqual(expected, self.readline().line)
+        self.assertEqual(expected_next, self.readline().line)
 
     def test_multiple_line_groupers(self):
         log_config = {'path': self.__path,
@@ -264,7 +264,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
 
         for line in expected:
-            self.assertEquals(line, self.readline().line)
+            self.assertEqual(line, self.readline().line)
 
     def test_multiple_line_grouper_options(self):
         log_config = {'path': self.__path,
@@ -288,14 +288,14 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L006\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.log_file.page_reads, 1)
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L005\n')
-        self.assertEquals(self.readline().line, 'L006\n')
-        self.assertEquals(self.log_file.page_reads, 2)
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.log_file.page_reads, 1)
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L005\n')
+        self.assertEqual(self.readline().line, 'L006\n')
+        self.assertEqual(self.log_file.page_reads, 2)
 
     def test_no_more_content(self):
         self.append_file(self.__path,
@@ -303,9 +303,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, '')
 
     def test_more_bytes_added(self):
         self.append_file(self.__path,
@@ -313,9 +313,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, '')
 
         self.append_file(self.__path,
                          'L03\n',
@@ -324,9 +324,9 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L03\n')
-        self.assertEquals(self.readline().line, 'L04\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L03\n')
+        self.assertEqual(self.readline().line, 'L04\n')
+        self.assertEqual(self.readline().line, '')
 
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
@@ -345,9 +345,9 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, '')
         self.assertFalse(self.log_file.at_end)
 
         _, second_sequence_number = self.log_file.get_sequence()
@@ -368,9 +368,9 @@ class TestLogFileIterator(ScalyrTestCase):
         os.chmod(self.__tempdir, 0)
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, '')
         self.assertFalse(self.log_file.at_end)
 
         self.scan_for_new_bytes(time_advance=60 * 11)
@@ -383,9 +383,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, '')
 
         _, first_sequence_number = self.log_file.get_sequence()
 
@@ -394,8 +394,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L003\n')
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, '')
 
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
@@ -409,8 +409,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L001\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, '')
 
         _, first_sequence_number = self.log_file.get_sequence()
 
@@ -423,26 +423,26 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L005\n')
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
 
         _, first_sequence_number = self.log_file.get_sequence()
-        self.assertEquals(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L003\n')
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
 
         _, first_sequence_number = self.log_file.get_sequence()
-        self.assertEquals(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L004\n')
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number > first_sequence_number)
 
-        self.assertEquals(self.readline().line, 'L005\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L005\n')
+        self.assertEqual(self.readline().line, '')
 
         self.mark(self.log_file.tell())
-        self.assertEquals(self.log_file.get_open_files_count(), 1)
+        self.assertEqual(self.log_file.get_open_files_count(), 1)
 
     def test_rotated_file_with_truncation_and_deletion(self):
         # This tests an old bug that caused us problems in production.  Basically, it tests
@@ -459,8 +459,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L008\n')
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
         self.truncate_file(self.__path)
         self.delete_file(self.__path)
@@ -471,13 +471,13 @@ class TestLogFileIterator(ScalyrTestCase):
                         'L012\n')
         self.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L009\n')
-        self.assertEquals(self.readline().line, 'L010\n')
-        self.assertEquals(self.readline().line, 'L011\n')
-        self.assertEquals(self.readline().line, 'L012\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L009\n')
+        self.assertEqual(self.readline().line, 'L010\n')
+        self.assertEqual(self.readline().line, 'L011\n')
+        self.assertEqual(self.readline().line, 'L012\n')
+        self.assertEqual(self.readline().line, '')
 
     def test_holes_in_file(self):
         # Since it cannot keep file handles open when they are moved/deleted, win32 cannot handle this case:
@@ -513,18 +513,18 @@ class TestLogFileIterator(ScalyrTestCase):
         original_position = self.log_file.tell()
 
         # Read through massively rotated file and verify all of the parts are there.
-        self.assertEquals(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L001\n')
 
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L003\n')
         _, first_sequence_number = self.log_file.get_sequence()
 
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L005\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L005\n')
         hole_position = self.log_file.tell()
-        self.assertEquals(self.readline().line, 'L006\n')
-        self.assertEquals(self.readline().line, 'L007\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L006\n')
+        self.assertEqual(self.readline().line, 'L007\n')
+        self.assertEqual(self.readline().line, '')
 
         # Now we go back to the begin and read it over again, but this time, remove a few of the portions
         # by truncating them.  In particular, we remove the first_portion to test what happens when we seek to
@@ -535,16 +535,16 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.log_file.seek(original_position)
 
-        self.assertEquals(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L003\n')
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number == first_sequence_number)
 
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L007\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L007\n')
+        self.assertEqual(self.readline().line, '')
 
         # We should also have the same number of bytes that should have been returned for the entire file.
-        self.assertEquals(self.log_file.bytes_between_positions(original_position, self.log_file.tell()), 35)
+        self.assertEqual(self.log_file.bytes_between_positions(original_position, self.log_file.tell()), 35)
 
         # The buffer should hold L003 to L007.  We next test that if we try to seek to a position that should
         # already be in the buffer but isn't because it is a hole, we get the next line.  Also verify that we
@@ -552,20 +552,20 @@ class TestLogFileIterator(ScalyrTestCase):
         page_reads = self.log_file.page_reads
 
         self.log_file.seek(hole_position)
-        self.assertEquals(self.readline().line, 'L007\n')
-        self.assertEquals(self.readline().line, '')
+        self.assertEqual(self.readline().line, 'L007\n')
+        self.assertEqual(self.readline().line, '')
 
-        self.assertEquals(self.log_file.page_reads, page_reads)
+        self.assertEqual(self.log_file.page_reads, page_reads)
 
     def test_partial_line(self):
         self.append_file(self.__path, 'L001')
-        self.assertEquals(self.readline(time_advance=1).line, '')
+        self.assertEqual(self.readline(time_advance=1).line, '')
 
         self.scan_for_new_bytes(time_advance=1)
-        self.assertEquals(self.readline(time_advance=1).line, '')
+        self.assertEqual(self.readline(time_advance=1).line, '')
 
         self.scan_for_new_bytes(time_advance=4)
-        self.assertEquals(self.readline().line, 'L001')
+        self.assertEqual(self.readline().line, 'L001')
 
     def test_set_position_with_valid_mark(self):
         self.append_file(self.__path,
@@ -574,13 +574,13 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
 
         position = self.log_file.tell()
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
         _, first_sequence_number = self.log_file.get_sequence()
 
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertTrue(second_sequence_number == first_sequence_number)
 
@@ -592,13 +592,13 @@ class TestLogFileIterator(ScalyrTestCase):
 
         position = self.log_file.tell()
         original = position
-        self.assertEquals(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L001\n')
         position = self.log_file.tell(dest=position)
         self.assertIs(original, position)
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
     def test_mark_does_not_move_position(self):
         self.append_file(self.__path,
@@ -607,15 +607,15 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L003\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
         position = self.log_file.tell()
         self.mark(self.log_file.tell())
 
-        self.assertEquals(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L003\n')
 
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L003\n')
 
     def test_set_invalid_position_after_mark(self):
         self.append_file(self.__path,
@@ -624,11 +624,11 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.scan_for_new_bytes()
         position = self.log_file.tell()
 
-        self.assertEquals(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L001\n')
 
         self.mark(self.log_file.tell())
 
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
         self.assertRaises(Exception, self.log_file.seek, position)
 
@@ -640,9 +640,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L004\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L001\n')
         self.mark(self.log_file.tell())
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
         saved_checkpoint = self.log_file.get_mark_checkpoint()
 
@@ -656,9 +656,9 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L004\n')
 
     def test_initial_checkpoint(self):
         self.write_file(self.__path,
@@ -674,17 +674,17 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.set_parameters(max_line_length=5, page_size=20)
 
         self.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L004\n')
 
     def test_exceeding_maximum_line_length(self):
         self.append_file(self.__path,
                          'L00001\n',
                          'L002\n')
         self.log_file.scan_for_new_bytes()
-        self.assertEquals(self.readline().line, 'L0000')
-        self.assertEquals(self.readline().line, '1\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L0000')
+        self.assertEqual(self.readline().line, '1\n')
+        self.assertEqual(self.readline().line, 'L002\n')
 
     def test_availabe_bytes(self):
         self.append_file(self.__path,
@@ -694,13 +694,13 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L004\n')
 
         self.scan_for_new_bytes()
-        self.assertEquals(self.log_file.available, 20L)
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.log_file.available, 15L)
-        self.assertEquals(self.readline().line, 'L002\n')
-        self.assertEquals(self.readline().line, 'L003\n')
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.log_file.available, 0L)
+        self.assertEqual(self.log_file.available, 20L)
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.log_file.available, 15L)
+        self.assertEqual(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L003\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.log_file.available, 0L)
 
     def test_skip_to_end(self):
         self.append_file(self.__path,
@@ -712,9 +712,9 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L006\n')
         self.scan_for_new_bytes()
         _, first_sequence_number = self.log_file.get_sequence()
-        self.assertEquals(self.log_file.available, 30L)
+        self.assertEqual(self.log_file.available, 30L)
 
-        self.assertEquals(self.log_file.advance_to_end(), 30L)
+        self.assertEqual(self.log_file.advance_to_end(), 30L)
         _, second_sequence_number = self.log_file.get_sequence()
         self.assertEqual(30L, second_sequence_number)
 
@@ -723,8 +723,8 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L008\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L007\n')
-        self.assertEquals(self.readline().line, 'L008\n')
+        self.assertEqual(self.readline().line, 'L007\n')
+        self.assertEqual(self.readline().line, 'L008\n')
 
     def test_skip_to_end_with_buffer(self):
         self.append_file(self.__path,
@@ -732,17 +732,17 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L002\n',
                          'L003\n')
         self.scan_for_new_bytes()
-        self.assertEquals(self.log_file.available, 15L)
+        self.assertEqual(self.log_file.available, 15L)
 
-        self.assertEquals(self.log_file.advance_to_end(), 15L)
+        self.assertEqual(self.log_file.advance_to_end(), 15L)
 
         self.append_file(self.__path,
                          'L004\n',
                          'L005\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L005\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L005\n')
 
     def test_move_position_after_skip_to_end(self):
         self.append_file(self.__path,
@@ -752,20 +752,20 @@ class TestLogFileIterator(ScalyrTestCase):
         self.scan_for_new_bytes()
         position = self.log_file.tell()
 
-        self.assertEquals(self.log_file.available, 15L)
+        self.assertEqual(self.log_file.available, 15L)
 
-        self.assertEquals(self.log_file.advance_to_end(), 15L)
+        self.assertEqual(self.log_file.advance_to_end(), 15L)
 
         self.append_file(self.__path,
                          'L004\n',
                          'L005\n')
         self.log_file.scan_for_new_bytes()
 
-        self.assertEquals(self.readline().line, 'L004\n')
-        self.assertEquals(self.readline().line, 'L005\n')
+        self.assertEqual(self.readline().line, 'L004\n')
+        self.assertEqual(self.readline().line, 'L005\n')
 
         self.log_file.seek(position)
-        self.assertEquals(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L001\n')
 
     def test_bytes_between_positions(self):
         self.append_file(self.__path,
@@ -775,11 +775,11 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L004\n')
         self.log_file.scan_for_new_bytes()
         pos1 = self.log_file.tell()
-        self.assertEquals(self.readline().line, 'L001\n')
-        self.assertEquals(self.readline().line, 'L002\n')
+        self.assertEqual(self.readline().line, 'L001\n')
+        self.assertEqual(self.readline().line, 'L002\n')
         pos2 = self.log_file.tell()
 
-        self.assertEquals(self.log_file.bytes_between_positions(pos1, pos2), 10)
+        self.assertEqual(self.log_file.bytes_between_positions(pos1, pos2), 10)
 
     def test_scan_for_new_bytes(self):
         self.append_file(self.__path,
@@ -788,25 +788,25 @@ class TestLogFileIterator(ScalyrTestCase):
                          'L003\n',
                          'L004\n')
         self.log_file.scan_for_new_bytes()
-        self.assertEquals(self.log_file.available, 20L)
+        self.assertEqual(self.log_file.available, 20L)
         self.append_file(self.__path,
                          'L005\n',
                          'L006\n')
         self.log_file.scan_for_new_bytes()
-        self.assertEquals(self.log_file.available, 30L)
+        self.assertEqual(self.log_file.available, 30L)
 
         self.move_file(self.__path, self.__path + '.1')
         self.write_file(self.__path,
                         'L007\n',
                         'L008\n')
         self.log_file.scan_for_new_bytes()
-        self.assertEquals(self.log_file.available, 40L)
+        self.assertEqual(self.log_file.available, 40L)
 
     def test_prepare_for_inactivity_closes_old_file_handles(self):
         self.append_file(self.__path, "some lines of text\n")
 
         open_count = self.log_file.get_open_files_count()
-        self.assertEquals(1, open_count)
+        self.assertEqual(1, open_count)
 
         modification_time = os.path.getmtime(self.__path)
         modification_time -= DEFAULT_CONFIG.close_old_files_duration_in_seconds + 100
@@ -816,7 +816,7 @@ class TestLogFileIterator(ScalyrTestCase):
         self.log_file.prepare_for_inactivity()
 
         open_count = self.log_file.get_open_files_count()
-        self.assertEquals(0, open_count)
+        self.assertEqual(0, open_count)
 
     def test_last_modification_time(self):
         known_time = time.time()
@@ -866,8 +866,8 @@ class TestLogFileIterator(ScalyrTestCase):
 class TestLogLineRedactor(ScalyrTestCase):
     def _run_case(self, redactor, line, expected_line, expected_redaction):
         (result_line, redacted) = redactor.process_line(line)
-        self.assertEquals(result_line, expected_line)
-        self.assertEquals(redacted, expected_redaction)
+        self.assertEqual(result_line, expected_line)
+        self.assertEqual(redacted, expected_redaction)
 
     def test_basic_redaction(self):
         redactor = LogLineRedacter('/var/fake_log')
@@ -1065,13 +1065,13 @@ class TestLogLineSampler(ScalyrTestCase):
     def test_no_sampling_rules(self):
         sampler = self.sampler
 
-        self.assertEquals(sampler.process_line('One line\n'), 1.0)
+        self.assertEqual(sampler.process_line('One line\n'), 1.0)
 
     def test_all_pass_rule(self):
         sampler = self.sampler
         sampler.add_rule('INFO', 1.0)
 
-        self.assertEquals(sampler.process_line('INFO Here is a line\n'), 1.0)
+        self.assertEqual(sampler.process_line('INFO Here is a line\n'), 1.0)
 
     def test_no_pass_rule(self):
         sampler = self.sampler
@@ -1085,8 +1085,8 @@ class TestLogLineSampler(ScalyrTestCase):
         sampler.add_rule('INFO', 0.0)
 
         self.assertTrue(sampler.process_line('INFO Here is a line\n') is None)
-        self.assertEquals(sampler.process_line('Error Another\n'), 1.0)
-        self.assertEquals(sampler.process_line('One more\n'), 1.0)
+        self.assertEqual(sampler.process_line('Error Another\n'), 1.0)
+        self.assertEqual(sampler.process_line('One more\n'), 1.0)
 
     def test_rule_with_sampling(self):
         sampler = self.sampler
@@ -1096,7 +1096,7 @@ class TestLogLineSampler(ScalyrTestCase):
         sampler.insert_next_number(0.1)
 
         self.assertTrue(sampler.process_line('INFO Another\n') is None)
-        self.assertEquals(sampler.process_line('INFO Here is a line\n'), 0.2)
+        self.assertEqual(sampler.process_line('INFO Here is a line\n'), 0.2)
 
 
 class TestLogFileProcessor(ScalyrTestCase):
@@ -1130,20 +1130,20 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(len(events.threads), 1)
+        self.assertEqual(len(events.threads), 1)
 
         status = log_processor.generate_status()
-        self.assertEquals(23L, status.total_bytes_pending)
-        self.assertEquals(0L, status.total_bytes_copied)
+        self.assertEqual(23L, status.total_bytes_pending)
+        self.assertEqual(0L, status.total_bytes_copied)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(2, events.total_events())
-        self.assertEquals(events.get_message(0), 'First line\n')
-        self.assertEquals(events.get_message(1), 'Second line\n')
+        self.assertEqual(2, events.total_events())
+        self.assertEqual(events.get_message(0), 'First line\n')
+        self.assertEqual(events.get_message(1), 'Second line\n')
 
         status = log_processor.generate_status()
-        self.assertEquals(0L, status.total_bytes_pending)
-        self.assertEquals(23L, status.total_bytes_copied)
+        self.assertEqual(0L, status.total_bytes_pending)
+        self.assertEqual(23L, status.total_bytes_copied)
 
         # Add some more text to make sure it appears.
         self.append_file(self.__path, 'Third line\n')
@@ -1154,15 +1154,15 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         status = log_processor.generate_status()
-        self.assertEquals(11L, status.total_bytes_pending)
-        self.assertEquals(23L, status.total_bytes_copied)
+        self.assertEqual(11L, status.total_bytes_pending)
+        self.assertEqual(23L, status.total_bytes_copied)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.get_message(0), 'Third line\n')
+        self.assertEqual(events.get_message(0), 'Third line\n')
 
         status = log_processor.generate_status()
-        self.assertEquals(0L, status.total_bytes_pending)
-        self.assertEquals(34L, status.total_bytes_copied)
+        self.assertEqual(0L, status.total_bytes_pending)
+        self.assertEqual(34L, status.total_bytes_copied)
 
     def test_negative_skipped_bytes_when_add_event_fails(self):
 
@@ -1176,7 +1176,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
         completion_callback( LogFileProcessor.SUCCESS )
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
 
         status = self.log_processor.generate_status()
         self.assertEqual( 0, status.total_bytes_skipped )
@@ -1193,7 +1193,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
         completion_callback( LogFileProcessor.SUCCESS )
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
         status = self.log_processor.generate_status()
         self.assertEqual( 0, status.total_bytes_skipped )
@@ -1219,8 +1219,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(expected, events.get_message(0))
 
     def test_max_log_offset_size_over_max_log_offset_size_no_checkpoint(self):
         # with no checkpoint, the LogFileProcessor should use max_log_offset_size
@@ -1241,7 +1241,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
     def test_max_log_offset_size_within_max_log_offset_size_no_pending_files(self):
         # If a checkpoint doesn't contain any pending files, then we haven't seen
@@ -1267,8 +1267,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(expected, events.get_message(0))
 
     def test_max_log_offset_size_over_max_log_offset_size_no_pending_files(self):
         # If a checkpoint doesn't contain any pending files, then we haven't seen
@@ -1291,7 +1291,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
     def test_parse_as_json_does_cause_incorrect_bytes_skipped_count( self ):
 
@@ -1308,7 +1308,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
 
         completion_callback( LogFileProcessor.SUCCESS )
         status = self.log_processor.generate_status()
@@ -1323,7 +1323,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
 
         checkpoint = self.log_processor.get_checkpoint()
 
@@ -1343,8 +1343,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(expected, events.get_message(0))
 
     def test_max_existing_log_offset_size_over_max_existing_log_offset_size(self):
         # If a checkpoint contains pending files, then we have seen
@@ -1356,7 +1356,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
 
         checkpoint = self.log_processor.get_checkpoint()
 
@@ -1376,7 +1376,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
     def test_max_log_offset_size_set_to_max_existing_log_offset_size_after_perform_processing(self):
         extra = {'max_log_offset_size': 20,
@@ -1396,8 +1396,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(expected, events.get_message(0))
 
         expected = "a string of almost 30 bytes\n"
         self.append_file(self.__path, expected)
@@ -1407,8 +1407,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = self.log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(expected, events.get_message(0))
 
     def test_fail_and_retry(self):
         log_processor = self.log_processor
@@ -1418,9 +1418,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(2, events.total_events())
-        self.assertEquals(events.get_message(0), 'First line\n')
-        self.assertEquals(events.get_message(1), 'Second line\n')
+        self.assertEqual(2, events.total_events())
+        self.assertEqual(events.get_message(0), 'First line\n')
+        self.assertEqual(events.get_message(1), 'Second line\n')
 
         self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_RETRY))
 
@@ -1428,9 +1428,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(2, events.total_events())
-        self.assertEquals(events.get_message(0), 'First line\n')
-        self.assertEquals(events.get_message(1), 'Second line\n')
+        self.assertEqual(2, events.total_events())
+        self.assertEqual(events.get_message(0), 'First line\n')
+        self.assertEqual(events.get_message(1), 'Second line\n')
 
     def test_fail_and_drop(self):
         log_processor = self.log_processor
@@ -1440,9 +1440,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(2, events.total_events())
-        self.assertEquals(events.get_message(0), 'First line\n')
-        self.assertEquals(events.get_message(1), 'Second line\n')
+        self.assertEqual(2, events.total_events())
+        self.assertEqual(events.get_message(0), 'First line\n')
+        self.assertEqual(events.get_message(1), 'Second line\n')
 
         self.assertFalse(completion_callback(LogFileProcessor.FAIL_AND_DROP))
 
@@ -1453,8 +1453,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(1, events.total_events())
-        self.assertEquals(events.get_message(0), 'Third line\n')
+        self.assertEqual(1, events.total_events())
+        self.assertEqual(events.get_message(0), 'Third line\n')
 
     def _set_new_log_processor(self, config, log_config, checkpoint=None):
         # create a new log processer and do an initial scan, because we need a line grouper
@@ -1479,7 +1479,7 @@ class TestLogFileProcessor(ScalyrTestCase):
                                                                                    current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(expected, events.get_message(0))
 
     def test_grouping_and_sampling_rules(self):
         log_config = {'path': self.__path, 'lineGroupers': JsonArray(DEFAULT_CONTINUE_THROUGH)}
@@ -1498,7 +1498,7 @@ class TestLogFileProcessor(ScalyrTestCase):
                                                                                    current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(expected, events.get_message(0))
+        self.assertEqual(expected, events.get_message(0))
 
     def test_sampling_rule(self):
         log_processor = self.log_processor
@@ -1511,7 +1511,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.get_message(0), 'ERROR Second line\n')
+        self.assertEqual(events.get_message(0), 'ERROR Second line\n')
 
     def test_redaction_rule(self):
         log_processor = self.log_processor
@@ -1523,7 +1523,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.get_message(0), 'GET /foo&password=foo&start=true\n')
+        self.assertEqual(events.get_message(0), 'GET /foo&password=foo&start=true\n')
 
     def test_hashed_redaction_in_middle_of_line(self):
         # Testing for #AGENT-83 indicated that redaction rules with hashing was truncating
@@ -1542,8 +1542,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
-        self.assertEquals( line_expected, events.get_message(0) )
+        self.assertEqual(1, events.total_events())
+        self.assertEqual( line_expected, events.get_message(0) )
 
     def test_hashed_redaction_with_non_redacted_lines(self):
         # Test for when a redaction rule with hashing is used, to make sure that
@@ -1561,9 +1561,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(2, events.total_events())
-        self.assertEquals( 'ello\n', events.get_message(0) )
-        self.assertEquals( line_expected, events.get_message(1) )
+        self.assertEqual(2, events.total_events())
+        self.assertEqual( 'ello\n', events.get_message(0) )
+        self.assertEqual( line_expected, events.get_message(1) )
 
     def test_redacting_utf8(self):
 
@@ -1601,7 +1601,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         # make sure everything is good
         expected = ('bb' + unichr(8230) + 'bb\n').encode("utf-8")
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.get_message(0), expected)
+        self.assertEqual(events.get_message(0), expected)
 
     def test_signals_deletion(self):
         log_processor = self.log_processor
@@ -1614,7 +1614,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
         self.__fake_time += 9 * 60
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
@@ -1637,7 +1637,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(0, events.total_events())
+        self.assertEqual(0, events.total_events())
 
         self.__fake_time += 4 * 60
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
@@ -1663,17 +1663,17 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(events.total_events(), 2)
-        self.assertEquals('scalyr-1', events.events[0].attrs['host'])
-        self.assertEquals('scalyr-1', events.events[1].attrs['host'])
+        self.assertEqual(events.total_events(), 2)
+        self.assertEqual('scalyr-1', events.events[0].attrs['host'])
+        self.assertEqual('scalyr-1', events.events[1].attrs['host'])
 
     def test_unique_id(self):
         first_thread_id = LogFileProcessor.generate_unique_thread_id()
         self.assertTrue(first_thread_id.startswith('log_'))
         sequence = int(first_thread_id[4:])
         self.assertTrue(sequence > 0)
-        self.assertEquals(first_thread_id, 'log_%d' % sequence)
-        self.assertEquals(LogFileProcessor.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
+        self.assertEqual(first_thread_id, 'log_%d' % sequence)
+        self.assertEqual(LogFileProcessor.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
 
     def test_thread_id_fails_to_be_added(self):
         log_processor = self.log_processor
@@ -1686,8 +1686,8 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(0, events.total_events())
-        self.assertEquals(len(events.threads), 0)
+        self.assertEqual(0, events.total_events())
+        self.assertEqual(len(events.threads), 0)
 
         # Now have a succuessful call and make sure we get the lines.
         events = TestLogFileProcessor.TestAddEventsRequest()
@@ -1695,10 +1695,10 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time)
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
-        self.assertEquals(2, events.total_events())
-        self.assertEquals(events.get_message(0), 'First line\n')
-        self.assertEquals(events.get_message(1), 'Second line\n')
-        self.assertEquals(len(events.threads), 1)
+        self.assertEqual(2, events.total_events())
+        self.assertEqual(events.get_message(0), 'First line\n')
+        self.assertEqual(events.get_message(1), 'Second line\n')
+        self.assertEqual(len(events.threads), 1)
 
     def test_sequence_id_and_number(self):
         log_processor = self.log_processor
@@ -1709,12 +1709,12 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
         first_sid, first_sn, sd = events.get_sequence(0)
 
         self.assertTrue(first_sid != None)
         self.assertTrue(first_sn != None)
-        self.assertEquals(None, sd)
+        self.assertEqual(None, sd)
 
     def test_sequence_delta(self):
         log_processor = self.log_processor
@@ -1728,13 +1728,13 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(2, events.total_events())
+        self.assertEqual(2, events.total_events())
         first_sid, first_sn, sd = events.get_sequence(0)
 
         second_sid, second_sn, sd = events.get_sequence(1)
-        self.assertEquals(None, second_sid)
-        self.assertEquals(None, second_sn)
-        self.assertEquals(expected_delta, sd)
+        self.assertEqual(None, second_sid)
+        self.assertEqual(None, second_sn)
+        self.assertEqual(expected_delta, sd)
 
     def test_sequence_reset(self):
         config = _create_configuration({'max_sequence_number': 20})
@@ -1759,7 +1759,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time)
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
 
-        self.assertEquals(2, events.total_events())
+        self.assertEqual(2, events.total_events())
 
         first_sid, _, _ = events.get_sequence(0)
 
@@ -1773,7 +1773,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time)
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
 
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
 
         third_sid, third_sn, third_sd = events.get_sequence(0)
 
@@ -1792,7 +1792,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         (completion_callback, buffer_full) = log_processor.perform_processing(
             events, current_time=self.__fake_time)
 
-        self.assertEquals(1, events.total_events())
+        self.assertEqual(1, events.total_events())
         first_sid, _, _ = events.get_sequence(0)
         self.assertTrue(isinstance(first_sid, basestring))
 
@@ -1871,14 +1871,14 @@ class TestLogMatcher(ScalyrTestCase):
     def test_matches_glob(self):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one))
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 2)
+        self.assertEqual(len(processors), 2)
 
         self._close_processors(processors)
 
     def test_matches_restricted_glob(self):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_two))
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         self._close_processors(processors)
 
@@ -1893,7 +1893,7 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one, ignore_stale_files=True,
                                                                     staleness_threshold_secs=staleness_threshold))
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         self._close_processors(processors)
 
@@ -1904,12 +1904,12 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals("/scalyr/test/text.txt", attrs['logfile'])
-        self.assertEquals(self.__path_one, attrs['original_file'])
+        self.assertEqual("/scalyr/test/text.txt", attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['original_file'])
 
     def test_rename_string_basename_no_ext(self):
         config = self._create_log_config(self.__path_one)
@@ -1918,12 +1918,12 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals("/scalyr/test/text.huzzah", attrs['logfile'])
-        self.assertEquals(self.__path_one, attrs['original_file'])
+        self.assertEqual("/scalyr/test/text.huzzah", attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['original_file'])
 
     def test_rename_string_path(self):
         config = self._create_log_config(self.__path_one)
@@ -1934,12 +1934,12 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals("/scalyr/test/%s/%s/log.log" % (path[2], path[1]), attrs['logfile'])
-        self.assertEquals(self.__path_one, attrs['original_file'])
+        self.assertEqual("/scalyr/test/%s/%s/log.log" % (path[2], path[1]), attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['original_file'])
 
     def test_rename_string_invalid_path(self):
         config = self._create_log_config(self.__path_one)
@@ -1950,11 +1950,11 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['logfile'])
         self.assertFalse('original_file' in attrs)
 
     def test_rename_regex(self):
@@ -1969,14 +1969,14 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
         # the temp directory is auto-generated, so it's not possible to
         # assert the actual path, we can however match the pre-folder and file name
 
-        self.assertEquals(
+        self.assertEqual(
             "text.txt", attrs['logfile'].split("/")[-1]
         )
 
@@ -1985,7 +1985,7 @@ class TestLogMatcher(ScalyrTestCase):
             attrs['logfile'].split("/")[1:3]
         )
 
-        self.assertEquals(self.__path_one, attrs['original_file'])
+        self.assertEqual(self.__path_one, attrs['original_file'])
 
     def test_rename_regex_invalid_match(self):
         config = self._create_log_config(self.__path_one)
@@ -1994,11 +1994,11 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['logfile'])
         self.assertFalse('original_file' in attrs)
 
     def test_rename_regex_invalid_replacement(self):
@@ -2008,11 +2008,11 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['logfile'])
         self.assertFalse('original_file' in attrs)
 
     def test_rename_regex_empty(self):
@@ -2021,11 +2021,11 @@ class TestLogMatcher(ScalyrTestCase):
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 1)
+        self.assertEqual(len(processors), 1)
 
         attrs = processors[0]._LogFileProcessor__base_event.attrs
 
-        self.assertEquals(self.__path_one, attrs['logfile'])
+        self.assertEqual(self.__path_one, attrs['logfile'])
         self.assertFalse('original_file' in attrs)
 
     def _close_processors(self, processors):

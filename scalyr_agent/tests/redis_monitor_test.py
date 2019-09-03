@@ -57,7 +57,7 @@ class RedisHostTestCase( unittest.TestCase ):
 
         self.host.utf8_warning_interval = 1
         self.host.log_entry( self.logger, self.entry )
-        self.assertEquals( expected, self.logger.command )
+        self.assertEqual( expected, self.logger.command )
         self.assertTrue( self.logger.warning.startswith( "Redis command contains invalid utf8" ) )
 
 
@@ -67,7 +67,7 @@ class RedisHostTestCase( unittest.TestCase ):
         self.entry['command'] = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' ).rstrip( '\0' )
 
         self.host.log_entry( self.logger, self.entry )
-        self.assertEquals( expected, self.logger.command )
+        self.assertEqual( expected, self.logger.command )
 
     def test_non_truncated_utf8_message( self ):
 
@@ -76,5 +76,5 @@ class RedisHostTestCase( unittest.TestCase ):
 
         self.host.log_entry( self.logger, self.entry )
 
-        self.assertEquals( expected, self.logger.command )
+        self.assertEqual( expected, self.logger.command )
 

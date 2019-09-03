@@ -63,14 +63,14 @@ class CopyingParamsTest(ScalyrTestCase):
         self.test_params = CopyingParameters(config)
 
     def test_initial_settings(self):
-        self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MB)
-        self.assertEquals(self.test_params.current_sleep_interval, 5.0)
+        self.assertEqual(self.test_params.current_bytes_allowed_to_send, ONE_MB)
+        self.assertEqual(self.test_params.current_sleep_interval, 5.0)
 
     def test_no_events_being_sent(self):
         for i in range(0, 5):
             self.test_params.update_params('success', 0)
-            self.assertEquals(self.test_params.current_bytes_allowed_to_send, ONE_MB)
-            self.assertEquals(self.test_params.current_sleep_interval, 5.0)
+            self.assertEqual(self.test_params.current_bytes_allowed_to_send, ONE_MB)
+            self.assertEqual(self.test_params.current_sleep_interval, 5.0)
 
     def test_small_events_being_sent(self):
         self.test_params.current_sleep_interval = 1
@@ -141,9 +141,9 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
                 'path': '/tmp/hi.log'
             }
         ], [])
-        self.assertEquals(len(test_manager.log_matchers), 2)
-        self.assertEquals(test_manager.log_matchers[0].config['path'], '/tmp/hi.log')
-        self.assertEquals(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEqual(len(test_manager.log_matchers), 2)
+        self.assertEqual(test_manager.log_matchers[0].config['path'], '/tmp/hi.log')
+        self.assertEqual(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/agent.log')
 
     def test_from_monitors(self):
         test_manager = self.__create_test_instance([
@@ -152,10 +152,10 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
                 'path': '/tmp/hi_monitor.log',
             }
         ])
-        self.assertEquals(len(test_manager.log_matchers), 2)
-        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
-        self.assertEquals(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
+        self.assertEqual(len(test_manager.log_matchers), 2)
+        self.assertEqual(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEqual(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
+        self.assertEqual(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
 
     def test_multiple_monitors_for_same_file(self):
         test_manager = self.__create_test_instance([
@@ -164,24 +164,24 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
             {'path': '/tmp/hi_monitor.log'},
             {'path': '/tmp/hi_second_monitor.log'}
         ])
-        self.assertEquals(len(test_manager.log_matchers), 3)
-        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
-        self.assertEquals(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
-        self.assertEquals(test_manager.log_matchers[2].config['path'], '/tmp/hi_second_monitor.log')
-        self.assertEquals(test_manager.log_matchers[2].config['attributes']['parser'], 'agent-metrics')
+        self.assertEqual(len(test_manager.log_matchers), 3)
+        self.assertEqual(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEqual(test_manager.log_matchers[1].config['path'], '/tmp/hi_monitor.log')
+        self.assertEqual(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
+        self.assertEqual(test_manager.log_matchers[2].config['path'], '/tmp/hi_second_monitor.log')
+        self.assertEqual(test_manager.log_matchers[2].config['attributes']['parser'], 'agent-metrics')
 
     def test_monitor_log_config_updated(self):
         test_manager = self.__create_test_instance([
         ], [
             {'path': 'hi_monitor.log'},
         ])
-        self.assertEquals(len(test_manager.log_matchers), 2)
-        self.assertEquals(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
-        self.assertEquals(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
+        self.assertEqual(len(test_manager.log_matchers), 2)
+        self.assertEqual(test_manager.log_matchers[0].config['path'], '/var/log/scalyr-agent-2/agent.log')
+        self.assertEqual(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
 
         # We also verify the monitor instance itself's log config object was updated to have the full path.
-        self.assertEquals(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
+        self.assertEqual(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
 
     def test_remove_log_path_with_non_existing_path(self):
         test_manager = self.__create_test_instance([
@@ -221,9 +221,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('success')
 
@@ -233,9 +233,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('success')
 
@@ -243,8 +243,8 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals('Third line', lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual('Third line', lines[0])
 
     def test_normal_error(self):
         controller = self.__create_test_instance()
@@ -252,9 +252,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('error')
 
@@ -262,9 +262,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
     def test_drop_request_due_to_error(self):
         controller = self.__create_test_instance()
@@ -272,9 +272,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('discardBuffer')
 
@@ -282,8 +282,8 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals('Third line', lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual('Third line', lines[0])
 
     def test_request_too_large_error(self):
         controller = self.__create_test_instance()
@@ -291,9 +291,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('requestTooLarge')
 
@@ -301,10 +301,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         (request, responder_callback) = controller.wait_for_rpc()
 
         lines = self.__extract_lines(request)
-        self.assertEquals(3, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
-        self.assertEquals('Third line', lines[2])
+        self.assertEqual(3, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
+        self.assertEqual('Third line', lines[2])
 
     def test_pipelined_requests(self):
         controller = self.__create_test_instance(use_pipelining=True)
@@ -319,9 +319,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('success')
 
@@ -330,8 +330,8 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertTrue(self.__was_pipelined(request))
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals('Third line', lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual('Third line', lines[0])
 
         responder_callback('success')
 
@@ -348,9 +348,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('error')
 
@@ -359,9 +359,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('success')
 
@@ -370,8 +370,8 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertTrue(self.__was_pipelined(request))
 
         lines = self.__extract_lines(request)
-        self.assertEquals(1, len(lines))
-        self.assertEquals('Third line', lines[0])
+        self.assertEqual(1, len(lines))
+        self.assertEqual('Third line', lines[0])
 
         responder_callback('success')
 
@@ -388,9 +388,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(2, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
+        self.assertEqual(2, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
 
         responder_callback('requestTooLarge')
 
@@ -399,10 +399,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         lines = self.__extract_lines(request)
 
-        self.assertEquals(3, len(lines))
-        self.assertEquals('First line', lines[0])
-        self.assertEquals('Second line', lines[1])
-        self.assertEquals('Third line', lines[2])
+        self.assertEqual(3, len(lines))
+        self.assertEqual('First line', lines[0])
+        self.assertEqual('Second line', lines[1])
+        self.assertEqual('Third line', lines[2])
 
         responder_callback('success')
 

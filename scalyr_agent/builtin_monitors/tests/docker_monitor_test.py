@@ -250,9 +250,9 @@ class DockerMonitorTest(ScalyrTestCase):
                 m1.assert_called()
                 m2.assert_called()
                 m3.assert_called()
-                self.assertEquals(fragment_polls.count(), 40)
-                self.assertEquals(counter['callback_invocations'], 4)
-                self.assertEquals(detected_fragment_changes, [
+                self.assertEqual(fragment_polls.count(), 40)
+                self.assertEqual(counter['callback_invocations'], 4)
+                self.assertEqual(detected_fragment_changes, [
                     'docker=true',
                     'docker=18.09.2|syslog',
                     'docker=18.09.2|docker_api|raw',

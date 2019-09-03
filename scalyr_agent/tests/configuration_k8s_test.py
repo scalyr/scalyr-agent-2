@@ -113,11 +113,11 @@ class TestConfigurationK8s(TestConfigurationBase):
         k8s_events_monitor = monitors_manager.monitors[1]
 
         # All environment-aware params defined in the k8s and k8s_events monitors must be tested
-        self.assertEquals(
+        self.assertEqual(
             set(k8s_testmap.keys()),
             set(k8s_monitor._config._environment_aware_map.keys()))
 
-        self.assertEquals(
+        self.assertEqual(
             set(k8s_events_testmap.keys()),
             set(k8s_events_monitor._config._environment_aware_map.keys()))
 
@@ -150,9 +150,9 @@ class TestConfigurationK8s(TestConfigurationBase):
                     # Keys were empty in config files so they take on environment values
                     materialized_value = monitor._config.get(key, convert_to=convert_to)
                     if hasattr(test_val, '__iter__'):
-                        self.assertEquals([x1 for x1 in test_val], [x2 for x2 in materialized_value])
+                        self.assertEqual([x1 for x1 in test_val], [x2 for x2 in materialized_value])
                     else:
-                        self.assertEquals(test_val, materialized_value)
+                        self.assertEqual(test_val, materialized_value)
 
     def test_k8s_event_object_filter_from_config(self):
         self._write_file_with_separator_conversion(""" { 
@@ -174,7 +174,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         event_object_filter = k8s_event_monitor._config.get('event_object_filter')
         elems = ["CronJob", "DaemonSet", "Deployment"]
         self.assertNotEquals(elems, event_object_filter)  # list != JsonArray
-        self.assertEquals(elems, [x for x in event_object_filter])
+        self.assertEqual(elems, [x for x in event_object_filter])
 
     def test_k8s_event_object_filter_from_environment_0(self):
         self._test_k8s_event_object_filter_from_environment('["CronJob", "DaemonSet", "Deployment"]')
@@ -208,8 +208,8 @@ class TestConfigurationK8s(TestConfigurationBase):
         k8s_event_monitor = test_manager.monitors[0]
         event_object_filter = k8s_event_monitor._config.get('event_object_filter')
         self.assertNotEquals(elems, event_object_filter)  # list != ArrayOfStrings
-        self.assertEquals(type(event_object_filter), ArrayOfStrings)
-        self.assertEquals(elems, list(event_object_filter))
+        self.assertEqual(type(event_object_filter), ArrayOfStrings)
+        self.assertEqual(elems, list(event_object_filter))
 
     def test_k8s_events_disable(self):
         def _assert_environment_variable(env_var_name, env_var_value, expected_value):
@@ -229,7 +229,7 @@ class TestConfigurationK8s(TestConfigurationBase):
 
             test_manager = MonitorsManager(config, FakePlatform([]))
             k8s_event_monitor = test_manager.monitors[0]
-            self.assertEquals(expected_value, k8s_event_monitor._KubernetesEventsMonitor__disable_monitor)
+            self.assertEqual(expected_value, k8s_event_monitor._KubernetesEventsMonitor__disable_monitor)
 
         # Legacy env variable is supported
         _assert_environment_variable('K8S_EVENTS_DISABLE', 't', True)

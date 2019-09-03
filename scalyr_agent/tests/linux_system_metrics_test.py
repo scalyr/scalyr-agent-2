@@ -41,6 +41,6 @@ class TestSystemMetricConfiguration(TestConfigurationBase):
         config.parse()
         test_manager = MonitorsManager(config, FakePlatform([]))
         system_metrics_monitor = test_manager.monitors[0]
-        self.assertEquals(system_metrics_monitor._log_write_rate, -1)
-        self.assertEquals(system_metrics_monitor._log_max_write_burst, -1)
+        self.assertEqual(system_metrics_monitor._log_write_rate, -1)
+        self.assertEqual(system_metrics_monitor._log_max_write_burst, -1)
 

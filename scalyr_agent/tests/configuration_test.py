@@ -118,7 +118,7 @@ class TestConfigurationBase(ScalyrTestCase):
         @type actual_path: str
         @type expected_path: str
         """
-        self.assertEquals(actual_path, self.convert_path(expected_path))
+        self.assertEqual(actual_path, self.convert_path(expected_path))
 
     def make_path(self, parent_directory, path):
         """Returns the full path created by joining path to parent_directory.
@@ -172,49 +172,49 @@ class TestConfiguration(TestConfigurationBase):
         """)
         config = self._create_test_configuration_instance()
         config.parse()
-        self.assertEquals(config.api_key, "hi there")
+        self.assertEqual(config.api_key, "hi there")
         self.assertPathEquals(config.agent_log_path, '/var/log/scalyr-agent-2')
         self.assertPathEquals(config.agent_data_path, '/var/lib/scalyr-agent-2')
-        self.assertEquals(config.additional_monitor_module_paths, '')
-        self.assertEquals(config.config_directory, self._config_fragments_dir)
-        self.assertEquals(config.implicit_metric_monitor, True)
-        self.assertEquals(config.implicit_agent_log_collection, True)
+        self.assertEqual(config.additional_monitor_module_paths, '')
+        self.assertEqual(config.config_directory, self._config_fragments_dir)
+        self.assertEqual(config.implicit_metric_monitor, True)
+        self.assertEqual(config.implicit_agent_log_collection, True)
         self.assertFalse(config.use_unsafe_debugging)
-        self.assertEquals(config.scalyr_server, 'https://agent.scalyr.com')
-        self.assertEquals(len(config.server_attributes), 1)
+        self.assertEqual(config.scalyr_server, 'https://agent.scalyr.com')
+        self.assertEqual(len(config.server_attributes), 1)
         self.assertTrue('serverHost' in config.server_attributes)
 
-        self.assertEquals(config.global_monitor_sample_interval, 30.0)
+        self.assertEqual(config.global_monitor_sample_interval, 30.0)
 
-        self.assertEquals(config.max_allowed_request_size, 1*1024*1024)
-        self.assertEquals(config.min_allowed_request_size, 100*1024)
+        self.assertEqual(config.max_allowed_request_size, 1*1024*1024)
+        self.assertEqual(config.min_allowed_request_size, 100*1024)
 
-        self.assertEquals(config.min_request_spacing_interval, 1.0)
-        self.assertEquals(config.max_request_spacing_interval, 5.0)
+        self.assertEqual(config.min_request_spacing_interval, 1.0)
+        self.assertEqual(config.max_request_spacing_interval, 5.0)
 
-        self.assertEquals(config.high_water_bytes_sent, 100*1024)
-        self.assertEquals(config.high_water_request_spacing_adjustment, 0.6)
-        self.assertEquals(config.low_water_bytes_sent, 20*1024)
-        self.assertEquals(config.low_water_request_spacing_adjustment, 1.5)
+        self.assertEqual(config.high_water_bytes_sent, 100*1024)
+        self.assertEqual(config.high_water_request_spacing_adjustment, 0.6)
+        self.assertEqual(config.low_water_bytes_sent, 20*1024)
+        self.assertEqual(config.low_water_request_spacing_adjustment, 1.5)
 
-        self.assertEquals(config.failure_request_spacing_adjustment, 1.5)
-        self.assertEquals(config.request_too_large_adjustment, 0.5)
-        self.assertEquals(config.debug_level, 0)
-        self.assertEquals(config.request_deadline, 60.0)
+        self.assertEqual(config.failure_request_spacing_adjustment, 1.5)
+        self.assertEqual(config.request_too_large_adjustment, 0.5)
+        self.assertEqual(config.debug_level, 0)
+        self.assertEqual(config.request_deadline, 60.0)
 
-        self.assertEquals(config.max_line_size, 9900)
-        self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
-        self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
-        self.assertEquals(config.max_sequence_number, 1024**4)
-        self.assertEquals(config.line_completion_wait_time, 5)
-        self.assertEquals(config.read_page_size, 64 * 1024)
-        self.assertEquals(config.copy_staleness_threshold, 15 * 60)
-        self.assertEquals(config.log_deletion_delay, 10 * 60)
+        self.assertEqual(config.max_line_size, 9900)
+        self.assertEqual(config.max_log_offset_size, 5 * 1024 * 1024)
+        self.assertEqual(config.max_existing_log_offset_size, 100 * 1024 * 1024)
+        self.assertEqual(config.max_sequence_number, 1024**4)
+        self.assertEqual(config.line_completion_wait_time, 5)
+        self.assertEqual(config.read_page_size, 64 * 1024)
+        self.assertEqual(config.copy_staleness_threshold, 15 * 60)
+        self.assertEqual(config.log_deletion_delay, 10 * 60)
 
-        self.assertEquals(config.max_new_log_detection_time, 1 * 60)
+        self.assertEqual(config.max_new_log_detection_time, 1 * 60)
 
-        self.assertEquals(config.copying_thread_profile_interval, 0)
-        self.assertEquals(config.copying_thread_profile_output_path, '/tmp/copying_thread_profiles_')
+        self.assertEqual(config.copying_thread_profile_interval, 0)
+        self.assertEqual(config.copying_thread_profile_output_path, '/tmp/copying_thread_profiles_')
 
         self.assertTrue(config.ca_cert_path.endswith('ca_certs.crt'))
         self.assertTrue(config.verify_server_certificate)
@@ -222,18 +222,18 @@ class TestConfiguration(TestConfigurationBase):
         self.assertFalse(config.pidfile_advanced_reuse_guard)
         self.assertFalse(config.strip_domain_from_default_server_host)
 
-        self.assertEquals(config.pipeline_threshold, 1.1)
+        self.assertEqual(config.pipeline_threshold, 1.1)
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEqual(len(config.log_configs), 2)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
-        self.assertEquals(config.log_configs[0].get_json_object('attributes'), JsonObject())
-        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
-        self.assertEquals(config.log_configs[0].get_json_array('redaction_rules'), JsonArray())
+        self.assertEqual(config.log_configs[0].get_json_object('attributes'), JsonObject())
+        self.assertEqual(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
+        self.assertEqual(config.log_configs[0].get_json_array('redaction_rules'), JsonArray())
         self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
         self.assertFalse(config.log_configs[0].get_bool('ignore_stale_files'))
-        self.assertEquals(config.log_configs[0].get_float('staleness_threshold_secs'), 300)
+        self.assertEqual(config.log_configs[0].get_float('staleness_threshold_secs'), 300)
 
-        self.assertEquals(len(config.monitor_configs), 0)
+        self.assertEqual(len(config.monitor_configs), 0)
         self.assertIsNone(config.network_proxies)
 
     def test_empty_config(self):
@@ -244,8 +244,8 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
         config.parse()
-        self.assertEquals(config.api_key, "hi there")
-        self.assertEquals(len(config.log_configs), 1)
+        self.assertEqual(config.api_key, "hi there")
+        self.assertEqual(len(config.log_configs), 1)
 
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
@@ -303,52 +303,52 @@ class TestConfiguration(TestConfigurationBase):
         """)
         config = self._create_test_configuration_instance()
         config.parse()
-        self.assertEquals(config.api_key, "hi there")
+        self.assertEqual(config.api_key, "hi there")
         self.assertPathEquals(config.agent_log_path, '/var/silly1')
         self.assertPathEquals(config.agent_data_path, '/var/silly2')
-        self.assertEquals(config.additional_monitor_module_paths, 'silly3')
-        self.assertEquals(config.config_directory, os.path.join(self._config_dir, 'silly4'))
-        self.assertEquals(config.implicit_metric_monitor, False)
-        self.assertEquals(config.implicit_agent_log_collection, False)
+        self.assertEqual(config.additional_monitor_module_paths, 'silly3')
+        self.assertEqual(config.config_directory, os.path.join(self._config_dir, 'silly4'))
+        self.assertEqual(config.implicit_metric_monitor, False)
+        self.assertEqual(config.implicit_agent_log_collection, False)
         self.assertTrue(config.use_unsafe_debugging)
-        self.assertEquals(config.scalyr_server, 'noland.scalyr.com')
-        self.assertEquals(len(config.server_attributes), 2)
-        self.assertEquals(config.server_attributes['region'], 'us-east')
+        self.assertEqual(config.scalyr_server, 'noland.scalyr.com')
+        self.assertEqual(len(config.server_attributes), 2)
+        self.assertEqual(config.server_attributes['region'], 'us-east')
 
-        self.assertEquals(config.global_monitor_sample_interval, 60.0)
+        self.assertEqual(config.global_monitor_sample_interval, 60.0)
 
-        self.assertEquals(config.max_allowed_request_size, 2000000)
-        self.assertEquals(config.min_allowed_request_size, 7000)
+        self.assertEqual(config.max_allowed_request_size, 2000000)
+        self.assertEqual(config.min_allowed_request_size, 7000)
 
-        self.assertEquals(config.min_request_spacing_interval, 2.0)
-        self.assertEquals(config.max_request_spacing_interval, 10.0)
+        self.assertEqual(config.min_request_spacing_interval, 2.0)
+        self.assertEqual(config.max_request_spacing_interval, 10.0)
 
-        self.assertEquals(config.high_water_bytes_sent, 50000)
-        self.assertEquals(config.high_water_request_spacing_adjustment, 2.0)
-        self.assertEquals(config.low_water_bytes_sent, 5000)
-        self.assertEquals(config.low_water_request_spacing_adjustment, -1.0)
+        self.assertEqual(config.high_water_bytes_sent, 50000)
+        self.assertEqual(config.high_water_request_spacing_adjustment, 2.0)
+        self.assertEqual(config.low_water_bytes_sent, 5000)
+        self.assertEqual(config.low_water_request_spacing_adjustment, -1.0)
 
-        self.assertEquals(config.max_line_size, 1 * 1024)
-        self.assertEquals(config.max_log_offset_size, 1 * 1024 * 1024)
-        self.assertEquals(config.max_existing_log_offset_size, 2 * 1024 * 1024)
-        self.assertEquals(config.max_sequence_number, 1 * 1024)
-        self.assertEquals(config.line_completion_wait_time, 2 * 60)
-        self.assertEquals(config.read_page_size, 3 * 1024)
-        self.assertEquals(config.copy_staleness_threshold, 4 * 60)
-        self.assertEquals(config.log_deletion_delay, 5 * 60)
+        self.assertEqual(config.max_line_size, 1 * 1024)
+        self.assertEqual(config.max_log_offset_size, 1 * 1024 * 1024)
+        self.assertEqual(config.max_existing_log_offset_size, 2 * 1024 * 1024)
+        self.assertEqual(config.max_sequence_number, 1 * 1024)
+        self.assertEqual(config.line_completion_wait_time, 2 * 60)
+        self.assertEqual(config.read_page_size, 3 * 1024)
+        self.assertEqual(config.copy_staleness_threshold, 4 * 60)
+        self.assertEqual(config.log_deletion_delay, 5 * 60)
 
-        self.assertEquals(config.copying_thread_profile_interval, 2)
-        self.assertEquals(config.copying_thread_profile_output_path, '/tmp/some_profiles')
+        self.assertEqual(config.copying_thread_profile_interval, 2)
+        self.assertEqual(config.copying_thread_profile_output_path, '/tmp/some_profiles')
 
-        self.assertEquals(config.max_new_log_detection_time, 2 * 60)
+        self.assertEqual(config.max_new_log_detection_time, 2 * 60)
         self.assertTrue(config.strip_domain_from_default_server_host)
 
-        self.assertEquals(config.pipeline_threshold, 0.5)
+        self.assertEqual(config.pipeline_threshold, 0.5)
 
-        self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
-        self.assertEquals(config.request_too_large_adjustment, 0.75)
-        self.assertEquals(config.debug_level, 1)
-        self.assertEquals(config.request_deadline, 30.0)
+        self.assertEqual(config.failure_request_spacing_adjustment, 2.0)
+        self.assertEqual(config.request_too_large_adjustment, 0.75)
+        self.assertEqual(config.debug_level, 1)
+        self.assertEqual(config.request_deadline, 30.0)
         self.assertPathEquals(config.ca_cert_path, '/var/lib/foo.pem')
         self.assertFalse(config.verify_server_certificate)
         self.assertTrue(config.debug_init)
@@ -486,13 +486,13 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEqual(len(config.log_configs), 2)
         sampling_rules = config.log_configs[0].get_json_array('sampling_rules')
-        self.assertEquals(len(sampling_rules), 2)
-        self.assertEquals(sampling_rules.get_json_object(0).get_string("match_expression"), "INFO")
-        self.assertEquals(sampling_rules.get_json_object(0).get_float("sampling_rate"), 0)
-        self.assertEquals(sampling_rules.get_json_object(1).get_string("match_expression"), ".*error.*=foo")
-        self.assertEquals(sampling_rules.get_json_object(1).get_float("sampling_rate"), 0.2)
+        self.assertEqual(len(sampling_rules), 2)
+        self.assertEqual(sampling_rules.get_json_object(0).get_string("match_expression"), "INFO")
+        self.assertEqual(sampling_rules.get_json_object(0).get_float("sampling_rate"), 0)
+        self.assertEqual(sampling_rules.get_json_object(1).get_string("match_expression"), ".*error.*=foo")
+        self.assertEqual(sampling_rules.get_json_object(1).get_float("sampling_rate"), 0.2)
 
     def test_bad_sampling_rules(self):
         # Missing match_expression.
@@ -565,15 +565,15 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEqual(len(config.log_configs), 2)
         redaction_rules = config.log_configs[0].get_json_array('redaction_rules')
-        self.assertEquals(len(redaction_rules), 3)
-        self.assertEquals(redaction_rules.get_json_object(0).get_string("match_expression"), "password=")
-        self.assertEquals(redaction_rules.get_json_object(0).get_string("replacement"), "password=foo")
-        self.assertEquals(redaction_rules.get_json_object(1).get_string("match_expression"), "password=.*")
-        self.assertEquals(redaction_rules.get_json_object(1).get_string("replacement"), "password=foo")
-        self.assertEquals(redaction_rules.get_json_object(2).get_string("match_expression"), "password=")
-        self.assertEquals(redaction_rules.get_json_object(2).get_string("replacement"), "")
+        self.assertEqual(len(redaction_rules), 3)
+        self.assertEqual(redaction_rules.get_json_object(0).get_string("match_expression"), "password=")
+        self.assertEqual(redaction_rules.get_json_object(0).get_string("replacement"), "password=foo")
+        self.assertEqual(redaction_rules.get_json_object(1).get_string("match_expression"), "password=.*")
+        self.assertEqual(redaction_rules.get_json_object(1).get_string("replacement"), "password=foo")
+        self.assertEqual(redaction_rules.get_json_object(2).get_string("match_expression"), "password=")
+        self.assertEqual(redaction_rules.get_json_object(2).get_string("replacement"), "")
 
     def test_bad_redaction_rules(self):
         # Missing match expression.
@@ -630,20 +630,20 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.additional_file_paths), 2)
+        self.assertEqual(len(config.additional_file_paths), 2)
         additional_paths = list(config.additional_file_paths)
         additional_paths.sort()
         self.assertTrue(additional_paths[0].endswith('apache.json'))
         self.assertTrue(additional_paths[1].endswith('nginx.json'))
 
-        self.assertEquals(len(config.log_configs), 4)
+        self.assertEqual(len(config.log_configs), 4)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
         self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/apache/access.log')
         self.assertPathEquals(config.log_configs[2].get_string('path'), '/var/log/nginx/access.log')
-        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
+        self.assertEqual(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
 
-        self.assertEquals(config.server_attributes['webServer'], 'true')
-        self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
+        self.assertEqual(config.server_attributes['webServer'], 'true')
+        self.assertEqual(config.server_attributes['serverHost'], 'foo.com')
 
     def test_api_key_and_scalyr_server_defined_in_config_directory(self):
         self._write_file_with_separator_conversion(""" {
@@ -662,8 +662,8 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.scalyr_server, 'foobar')
-        self.assertEquals(config.api_key, 'hi there')
+        self.assertEqual(config.scalyr_server, 'foobar')
+        self.assertEqual(config.api_key, 'hi there')
 
     def test_bad_fields_in_configuration_directory(self):
         self._write_file_with_separator_conversion(""" { api_key: "hi there"
@@ -709,7 +709,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.log_configs), 2)
+        self.assertEqual(len(config.log_configs), 2)
 
     def test_parser_specification(self):
         self._write_file_with_separator_conversion(""" {
@@ -721,8 +721,8 @@ class TestConfiguration(TestConfigurationBase):
         """)
         config = self._create_test_configuration_instance()
         config.parse()
-        self.assertEquals(len(config.log_configs), 1)
-        self.assertEquals(config.log_configs[0]['attributes']['parser'], 'foo-parser')
+        self.assertEqual(len(config.log_configs), 1)
+        self.assertEqual(config.log_configs[0]['attributes']['parser'], 'foo-parser')
 
     def test_monitors(self):
         self._write_file_with_separator_conversion(""" {
@@ -733,10 +733,10 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.monitor_configs), 1)
-        self.assertEquals(len(config.log_configs), 1)
-        self.assertEquals(config.monitor_configs[0].get_string('module'), 'httpPuller')
-        self.assertEquals(config.monitor_configs[0].get_string('log_path'), 'httpPuller.log')
+        self.assertEqual(len(config.monitor_configs), 1)
+        self.assertEqual(len(config.log_configs), 1)
+        self.assertEqual(config.monitor_configs[0].get_string('module'), 'httpPuller')
+        self.assertEqual(config.monitor_configs[0].get_string('log_path'), 'httpPuller.log')
 
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/scalyr-agent-2/agent.log')
 
@@ -752,13 +752,13 @@ class TestConfiguration(TestConfigurationBase):
             "path": 'hi.log'
         })
 
-        self.assertEquals(parsed_log_config['path'], '/var/log/scalyr-agent-2/hi.log')
+        self.assertEqual(parsed_log_config['path'], '/var/log/scalyr-agent-2/hi.log')
 
         parsed_log_config = config.parse_log_config({
             "path": '/var/log/scalyr-agent-2/hi.log'
         }, default_parser="foo")
 
-        self.assertEquals(parsed_log_config['attributes']['parser'], 'foo')
+        self.assertEqual(parsed_log_config['attributes']['parser'], 'foo')
 
     def test_parse_monitor_config(self):
         self._write_file_with_separator_conversion(""" {
@@ -773,7 +773,7 @@ class TestConfiguration(TestConfigurationBase):
             "module": "foo"
         })
 
-        self.assertEquals(parsed_monitor_config['module'], 'foo')
+        self.assertEqual(parsed_monitor_config['module'], 'foo')
 
     def test_equivalent_configuration(self):
         self._write_file_with_separator_conversion(""" {
@@ -822,10 +822,10 @@ class TestConfiguration(TestConfigurationBase):
         # Should be not equivalent when we aren't ignoring debug_level,
         # but equivalent when we are.
         self.assertFalse(config_a.equivalent(config_b))
-        self.assertEquals(config_b.debug_level, 1)
+        self.assertEqual(config_b.debug_level, 1)
 
         self.assertTrue(config_a.equivalent(config_b, exclude_debug_level=True))
-        self.assertEquals(config_b.debug_level, 1)
+        self.assertEqual(config_b.debug_level, 1)
 
     def test_multiple_calls_to_bad_config(self):
         self._write_file_with_separator_conversion(""" {
@@ -855,7 +855,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hibye')
+        self.assertEqual(config.api_key, 'hibye')
 
     def test_substitution_with_default(self):
         self._write_file_with_separator_conversion(""" {
@@ -867,7 +867,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hifoo')
+        self.assertEqual(config.api_key, 'hifoo')
 
     def test_substitution_with_unused_default(self):
         self._write_file_with_separator_conversion(""" {
@@ -880,7 +880,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hibar')
+        self.assertEqual(config.api_key, 'hibar')
 
     def test_substitution_with_empty_var(self):
         self._write_file_with_separator_conversion(""" {
@@ -893,7 +893,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hifoo')
+        self.assertEqual(config.api_key, 'hifoo')
 
     def test_api_key_override_no_override(self):
         self._write_file_with_separator_conversion(""" {
@@ -905,7 +905,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'abcd1234')
+        self.assertEqual(config.api_key, 'abcd1234')
 
     def test_api_key_override_empty_override(self):
         self._write_file_with_separator_conversion(""" {
@@ -918,7 +918,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'abcd1234')
+        self.assertEqual(config.api_key, 'abcd1234')
 
     def test_api_key_overridden_by_config_file(self):
         self._write_file_with_separator_conversion(""" {
@@ -931,7 +931,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
-        self.assertEquals(config.api_key, 'abcd1234')
+        self.assertEqual(config.api_key, 'abcd1234')
         mock_logger.warn.assert_called_with(
             "Conflicting values detected between global config file parameter `api_key` and the environment variable "
             "`SCALYR_API_KEY`. Ignoring environment variable.",
@@ -949,7 +949,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance(logger=mock_logger)
         config.parse()
 
-        self.assertEquals(config.api_key, 'xyz')
+        self.assertEqual(config.api_key, 'xyz')
         mock_logger.warn.assert_not_called()
         mock_logger.debug.assert_called_with(
             "Using the api key from environment variable `SCALYR_API_KEY`",
@@ -1113,10 +1113,10 @@ class TestConfiguration(TestConfigurationBase):
                 if field in config_file_dict:
                     # Config params defined in the config file must not take on the fake environment values.
                     self.assertNotEquals(value, fake_env[field])
-                    self.assertEquals(value, config_file_value)
+                    self.assertEqual(value, config_file_value)
                 else:
                     # But those not defined in config file will take on environment values.
-                    self.assertEquals(value, fake_env[field])
+                    self.assertEqual(value, fake_env[field])
                     self.assertNotEquals(value, config_file_value)
         patch_and_start_test()
 
@@ -1134,8 +1134,8 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
         excludes = config.log_configs[0]['exclude']
-        self.assertEquals(type(excludes), JsonArray)
-        self.assertEquals(list(excludes), ["*.[0-9]*", "*.bak"])
+        self.assertEqual(type(excludes), JsonArray)
+        self.assertEqual(list(excludes), ["*.[0-9]*", "*.bak"])
 
     def test_global_options_in_fragments(self):
         self._write_config_fragment_file_with_separator_conversion("fragment.json", """{
@@ -1153,8 +1153,8 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals( config.api_key, "abcdefg" )
-        self.assertEquals( config.agent_log_path, "/var/silly1" )
+        self.assertEqual( config.api_key, "abcdefg" )
+        self.assertEqual( config.agent_log_path, "/var/silly1" )
         self.assertEqual(config.network_proxies, {"http": "http://foo.com", 'https': 'https://bar.com'})
 
     def test_global_duplicate_options_in_fragments(self):
@@ -1189,7 +1189,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hibye')
+        self.assertEqual(config.api_key, 'hibye')
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/ok.log')
 
     def test_empty_substitution(self):
@@ -1202,7 +1202,7 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(config.api_key, 'hi')
+        self.assertEqual(config.api_key, 'hi')
 
     def test_import_vars_in_configuration_directory(self):
         os.environ['TEST_VAR'] = 'bye'
@@ -1222,15 +1222,15 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         config.parse()
 
-        self.assertEquals(len(config.additional_file_paths), 1)
+        self.assertEqual(len(config.additional_file_paths), 1)
         additional_paths = list(config.additional_file_paths)
         additional_paths.sort()
         self.assertTrue(additional_paths[0].endswith('nginx.json'))
 
-        self.assertEquals(len(config.log_configs), 3)
+        self.assertEqual(len(config.log_configs), 3)
         self.assertPathEquals(config.log_configs[0].get_string('path'), '/var/log/tomcat6/access.log')
         self.assertPathEquals(config.log_configs[1].get_string('path'), '/var/log/nginx/bye.log')
-        self.assertEquals(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
+        self.assertEqual(config.log_configs[0].get_json_array('sampling_rules'), JsonArray())
 
-        self.assertEquals(config.server_attributes['webServer'], 'true')
-        self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
+        self.assertEqual(config.server_attributes['webServer'], 'true')
+        self.assertEqual(config.server_attributes['serverHost'], 'foo.com')

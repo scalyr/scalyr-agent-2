@@ -98,7 +98,7 @@ class TestConfigurationDocker(TestConfiguration):
         docker_monitor = monitors_manager.monitors[0]
 
         # All environment-aware params defined in the docker monitor must be gested
-        self.assertEquals(
+        self.assertEqual(
             set(docker_testmap.keys()),
             set(docker_monitor._config._environment_aware_map.keys()))
 
@@ -130,9 +130,9 @@ class TestConfigurationDocker(TestConfiguration):
                     # Keys were empty in config files so they take on environment values
                     materialized_value = monitor._config.get(key, convert_to=convert_to)
                     if hasattr(test_val, '__iter__'):
-                        self.assertEquals([x1 for x1 in test_val], [x2 for x2 in materialized_value])
+                        self.assertEqual([x1 for x1 in test_val], [x2 for x2 in materialized_value])
                     else:
-                        self.assertEquals(test_val, materialized_value)
+                        self.assertEqual(test_val, materialized_value)
 
     def test_label_include_globs_from_config(self):
         self._write_file_with_separator_conversion(""" { 
@@ -155,7 +155,7 @@ class TestConfigurationDocker(TestConfiguration):
         include_globs = docker_monitor._config.get('label_include_globs')
         elems = ["*glob1*", "*glob2*", "*glob3*"]
         self.assertNotEquals(elems, include_globs)  # list != JsonArray
-        self.assertEquals(elems, [x for x in include_globs])
+        self.assertEqual(elems, [x for x in include_globs])
 
     def test_label_include_globs_from_environment(self):
 
@@ -184,7 +184,7 @@ class TestConfigurationDocker(TestConfiguration):
         exclude_globs = docker_monitor._config.get('label_exclude_globs')
         self.assertNotEquals(include_elems, include_globs)  # list != ArrayOfStrings
         self.assertNotEquals(exclude_elems, exclude_globs)  # list != ArrayOfStrings
-        self.assertEquals(type(include_globs), ArrayOfStrings)
-        self.assertEquals(type(exclude_globs), ArrayOfStrings)
-        self.assertEquals(include_elems, list(include_globs))
-        self.assertEquals(exclude_elems, list(exclude_globs))
+        self.assertEqual(type(include_globs), ArrayOfStrings)
+        self.assertEqual(type(exclude_globs), ArrayOfStrings)
+        self.assertEqual(include_elems, list(include_globs))
+        self.assertEqual(exclude_elems, list(exclude_globs))

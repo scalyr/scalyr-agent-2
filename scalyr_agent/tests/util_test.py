@@ -98,7 +98,7 @@ class TestUtil(ScalyrTestCase):
         self.__create_file(self.__path, '{ a: "hi"}')
 
         json_object = scalyr_util.read_file_as_json(self.__path)
-        self.assertEquals(json_object, JsonObject(a='hi'))
+        self.assertEqual(json_object, JsonObject(a='hi'))
 
     def test_read_file_as_json_no_file(self):
         self.assertRaises(JsonReadFileException, scalyr_util.read_file_as_json, 'foo')
@@ -113,7 +113,7 @@ class TestUtil(ScalyrTestCase):
         scalyr_util.atomic_write_dict_as_json_file( self.__path, self.__path + '~', info )
 
         json_object = scalyr_util.read_file_as_json( self.__path )
-        self.assertEquals( json_object, JsonObject( a='hi' ) )
+        self.assertEqual( json_object, JsonObject( a='hi' ) )
 
     def __create_file(self, path, contents):
         fp = open(path, 'w')
@@ -124,33 +124,33 @@ class TestUtil(ScalyrTestCase):
         dt = datetime.datetime( 2015, 8, 6, 14, 40, 56 )
         expected = 1438872056.0
         actual = scalyr_util.seconds_since_epoch( dt )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_microseconds_since_epoch( self ):
         dt = datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
         expected = 1438872056123456
         actual = scalyr_util.microseconds_since_epoch( dt )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_datetime( self ):
         s = "2015-08-06T14:40:56.123456Z"
         expected =  datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
         actual = scalyr_util.rfc3339_to_datetime( s )
 
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_datetime_truncated_nano( self ):
         s = "2015-08-06T14:40:56.123456789Z"
         expected =  datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 )
         actual = scalyr_util.rfc3339_to_datetime( s )
 
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_datetime_bad_format_date_and_time_separator( self ):
         s = "2015-08-06 14:40:56.123456789Z"
         expected = None
         actual = scalyr_util.rfc3339_to_datetime( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_datetime_bad_format_has_timezone( self ):
         # currently this function only handles UTC.  Remove this test if
@@ -158,43 +158,43 @@ class TestUtil(ScalyrTestCase):
         s = "2015-08-06T14:40:56.123456789+04:00"
         expected = None
         actual = scalyr_util.rfc3339_to_datetime( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch( self ):
         s = "2015-08-06T14:40:56.123456Z"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch_no_fractions( self ):
         s = "2015-08-06T14:40:56"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56) ) * 1000
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch_some_fractions( self ):
         s = "2015-08-06T14:40:56.123Z"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123000 ) ) * 1000
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch_many_fractions( self ):
         s = "2015-08-06T14:40:56.123456789Z"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000 + 789
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch_too_many_fractions( self ):
         s = "2015-08-06T14:40:56.123456789999Z"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2015, 8, 6, 14, 40, 56, 123456 ) ) * 1000 + 789
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_rfc3339_to_nanoseconds_since_epoch_strange_value( self ):
         s = "2017-09-20T20:44:00.123456Z"
         expected =  scalyr_util.microseconds_since_epoch( datetime.datetime( 2017, 9, 20, 20, 44, 00, 123456 ) ) * 1000
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch( s )
-        self.assertEquals( expected, actual )
+        self.assertEqual( expected, actual )
 
     def test_uuid(self):
         first = scalyr_util.create_unique_id()
@@ -204,11 +204,11 @@ class TestUtil(ScalyrTestCase):
         self.assertNotEqual(first, second)
 
     def test_remove_newlines_and_truncate(self):
-        self.assertEquals(scalyr_util.remove_newlines_and_truncate('hi', 1000), 'hi')
-        self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok then', 2), 'ok')
-        self.assertEquals(scalyr_util.remove_newlines_and_truncate('o\nk\n', 1000), 'o k ')
-        self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 1000), 'ok   there')
-        self.assertEquals(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 6), 'ok   t')
+        self.assertEqual(scalyr_util.remove_newlines_and_truncate('hi', 1000), 'hi')
+        self.assertEqual(scalyr_util.remove_newlines_and_truncate('ok then', 2), 'ok')
+        self.assertEqual(scalyr_util.remove_newlines_and_truncate('o\nk\n', 1000), 'o k ')
+        self.assertEqual(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 1000), 'ok   there')
+        self.assertEqual(scalyr_util.remove_newlines_and_truncate('ok\n\r there', 6), 'ok   t')
 
     def test_is_list_of_strings_yes( self ):
         self.assertTrue( scalyr_util.is_list_of_strings( [ '*', 'blah', 'dah' ] ) )
@@ -253,7 +253,7 @@ class TestRunState(ScalyrTestCase):
 
         self.assertTrue(run_state.is_running())
         run_state.sleep_but_awaken_if_stopped(1.0)
-        self.assertEquals(run_state.total_times_slept, 1)
+        self.assertEqual(run_state.total_times_slept, 1)
         run_state.stop()
         self.assertFalse(run_state.is_running())
 
@@ -262,7 +262,7 @@ class TestRunState(ScalyrTestCase):
 
         run_state.stop()
         run_state.sleep_but_awaken_if_stopped(1.0)
-        self.assertEquals(run_state.total_times_slept, 0)
+        self.assertEqual(run_state.total_times_slept, 0)
 
     def test_callbacks(self):
         self.called = False
@@ -368,10 +368,10 @@ class TestScriptEscalator(ScalyrTestCase):
 
     def test_change_user_and_rerun_script(self):
         (test_instance, controller) = self.create_instance('czerwin', 'fileA', 'steve')
-        self.assertEquals(test_instance.change_user_and_rerun_script('random'), 0)
+        self.assertEqual(test_instance.change_user_and_rerun_script('random'), 0)
 
-        self.assertEquals(controller.call_count, 1)
-        self.assertEquals(controller.last_call['user'], 'steve')
+        self.assertEqual(controller.call_count, 1)
+        self.assertEqual(controller.last_call['user'], 'steve')
         self.assertIsNotNone(controller.last_call['script_file'])
 
     def create_instance(self, current_user, config_file, config_owner):
@@ -421,35 +421,35 @@ class TestRedirectorServer(ScalyrTestCase):
     def test_sending_str(self):
         self._server.start()
         # Verify that the server told the channel to accept the next client connection.
-        self.assertEquals(self._channel.accept_count, 1)
+        self.assertEqual(self._channel.accept_count, 1)
         # Simulate writing to stdout.
         self._sys.stdout.write('Testing')
         # Make sure we wrote a message to the channel
-        self.assertEquals(self._channel.write_count, 1)
+        self.assertEqual(self._channel.write_count, 1)
         (stream_id, content) = self._parse_sent_bytes(self._channel.last_write)
 
-        self.assertEquals(stream_id, 0)
-        self.assertEquals(content, 'Testing')
+        self.assertEqual(stream_id, 0)
+        self.assertEqual(content, 'Testing')
 
     def test_sending_unicode(self):
         self._server.start()
-        self.assertEquals(self._channel.accept_count, 1)
+        self.assertEqual(self._channel.accept_count, 1)
         self._sys.stdout.write(u'caf\xe9')
-        self.assertEquals(self._channel.write_count, 1)
+        self.assertEqual(self._channel.write_count, 1)
         (stream_id, content) = self._parse_sent_bytes(self._channel.last_write)
 
-        self.assertEquals(stream_id, 0)
-        self.assertEquals(content, u'caf\xe9')
+        self.assertEqual(stream_id, 0)
+        self.assertEqual(content, u'caf\xe9')
 
     def test_sending_to_stderr(self):
         self._server.start()
-        self.assertEquals(self._channel.accept_count, 1)
+        self.assertEqual(self._channel.accept_count, 1)
         self._sys.stderr.write('Testing again')
-        self.assertEquals(self._channel.write_count, 1)
+        self.assertEqual(self._channel.write_count, 1)
         (stream_id, content) = self._parse_sent_bytes(self._channel.last_write)
 
-        self.assertEquals(stream_id, 1)
-        self.assertEquals(content, 'Testing again')
+        self.assertEqual(stream_id, 1)
+        self.assertEqual(content, 'Testing again')
 
     def test_connection_failure(self):
         # Set the channel to simulate a connection timeout.
@@ -476,7 +476,7 @@ class TestRedirectorServer(ScalyrTestCase):
         stream_id = code % 2
         num_bytes = code >> 1
 
-        self.assertEquals(len(content), num_bytes + 4)
+        self.assertEqual(len(content), num_bytes + 4)
         decoded_str = content[4:].decode('utf-8')
 
         return stream_id, decoded_str
@@ -509,13 +509,13 @@ class TestRedirectorClient(ScalyrTestCase):
         self._send_to_client(0, 'Testing')
         # Wait until have bytes written to stdout by the client thread.
         self._fake_sys.stdout.wait_for_bytes(1.0)
-        self.assertEquals(self._fake_sys.stdout.last_write, 'Testing')
+        self.assertEqual(self._fake_sys.stdout.last_write, 'Testing')
 
     def test_receiving_unicode(self):
         self._accept_client_connection()
         self._send_to_client(0, u'caf\xe9')
         self._fake_sys.stdout.wait_for_bytes(1.0)
-        self.assertEquals(self._fake_sys.stdout.last_write, u'caf\xe9')
+        self.assertEqual(self._fake_sys.stdout.last_write, u'caf\xe9')
 
     def test_connection_timeout(self):
         # We advance the time past 60 seconds which is the connection time out.
