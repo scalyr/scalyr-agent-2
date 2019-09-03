@@ -21,6 +21,8 @@ __author__ = 'echee@scalyr.com'
 import sys
 import unittest
 
+from scalyr_agent.third_party import six
+
 from scalyr_agent import util
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
@@ -46,13 +48,13 @@ class EncodeDecodeTest(ScalyrTestCase):
         self.assertRaises(ValueError, lambda: util._set_json_lib('BAD JSON LIBRARY NAME'))
 
     def test_dict(self):
-        self.__test_encode_decode('{"a":1,"b":2}', {u'a': 1, u'b': 2})
+        self.__test_encode_decode('{"a":1,"b":2}', {six.u('a'): 1, six.u('b'): 2})
 
     def test_dict2(self):
-        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {u'a': 1, u'b': {u'c': 2}})
+        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {six.u('a'): 1, six.u('b'): {six.u('c'): 2}})
 
     def test_str(self):
-        self.__test_encode_decode(r'"a"', u'a')
+        self.__test_encode_decode(r'"a"', six.u('a'))
 
     def test_int(self):
         self.__test_encode_decode(r'1', 1)
@@ -80,22 +82,22 @@ class EncodeDecodeTest(ScalyrTestCase):
         self.__test_encode_decode(r'[1,2,3]', [1, 2, 3])
 
     def test_list2(self):
-        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u'a'])
+        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, six.u('a')])
 
     def test_jsonarray(self):
         self.__test_encode_decode(r'[1,2,3]', JsonArray(1, 2, 3))
 
     def test_jsonobject(self):
-        self.__test_encode_decode(r'{"a":1,"b":2}', JsonObject({u'a': 1, u'b': 2}))
+        self.__test_encode_decode(r'{"a":1,"b":2}', JsonObject({six.u('a'): 1, six.u('b'): 2}))
 
     def test_jsonobject_nested_dict(self):
-        self.__test_encode_decode(r'{"a":{"b":{"c":3}}}', JsonObject({u'a': JsonObject({u'b': JsonObject({u'c': 3})})}))
+        self.__test_encode_decode(r'{"a":{"b":{"c":3}}}', JsonObject({six.u('a'): JsonObject({six.u('b'): JsonObject({six.u('c'): 3})})}))
 
     def test_jsonobject_nested_jsonarray(self):
-        self.__test_encode_decode(r'{"a":[1,2,3]}', JsonObject({u'a': JsonArray(1, 2, 3)}))
+        self.__test_encode_decode(r'{"a":[1,2,3]}', JsonObject({six.u('a'): JsonArray(1, 2, 3)}))
 
     def test_jsonobject_nested_jsonarray2(self):
-        self.__test_encode_decode(r'{"a":[1,2,3,[1,2,3]]}', JsonObject({u'a': JsonArray(1, 2, 3, JsonArray(1, 2, 3))}))
+        self.__test_encode_decode(r'{"a":[1,2,3,[1,2,3]]}', JsonObject({six.u('a'): JsonArray(1, 2, 3, JsonArray(1, 2, 3))}))
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):

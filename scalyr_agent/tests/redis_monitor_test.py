@@ -21,6 +21,8 @@ import time
 import unittest
 from struct import pack
 
+from scalyr_agent.third_party import six
+
 from scalyr_agent.builtin_monitors.redis_monitor import RedisMonitor
 from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
 

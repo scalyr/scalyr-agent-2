@@ -25,6 +25,8 @@ import tempfile
 import unittest
 import sys
 
+from scalyr_agent.third_party import six
+
 from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.log_processing import LogFileIterator, LogLineSampler, LogLineRedacter, LogFileProcessor, LogMatcher

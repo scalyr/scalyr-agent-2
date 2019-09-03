@@ -26,6 +26,8 @@ from mock import patch, MagicMock
 
 import scalyr_agent.util as scalyr_util
 
+from scalyr_agent.third_party import six
+
 from scalyr_agent.util import JsonReadFileException, RateLimiter, BlockingRateLimiter, FakeRunState, ScriptEscalator
 from scalyr_agent.util import FakeClockCounter
 from scalyr_agent.util import StoppableThread, RedirectorServer, RedirectorClient, RedirectorError
@@ -434,12 +436,12 @@ class TestRedirectorServer(ScalyrTestCase):
     def test_sending_unicode(self):
         self._server.start()
         self.assertEqual(self._channel.accept_count, 1)
-        self._sys.stdout.write(u'caf\xe9')
+        self._sys.stdout.write(six.u('caf\xe9'))
         self.assertEqual(self._channel.write_count, 1)
         (stream_id, content) = self._parse_sent_bytes(self._channel.last_write)
 
         self.assertEqual(stream_id, 0)
-        self.assertEqual(content, u'caf\xe9')
+        self.assertEqual(content, six.u('caf\xe9'))
 
     def test_sending_to_stderr(self):
         self._server.start()
@@ -513,9 +515,9 @@ class TestRedirectorClient(ScalyrTestCase):
 
     def test_receiving_unicode(self):
         self._accept_client_connection()
-        self._send_to_client(0, u'caf\xe9')
+        self._send_to_client(0, six.u('caf\xe9'))
         self._fake_sys.stdout.wait_for_bytes(1.0)
-        self.assertEqual(self._fake_sys.stdout.last_write, u'caf\xe9')
+        self.assertEqual(self._fake_sys.stdout.last_write, six.u('caf\xe9'))
 
     def test_connection_timeout(self):
         # We advance the time past 60 seconds which is the connection time out.

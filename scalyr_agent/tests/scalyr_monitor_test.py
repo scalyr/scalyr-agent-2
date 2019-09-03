@@ -17,6 +17,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+from scalyr_agent.third_party import six
 
 from scalyr_agent.json_lib import serialize
 from scalyr_agent.json_lib import parse as json_lib_parse
@@ -35,7 +36,7 @@ class MonitorConfigTest(ScalyrTestCase):
                 'int': 1,
                 'bool': True,
                 'string': 'hi',
-                'unicode': u'bye',
+                'unicode': six.u('bye'),
                 'float': 1.4,
                 'long': 1L,
                 'JsonArray': JsonArray(*test_array),
@@ -49,7 +50,7 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEqual(config['int'], 1)
         self.assertEqual(config['bool'], True)
         self.assertEqual(config['string'], 'hi')
-        self.assertEqual(config['unicode'], u'bye')
+        self.assertEqual(config['unicode'], six.u('bye'))
         self.assertEqual(config['float'], 1.4)
         self.assertEqual(config['long'], 1L)
         self.assertEqual(config['JsonArray'], JsonArray(*test_array))
@@ -63,7 +64,7 @@ class MonitorConfigTest(ScalyrTestCase):
     def test_int_conversion(self):
         self.assertEqual(self.get(1, convert_to=int), 1)
         self.assertEqual(self.get('12', convert_to=int), 12)
-        self.assertEqual(self.get(u'13', convert_to=int), 13)
+        self.assertEqual(self.get(six.u('13'), convert_to=int), 13)
 
         self.assertRaises(BadMonitorConfiguration, self.get, 2.0, convert_to=int)
         self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=int)
@@ -100,11 +101,11 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEqual(self.get(serialize(test_obj), convert_to=JsonObject), json_lib_parse(serialize(test_obj)))
 
     def test_unicode_conversion(self):
-        self.assertEqual(self.get(1, convert_to=unicode), u'1')
-        self.assertEqual(self.get('ah', convert_to=unicode), u'ah')
-        self.assertEqual(self.get(False, convert_to=unicode), u'False')
-        self.assertEqual(self.get(1.3, convert_to=unicode), u'1.3')
-        self.assertEqual(self.get(1L, convert_to=unicode), u'1')
+        self.assertEqual(self.get(1, convert_to=unicode), six.u('1'))
+        self.assertEqual(self.get('ah', convert_to=unicode), six.u('ah'))
+        self.assertEqual(self.get(False, convert_to=unicode), six.u('False'))
+        self.assertEqual(self.get(1.3, convert_to=unicode), six.u('1.3'))
+        self.assertEqual(self.get(1L, convert_to=unicode), six.u('1'))
 
     def test_long_conversion(self):
         self.assertEqual(self.get(2, convert_to=long), 2L)
