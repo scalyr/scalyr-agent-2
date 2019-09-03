@@ -87,10 +87,10 @@ def _thread_watcher():
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
-    print 'Detected hung test run.  Active threads are:'
+    print( 'Detected hung test run.  Active threads are:' )
     for t in threading.enumerate():
-        print 'Active thread %s daemon=%s' % (t.getName(), str(t.isDaemon()))
-    print 'Done'
+        print( 'Active thread %s daemon=%s' % (t.getName(), t.isDaemon()) )
+    print( 'Done' )
 
 
 def _start_thread_watcher_if_necessary():

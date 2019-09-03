@@ -28,6 +28,8 @@ import resource
 import signal
 import tempfile
 
+from scalyr_agent.third_party import six
+
 from scalyr_agent.platform_controller import PlatformController, DefaultPaths, AgentAlreadyRunning
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 import scalyr_agent.util as scalyr_util
@@ -128,10 +130,10 @@ class PosixPlatformController(PlatformController):
 
         elif self.__pidfile_from_options is None:
             self.__pidfile = os.path.join(self.default_paths.agent_log_path, 'agent.pid')
-            print >> sys.stderr, 'Assuming pid file is \'%s\'.  Use --pid-file to override.' % self.__pidfile
+            six.print_( 'Assuming pid file is \'%s\'.  Use --pid-file to override.' % self.__pidfile, file=sys.stderr)
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)
-            print >> sys.stderr, 'Using pid file \'%s\'.' % self.__pidfile
+            six.print_( 'Using pid file \'%s\'.' % self.__pidfile, file=sys.stderr)
 
     @property
     def default_paths(self):
@@ -447,7 +449,7 @@ class PosixPlatformController(PlatformController):
         # head of any potential bugs that could cause infinite loops.
         arguments = ['sudo', '-u', user_name, sys.executable, script_file, '--no-change-user'] + script_arguments
 
-        print >>sys.stderr, ('Running as %s' % user_name)
+        six.print_('Running as %s' % user_name, file=sys.stderr)
         return os.execvp("sudo", arguments)
 
     def is_agent(self):
@@ -564,7 +566,7 @@ class PosixPlatformController(PlatformController):
             return 0  # not an error in a restart
 
         if not quiet:
-            print 'Sending signal to terminate agent.'
+            print( 'Sending signal to terminate agent.' )
 
         # Try killing the daemon process
         try:
@@ -576,7 +578,7 @@ class PosixPlatformController(PlatformController):
                 term_attempts -= 1
 
             if not quiet:
-                print 'Still waiting for agent to terminate, sending KILL signal.'
+                print( 'Still waiting for agent to terminate, sending KILL signal.' )
 
             while 1:
                 os.kill(pid, signal.SIGKILL)
@@ -588,14 +590,14 @@ class PosixPlatformController(PlatformController):
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
-                print 'Unable to terminate agent.'
-                print str(err)
+                print( 'Unable to terminate agent.' )
+                print( "%s" % err )
                 return 1
 
         if not quiet:
             # Warning, do not change this output.  The config_main.py file looks for this message when
             # upgrading a tarball install to make sure the agent was running.
-            print 'Agent has stopped.'
+            print( 'Agent has stopped.' )
 
         return 0
 
@@ -649,7 +651,7 @@ class PosixPlatformController(PlatformController):
         try:
             time.sleep(seconds)
         except Exception:
-            print 'Ignoring exception while sleeping'
+            print( 'Ignoring exception while sleeping' )
 
     def sleep(self, seconds):
         """Sleeps for at most the specified number of seconds while also handling signals.

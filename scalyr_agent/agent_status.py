@@ -29,6 +29,7 @@ __author__ = 'czerwin@scalyr.com'
 
 import os
 
+from scalyr_agent.third_party import six
 import scalyr_agent.util as scalyr_util
 
 
@@ -244,46 +245,46 @@ class MonitorStatus(object):
 
 
 def report_status(output, status, current_time):
-    print >>output, 'Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help'
-    print >>output, ''
-    print >>output, 'Current time:     %s' % scalyr_util.format_time(current_time)
-    print >>output, 'Agent started at: %s' % scalyr_util.format_time(status.launch_time)
-    print >>output, 'Version:          %s' % status.version
-    print >>output, 'Agent running as: %s' % status.user
-    print >>output, 'Agent log:        %s' % status.log_path
-    print >>output, 'ServerHost:       %s' % status.server_host
-    print >>output, ''
+    six.print_( 'Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help', file=output)
+    six.print_('', file=output)
+    six.print_('Current time:     %s' % scalyr_util.format_time(current_time), file=output)
+    six.print_('Agent started at: %s' % scalyr_util.format_time(status.launch_time), file=output)
+    six.print_('Version:          %s' % status.version, file=output)
+    six.print_('Agent running as: %s' % status.user, file=output)
+    six.print_('Agent log:        %s' % status.log_path, file=output)
+    six.print_('ServerHost:       %s' % status.server_host, file=output)
+    six.print_('', file=output)
     server = status.scalyr_server
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,
     # you should go to https://www.scalyr.com.  So, we do a little clean up before sticking it in
     # the url.  Same goes for https://log.scalyr.com  -- it is really is just https://www.scalyr.com
     server = server.replace('https://agent.', 'https://www.')
     server = server.replace('https://log.', 'https://www.')
-    print >>output, 'View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27' % (
-        server, status.server_host)
-    print >>output, ''
-    print >>output, ''
+    six.print_('View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27' % (
+        server, status.server_host), file=output)
+    six.print_('', file=output)
+    six.print_('', file=output)
 
     # Configuration file status:
-    print >>output, 'Agent configuration:'
-    print >>output, '===================='
-    print >>output, ''
+    six.print_('Agent configuration:', file=output)
+    six.print_('====================', file=output)
+    six.print_('', file=output)
     if len(status.config_status.additional_paths) == 0:
-        print >>output, 'Configuration file:    %s' % status.config_status.path
+        six.print_('Configuration file:    %s' % status.config_status.path, file=output)
     else:
-        print >>output, 'Configuration files:   %s' % status.config_status.path
+        six.print_('Configuration files:   %s' % status.config_status.path, file=output)
         for x in status.config_status.additional_paths:
-            print >>output, '                       %s' % x
+            six.print_('                       %s' % x, file=output)
 
     if status.config_status.last_error is None:
-        print >>output, 'Status:                Good (files parsed successfully)'
+        six.print_('Status:                Good (files parsed successfully)', file=output)
     else:
-        print >>output, 'Status:                Bad (could not parse, using last good version)'
-    print >>output, 'Last checked:          %s' % scalyr_util.format_time(status.config_status.last_check_time)
-    print >>output, 'Last changed observed: %s' % scalyr_util.format_time(status.config_status.last_read_time)
+        six.print_('Status:                Bad (could not parse, using last good version)', file=output)
+    six.print_('Last checked:          %s' % scalyr_util.format_time(status.config_status.last_check_time), file=output)
+    six.print_('Last changed observed: %s' % scalyr_util.format_time(status.config_status.last_read_time), file=output)
 
     if status.config_status.last_error is not None:
-        print >>output, 'Parsing error:         %s' % str(status.config_status.last_error)
+        six.print_('Parsing error:         %s' % str(status.config_status.last_error), file=output)
 
     def print_environment():
 
@@ -303,7 +304,7 @@ def report_status(output, status, current_time):
         # Sort order does not consider letter case.
         sorted_upperkeys = main_keys + sorted(set(upper2actualkey.keys()) - set(main_keys))
 
-        print >>output, ''
+        six.print_('', file=output)
         row = 0
         for kup in sorted_upperkeys:
             key = upper2actualkey.get(kup, kup)
@@ -314,56 +315,56 @@ def report_status(output, status, current_time):
                 val = '<Redacted>'
 
             if row == 0:
-                print >>output, 'Environment variables: %s = %s' % (key, val)
+                six.print_('Environment variables: %s = %s' % (key, val), file=output)
             else:
-                print >>output, '                       %s = %s' % (key, val)
+                six.print_('                       %s = %s' % (key, val), file=output)
             row += 1
 
     print_environment()
 
     if status.copying_manager_status is not None:
-        print >>output, ''
-        print >>output, ''
+        six.print_('', file=output)
+        six.print_('', file=output)
         __report_copying_manager(output, status.copying_manager_status, status.log_path,
                                  status.config_status.last_read_time)
 
     if status.monitor_manager_status is not None:
-        print >>output, ''
-        print >>output, ''
+        six.print_('', file=output)
+        six.print_('', file=output)
         __report_monitor_manager(output, status.monitor_manager_status, status.config_status.last_read_time)
 
 
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
-    print >>output, 'Log transmission:'
-    print >>output, '================='
-    print >>output, ''
-    print >>output, '(these statistics cover the period from %s)' % scalyr_util.format_time(read_time)
-    print >>output, ''
+    six.print_('Log transmission:', file=output)
+    six.print_('=================', file=output)
+    six.print_('', file=output)
+    six.print_('(these statistics cover the period from %s)' % scalyr_util.format_time(read_time), file=output)
+    six.print_('', file=output)
 
-    print >>output, 'Bytes uploaded successfully:               %ld' % manager_status.total_bytes_uploaded
-    print >>output, 'Last successful communication with Scalyr: %s' % scalyr_util.format_time(
-        manager_status.last_success_time)
-    print >>output, 'Last attempt:                              %s' % scalyr_util.format_time(
-        manager_status.last_attempt_time)
+    six.print_('Bytes uploaded successfully:               %ld' % manager_status.total_bytes_uploaded, file=output)
+    six.print_('Last successful communication with Scalyr: %s' % scalyr_util.format_time(
+        manager_status.last_success_time), file=output)
+    six.print_('Last attempt:                              %s' % scalyr_util.format_time(
+        manager_status.last_attempt_time), file=output)
     if manager_status.last_attempt_size is not None:
-        print >>output, 'Last copy request size:                    %ld' % manager_status.last_attempt_size
+        six.print_('Last copy request size:                    %ld' % manager_status.last_attempt_size, file=output)
     if manager_status.last_response is not None:
-        print >>output, 'Last copy response size:                   %ld' % len(manager_status.last_response)
-        print >>output, 'Last copy response status:                 %s' % manager_status.last_response_status
+        six.print_('Last copy response size:                   %ld' % len(manager_status.last_response), file=output)
+        six.print_('Last copy response status:                 %s' % manager_status.last_response_status, file=output)
         if manager_status.last_response_status != 'success':
-            print >>output, 'Last copy response:                        %s' % scalyr_util.remove_newlines_and_truncate(
-                manager_status.last_response, 1000)
+            six.print_('Last copy response:                        %s' % scalyr_util.remove_newlines_and_truncate(
+                manager_status.last_response, 1000), file=output)
     if manager_status.total_errors > 0:
-        print >>output, 'Total responses with errors:               %d (see \'%s\' for details)' % (
-            manager_status.total_errors, agent_log_file_path)
-    print >>output, ''
+        six.print_('Total responses with errors:               %d (see \'%s\' for details)' % (
+            manager_status.total_errors, agent_log_file_path), file=output)
+    six.print_('', file=output)
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:
             if len(matcher_status.log_processors_status) == 0:
                 # This is an absolute file path (no wildcards) and there are not matches.
-                print >>output, 'Path %s: no matching readable file, last checked %s' % (
-                    matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time))
+                six.print_('Path %s: no matching readable file, last checked %s' % (
+                    matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time)), file=output)
             else:
                 # We have a match.. matcher_status.log_processors_status should really only have one
                 # entry, but we loop anyway.
@@ -391,9 +392,9 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         if matcher_status.is_glob:
             if need_to_add_extra_line:
                 need_to_add_extra_line = False
-                print >>output, ''
-            print >>output, 'Glob: %s:: last scanned for glob matches at %s' % (
-                matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time))
+                six.print_('', file=output)
+            six.print_('Glob: %s:: last scanned for glob matches at %s' % (
+                matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time)), file=output)
 
             for processor_status in matcher_status.log_processors_status:
                 output.write('  %s: copied %ld bytes (%ld lines), %ld bytes pending, ' % (
@@ -416,27 +417,27 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
 
 
 def __report_monitor_manager(output, manager_status, read_time):
-    print >>output, 'Monitors:'
-    print >>output, '========='
-    print >>output, ''
-    print >>output, '(these statistics cover the period from %s)' % scalyr_util.format_time(read_time)
-    print >>output, ''
+    six.print_('Monitors:', file=output)
+    six.print_('=========', file=output)
+    six.print_('', file=output)
+    six.print_('(these statistics cover the period from %s)' % scalyr_util.format_time(read_time), file=output)
+    six.print_('', file=output)
     if manager_status.total_alive_monitors < len(manager_status.monitors_status):
-        print >>output, 'Running monitors:'
+        six.print_('Running monitors:', file=output)
         padding = '  '
     else:
         padding = ''
 
     for entry in manager_status.monitors_status:
         if entry.is_alive:
-            print >>output, '%s%s: %d lines emitted, %d errors' % (
-                padding, entry.monitor_name, entry.reported_lines, entry.errors)
+            six.print_('%s%s: %d lines emitted, %d errors' % (
+                padding, entry.monitor_name, entry.reported_lines, entry.errors), file=output)
 
     dead_monitors = len(manager_status.monitors_status) - manager_status.total_alive_monitors
     if dead_monitors > 0:
-        print >>output, ''
-        print >>output, 'Failed monitors:'
+        six.print_('', file=output)
+        six.print_('Failed monitors:', file=output)
         for entry in manager_status.monitors_status:
             if not entry.is_alive:
-                print >>output, '  %s %d lines emitted, %d errors' % (
-                    entry.monitor_name, entry.reported_lines, entry.errors)
+                six.print_('  %s %d lines emitted, %d errors' % (
+                    entry.monitor_name, entry.reported_lines, entry.errors), file=output)

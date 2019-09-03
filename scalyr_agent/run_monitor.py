@@ -44,6 +44,8 @@ import signal
 import sys
 import time
 
+from scalyr_agent.third_party import six
+
 from optparse import OptionParser
 
 from __scalyr__ import scalyr_init
@@ -84,7 +86,7 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
         parsed_config = json_lib.parse(monitor_config)
         log.log(scalyr_logging.DEBUG_LEVEL_1, 'Parsed configuration successfully')
     except json_lib.JsonParseException, e:
-        print >>sys.stderr, 'Failed to parse the monitor configuration as valid JSON: %s', str(e)
+        six.print_( 'Failed to parse the monitor configuration as valid JSON: %s' % e, file=sys.stderr )
         return 1
 
     parsed_config['module'] = monitor_module
@@ -93,7 +95,7 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
 
     # noinspection PyUnusedLocal
     def handle_shutdown_signal(signum, frame):
-        print >>sys.stdout, 'Signal received, stopping monitor...'
+        six.print_( 'Signal received, stopping monitor...', file=sys.stdout )
         monitor.stop()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -117,7 +119,7 @@ def run_standalone_monitor(monitor_module, monitor_python_path, monitor_config, 
         while monitor.isAlive():
             time.sleep(0.1)
     except BadMonitorConfiguration, e:
-        print >>sys.stderr, 'Invalid monitor configuration: %s' % str(e)
+        six.print_( 'Invalid monitor configuration: %s' % e, file=sys.stderr)
 
     return 0
 
@@ -145,7 +147,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     if len(args) != 1:
-        print >> sys.stderr, 'You must provide the module that contains the Scalyr Monitor plugin you wish to run.'
+        six.print_( 'You must provide the module that contains the Scalyr Monitor plugin you wish to run.', file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
 
@@ -154,8 +156,8 @@ if __name__ == '__main__':
         if my_debug_level < 0 or my_debug_level > 5:
             raise ValueError('Out of range')
     except ValueError:
-        print >>sys.stderr, ('Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 ' %
-                             str(options.debug_level))
+        six.print_('Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 ' %
+                             options.debug_level, file=sys.stderr)
         sys.exit(1)
 
     debug_levels = [scalyr_logging.DEBUG_LEVEL_0, scalyr_logging.DEBUG_LEVEL_1, scalyr_logging.DEBUG_LEVEL_2,

@@ -33,6 +33,8 @@ import threading
 import time
 from collections import deque
 
+from scalyr_agent.third_party import six
+
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
 from scalyr_agent.json_lib import parse, JsonParseException
@@ -843,7 +845,7 @@ class StoppableThread(threading.Thread):
                 self.run_and_propagate()
         except Exception, e:
             self.__exception_info = sys.exc_info()
-            print >> sys.stderr, 'Received exception from run method in StoppableThread %s' % str(e)
+            six.print_( 'Received exception from run method in StoppableThread %s' % e, file=sys.stderr)
             return None
 
     def run_and_propagate(self):
@@ -1017,14 +1019,14 @@ class ScriptEscalator(object):
         except CannotExecuteAsUser, e:
             if not handle_error:
                 raise e
-            print >> sys.stderr, ('Failing, cannot %s as the correct user.  The command must be executed using the '
+            six.print_('Failing, cannot %s as the correct user.  The command must be executed using the '
                                   'same account that owns the configuration file.  The configuration file is owned by '
                                   '%s whereas the current user is %s.  Changing user failed due to the following '
                                   'error: "%s". Please try to re-execute the command as %s' % (description,
                                                                                                self.__desired_user,
                                                                                                self.__running_user,
                                                                                                e.error_message,
-                                                                                               self.__desired_user))
+                                                                                               self.__desired_user), file=sys.stderr)
             return 1
 
 
