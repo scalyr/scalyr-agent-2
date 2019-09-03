@@ -1296,8 +1296,6 @@ class KubernetesApi( object ):
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
         self._rate_limiter = rate_limiter
-        if not self._rate_limiter:
-            global_log.warn("KubernetesAPI created without rate limiter.\n%s" % traceback.format_stack())
 
     @property
     def default_query_options(self):
