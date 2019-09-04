@@ -23,9 +23,10 @@ import tempfile
 from mock import patch, Mock
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
+from scalyr_agent.config_util import parse_array_of_strings, convert_config_param, get_config_from_env
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
-from scalyr_agent.json_lib.objects import ArrayOfStrings
+from scalyr_agent.json_lib.objects import ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -1256,3 +1257,62 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
+
+
+class TestParseArrayOfStrings(TestConfigurationBase):
+
+    def test_none(self):
+        self.assertIsNone(parse_array_of_strings(None))
+
+    def test_empty_string(self):
+        self.assertEqual(parse_array_of_strings(''), ArrayOfStrings())
+
+    def test_list(self):
+        self.assertEqual(parse_array_of_strings('a, b, c'), ArrayOfStrings(['a', 'b', 'c']))
+
+
+class TestConvertConfigParam(TestConfigurationBase):
+
+    def test_none_to_anything(self):
+        """"""
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, str))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, bool))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, int))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, float))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, list))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, JsonArray))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, JsonObject))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, ArrayOfStrings))
+
+    def test_empty_string(self):
+        self.assertEqual('', convert_config_param('dummy_field', '', str))
+        self.assertEqual(False, convert_config_param('dummy_field', '', bool))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', '', int))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', '', float))
+        self.assertEqual(ArrayOfStrings(), convert_config_param('dummy_field', '', ArrayOfStrings))
+        self.assertEqual(ArrayOfStrings(),
+                         convert_config_param('dummy_field', '', SpaceAndCommaSeparatedArrayOfStrings))
+        self.assertRaises(IndexError, lambda: convert_config_param('dummy_field', '', JsonArray))
+        self.assertRaises(IndexError, lambda: convert_config_param('dummy_field', '', JsonArray))
+
+
+class TestGetConfigFromEnv(TestConfigurationBase):
+
+    def test_get_empty_array_of_string(self):
+        os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = ''
+        self.assertEqual(ArrayOfStrings(),
+                         get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+        os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = 'a, b, c'
+        self.assertEqual(ArrayOfStrings(['a', 'b', 'c']),
+                         get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+        del os.environ['SCALYR_K8S_IGNORE_NAMESPACES']
+        self.assertIsNone(get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+    def test_get_empty_string(self):
+        os.environ['SCALYR_K8S_API_URL'] = ''
+        self.assertEqual('', get_config_from_env('k8s_api_url', convert_to=str))
+
+        del os.environ['SCALYR_K8S_API_URL']
+        self.assertIsNone(get_config_from_env('k8s_api_url', convert_to=str))

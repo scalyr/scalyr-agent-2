@@ -1533,13 +1533,13 @@ class KubernetesMonitor( ScalyrMonitor ):
         # The namespace whose logs we should not collect.
         global_namespaces_to_ignore = self._global_config.k8s_ignore_namespaces
         default_val = Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
-        if global_namespaces_to_ignore and [g for g in global_namespaces_to_ignore] != default_val:
+        if global_namespaces_to_ignore is not None and [g for g in global_namespaces_to_ignore] != default_val:
             # use global value
             result = global_namespaces_to_ignore
         else:
             # use local value
             local_namespaces_to_ignore = self._config.get('k8s_ignore_namespaces')
-            if local_namespaces_to_ignore and [l for l in local_namespaces_to_ignore] != default_val:
+            if local_namespaces_to_ignore is not None and [l for l in local_namespaces_to_ignore] != default_val:
                 result = local_namespaces_to_ignore
             else:
                 result = default_val
