@@ -261,23 +261,24 @@ class TestConfigurationK8s(TestConfigurationBase):
             monitors_manager, config, mock_logger = self._create_test_objects()
             k8s_monitor = monitors_manager.monitors[0]
             result = k8s_monitor._get_ignore_namespaces()
-            if result is None:
-                self.assertIsNone(expected)
-            else:
-                self.assertEquals(expected, result)
+            self.assertEquals(expected, result)
 
         def _test_k8s_ignore_namespaces_local(test_str, expected):
+            k8s_config_line = ''
+            if test_str is not None:
+                k8s_config_line = ", k8s_ignore_namespaces: %s" % test_str
+
             self._write_file_with_separator_conversion(""" { 
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [
                     {
-                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor",
-                        k8s_ignore_namespaces: %s
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor"
+                        %s
                     }
                 ]
               }
-            """ % test_str)
+            """ % k8s_config_line)
             _verify(expected)
 
         def _test_k8s_ignore_namespaces_global(test_str, expected):
@@ -294,8 +295,19 @@ class TestConfigurationK8s(TestConfigurationBase):
             """ % test_str)
             _verify(expected)
 
+        def _set_env_val(test_str):
+            """
+            Value of None means delete it from the environment
+            Empty string means set the environment value to empty string (see AGENT-241)
+            """
+            if test_str is None:
+                if 'SCALYR_K8S_IGNORE_NAMESPACES' in os.environ:
+                    del os.environ['SCALYR_K8S_IGNORE_NAMESPACES']
+            else:
+                os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = test_str
+
         def _test_k8s_ignore_namespaces_environ(test_str, expected):
-            os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = test_str
+            _set_env_val(test_str)
             self._write_file_with_separator_conversion(""" { 
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
@@ -309,18 +321,23 @@ class TestConfigurationK8s(TestConfigurationBase):
             _verify(expected)
 
         def _test_k8s_ignore_namespaces_supersedes(env_str, local_str, expected):
-            os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = env_str
+            _set_env_val(env_str)
+
+            k8s_config_line = ''
+            if local_str is not None:
+                k8s_config_line = ", k8s_ignore_namespaces: %s" % local_str
+
             self._write_file_with_separator_conversion(""" { 
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [
                     {
-                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor",
-                        k8s_ignore_namespaces: %s
+                        module: "scalyr_agent.builtin_monitors.kubernetes_monitor"
+                        %s
                     }
                 ]
               }
-            """ % local_str)
+            """ % k8s_config_line)
             _verify(expected)
 
         expected = ['a', 'b', 'c', 'd']
@@ -329,7 +346,8 @@ class TestConfigurationK8s(TestConfigurationBase):
         # define locally in agent.json
         _test_k8s_ignore_namespaces_local(r'"a, b  c, d"', expected)
         _test_k8s_ignore_namespaces_local(r'["a", "b", "c", "d"]', expected)
-        _test_k8s_ignore_namespaces_local(r'""', kube_system)
+        _test_k8s_ignore_namespaces_local(None, ['kube-system'])
+        _test_k8s_ignore_namespaces_local(r'""', [])
 
         # defined globally in agent.json
         _test_k8s_ignore_namespaces_global(r'["a", "b", "c", "d"]', expected)
@@ -338,11 +356,16 @@ class TestConfigurationK8s(TestConfigurationBase):
         # defined in environment
         _test_k8s_ignore_namespaces_environ(r'a, b  c, d', expected)
         _test_k8s_ignore_namespaces_environ(r'["a", "b", "c", "d"]', expected)
-        _test_k8s_ignore_namespaces_environ(r'', kube_system)
+        _test_k8s_ignore_namespaces_environ(None, ['kube-system'])
+        # empty string overrides default kube-system
+        _test_k8s_ignore_namespaces_environ(r'', [])
 
         # environment supersedes local
         _test_k8s_ignore_namespaces_supersedes("a b c d", r'"1 2 3"', expected)
         _test_k8s_ignore_namespaces_supersedes("a b, c d", r'"1, 2 3"', expected)
         _test_k8s_ignore_namespaces_supersedes(r'["a", "b", "c", "d"]', r'["1", "2", "3"]', expected)
-        _test_k8s_ignore_namespaces_supersedes(r'', r'"1, 2, 3"', ["1", "2", "3"])
-        _test_k8s_ignore_namespaces_supersedes(r'', r'""', kube_system)
+        _test_k8s_ignore_namespaces_supersedes(None, r'"1, 2, 3"', ["1", "2", "3"])
+        _test_k8s_ignore_namespaces_supersedes(r'', r'"1, 2, 3"', [])
+        _test_k8s_ignore_namespaces_supersedes(None, None, kube_system)
+        _test_k8s_ignore_namespaces_supersedes(None, r'""', [])
+        _test_k8s_ignore_namespaces_supersedes(r'', r'""', [])
