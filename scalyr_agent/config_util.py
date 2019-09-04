@@ -42,15 +42,17 @@ def parse_array_of_strings(strlist, separators=[',']):
     @return: None if strlist is empty, else return a JsonArray of strings
     @raise TypeError if element_type is specified and conversion of any element fails
     """
-    if not strlist:
+    if strlist is None:
         return None
+    if not strlist:
+        return ArrayOfStrings()
     strlist = strlist.strip()
 
     # Remove surrounding square brackets
     if strlist[0] == '[' and strlist[-1] == ']':
         strlist = strlist[1:-1]
     if not strlist:
-        return None
+        return ArrayOfStrings()
 
     # Extract elements, removing any surrounding quotes (Single-quotes are illegal JSON. Double quotes will be added).
     elems = []
@@ -95,7 +97,13 @@ ALLOWED_CONVERSIONS = {
 
 
 def convert_config_param(field_name, value, convert_to, is_environment_variable=False):
-    """Convert monitor config values to a different type according to the ALLOWED_CONVERSIONS matrix"""
+    """Convert monitor config values to a different type according to the ALLOWED_CONVERSIONS matrix
+
+    None is an invalid input and will raise BadConfiguration error.
+    Empty strings will convert into str, bool, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings but raises
+        exception for int, float, JsonArray, JsonObject
+
+    """
     convert_from = type(value)
 
     kind = 'environment variable'
@@ -216,11 +224,11 @@ def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
     env_name = env_name.upper()
     strval = os.getenv(env_name)
 
-    if not strval:
+    if strval is None:
         env_name = env_name.lower()
         strval = os.getenv(env_name)
 
-    if not strval or convert_to is None:
+    if strval is None or convert_to is None:
         return strval
 
     converted_val = convert_config_param(param_name, strval, convert_to, is_environment_variable=True)
