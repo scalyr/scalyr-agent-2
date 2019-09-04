@@ -33,9 +33,8 @@ import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.json_lib import JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
-from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
-from scalyr_agent.monitor_utils.k8s import K8sApiException, K8sApiPermanentError, DockerMetricFetcher, QualifiedName
+from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
