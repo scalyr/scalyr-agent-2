@@ -22,9 +22,9 @@ class LogWatcher( object ):
     to add/remove a set of log paths
     """
 
-    def add_log_config( self, monitor, log_config ):
+    def add_log_config( self, monitor_name, log_config ):
         """Add the path specified by the log_config to the list of paths being watched
-        param: monitor - the monitor adding the log_config
+        param: monitor_name - the name of the monitor adding the log_config
         param: log_config - a log_config object containing at least a path
         returns: the log_config variable with updated path and default information
         """

@@ -30,7 +30,7 @@ from scalyr_agent.util import FakeClockCounter
 
 class MonitorsManagerTest(ScalyrTestCase):
     def test_single_module(self):
-        test_manager = ScalyrTestUtils.create_test_monitors_manager([
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager([
             {
                 'module': 'scalyr_agent.builtin_monitors.test_monitor',
                 'gauss_mean': 0
@@ -40,7 +40,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         self.assertEquals(test_manager.monitors[0].monitor_name, 'test_monitor()')
 
     def test_multiple_modules(self):
-        test_manager = ScalyrTestUtils.create_test_monitors_manager([
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager([
             {
                 'module': 'scalyr_agent.builtin_monitors.test_monitor',
                 'gauss_mean': 0
@@ -56,7 +56,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         self.assertEquals(test_manager.monitors[1].monitor_name, 'test_monitor(2)')
 
     def test_module_with_id(self):
-        test_manager = ScalyrTestUtils.create_test_monitors_manager([
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager([
             {
                 'module': 'scalyr_agent.builtin_monitors.test_monitor',
                 'id': 'first',
@@ -91,7 +91,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         # Create MonitorsManager + 2 monitors. Set each to daemon otherwise unit test doesn't terminate
         # Fake the clock to fast-forward MonitorsManager sleep loop
         fake_clock = scalyr_util.FakeClock()
-        test_manager = ScalyrTestUtils.create_test_monitors_manager(
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
             config_monitors=[
                 {
                     'module': 'scalyr_agent.builtin_monitors.test_monitor',

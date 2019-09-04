@@ -28,6 +28,7 @@ import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
 from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
@@ -279,6 +280,14 @@ class Configuration(object):
         return self.__get_config().get_bool('k8s_verify_api_queries')
 
     @property
+    def k8s_cache_query_timeout_secs(self):
+        return self.__get_config().get_int('k8s_cache_query_timeout_secs')
+
+    @property
+    def k8s_cache_expiry_secs(self):
+        return self.__get_config().get_int('k8s_cache_expiry_secs')
+
+    @property
     def k8s_cache_expiry_secs(self):
         return self.__get_config().get_int('k8s_cache_expiry_secs')
 
@@ -295,8 +304,76 @@ class Configuration(object):
         return self.__get_config().get_int('k8s_cache_purge_secs')
 
     @property
+    def k8s_log_api_responses(self):
+        return self.__get_config().get_bool('k8s_log_api_responses')
+
+    @property
+    def k8s_log_api_exclude_200s(self):
+        return self.__get_config().get_bool('k8s_log_api_exclude_200s')
+
+    @property
+    def k8s_log_api_min_response_len(self):
+        return self.__get_config().get_int('k8s_log_api_min_response_len')
+
+    @property
+    def k8s_log_api_min_latency(self):
+        return self.__get_config().get_float('k8s_log_api_min_latency')
+
+    @property
+    def k8s_log_api_ratelimit_interval(self):
+        return self.__get_config().get_float('k8s_log_api_ratelimit_interval')
+
+    @property
+    def k8s_controlled_warmer_max_attempts(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_max_attempts')
+
+    @property
+    def k8s_controlled_warmer_max_query_retries(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_max_query_retries')
+
+    @property
+    def k8s_controlled_warmer_blacklist_time(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_blacklist_time')
+
+    @property
     def k8s_events_disable(self):
         return self.__get_config().get_bool('k8s_events_disable')
+    
+    @property
+    def k8s_ratelimit_cluster_num_agents(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_num_agents')
+
+    @property
+    def k8s_ratelimit_cluster_rps_init(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_init')
+
+    @property
+    def k8s_ratelimit_cluster_rps_min(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_min')
+
+    @property
+    def k8s_ratelimit_cluster_rps_max(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_max')
+
+    @property
+    def k8s_ratelimit_consecutive_increase_threshold(self):
+        return self.__get_config().get_int('k8s_ratelimit_consecutive_increase_threshold')
+
+    @property
+    def k8s_ratelimit_strategy(self):
+        return self.__get_config().get_string('k8s_ratelimit_strategy')
+
+    @property
+    def k8s_ratelimit_increase_factor(self):
+        return self.__get_config().get_float('k8s_ratelimit_increase_factor')
+
+    @property
+    def k8s_ratelimit_backoff_factor(self):
+        return self.__get_config().get_float('k8s_ratelimit_backoff_factor')
+
+    @property
+    def k8s_ratelimit_max_concurrency(self):
+        return self.__get_config().get_int('k8s_ratelimit_max_concurrency')
 
     @property
     def enable_profiling( self ):
@@ -1045,11 +1122,83 @@ class Configuration(object):
         self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', Configuration.DEFAULT_K8S_IGNORE_NAMESPACES, description, apply_defaults, separators=[None, ','], env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'k8s_cache_query_timeout_secs', 20, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
+
+        # Whether to log api responses to agent_debug.log
+        self.__verify_or_set_optional_bool(
+            config, 'k8s_log_api_responses', False, description, apply_defaults, env_aware=True
+        )
+
+        # If set to True, do not log successes (response code 2xx)
+        self.__verify_or_set_optional_bool(
+            config, 'k8s_log_api_exclude_200s', False, description, apply_defaults, env_aware=True
+        )
+        # Minimum response length of api responses to be logged.  Responses smaller than this limit are not logged.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_min_response_len', 0, description, apply_defaults, env_aware=True
+        )
+        # Minimum latency of responses to be logged.  Responses faster than this limit are not logged.
+        self.__verify_or_set_optional_float(
+            config, 'k8s_log_api_min_latency', 0.0, description, apply_defaults, env_aware=True
+        )
+        # If positive, api calls with the same path will be rate-limited to a message every interval seconds
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_ratelimit_interval', 0, description, apply_defaults, env_aware=True
+        )
+
+        # TODO-163 : make other settings more aggressive
+
+        # Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod before giving up and
+        # classifying it as a Temporary Error
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_max_query_retries', 3, description, apply_defaults, env_aware=True
+        )
+        # Optional (defaults to 5). The maximum number of Temporary Errors that may occur when warming a pod's entry,
+        # before the warmer blacklists it.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_max_attempts', 5, description, apply_defaults, env_aware=True
+        )
+        # Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is
+        # tried again for warming.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_blacklist_time', 300, description, apply_defaults, env_aware=True
+        )
+
         self.__verify_or_set_optional_bool(config, 'k8s_events_disable', False, description, apply_defaults, env_aware=True)
+
+        # Agent-wide k8s rate limiter settings
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_cluster_num_agents', 1, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_init', 1000.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_min', 1.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_max', 1E9, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_strategy', BlockingRateLimiter.STRATEGY_MULTIPLY,
+            description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_increase_factor', 2.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_backoff_factor', 0.5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_max_concurrency', 1, description, apply_defaults, env_aware=True
+        )
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 

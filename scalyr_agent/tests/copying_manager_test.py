@@ -23,6 +23,7 @@ import os
 import tempfile
 
 import logging
+import shutil
 import sys
 import time
 
@@ -43,8 +44,95 @@ from scalyr_agent.test_base import skip, ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent import json_lib
+import scalyr_agent.util as scalyr_util
 
 ONE_MB = 1024 * 1024
+
+
+class DynamicLogPathTest(ScalyrTestCase):
+
+    def setUp(self):
+        self._temp_dir = tempfile.mkdtemp()
+        self._data_dir = os.path.join(self._temp_dir, 'data')
+        self._log_dir = os.path.join(self._temp_dir, 'log')
+        self._config_dir = os.path.join(self._temp_dir, 'config')
+        self._config_file = os.path.join(self._config_dir, 'agentConfig.json')
+        self._config_fragments_dir = os.path.join(self._config_dir, 'configs.d')
+
+        os.makedirs(self._config_fragments_dir)
+        os.makedirs(self._data_dir)
+        os.makedirs(self._log_dir)
+
+        self._controller = None
+
+    def tearDown(self):
+        if self._controller is not None:
+            self._controller.stop()
+        shutil.rmtree(self._config_dir)
+
+
+    def create_copying_manager( self, config ):
+
+        if 'api_key' not in config:
+            config['api_key'] = 'fake'
+
+        f = open( self._config_file, "w" )
+        if f:
+
+            f.write( scalyr_util.json_encode( config ) )
+            f.close()
+
+        default_paths = DefaultPaths(self._log_dir, self._config_file, self._data_dir)
+
+        configuration = Configuration(self._config_file, default_paths, None)
+        configuration.parse()
+        self._manager = TestableCopyingManager(configuration, [])
+        self._controller = self._manager.controller
+
+    def test_remove_path(self):
+
+        glob_root = os.path.join(self._temp_dir, 'containers')
+        os.makedirs( glob_root )
+        config = {
+            "logs": [
+                { "path": "%s/*/*" % glob_root }
+            ]
+        }
+
+        path = os.path.join( glob_root, "container", "container.log" )
+        os.makedirs( os.path.dirname( path ) )
+
+        f = open( path, "w" )
+        if f:
+            f.close()
+
+        self.create_copying_manager( config )
+
+        # At this point, the test state = SLEEPING (after init)
+        # perform_scan() calls run_and_stop_at(SENDING, required=SLEEPING)
+        # Since the test state is already SLEEPING, the required transition is 'consumed' and the require-transition
+        # assertion passes and the next-round required transition becomes NONE
+        def _fake_scan():
+            self._controller.perform_scan()
+            _, responder_callback = self._controller.wait_for_rpc()
+            responder_callback('dummy')
+        _fake_scan()
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config );
+
+        _fake_scan()
+
+        self._manager.schedule_log_path_for_removal( 'unittest', log_config['path'] )
+
+        self.assertEquals( 1, self._manager.logs_pending_removal_count() )
+
+        _fake_scan()
+
+        self.assertEquals( 0, self._manager.logs_pending_removal_count() )
 
 
 class CopyingParamsTest(ScalyrTestCase):
@@ -136,7 +224,7 @@ class CopyingParamsTest(ScalyrTestCase):
 class CopyingManagerInitializationTest(ScalyrTestCase):
 
     def test_from_config_file(self):
-        test_manager = self.__create_test_instance([
+        test_manager = self._create_test_instance([
             {
                 'path': '/tmp/hi.log'
             }
@@ -146,7 +234,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(test_manager.log_matchers[1].config['path'], '/var/log/scalyr-agent-2/agent.log')
 
     def test_from_monitors(self):
-        test_manager = self.__create_test_instance([
+        test_manager = self._create_test_instance([
         ], [
             {
                 'path': '/tmp/hi_monitor.log',
@@ -158,7 +246,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(test_manager.log_matchers[1].config['attributes']['parser'], 'agent-metrics')
 
     def test_multiple_monitors_for_same_file(self):
-        test_manager = self.__create_test_instance([
+        test_manager = self._create_test_instance([
         ], [
             {'path': '/tmp/hi_monitor.log'},
             {'path': '/tmp/hi_monitor.log'},
@@ -172,7 +260,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(test_manager.log_matchers[2].config['attributes']['parser'], 'agent-metrics')
 
     def test_monitor_log_config_updated(self):
-        test_manager = self.__create_test_instance([
+        test_manager = self._create_test_instance([
         ], [
             {'path': 'hi_monitor.log'},
         ])
@@ -184,14 +272,45 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(self.__monitor_fake_instances[0].log_config['path'], '/var/log/scalyr-agent-2/hi_monitor.log')
 
     def test_remove_log_path_with_non_existing_path(self):
-        test_manager = self.__create_test_instance([
+        test_manager = self._create_test_instance([
         ], [
             {'path': 'test.log'},
         ])
         # check that removing a non-existent path runs without throwing an exception
         test_manager.remove_log_path( 'test_monitor', 'blahblah.log' )
 
-    def __create_test_instance(self, configuration_logs_entry, monitors_log_configs):
+    def test_get_server_attribute(self):
+        logs_json_array = JsonArray()
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
+        self.__monitor_fake_instances = []
+        monitor_a = FakeMonitor1({'path': 'testA.log'}, id='a', attribute_key='KEY_a')
+        monitor_b = FakeMonitor1({'path': 'testB.log'}, id='b', attribute_key='KEY_b')
+        self.__monitor_fake_instances.append(monitor_a)
+        self.__monitor_fake_instances.append(monitor_b)
+        copy_manager = CopyingManager(config, self.__monitor_fake_instances)
+        attribs = copy_manager.expanded_server_attributes
+        self.assertEquals(attribs['KEY_a'], monitor_a.attribute_value)
+        self.assertEquals(attribs['KEY_b'], monitor_b.attribute_value)
+
+    def test_get_server_attribute_no_override(self):
+        logs_json_array = JsonArray()
+        config = ScalyrTestUtils.create_configuration(extra_toplevel_config={'logs': logs_json_array})
+        self.__monitor_fake_instances = []
+        monitor_a = FakeMonitor1({'path': 'testA.log'}, id='a', attribute_key='common_key')
+        monitor_b = FakeMonitor1({'path': 'testB.log'}, id='b', attribute_key='common_key')
+        self.__monitor_fake_instances.append(monitor_a)
+        self.__monitor_fake_instances.append(monitor_b)
+        copy_manager = CopyingManager(config, self.__monitor_fake_instances)
+        if monitor_a.access_order < monitor_b.access_order:
+            first_accessed = monitor_a
+            second_accessed = monitor_b
+        else:
+            first_accessed = monitor_b
+            second_accessed = monitor_a
+        self.assertLess(first_accessed.access_order, second_accessed.access_order)
+        self.assertEquals(copy_manager.expanded_server_attributes['common_key'], first_accessed.attribute_value)
+
+    def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
         logs_json_array = JsonArray()
         for entry in configuration_logs_entry:
             logs_json_array.add(JsonObject(content=entry))
@@ -481,9 +600,9 @@ class TestableCopyingManager(CopyingManager):
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
     # The different points at which the CopyingManager can be stopped.  See below.
-    SLEEPING = 'sleeping'
-    SENDING = 'sending'
-    RESPONDING = 'responding'
+    SLEEPING = 'SLEEPING'
+    SENDING = 'SENDING'
+    RESPONDING = 'RESPONDING'
 
     # To prevent tests from hanging indefinitely, wait a maximum amount of time before giving up on some test condition.
     WAIT_TIMEOUT = 5.0
@@ -769,3 +888,28 @@ class FakeMonitor(object):
 
     def set_log_watcher(self, log_watcher):
         pass
+
+    def get_extra_server_attributes(self):
+        return None
+
+
+class FakeMonitor1(object):
+    order = 0
+    def __init__(self, monitor_log_config, id=None, attribute_key='extra_attrib'):
+        self.id = id
+        self.module_name = 'fake_monitor_%s' % id
+        self.log_config = monitor_log_config
+        self.access_order = None
+        self.attribute_key = attribute_key
+
+    def set_log_watcher(self, log_watcher):
+        pass
+
+    @property
+    def attribute_value(self):
+        return 'VALUE_%s' % self.id
+
+    def get_extra_server_attributes(self):
+        self.access_order = FakeMonitor1.order
+        FakeMonitor1.order += 1
+        return {self.attribute_key: self.attribute_value}
