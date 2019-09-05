@@ -135,6 +135,10 @@ class LogLine(object):
         # attrs is a dict of optional attributes to attach to the log message
         self.attrs = None
 
+        # length of raw line (in contrast
+        self.raw_line_len = len(self.line)
+
+
 class LogFileIterator(object):
     """Reads the bytes from a log file at a particular path, returning the lines.
 
@@ -597,8 +601,9 @@ class LogFileIterator(object):
 
             except Exception, e:
                 # something went wrong. Return the full line and log a message
-                log.warn("Error parsing line as json for %s.  Logging full line: %s\n%s" % (self.__path, str(e), result.line.decode( "utf-8", 'replace' )),
+                log.warn("Error parsing line as json for log '%s' - %s" % (self.__path, e),
                          limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
+
         return result
 
     def advance_to_end(self, current_time=None):
@@ -711,7 +716,7 @@ class LogFileIterator(object):
         then it will return the next smallest valid position in the buffer, or None if the end of buffer is reached.
 
         @param mark_position:  The position
-        @type: int
+        @type int:
 
         @return:  The index of the position into the buffer, or None.
         """
@@ -735,7 +740,7 @@ class LogFileIterator(object):
         """Returns the position (relative to mark) represented by the specified index in the buffer.
 
         @param buffer_index: The index into the buffer
-        @type: int
+        @type int:
 
         @return: The position relative to the last mark.
         """
@@ -1587,6 +1592,7 @@ class LogFileProcessor(object):
         try:
             # Keep track of some states about the lines/events we process.
             bytes_read = 0L
+            previous_bytes_read = 0L
             lines_read = 0L
             bytes_copied = 0L
             lines_copied = 0L
@@ -1612,12 +1618,16 @@ class LogFileProcessor(object):
 
                 #time_spent_reading -= fast_get_time()
                 line_object = self.__log_file_iterator.readline(current_time=current_time)
-                line_len = len(line_object.line)
+                line_len = line_object.raw_line_len
                 #time_spent_reading += fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
                 if line_len == 0:
                     break
+
+                # keep a copy of this value in case we need to reset bytes_read count
+                # See #AGENT-219
+                previous_bytes_read = bytes_read
 
                 # We have a line, process it and see what comes out.
                 bytes_read += line_len
@@ -1645,9 +1655,11 @@ class LogFileProcessor(object):
                     event = self.__create_events_object(line_object, sample_result)
                     if not add_events_request.add_event(event, timestamp=line_object.timestamp, sequence_id=sequence_id, sequence_number=sequence_number):
                         #time_spent_serializing -= fast_get_time()
-
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
+
+                        # AGENT-219 reset bytes_read count to prevent negative skipped bytes
+                        bytes_read = previous_bytes_read
                         break
 
                     #time_spent_serializing -= fast_get_time()
@@ -1661,6 +1673,9 @@ class LogFileProcessor(object):
                             add_events_request.set_position(original_events_position)
                             self.__log_file_iterator.seek(position)
                             buffer_filled = True
+
+                            # AGENT-219 reset bytes_read count to prevent negative skipped bytes
+                            bytes_read = previous_bytes_read
                             break
                         added_thread_id = True
 
@@ -1717,7 +1732,7 @@ class LogFileProcessor(object):
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
                         bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
-                        self.__total_bytes_skipped +=  bytes_between_positions - bytes_read
+                        self.__total_bytes_skipped += bytes_between_positions - bytes_read
 
                         self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
                         self.__total_bytes_pending = self.__log_file_iterator.available
@@ -1742,10 +1757,12 @@ class LogFileProcessor(object):
                         self.__log_file_iterator.mark(final_position, current_time=current_time)
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         self.__total_bytes_failed += bytes_read
+                        log.info('Request failed. Dropping %d bytes of logs as per server request.' % bytes_read)
                         return False
                     elif result == LogFileProcessor.FAIL_AND_RETRY:
                         self.__log_file_iterator.seek(original_position)
                         self.__total_bytes_pending = self.__log_file_iterator.available
+                        log.info('Request failed. Retrying')
                         return False
                     else:
                         raise Exception('Invalid result %s' % str(result))

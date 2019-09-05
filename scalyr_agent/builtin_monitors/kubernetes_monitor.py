@@ -22,19 +22,23 @@ import fnmatch
 import glob
 import traceback
 import os
+import random
 import re
 import stat
 from string import Template
+import threading
 import time
-from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
+from scalyr_agent import ScalyrMonitor, define_config_option, define_metric, BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.json_lib import JsonObject, ArrayOfStrings
-from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, DockerMetricFetcher
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.json_lib import JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+from scalyr_agent.monitor_utils.k8s import KubernetesApi, KubeletApi, KubeletApiException, K8sApiTemporaryError
+from scalyr_agent.monitor_utils.k8s import K8sApiPermanentError, DockerMetricFetcher, QualifiedName
 import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
-from scalyr_agent.util import StoppableThread
+from scalyr_agent.util import StoppableThread, HistogramTracker
 
 
 global_log = scalyr_logging.getLogger(__name__)
@@ -109,11 +113,12 @@ define_config_option( __monitor__, 'report_container_metrics',
 
 define_config_option( __monitor__, 'report_k8s_metrics',
                       'Optional (defaults to True). If true and report_container_metrics is true, metrics will be '
-                      'collected from the k8s and reported to Scalyr.  ', convert_to=bool, default=True, env_aware=True)
+                      'collected from the k8s and reported to Scalyr.', convert_to=bool, default=True, env_aware=True)
 
 define_config_option( __monitor__, 'k8s_ignore_namespaces',
                       'Optional (defaults to "kube-system"). A comma-delimited list of the namespaces whose pods\'s '
-                      'logs should not be collected and sent to Scalyr.', convert_to=str, default="kube-system")
+                      'logs should not be collected and sent to Scalyr.',
+                      convert_to=SpaceAndCommaSeparatedArrayOfStrings, default=["kube-system"])
 
 define_config_option( __monitor__, 'k8s_ignore_pod_sandboxes',
                       'Optional (defaults to True). If True then all containers with the label '
@@ -136,9 +141,7 @@ define_config_option( __monitor__, 'k8s_use_v1_and_v2_attributes',
                       'names.  This may be used to fix breakages when you relied on the v1 attribute names',
                       convert_to=bool, default=False)
 
-define_config_option( __monitor__, 'k8s_api_url',
-                      'Optional (defaults to "https://kubernetes.default"). The URL for the Kubernetes API server for '
-                      'this cluster.', convert_to=str, default='https://kubernetes.default')
+define_config_option( __monitor__, 'k8s_api_url', 'DEPRECATED.', convert_to=str, default='https://kubernetes.default')
 
 define_config_option( __monitor__, 'k8s_cache_expiry_secs',
                      'Optional (defaults to 30). The amount of time to wait between fully updating the k8s cache from the k8s api. '
@@ -174,6 +177,11 @@ define_config_option( __monitor__, 'k8s_always_use_cri',
                      'even when the runtime is detected as docker',
                      convert_to=bool, default=False, env_aware=True)
 
+define_config_option( __monitor__, 'k8s_always_use_docker',
+                     'Optional (defaults to False). If True, the kubernetes monitor will always try to get the list of running '
+                     'containers using docker even when the runtime is detected to be something different.',
+                     convert_to=bool, default=False, env_aware=True)
+
 define_config_option( __monitor__, 'k8s_cri_query_filesystem',
                      'Optional (defaults to False). If True, then when in CRI mode, the monitor will only query the filesystem for the list of active containers, rather than first querying the Kubelet API. This is a useful optimization when the Kubelet API is known to be disabled.',
                      convert_to=bool, default=False, env_aware=True)
@@ -192,6 +200,11 @@ define_config_option( __monitor__, 'gather_k8s_pod_info',
 define_config_option( __monitor__, 'include_daemonsets_as_deployments',
                       'Deprecated',
                       convert_to=bool, default=True)
+
+define_config_option( __monitor__, 'k8s_kubelet_host_ip',
+                     'Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it',
+                     convert_to=str, default=None, env_aware=True)
+
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -399,12 +412,591 @@ def _ignore_old_dead_container( container, created_before=None ):
 
     return False
 
-def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
+
+class ControlledCacheWarmer(StoppableThread):
+    """A background thread that does a controlled warming of the pod cache.
+
+    Tracks which pods are active and ensures that their information is cached in the pod cache.
+    In order to warm the cache, a thread is run that requests each active pod's information one
+    at a time.  It also tracks failures, moving active pods to a temporary blacklist if too many
+    errors are seen.  While on the blacklist, a pod's information will not be fetched in order to
+    populate the cache.
+    """
+    def __init__(self, name='warmer', max_failure_count=5, blacklist_time_secs=300, max_query_retries=3, logger=None):
+        """Initializes the thread.
+
+        @param name:  The name of this warmer, used when it logs its stats.
+        @param max_failure_count: If this number of temporary failures is experienced when fetching a single
+            pod's information, that pod will be placed on the blacklist.  Note, any permanent error will result
+            in the pod being moved to the blacklist.
+        @param blacklist_time_secs: The amount of time a pod will remain on the blacklist once it is moved there.
+        @param max_query_retries:  The number of times we will retry a query to warm the pod when it fails due to
+            a temporary error
+        @param rate_limiter:  Rate limiter for api calls
+        @param logger:  The logger to use when reporting results
+
+        @type name: str
+        @type max_failure_count: int
+        @type blacklist_time_secs: double
+        @type max_query_retries: int
+        @type logger: Logger
+        """
+        StoppableThread.__init__(self, name='cache warmer and filter')
+        self.__name = name
+        self.__k8s_cache = None
+        # Protects most fields, such as active_pods and containers_to_warm
+        self.__lock = threading.Lock()
+        self.__is_running = False
+        # Used to notify threads of changes to the containers_to_warm state.
+        self.__condition_var = threading.Condition(self.__lock)
+        # Tracks the active pods.  Active pods are those docker or some other CRI has recently indicated is
+        # running.  This variable maps container id to a WarmingEntry for the pod.
+        self.__active_pods = dict()
+        # The list of containers whose pods are eligible to be warmed in the cache.  Essentially, the active_pods
+        # minus those already warmed or blacklisted.
+        self.__containers_to_warm = []
+        self.__max_failure_count = max_failure_count
+        self.__blacklist_time_secs = blacklist_time_secs
+        self.__max_query_retries = max_query_retries
+        self.__logger = logger
+        # The wallclock of when the last periodic report was written to the logger
+        self.__last_report_time = None
+        # Summarizes information about warming attempts.  There is an entry recording the running totals for
+        # `total`, `success`, `already_warm`, `temp_error`, `perm_error`, `unknown_error`.
+        self.__warming_attempts = dict()
+        self.__last_reported_warming_attempts = dict()
+        # Gathers statistics about how long it took to warm cache entries.  The values are expressed in seconds.
+        self.__warming_times = HistogramTracker([1, 5, 30, 60, 120, 300, 600])
+
+    def start(self):
+        self.__lock.acquire()
+        try:
+            super(ControlledCacheWarmer, self).start()
+            self.__is_running = True
+        finally:
+            self.__lock.release()
+
+    def is_running(self):
+        """
+        @return True if `start` has been invoked on this instance
+        @rtype: bool
+        """
+        self.__lock.acquire()
+        try:
+            return self.__is_running
+        finally:
+            self.__lock.release()
+
+    def set_k8s_cache(self, k8s_cache):
+        """Sets the cache to use.
+
+        WARNING, this must be invoked before the thread is started.
+
+        @param k8s_cache The cache instance to populate
+        @type k8s_cache: KubernetesCache
+        """
+        self.__k8s_cache = k8s_cache
+
+    def _prepare_to_stop(self):
+        """Invoked when the stop has been requested to be stopped.
+        """
+        # Since our background thread may be waiting in `__pick_next_pod`, we poke the condition variable to
+        # get it to wake up and notice the thread has stopped.
+        self.__condition_var.acquire()
+        try:
+            self.__is_running = False
+            self.__condition_var.notify_all()
+        finally:
+            self.__condition_var.release()
+
+    def begin_marking(self):
+        """Must be invoked before any container is marked as being active, by invoking `mark_to_warm`.
+        This instructs this abstraction that the entire list of active containers is about to be marked.
+        The list will end when `end_marking` is invoked.
+        """
+        self.__lock.acquire()
+        try:
+            for value in self.__active_pods.itervalues():
+                value.is_recently_marked = False
+        finally:
+            self.__lock.release()
+
+    def mark_to_warm(self, container_id, pod_namespace, pod_name):
+        """Updates the state to reflect the specified container for the specified pod is active and
+        its pod's information should be warmed in the cache if it has not already been.
+
+        @param container_id:  The id of the container
+        @param pod_namespace: The namespace for to the container's pod
+        @param pod_name: The name of the container's pod.
+
+        @type container_id: str
+        @type pod_namespace: str
+        @type pod_name: str
+        """
+        # This will be set to True if this entry was previously marked to be warmed but the cache indicated it
+        # has already been warmed.
+        self.__lock.acquire()
+        try:
+            if not container_id in self.__active_pods:
+                self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(pod_namespace, pod_name)
+            self.__active_pods[container_id].is_recently_marked = True
+        finally:
+            self.__lock.release()
+
+    def end_marking(self):
+        """Indicates the end of marking all active containers has finished.
+
+        Any container that was not marked since the last call to `begin_marking`, will no longer be considered active
+        and therefore its pod's information will not be populated into the cache.
+        """
+        current_time = self._get_current_time()
+        new_active_pods = dict()
+        # Will hold a list of container ids whose pods are now in the cache, without us querying for them.
+        already_warmed = None
+        self.__lock.acquire()
+        try:
+            for key, value in self.__active_pods.iteritems():
+                if value.is_recently_marked:
+                    new_active_pods[key] = value
+            self.__active_pods = new_active_pods
+            # Take the opportunity to see if any of the container's pods are already warmed (in the cache)
+            # as well as see any blacklisted containers should be moved back to active as well
+            already_warmed = self.__update_is_warm()
+            self.__update_blacklist(current_time)
+            self.__update_containers_to_warm(current_time)
+            self.__emit_report_if_necessary(current_time=current_time)
+        except Exception:
+            global_log.warn(
+                "Unexpected exception in end_marking()\n%s\n" % traceback.format_exc(),
+                limit_once_per_x_secs=300, limit_key="end-marking-exception"
+            )
+        finally:
+            self.__lock.release()
+
+            # We need to record the warming results while we don't hold the lock.
+            if already_warmed is not None:
+                for container_id in already_warmed:
+                    self.__record_warming_result(container_id, already_warm=True)
+
+    def is_warm(self, pod_namespace, pod_name, allow_expired=False):
+        """Returns true if the specified pod's information is cached.
+
+        @param pod_namespace: The namespace for the pod
+        @param pod_name: The name for the pod
+        @param allow_expired: If True, an object is considered present in cache even if it is expired.
+
+        @type pod_namespace: str
+        @type pod_name: str
+        @type allow_expired: bool
+
+        @rtype bool
+        """
+        return self.__k8s_cache.is_pod_cached(pod_namespace, pod_name, allow_expired)
+
+    def get_report_stats( self ):
+        """
+        Gathers stats of warming calls
+
+        Used for testing
+
+        @return: a dict of tuples containing current and previous warming attempt counts, keyed by result category
+        @rtype: dict  (int, int)
+        """
+        self.__lock.acquire()
+        result = {}
+        try:
+            return self.__gather_report_stats()
+        finally:
+            self.__lock.release()
+
+    def __gather_report_stats( self ):
+        """
+        Gathers stats of results of warming calls
+
+        WARNING:  The caller must have already acquired _lock.
+
+        @return: a dict of result counts keyed by result category
+        """
+        result = {}
+        for category in ['total', 'success', 'already_warm', 'temp_error', 'perm_error', 'unknown_error', 'unhandled_error']:
+            current_amount = self.__warming_attempts.get(category, 0)
+            previous_amount = self.__last_reported_warming_attempts.get(category, 0)
+            result[category] = (current_amount, previous_amount)
+        return result
+
+    def __emit_report_if_necessary(self, current_time=None):
+        """Emit the periodic reporting lines if sufficient time has passed.
+
+        WARNING:  The caller must have already acquired _lock.
+        """
+        if self.__logger is None:
+            return
+
+        if current_time is None:
+            current_time = self._get_current_time()
+
+        if self.__last_report_time is None or current_time > self.__last_report_time + 300:
+            self.__last_report_time = current_time
+
+            warm_attempts_info = ''
+            stats = self.__gather_report_stats()
+            for category, (current_amount, previous_amount) in stats.iteritems():
+                warm_attempts_info += '%s=%d(delta=%d) ' % (category, current_amount, current_amount - previous_amount)
+            self.__logger.info('controlled_cache_warmer[%s] pending_warming=%d blacklisted=%d %s warming_times=%s',
+                               self.__name,
+                               len(self.__containers_to_warm),
+                               self.__count_blacklisted(),
+                               warm_attempts_info,
+                               self.__warming_times.summarize())
+            self.__last_reported_warming_attempts = self.__warming_attempts.copy()
+            self.__warming_times.reset()
+
+    def __count_blacklisted(self):
+        """Counts and returns the total number of blacklisted containers.
+
+        WARNING:  The caller must have already acquired _lock.
+
+        :return:  The total number of blacklisted containers.
+        :rtype: int
+        """
+        result = 0
+        for value in self.__active_pods.itervalues():
+            if value.blacklisted_until is not None:
+                result += 1
+        return result
+
+    def __update_is_warm(self):
+        """Updates the `is_warm` state information for the all pods in `__active_pods` based on the current
+        contents of the cache.
+
+        This method also calculates the list of all containers which are newly warmed (meaning the cache now indicates
+        they are warm).
+
+        If a container is newly cold (used to be warm but cache now says they are not), then we also reset the
+        start warming time so that when we do go to start warming it, we measure it from the correct time.
+
+        WARNING:  The caller must have already acquired _lock.
+
+        @return: The list of container ids for all containers whose pods were previously not in the cache but now are.
+        @rtype: [str]
+        """
+        already_warmed = []
+        for key, entry in self.__active_pods.iteritems():
+            was_warm = entry.is_warm
+            # Check the actual cache.
+            entry.is_warm = self.is_warm(entry.pod_namespace, entry.pod_name)
+            # Reset the start of the warming time if we used to be warm and now need to warm (i.e., cache refresh).
+            if was_warm and not entry.is_warm:
+                entry.start_time = None
+
+            if not was_warm and entry.is_warm:
+                already_warmed.append(key)
+
+        return already_warmed
+
+    def __update_blacklist(self, current_time):
+        """Updates the blacklist state information for the pods in `__active_pods`.
+
+        Containers whose blacklisted time has expired are moved off of the blacklist.
+
+        WARNING:  The caller must have already acquired _lock.
+
+        @param current_time:  The current time in seconds past epoch.
+        @type current_time: Number
+        """
+        for value in self.__active_pods.itervalues():
+            if value.blacklisted_until is not None and value.blacklisted_until < current_time:
+                # After coming off the blacklist, the pod gets a fresh start.  Reset all counters.
+                # Note, we intentionally do not update `start_time` here because we want it to include blacklisting time.
+                value.blacklisted_until = None
+                value.blacklist_reason = None
+                value.failure_count = 0
+
+    def __update_containers_to_warm(self, current_time):
+        """Updates the list of containers to warm based on the contents of the `__active_pods`.
+
+        Containers are only considered for warming if their pod's information is not in the cache and
+        if it is not on the blacklist.
+
+        WARNING:  The caller must have already acquired _lock.
+
+        @param current_time:  The current time in seconds past epoch.
+        @type current_time: Number
+        """
+        # We see if the count changes.  If so, we need to notify listeners on __containers_to_warm.
+        # The main listener is the background thread that waits to warm newly discovered containers.
+        original_to_warm_count = len(self.__containers_to_warm)
+        self.__containers_to_warm = []
+
+        for key, value in self.__active_pods.iteritems():
+            if not value.is_warm and value.blacklisted_until is None:
+                self.__containers_to_warm.append(key)
+                if value.start_time is None:
+                    value.start_time = current_time
+
+        if len(self.__containers_to_warm) != original_to_warm_count:
+            self.__condition_var.notify_all()
+
+    def block_until_idle(self, timeout=None):
+        """Blocks the calling thread until the cache warming thread no longer has any containers that
+        should be immediately warmed (either they are already warmed in the cache or they are on the blacklist
+        so should not be warmed immediately).
+
+        Takes an optional timeout as a parameter so that test code does not hang indefinitely
+
+        WARNING:  Only used for tests.
+        """
+        start_time = time.time()
+        self.__lock.acquire()
+        try:
+            while self._run_state.is_running() and len(self.__containers_to_warm) > 0:
+                if timeout is not None and time.time() - start_time > timeout:
+                    raise Exception( "block_until_idle timed out" )
+                self.__condition_var.wait( timeout )
+        finally:
+            self.__lock.release()
+
+    def warming_containers(self):
+        """
+        Returns a sorted list of the ids of the containers that will be warmed by this instance.
+
+        WARNING: Only used for tests.
+
+        @rtype: list
+        """
+        self.__lock.acquire()
+        try:
+            result = list(self.__containers_to_warm)
+            result.sort()
+            return result
+        finally:
+            self.__lock.release()
+
+    def active_containers(self):
+        """
+        Returns a sorted list of the ids of the containers currently consider active by this instance.
+
+        WARNING: Only used for tests.
+
+        @rtype: list
+        """
+        self.__lock.acquire()
+        try:
+            result = list(self.__active_pods.keys())
+            result.sort()
+            return result
+        finally:
+            self.__lock.release()
+
+    def blacklisted_containers(self):
+        """
+        Returns a sorted list of the ids of the containers currently blacklisted by this instance.
+
+        WARNING: Only used for tests.
+
+        @rtype: list
+        """
+        result = []
+        self.__lock.acquire()
+        try:
+            for container_id, entry in self.__active_pods.iteritems():
+                if entry.blacklisted_until is not None:
+                    result.append(container_id)
+            result.sort()
+            return result
+        finally:
+            self.__lock.release()
+
+    def __pick_next_pod(self):
+        """Picks a random container's pod to warm.  Only containers that are active, are not warm in the
+        cache, and are not blacklisted are considered.
+
+        This method will block if there currently is no pod that needs to be warmed and wait until there is.
+
+        :return: The container id, pod namespace and pod name of the pick container.  Or None, None, None if
+            the warmer was stopped before a new container arrived.
+        :rtype: (str, str, str)
+        """
+        self.__condition_var.acquire()
+        try:
+            while self._run_state.is_running() and len(self.__containers_to_warm) == 0:
+                # We should be woken up by the notifies in _update_containers_to_warm
+                self.__condition_var.wait()
+
+            if len(self.__containers_to_warm) == 0:
+                return None, None, None
+
+            container_id = random.choice(self.__containers_to_warm)
+            entry = self.__active_pods[container_id]
+            return container_id, entry.pod_namespace, entry.pod_name
+
+        finally:
+            self.__condition_var.release()
+
+    def __record_warming_result(self, container_id, success=None, already_warm=None, permanent_error=None, temporary_error=None,
+                                unknown_error=None, traceback_report=None):
+        """Updates the state based on the result of warming the pod associated with the specified container.
+        Only one of the result params (success, permanent_error, temporary_error, or unknown_error) should be
+        specified.
+
+        @param container_id: The id of the container associated with the pod
+        @param success:  If True, the pod's information was successfully added to the cache.
+        @param already_warm: If True, the pod's information was added to the cache between being marked to warm
+            and when we were going to query the cache.
+        @param permanent_error: The exception generated while warming the pod that indicated a permanent error.
+            Permanent errors results in the pod being immediately blacklisted.
+        @param temporary_error:  The exception generated while warming the pod that indicated a temporary error.
+            Temporary errors results in the pod being blacklisted after __max_failure_count.
+        @param unknown_error:  The exception generated while warming the pod that could not be categorized.
+            It is treated as a temporary error.
+        @param traceback_report:  The traceback of the exception if one of the error types
+
+        @type container_id: str
+        @type success: bool or None
+        @type already_warm: bool or None
+        @type permanent_error: Exception or None
+        @type temporary_error: Exception or None
+        @type unknown_error: Exception or None
+        @type traceback_report: str or None
+        """
+        current_time = self._get_current_time()
+        warm_time = None
+        result_type = 'not_set'
+        exception_to_report = None
+        self.__lock.acquire()
+        try:
+            if container_id in self.__active_pods:
+                entry = self.__active_pods[container_id]
+                if success:
+                    warm_time = current_time - entry.start_time
+                    entry.set_warm()
+                    result_type = 'success'
+                elif already_warm:
+                    entry.set_warm()
+                    result_type = 'already_warm'
+                else:
+                    if permanent_error:
+                        result_type = 'perm_error'
+                        exception_to_report = permanent_error
+                    elif temporary_error:
+                        result_type = 'temp_error'
+                        exception_to_report = temporary_error
+                    elif unknown_error:
+                        result_type = 'unknown_error'
+                        exception_to_report = unknown_error
+                    else:
+                        result_type = 'unhandled_error'
+
+                    entry.failure_count += 1
+                    if permanent_error or entry.failure_count >= self.__max_failure_count:
+                        entry.blacklisted_until = current_time + self.__blacklist_time_secs
+                        entry.blacklist_reason = result_type
+                self.__update_containers_to_warm(current_time)
+
+        finally:
+            self.__warming_attempts['total'] = self.__warming_attempts.get('total', 0) + 1
+            self.__warming_attempts[result_type] = self.__warming_attempts.get(result_type, 0) + 1
+
+            if warm_time is not None:
+                self.__warming_times.add_sample(warm_time)
+
+            self.__lock.release()
+            if exception_to_report is not None and self.__logger is not None:
+                self.__logger.error('An error of type %s was seen when warming container %s.  Exception was %s: %s',
+                                    result_type, container_id, str(exception_to_report), str(traceback_report),
+                                    limit_once_per_x_secs=300, limit_key='warmer-record-result-%s' % result_type)
+
+    @staticmethod
+    def _get_current_time():
+        """Returns the current time.
+
+        This method exists so it can be overridden during testing.
+        """
+        return time.time()
+
+    def run_and_propagate(self):
+        """Runs the background thread that is responsible for actually warming the active pod's information.
+        """
+        assert self.__k8s_cache is not None
+
+        consecutive_warm_pods = 0
+        while self._run_state.is_running():
+            try:
+                container_id, pod_namespace, pod_name = self.__pick_next_pod()
+                if container_id is not None and not self.is_warm(pod_namespace, pod_name):
+                    consecutive_warm_pods = 0
+                    try:
+                        self.__k8s_cache.pod(pod_namespace, pod_name, allow_expired=False)
+                        self.__record_warming_result(container_id, success=True)
+                    except K8sApiPermanentError, e:
+                        self.__record_warming_result(container_id, permanent_error=e,
+                                                     traceback_report=traceback.format_exc())
+                    except K8sApiTemporaryError, e:
+                        self.__record_warming_result(container_id, temporary_error=e,
+                                                     traceback_report=traceback.format_exc())
+                    except Exception, e:
+                        self.__record_warming_result(container_id, unknown_error=e,
+                                                     traceback_report=traceback.format_exc())
+                else:
+                    # Something else warmed the pod before we got a chance.  Just take the win.
+                    self.__record_warming_result(container_id, already_warm=True)
+                    consecutive_warm_pods += 1
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_3,
+                                   'CacheWarmer.run_and_propagate: %s consecutive warms in a row: %s %s %s'
+                                   % (consecutive_warm_pods, container_id, pod_namespace, pod_name))
+                    if consecutive_warm_pods == 10:
+                        # TODO-163: Get rid of circuit breaker.
+                        self._run_state.sleep_but_awaken_if_stopped(0.1)
+            except:
+                global_log.exception('cacher warmer uncaught exception')
+
+
+    class WarmingEntry(object):
+        """Used to represent an active container whose pod information should be warmed in the cache.
+        """
+        def __init__(self, pod_namespace, pod_name):
+            # The associated pod's namespace.
+            self.pod_namespace = pod_namespace
+            # The associated pod's name.
+            self.pod_name = pod_name
+            # The time when this pod was first requested to be warmed
+            self.start_time = None
+            # Whether or not it has been successfully warmed.
+            self.is_warm = False
+            # Used to indicate if it is been marked in the most recent marking run started by `begin_marking`.
+            self.is_recently_marked = False
+            # The number of consecutive failures seen while trying to warm the pod's information.
+            self.failure_count = 0
+            # If not none, this container has been blacklisted.  It will not be warmed again until the wallclock
+            # time stored in this variable has been reached.
+            self.blacklisted_until = None
+            # The reason for the blacklisting.
+            self.blacklist_reason = None
+
+        def __repr__(self):
+            s = 'WarmingEntry:'
+            for key, val in self.__dict__.items():
+                s += '\n\t%s: %s' % (key, val)
+            return s + '\n'
+
+        def set_warm( self ):
+            """
+            Sets the entry to warm, and resets failure count and black list status.
+            """
+            self.is_warm = True
+            self.failure_count = 0
+            self.blacklisted_until = None
+            self.blacklist_reason = None
+
+
+def _get_containers(client, ignore_container=None, ignored_pod=None, restrict_to_container=None, logger=None,
                     only_running_containers=True, running_or_created_after=None, glob_list=None, include_log_path=False, k8s_cache=None,
-                    k8s_include_by_default=True, k8s_namespaces_to_exclude=None, ignore_pod_sandboxes=True, current_time=None):
+                    k8s_include_by_default=True, k8s_namespaces_to_exclude=None, ignore_pod_sandboxes=True, current_time=None,
+                    controlled_warmer=None):
     """Queries the Docker API and returns a dict of running containers that maps container id to container name, and other info
         @param client: A docker.Client object
         @param ignore_container: String, a single container id to exclude from the results (useful for ignoring the scalyr_agent container)
+        @param ignored_pod: QualifiedPod, a pod name and namespace to exclude from results (useful for ignoring the scalyr_agent container)
         @param restrict_to_container: String, a single continer id that will be the only returned result
         @param logger: scalyr_logging.Logger.  Allows the caller to write logging output to a specific logger.  If None the default agent.log
             logger is used.
@@ -418,7 +1010,9 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
             If False, then all k8s containers are excluded by default, unless an include/exclude annotation includes them.
         @param k8s_namespaces_to_exclude: List  The of namespaces whose containers should be excluded.
         @param ignore_pod_sandboxes: Boolean.  If True then any k8s pod sandbox containers are ignored from the list of monitored containers
-        @param current_time.  Timestamp since the epoch
+        @param current_time: Timestamp since the epoch
+        @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
+            strategy, then the warmer instance to use.
     """
     if logger is None:
         logger = global_log
@@ -437,110 +1031,151 @@ def _get_containers(client, ignore_container=None, restrict_to_container=None, l
     try:
         filters = {"id": restrict_to_container} if restrict_to_container is not None else None
         response = client.containers(filters=filters, all=not only_running_containers)
-        for container in response:
-            cid = container['Id']
-            short_cid = _get_short_cid( cid )
+        try:
+            if controlled_warmer is not None:
+                controlled_warmer.begin_marking()
 
-            if ignore_container is not None and cid == ignore_container:
-                continue
+            for container in response:
+                cid = container['Id']
+                short_cid = _get_short_cid( cid )
 
-            # Note we need to *include* results that were created after the 'running_or_created_after' time.
-            # that means we need to *ignore* any containers created before that
-            # hence the reason 'create_before' is assigned to a value named '...created_after'
-            if _ignore_old_dead_container( container, created_before=running_or_created_after ):
-                continue
+                if ignore_container is not None and cid == ignore_container:
+                    continue
 
-            if len( container['Names'] ) > 0:
-                name = container['Names'][0].lstrip('/')
+                # Note we need to *include* results that were created after the 'running_or_created_after' time.
+                # that means we need to *ignore* any containers created before that
+                # hence the reason 'create_before' is assigned to a value named '...created_after'
+                if _ignore_old_dead_container( container, created_before=running_or_created_after ):
+                    continue
 
-                # ignore any pod sandbox containers
-                if ignore_pod_sandboxes:
-                    container_type = container.get( 'Labels', {} ).get( 'io.kubernetes.docker.type', '' )
-                    if container_type == 'podsandbox':
-                        continue
+                if len( container['Names'] ) > 0:
+                    name = container['Names'][0].lstrip('/')
 
-                add_container = True
+                    # ignore any pod sandbox containers
+                    if ignore_pod_sandboxes:
+                        container_type = container.get( 'Labels', {} ).get( 'io.kubernetes.docker.type', '' )
+                        if container_type == 'podsandbox':
+                            continue
 
-                if glob_list:
-                    add_container = False
-                    for glob in glob_list:
-                        if fnmatch.fnmatch( name, glob ):
-                            add_container = True
-                            break
+                    add_container = True
 
-                if add_container:
-                    log_path = None
-                    k8s_info = None
-                    status = None
-                    if include_log_path or k8s_cache is not None:
-                        try:
-                            info = client.inspect_container( cid )
+                    if glob_list:
+                        add_container = False
+                        for glob in glob_list:
+                            if fnmatch.fnmatch( name, glob ):
+                                add_container = True
+                                break
 
-                            log_path = info['LogPath'] if include_log_path and 'LogPath' in info else None
+                    if add_container:
+                        log_path = None
+                        k8s_info = None
+                        status = None
+                        if include_log_path or k8s_cache is not None:
+                            try:
+                                info = client.inspect_container( cid )
 
-                            if not only_running_containers:
-                                status = info['State']['Status']
+                                log_path = info['LogPath'] if include_log_path and 'LogPath' in info else None
 
-                            if k8s_cache is not None:
-                                config = info.get('Config', {} )
-                                labels = config.get( 'Labels', {} )
+                                if not only_running_containers:
+                                    status = info['State']['Status']
 
-                                k8s_info = {}
-                                missing_field = False
+                                if k8s_cache is not None:
+                                    config = info.get('Config', {} )
+                                    labels = config.get( 'Labels', {} )
 
-                                for key, label in k8s_labels.iteritems():
-                                    value = labels.get( label )
-                                    if value:
-                                        k8s_info[key] = value
-                                    else:
-                                        missing_field = True
-                                        logger.warn( "Missing kubernetes label '%s' in container %s" % (label, short_cid), limit_once_per_x_secs=300,limit_key="docker-inspect-k8s-%s" % short_cid)
+                                    k8s_info = {}
+                                    missing_field = False
 
-                                if missing_field:
-                                    logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
+                                    for key, label in k8s_labels.iteritems():
+                                        value = labels.get( label )
+                                        if value:
+                                            k8s_info[key] = value
+                                        else:
+                                            missing_field = True
+                                            logger.warn( "Missing kubernetes label '%s' in container %s" % (label, short_cid), limit_once_per_x_secs=300,limit_key="docker-inspect-k8s-%s" % short_cid)
 
-                                if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
-                                    if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
-                                        logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based excluded namespaces" % short_cid)
-                                        continue
+                                    if missing_field:
+                                        logger.log( scalyr_logging.DEBUG_LEVEL_1, "Container Labels %s" % (scalyr_util.json_encode(labels)), limit_once_per_x_secs=300,limit_key="docker-inspect-container-dump-%s" % short_cid)
 
-                                    pod = k8s_cache.pod( k8s_info['pod_namespace'], k8s_info['pod_name'], current_time )
-                                    if pod:
-                                        k8s_info['pod_info'] = pod
-
-                                        k8s_container = k8s_info.get( 'k8s_container_name', None )
-
-                                        # check to see if we should exclude this container
-                                        default_exclude = not k8s_include_by_default
-                                        exclude = pod.exclude_pod( container_name=k8s_container, default=default_exclude)
-
-                                        if exclude:
-                                            if pod.annotations:
-                                                logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+                                    if 'pod_name' in k8s_info and 'pod_namespace' in k8s_info:
+                                        if k8s_namespaces_to_exclude is not None and k8s_info['pod_namespace'] in k8s_namespaces_to_exclude:
+                                            logger.log(
+                                                scalyr_logging.DEBUG_LEVEL_2,
+                                                "Excluding container '%s' based on excluded namespaces: %s in %s" %
+                                                (short_cid, k8s_info['pod_namespace'], k8s_namespaces_to_exclude)
+                                            )
                                             continue
 
-                                        # add a debug message if containers are excluded by default but this container is included
-                                        if default_exclude and not exclude:
-                                            logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+                                        # If we are warming the cache using the controlled strategy, then skip this
+                                        # container if it is not yet warmed in the pod.  That way, all code from here
+                                        # on out is guaranteed to not issue an API request if the pod is
+                                        # cached.
+                                        namespace = k8s_info['pod_namespace']
+                                        pod_name = k8s_info['pod_name']
 
-                        except Exception, e:
-                          logger.error("Error inspecting container '%s' - %s, %s" % (cid, e, traceback.format_exc()), limit_once_per_x_secs=300,limit_key="docker-api-inspect")
+                                        if controlled_warmer is not None:
+                                            controlled_warmer.mark_to_warm(cid, namespace, pod_name)
+                                            # Must not exclude this pod if it's expired but still present in cache.
+                                            # Otherwise, the pod's logfile will be dropped and re-watched repeatedly
+                                            # resulting in continuous thrashing.
+                                            if not controlled_warmer.is_warm(namespace, pod_name, allow_expired=True):
+                                                logger.log(
+                                                    scalyr_logging.DEBUG_LEVEL_2,
+                                                    "Excluding container '%s' because not in cache warmer" % short_cid
+                                                )
+                                                continue
+
+                                        if ignored_pod is not None and k8s_info['pod_namespace'] == ignored_pod.namespace and k8s_info['pod_name'] == ignored_pod.name:
+                                            logger.log(
+                                                scalyr_logging.DEBUG_LEVEL_2,
+                                                "Excluding container '%s' for ignored_pod: %s/%s" %
+                                                (short_cid, k8s_info['pod_namespace'], k8s_info['pod_name'])
+                                            )
+                                            continue
+
+                                        pod = k8s_cache.pod(namespace, pod_name, current_time,
+                                                            ignore_k8s_api_exception=True)
+                                        if pod:
+                                            k8s_info['pod_info'] = pod
+
+                                            k8s_container = k8s_info.get( 'k8s_container_name', None )
+
+                                            # check to see if we should exclude this container
+                                            default_exclude = not k8s_include_by_default
+                                            exclude = pod.exclude_pod( container_name=k8s_container, default=default_exclude)
+
+                                            if exclude:
+                                                if pod.annotations:
+                                                    logger.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+                                                continue
+
+                                            # add a debug message if containers are excluded by default but this container is included
+                                            if default_exclude and not exclude:
+                                                logger.log( scalyr_logging.DEBUG_LEVEL_2, "Including container '%s' based on pod annotations, %s" % (short_cid, str(pod.annotations)) )
+
+                            except Exception, e:
+                              logger.error("Error inspecting container '%s' - %s, %s" % (cid, e, traceback.format_exc()), limit_once_per_x_secs=300,limit_key="docker-api-inspect")
 
 
-                    result[cid] = {'name': name, 'log_path': log_path }
+                        result[cid] = {'name': name, 'log_path': log_path }
 
-                    if status:
-                        result[cid]['status'] = status
+                        if status:
+                            result[cid]['status'] = status
 
-                    if k8s_info:
-                        result[cid]['k8s_info'] = k8s_info
+                        if k8s_info:
+                            result[cid]['k8s_info'] = k8s_info
 
-            else:
-                result[cid] = {'name': cid, 'log_path': None}
+                else:
+                    result[cid] = {'name': cid, 'log_path': None}
+        finally:
+            if controlled_warmer is not None:
+                controlled_warmer.end_marking()
 
     except Exception, e:  # container querying failed
-        logger.error("Error querying running containers", limit_once_per_x_secs=300,
-                     limit_key='docker-api-running-containers' )
+        logger.exception("Error querying running containers: %s, filters=%s, only_running_containers=%s"
+                         % (str(e), filters, only_running_containers),
+                         limit_once_per_x_secs=300,
+                         limit_key='k8s-docker-api-running-containers')
         result = None
 
     return result
@@ -550,8 +1185,13 @@ class ContainerEnumerator( object):
     Base class that defines an api for enumerating all containers running on a node
     """
 
-    def __init__( self, container_id ):
-        self._container_id = container_id
+    def __init__(self, ignored_pod):
+        """
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
+            is the agent pod.
+        @type ignored_pod: QualifiedName
+        """
+        self._ignored_pod = ignored_pod
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         raise NotImplementedError()
@@ -561,21 +1201,33 @@ class DockerEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the docker remote API over the docker socket by usin
     a docker.Client
     """
-    def __init__( self, client, container_id ):
-        super( DockerEnumerator, self).__init__( container_id )
+    def __init__(self, client, ignored_pod, controlled_warmer=None):
+        """
+        @param client: The docker client to use for accessing docker
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
+            is the agent pod.
+        @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
+            strategy, then the warmer instance to use.
+        @type client: DockerClient
+        @type ignored_pod: QualifiedName
+        @type controlled_warmer: ControlledCacheWarmer or None
+        """
+        super( DockerEnumerator, self).__init__(ignored_pod)
         self._client = client
+        self.__controlled_warmer = controlled_warmer
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         return _get_containers(
             self._client,
-            ignore_container=self._container_id,
+            ignored_pod=self._ignored_pod,
             running_or_created_after=running_or_created_after,
             glob_list=glob_list,
             include_log_path=True,
             k8s_cache=k8s_cache,
             k8s_include_by_default=k8s_include_by_default,
             k8s_namespaces_to_exclude=k8s_namespaces_to_exclude,
-            current_time=current_time
+            current_time=current_time,
+            controlled_warmer=self.__controlled_warmer
             )
 
 class CRIEnumerator( ContainerEnumerator ):
@@ -583,14 +1235,28 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__( self, container_id, k8s_api_url, query_filesystem ):
-        super( CRIEnumerator, self).__init__( container_id )
-        k8s = KubernetesApi(k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi( k8s )
+    def __init__(self, global_config, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
+        """
+        @param global_config: Global configuration
+        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
+            is the agent pod.
+        @param k8s_api_url: The URL to use for accessing the API
+        @param query_filesystem: Whether or not to get the container list using the filesystem-based approach
+        @param kubelet_api_host_ip: The HOST IP to use for accessing the Kubelet API
+        @type ignored_pod: QualifiedName
+        @type k8s_api_url: str
+        @type query_filesystem: bool
+        @type kubelet_api_host_ip: str
+        """
+        super( CRIEnumerator, self).__init__(ignored_pod)
+        k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
+        self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
 
         self._log_base = '/var/log/containers'
+        self._pod_base = '/var/log/pods'
         self._container_glob = '%s/*.log' % self._log_base
+        self._pod_re = re.compile( '^%s/([^/]+)/([^/]+)/.*\.log$' % self._pod_base )
         self._info_re = re.compile( '^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$' % self._log_base )
 
     def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
@@ -633,9 +1299,24 @@ class CRIEnumerator( ContainerEnumerator ):
                 k8s_info['pod_namespace'] = pod_namespace
                 k8s_info['k8s_container_name'] = cname
 
+                # build the path to the log file on disk
+                log_path = "%s/%s_%s_%s-%s.log" % (self._log_base, pod_name, pod_namespace, cname, cid)
+
+                if self._query_filesystem:
+                    # get pod uid from the path
+                    # the log path should be a link to the /var/logs/pod/<pod_uid>/N.log
+                    # so read the link.  Note, use os.readlink rather than os.path.realpath
+                    # because we only want to traverse one level of links, rather than finding
+                    # the eventual path on disk (which may not be the /var/logs/pod/<pod_uid>/N.log)
+                    if os.path.islink( log_path ):
+                        link = os.readlink( log_path )
+                        m = self._pod_re.match( link )
+                        if m and cname == m.group(2):
+                            k8s_info['pod_uid'] = m.group(1)
+
                 # get pod and deployment/controller information for the container
                 if k8s_cache:
-                    pod = k8s_cache.pod( pod_namespace, pod_name, current_time )
+                    pod = k8s_cache.pod(pod_namespace, pod_name, current_time, ignore_k8s_api_exception=True)
                     if pod:
                         # check to see if we should exclude this container
                         default_exclude = not k8s_include_by_default
@@ -654,8 +1335,6 @@ class CRIEnumerator( ContainerEnumerator ):
                         k8s_info['pod_info'] = pod
                         k8s_info['pod_uid'] = pod.uid
 
-                # build the path to the log file on disk
-                log_path = "%s/%s_%s_%s-%s.log" % (self._log_base, pod_name, pod_namespace, cname, cid)
 
                 # add this container to the list of results
                 result[cid] = {'name': cname, 'log_path': log_path, 'k8s_info': k8s_info }
@@ -689,8 +1368,11 @@ class CRIEnumerator( ContainerEnumerator ):
                 continue
 
             # ignore the scalyr-agent container
-            if cid == self._container_id:
-                global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % _get_short_cid( cid ) )
+            if self._ignored_pod is not None and pod_name == self._ignored_pod.name and pod_namespace == self._ignored_pod.namespace:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_2,
+                    "Excluding container because pod_name '%s' in namespace '%s' is ignored" % (pod_name, pod_namespace)
+                )
                 continue
 
             result.append( (pod_name, pod_namespace, cname, cid) )
@@ -741,8 +1423,11 @@ class CRIEnumerator( ContainerEnumerator ):
                     short_cid = _get_short_cid( cid )
 
                     # ignore the scalyr-agent container
-                    if cid == self._container_id:
-                        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container because cid '%s' is the scalyr_agent container" % short_cid )
+                    if self._ignored_pod is not None and pod_name == self._ignored_pod.name and pod_namespace == self._ignored_pod.namespace:
+                        global_log.log(
+                            scalyr_logging.DEBUG_LEVEL_2,
+                            "Excluding container because pod_name '%s' in namespace '%s' is ignored" % (pod_name, pod_namespace)
+                        )
                         continue
 
                     # make sure the container has a name
@@ -765,20 +1450,48 @@ class CRIEnumerator( ContainerEnumerator ):
                          limit_key='kubelet-api-connect' )
             self._query_filesystem = True
         except Exception, e:
-            global_log.error("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
+            global_log.exception("Error querying kubelet API for running pods and containers", limit_once_per_x_secs=300,
                          limit_key='kubelet-api-query-pods' )
 
         return result
 
-class ContainerChecker( StoppableThread ):
+class ContainerChecker(object):
     """
         Monitors containers to check when they start and stop running.
     """
 
-    def __init__( self, config, global_config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path,
+    def __init__( self, config, global_config, logger, socket_file, docker_api_version, agent_pod, host_hostname, log_path,
                   include_all, include_controller_info, namespaces_to_ignore,
-                  ignore_pod_sandboxes ):
-
+                  ignore_pod_sandboxes, controlled_warmer=None ):
+        """
+        @param config: The configuration for the monitor which includes options for the container checker
+        @param global_config: The global configuration file
+        @param logger: The logger instance to use
+        @param socket_file: The docker socket file
+        @param docker_api_version: The API version to use for docker
+        @param agent_pod: The pod name and namespace for the agent
+        @param host_hostname: The hostname for this node
+        @param log_path: The path to the container logs
+        @param include_all: Whether or not include all container by default
+        @param include_controller_info: Whether or not to include the controller information for all pods upload
+        @param namespaces_to_ignore: The namespaces whose pods should not be uploaded
+        @param ignore_pod_sandboxes: Whether or not to recognize pod sandboxes
+        @param controlled_warmer: If the pod cache should be proactively warmed using the controlled
+            cache warmer strategy, the instance to use.
+        @type config: dict
+        @type global_config: Configuration
+        @type logger: Logger
+        @type socket_file: str
+        @type docker_api_version: str
+        @type agent_pod: QualifiedName
+        @type host_hostname: str
+        @type log_path: str
+        @type include_all: bool
+        @type include_controller_info: bool
+        @type namespaces_to_ignore: [str]
+        @type ignore_pod_sandboxes: bool
+        @type controlled_warmer: ControlledCacheWarmer or None
+        """
         self._config = config
         self._global_config = global_config
         self._logger = logger
@@ -807,9 +1520,10 @@ class ContainerChecker( StoppableThread ):
         self.__docker_api_version = docker_api_version
         self.__client = None
         self.__always_use_cri = self._config.get( 'k8s_always_use_cri' )
+        self.__always_use_docker = self._config.get( 'k8s_always_use_docker' )
         self.__cri_query_filesystem = self._config.get( 'k8s_cri_query_filesystem' )
 
-        self.container_id = None
+        self.__agent_pod = agent_pod
 
         self.__log_path = log_path
 
@@ -835,12 +1549,18 @@ class ContainerChecker( StoppableThread ):
 
         self.k8s_cache = None
 
+        self.__node_name = None
+
         self.__log_watcher = None
         self.__module = None
         self.__start_time = time.time()
         self.__thread = StoppableThread( target=self.check_containers, name="Container Checker" )
         self._container_enumerator = None
         self._container_runtime = 'unknown'
+        self.__controlled_warmer = controlled_warmer
+
+        # give this an initial empty value
+        self.raw_logs = []
 
     def _is_running_in_docker( self ):
         """
@@ -850,14 +1570,36 @@ class ContainerChecker( StoppableThread ):
         # by the existence of the file /.dockerenv
         return os.path.exists( "/.dockerenv" )
 
+    def get_cluster_name( self, k8s_cache ):
+        """ Gets the cluster name that the agent is running on """
+
+        cluster_name = os.environ.get( 'SCALYR_K8S_CLUSTER_NAME' )
+        if cluster_name is not None:
+            return cluster_name
+
+        return (k8s_cache and k8s_cache.get_cluster_name()) or None
+
+    def _get_node_name( self ):
+        """ Gets the node name of the node running the agent from downward API """
+        return os.environ.get( 'SCALYR_K8S_NODE_NAME' )
+
+
+    def _get_container_runtime( self ):
+        """ Gets the container runtime currently in use """
+        return (self.k8s_cache and self.k8s_cache.get_container_runtime()) or 'unknown'
+
     def start( self ):
 
         try:
-            k8s_api_url = self._config.get('k8s_api_url')
+            k8s_api_url = self._global_config.k8s_api_url
             k8s_verify_api_queries = self._config.get( 'k8s_verify_api_queries' )
 
             # create the k8s cache
-            self.k8s_cache = k8s_utils.cache( self._global_config )
+            self.k8s_cache = k8s_utils.cache(self._global_config)
+
+            if self.__controlled_warmer is not None:
+                self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
+                self.__controlled_warmer.start()
 
             delay = 0.5
             message_delay = 5
@@ -886,22 +1628,26 @@ class ContainerChecker( StoppableThread ):
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.k8s_cache.get_cluster_name() is not None:
+            if self.get_cluster_name( self.k8s_cache ) is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "ContainerChecker - cluster name detected, enabling v2 attributes and controller information" )
                 self.__use_v2_attributes = True
                 self.__include_controller_info = True
 
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
 
-            self.container_id = self.k8s_cache.get_agent_container_id() or 'unknown'
-            self._container_runtime = self.k8s_cache.get_container_runtime() or 'unknown'
+            self.__node_name = self._get_node_name() or 'unknown node'
+            self._container_runtime = self._get_container_runtime()
             self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Container runtime is '%s'" % (self._container_runtime) )
 
-            if self._container_runtime == 'docker' and not self.__always_use_cri:
+            if self.__always_use_docker or (self._container_runtime == 'docker' and not self.__always_use_cri):
+                global_log.info('kubernetes_monitor is using docker for listing containers')
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
-                self._container_enumerator = DockerEnumerator( self.__client, self.container_id )
+                self._container_enumerator = DockerEnumerator( self.__client, self.__agent_pod,
+                                                               controlled_warmer=self.__controlled_warmer )
             else:
-                self._container_enumerator = CRIEnumerator( self.container_id, k8s_api_url, query_filesystem=self.__cri_query_filesystem )
+                query_fs = self.__cri_query_filesystem
+                global_log.info('kubernetes_monitor is using CRI with fs=%s for listing containers' % str(query_fs))
+                self._container_enumerator = CRIEnumerator( self._global_config, self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
 
             if self.__parse_format == 'auto':
                 # parse in json if we detect the container runtime to be 'docker' or if we detect
@@ -939,6 +1685,9 @@ class ContainerChecker( StoppableThread ):
 
 
     def stop( self, wait_on_join=True, join_timeout=5 ):
+        if self.__controlled_warmer is not None:
+            self.__controlled_warmer.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
         self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
         #stop the DockerLoggers
@@ -1022,9 +1771,11 @@ class ContainerChecker( StoppableThread ):
                         pod = info['k8s_info'].get( 'pod_info', None )
 
                         if not pod:
-                            self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
-                                                  limit_once_per_x_secs=300,
-                                                  limit_key='check-container-pod-info-%s' % cid)
+                            pass
+                            # Don't log any warnings here for now
+                            #self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
+                            #                      limit_once_per_x_secs=300,
+                            #                      limit_key='check-container-pod-info-%s' % cid)
 
                     # start the container if have a container that wasn't running
                     if cid not in self.containers:
@@ -1082,7 +1833,7 @@ class ContainerChecker( StoppableThread ):
     def __stop_loggers( self, stopping ):
         """
         Stops any DockerLoggers in the 'stopping' dict
-        @param: stopping - a dict of container ids => container names. Any running containers that have
+        @param stopping:  a dict of container ids => container names. Any running containers that have
         the same container-id as a key in the dict will be stopped.
         """
         if stopping:
@@ -1103,7 +1854,7 @@ class ContainerChecker( StoppableThread ):
     def __start_loggers( self, starting, k8s_cache ):
         """
         Starts a list of DockerLoggers
-        @param: starting - a list of DockerLoggers to start
+        @param starting:  a list of DockerLoggers to start
         """
         if starting:
             self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Starting all docker loggers')
@@ -1114,7 +1865,7 @@ class ContainerChecker( StoppableThread ):
     def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
             if self.__log_watcher:
-                log['log_config'] = self.__log_watcher.add_log_config( self.__module, log['log_config'] )
+                log['log_config'] = self.__log_watcher.add_log_config( self.__module.module_name, log['log_config'] )
 
             self.raw_logs.append( log )
 
@@ -1181,6 +1932,7 @@ class ContainerChecker( StoppableThread ):
             container_attributes['containerId'] = cid
         elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
             container_attributes['container_id'] = cid
+
         parser = 'docker'
         common_annotations = {}
         container_annotations = {}
@@ -1198,26 +1950,36 @@ class ContainerChecker( StoppableThread ):
             'container_name' : info['name'],
         }
 
+        rename_logfile = '/%s/%s.log' % (self._container_runtime, info['name'])
+
         k8s_info = info.get( 'k8s_info', {} )
 
         if k8s_info:
             pod_name = k8s_info.get('pod_name', 'invalid_pod')
             pod_namespace = k8s_info.get('pod_namespace', 'invalid_namespace')
             self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "got k8s info for container %s, '%s/%s'" % (short_cid, pod_namespace, pod_name) )
-            pod = k8s_cache.pod( pod_namespace, pod_name )
+
+            rename_vars['pod_name'] = pod_name
+            rename_vars['namespace'] = pod_namespace
+            container_attributes['pod_name'] = pod_name
+            container_attributes['pod_namespace'] = pod_namespace
+
+            # get the cluster name
+            cluster_name = self.get_cluster_name( k8s_cache )
+            if self.__include_controller_info and cluster_name is not None:
+                container_attributes['_k8s_cn'] = cluster_name
+
+            pod = k8s_cache.pod(pod_namespace, pod_name, ignore_k8s_api_exception=True)
             if pod:
-                rename_vars['pod_name'] = pod.name
-                rename_vars['namespace'] = pod.namespace
                 rename_vars['node_name'] = pod.node_name
 
-                container_attributes['pod_name'] = pod.name
-                container_attributes['pod_namespace'] = pod.namespace
+                container_attributes['scalyr-category'] = 'log'
                 container_attributes['pod_uid'] = pod.uid
+
                 if not self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes['node_name'] = pod.node_name
                 elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes['k8s_node'] = pod.node_name
-                container_attributes['scalyr-category'] = 'log'
 
                 for label, value in pod.labels.iteritems():
                     container_attributes[label] = value
@@ -1236,10 +1998,6 @@ class ContainerChecker( StoppableThread ):
                         container_attributes['_k8s_dl'] = controller.flat_labels
                         container_attributes['_k8s_ck'] = controller.kind
 
-                # get the cluster name
-                cluster_name = k8s_cache.get_cluster_name()
-                if self.__include_controller_info and cluster_name is not None:
-                    container_attributes['_k8s_cn'] = cluster_name
 
                 # get the annotations of this pod as a dict.
                 # by default all annotations will be applied to all containers
@@ -1282,7 +2040,7 @@ class ContainerChecker( StoppableThread ):
 
         if 'log_path' in info and info['log_path']:
             result = self.__create_log_config( parser=parser, path=info['log_path'], attributes=container_attributes, parse_format=self.__parse_format )
-            result['rename_logfile'] = '/%s/%s.log' % (self._container_runtime, info['name'])
+            result['rename_logfile'] = rename_logfile
             # This is for a hack to prevent the original log file name from being added to the attributes.
             if self.__use_v2_attributes and not self.__use_v1_and_v2_attributes:
                 result['rename_no_original'] = True
@@ -1515,7 +2273,33 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         return api_socket
 
+    def _set_ignore_namespaces(self):
+        """This function is separated out for better testability
+        (consider generalizing this method to support other k8s_monitor config params that are overridden globally)
+        """
+        # The namespace whose logs we should not collect.
+        global_namespaces_to_ignore = self._global_config.k8s_ignore_namespaces
+        default_val = Configuration.DEFAULT_K8S_IGNORE_NAMESPACES
+        if global_namespaces_to_ignore is not None and [g for g in global_namespaces_to_ignore] != default_val:
+            # use global value
+            result = global_namespaces_to_ignore
+        else:
+            # use local value
+            local_namespaces_to_ignore = self._config.get('k8s_ignore_namespaces')
+            if local_namespaces_to_ignore is not None and [l for l in local_namespaces_to_ignore] != default_val:
+                result = local_namespaces_to_ignore
+            else:
+                result = default_val
+
+        self.__namespaces_to_ignore = []
+        for x in result:
+            self.__namespaces_to_ignore.append(x.strip())
+
+    def _get_ignore_namespaces(self):
+        return self.__namespaces_to_ignore
+
     def _initialize( self ):
+        """This method gets called every 30 seconds regardless"""
         data_path = ""
         log_path = ""
         host_hostname = ""
@@ -1546,15 +2330,12 @@ class KubernetesMonitor( ScalyrMonitor ):
         if parse_format not in ['auto', 'raw', 'json', 'cri']:
             raise BadMonitorConfiguration( "k8s_parse_format must be one of 'auto', 'json', 'cri' or 'raw'.  Current value is: %s" % parse_format, 'k8s_parse_format' )
 
-        # The namespace whose logs we should not collect.
-        self.__namespaces_to_ignore = []
-        for x in self._config.get('k8s_ignore_namespaces').split():
-            self.__namespaces_to_ignore.append(x.strip())
+        self._set_ignore_namespaces()
 
         self.__ignore_pod_sandboxes = self._config.get('k8s_ignore_pod_sandboxes')
         self.__socket_file = self.__get_socket_file()
         self.__docker_api_version = self._config.get( 'docker_api_version' )
-        self.__k8s_api_url = self._config.get('k8s_api_url')
+        self.__k8s_api_url = self._global_config.k8s_api_url
         self.__docker_max_parallel_stats = self._config.get('docker_max_parallel_stats')
         self.__client = None
         self.__metric_fetcher = None
@@ -1573,12 +2354,33 @@ class KubernetesMonitor( ScalyrMonitor ):
         # controller labels)
         self.__include_controller_info = self._config.get('include_deployment_info', convert_to=bool, default=False)
 
+        # Throw BadMonitorConfiguration if any of these required environment variables is not set.
+        self.__verify_required_env_var('SCALYR_K8S_POD_NAME')
+        self.__verify_required_env_var('SCALYR_K8S_POD_NAMESPACE')
+        self.__verify_required_env_var('SCALYR_K8S_NODE_NAME')
+
+        self.__agent_pod = QualifiedName(os.getenv('SCALYR_K8S_POD_NAMESPACE'), os.getenv('SCALYR_K8S_POD_NAME'))
+
+        # create controlled cache warmers for logs and metrics
+        self.__logs_controlled_warmer = ControlledCacheWarmer(
+            max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+            blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+            max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+            logger=global_log)
+
+        self.__metrics_controlled_warmer = ControlledCacheWarmer(
+            max_failure_count=self._global_config.k8s_controlled_warmer_max_attempts,
+            blacklist_time_secs=self._global_config.k8s_controlled_warmer_blacklist_time,
+            max_query_retries=self._global_config.k8s_controlled_warmer_max_query_retries,
+            logger=global_log)
+
         self.__container_checker = None
         if self._config.get('log_mode') != 'syslog':
             self.__container_checker = ContainerChecker( self._config, self._global_config, self._logger, self.__socket_file,
-                                                         self.__docker_api_version, host_hostname, data_path, log_path,
-                                                         self.__include_all, self.__include_controller_info,
-                                                         self.__namespaces_to_ignore, self.__ignore_pod_sandboxes )
+                                                         self.__docker_api_version, self.__agent_pod, host_hostname,
+                                                         log_path,self.__include_all, self.__include_controller_info,
+                                                         self.__namespaces_to_ignore, self.__ignore_pod_sandboxes,
+                                                         controlled_warmer=self.__logs_controlled_warmer)
 
         # Metrics provided by the kubelet API.
         self.__k8s_pod_network_metrics = {
@@ -1672,6 +2474,14 @@ class KubernetesMonitor( ScalyrMonitor ):
             result["%s%s"%(prefix, name)] = name
         return result
 
+    def __verify_required_env_var(self, env_var_name):
+        if len(os.environ.get(env_var_name, '')) == 0:
+            self._logger.error('ERROR: Missing required environment variable for kubenetes_monitor: %s' % env_var_name)
+            self._logger.error('Please restart with up-to-date Scalyr Agent Daemonset manifest (YAML) file.')
+            raise BadMonitorConfiguration(
+                'Required environment variable "%s" is not set for kubernetes_monitor.' % env_var_name,
+                env_var_name)
+
     def __log_metrics( self, monitor_override, metrics_to_emit, metrics, extra=None ):
         if metrics is None:
             return
@@ -1687,10 +2497,10 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_network_interface_metrics( self, container, metrics, interface=None, k8s_extra={} ):
         """ Logs network interface metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: interface - an optional interface value to associate with each metric value emitted
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container:  name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param interface: an optional interface value to associate with each metric value emitted
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         extra = None
         if interface:
@@ -1706,9 +2516,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_memory_stats_metrics( self, container, metrics, k8s_extra ):
         """ Logs memory stats metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         if 'stats' in metrics:
             self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'], k8s_extra )
@@ -1718,9 +2528,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_cpu_stats_metrics( self, container, metrics, k8s_extra ):
         """ Logs cpu stats metrics
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
@@ -1747,9 +2557,9 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __log_json_metrics( self, container, metrics, k8s_extra ):
         """ Log docker metrics based on the JSON response returned from querying the Docker API
 
-            @param: container - name of the container the log originated from
-            @param: metrics - a dict of metrics keys/values to emit
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container the log originated from
+            @param metrics: a dict of metrics keys/values to emit
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         for key, value in metrics.iteritems():
             if value is None:
@@ -1768,8 +2578,8 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __gather_metrics_from_api_for_container( self, container, k8s_extra ):
         """ Query the Docker API for container metrics
 
-            @param: container - name of the container to query
-            @param: k8s_extra - extra k8s specific key/value pairs to associate with each metric value emitted
+            @param container: name of the container to query
+            @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
         result = self.__metric_fetcher.get_metrics(container)
         if result is not None:
@@ -1779,7 +2589,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Builds a dict containing information about the controller settings for a given pod
 
-            @param: pod - a PodInfo object containing basic information (namespace/name) about the pod to query
+            @param pod: a PodInfo object containing basic information (namespace/name) about the pod to query
 
             @return: a dict containing the controller name for the controller running
                      the specified pod, or an empty dict if the pod is not part of a controller
@@ -1787,7 +2597,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         k8s_extra = {}
         if pod is not None:
 
-            # default key and controlle name
+            # default key and controller name
             key = 'k8s-controller'
             name = 'none'
 
@@ -1809,7 +2619,7 @@ class KubernetesMonitor( ScalyrMonitor ):
     def __get_k8s_controller_info( self, container ):
         """
             Gets information about the kubernetes controller of a given container
-            @param: container - a dict containing information about a container, returned by _get_containers
+            @param container: a dict containing information about a container, returned by _get_containers
         """
         k8s_info = container.get( 'k8s_info', {} )
         pod = k8s_info.get( 'pod_info', None )
@@ -1848,8 +2658,8 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers metrics from a Kubelet API response for a specific pod
 
-            @param: node_metrics - A JSON Object from a response to a Kubelet API query
-            @param: extra - Extra fields to append to each metric
+            @param node_metrics: A JSON Object from a response to a Kubelet API query
+            @param extra: Extra fields to append to each metric
         """
 
         name = node.get( "nodeName", None )
@@ -1869,9 +2679,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers metrics from a Kubelet API response for a specific pod
 
-            @param: pod_metrics - A JSON Object from a response to a Kubelet API query
-            @param: pod_info - A PodInfo structure regarding the pod in question
-            @param: k8s_extra - Extra k8s specific fields to append to each metric
+            @param pod_metrics: A JSON Object from a response to a Kubelet API query
+            @param pod_info: A PodInfo structure regarding the pod in question
+            @param k8s_extra: Extra k8s specific fields to append to each metric
         """
 
         extra = {
@@ -1888,9 +2698,9 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
             Gathers k8s metrics from a response to a stats query of the Kubelet API
 
-            @param: containers - a dict returned by _get_containers with info for all containers we are interested in
-            @param: kubelet_api - a KubeletApi object for querying the KubeletApi
-            @param: cluster_name - the name of the k8s cluster
+            @param containers: a dict returned by _get_containers with info for all containers we are interested in
+            @param kubelet_api: a KubeletApi object for querying the KubeletApi
+            @param cluster_name: the name of the k8s cluster
 
         """
 
@@ -1945,9 +2755,13 @@ class KubernetesMonitor( ScalyrMonitor ):
             k8s_cache = self.__container_checker.k8s_cache
         return k8s_cache
 
+    def get_extra_server_attributes(self):
+        # Immutable, hence thread safe
+        return None
+        # return {'_k8s_ver': 'star'}
+
     def get_user_agent_fragment(self):
-        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe.
-        """
+        """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe."""
         k8s_cache = self.__get_k8s_cache()
         ver = None
         runtime = None
@@ -1970,9 +2784,13 @@ class KubernetesMonitor( ScalyrMonitor ):
         # gather metrics
         containers = None
         if self.__report_container_metrics and self.__client:
+            if self.__metrics_controlled_warmer is not None and not self.__metrics_controlled_warmer.is_running():
+                self.__metrics_controlled_warmer.set_k8s_cache(k8s_cache)
+                self.__metrics_controlled_warmer.start()
             containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list,
                                          k8s_cache=k8s_cache, k8s_include_by_default=self.__include_all,
-                                         k8s_namespaces_to_exclude=self.__namespaces_to_ignore)
+                                         k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
+                                         controlled_warmer=self.__metrics_controlled_warmer)
         try:
             if containers:
                 if self.__report_container_metrics:
@@ -2038,10 +2856,45 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         k8s_cache = self.__get_k8s_cache()
 
+        envars_to_log = [
+            'SCALYR_K8S_NODE_NAME',
+            'SCALYR_K8S_POD_NAME',
+            'SCALYR_K8S_POD_NAMESPACE',
+            'SCALYR_K8S_POD_UID',
+            'SCALYR_K8S_KUBELET_HOST_IP',
+            'SCALYR_K8S_CLUSTER_NAME',
+            'SCALYR_K8S_DISABLE_API_SERVER',
+            'SCALYR_K8S_CACHE_EXPIRY_SECS',
+            'SCALYR_K8S_CACHE_PURGE_SECS',
+            'SCALYR_K8S_CACHE_START_FUZZ_SECS',
+            'SCALYR_K8S_CACHE_EXPIRY_FUZZ_SECS',
+            'SCALYR_COMPRESSION_TYPE',
+            'SCALYR_ENABLE_PROFILING',
+            'SCALYR_PROFILE_DURATION_MINUTES',
+            'SCALYR_MAX_PROFILE_INTERVAL_MINUTES',
+            'SCALYR_K8S_ALWAYS_USE_DOCKER',
+            'SCALYR_K8S_CACHE_BATCH_POD_UPDATES',
+            'SCALYR_K8S_CACHE_DISABLE_NODE_FILTER',
+            'SCALYR_K8S_CONTROLLED_WARMER_MAX_ATTEMPTS',
+            'SCALYR_K8S_CONTROLLED_WARMER_MAX_QUERY_RETRIES',
+            'SCALYR_K8S_CONTROLLED_WARMER_BLACKLIST_TIME',
+            'SCALYR_K8S_RATELIMIT_CLUSTER_NUM_AGENTS',
+            'SCALYR_K8S_RATELIMIT_CLUSTER_RPS_INIT',
+            'SCALYR_K8S_RATELIMIT_CLUSTER_RPS_MIN',
+            'SCALYR_K8S_RATELIMIT_CLUSTER_RPS_MAX',
+            'SCALYR_K8S_RATELIMIT_CONSECUTIVE_INCREASE_THRESHOLD',
+            'SCALYR_K8S_RATELIMIT_INCREASE_STRATEGY',
+            'SCALYR_K8S_RATELIMIT_INCREASE_FACTOR',
+            'SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR',
+            'SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY',
+        ]
+        for envar in envars_to_log:
+            self._logger.info("Environment variable %s : %s" % (envar, os.environ.get(envar, '<Not set>')))
+
         try:
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
-            if self.__container_checker and self.__container_checker.k8s_cache.get_cluster_name() is not None:
+            if self.__container_checker and self.__container_checker.get_cluster_name( self.__container_checker.k8s_cache ) is not None:
                 self._logger.log( scalyr_logging.DEBUG_LEVEL_1, "Cluster name detected, enabling k8s metric reporting and controller information" )
                 self.__include_controller_info = True
                 self.__report_k8s_metrics = self.__report_container_metrics
@@ -2050,26 +2903,30 @@ class KubernetesMonitor( ScalyrMonitor ):
 
                 runtime = None
                 if k8s_cache:
+                    # TODO(czerwin):  If the api server has been disabled, we need to decide what to do here.
                     runtime = k8s_cache.get_container_runtime()
 
                 if runtime == 'docker':
                     self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
                     self.__metric_fetcher = DockerMetricFetcher(self.__client, self.__docker_max_parallel_stats )
 
-                k8s = KubernetesApi(k8s_api_url=self.__k8s_api_url)
-                self.__kubelet_api = KubeletApi( k8s )
+                k8s = KubernetesApi.create_instance(self._global_config, k8s_api_url=self.__k8s_api_url)
+                self.__kubelet_api = KubeletApi( k8s, host_ip=self._config.get('k8s_kubelet_host_ip') )
         except Exception, e:
             self._logger.error( "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s" % str( e ) )
             self.__report_k8s_metrics = False
 
 
-        global_log.info('kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers %s, '
-                        'report_metrics %s' % (','.join(self.__namespaces_to_ignore),
-                                                         str(self.__include_controller_info),
-                                                         str(self.__report_container_metrics)))
+        global_log.info(
+            'kubernetes_monitor parameters: ignoring namespaces: %s, report_controllers: %s, report_metrics: %s'
+            % (self.__namespaces_to_ignore, self.__include_controller_info, self.__report_container_metrics)
+        )
         ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):
+        if self.__metrics_controlled_warmer is not None and self.__metrics_controlled_warmer.is_running():
+            self.__metrics_controlled_warmer.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+
         #stop the main server
         ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 

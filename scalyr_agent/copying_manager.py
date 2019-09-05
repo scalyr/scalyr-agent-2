@@ -18,6 +18,7 @@
 
 __author__ = 'czerwin@scalyr.com'
 
+import copy
 import datetime
 import fnmatch
 import os
@@ -199,6 +200,22 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Keep track of monitors
         self.__monitors = monitors
 
+        # collect monitor-specific extra server-attributes
+        self.__expanded_server_attributes = copy.deepcopy(self.__config.server_attributes)
+        for monitor in monitors:
+            monitor_attribs = monitor.get_extra_server_attributes()
+            if not monitor_attribs:
+                continue
+            for key, value in monitor_attribs.items():
+                if key in self.__expanded_server_attributes:
+                    log.log(scalyr_logging.DEBUG_LEVEL_0,
+                            "Extra server attribute already defined. Cannot add extra server attribute '%s' from monitor %s"
+                            % (key, monitor.module_name),
+                            limit_once_per_x_secs=300,
+                            limit_key='extra-server-attrib-%s' % key)
+                else:
+                    self.__expanded_server_attributes[key] = value
+
         # We keep track of which paths we have configs for so that when we add in the configuration for the monitor
         # log files we don't re-add in the same path.  This can easily happen if a monitor is used multiple times
         # but they are all just writing to the same monitor file.
@@ -271,6 +288,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__disable_copying_thread = configuration.disable_copying_thread
 
     @property
+    def expanded_server_attributes(self):
+        """Return deepcopy of expanded server attributes"""
+        return copy.deepcopy(self.__expanded_server_attributes)
+
+    @property
     def log_matchers(self):
         """Returns the list of log matchers that were created based on the configuration and passed in monitors.
 
@@ -289,24 +311,24 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         return None
 
-    def add_log_config( self, monitor, log_config ):
+    def add_log_config( self, monitor_name, log_config ):
         """Add the log_config item to the list of paths being watched
-        param: monitor - the monitor adding the log config
+        param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
         returns: an updated log_config object
         """
-        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor.module_name).copy()
+        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor_name).copy()
 
         self.__lock.acquire()
         try:
             path = self.__path_in_globs( log_config['path'], self.__all_paths.keys() )
             if path is None:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor.module_name ) )
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (log_config['path'], monitor_name ) )
                 self.__pending_log_matchers.append( LogMatcher( self.__config, log_config ) )
                 self.__all_paths[log_config['path']] = 1
                 path = log_config['path']
             else:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'New log file \'%s\' already matches \'%s\' for monitor \'%s\'' % (log_config['path'], path, monitor.module_name ) )
+                log.log(scalyr_logging.DEBUG_LEVEL_0, 'New log file \'%s\' already matches \'%s\' for monitor \'%s\'' % (log_config['path'], path, monitor_name ) )
                 # log_config['path'] and path will not be equal if log_config['path'] matched path
                 # because of a glob pattern.  They will only be equal if they are the exact same path.
                 # We want to ignore any added paths that match a glob pattern, and so we skip over incrementing the path count
@@ -369,6 +391,13 @@ class CopyingManager(StoppableThread, LogWatcher):
                     self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
                     self.__logs_pending_removal.pop( log_path, None )
 
+            # check to see if we are removing a path that matches a glob
+            elif self.__path_in_globs( log_path, self.__all_paths.keys() ):
+                # if we are here, it means there was a dynamically added log path that also matched
+                # a glob pattern specified in the config file, and now we are dynamically removing
+                # that log path. The config file overrides the dynamic addition/removals so the glob pattern
+                # needs to stay, but we do need to remove the dynamic path from the list of pending removals
+                self.__logs_pending_removal.pop( log_path, None )
             else:
                 log.log(scalyr_logging.DEBUG_LEVEL_0, "'%s' - trying to remove non-existent path from copy manager: '%s'" % ( monitor_name, log_path) )
         finally:
@@ -388,6 +417,16 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
+    def logs_pending_removal_count( self ):
+        """
+            Used for testing - returns the number of logs pending removal
+        """
+
+        self.__lock.acquire()
+        try:
+            return len( self.__logs_pending_removal )
+        finally:
+            self.__lock.release()
     def __create_log_matches(self, configuration, monitors ):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
@@ -878,7 +917,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Whether or not the max bytes allowed to send has been reached.
         buffer_filled = False
 
-        add_events_request = self._create_add_events_request(session_info=self.__config.server_attributes,
+        add_events_request = self._create_add_events_request(session_info=self.__expanded_server_attributes,
                                                              max_size=bytes_allowed_to_send)
 
         if for_pipelining:

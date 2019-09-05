@@ -39,7 +39,7 @@ max_wait=$3
 #----------------------------------------------------------------------------------------
 
 # Smoketest code (built into smoketest image)
-smoketest_script="/usr/bin/python3 /tmp/smoketest.py"
+smoketest_script="source ~/.bashrc && pyenv shell 3.7.3 && python3 /tmp/smoketest.py"
 
 # Erase variables (to avoid subtle config bugs in development)
 syslog_driver_option=""
@@ -102,11 +102,11 @@ echo "Agent container ID == ${agent_hostname}"
 # You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
 # query to work (uploader container waits for agent to be alive before uploading data)
 docker run ${syslog_driver_option}  -d --name ${contname_uploader} ${smoketest_image} \
-${smoketest_script} ${contname_uploader} ${max_wait} \
+bash -c "${smoketest_script} ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
---agent_hostname ${agent_hostname}
+--agent_hostname ${agent_hostname}"
 
 # Capture uploader short container ID
 uploader_hostname=$(docker ps --format "{{.ID}}" --filter "name=$contname_uploader")
@@ -115,13 +115,13 @@ echo "Uploader container ID == ${uploader_hostname}"
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
-${smoketest_script} ${contname_verifier} ${max_wait} \
+bash -c "${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \
 --read_api_key ${READ_API_KEY} \
 --agent_hostname ${agent_hostname} \
 --uploader_hostname ${uploader_hostname} \
---debug true
+--debug true"
 
 kill_and_delete_docker_test_containers
 

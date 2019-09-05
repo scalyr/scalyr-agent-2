@@ -23,8 +23,10 @@ import tempfile
 from mock import patch, Mock
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
+from scalyr_agent.config_util import parse_array_of_strings, convert_config_param, get_config_from_env
 from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
+from scalyr_agent.json_lib.objects import ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -970,10 +972,10 @@ class TestConfiguration(TestConfigurationBase):
         config = self._create_test_configuration_instance()
         self.assertRaises(BadConfiguration, config.parse)
 
-    def test_environment_aware_global_params_true(self):
+    def test_environment_aware_global_params_uppercase(self):
         self._test_environment_aware_global_params(True)
 
-    def test_environment_aware_global_params_false(self):
+    def test_environment_aware_global_params_lowercase(self):
         self._test_environment_aware_global_params(True)
 
     def _test_environment_aware_global_params(self, uppercase):
@@ -1008,12 +1010,14 @@ class TestConfiguration(TestConfigurationBase):
         original_verify_or_set_optional_int = config._Configuration__verify_or_set_optional_int
         original_verify_or_set_optional_float = config._Configuration__verify_or_set_optional_float
         original_verify_or_set_optional_string = config._Configuration__verify_or_set_optional_string
+        original_verify_or_set_optional_array_of_strings = config._Configuration__verify_or_set_optional_array_of_strings
 
         @patch.object(config, '_Configuration__verify_or_set_optional_bool')
         @patch.object(config, '_Configuration__verify_or_set_optional_int')
         @patch.object(config, '_Configuration__verify_or_set_optional_float')
         @patch.object(config, '_Configuration__verify_or_set_optional_string')
-        def patch_and_start_test(p3, p2, p1, p0):
+        @patch.object(config, '_Configuration__verify_or_set_optional_array_of_strings')
+        def patch_and_start_test(p4, p3, p2, p1, p0):
             # Decorate the Configuration.__verify_or_set_optional_xxx methods as follows:
             # 1) capture fields that are environment-aware
             # 2) allow setting of the corresponding environment variable
@@ -1040,12 +1044,15 @@ class TestConfiguration(TestConfigurationBase):
                         return original_verify_or_set_optional_float(*args, **kwargs)
                     elif field_type == str:
                         return original_verify_or_set_optional_string(*args, **kwargs)
+                    elif field_type == ArrayOfStrings:
+                        return original_verify_or_set_optional_array_of_strings(*args, **kwargs)
                 return wrapper
 
             p0.side_effect = capture_aware_field(bool)
             p1.side_effect = capture_aware_field(int)
             p2.side_effect = capture_aware_field(float)
             p3.side_effect = capture_aware_field(str)
+            p4.side_effect = capture_aware_field(ArrayOfStrings)
 
             # Build the Configuration object tree, also populating the field_types lookup in the process
             # This first iteration does not set any environment variables
@@ -1065,6 +1072,7 @@ class TestConfiguration(TestConfigurationBase):
             FAKE_INT = 1234567890
             FAKE_FLOAT = 1234567.89
             FAKE_STRING = str(FAKE_INT)
+            FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(['s1', 's2', 's3'])
 
             for field in expected_aware_fields:
                 field_type = field_types[field]
@@ -1090,10 +1098,23 @@ class TestConfiguration(TestConfigurationBase):
                     self.assertNotEquals(FAKE_STRING, config_obj.get_string(field, none_if_missing=True))
                     fake_env[field] = FAKE_STRING
 
+                elif field_type == ArrayOfStrings:
+                    self.assertNotEquals(FAKE_ARRAY_OF_STRINGS, config_obj.get_json_array(field, none_if_missing=True))
+                    fake_env[field] = FAKE_ARRAY_OF_STRINGS
+
             def fake_environment_value(field):
                 if field not in fake_env:
                     return None
-                return str(fake_env[field]).lower()
+                fake_field_val = fake_env[field]
+                if isinstance(fake_field_val, ArrayOfStrings):
+                    separator = ','
+                    # legacy whitespace separator support for 'k8s_ignore_namespaces'
+                    if field == 'k8s_ignore_namespaces':
+                        separator = ' '
+                    result = str(separator.join([x for x in fake_field_val])).lower()
+                else:
+                    result = str(fake_field_val).lower()
+                return result
             function_lookup = {'get_environment': fake_environment_value}
 
             config.parse()
@@ -1108,6 +1129,8 @@ class TestConfiguration(TestConfigurationBase):
                     value = config._Configuration__get_config().get_float(field)
                 elif field_type == str:
                     value = config._Configuration__get_config().get_string(field)
+                elif field_type == ArrayOfStrings:
+                    value = config._Configuration__get_config().get_json_array(field)
 
                 config_file_value = config_file_dict.get(field)
                 if field in config_file_dict:
@@ -1234,3 +1257,62 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.server_attributes['webServer'], 'true')
         self.assertEquals(config.server_attributes['serverHost'], 'foo.com')
+
+
+class TestParseArrayOfStrings(TestConfigurationBase):
+
+    def test_none(self):
+        self.assertIsNone(parse_array_of_strings(None))
+
+    def test_empty_string(self):
+        self.assertEqual(parse_array_of_strings(''), ArrayOfStrings())
+
+    def test_list(self):
+        self.assertEqual(parse_array_of_strings('a, b, c'), ArrayOfStrings(['a', 'b', 'c']))
+
+
+class TestConvertConfigParam(TestConfigurationBase):
+
+    def test_none_to_anything(self):
+        """"""
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, str))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, bool))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, int))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, float))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, list))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, JsonArray))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, JsonObject))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', None, ArrayOfStrings))
+
+    def test_empty_string(self):
+        self.assertEqual('', convert_config_param('dummy_field', '', str))
+        self.assertEqual(False, convert_config_param('dummy_field', '', bool))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', '', int))
+        self.assertRaises(BadConfiguration, lambda: convert_config_param('dummy_field', '', float))
+        self.assertEqual(ArrayOfStrings(), convert_config_param('dummy_field', '', ArrayOfStrings))
+        self.assertEqual(ArrayOfStrings(),
+                         convert_config_param('dummy_field', '', SpaceAndCommaSeparatedArrayOfStrings))
+        self.assertRaises(IndexError, lambda: convert_config_param('dummy_field', '', JsonArray))
+        self.assertRaises(IndexError, lambda: convert_config_param('dummy_field', '', JsonArray))
+
+
+class TestGetConfigFromEnv(TestConfigurationBase):
+
+    def test_get_empty_array_of_string(self):
+        os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = ''
+        self.assertEqual(ArrayOfStrings(),
+                         get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+        os.environ['SCALYR_K8S_IGNORE_NAMESPACES'] = 'a, b, c'
+        self.assertEqual(ArrayOfStrings(['a', 'b', 'c']),
+                         get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+        del os.environ['SCALYR_K8S_IGNORE_NAMESPACES']
+        self.assertIsNone(get_config_from_env('k8s_ignore_namespaces', convert_to=SpaceAndCommaSeparatedArrayOfStrings))
+
+    def test_get_empty_string(self):
+        os.environ['SCALYR_K8S_API_URL'] = ''
+        self.assertEqual('', get_config_from_env('k8s_api_url', convert_to=str))
+
+        del os.environ['SCALYR_K8S_API_URL']
+        self.assertIsNone(get_config_from_env('k8s_api_url', convert_to=str))

@@ -20,7 +20,6 @@ import sys
 import struct
 import thread
 
-import scalyr_agent.json_lib.objects
 
 __author__ = 'czerwin@scalyr.com'
 
@@ -193,9 +192,9 @@ def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
     """Write a dict to a JSON encoded file
     The file is first completely written to tmp_path, and then renamed to file_path
 
-    @param: file_path: The final path of the file
-    @param: tmp_path: A temporary path to write the file to
-    @param: info: A dict containing the JSON object to write
+    @param file_path: The final path of the file
+    @param tmp_path: A temporary path to write the file to
+    @param info: A dict containing the JSON object to write
     """
     fp = None
     try:
@@ -698,6 +697,23 @@ class FakeClock(object):
         self._waiting_condition.release()
 
 
+class RealFakeClock(FakeClock):
+
+    def time(self):
+        return time.time()
+
+    def advance_time(self, set_to=None, increment_by=None):
+        self._time_condition.acquire()
+        if set_to is not None:
+            increment_by = set_to - time.time()
+        if increment_by is None:
+            raise ValueError('Either set_to or increment_by must be supplied')
+        increment_by = max(0, increment_by)
+        time.sleep(increment_by)
+        self._time_condition.notifyAll()
+        self._time_condition.release()
+
+
 class FakeClockCounter(object):
     """Helper class for multithreaded testing. Provides a method for a thread to block until a count has reached target
     value.  Moreover, for every successfully observed increment, it will advance the fake_clock and wait for all
@@ -776,12 +792,12 @@ class StoppableThread(threading.Thread):
     # A prefix to add to all threads.  This is used for testing.
     __name_prefix = None
 
-    def __init__(self, name=None, target=None, fake_clock=None):
+    def __init__(self, name=None, target=None, fake_clock=None, is_daemon=False):
         """Creates a new thread.
 
         You must invoke `start` to actually have the thread begin running.
 
-        Note, if you set `target` to None, then the thread will invoked `run_and_propagate` instead of `run` to
+        Note, if you set `target` to None, then the thread will invoke `run_and_propagate` instead of `run` to
         execute the work for the thread.  You must override `run_and_propagate` instead of `run`.
 
         @param name: The name to give the thread.  Note, if a prefix has been specified via `set_name_prefix`,
@@ -790,10 +806,13 @@ class StoppableThread(threading.Thread):
             the work for the thread.  This function should accept a single argument, the `RunState` instance
             that will signal when the thread should stop work.
         @param fake_clock:  A fake clock to control the time and when threads wake up for tests.
+        @param is_daemon: If True, will set this thread to Daemon (useful for stopping test threads quicker).
+            Use this cautiously as it may result in resources not being freed up properly.
 
         @type name: str
         @type target: None|func
         @type fake_clock: FakeClock|None
+
         """
         name_prefix = StoppableThread._get_name_prefix()
         if name_prefix is not None:
@@ -802,6 +821,8 @@ class StoppableThread(threading.Thread):
             else:
                 name = name_prefix
         threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        if is_daemon:
+            self.setDaemon(True)
         self.__target = target
         self.__exception_info = None
         # Tracks whether or not the thread should still be running.
@@ -862,8 +883,17 @@ class StoppableThread(threading.Thread):
         @param join_timeout: The maximum number of seconds to block for the join.
         """
         self._run_state.stop()
+        self._prepare_to_stop()
         if wait_on_join:
             self.join(join_timeout)
+
+    def _prepare_to_stop(self):
+        """Invoked when the thread has been asked to stop.  It is called after the run state has been updated
+        to indicate the thread should no longer be running.
+
+        Derived classes may override this method to perform work when the thread is about to be stopped.
+        """
+        pass
 
     def join(self, timeout=None):
         """Blocks until the thread has finished.
@@ -1433,251 +1463,199 @@ class RateLimiterToken(object):
         return 'Token #%s' % self._token_id
 
 
-class BlockingRateLimiter(object):
-    """A Rate Limiter that blocks for a random time interval such that over time, the average rate of acquire() calls
-    is R where R varies between a max upper and min lower bound. R is a "cluster" rate where the semantics are
-    each of num_agents Scalyr Agents instantiates one of these rate limiters such that the aggregate access rate over
-    all agents is R.  (Therefore, the per-agent rate is R / num_agents).
+class HistogramTracker(object):
+    """Track as an approximate histogram for a set of values.  The approximation is created by
+    counting the number of values that fall into a predefined set of ranges.  The caller sets
+    the ranges so can control the granularity of the approximation.
 
-    Whenever a certain number of consecutive successes are seen, the rate is increased up until upper_cluster_rate.
-    Likewise, whenever a failure is reported (on token release()), the rate is lowered up until a lower_cluster_rate.
-    Cluster rate is reduced by dividing current rate by backoff_factor.  Cluster rate is increased either by
-    multiplying by increase_factor or resetting to initial rate, depending on the increase_strategy.
-    (Note: if cluster rate is already greater or equal to initial rate, it will be multiplied by the increase factor)
+    This abstraction also tracks several other statistics for the values, including average, minimum value, and
+    maximum value.
     """
+    def __init__(self, bucket_ranges):
+        """Creates an instance with the specified bucket ranges.  The ranges are specified as an sorted array of numbers,
+        where the first bucket will be from 0 >= to < bucket_ranges[0], the second bucket_ranges[0] >= to <
+        bucket_ranges[1], etc.
 
-    INCREASE_STRATEGY_MULTIPLY = 'multiply'
-    INCREASE_STRATEGY_RESET_THEN_MULTIPLY = 'reset_then_multiply'
-
-    def __init__(self, num_agents, initial_cluster_rate, upper_cluster_rate, lower_cluster_rate,
-                 consecutive_success_threshold, increase_strategy, increase_factor=2.0, backoff_factor=0.5,
-                 max_concurrency=1, fake_clock=None):
+        @param bucket_ranges:  The bucket ranges, specified as a sorted array of numbers where bucket_ranges[i]
+            specifies the end of ith bucket and the first bucket starts at 0.
+        @type bucket_ranges: [number]
         """
-        @param num_agents: Number of agents in the cluster
-        @param initial_cluster_rate: initial cluster rate (requests/sec)
-        @param upper_cluster_rate: upper bound on cluster rate (requests/sec)
-        @param lower_cluster_rate: lower bound on cluster rate (requests/sec)
-        @param consecutive_success_threshold: number of consecutive successes to trigger a rate increase
-        @param increase_strategy: strategy for increasing the rate (multiply by increase_factor or reset to initial)
-        @param increase_factor: multiplicative factor for increasing rate
-        @param backoff_factor: multiplicative factor for decreasing rate
-        @param max_concurrency: max number of tokens (for limiting concurrent requests) that can be acquired
-
-        @type num_agents: int
-        @type initial_cluster_rate: float
-        @type upper_cluster_rate: float
-        @type lower_cluster_rate: float
-        @type consecutive_success_threshold: int
-        @type increase_strategy: str
-        @type increase_factor: float
-        @type backoff_factor: float
-        @type max_concurrency: int
-        """
-        self._num_agents = num_agents
-        self._initial_cluster_rate = initial_cluster_rate
-        self._upper_cluster_rate = upper_cluster_rate
-        self._lower_cluster_rate = lower_cluster_rate
-        self._consecutive_success_threshold = consecutive_success_threshold
-        self._increase_strategy = increase_strategy
-        self._increase_factor = increase_factor
-        self._backoff_factor = backoff_factor
-
-        self._current_cluster_rate = self._initial_cluster_rate
-        self._consecutive_successes = 0
-        self._cluster_rate_lock = threading.Lock()
-
-        self._max_concurrency = max_concurrency
-
-        # A queue of tokens
-        self._ripe_time = None
-        self._token_queue = deque()
-        # Condition variable to synchronize access to token queue
-        self._token_queue_cv = threading.Condition()
-
-        # fake clock for testing
-        self._fake_clock = fake_clock
-        self._test_mode_lock = threading.Lock()
-
-        # Validate input
-        strategies = [self.INCREASE_STRATEGY_MULTIPLY, self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY]
-        if increase_strategy not in strategies:
-            raise ValueError('Increase strategy must be one of %s' % strategies)
-
-        if self._max_concurrency < 1:
-            raise ValueError('max_concurrency must be greater than 0')
-
-        if self._consecutive_success_threshold < 1:
-            raise ValueError(
-                'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
-
-        if self._initial_cluster_rate < self._lower_cluster_rate or self._initial_cluster_rate > self._upper_cluster_rate:
-            raise ValueError(
-                'Initial cluster rate must be between lower and upper rates. Initial=%s, Lower=%s, Upper=%s.' % (
-                    initial_cluster_rate, lower_cluster_rate, upper_cluster_rate))
-
-        self._initialize_token_queue()
-
-    @property
-    def current_cluster_rate(self):
-        return self._current_cluster_rate
-
-    @property
-    def current_agent_rate(self):
-        return float(self._current_cluster_rate) / self._num_agents
-
-    def _initialize_token_queue(self):
-        """Initialize a queue with max_concurrency tokens."""
-        self._token_queue_cv.acquire()
-        for num in range(self._max_concurrency):
-            token = RateLimiterToken(num)
-            self._token_queue.append(token)
-        self._ripe_time = self._get_next_ripe_time()
-        self._token_queue_cv.release()
-
-    def _adjust_cluster_rate(self, success):
-        """Adjust cluster rate, backing off on failure or increasing on enough consecutive successes.
-
-        Any failure will cause backoff.
-        A success will accumulate until self._consecutive_success_threshold is reached, at which point the rate will be
-            increased according to self._increase_strategy.  When this happens, the success accumulator resets to 0
-
-        @param success: Whether an operation was successful
-        @type success: bool
-        """
-        self._cluster_rate_lock.acquire()
-        try:
-            if success:
-                self._consecutive_successes += 1
+        # An array of the histogram bucket boundaries, such as 1, 10, 30, 100
+        self.__bucket_ranges = list(bucket_ranges)
+        last_value = None
+        for i in self.__bucket_ranges:
+            if last_value is not None and i < last_value:
+                raise ValueError('The bucket_ranges argument must be sorted.')
             else:
-                self._consecutive_successes = 0
-            if not success:
-                # Failure case: halve the rate
-                self._current_cluster_rate = max(
-                    self._lower_cluster_rate,
-                    self._current_cluster_rate * self._backoff_factor
-                )
-            else:
-                # Success case: If current rate can be increased, do so based on strategy
-                if self._consecutive_successes >= self._consecutive_success_threshold:
-                    if self._current_cluster_rate < self._upper_cluster_rate:
-                        if (self._increase_strategy == self.INCREASE_STRATEGY_RESET_THEN_MULTIPLY and
-                                self._current_cluster_rate < self._initial_cluster_rate):
-                            self._current_cluster_rate = self._initial_cluster_rate
-                        else:
-                            self._current_cluster_rate = min(
-                                self._upper_cluster_rate, self._current_cluster_rate * self._increase_factor)
-                    self._consecutive_successes = 0
-        finally:
-            self._cluster_rate_lock.release()
+                last_value = i
 
-    def _get_next_ripe_time(self):
-        """Get the absolute time for when this token becomes next available
+        # __counts[i] holds the total number of values we have seen >= to __boundaries[i-1] and < __boundaries[i]
+        self.__counts = [0] * len(bucket_ranges)
+        # __overflows holds the number of values >= __boundaries[-1]
+        self.__overflow = 0
+        # The minimum and maximum values seen.
+        self.__min = None
+        self.__max = None
+        # The total number of values collected.
+        self.__total_count = 0
+        # The sum of the values collected
+        self.__total_values = 0
 
-        A token contains state representing the last time it was acquired.
-        In order to achieve a uniform cluster-wide average rate of R, the next time is calculated as:
+    def add_sample(self, value):
+        """Adds the specified value to the values being tracked by this instance.  This value will be reflected in the
+        statistics for this instance until `reset` is invoked.
 
-        current_time + delta
-
-        where delta = random number between (0, 2 * T)
-        where T is the per-agent interval or num_agents / cluster rate
+        @param value: The value
+        @type value: Number
         """
-        agent_interval = float(self._num_agents) / self._current_cluster_rate
-        delta = random.uniform(0, 2 * agent_interval)
-        return max(self._ripe_time, self._time()) + delta
+        index = None
+        # Find the index of the bucket for this value, which is going to be first bucket range greater than the value.
+        for i in range(0, len(self.__bucket_ranges)):
+            if self.__bucket_ranges[i] > value:
+                index = i
+                break
 
-    def _time(self):
-        """Returns absolute time in UTC epoch seconds"""
-        if self._fake_clock:
-            return self._fake_clock.time()
+        # Increment that histogram bucket count.
+        if index is not None:
+            self.__counts[index] += 1
         else:
-            return time.time()
+            # Otherwise, the value must have been greater than our last boundary, so increment the overflow
+            self.__overflow += 1
 
-    def _simulate_acquire_token(self):
-        self._test_mode_lock.acquire()
-        try:
-            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
-                self._test_mode_lock.release()
-                self._fake_clock.simulate_waiting()
-                self._test_mode_lock.acquire()
+        if self.__min is None or value < self.__min:
+            self.__min = value
 
-            # Head token is ripe
-            token = self._token_queue.popleft()
-            self._ripe_time = self._get_next_ripe_time()
-            return token
-        finally:
-            self._test_mode_lock.release()
+        if self.__max is None or value > self.__max:
+            self.__max = value
 
-    def _simulate_release_token(self, token, success):
-        self._adjust_cluster_rate(success)
-        self._test_mode_lock.acquire()
-        try:
-            self._token_queue.append(token)
-        finally:
-            self._test_mode_lock.release()
-        self._fake_clock.advance_time(increment_by=self._ripe_time - self._fake_clock.time())
+        self.__total_count += 1
+        self.__total_values += value
 
-    def acquire_token(self):
-        """Acquires a token, blocking until a token becomes available.
+    def buckets(self, disable_last_bucket_padding=False):
+        """An iterator that returns the tracked buckets along with the number of times a sample was added that
+        fell into that bucket since the last reset.  A bucket is only returned if it has at least one sample
+        fall into it.
 
-        The primary state used to determine token availability is self._ripe_time. Until that time is reached,
-        all client threads are blocked.
-
-        @return: a token object
-        @rtype: RateLimiterToken
+        Each iteration step returns a tuple describing a single bucket: the number of times a value fell into this
+        bucket, the lower end of the bucket, and the upper end of the bucket.  Note, the lower end is inclusive, while
+        the upper end is exclusive.
         """
-        if self._fake_clock:
-            return self._simulate_acquire_token()
+        if self.__total_count == 0:
+            return
 
-        # block until a token is available from the token heap
-        self._token_queue_cv.acquire()
+        # We use the minimum value for the lower bound of the first bucket.
+        previous = self.__min
+        for i in range(0, len(self.__counts)):
+            if self.__counts[i] > 0:
+                yield self.__counts[i], previous, self.__bucket_ranges[i]
+            previous = self.__bucket_ranges[i]
 
-        try:
-            while len(self._token_queue) == 0 or self._time() < self._ripe_time:
-                # no tokens available so sleep for a while
-                if len(self._token_queue) == 0:
-                    # queue contained no tokens so wait indefinitely
-                    self._token_queue_cv.wait()
-                else:
-                    # queue contained at least one token so sleep until the head token becomes ripe
-                    sleep_time = max(0, self._ripe_time - self._time())
-                    if sleep_time > 0:
-                        self._token_queue_cv.wait()
+        if self.__overflow == 0:
+            return
 
-            # Head token is ripe.
-            token = self._token_queue.popleft()
-            self._ripe_time = self._get_next_ripe_time()
-            return token
+        if not disable_last_bucket_padding:
+            padding = 0.01
+        else:
+            padding = 0.0
 
-        finally:
-            self._token_queue_cv.release()
+        # We use the maximum value for the upper bound of the overflow range.  Note, we added 0.01 to make sure the
+        # boundary is exclusive to the values that fell in it.
+        yield self.__overflow, self.__bucket_ranges[-1], self.__max + padding
 
-    def release_token(self, token, success):
-        """Release a token back to the rate limiter.  Adjusts the rate based on success/failure and then re-inserts
-        token back into the queue
-
-        @param token: Token to release
-        @param success: Whether or not the client operation was successful
-
-        @type token: RateLimiterToken
-        @type success: bool
+    def average(self):
         """
-        if not isinstance(token, RateLimiterToken):
-            raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
+        @return: The average for all values added to this instance since the last reset, or None if no values have been
+            added.
+        @rtype: Number or None
+        """
+        if self.__total_count > 0:
+            return self.__total_values / self.__total_count
+        else:
+            return None
 
-        if self._fake_clock:
-            return self._simulate_release_token(token, success)
+    def estimate_median(self):
+        """Calculates an estimate for the median of all the values since the last reset.  The accuracy of this estimate
+        will depend on the granularity of the original buckets.
 
-        self._token_queue_cv.acquire()
+        @return: The estimated median or None if no values have been added.
+        @rtype: Number or None
+        """
+        return self.estimate_percentile(0.5)
 
-        try:
-            # potentially adjust rate depending on reported outcome
-            self._adjust_cluster_rate(success)
+    def estimate_percentile(self, percentile):
+        """Calculates an estimate for the percentile of the added values (such as 95%th) since the last reset.  The
+        accuracy of this estimate will depend on the granularity of the original buckets.
 
-            # re-insert token
-            self._token_queue.append(token)
+        @param percentile:  The percentile to estimate, from 0 to 1.
+        @type percentile: Number
 
-            # awaken threads waiting for tokens
-            self._token_queue_cv.notifyAll()
+        @return: The estimated percentile or None if no values have been added.
+        @rtype: Number or None
+        """
+        if percentile > 1.0:
+            raise ValueError("Percentile must be between 0 and 1.")
 
-        finally:
-            self._token_queue_cv.release()
+        if self.__total_count == 0:
+            return None
+
+        # The first step is to calculate which bucket this percentile lands in.  We do this by calculating the "index"
+        # of what that percentile's sample would have been.  For example, if we are calculating the 75% and there were
+        # 100 values, then the 75% would be the 75th value in sorted order.
+        target_count = self.__total_count * percentile
+
+        cumulative_count = 0
+
+        # Now find the bucket by going over the buckets, keeping track of the cumulative counts across all buckets.
+        for bucket_count, lower_bound, upper_bound in self.buckets(disable_last_bucket_padding=True):
+            cumulative_count = cumulative_count + bucket_count
+            if target_count <= cumulative_count:
+                # Ok, we found the bucket.  To minimize error, we estimate the value of the percentile to be the
+                # midpoint between the lower and upper bounds.
+                return (upper_bound + lower_bound) / 2.0
+
+        # We should never get here because target_count will always be <= the total counts across all buckets.
+
+    def count(self):
+        """
+        @return: The number of samples added to this instance, since the last `reset`.
+        @rtype: int
+        """
+        return self.__total_count
+
+    def min(self):
+        """
+        @return: The minimum value of all samples added to this instance, since the last `reset`.
+        @rtype: Number
+        """
+        return self.__min
+
+    def max(self):
+        """
+        @return: The maximum value of all samples added to this instance, since the last `reset`.
+        @rtype: Number
+        """
+        return self.__max
+
+    def reset(self):
+        """Resets all the instance, discarding all information about all previously added samples.
+        """
+        for i in range(0, len(self.__counts)):
+            self.__counts[i] = 0
+        self.__overflow = 0
+        self.__total_count = 0
+        self.__total_values = 0
+        self.__min = None
+        self.__max = None
+
+    def summarize(self):
+        """
+        Returns a string summarizing the histogram.
+        :return:
+        :rtype:
+        """
+        if self.__total_count == 0:
+            return '(count=0)'
+
+        # noinspection PyStringFormat
+        return '(count=%ld,avg=%.2lf,min=%.2lf,max=%.2lf,median=%.2lf)' % (self.count(), self.average(), self.min(), self.max(),
+                                                                           self.estimate_median())

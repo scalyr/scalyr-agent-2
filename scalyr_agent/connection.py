@@ -258,7 +258,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
             self.sock = socket.create_connection((self.host, self.port), self.__timeout)
         else:
             self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
-        if self._tunnel_host:
+        if hasattr(self, '_tunnel_host') and self._tunnel_host:
             self._tunnel()
 
 
@@ -315,7 +315,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         else:
             self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
 
-        if self._tunnel_host:
+        if hasattr(self, '_tunnel_host') and self._tunnel_host:
             self._tunnel()
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.

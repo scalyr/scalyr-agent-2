@@ -27,7 +27,8 @@ import urlparse
 import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.json_lib import JsonConversionException, JsonMissingFieldException
-from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings
+from scalyr_agent.json_lib.objects import JsonObject, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
@@ -52,6 +53,9 @@ class Configuration(object):
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
     """
+
+    DEFAULT_K8S_IGNORE_NAMESPACES = ['kube-system']
+
     def __init__(self, file_path, default_paths, logger):
         # Captures all environment aware variables for testing purposes
         self._environment_aware_map = {}
@@ -265,7 +269,7 @@ class Configuration(object):
     # k8s cache options
     @property
     def k8s_ignore_namespaces(self):
-        return self.__get_config().get_string('k8s_ignore_namespaces')
+        return self.__get_config().get_json_array('k8s_ignore_namespaces')
 
     @property
     def k8s_api_url(self):
@@ -274,6 +278,14 @@ class Configuration(object):
     @property
     def k8s_verify_api_queries(self):
         return self.__get_config().get_bool('k8s_verify_api_queries')
+
+    @property
+    def k8s_cache_query_timeout_secs(self):
+        return self.__get_config().get_int('k8s_cache_query_timeout_secs')
+
+    @property
+    def k8s_cache_expiry_secs(self):
+        return self.__get_config().get_int('k8s_cache_expiry_secs')
 
     @property
     def k8s_cache_expiry_secs(self):
@@ -292,8 +304,76 @@ class Configuration(object):
         return self.__get_config().get_int('k8s_cache_purge_secs')
 
     @property
+    def k8s_log_api_responses(self):
+        return self.__get_config().get_bool('k8s_log_api_responses')
+
+    @property
+    def k8s_log_api_exclude_200s(self):
+        return self.__get_config().get_bool('k8s_log_api_exclude_200s')
+
+    @property
+    def k8s_log_api_min_response_len(self):
+        return self.__get_config().get_int('k8s_log_api_min_response_len')
+
+    @property
+    def k8s_log_api_min_latency(self):
+        return self.__get_config().get_float('k8s_log_api_min_latency')
+
+    @property
+    def k8s_log_api_ratelimit_interval(self):
+        return self.__get_config().get_float('k8s_log_api_ratelimit_interval')
+
+    @property
+    def k8s_controlled_warmer_max_attempts(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_max_attempts')
+
+    @property
+    def k8s_controlled_warmer_max_query_retries(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_max_query_retries')
+
+    @property
+    def k8s_controlled_warmer_blacklist_time(self):
+        return self.__get_config().get_int('k8s_controlled_warmer_blacklist_time')
+
+    @property
     def k8s_events_disable(self):
         return self.__get_config().get_bool('k8s_events_disable')
+    
+    @property
+    def k8s_ratelimit_cluster_num_agents(self):
+        return self.__get_config().get_int('k8s_ratelimit_cluster_num_agents')
+
+    @property
+    def k8s_ratelimit_cluster_rps_init(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_init')
+
+    @property
+    def k8s_ratelimit_cluster_rps_min(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_min')
+
+    @property
+    def k8s_ratelimit_cluster_rps_max(self):
+        return self.__get_config().get_float('k8s_ratelimit_cluster_rps_max')
+
+    @property
+    def k8s_ratelimit_consecutive_increase_threshold(self):
+        return self.__get_config().get_int('k8s_ratelimit_consecutive_increase_threshold')
+
+    @property
+    def k8s_ratelimit_strategy(self):
+        return self.__get_config().get_string('k8s_ratelimit_strategy')
+
+    @property
+    def k8s_ratelimit_increase_factor(self):
+        return self.__get_config().get_float('k8s_ratelimit_increase_factor')
+
+    @property
+    def k8s_ratelimit_backoff_factor(self):
+        return self.__get_config().get_float('k8s_ratelimit_backoff_factor')
+
+    @property
+    def k8s_ratelimit_max_concurrency(self):
+        return self.__get_config().get_int('k8s_ratelimit_max_concurrency')
 
     @property
     def enable_profiling( self ):
@@ -921,7 +1001,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'api_key', '', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'allow_http', False, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'check_remote_if_no_tty', True, description, apply_defaults, env_aware=True)
-        self.__verify_or_set_optional_string(config, 'compression_type', 'bz2', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_string(config, 'compression_type', 'deflate', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'compression_level', 9, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_attributes(config, 'server_attributes', description, apply_defaults)
         self.__verify_or_set_optional_string(config, 'agent_log_path', self.__default_paths.agent_log_path,
@@ -1039,15 +1119,86 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
 
-
-        self.__verify_or_set_optional_string(config, 'k8s_ignore_namespaces', 'kube-system', description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_array_of_strings(config, 'k8s_ignore_namespaces', Configuration.DEFAULT_K8S_IGNORE_NAMESPACES, description, apply_defaults, separators=[None, ','], env_aware=True)
         self.__verify_or_set_optional_string(config, 'k8s_api_url', 'https://kubernetes.default', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'k8s_verify_api_queries', True, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_int(config, 'k8s_cache_query_timeout_secs', 20, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_secs', 30, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_expiry_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_start_fuzz_secs', 0, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_int(config, 'k8s_cache_purge_secs', 300, description, apply_defaults, env_aware=True)
+
+        # Whether to log api responses to agent_debug.log
+        self.__verify_or_set_optional_bool(
+            config, 'k8s_log_api_responses', False, description, apply_defaults, env_aware=True
+        )
+
+        # If set to True, do not log successes (response code 2xx)
+        self.__verify_or_set_optional_bool(
+            config, 'k8s_log_api_exclude_200s', False, description, apply_defaults, env_aware=True
+        )
+        # Minimum response length of api responses to be logged.  Responses smaller than this limit are not logged.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_min_response_len', 0, description, apply_defaults, env_aware=True
+        )
+        # Minimum latency of responses to be logged.  Responses faster than this limit are not logged.
+        self.__verify_or_set_optional_float(
+            config, 'k8s_log_api_min_latency', 0.0, description, apply_defaults, env_aware=True
+        )
+        # If positive, api calls with the same path will be rate-limited to a message every interval seconds
+        self.__verify_or_set_optional_int(
+            config, 'k8s_log_api_ratelimit_interval', 0, description, apply_defaults, env_aware=True
+        )
+
+        # TODO-163 : make other settings more aggressive
+
+        # Optional (defaults to 3). The number of times the warmer will retry a query to warm a pod before giving up and
+        # classifying it as a Temporary Error
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_max_query_retries', 3, description, apply_defaults, env_aware=True
+        )
+        # Optional (defaults to 5). The maximum number of Temporary Errors that may occur when warming a pod's entry,
+        # before the warmer blacklists it.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_max_attempts', 5, description, apply_defaults, env_aware=True
+        )
+        # Optional (defaults to 300). When a pod is blacklisted, how many secs it must wait until it is
+        # tried again for warming.
+        self.__verify_or_set_optional_int(
+            config, 'k8s_controlled_warmer_blacklist_time', 300, description, apply_defaults, env_aware=True
+        )
+
         self.__verify_or_set_optional_bool(config, 'k8s_events_disable', False, description, apply_defaults, env_aware=True)
+
+        # Agent-wide k8s rate limiter settings
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_cluster_num_agents', 1, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_init', 1000.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_min', 1.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_cluster_rps_max', 1E9, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_consecutive_increase_threshold', 5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_string(
+            config, 'k8s_ratelimit_strategy', BlockingRateLimiter.STRATEGY_MULTIPLY,
+            description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_increase_factor', 2.0, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_float(
+            config, 'k8s_ratelimit_backoff_factor', 0.5, description, apply_defaults, env_aware=True
+        )
+        self.__verify_or_set_optional_int(
+            config, 'k8s_ratelimit_max_concurrency', 1, description, apply_defaults, env_aware=True
+        )
 
         self.__verify_or_set_optional_bool(config, 'disable_send_requests', False, description, apply_defaults, env_aware=True)
 
@@ -1094,7 +1245,7 @@ class Configuration(object):
 
         @param config_object: The JsonObject config containing the field as a key
         @param param_name: Parameter name
-        @param param_type: Parameter primitive type
+        @param param_type: Parameter type
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param custom_env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name. Both upper and lower case versions are tried.
@@ -1117,7 +1268,7 @@ class Configuration(object):
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
         elif param_type == JsonArray:
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
-        elif param_type == ArrayOfStrings:
+        elif param_type in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
             # ArrayOfStrings are extracted from config file as JsonArray
             # (but extracted from the environment different from JsonArray)
             config_val = config_object.get_json_array(param_name, none_if_missing=True)
@@ -1202,7 +1353,7 @@ class Configuration(object):
         if no_description_given:
             description = 'the entry for "%s" in the "logs" array in configuration file "%s"' % (path, config_file_path)
 
-        self.__verify_or_set_optional_array_of_strings( log_entry, 'exclude', description )
+        self.__verify_or_set_optional_array_of_strings( log_entry, 'exclude', [], description )
 
         # If a parser was specified, make sure it is a string.
         if 'parser' in log_entry:
@@ -1543,8 +1694,8 @@ class Configuration(object):
             raise BadConfiguration('The value for the required field "%s" is not an array.  '
                                    'Error is in %s' % (field, config_description), field, 'notJsonArray')
 
-    def __verify_or_set_optional_array_of_strings(self, config_object, field, config_description, apply_defaults=True,
-                                                  env_aware=False, env_name=None):
+    def __verify_or_set_optional_array_of_strings(self, config_object, field, default_value, config_description, apply_defaults=True,
+                                                  separators=[','], env_aware=False, env_name=None):
         """Verifies that the specified field in config_object is an array of strings if present, otherwise sets
         to empty array.
 
@@ -1552,21 +1703,27 @@ class Configuration(object):
 
         @param config_object: The JsonObject containing the configuration information.
         @param field: The name of the field to check in config_object.
+        @param default_value: Default values (array of strings)
         @param config_description: A description of where the configuration object was sourced from to be used in the
             error reporting to the user.
         @param apply_defaults: If true, apply default values for any missing fields.  If false do not set values
             for any fields missing from the config.
+        @param separators: list of allowed separators (An entry of None represents "any whitespace")
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         """
+        separators.sort()
+        # For legacy reasons, must support space-separated array of strings
+        cls = ArrayOfStrings
+        if separators == [None, ',']:
+            cls = SpaceAndCommaSeparatedArrayOfStrings
         try:
-            array_of_strings = self.__get_config_or_environment_val(config_object, field, ArrayOfStrings,
-                                                                    env_aware, env_name)
+            array_of_strings = self.__get_config_or_environment_val(config_object, field, cls, env_aware, env_name)
 
             if array_of_strings is None:
                 if apply_defaults:
-                    config_object.put(field, ArrayOfStrings())
+                    config_object.put(field, cls(values=default_value))
                 return
 
             index = 0

@@ -73,7 +73,7 @@ class ScalyrTestUtils(object):
 
     @staticmethod
     def create_test_monitors_manager(config_monitors=None, platform_monitors=None, extra_toplevel_config=None,
-                                     null_logger=False, fake_clock=False, set_daemon=False):
+                                     null_logger=False, fake_clock=False):
         """Create a test MonitorsManager
 
         @param config_monitors: config monitors
@@ -114,7 +114,7 @@ class ScalyrTestUtils(object):
             if isinstance(monitor, threading.Thread):
                 monitor.setDaemon(True)
 
-        return test_manager
+        return test_manager, config
 
 
 class NullHandler(logging.Handler):

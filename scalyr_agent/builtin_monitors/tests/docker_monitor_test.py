@@ -161,7 +161,7 @@ class DockerMonitorTest(ScalyrTestCase):
 
             manager_poll_interval = 30
             fake_clock = FakeClock()
-            manager = ScalyrTestUtils.create_test_monitors_manager(
+            manager, _ = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
                     {
                         'module': "scalyr_agent.builtin_monitors.docker_monitor",
