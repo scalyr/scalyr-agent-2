@@ -11,7 +11,7 @@ spec:
       serviceAccountName: scalyr-service-account
       containers:
       - name: scalyr-agent
-        image: scalyr/scalyr-k8s-agent:2.0.50
+        image: scalyr/scalyr-k8s-agent:2.0.51
         imagePullPolicy: Always
         env:
           - name: SCALYR_API_KEY
