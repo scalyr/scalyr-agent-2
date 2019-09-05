@@ -1,0 +1,16 @@
+{
+  // Fields describing this server. These fields are attached to each log message, and
+  // can be used to filter data from a particular server or group of servers.
+  server_attributes: {
+     // Fill in this field if you'd like to override the server's hostname.
+     serverHost: "ci-agent-standalone-CIRCLE_BUILD_NUM",
+     
+     // You can add whatever additional fields you'd like.
+     // tier: "production"
+  }
+
+  // Log files to upload to Scalyr. You can use '*' wildcards here.
+  logs: [
+     { path: "/var/log/scalyr-agent-2/data.json", attributes: {parser: "json"} }
+  ],
+}
