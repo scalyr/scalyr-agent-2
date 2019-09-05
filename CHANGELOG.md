@@ -8,18 +8,18 @@ Packaged by Edward Chee <echee@scalyr.com> on Sep 5, 2019 15:00 -0700
 --->
 
 Features
-- Major refactor of kubernetes_monitor (rate-limit k8s api master calls and avoid large api master queries). Tested on a 1000-node cluster.
+* Major refactor of kubernetes_monitor (rate-limit k8s api master calls and avoid large api master queries). Tested on a 1000-node cluster.
 
 Bugs
-- You can now set config params to empty string, thus allowing overriding of non-null default values (e.g. set `k8s_ignore_namespaces` to empty list instead of default `kube-system`).
-- `k8s_ignore_namespaces` is now a comma-separated array-of-strings (legacy space-separated behavior is still supported).
-- JSON logs were causing `total_bytes_skipped` to incorrectly report as always increasing in agent.log `agent_status` line.
-- Python 2.5 sometimes fails to launch because `httplib.HTTPConnection._tunnel_host` is not present.
+* You can now set config params to empty string, thus allowing overriding of non-null default values (e.g. set `k8s_ignore_namespaces` to empty list instead of default `kube-system`).
+* `k8s_ignore_namespaces` is now a comma-separated array-of-strings (legacy space-separated behavior is still supported).
+* JSON logs were causing `total_bytes_skipped` to incorrectly report as always increasing in agent.log `agent_status` line.
+* Python 2.5 sometimes fails to launch because `httplib.HTTPConnection._tunnel_host` is not present.
 
 Miscellaneous changes
-- Emit log message indicating whether kubernetes_monitor is using docker socket or cri filesystem to query running containers.
-- If an error is encountered while parsing JSON logs, do not log the offending JSON line in agent.log.
-- Better reporting of stack trace when exception occurs in kubernetes & docker monitor _get_container() loops.
+* Emit log message indicating whether kubernetes_monitor is using docker socket or cri filesystem to query running containers.
+* If an error is encountered while parsing JSON logs, do not log the offending JSON line in agent.log.
+* Better reporting of stack trace when exception occurs in kubernetes & docker monitor _get_container() loops.
 
 
 ## 2.0.50 "Chevron" - July 30, 2019
