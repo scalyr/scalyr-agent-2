@@ -41,7 +41,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:2 /tmp/unittest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
 
   unittest-25:
     docker:
@@ -50,7 +50,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.5 scalyr/scalyr-agent-ci-unittest:2 /tmp/unittest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.5 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
 
   unittest-24:
     docker:
@@ -59,7 +59,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.4 scalyr/scalyr-agent-ci-unittest:2 /tmp/unittest.sh
+          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.4 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
 
   smoke-standalone-27:
     docker:
@@ -72,7 +72,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:2 /app/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
   smoke-standalone-26:
     docker:
@@ -85,7 +85,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:2 /tmp/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
   smoke-standalone-25:
     docker:
@@ -98,7 +98,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:2 /tmp/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy
   smoke-standalone-24:
     docker:
@@ -111,7 +111,7 @@ jobs:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:2 /tmp/smoketest_standalone.sh && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy
   smoke-docker-json:
     docker:
@@ -132,7 +132,7 @@ jobs:
           paths:
             - "venv"
       - run:
-          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:2 json 300
+          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
 
   smoke-docker-syslog:
     docker:
@@ -153,7 +153,7 @@ jobs:
           paths:
             - "venv"
       - run:
-          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:2 syslog 300
+          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
 
   smoke-k8s:
     machine:
@@ -202,7 +202,7 @@ jobs:
       - run:
           name: build k8s agent and run smoketest
           command: |
-            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:2 300 no_delete_existing_k8s_objs
+            source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs
 
   smoke-k8s-helm:
     machine:
