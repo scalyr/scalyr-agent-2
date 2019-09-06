@@ -36,6 +36,11 @@ class MySqlMonitorTest(ScalyrTestCase):
             self._import_mysql_monitor()
 
     def test_missing_qcache_hits(self):
+        if sys.version_info[:2] < (2, 7):
+            print("Skipping test 'test_missing_qcache_hits'.\n"
+                  "This test is non-critical for pre-2.7 testing.\n" )
+            return
+
         from scalyr_agent.builtin_monitors.mysql_monitor import MysqlDB
 
         class TestMysqlDB(MysqlDB):
