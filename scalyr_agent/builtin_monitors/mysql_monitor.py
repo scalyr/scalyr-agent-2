@@ -30,8 +30,8 @@ global_log = scalyr_logging.getLogger(__name__)
 
 # We must require 2.6 or greater right now because PyMySQL requires it.  We are considering
 # forking PyMySQL and adding in support if there is enough customer demand.
-if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 6):
-    raise UnsupportedSystem('mysql_monitor', 'Requires Python 2.6 or greater.')
+if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 7):
+    raise UnsupportedSystem('mysql_monitor', 'Requires Python 2.7 or greater')
 
 # We import pymysql from the third_party directory.  This
 # relies on PYTHONPATH being set up correctly, which is done
@@ -584,7 +584,7 @@ class MysqlDB(object):
     def _derived_stat_query_cache_efficiency(self, globalVars, globalStatusMap):
         """How efficiently is the query cache being used?"""
         pct = 0.0
-        if globalStatusMap['global.com_select'] + globalStatusMap['global.qcache_hits'] > 0:
+        if 'global.qcache_hits' in globalStatusMap and (globalStatusMap['global.com_select'] + globalStatusMap['global.qcache_hits'] > 0):
             pct = 100.0 * (float(globalStatusMap['global.qcache_hits']) / float(globalStatusMap['global.com_select'] + globalStatusMap['global.qcache_hits']))
         return pct
         
