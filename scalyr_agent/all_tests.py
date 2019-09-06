@@ -61,6 +61,7 @@ PRE_PYTHON27_WHITELIST = [
     'scalyr_agent.tests.configuration_k8s_test',
     'scalyr_agent.builtin_monitors.tests.docker_monitor_test',
     'scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test',
+    'scalyr_agent.builtin_monitors.tests.mysql_monitor_test',
     'scalyr_agent.monitor_utils.tests.k8s_test',
     'scalyr_agent.tests.syslog_request_parser_test',
     'scalyr_agent.tests.syslog_monitor_test',
