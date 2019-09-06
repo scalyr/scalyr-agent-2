@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 ''' Python DB API 2.0 driver compliance unit test suite.
 
     This software is Public Domain and may be used without restrictions.
@@ -827,8 +826,8 @@ class DatabaseAPI20Test(unittest.TestCase):
         # self.assertEqual(str(t1),str(t2))
 
     def test_Binary(self):
-        b = self.driver.Binary('Something')
-        b = self.driver.Binary('')
+        b = self.driver.Binary(b'Something')
+        b = self.driver.Binary(b'')
 
     def test_STRING(self):
         self.assertTrue(hasattr(self.driver,'STRING'),
