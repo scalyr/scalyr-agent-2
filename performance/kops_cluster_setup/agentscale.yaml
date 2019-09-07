@@ -1,0 +1,284 @@
+# Creates a five-zone cluster but only with a small number of workers nodes.
+# 
+# Small number of worker nodes is advisable as setting it to a large number (e.g. 1000) 
+# leads to situations where the cluster ultimately does not start but you'd find out after
+# 1.5-2 hours (on AWS).  Therefore, create the cluster with a small number of nodes, then 
+# go into the AWS EC2 console and increase the autoscaling group limits to expand the number
+# of nodes.
+#
+# Additional tweaks:
+# 1. Avoids gossip protocol as it could be source of ongoing high worker CPU/mem
+# 2. Master nodes must have local SSD (i3.4xlarge $1.2/hr each)
+# 3. private network
+# 4. Calico network provider
+# 5. arp hook must have space before multicmd semicolons
+# 6. Use lower k8s version (1.10) otherwise multi-master cluster creation fails!
+# 7. One master per AZ zone unfortunately
+#
+# Reference Notes:
+# https://github.com/kubernetes/kops/issues/6172
+#   hooks:
+#   - manifest: |
+#       Type=oneshot
+#       ExecStart=/sbin/sysctl net.ipv4.neigh.default.gc_thresh3=100000 ; /sbin/sysctl net.ipv4.neigh.default.gc_thresh2=90000 ; /sbin/sysctl -p
+#     name: increase-neigh-gc-thresh.service
+apiVersion: kops/v1alpha2
+kind: Cluster
+metadata:
+  creationTimestamp: null
+  name: agentscale.dev.scalyr.com
+spec:
+  api:
+    loadBalancer:
+      type: Public
+  authorization:
+    rbac: {}
+  channel: stable
+  cloudProvider: aws
+  configBase: s3://agentscale-dev-scalyr-com-state-store/agentscale.dev.scalyr.com
+  etcdClusters:
+  - cpuRequest: 200m
+    etcdMembers:
+    - instanceGroup: master-us-east-1a
+      name: a
+    - instanceGroup: master-us-east-1b
+      name: b
+    - instanceGroup: master-us-east-1c
+      name: c
+    - instanceGroup: master-us-east-1d
+      name: d
+    - instanceGroup: master-us-east-1f
+      name: f
+    memoryRequest: 100Mi
+    name: main
+  - cpuRequest: 100m
+    etcdMembers:
+    - instanceGroup: master-us-east-1a
+      name: a
+    - instanceGroup: master-us-east-1b
+      name: b
+    - instanceGroup: master-us-east-1c
+      name: c
+    - instanceGroup: master-us-east-1d
+      name: d
+    - instanceGroup: master-us-east-1f
+      name: f
+    memoryRequest: 100Mi
+    name: events
+  hooks:
+  - manifest: |
+      Type=oneshot
+      ExecStart=/sbin/sysctl net.ipv4.neigh.default.gc_thresh3=100000 ; /sbin/sysctl net.ipv4.neigh.default.gc_thresh2=90000 ; /sbin/sysctl -p
+    name: increase-neigh-gc-thresh.service
+  iam:
+    allowContainerRegistry: true
+    legacy: false
+  kubelet:
+    anonymousAuth: false
+  kubernetesApiAccess:
+  - 0.0.0.0/0
+  kubernetesVersion: 1.10.13
+  masterPublicName: api.agentscale.dev.scalyr.com
+  networkCIDR: 172.20.0.0/16
+  networking:
+    kopeio: {}
+  nonMasqueradeCIDR: 100.64.0.0/10
+  sshAccess:
+  - 0.0.0.0/0
+  subnets:
+  - cidr: 172.20.32.0/19
+    name: us-east-1a
+    type: Private
+    zone: us-east-1a
+  - cidr: 172.20.64.0/19
+    name: us-east-1b
+    type: Private
+    zone: us-east-1b
+  - cidr: 172.20.96.0/19
+    name: us-east-1c
+    type: Private
+    zone: us-east-1c
+  - cidr: 172.20.128.0/19
+    name: us-east-1d
+    type: Private
+    zone: us-east-1d
+  - cidr: 172.20.160.0/19
+    name: us-east-1f
+    type: Private
+    zone: us-east-1f
+  - cidr: 172.20.0.0/22
+    name: utility-us-east-1a
+    type: Utility
+    zone: us-east-1a
+  - cidr: 172.20.4.0/22
+    name: utility-us-east-1b
+    type: Utility
+    zone: us-east-1b
+  - cidr: 172.20.8.0/22
+    name: utility-us-east-1c
+    type: Utility
+    zone: us-east-1c
+  - cidr: 172.20.12.0/22
+    name: utility-us-east-1d
+    type: Utility
+    zone: us-east-1d
+  - cidr: 172.20.16.0/22
+    name: utility-us-east-1f
+    type: Utility
+    zone: us-east-1f
+  topology:
+    bastion:
+      bastionPublicName: bastion.agentscale.dev.scalyr.com
+      idleTimeoutSeconds: 3600
+    dns:
+      type: Public
+    masters: private
+    nodes: private
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: master-us-east-1a
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: i3.4xlarge
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: master-us-east-1a
+  role: Master
+  subnets:
+  - us-east-1a
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: master-us-east-1b
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: i3.4xlarge
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: master-us-east-1b
+  role: Master
+  subnets:
+  - us-east-1b
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: master-us-east-1c
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: i3.4xlarge
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: master-us-east-1c
+  role: Master
+  subnets:
+  - us-east-1c
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: master-us-east-1d
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: i3.4xlarge
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: master-us-east-1d
+  role: Master
+  subnets:
+  - us-east-1d
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: master-us-east-1f
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: i3.4xlarge
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: master-us-east-1f
+  role: Master
+  subnets:
+  - us-east-1f
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: nodes
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: t3.small
+  maxSize: 10
+  minSize: 10
+  nodeLabels:
+    kops.k8s.io/instancegroup: nodes
+  role: Node
+  subnets:
+  - us-east-1a
+  - us-east-1b
+  - us-east-1c
+  - us-east-1d
+  - us-east-1f
+
+---
+
+apiVersion: kops/v1alpha2
+kind: InstanceGroup
+metadata:
+  creationTimestamp: null
+  labels:
+    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+  name: bastions
+spec:
+  image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-05-13
+  machineType: t2.micro
+  maxSize: 1
+  minSize: 1
+  nodeLabels:
+    kops.k8s.io/instancegroup: bastions
+  role: Bastion
+  subnets:
+  - utility-us-east-1a
+  - utility-us-east-1b
+  - utility-us-east-1c
+  - utility-us-east-1d
+  - utility-us-east-1f
