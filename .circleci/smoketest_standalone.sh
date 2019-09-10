@@ -9,13 +9,18 @@
 #   READ_API_KEY: Read api key for querying
 #   SCALYR_SERVER: scalyr server
 #   MAX_WAIT: max secs to verify upload
-#   CIRCLE_BUILD_NUM
+#   CIRCLE_BUILD_NUM: unique circle ci build num
+#
+# Optional env vars:
+#   TLS_REVERSE_PROXY:  (e.g. https://localhost:8080). If set, scalyr agent will use this proxy url
 ##################################################################
 
 alias ll='ls -la'
 PS1='\h:\w\$ '
 
 FILES=/tmp
+
+# Parse args
 
 # Create work directory to checkout source code
 mkdir -p /tmp/src && pushd /tmp/src
@@ -64,7 +69,11 @@ cat /etc/scalyr-agent-2/agent.json
 
 echo "{api_key: \"$SCALYR_API_KEY\"}" > /tmp/api_key.json
 sudo mv /tmp/api_key.json /etc/scalyr-agent-2/agent.d/api_key.json
-echo "{scalyr_server: \"qatesting.scalyr.com\", debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
+if [[ -n ${TLS_REVERSE_PROXY} ]]; then
+    echo "{scalyr_server: \"${TLS_REVERSE_PROXY}\", verify_server_certificate: false, allow_http: true, debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
+else
+    echo "{scalyr_server: \"${SCALYR_SERVER}\", debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
+fi
 sudo mv /tmp/scalyr_server.json /etc/scalyr-agent-2/agent.d/scalyr_server.json
 
 # Start the agent.  Must use -E to inherit environment for proper python settings
