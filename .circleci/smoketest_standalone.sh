@@ -1,6 +1,15 @@
 #!/bin/bash
 
 ##################################################################
+# Scalyr Agent smoketest
+#   Checks out a test branch.
+#   Builds an RPM and installs it (mimicking a user install).
+#   Starts the agent, configured to watch a designated local file.
+#   Runs the standalone-agent smoketest, a python process that comprises:
+#     uploader: writes text into the designated local file
+#     verifier: queries scalyr backend to verify that the agent has
+#               correctly uploaded the designated local file.
+#
 # Usage: <this_script>
 # Expects the following env vars
 #   TEST_BRANCH: git branch
