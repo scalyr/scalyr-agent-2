@@ -81,6 +81,7 @@ import socket
 import sys
 import threading
 import urllib
+from copy import deepcopy
 
 
 NAME_SUFFIX_UPLOADER = 'uploader'
@@ -844,6 +845,10 @@ if __name__ == '__main__':
             CONTAINER_PREFIX_2_VERIFIER_CLASS.keys())
         )
 
+    args_copy = deepcopy(vars(args))
+    if 'read_api_key' in args_copy:
+        args_copy['read_api_key'] = args_copy['read_api_key'][:4] + "xxxxxxxxx"
+    _pretty_print('smoketest.py command line args', str(args_copy))
     actor = klass(**vars(args))
 
     # Optionally start upload in a separate thread.  Verifiers should not upload.

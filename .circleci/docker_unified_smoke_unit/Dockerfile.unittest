@@ -1,3 +1,16 @@
+#--------------------------------------------------------------------------------------------------
+# This dockerfile builds the unified image for running Scalyr agent unit & smoke tests
+#
+# It requires the following files:
+#
+# smoketest
+#   override_files
+#     agent.json (agent config file with placeholder serverHost token)
+#   smoketest.py (main smoketest python script)
+# unittest
+#   unittest.sh (unittest script)
+#--------------------------------------------------------------------------------------------------
+
 FROM centos
 
 RUN yum install -y sudo gcc gcc-c++ make git patch openssl-devel zlib-devel readline-devel sqlite-devel bzip2-devel which wget

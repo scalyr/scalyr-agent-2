@@ -10,6 +10,8 @@
 #     verifier: queries scalyr backend to verify that the agent has
 #               correctly uploaded the designated local file.
 #
+# Expects /tmp to contain smoketest.py and the override agent config files
+#
 # Usage: <this_script>
 # Expects the following env vars
 #   TEST_BRANCH: git branch
