@@ -1,6 +1,19 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.52 "Einstein-Rosen Bridge" - Sep 16, 2019
+
+<!---
+Packaged by Edward Chee <echee@scalyr.com> on Sep 16, 2019 11:00 -0700
+--->
+
+Features
+* K8s serverHosts are no longer displayed in Scalyr UI Log Sources (thus avoiding situations where hundreds of serverHost entries pollute the Log Sources overview).
+
+Bugs
+* MySQL monitor plugin fails to connect to Amazon RDS instances. Note: the fix requires python 2.7 so customers running older python versions will no longer be able to run the MySQL monitor from this release onward.
+
+
 ## 2.0.51 "Daniel Jackson" - Sep 5, 2019
 
 <!---
