@@ -81,6 +81,11 @@ define_config_option( __monitor__, 'docker_max_parallel_stats',
                      'Optional (defaults to 20). Maximum stats requests to issue in parallel when retrieving container '
                      'metrics using the Docker API.', convert_to=int, default=20, env_aware=True)
 
+define_config_option( __monitor__, 'docker_percpu_metrics',
+                     'Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by '
+                     'default because it can result in an excessive amount of metric data on cpus with a large number of cores ',
+                     convert_to=bool, default=False, env_aware=True)
+
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
                      'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
@@ -2345,6 +2350,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
         self.__report_k8s_metrics = self._config.get('report_k8s_metrics') and self.__report_container_metrics
+        self.__percpu_metrics = self._config.get('docker_percpu_metrics')
         # Object for talking to the kubelet server running on this localhost.  This is used to gather metrics only
         # available via the kubelet.
         self.__kubelet_api = None
@@ -2534,7 +2540,7 @@ class KubernetesMonitor( ScalyrMonitor ):
         """
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
-            if 'percpu_usage' in cpu_usage:
+            if self.__percpu_metrics and 'percpu_usage' in cpu_usage:
                 percpu = cpu_usage['percpu_usage']
                 count = 1
                 if percpu:
