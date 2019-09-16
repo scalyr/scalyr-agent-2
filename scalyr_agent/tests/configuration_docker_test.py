@@ -51,6 +51,7 @@ class TestConfigurationDocker(TestConfiguration):
             "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, str),
             "log_mode": ('SCALYR_DOCKER_LOG_MODE', TEST_STRING, str),
             "docker_raw_logs": (STANDARD_PREFIX, False, bool),  # test config file is set to True
+            "docker_percpu_metrics": (STANDARD_PREFIX, True, bool),  # test config file is set to False
             "metrics_only": ('SCALYR_DOCKER_METRICS_ONLY', True, bool),
             "container_globs": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
             "container_globs_exclude": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
