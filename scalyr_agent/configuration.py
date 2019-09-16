@@ -52,6 +52,11 @@ class Configuration(object):
 
     This also handles reporting status information about the configuration state, including what time it was
     read and what error (if any) was raised.
+
+    Note:
+    UNDOCUMENTED_CONFIG: These are undocumented config params, meaning they are not described in the public online docs
+        in order to simplify the mental model.  In rare cases, a customer may need to tune these params under direct
+        guidance from support.
     """
 
     DEFAULT_K8S_IGNORE_NAMESPACES = ['kube-system']
@@ -305,34 +310,42 @@ class Configuration(object):
 
     @property
     def k8s_log_api_responses(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool('k8s_log_api_responses')
 
     @property
     def k8s_log_api_exclude_200s(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool('k8s_log_api_exclude_200s')
 
     @property
     def k8s_log_api_min_response_len(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_log_api_min_response_len')
 
     @property
     def k8s_log_api_min_latency(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_log_api_min_latency')
 
     @property
     def k8s_log_api_ratelimit_interval(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_log_api_ratelimit_interval')
 
     @property
     def k8s_controlled_warmer_max_attempts(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_controlled_warmer_max_attempts')
 
     @property
     def k8s_controlled_warmer_max_query_retries(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_controlled_warmer_max_query_retries')
 
     @property
     def k8s_controlled_warmer_blacklist_time(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_controlled_warmer_blacklist_time')
 
     @property
@@ -341,38 +354,47 @@ class Configuration(object):
     
     @property
     def k8s_ratelimit_cluster_num_agents(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_ratelimit_cluster_num_agents')
 
     @property
     def k8s_ratelimit_cluster_rps_init(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_ratelimit_cluster_rps_init')
 
     @property
     def k8s_ratelimit_cluster_rps_min(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_ratelimit_cluster_rps_min')
 
     @property
     def k8s_ratelimit_cluster_rps_max(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_ratelimit_cluster_rps_max')
 
     @property
     def k8s_ratelimit_consecutive_increase_threshold(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_ratelimit_consecutive_increase_threshold')
 
     @property
     def k8s_ratelimit_strategy(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_string('k8s_ratelimit_strategy')
 
     @property
     def k8s_ratelimit_increase_factor(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_ratelimit_increase_factor')
 
     @property
     def k8s_ratelimit_backoff_factor(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_float('k8s_ratelimit_backoff_factor')
 
     @property
     def k8s_ratelimit_max_concurrency(self):
+        # UNDOCUMENTED_CONFIG
         return self.__get_config().get_int('k8s_ratelimit_max_concurrency')
 
     @property

@@ -2757,8 +2757,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
     def get_extra_server_attributes(self):
         # Immutable, hence thread safe
-        return None
-        # return {'_k8s_ver': 'star'}
+        return {'_k8s_ver': 'star'}
 
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe."""
