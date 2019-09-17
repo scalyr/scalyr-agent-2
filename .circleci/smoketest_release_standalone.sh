@@ -60,8 +60,8 @@ elif [[ $ARTIFACT_FILE =~ .*deb ]]; then
   apt-get update
 elif [[ $ARTIFACT_FILE == "PUBLISHED" ]]; then
   echo "Installing via published script (https://www.scalyr.com/install-agent.sh)"
-  pushd /tmp && curl https://www.scalyr.com/install-agent.sh -o /tmp/install_agent.sh && chmod 755 /tmp/install_agent.sh && \
-   /tmp/install-agent.sh --set-api-key $SCALYR_API_KEY
+  pushd /tmp && curl https://www.scalyr.com/install-agent.sh -o /tmp/install-agent.sh && sleep 3 && chmod 755 /tmp/install-agent.sh && \
+  sudo /tmp/install-agent.sh --set-api-key $SCALYR_API_KEY
 elif [[ $ARTIFACT_FILE =~ .*gz ]]; then
   pushd /usr/share
   tar --no-same-owner -zxf $ARTIFACT_FILE
@@ -76,6 +76,8 @@ fi
 FILES=/tmp
 
 if [[ ! -f $SCALYR_AGENT_ETC_DIR/agent.json ]]; then
+    find / -name scalyr_install.log
+    cat $(find / -name scalyr_install.log)
     exit 1
 fi
 
