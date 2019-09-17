@@ -7,6 +7,7 @@ MAINTAINER Scalyr Inc <support@scalyr.com>
 RUN apt-get update && apt-get install -y build-essential
 RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi
 
+
 # main image - copies dependencies from scalyr-dependencies and extracts
 # the tar-zipped file containing the scalyr-agent code
 FROM python:2.7-slim as scalyr
