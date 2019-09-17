@@ -13,6 +13,7 @@ FROM centos
 RUN yum install -y epel-release && yum install -y python36 python36-pip
 RUN pip3 install requests
 RUN yum install -y perl
+RUN yum install -y sudo
 
 #------------------------------------------------------
 # Copy and run test scripts
