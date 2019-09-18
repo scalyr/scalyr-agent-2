@@ -2545,8 +2545,7 @@ class KubernetesMonitor( ScalyrMonitor ):
                 count = 1
                 if percpu:
                     for usage in percpu:
-                        # Use dev for the CPU number since it is a known tag for Scalyr to use in delta computation.
-                        extra = { 'dev' : count }
+                        extra = { 'cpu' : count }
                         if k8s_extra is not None:
                             extra.update(k8s_extra)
                         self._logger.emit_value( 'docker.cpu.usage', usage, extra, monitor_id_override=container )
