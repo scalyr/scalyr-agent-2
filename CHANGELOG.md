@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.53 "Serenity" - Sep 18, 2019
+
+<!---
+Packaged by Imron Alston <imron@scalyr.com> on Sep 18, 2019 15:00 -0700
+--->
+
+Features
+* Collection of per CPU metric data under docker/kubernetes has been placed behind a config option to prevent collecting excessive metrics on machines with a large number of cores.
+
+Miscellaneous changes
+* Added scripts for bringing up/tearing down large clusters for testing
+* Fixed problem with smoketest scripts
+
+
 ## 2.0.52 "Einstein-Rosen Bridge" - Sep 16, 2019
 
 <!---
