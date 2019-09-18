@@ -7,7 +7,7 @@
 export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
 export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
 BUCKET=<YOUR_BUCKET_STORE_NAME>
-export KOPS_CLUSTER_NAME=<YOUR_CLUSTER_NAME>  # should be a valid DNS name, e.g. <YOUR_CUSTER_NAME>
+export KOPS_CLUSTER_NAME=<YOUR_CLUSTER_NAME>  # should be a valid DNS name, e.g. agentscale.dev.scalyr.com
 export KOPS_STATE_STORE=s3://${BUCKET}
 
 # Create bucket for cluster state
