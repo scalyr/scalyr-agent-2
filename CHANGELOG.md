@@ -1,7 +1,7 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.53 "Serenity" - Sep 18, 2019
+## 2.0.53 "Firefly" - Sep 18, 2019
 
 <!---
 Packaged by Imron Alston <imron@scalyr.com> on Sep 18, 2019 15:00 -0700
