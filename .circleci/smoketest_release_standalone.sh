@@ -60,7 +60,7 @@ elif [[ $ARTIFACT_FILE =~ .*deb ]]; then
   apt-get update
 elif [[ $ARTIFACT_FILE == "PUBLISHED" ]]; then
   echo "Installing via published script (https://www.scalyr.com/install-agent.sh)"
-  pushd /tmp && curl https://www.scalyr.com/install-agent.sh -o /tmp/install-agent.sh && sleep 0 && chmod 755 /tmp/install-agent.sh && \
+  pushd /tmp && curl https://www.scalyr.com/install-agent.sh -o /tmp/install-agent.sh && sleep 10 && chmod 755 /tmp/install-agent.sh && \
   echo "Running install-agent.sh as root" && sudo /tmp/install-agent.sh --set-api-key $SCALYR_API_KEY
 elif [[ $ARTIFACT_FILE =~ .*gz ]]; then
   pushd /usr/share
