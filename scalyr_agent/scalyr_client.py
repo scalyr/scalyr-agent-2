@@ -52,7 +52,8 @@ class ScalyrClientSession(object):
     The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
     are monotonically increasing within a session.
     """
-    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0, ca_file=None, use_requests_lib=False,
+    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0,
+                 ca_file=None, intermediate_certs_file=None, use_requests_lib=False,
                  proxies=None, compression_type=None, compression_level=9, disable_send_requests=False):
         """Initializes the connection.
 
@@ -65,6 +66,8 @@ class ScalyrClientSession(object):
         @param request_deadline: The maximum time to wait for all requests in seconds.
         @param ca_file: The path to the file containing the certificates for the trusted certificate authority roots.
             This is used for the SSL connections to verify the connection is to Scalyr.
+        @param intermediate_certs_file: The path to the file containing the certs for the trusted intermediate
+            certificate authorities. This is used for the SSL connections to verify the connection is to Scalyr.
         @param proxies:  A dict describing the network proxies to use (such as a mapping for `https`) or None.
         @param compression_type:  A string containing the compression method to use.
             Valid options are bz2, deflate or None.  Defaults to None.
@@ -76,6 +79,7 @@ class ScalyrClientSession(object):
         @type quiet: bool
         @type request_deadline: float
         @type ca_file: str
+        @type intermediate_certs_file: str
         @type proxies: dict
         @type compression_type: str
         @type compression_level: int
@@ -115,7 +119,7 @@ class ScalyrClientSession(object):
         self.__standard_headers = {
             'Connection': 'Keep-Alive',
             'Accept': 'application/json',
-            'User-Agent': ScalyrClientSession.__get_user_agent(agent_version)
+            'User-Agent': self.__get_user_agent(agent_version)
         }
 
         # Configure compression type
@@ -166,6 +170,7 @@ class ScalyrClientSession(object):
         # connection to Scalyr.  If this is None, then server certificate verification is disabled, and we are
         # susceptible to man-in-the-middle attacks.
         self.__ca_file = ca_file
+        self.__intermediate_certs_file = intermediate_certs_file
         self.__proxies = proxies
 
         # debug flag to disable send requests
@@ -177,7 +182,7 @@ class ScalyrClientSession(object):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of str
         """
-        self.__standard_headers['User-Agent'] = ScalyrClientSession.__get_user_agent(self.__agent_version, fragments)
+        self.__standard_headers['User-Agent'] = self.__get_user_agent(self.__agent_version, fragments)
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -231,7 +236,8 @@ class ScalyrClientSession(object):
             try:
                 if self.__connection is None:
                     self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
-                                                                      self.__ca_file, self.__standard_headers,
+                                                                      self.__ca_file,  self.__intermediate_certs_file,
+                                                                      self.__standard_headers,
                                                                       self.__use_requests, quiet=self.__quiet,
                                                                       proxies=self.__proxies)
                     self.total_connections_created += 1
@@ -484,8 +490,7 @@ class ScalyrClientSession(object):
 
         return AddEventsRequest(body, max_size=max_size)
 
-    @staticmethod
-    def __get_user_agent(agent_version, fragments=None):
+    def __get_user_agent(self, agent_version, fragments=None):
         """Determine the user agent to report in the request headers.
 
         We construct an agent that gives Scalyr some information about the platform the customer is running on,
@@ -538,6 +543,8 @@ class ScalyrClientSession(object):
         # whether or not the client is doing server certificate verification.
         if __has_ssl__:
             ssl_str = 'ssllib'
+            if self.__connection and self.__connection.is_pure_python_tls:
+                ssl_str = 'tlslite'
         else:
             ssl_str = 'nossllib'
 
@@ -1521,91 +1528,6 @@ def _set_last_timestamp( val ):
     """
     global __last_time_stamp__
     __last_time_stamp__ = val
-
-
-class HTTPConnectionWithTimeout(httplib.HTTPConnection):
-    """An HTTPConnection replacement with added support for setting a timeout on all blocking operations.
-
-    Older versions of Python (2.4, 2.5) do not allow for setting a timeout directly on httplib.HTTPConnection
-    objects.  This is meant to solve that problem generally.
-    """
-    def __init__(self, host, port, timeout):
-        self.__timeout = timeout
-        httplib.HTTPConnection.__init__(self, host, port)
-
-    def connect(self):
-        # This method is essentially copied from 2.7's httplib.HTTPConnection.connect.
-        # If socket.create_connection then we use it (as it does in newer Pythons), otherwise, rely on our
-        # own way of doing it.
-        if hasattr(socket, 'create_connection'):
-            self.sock = socket.create_connection((self.host, self.port), self.__timeout)
-        else:
-            self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
-        if hasattr(self, '_tunnel_host') and self._tunnel_host:
-            self._tunnel()
-
-
-class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
-    """An HTTPSConnection replacement that adds support for setting a timeout as well as performing server
-    certificate validation.
-
-    Older versions of Python (2.4, 2.5) do not allow for setting a timeout directly on httplib.HTTPConnection
-    objects, nor do they perform validation of the server certificate.  However, if the user installs the ssl
-    Python library, then it is possible to perform server certificate validation even on Python 2.4, 2.5.  This
-    class implements the necessary support.
-    """
-    def __init__(self, host, port, timeout, ca_file, has_ssl):
-        """
-        Creates an instance.
-
-        Params:
-            host: The server host to connect to.
-            port: The port to connect to.
-            timeout: The timeout, in seconds, to use for all blocking operations on the underlying socket.
-            ca_file:  If not None, then this is a file containing the certificate authority's root cert to use
-                for validating the certificate sent by the server.  This must be None if has_ssl is False.
-                If None is passed in, then no validation of the server certificate will be done whatsoever, so
-                you will be susceptible to man-in-the-middle attacks.  However, at least your traffic will be
-                encrypted.
-            has_ssl:  True if the ssl Python library is available.
-        """
-        if not has_ssl and ca_file is not None:
-            raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
-        self.__timeout = timeout
-        self.__ca_file = ca_file
-        self.__has_ssl = has_ssl
-        httplib.HTTPSConnection.__init__(self, host, port)
-
-    def connect(self):
-        # If the ssl library is not available, then we just have to fall back on old HTTPSConnection.connect
-        # method.  There are too many dependencies to implement it directly here.
-        if not self.__has_ssl:
-            # Unfortunately, the only way to set timeout is to temporarily set the global default timeout
-            # for what it should be for this connection, and then reset it once the connection is established.
-            # Messy, but not much we can do.
-            old_timeout = None
-            try:
-                old_timeout = socket.getdefaulttimeout()
-                socket.setdefaulttimeout(self.__timeout)
-                httplib.HTTPSConnection.connect(self)
-                return
-            finally:
-                socket.setdefaulttimeout(old_timeout)
-
-        # Create the underlying socket.  Prefer Python's newer socket.create_connection method if it is available.
-        if hasattr(socket, 'create_connection'):
-            self.sock = socket.create_connection((self.host, self.port), self.__timeout)
-        else:
-            self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
-
-        if hasattr(self, '_tunnel_host') and self._tunnel_host:
-            self._tunnel()
-
-        # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
-        if self.__ca_file is not None:
-            self.sock = ssl.wrap_socket(self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED)
-        else:
-            self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
 
 
 def create_connection_helper(host, port, timeout=None, source_address=None):

@@ -730,7 +730,10 @@ def build_base_files(base_configs='config'):
 
     # Create the trusted CA root list.
     os.chdir('certs')
-    cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'ca_certs.crt')
+    cat_files(glob_files(make_path(agent_source_root, 'certs/*_root.pem')), 'ca_certs.crt')
+    cat_files(glob_files(make_path(agent_source_root, 'certs/*_intermediate.pem')), 'intermediate_certs.pem')
+    for cert_file in glob_files(make_path(agent_source_root, 'certs/*.pem')):
+        shutil.copy(cert_file, cert_file.split('/')[-1])
 
     os.chdir('..')
 

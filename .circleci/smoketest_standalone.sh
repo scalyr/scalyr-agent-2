@@ -35,36 +35,60 @@ FILES=/tmp
 
 # Create work directory to checkout source code
 mkdir -p /tmp/src && pushd /tmp/src
-if [ ! -d "./scalyr-agent-2" ]; then
+df -kh
+if [[ ! -d "./scalyr-agent-2" ]]; then
     git clone https://github.com/scalyr/scalyr-agent-2.git
 fi
 cd scalyr-agent-2
 git checkout $TEST_BRANCH
 
-# Make sure /usr/local/bin/fpm is runnable
-export PATH=/usr/local/bin:$PATH
-
-# Build RPM with python 2.7
-source ~/.bashrc && pyenv shell 2.7.12 && pyenv version
-echo "Building agent RPM"
-python build_package.py rpm
-RPMFILE=`ls scalyr-agent*.rpm`
-sudo -E rpm -i $RPMFILE
 
 # Switch python version and set PATH.  Also symlink /usr/bin/python to Tcollector doesn't
 # inadvertently use preinstalled 2.7
 python_version_opt='--version'
+SIMULATE_TLS12_FAILURE=false
+
+echo "Input PYTHON_VERSION = $PYTHON_VERSION"
 if [[ $PYTHON_VERSION == "2.4" ]]; then
-    PYENV_VERSION="2.4.1"
+    export PYENV_VERSION="2.4.1"
     python_version_opt='-V'
 elif [[ $PYTHON_VERSION == "2.5" ]]; then
-    PYENV_VERSION="2.5.4"
+    export PYENV_VERSION="2.5.4"
 elif [[ $PYTHON_VERSION == "2.6" ]]; then
-    PYENV_VERSION="2.6.9"
+    export PYENV_VERSION="2.6.9"
 elif [[ $PYTHON_VERSION == "2.7" ]]; then
-    PYENV_VERSION="2.7.12"
+    export PYENV_VERSION="2.7.12"
+elif [[ $PYTHON_VERSION == "2.6.tls12" ]]; then
+    export PYENV_VERSION="2.6.9"
+    SIMULATE_TLS12_FAILURE=true
+elif [[ $PYTHON_VERSION == "2.7.tls12" ]]; then
+    export PYENV_VERSION="2.7.12"
+    SIMULATE_TLS12_FAILURE=true
 fi
-source ~/.bashrc && pyenv shell $PYENV_VERSION && pyenv version
+
+
+# Force an Exception when HTTPSConnectionWithTimeoutAndVerification is used
+if [[ $SIMULATE_TLS12_FAILURE == "true" ]]; then
+    perl -pi -e 's/# SIMULATE_TLS12_FAILURE //g' scalyr_agent/connection.py
+fi
+
+
+# Make sure /usr/local/bin/fpm is runnable
+export PATH=/usr/local/bin:$PATH
+
+# Build RPM with python 2.7
+echo ""
+echo "Using python 2.7 to build rpm"
+SAVED_PYENV_VERSION=$PYENV_VERSION
+source ~/.bashrc && pyenv shell 2.7.12 && pyenv version
+echo "Building agent RPM."
+python build_package.py rpm
+RPMFILE=`ls scalyr-agent*.rpm`
+sudo -E rpm -i $RPMFILE
+
+echo ""
+echo "Switching to python $SAVED_PYENV_VERSION for smoke test"
+source ~/.bashrc && pyenv shell $SAVED_PYENV_VERSION && pyenv version
 
 # Make sure system python is the same as test version (for tcollector)
 pythonbin=$(which python)

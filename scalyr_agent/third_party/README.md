@@ -27,6 +27,12 @@ The following libraries are included:
   * [six](#six)
   * [backports.ssl-match-hostname](#ssl-match-hostname)
   * [PySocks](#PySocks)
+  * [tlslite-ng](#tlslite-ng)
+  * [certvalidator](#certvalidator)
+  * [ecdsa](#ecdsa)
+  * [asn1crypto](#asn1crypto)
+  * [cffi](#cffi)
+  * [oscrypto](#oscrypto)
 
 ## tcollector<a name="tcollector">
 
@@ -129,3 +135,37 @@ The ssl.match_hostname() function from Python 3.5.  A dependency of docker-py.  
 ## PySocks<a name="PySocks">
 
 PySocks library.  Used to enable SOCKS support for Requests.
+
+## tlslite-ng<a name="tlslite-ng">
+
+A pure-python library that implements SSL and TLS cryptographic protocols (supports TLS 1.2 without depending on `openssl`).  See project home [here](https://github.com/tomato42/tlslite-ng).
+
+## certvalidator<a name="certvalidator">
+
+A Python library for validating X.509 certificates or paths.  The agent uses this library to validate server 
+certificate chains when using the `tlslite-ng` library for TLS 1.2 (The `tlslite-ng` library does not perform chain
+validation).  See project home [here](https://github.com/wbond/certvalidator).
+
+## ecdsa<a name="ecdsa">
+
+`tlslite-ng` requires this library.
+
+A pure python implementation of ECDSA cryptography.  See project home [here](https://pypi.org/project/ecdsa/).
+
+## asn1crypto<a name="asn1crypto">
+
+`certvalidator` requires this library.
+
+A fast pure Python library for parsing and serializing ASN.1 structures.  See project home [here](https://github.com/wbond/asn1crypto). 
+
+## cffi<a name="cffi">
+
+`certvalidator` requires this library.
+
+C Foreign Function Interface for Python.  Allows you to interact with almost any C code from Python, based on C-like declarations that you can often copy-paste from header files or documentation.  See project home [here](https://cffi.readthedocs.io/en/latest/). 
+
+## oscrypto<a name="oscrypto">
+
+`certvalidator` requires this library.
+
+An encryption library that `tlslite-ng` depends on.  See project home [here](https://github.com/wbond/oscrypto).

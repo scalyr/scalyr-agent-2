@@ -16,4 +16,3 @@ COPY --from=scalyr-dependencies  /tmp/dependencies/ /
 ADD scalyr-k8s-agent.tar.gz /
 
 CMD ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"]
-
