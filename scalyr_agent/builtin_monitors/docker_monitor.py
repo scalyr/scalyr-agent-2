@@ -77,6 +77,11 @@ define_config_option( __monitor__, 'docker_log_prefix',
                      'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
                      convert_to=str, default='docker', env_aware=True)
 
+define_config_option( __monitor__, 'docker_percpu_metrics',
+                     'Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by '
+                     'default because it can result in an excessive amount of metric data on cpus with a large number of cores.',
+                     convert_to=bool, default=False, env_aware=True)
+
 define_config_option( __monitor__, 'max_previous_lines',
                      'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
                      'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
@@ -1479,6 +1484,8 @@ class DockerMonitor( ScalyrMonitor ):
 
         self.__report_container_metrics = self._config.get('report_container_metrics')
 
+        self.__percpu_metrics = self._config.get('docker_percpu_metrics')
+
         metrics_only = self._config.get('metrics_only')
 
         self.label_exclude_globs = self._config.get( 'label_exclude_globs' )
@@ -1607,13 +1614,13 @@ class DockerMonitor( ScalyrMonitor ):
     def __log_cpu_stats_metrics( self, container, metrics ):
         if 'cpu_usage' in metrics:
             cpu_usage = metrics['cpu_usage']
-            if 'percpu_usage' in cpu_usage:
+            if self.__percpu_metrics and 'percpu_usage' in cpu_usage:
                 percpu = cpu_usage['percpu_usage']
                 count = 1
                 if percpu:
                     for usage in percpu:
                         extra = { 'cpu' : count }
-                        self._logger.emit_value( 'docker.cpu.usage', usage, monitor_id_override=container )
+                        self._logger.emit_value( 'docker.cpu.usage', usage, extra, monitor_id_override=container )
                         count += 1
             self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage )
 

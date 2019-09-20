@@ -2,12 +2,24 @@
 # Author: echee@scalyr.com (Edward Chee)
 #
 # Prerequisites:
+#
 # 1) Install kops
 # 2) Create and version an s3 bucket.  Create the agentscale.yaml cluster definition file 
 #    Run `create_agentscale_yaml.sh` to do this.  The cluster definition will be saved to `fivezones.yaml`.
 # 3) Save `fivezones.yaml` as `agentscale.yaml`.  Customize `agentscale.yaml`, e.g turning off Gossip protocol.
 #    (Diff `fivezones.yaml` and `agentscale.yaml` to view the customizations I used to 
 #    successfully bring up a 1000-node cluster.)
+#
+# Finally, note that all scripts and sample files have the following placeholders:
+#  <YOUR_CUSTER_NAME> : must be a valid DNS name, e.g. agentscale.dev.scalyr.com (pick something unique to your org)
+#  <YOUR_BUCKET_STORE_NAME> : s3 bucket name
+#
+# These placeholders were retroactively edited in the generated `fivezones.yaml` and `agentscale.yaml` to prevent
+# inadvertent reuse of the same s3 bucket by multiple parties.
+#
+# If you wish to use the `agentscale.yaml` directly, you must replace those placeholders with your custom values.
+# Otherwise, set them and run the sample commands in this script to generate `fivezones.yaml`, then `agentscale.yaml`.
+#
 ###################################################################################################################
 
 ###################################################################################################################
@@ -21,8 +33,8 @@ export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
 ###################################################################################################################
 # kops environment variables. These must match the settings you used in step 2 to create the s3 bucket
 ###################################################################################################################
-BUCKET=agentscale-dev-scalyr-com-state-store
-export KOPS_CLUSTER_NAME=agentscale.dev.scalyr.com
+BUCKET=<YOUR_BUCKET_STORE_NAME>
+export KOPS_CLUSTER_NAME=<YOUR_CUSTER_NAME>
 export KOPS_STATE_STORE=s3://${BUCKET}
 
 ###################################################################################################################
@@ -33,12 +45,12 @@ kops create -f agentscale.yaml
 ###################################################################################################################
 # Grant your ssh public key access to the cluster
 ###################################################################################################################
-kops create secret --name agentscale.dev.scalyr.com sshpublickey admin -i ~/.ssh/agentscale_id_rsa.pub
+kops create secret --name $KOPS_CLUSTER_NAME sshpublickey admin -i ~/.ssh/agentscale_id_rsa.pub
 
 ###################################################################################################################
 # Create the cluster
 ###################################################################################################################
-kops update cluster --name agentscale.dev.scalyr.com --yes
+kops update cluster --name $KOPS_CLUSTER_NAME --yes
 
 ###################################################################################################################
 # Wait a while then check cluster status
@@ -49,4 +61,4 @@ kubectl get nodes
 ###################################################################################################################
 # When done, delete the cluster
 ###################################################################################################################
-kops delete cluster --name agentscale.dev.scalyr.com --yes
+kops delete cluster --name $KOPS_CLUSTER_NAME --yes

@@ -2,7 +2,7 @@ apiVersion: kops/v1alpha2
 kind: Cluster
 metadata:
   creationTimestamp: null
-  name: agentscale.dev.scalyr.com
+  name: <YOUR_CUSTER_NAME>
 spec:
   api:
     loadBalancer:
@@ -11,7 +11,7 @@ spec:
     rbac: {}
   channel: stable
   cloudProvider: aws
-  configBase: s3://agentscale-dev-scalyr-com-state-store/agentscale.dev.scalyr.com
+  configBase: s3://<YOUR_BUCKET_STORE_NAME>/<YOUR_CUSTER_NAME>
   etcdClusters:
   - cpuRequest: 200m
     etcdMembers:
@@ -49,7 +49,7 @@ spec:
   kubernetesApiAccess:
   - 0.0.0.0/0
   kubernetesVersion: 1.12.10
-  masterPublicName: api.agentscale.dev.scalyr.com
+  masterPublicName: api.<YOUR_CUSTER_NAME>
   networkCIDR: 172.20.0.0/16
   networking:
     kopeio: {}
@@ -99,7 +99,7 @@ spec:
     zone: us-east-1f
   topology:
     bastion:
-      bastionPublicName: bastion.agentscale.dev.scalyr.com
+      bastionPublicName: bastion.<YOUR_CUSTER_NAME>
     dns:
       type: Public
     masters: private
@@ -112,7 +112,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: master-us-east-1a
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -132,7 +132,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: master-us-east-1b
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -152,7 +152,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: master-us-east-1c
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -172,7 +172,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: master-us-east-1d
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -192,7 +192,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: master-us-east-1f
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -212,7 +212,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: nodes
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21
@@ -236,7 +236,7 @@ kind: InstanceGroup
 metadata:
   creationTimestamp: null
   labels:
-    kops.k8s.io/cluster: agentscale.dev.scalyr.com
+    kops.k8s.io/cluster: <YOUR_CUSTER_NAME>
   name: bastions
 spec:
   image: kope.io/k8s-1.12-debian-stretch-amd64-hvm-ebs-2019-06-21

@@ -58,6 +58,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         k8s_testmap = {
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
             "docker_max_parallel_stats": (STANDARD_PREFIX, TEST_INT, int),
+            "docker_percpu_metrics": (STANDARD_PREFIX, True, bool),
             "container_globs": (STANDARD_PREFIX, TEST_ARRAY_OF_STRINGS, ArrayOfStrings),
             "report_container_metrics": (STANDARD_PREFIX, False, bool),
             "report_k8s_metrics": (STANDARD_PREFIX, True, bool),
