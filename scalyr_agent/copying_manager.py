@@ -1056,6 +1056,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
+        # keep track of paths actually removed, to also remove them from log_matchers
+        removed_paths = {}
+
         # check to see if any of the pending logs have 0 bytes remaining
         # and remove the ones that do
         for path, processed in pending_removal.iteritems():
@@ -1068,6 +1071,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                     if self.__log_paths_being_processed[path].total_bytes_pending == 0:
                         self.remove_log_path( "scheduled-deletion", path )
+                        removed_paths[path] = True
                 else:
 
                     # the log file is schedule for removal and the pending list indicates that it
@@ -1078,7 +1082,16 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__logs_pending_removal.pop( path, None )
                     finally:
                         self.__lock.release()
+                    removed_paths[path] = True
                     log.warn( "Log scheduled for removal is not being monitored: %s" % path )
+
+        # update log matchers
+        self.__lock.acquire()
+        try:
+            self.__log_matchers[:] = [m for m in self.__log_matchers if m.log_path not in removed_paths]
+        finally:
+            self.__lock.release()
+
 
     def __scan_for_pending_log_files( self ):
         """
@@ -1172,7 +1185,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # if none were found, this is indicative that the log file has already been
             # removed
             if matcher.config['path'] in pending_removal and not pending_removal[matcher.config['path']]:
-                log.warn( "No log matches were found for %s.  This is likely indicative that the log file no longer exists.\n", matcher.config['path'] )
+                log.warn( "No log matches were found for %s.  This is likely indicative that the log file no longer exists.", matcher.config['path'] )
 
                 # remove it anyway, otherwise the logs_`pending_removal list will just
                 # grow and grow
