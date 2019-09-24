@@ -583,7 +583,8 @@ class RunState(object):
         """
         self.__condition.acquire()
         try:
-            self.__on_stop_callbacks.remove(callback)
+            if self.__is_running:
+                self.__on_stop_callbacks.remove(callback)
         finally:
             self.__condition.release()
 
@@ -1378,7 +1379,7 @@ class RedirectorClient(StoppableThread):
         elif deadline > poll_deadline:
             deadline = poll_deadline
 
-        if self.__fake_clock is not None:
+        if self.__fake_clock is None:
             self._run_state.sleep_but_awaken_if_stopped(deadline - current_time)
         else:
             self.__simulate_busy_loop(deadline)
