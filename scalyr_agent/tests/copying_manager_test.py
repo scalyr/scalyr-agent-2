@@ -46,6 +46,9 @@ from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent import json_lib
 import scalyr_agent.util as scalyr_util
 
+from scalyr_agent.third_party import six
+
+
 ONE_MB = 1024 * 1024
 
 
@@ -78,7 +81,6 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         f = open( self._config_file, "w" )
         if f:
-
             f.write( scalyr_util.json_encode( config ) )
             f.close()
 
@@ -89,22 +91,59 @@ class DynamicLogPathTest(ScalyrTestCase):
         self._manager = TestableCopyingManager(configuration, [])
         self._controller = self._manager.controller
 
+    def _fake_scan( self ):
+        self._controller.perform_scan()
+        _, responder_callback = self._controller.wait_for_rpc()
+        responder_callback('dummy')
+
+    def _touch_path( self, base_dirs, filename ):
+        if isinstance( base_dirs, six.string_types ):
+            base_dirs = [base_dirs]
+
+        dirs = os.path.join(self._temp_dir, *base_dirs)
+        os.makedirs( dirs )
+
+        path = os.path.join( dirs, filename )
+
+        f = open( path, "w" )
+        if f:
+            f.close()
+
+        return path
+
+    def _append_log_lines(self, filename, *args):
+        fp = open(filename, 'a')
+        for l in args:
+            fp.write(l)
+            fp.write('\n')
+        fp.close()
+
+
+    def test_add_log_config( self ):
+        config = {}
+        self.create_copying_manager( config )
+        self._fake_scan()
+
+        path = self._touch_path( 'dynamic', 'container.log' )
+        log_config = { "path": path }
+
+        self._manager.add_log_config( 'dynamic-add-test', log_config )
+        paths = [m.log_path for m in self._manager.log_matchers]
+        self.assertFalse( path in paths )
+        self._fake_scan()
+        paths = [m.log_path for m in self._manager.log_matchers]
+        self.assertTrue( path in paths )
+
     def test_remove_path(self):
 
+        path = self._touch_path( ['containers', 'container'], 'container.log' )
+
         glob_root = os.path.join(self._temp_dir, 'containers')
-        os.makedirs( glob_root )
         config = {
             "logs": [
                 { "path": "%s/*/*" % glob_root }
             ]
         }
-
-        path = os.path.join( glob_root, "container", "container.log" )
-        os.makedirs( os.path.dirname( path ) )
-
-        f = open( path, "w" )
-        if f:
-            f.close()
 
         self.create_copying_manager( config )
 
@@ -112,11 +151,7 @@ class DynamicLogPathTest(ScalyrTestCase):
         # perform_scan() calls run_and_stop_at(SENDING, required=SLEEPING)
         # Since the test state is already SLEEPING, the required transition is 'consumed' and the require-transition
         # assertion passes and the next-round required transition becomes NONE
-        def _fake_scan():
-            self._controller.perform_scan()
-            _, responder_callback = self._controller.wait_for_rpc()
-            responder_callback('dummy')
-        _fake_scan()
+        self._fake_scan()
 
         log_config = {
             "path": path
@@ -124,16 +159,34 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         self._manager.add_log_config( 'unittest', log_config );
 
-        _fake_scan()
+        self._fake_scan()
 
         self._manager.schedule_log_path_for_removal( 'unittest', log_config['path'] )
 
         self.assertEquals( 1, self._manager.logs_pending_removal_count() )
 
-        _fake_scan()
+        self._fake_scan()
 
         self.assertEquals( 0, self._manager.logs_pending_removal_count() )
 
+        active = self._manager.is_path_active( path )
+        self.assertEquals( 0, len(active), "Path '%s' is still active in %s" % (path, ", ".join(active)) )
+
+    def test_log_matchers_are_removed_if_file_deleted( self ):
+        config = {}
+        self.create_copying_manager( config )
+        self._fake_scan()
+
+        path = self._touch_path( 'dynamic', 'container.log' )
+        log_config = { "path": path }
+
+        self._manager.add_log_config( 'dynamic-add', log_config )
+        self._manager.schedule_log_path_for_removal( 'unittest', path )
+        os.remove( path )
+        self._fake_scan()
+
+        active = self._manager.is_path_active( path )
+        self.assertEquals( 0, len(active), "Path '%s' is still active in %s" % (path, ", ".join(active)) )
 
 class CopyingParamsTest(ScalyrTestCase):
     def setUp(self):
@@ -840,6 +893,13 @@ class TestableCopyingManager(CopyingManager):
             # To do a proper initialization where the copying manager has scanned the current log file and is ready
             # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
             copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
+
+        def scan_for_pending_log_files(self):
+            """
+            Call private function - __scan_for_pending_log_files
+            """
+            self.__copying_manager._CopyingManager__scan_for_pending_log_files()
+
 
         def perform_scan(self):
             """Tells the CopyingManager thread to go through the process loop until far enough where it has performed

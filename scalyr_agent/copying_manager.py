@@ -303,6 +303,55 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         return self.__log_matchers
 
+    def is_path_active( self, path ):
+        """ Returns a list of data structures that still contain a reference to the path
+
+        Only used for testing purposes
+
+        @param path: The path to check
+        @return: list of of strings containing the name of the data structure(s) that still contain the path
+        @rtype: list<str>
+        """
+
+        result = []
+        # check in log matchers
+        for m in self.__log_matchers:
+            if path == m.log_path:
+                result.append('log_matchers')
+                break
+
+        # check in all_paths
+        if path in self.__all_paths:
+            result.append( "all_paths" )
+
+        # check in logs_pending_remove
+        if path in self.__logs_pending_removal:
+            result.append( "logs_pending_removal" )
+
+        # check in logs_pending_reload
+        for m in self.__logs_pending_reload:
+            if path == m.log_path:
+                result.append( "logs_pending_reload" )
+                break
+
+        # check in pending_log_matchers
+        for m in self.__pending_log_matchers:
+            if path == m.log_path:
+                result.append( "pending_log_matchers" )
+                break
+
+        # check in log_processors
+        for p in self.__log_processors:
+            if path == p.log_path:
+                result.append( "log_processors" )
+                break
+
+        # check in log_paths_being_processed
+        if path in self.__log_paths_being_processed:
+            result.append( "log_paths_being_processed" )
+
+        return result
+
     def __path_in_globs( self, path, path_globs ):
         """ Returns the first glob pattern in 'path_globs' that matches 'path' if one exists."""
         for p in path_globs:
