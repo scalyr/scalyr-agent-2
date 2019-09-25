@@ -131,7 +131,7 @@ HAS_UTF8 = re.compile(r'[\x80-\xff]')
 
 # Used for an optimization when escaping a string. This regexp matches a continuous sequence of regular ascii
 # characters (from char 32 to 127).
-SIMPLE_MATCHER = re.compile('^[ -~]*')
+SIMPLE_MATCHER = re.compile('^[ -~]+')
 # Find the two characters " and \ that need to be escaped from the above regular ascii characters.
 ESCAPE_ME = re.compile(r'(\"|\\)')
 
@@ -151,7 +151,7 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
     if type(string_value) is unicode:
         type_index = 1
     elif not use_fast_encoding:
-        if not isinstance(string_value, str):
+        if not isinstance(string_value, str) or HAS_UTF8.search(string_value):
             # it is possible to have the raw strings being passed through (UTF-8)
             # in which case, the utf-8 decoding is not necessary and will throw
             string_value = string_value.decode('utf8')
