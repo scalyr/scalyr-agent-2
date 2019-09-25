@@ -529,8 +529,10 @@ class RunState(object):
         """
         deadline = self.__fake_clock.time() + timeout
 
-        while deadline > self.__fake_clock.time() and self.is_running():
-            self.__fake_clock.simulate_waiting()
+        def deadline_exceeded_or_not_running(current_time):
+            return current_time >= deadline or not self.is_running()
+
+        self.__fake_clock.simulate_waiting(exit_when=deadline_exceeded_or_not_running)
 
         return not self.is_running()
 
@@ -572,6 +574,18 @@ class RunState(object):
         # Invoke the callback if we are already stopped.
         if is_already_stopped:
             callback()
+
+    def remove_on_stop_callback(self, callback):
+        """Removes the specified callback that was previously added via `register_on_stop_callback`.
+
+        @param callback: The callback
+        """
+        self.__condition.acquire()
+        try:
+            if self.__is_running:
+                self.__on_stop_callbacks.remove(callback)
+        finally:
+            self.__condition.release()
 
     def _wait_on_condition(self, timeout):
         """Blocks for the condition to be signaled for the specified timeout.
@@ -647,8 +661,8 @@ class FakeClock(object):
         self._time_condition.notifyAll()
         self._time_condition.release()
 
-    def simulate_waiting(self):
-        """Will block the current thread until notified or until max_wait seconds has elapsed
+    def simulate_waiting(self, exit_when=None):
+        """Will block the current thread until notified and exit_when returns true (if exit_when is not None).
 
         Notification can occur if another thread invokes `advance_time` or `wake_all_threads`
 
@@ -656,14 +670,28 @@ class FakeClock(object):
         to see if time has advanced far enough for any condition they wish.  However, it is typically expected that
         they will not only be waiting for a particular time but also on some other condition, such as whether or not
         a condition has been notified.
+
+        @param exit_when:  A function whose result will determine if this method should finish waiting and return.
+            This function takes in one parameter, the current time.  Note, the lock on the fake clock is held while this
+            method is invoked, so you can atomically check the time against other conditions.  If the function returns
+            true, this function will return.  The function is checked once at the start of the invocation and then
+            after every subsequent notification on the fake clock.
         """
         self._time_condition.acquire()
-        self._increment_waiting_count(1)
 
-        self._time_condition.wait()
-
-        self._increment_waiting_count(-1)
-        self._time_condition.release()
+        # Helper function to reduce code copy
+        def wait_block():
+            self._increment_waiting_count(1)
+            self._time_condition.wait()
+            self._increment_waiting_count(-1)
+        try:
+            if exit_when is None:
+                wait_block()
+            else:
+                while not exit_when(self._time):
+                    wait_block()
+        finally:
+            self._time_condition.release()
 
     def block_until_n_waiting_threads(self, n):
         """Blocks until there are n threads blocked in `simulate_waiting`.
@@ -1271,12 +1299,18 @@ class RedirectorClient(StoppableThread):
 
         try:
             # Do a busy loop to waiting to connect to the server.
+            # Note, for testing purposes, it is important we get the time before we invoke `connect`, since
+            # the simulated calls to allow for connection advance the clock.  By capturing the time before we
+            # invoked `connect`, we can easily see if the connect state later changes (because the time is different
+            # than our captured time).
+            last_busy_loop_time = self.__time()
             while self._is_running():
                 if self.__channel.connect():
                     connected = True
                     break
 
-                self._sleep_for_busy_loop(overall_deadline, 'connection to be made.')
+                self._sleep_for_busy_loop(overall_deadline, last_busy_loop_time, 'connection to be made.')
+                last_busy_loop_time = self.__time()
 
             # If we aren't running any more, then return.  This could happen if the creator of this instance
             # called the `stop` method before we connected.
@@ -1325,13 +1359,18 @@ class RedirectorClient(StoppableThread):
         @return: True if new bytes are available, or False if the thread has been stopped.
         @rtype: bool
         """
+        # For testing purposes, it is important that we capture the time before we invoke `peek`.  That's because
+        # all methods that write bytes will advance the clock... so we can tell if there may be new data by seeing
+        # if the time has changed since the captured time.
+        last_busy_loop_time = self.__time()
         while self._is_running():
             (num_bytes_available, result) = self.__channel.peek()
             if result != 0:
                 raise RedirectorError('Error while waiting for more bytes from redirect server error=%d' % result)
             if num_bytes_available > 0:
                 return True
-            self._sleep_for_busy_loop(overall_deadline, 'more bytes to be read')
+            self._sleep_for_busy_loop(overall_deadline, last_busy_loop_time, 'more bytes to be read')
+            last_busy_loop_time = self.__time()
         return False
 
     def _is_running(self):
@@ -1345,25 +1384,60 @@ class RedirectorClient(StoppableThread):
     # to become available.
     BUSY_LOOP_POLL_INTERVAL = .03
 
-    def _sleep_for_busy_loop(self, deadline, description):
+    def _sleep_for_busy_loop(self, deadline, last_loop_time, description):
         """Sleeps for a small unit of time as part of a busy wait loop.
 
         This method will return if either the small unit of time has exceeded, the overall deadline has been exceeded,
         or if the `stop` method of this thread has been invoked.
 
-        @param deadline: The walltime that this operation should time out.  This method will sleep for the small of
-            BUSY_LOOP_POLL_INTERVAL or the difference between now and walltime.
+        @param deadline: The walltime that this operation should time out.  This method will sleep until the smaller of
+            last_loop_time + BUSY_LOOP_POLL_INTERVAL or deadline.
+        @param last_loop_time: The time the last loop through the busy wait loop began.  This is used to calculate the
+            deadline of the busy sleep.  Note, it is also important for catching advances in the fake clock when
+            in test mode.
         @param description: A description of why we waiting to be used in error output.
 
         @type deadline: float
+        @type last_loop_time: float
         @type description: str
         """
-        timeout = deadline - self.__time()
-        if timeout < 0:
+        current_time = self.__time()
+        poll_deadline = RedirectorClient.BUSY_LOOP_POLL_INTERVAL + last_loop_time
+
+        if deadline - current_time < 0:
             raise RedirectorError('Deadline exceeded while waiting for %s' % description)
-        elif timeout > RedirectorClient.BUSY_LOOP_POLL_INTERVAL:
-            timeout = RedirectorClient.BUSY_LOOP_POLL_INTERVAL
-        self._run_state.sleep_but_awaken_if_stopped(timeout)
+        elif deadline > poll_deadline:
+            deadline = poll_deadline
+
+        if self.__fake_clock is None:
+            self._run_state.sleep_but_awaken_if_stopped(deadline - current_time)
+        else:
+            self.__simulate_busy_loop(deadline)
+
+    def __simulate_busy_loop(self, deadline):
+        """Simulates the busy wait loop using a fake clock.  This will exit when either deadline is exceeded on the
+        fake clock or the `stop` method of the thread has been invoked.
+
+        @param deadline: The walltime when this operation should return
+        @type deadline: float
+        """
+        # Helper method to determine if the exit condition has been met.
+        def deadline_exceeded_or_is_stopped(current_time):
+            return current_time > deadline or not self._run_state.is_running()
+
+        # Helper method to advance the clock.
+        def advance_clock():
+            self.__fake_clock.advance_time(increment_by=0.01)
+
+        # We will primarily be blocking on the clock waiting for it to advance.  In order to notice when the thread
+        # has been stopped, we increment the clock when `stop` is invoked.
+        self._run_state.register_on_stop_callback(advance_clock)
+        try:
+            # Simulate the waiting, looking for the deadline to be exceeded or stop to be invoked.
+            self.__fake_clock.simulate_waiting(exit_when=deadline_exceeded_or_is_stopped)
+        finally:
+            # Be sure to remove our callback.
+            self._run_state.remove_on_stop_callback(advance_clock)
 
     def __time(self):
         if self.__fake_clock is None:
