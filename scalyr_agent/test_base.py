@@ -115,6 +115,8 @@ class BaseScalyrTestCase(unittest.TestCase):
     # noinspection PyPep8Naming
     def __init__(self, methodName='runTest'):
         unittest.TestCase.__init__(self, methodName=methodName)
+        # Add in some code to check to make sure that derived classed invoked this classes `setUp` method if
+        # they overrode it.
         self.__setup_invoked = False
         self.addCleanup(self.verify_setup_invoked)
 
@@ -138,7 +140,9 @@ if sys.version_info[:2] < (2, 7):
         """The base class for Scalyr tests.
 
         This is used mainly to hide differences between the test fixtures available in the various Python
-        versions
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
         def assertIs(self, obj1, obj2, msg=None):
             """Just like self.assertTrue(a is b), but with a nicer default message."""
@@ -178,7 +182,9 @@ else:
         """The base class for Scalyr tests.
 
         This is used mainly to hide differences between the test fixtures available in the various Python
-        versions
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
         def assertIs(self, obj1, obj2, msg=None):
             unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
