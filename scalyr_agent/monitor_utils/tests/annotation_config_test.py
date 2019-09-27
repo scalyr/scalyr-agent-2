@@ -24,9 +24,6 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 
 class TestAnnotationConfig(ScalyrTestCase):
-    def setUp(self):
-        pass
-
     def test_plain_values(self):
         annotations = {
             "log.config.scalyr.com/someKey": "someValue",

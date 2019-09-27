@@ -31,6 +31,7 @@ import unittest
 class AddEventsRequestTest(ScalyrTestCase):
 
     def setUp(self):
+        super(AddEventsRequestTest, self).setUp()
         self.__body = {'token': 'fakeToken'}
         scalyr_client._set_last_timestamp(0)
 
@@ -292,9 +293,6 @@ class AddEventsRequestTest(ScalyrTestCase):
 
 
 class EventTest(ScalyrTestCase):
-    def setUp(self):
-        pass
-
     def test_all_fields(self):
         x = Event(thread_id='foo', attrs={"parser": "bar"})
         x.set_message("my_message")
@@ -452,7 +450,8 @@ class EventTest(ScalyrTestCase):
 
 
 class EventSequencerTest(ScalyrTestCase):
-    def setUp( self ):
+    def setUp(self):
+        super(EventSequencerTest, self).setUp()
         self.event_sequencer = EventSequencer()
 
     def test_sequence_id_but_no_number( self ):
@@ -560,6 +559,7 @@ class EventSequencerTest(ScalyrTestCase):
 class PostFixBufferTest(ScalyrTestCase):
 
     def setUp(self):
+        super(PostFixBufferTest, self).setUp()
         self.__format = '], threads: THREADS, client_time: TIMESTAMP }'
 
     def test_basic_case(self):

@@ -27,6 +27,7 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingR
 class AutoFlushingRotatingFileTestCase( unittest.TestCase ):
 
     def setUp(self):
+        super(AutoFlushingRotatingFileTestCase, self).setUp()
         self._tempdir = tempfile.mkdtemp()
         self._path = os.path.join(self._tempdir, 'out.log')
 

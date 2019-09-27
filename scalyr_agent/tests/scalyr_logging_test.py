@@ -27,6 +27,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class ScalyrLoggingTest(ScalyrTestCase):
     def setUp(self):
+        super(ScalyrLoggingTest, self).setUp()
         self.__log_path = tempfile.mktemp('.log')
         scalyr_logging.set_log_destination(use_disk=True, logs_directory=os.path.dirname(self.__log_path),
                                            agent_log_file_path=self.__log_path)

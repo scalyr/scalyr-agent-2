@@ -23,6 +23,7 @@ import thread
 
 __author__ = 'czerwin@scalyr.com'
 
+import logging
 import base64
 import calendar
 import datetime
@@ -892,7 +893,7 @@ class StoppableThread(threading.Thread):
                 self.run_and_propagate()
         except Exception, e:
             self.__exception_info = sys.exc_info()
-            print >> sys.stderr, 'Received exception from run method in StoppableThread %s' % str(e)
+            logging.getLogger().warn('Received exception from run method in StoppableThread %s' % str(e))
             return None
 
     def run_and_propagate(self):

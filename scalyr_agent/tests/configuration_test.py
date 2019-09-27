@@ -35,6 +35,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 class TestConfigurationBase(ScalyrTestCase):
 
     def setUp(self):
+        super(TestConfigurationBase, self).setUp()
         self.original_os_env = dict([(k, v) for k, v in os.environ.iteritems()])
         self._config_dir = tempfile.mkdtemp()
         self._config_file = os.path.join(self._config_dir, 'agent.json')

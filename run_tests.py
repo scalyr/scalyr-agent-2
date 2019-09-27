@@ -22,8 +22,10 @@
 __author__ = 'czerwin@scalyr.com'
 
 from scalyr_agent.__scalyr__ import scalyr_init
-scalyr_init()
+import scalyr_agent.scalyr_logging as scalyr_logging
 
+scalyr_init()
+scalyr_logging.set_log_destination(use_stdout=True)
 
 from scalyr_agent.all_tests import run_all_tests
 

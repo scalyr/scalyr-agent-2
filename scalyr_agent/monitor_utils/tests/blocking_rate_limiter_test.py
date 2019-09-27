@@ -59,6 +59,7 @@ def rate_maintainer(consecutive_success_threshold, backoff_rate, increase_rate):
 class BlockingRateLimiterTest(ScalyrTestCase):
 
     def setUp(self):
+        super(BlockingRateLimiterTest, self).setUp()
         self._fake_clock = FakeClock()
         self._test_state = {
             'count': 0,
