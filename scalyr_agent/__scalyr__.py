@@ -145,9 +145,8 @@ def __add_scalyr_package_to_path():
     sys.path.insert(0, os.path.dirname(get_package_root()))
 
 
-def __add_third_party_hacks():
-    """Apply hacks to get some of the third party libraries in the `scalyr_agent/third_party` directory
-    to propertly import.
+def __add_backport_hack():
+    """Adds the hack to support backport.  This should only be imported for Python 2.7 and higher.
     """
     # The backports.ssl_match_hostname third party library (in scalyr_agent/third_party) will not be imported in
     # for systems that already have any version of the `backports` module installed.  This is depended on by Docker,
@@ -176,6 +175,14 @@ def __add_third_party_hacks():
         from backports.ssl_match_hostname import match_hostname
     finally:
         sys.path = original_path
+
+
+def __add_third_party_hacks():
+    """Apply hacks to get some of the third party libraries in the `scalyr_agent/third_party` directory
+    to propertly import.
+    """
+    if sys.version_info[:2] >= (2, 7):
+        __add_backport_hack()
 
 
 def __determine_version():
