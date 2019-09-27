@@ -113,12 +113,13 @@ class BaseScalyrTestCase(unittest.TestCase):
     adds protection to help detect hung test threads.
     """
     # noinspection PyPep8Naming
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName='runTest', verify_setup_invoked=False):
         unittest.TestCase.__init__(self, methodName=methodName)
         # Add in some code to check to make sure that derived classed invoked this classes `setUp` method if
         # they overrode it.
-        self.__setup_invoked = False
-        self.addCleanup(self.verify_setup_invoked)
+        if verify_setup_invoked:
+            self.__setup_invoked = False
+            self.addCleanup(self.verify_setup_invoked)
 
     def setUp(self):
         # We need to reset the log destinations here because it is only at this point is stdout replaced with
@@ -144,6 +145,11 @@ if sys.version_info[:2] < (2, 7):
 
         WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
+        # noinspection PyPep8Naming
+        def __init__(self, methodName='runTest'):
+            # Do not verify the setup was invoked since it relies on addCleanup which is only available in 2.7
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=False)
+
         def assertIs(self, obj1, obj2, msg=None):
             """Just like self.assertTrue(a is b), but with a nicer default message."""
             if obj1 is not obj2:
@@ -186,6 +192,10 @@ else:
 
         WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
+        # noinspection PyPep8Naming
+        def __init__(self, methodName='runTest'):
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=True)
+
         def assertIs(self, obj1, obj2, msg=None):
             unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
 
