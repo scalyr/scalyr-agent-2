@@ -94,7 +94,11 @@ def run_all_tests():
             print( "Error loading test_case '%s'.  %s, %s" % (test_case, str(e), traceback.format_exc()) )
 
     test_suite = unittest.TestSuite(suites)
-    text_runner = unittest.TextTestRunner(buffer=True).run(test_suite)
+    if sys.version_info[:2] < (2, 7):
+        # 2.6 and below to do not support capturing test output
+        text_runner = unittest.TextTestRunner().run(test_suite)
+    else:
+        text_runner = unittest.TextTestRunner(buffer=True).run(test_suite)
     if not text_runner.wasSuccessful():
         error = True
     sys.exit(error)
