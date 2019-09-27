@@ -925,6 +925,7 @@ class MetricLogHandler(object):
         # up to the root.
         if not self.__added_to_root:
             logging.getLogger().addHandler(self)
+            self.__added_to_root = True
 
         self.__monitors[monitor] = True
 
