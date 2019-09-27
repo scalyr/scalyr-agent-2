@@ -1239,7 +1239,7 @@ class AgentLogManager(object):
 
         # Create the right type of handler.
         if self.__use_stdout:
-            handler = logging.StreamHandler(stream=sys.stdout)
+            handler = logging.StreamHandler(sys.stdout)
         else:
             handler = logging.handlers.RotatingFileHandler(file_path, maxBytes=self.__rotation_max_bytes,
                                                            backupCount=self.__rotation_backup_count)
