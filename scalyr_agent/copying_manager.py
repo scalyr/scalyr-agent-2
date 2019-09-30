@@ -312,43 +312,48 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: list of of strings containing the name of the data structure(s) that still contain the path
         @rtype: list<str>
         """
-
         result = []
-        # check in log matchers
-        for m in self.__log_matchers:
-            if path == m.log_path:
-                result.append('log_matchers')
-                break
 
-        # check in all_paths
-        if path in self.__all_paths:
-            result.append( "all_paths" )
+        self.__lock.acquire()
+        try:
+            # check in log matchers
+            for m in self.__log_matchers:
+                if path == m.log_path:
+                    result.append('log_matchers')
+                    break
 
-        # check in logs_pending_remove
-        if path in self.__logs_pending_removal:
-            result.append( "logs_pending_removal" )
+            # check in all_paths
+            if path in self.__all_paths:
+                result.append( "all_paths" )
 
-        # check in logs_pending_reload
-        for m in self.__logs_pending_reload:
-            if path == m.log_path:
-                result.append( "logs_pending_reload" )
-                break
+            # check in logs_pending_remove
+            if path in self.__logs_pending_removal:
+                result.append( "logs_pending_removal" )
 
-        # check in pending_log_matchers
-        for m in self.__pending_log_matchers:
-            if path == m.log_path:
-                result.append( "pending_log_matchers" )
-                break
+            # check in logs_pending_reload
+            for m in self.__logs_pending_reload:
+                if path == m.log_path:
+                    result.append( "logs_pending_reload" )
+                    break
 
-        # check in log_processors
-        for p in self.__log_processors:
-            if path == p.log_path:
-                result.append( "log_processors" )
-                break
+            # check in pending_log_matchers
+            for m in self.__pending_log_matchers:
+                if path == m.log_path:
+                    result.append( "pending_log_matchers" )
+                    break
 
-        # check in log_paths_being_processed
-        if path in self.__log_paths_being_processed:
-            result.append( "log_paths_being_processed" )
+            # check in log_processors
+            for p in self.__log_processors:
+                if path == p.log_path:
+                    result.append( "log_processors" )
+                    break
+
+            # check in log_paths_being_processed
+            if path in self.__log_paths_being_processed:
+                result.append( "log_paths_being_processed" )
+
+        finally:
+            self.__lock.release()
 
         return result
 
@@ -439,6 +444,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                     #do the removals
                     self.__log_matchers[:] = [m for m in self.__log_matchers if not m.log_path == log_path]
                     self.__logs_pending_removal.pop( log_path, None )
+                    del self.__all_paths[log_path]
 
             # check to see if we are removing a path that matches a glob
             elif self.__path_in_globs( log_path, self.__all_paths.keys() ):
@@ -1068,6 +1074,13 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                     if self.__log_paths_being_processed[path].total_bytes_pending == 0:
                         self.remove_log_path( "scheduled-deletion", path )
+                        # remove from the log_paths_being_processed.
+                        # Note: We do this here rather than in remove_log_path, because
+                        # changes to log_paths_being processed should only happen on the main thread
+                        processor = self.__log_paths_being_processed[path]
+                        del self.__log_paths_being_processed[path]
+                        processor.close()
+                        self.__log_processors[:] = [p for p in self.__log_processors if p.log_path != path]
                 else:
 
                     # the log file is schedule for removal and the pending list indicates that it
