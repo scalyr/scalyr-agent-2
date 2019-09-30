@@ -91,6 +91,7 @@ class TestReportStatus(ScalyrTestCase):
         os.environ.update(self.saved_env)
 
     def setUp(self):
+        super(TestReportStatus, self).setUp()
         self.saved_env = dict(os.environ)
         os.environ.clear()
         self.time = 1409958853

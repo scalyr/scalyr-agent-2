@@ -30,6 +30,7 @@ class UrlMonitorTestRequest(unittest.TestCase):
     """
 
     def setUp(self):
+        super(UrlMonitorTestRequest, self).setUp()
         self.legit_headers = JsonArray()
         self.legit_headers.add(JsonObject({'header': 'header_foo', 'value': 'foo'}))
         self.legit_headers.add(JsonObject({'header': 'header_bar', 'value': 'bar'}))

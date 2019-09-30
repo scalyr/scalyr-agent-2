@@ -29,6 +29,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class TestStatusReporter(ScalyrTestCase):
     def setUp(self):
+        super(TestStatusReporter, self).setUp()
         self.receiver = StatusReporter()
         self.sender = StatusReporter(duplicate_reporter=self.receiver)
 
@@ -54,6 +55,7 @@ class TestStatusReporter(ScalyrTestCase):
 
 class TestPidfileManager(ScalyrTestCase):
     def setUp(self):
+        super(TestPidfileManager, self).setUp()
         self.__pidfile_name = self._create_tempfile_name()
 
         self.__test_manager = PidfileManager(self.__pidfile_name)

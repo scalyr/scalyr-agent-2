@@ -148,6 +148,7 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
     POD_2 = 'pod_2'
 
     def setUp(self):
+        super(ControlledCacheWarmerTest, self).setUp()
         self.__fake_cache = FakeCache()
         self.__warmer_test_instance = ControlledCacheWarmer(max_failure_count=5, blacklist_time_secs=300)
         self.assertFalse(self.__warmer_test_instance.is_running())

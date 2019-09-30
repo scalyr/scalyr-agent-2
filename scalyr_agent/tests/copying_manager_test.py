@@ -52,6 +52,7 @@ ONE_MB = 1024 * 1024
 class DynamicLogPathTest(ScalyrTestCase):
 
     def setUp(self):
+        super(DynamicLogPathTest, self).setUp()
         self._temp_dir = tempfile.mkdtemp()
         self._data_dir = os.path.join(self._temp_dir, 'data')
         self._log_dir = os.path.join(self._temp_dir, 'log')
@@ -137,6 +138,7 @@ class DynamicLogPathTest(ScalyrTestCase):
 
 class CopyingParamsTest(ScalyrTestCase):
     def setUp(self):
+        super(CopyingParamsTest, self).setUp()
         self.__config_dir = tempfile.mkdtemp()
         self.__config_file = os.path.join(self.__config_dir, 'agentConfig.json')
         self.__config_fragments_dir = os.path.join(self.__config_dir, 'configs.d')
@@ -328,6 +330,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
 class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
     def setUp(self):
+        super(CopyingManagerEnd2EndTest, self).setUp()
         self._controller = None
 
     def tearDown(self):

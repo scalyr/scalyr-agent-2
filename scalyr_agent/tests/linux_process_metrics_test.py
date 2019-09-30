@@ -77,6 +77,7 @@ class TestMetricClass(ScalyrTestCase):
 
 class TestProcessMonitorInitialize(ScalyrTestCase):
     def setUp(self):
+        super(TestProcessMonitorInitialize, self).setUp()
         self.config_commandline = {
             "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
             "id": "myapp",
@@ -95,6 +96,7 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
     """
 
     def setUp(self):
+        super(TestProcessMonitorRecordMetrics, self).setUp()
         self.config_commandline = {
             "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
             "id": "myapp",
@@ -178,6 +180,7 @@ class TestProcessMonitorRecordMetrics(ScalyrTestCase):
 
 class TestProcessListUtility(ScalyrTestCase):
     def setUp(self):
+        super(TestProcessListUtility, self).setUp()
         self.ps = ProcessList()
 
     def test_no_process(self):
@@ -260,6 +263,7 @@ class TestProcessMonitorRunningTotal(ScalyrTestCase):
     """
 
     def setUp(self):
+        super(TestProcessMonitorRunningTotal, self).setUp()
         self.config_commandline = {
             "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
             "id": "myapp",

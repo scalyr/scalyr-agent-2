@@ -37,6 +37,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class TestUtilCompression(ScalyrTestCase):
     def setUp(self):
+        super(TestUtilCompression, self).setUp()
         self._data = 'The rain in spain. ' * 1000
 
     def test_zlib(self):
@@ -91,6 +92,7 @@ class TestUtilCompression(ScalyrTestCase):
 class TestUtil(ScalyrTestCase):
 
     def setUp(self):
+        super(TestUtil, self).setUp()
         self.__tempdir = tempfile.mkdtemp()
         self.__path = os.path.join(self.__tempdir, 'testing.json')
 
@@ -222,6 +224,7 @@ class TestUtil(ScalyrTestCase):
 
 class TestRateLimiter(ScalyrTestCase):
     def setUp(self):
+        super(TestRateLimiter, self).setUp()
         self.__test_rate = RateLimiter(100, 10, current_time=0)
         self.__current_time = 0
 
@@ -284,6 +287,7 @@ class TestRunState(ScalyrTestCase):
 
 class TestStoppableThread(ScalyrTestCase):
     def setUp(self):
+        super(TestStoppableThread, self).setUp()
         self._run_counter = 0
 
     def test_basic_use(self):
@@ -412,6 +416,7 @@ class TestRedirectorServer(ScalyrTestCase):
     """Tests the RedirectorServer code using fakes for stdout, stderr and the channel.
     """
     def setUp(self):
+        super(TestRedirectorServer, self).setUp()
         # Allows us to watch what bytes are being sent to the client.
         self._channel = FakeServerChannel()
         # Allows us to write bytes to stdout, stderr without them going to the terminal.
@@ -486,6 +491,7 @@ class TestRedirectorClient(ScalyrTestCase):
     """Test the RedirectorClient by faking out the client channel and also the clock.
     """
     def setUp(self):
+        super(TestRedirectorClient, self).setUp()
         self._fake_sys = FakeSys()
         # Since the client is an actual other thread that blocks waiting for input from the server, we have to
         # simulate the time using a fake clock.  That will allow us to wait up the client thread from time to time.
@@ -567,6 +573,7 @@ class TestRedirectionService(ScalyrTestCase):
     """Tests both the RedirectorServer and the RedirectorClient communicating together.
     """
     def setUp(self):
+        super(TestRedirectionService, self).setUp()
         self._client_sys = FakeSys()
         self._server_sys = FakeSys()
         self._fake_clock = scalyr_util.FakeClock()
@@ -706,6 +713,7 @@ class TestHistogramTracker(ScalyrTestCase):
     """Tests the HistogramTracker abstraction.
     """
     def setUp(self):
+        super(TestHistogramTracker, self).setUp()
         self._testing = HistogramTracker([10, 25, 50, 100])
 
     def test_count(self):

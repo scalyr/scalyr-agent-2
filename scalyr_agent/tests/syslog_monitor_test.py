@@ -214,6 +214,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             pass
 
     def setUp(self):
+        super(SyslogMonitorConnectTest, self).setUp()
         self.monitor = None
         self.sockets = []
 

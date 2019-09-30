@@ -132,6 +132,7 @@ class TestCRILogParsing(ScalyrTestCase):
 
 class TestLogFileIterator(ScalyrTestCase):
     def setUp(self):
+        super(TestLogFileIterator, self).setUp()
         self.__tempdir = tempfile.mkdtemp()
         self.__file_system = FileSystem()
         self.__path = os.path.join(self.__tempdir, 'text.txt')
@@ -1118,6 +1119,7 @@ class TestLogLineSampler(ScalyrTestCase):
             self.__pending_numbers.append(random_number)
 
     def setUp(self):
+        super(TestLogLineSampler, self).setUp()
         self.sampler = TestLogLineSampler.TestableLogLineSampler()
 
     def test_no_sampling_rules(self):
@@ -1159,6 +1161,7 @@ class TestLogLineSampler(ScalyrTestCase):
 
 class TestLogFileProcessor(ScalyrTestCase):
     def setUp(self):
+        super(TestLogFileProcessor, self).setUp()
         self.__tempdir = tempfile.mkdtemp()
         self.__file_system = FileSystem()
         self.__path = os.path.join(self.__tempdir, 'text.txt')
@@ -1912,6 +1915,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
 class TestLogMatcher(ScalyrTestCase):
     def setUp(self):
+        super(TestLogMatcher, self).setUp()
         self.__config = _create_configuration()
 
         self.__tempdir = tempfile.mkdtemp()

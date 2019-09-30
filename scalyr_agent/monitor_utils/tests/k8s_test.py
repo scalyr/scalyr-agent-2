@@ -43,6 +43,7 @@ class Test_K8sCache( ScalyrTestCase ):
             self.access_time = access_time
 
     def setUp(self):
+        super(Test_K8sCache, self).setUp()
         self.k8s = FakeK8s()
         self.clock = FakeClock()
         self.processor = FakeProcessor()
@@ -124,6 +125,7 @@ class TestKubernetesApi(ScalyrTestCase):
     Tests the Kubernetes API
     """
     def setUp(self):
+        super(TestKubernetesApi, self).setUp()
         self._path = '/foo'
 
     def _get_expected_log_mesg(self, path, stack_trace_lines, response_content):
@@ -322,6 +324,7 @@ class TestDockerMetricFetcher(ScalyrTestCase):
     """Tests the DockerMetricFetch abstraction.
     """
     def setUp(self):
+        super(TestDockerMetricFetcher, self).setUp()
         self._faker = DockerClientFaker()
         self._fetcher = DockerMetricFetcher(self._faker, 5)
 

@@ -30,6 +30,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class TestInt32RequestParser(ScalyrTestCase):
     def setUp(self):
+        super(TestInt32RequestParser, self).setUp()
         self.__buffer = cStringIO.StringIO()
 
     def test_basic_case(self):
@@ -120,6 +121,7 @@ class FakeSocket(object):
 
 class TestRequestStream(ScalyrTestCase):
     def setUp(self):
+        super(TestRequestStream, self).setUp()
         self.__fake_socket = FakeSocket()
         self.__fake_run_state = FakeRunState()
 
@@ -202,6 +204,7 @@ class TestRequestStream(ScalyrTestCase):
 
 class TestLineRequestEOF( ScalyrTestCase ):
     def setUp(self):
+        super(TestLineRequestEOF, self).setUp()
         self.__fake_socket = FakeSocket()
         self.__fake_run_state = FakeRunState()
 
@@ -219,6 +222,7 @@ class TestLineRequestEOF( ScalyrTestCase ):
 
 class TestConnectionHandler(ScalyrTestCase):
     def setUp(self):
+        super(TestConnectionHandler, self).setUp()
         self.__fake_socket = FakeSocket()
         self.__fake_run_state = FakeRunState()
         self.__last_request = None

@@ -22,6 +22,7 @@ import sys
 import threading
 import time
 import unittest
+import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.util import StoppableThread
 
@@ -105,13 +106,50 @@ def _start_thread_watcher_if_necessary():
         __thread_watcher_started = True
 
 
+class BaseScalyrTestCase(unittest.TestCase):
+    """Used to define ScalyrTestCase below.
+
+    This augments the standard TestCase by capturing all logged lines to stdout and
+    adds protection to help detect hung test threads.
+    """
+    # noinspection PyPep8Naming
+    def __init__(self, methodName='runTest', verify_setup_invoked=False):
+        unittest.TestCase.__init__(self, methodName=methodName)
+        # Add in some code to check to make sure that derived classed invoked this classes `setUp` method if
+        # they overrode it.
+        if verify_setup_invoked:
+            self.__setup_invoked = False
+            self.addCleanup(self.verify_setup_invoked)
+
+    def setUp(self):
+        # We need to reset the log destinations here because it is only at this point is stdout replaced with
+        # whatever object is capturing stdout for this test case.
+        scalyr_logging.set_log_destination(use_stdout=True)
+        self.__setup_invoked = True
+
+    def run(self, result=None):
+        _start_thread_watcher_if_necessary()
+        StoppableThread.set_name_prefix('TestCase %s: ' % str(self))
+        return unittest.TestCase.run(self, result=result)
+
+    def verify_setup_invoked(self):
+        self.assertTrue(self.__setup_invoked,
+                        msg='Inherited setUp method was not invoked by class derived from ScalyrTestCase')
+
 if sys.version_info[:2] < (2, 7):
-    class ScalyrTestCase(unittest.TestCase):
+    class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
         This is used mainly to hide differences between the test fixtures available in the various Python
-        versions
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
+        # noinspection PyPep8Naming
+        def __init__(self, methodName='runTest'):
+            # Do not verify the setup was invoked since it relies on addCleanup which is only available in 2.7
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=False)
+
         def assertIs(self, obj1, obj2, msg=None):
             """Just like self.assertTrue(a is b), but with a nicer default message."""
             if obj1 is not obj2:
@@ -145,18 +183,19 @@ if sys.version_info[:2] < (2, 7):
             else:
                 self.assertTrue(a < b, '%s is greater than %s' % (str(a), str(b)))
 
-        def run(self, result=None):
-            _start_thread_watcher_if_necessary()
-            StoppableThread.set_name_prefix('TestCase %s: ' % str(self))
-            return unittest.TestCase.run(self, result=result)
-
 else:
-    class ScalyrTestCase(unittest.TestCase):
+    class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
         This is used mainly to hide differences between the test fixtures available in the various Python
-        versions
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
+        # noinspection PyPep8Naming
+        def __init__(self, methodName='runTest'):
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=True)
+
         def assertIs(self, obj1, obj2, msg=None):
             unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
 
@@ -171,8 +210,3 @@ else:
 
         def assertLess(self, a, b, msg=None):
             unittest.TestCase.assertLess(self, a, b, msg=msg)
-
-        def run(self, result=None):
-            _start_thread_watcher_if_necessary()
-            StoppableThread.set_name_prefix('TestCase %s: ' % str(self))
-            return unittest.TestCase.run(self, result=result)
