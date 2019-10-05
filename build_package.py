@@ -190,6 +190,10 @@ def build_win32_installer_package(variant, version):
     recursively_delete_dirs_by_name('\.idea', 'tests')
     recursively_delete_files_by_name('.*\.pyc', '.*\.pyo', '.*\.pyd', 'all_tests\.py', '.*~')
 
+    # exclude all the third_party_tls libs under windows
+    # because windows python has tls built in.
+    recursively_delete_dirs_by_name('third_party_tls')
+
     # Move back up to the root directory and populate the data_files.
     os.chdir('..')
     os.chdir('data_files')
