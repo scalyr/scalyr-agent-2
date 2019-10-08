@@ -53,7 +53,7 @@ class ScalyrClientSession(object):
     are monotonically increasing within a session.
     """
     def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0,
-                 ca_file=None, intermediate_certs_file=None, use_requests_lib=False,
+                 ca_file=None, intermediate_certs_file=None, use_requests_lib=False, use_tlslite=False,
                  proxies=None, compression_type=None, compression_level=9, disable_send_requests=False):
         """Initializes the connection.
 
@@ -100,6 +100,7 @@ class ScalyrClientSession(object):
         # The Connection object that has been opened to the servers, if one has been opened.
         self.__connection = None
         self.__use_requests = use_requests_lib
+        self.__use_tlslite = use_tlslite
         self.__api_key = api_key
         self.__session_id = scalyr_util.create_unique_id()
         self.__quiet = quiet
@@ -238,7 +239,8 @@ class ScalyrClientSession(object):
                     self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
                                                                       self.__ca_file,  self.__intermediate_certs_file,
                                                                       self.__standard_headers,
-                                                                      self.__use_requests, quiet=self.__quiet,
+                                                                      self.__use_requests, self.__use_tlslite,
+                                                                      quiet=self.__quiet,
                                                                       proxies=self.__proxies)
                     self.total_connections_created += 1
             except Exception, e:

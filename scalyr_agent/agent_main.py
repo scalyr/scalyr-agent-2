@@ -942,10 +942,11 @@ class ScalyrAgent(object):
             ca_file = None
             intermediate_certs_file = None
         use_requests_lib = self.__config.use_requests_lib
+        use_tlslite = self.__config.use_tlslite
         return ScalyrClientSession(self.__config.scalyr_server, self.__config.api_key, SCALYR_VERSION, quiet=quiet,
                                    request_deadline=self.__config.request_deadline,
                                    ca_file=ca_file, intermediate_certs_file=intermediate_certs_file,
-                                   use_requests_lib=use_requests_lib, compression_type=self.__config.compression_type,
+                                   use_requests_lib=use_requests_lib, use_tlslite=use_tlslite, compression_type=self.__config.compression_type,
                                    compression_level=self.__config.compression_level,
                                    proxies=self.__config.network_proxies,
                                    disable_send_requests=self.__config.disable_send_requests)
