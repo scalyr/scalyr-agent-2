@@ -2299,6 +2299,7 @@ class LogMatcher(object):
         else:
             self.__stale_threshold_secs = None
 
+        self.__is_finished = False
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
         # This probably leads to false positives, but that's ok.
         self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
@@ -2307,7 +2308,7 @@ class LogMatcher(object):
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
         self.__processors = []
-        # The lock that protects the __processor and __last_check vars.
+        # The lock that protects the __processor, __is_finished and __last_check vars.
         self.__lock = threading.Lock()
 
     @property
@@ -2320,6 +2321,46 @@ class LogMatcher(object):
         @rtype: dict
         """
         return self.__log_entry_config
+
+    def finish( self ):
+        """
+        Tells the log matcher to finish processing any processors.
+
+        LogMatchers that are `finished` no longer match log files or create new processors, unless
+        they haven't ever matched any files, in which case they will match at least once
+        """
+        self.__lock.acquire()
+        try:
+            # set the matcher as finished
+            self.__is_finished = True
+
+            # set any existing processors as finished
+            for processor in self.__processors:
+                processor.finish()
+        finally:
+            self.__lock.release()
+
+    def is_finished( self ):
+        """
+        Returns true if the log matcher and all of its processors are finished, and the matcher has
+        been processed at least once
+        """
+        result = False
+        self.__lock.acquire()
+        try:
+            # check if we are finished
+            result = self.__is_finished and self.__last_check is not None
+
+            # check if all the processors are finished
+            for processor in self.__processors:
+                # exit early if the matcher or a previous processor is finished
+                if not result:
+                    return result
+                result = processor.is_finished()
+        finally:
+            self.__lock.release()
+
+        return result
 
     def generate_status(self):
         """
@@ -2367,9 +2408,18 @@ class LogMatcher(object):
             return []
 
         self.__lock.acquire()
-        self.__last_check = time.time()
-        self.__removed_closed_processors()
-        self.__lock.release()
+        try:
+            is_finished = self.__is_finished
+            has_been_processed = self.__last_check is not None
+            self.__last_check = time.time()
+            self.__removed_closed_processors()
+        finally:
+            self.__lock.release()
+
+        # check to see if the log matcher is finished and we have checked it at least once
+        if has_been_processed and is_finished:
+            # if so, then don't do any more matching on this log matcher
+            return []
 
         result = []
         # We need to be careful that we throw out any processors that were created if we do hit an exception,
@@ -2441,6 +2491,8 @@ class LogMatcher(object):
             self.__lock.acquire()
             for new_processor in result:
                 self.__processors.append(new_processor)
+                if is_finished:
+                    new_processor.finish()
             self.__lock.release()
 
             reached_return = True

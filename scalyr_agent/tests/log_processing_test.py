@@ -1168,6 +1168,9 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.__fake_time = 10
         self.log_processor = self._create_processor()
 
+    def tearDown(self):
+        shutil.rmtree(self.__tempdir)
+
     def _create_processor(self, close_when_staleness_exceeds=None):
         # Create the processor to test.  We have it do one scan of an empty
         # file so that when we next append lines to it, it will notice it.
@@ -1985,6 +1988,9 @@ class TestLogMatcher(ScalyrTestCase):
 
         self.__fake_time = 10
 
+    def tearDown(self):
+        shutil.rmtree(self.__tempdir)
+
     def test_matches_glob(self):
         matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_one))
         processors = matcher.find_matches(dict(), dict())
@@ -2145,6 +2151,68 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEquals(self.__path_one, attrs['logfile'])
         self.assertFalse('original_file' in attrs)
 
+    def test_is_finished_unprocessed(self):
+        config = self._create_log_config(self.__path_one)
+        matcher = LogMatcher(self.__config, config)
+        matcher.finish()
+        self.assertFalse( matcher.is_finished() )
+
+    def test_is_finished_processors_not_finished(self):
+        config = self._create_log_config(self.__path_one)
+        self.append_file(self.__path_one, "First line\n" )
+        matcher = LogMatcher(self.__config, config)
+        matcher.finish()
+        processors = matcher.find_matches( dict(), dict(), copy_at_index_zero=True )
+
+        self.assertFalse( matcher.is_finished() )
+
+        self._close_processors(processors)
+
+    def test_is_finished_yes(self):
+        config = self._create_log_config(self.__path_one)
+        self.append_file(self.__path_one, "First line\n" )
+        matcher = LogMatcher(self.__config, config)
+        matcher.finish()
+        processors = matcher.find_matches( dict(), dict(), copy_at_index_zero=True )
+
+        for p in processors:
+            p.scan_for_new_bytes()
+            events = TestLogFileProcessor.TestAddEventsRequest()
+            (completion_callback, buffer_full) = p.perform_processing(
+                events, current_time=self.__fake_time)
+            completion_callback(LogFileProcessor.SUCCESS)
+            (completion_callback, buffer_full) = p.perform_processing(
+                events, current_time=self.__fake_time)
+            completion_callback(LogFileProcessor.SUCCESS)
+
+        self.assertTrue( matcher.is_finished() )
+
+        self._close_processors(processors)
+
+    def test_find_matches_if_completely_finished(self):
+        config = self._create_log_config(self.__path_one)
+        self.append_file(self.__path_one, "First line\n" )
+        matcher = LogMatcher(self.__config, config)
+        matcher.finish()
+        processors = matcher.find_matches( dict(), dict(), copy_at_index_zero=True )
+
+        for p in processors:
+            p.scan_for_new_bytes()
+            events = TestLogFileProcessor.TestAddEventsRequest()
+            (completion_callback, buffer_full) = p.perform_processing(
+                events, current_time=self.__fake_time)
+            completion_callback(LogFileProcessor.SUCCESS)
+            (completion_callback, buffer_full) = p.perform_processing(
+                events, current_time=self.__fake_time)
+            completion_callback(LogFileProcessor.SUCCESS)
+
+        self._close_processors(processors)
+
+        new_processors = matcher.find_matches( dict(), dict(), copy_at_index_zero=True )
+        self.assertEqual( 0, len(new_processors) )
+        self._close_processors(new_processors)
+
+
     def _close_processors(self, processors):
         for x in processors:
             x.close()
@@ -2155,6 +2223,12 @@ class TestLogMatcher(ScalyrTestCase):
     def _create_file(self, file_path):
         fp = open(file_path, 'w')
         fp.close()
+
+    def append_file(self, path, *lines):
+        contents = ''.join(lines)
+        file_handle = open(path, 'ab')
+        file_handle.write(contents)
+        file_handle.close()
 
     def _create_log_config(self, path, ignore_stale_files=False, staleness_threshold_secs=None):
         return dict(
