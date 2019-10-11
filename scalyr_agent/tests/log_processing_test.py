@@ -1857,6 +1857,61 @@ class TestLogFileProcessor(ScalyrTestCase):
         first_sid, _, _ = events.get_sequence(0)
         self.assertTrue(isinstance(first_sid, basestring))
 
+    def test_is_finished_not_finished( self ):
+        log_processor = self.log_processor
+        self.append_file(self.__path, "First line\n" )
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback(LogFileProcessor.SUCCESS)
+        status = log_processor.generate_status()
+
+        self.assertFalse( log_processor.is_finished() )
+
+    def test_is_finished_bytes_pending( self ):
+        log_processor = self.log_processor
+        log_processor.finish()
+        self.append_file(self.__path, "First line\n" )
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback(LogFileProcessor.SUCCESS)
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        self.append_file(self.__path, "Second line\n" )
+        log_processor.scan_for_new_bytes()
+        completion_callback(LogFileProcessor.SUCCESS)
+        status = log_processor.generate_status()
+
+        self.assertFalse( log_processor.is_finished() )
+
+    def test_is_finished_bytes_read_non_zero( self ):
+        log_processor = self.log_processor
+        log_processor.finish()
+        self.append_file(self.__path, "First line\n" )
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback(LogFileProcessor.SUCCESS)
+        status = log_processor.generate_status()
+
+        self.assertFalse( log_processor.is_finished() )
+
+    def test_is_finished_yes( self ):
+        log_processor = self.log_processor
+        log_processor.finish()
+        self.append_file(self.__path, "First line\n" )
+        events = TestLogFileProcessor.TestAddEventsRequest()
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback(LogFileProcessor.SUCCESS)
+        (completion_callback, buffer_full) = log_processor.perform_processing(
+            events, current_time=self.__fake_time)
+        completion_callback(LogFileProcessor.SUCCESS)
+        status = log_processor.generate_status()
+
+        self.assertTrue( log_processor.is_finished() )
+
     def write_file(self, path, *lines):
         contents = ''.join(lines)
         file_handle = open(path, 'wb')
