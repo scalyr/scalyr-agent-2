@@ -1399,6 +1399,12 @@ class LogFileProcessor(object):
         # Tracks whether the processor has recently logged data
         self.__is_active = False
 
+        # Tracks whether or not the processor has been marked as finished
+        self.__is_finished = False
+
+        # Tracks the number of bytes that was last read from the processor
+        self.__prev_bytes_read = 0
+
         # The processor should be closed if the staleness of this file exceeds this number of seconds (if not None)
         self.__close_when_staleness_exceeds = close_when_staleness_exceeds
 
@@ -1409,7 +1415,7 @@ class LogFileProcessor(object):
         # The sampler to apply to all log lines from this log file.
         self.__sampler = LogLineSampler(file_path)
 
-        # The lock that must be held when reading all status related fields and __is_closed.
+        # The lock that must be held when reading all status related fields, __is_finished,  and __is_closed.
         self.__lock = threading.Lock()
         # The following fields are tracked for generating status information.
         self.__total_bytes_copied = 0L
@@ -1446,6 +1452,36 @@ class LogFileProcessor(object):
         self.__last_success = None
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
+
+    def finish( self ):
+        """
+        Marks the log processor as finished.
+
+        When a log processor is `finished`, then it can be scheduled for removal from the
+        main copy manager once it no longer has any bytes available for reading.
+        """
+        self.__lock.acquire()
+        try:
+            self.__is_finished = True
+        finally:
+            self.__lock.release()
+
+    def is_finished( self ):
+        """
+        Returns whether or not this processor is in the finished state, *and* there are no bytes
+        available for reading.
+
+        If this method returns True, then the log processor can be removed from the copy manager
+        """
+        # We only lock for __is_finished.  The other fields are only modified on the main thread
+        self.__lock.acquire()
+        try:
+            # __is_finished means the log has been marked as finished
+            # __prev_bytes_read == 0 means the last call to perform_processing didn't have any bytes for this processor
+            # __total_bytes_pending == 0 means there are no more bytes available from the iterator
+            return self.__is_finished and self.__prev_bytes_read == 0 and self.__log_file_iterator.available == 0
+        finally:
+            self.__lock.release()
 
     def add_missing_attributes( self, attributes ):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
@@ -1701,6 +1737,9 @@ class LogFileProcessor(object):
             self.__lock.acquire()
             self.__total_bytes_being_processed = bytes_copied
             self.__total_bytes_pending = self.__log_file_iterator.available
+
+            # also keep track of the amount of bytes read this time
+            self.__prev_bytes_read = bytes_read
             self.__lock.release()
 
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
