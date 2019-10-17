@@ -7,7 +7,7 @@ Scalyr Agent 2 Changes By Release
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 18, 2019 15:00 -0700
 --->
 
-Note, this release is pending an actual release date is TBD
+Note, this release is pending an actual release date is TBD sometime in Oct.
 
 Features
 * Added TSLite support to allow customers using Python 2.6 to connect via TLSv1.1
