@@ -28,7 +28,7 @@ __author__ = 'czerwin@scalyr.com'
 import datetime
 import errno
 import fnmatch
-import glob
+import glob2
 import os
 import random
 import re
@@ -2343,15 +2343,16 @@ class LogMatcher(object):
 
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
-            for matched_file in glob.glob(self.__log_entry_config['path']):
-
+            for matched_file in glob2.glob(self.__log_entry_config['path']):
                 skip = False
                 # check to see if this file matches any of the exclude globs
                 for exclude_glob in self.__log_entry_config['exclude']:
                     if fnmatch.fnmatch( matched_file, exclude_glob ):
                         skip = True
                         break
-
+                # Check if this is a directory
+                if os.path.isdir(matched_file):
+                    skip = True
                 # if so, skip it.
                 if skip:
                     continue
