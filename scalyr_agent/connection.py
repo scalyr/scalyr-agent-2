@@ -89,7 +89,7 @@ class ConnectionFactory:
                 log.warn( "Both `use_requests_lib` and `use_tlslite` are set to True.  `use_tlslite` is ignored if `use_requests_lib` is True" )
 
             if sys.version_info[:3] >= (2, 7, 9):
-                log.warn( "`use_tlslite` is only valid when running on Python 2.7.8 or beloew" )
+                log.warn( "`use_tlslite` is only valid when running on Python 2.7.8 or below" )
                 use_tlslite = False
 
 
@@ -299,6 +299,11 @@ class ScalyrHttpConnection(Connection):
                 'addtrust_external_ca_root.pem'
             ]
 
+            # Determine the directory containing the certs.
+            # First check the directory containing the _ca_file
+            # but if we don't find the intermediate/extra certs there
+            # then look in the relative `certs` directory.  The latter
+            # will typically be required if running directly from source
             all_cert_names = intermediate_cert_names + extra_trust_names
             cert_dir = os.path.dirname(self._ca_file)
             if not cert_files_exist(cert_dir, all_cert_names):

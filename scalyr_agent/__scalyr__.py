@@ -143,9 +143,9 @@ def __add_scalyr_package_to_path():
     # third_party_tls directories
     sys.path.insert(0, os.path.join(get_package_root(), 'third_party'))
 
-    # prepend the third party tls directory first so it appears after the package root
-    sys.path.insert(0, os.path.join(get_package_root(), 'third_party_tls'))
-
+    # if we are not on windows, prepend the third party tls directory first so it appears after the package root
+    if not __is_py2exe__:
+        sys.path.insert(0, os.path.join(get_package_root(), 'third_party_tls'))
 
     sys.path.insert(0, os.path.dirname(get_package_root()))
 
