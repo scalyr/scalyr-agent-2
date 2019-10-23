@@ -1399,11 +1399,8 @@ class LogFileProcessor(object):
         # Tracks whether the processor has recently logged data
         self.__is_active = False
 
-        # Tracks whether or not the processor has been marked as finished
-        self.__is_finished = False
-
-        # Tracks the number of bytes that was last read from the processor
-        self.__prev_bytes_read = 0
+        # Tracks whether or not the processor should close when it reaches the end of the file
+        self.__close_at_eof = False
 
         # The processor should be closed if the staleness of this file exceeds this number of seconds (if not None)
         self.__close_when_staleness_exceeds = close_when_staleness_exceeds
@@ -1415,7 +1412,7 @@ class LogFileProcessor(object):
         # The sampler to apply to all log lines from this log file.
         self.__sampler = LogLineSampler(file_path)
 
-        # The lock that must be held when reading all status related fields, __is_finished,  and __is_closed.
+        # The lock that must be held when reading all status related fields, __close_at_eof,  and __is_closed.
         self.__lock = threading.Lock()
         # The following fields are tracked for generating status information.
         self.__total_bytes_copied = 0L
@@ -1453,33 +1450,16 @@ class LogFileProcessor(object):
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
 
-    def finish( self ):
+    def close_at_eof( self ):
         """
-        Marks the log processor as finished.
+        Tell the log processor to close itself once it catches up to the end of the file.
 
-        When a log processor is `finished`, then it can be scheduled for removal from the
-        main copy manager once it no longer has any bytes available for reading.
+        This allows us to keep log processors open long enough to read all of the remaining
+        data in the file.
         """
         self.__lock.acquire()
         try:
-            self.__is_finished = True
-        finally:
-            self.__lock.release()
-
-    def is_finished( self ):
-        """
-        Returns whether or not this processor is in the finished state, *and* there are no bytes
-        available for reading.
-
-        If this method returns True, then the log processor can be removed from the copy manager
-        """
-        # We only lock for __is_finished.  The other fields are only modified on the main thread
-        self.__lock.acquire()
-        try:
-            # __is_finished means the log has been marked as finished
-            # __prev_bytes_read == 0 means the last call to perform_processing didn't have any bytes for this processor
-            # __total_bytes_pending == 0 means there are no more bytes available from the iterator
-            return self.__is_finished and self.__prev_bytes_read == 0 and self.__log_file_iterator.available == 0
+            self.__close_at_eof = True
         finally:
             self.__lock.release()
 
@@ -1593,9 +1573,21 @@ class LogFileProcessor(object):
         if last_scan_time is not None and self.__minimum_scan_interval is not None:
             scan = (current_time - last_scan_time > self.__minimum_scan_interval)
 
+        # by default, we don't close at eof, unless we are scanning for new bytes
+        close_at_eof = False
+
         # scan for new bytes
         if scan:
+
+            # Make a local copy of __close_at_eof for use in the completion callback.
+            # We will only consider closing a file at eof if __close_at_eof was True
+            # before scanning for new bytes
+            self.__lock.acquire()
+            close_at_eof = self.__close_at_eof
+            self.__lock.release()
+
             self.__log_file_iterator.scan_for_new_bytes(current_time=current_time)
+
             self.__lock.acquire()
             self.__last_scan_time = current_time
             self.__lock.release()
@@ -1737,9 +1729,6 @@ class LogFileProcessor(object):
             self.__lock.acquire()
             self.__total_bytes_being_processed = bytes_copied
             self.__total_bytes_pending = self.__log_file_iterator.available
-
-            # also keep track of the amount of bytes read this time
-            self.__prev_bytes_read = bytes_read
             self.__lock.release()
 
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
@@ -1786,7 +1775,16 @@ class LogFileProcessor(object):
                         if bytes_between_positions > 0:
                             self.__log_file_iterator.mark(final_position, current_time=current_time)
 
-                        if self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time):
+                        # close the processor if we are at the end of the log file iterator
+                        # or if the log is stale
+                        close = self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time)
+
+                        # also close if we should close at eof and no bytes were read for this processor
+                        # and the log file iterator has no bytes pending
+                        if close_at_eof and bytes_between_positions == 0 and self.__total_bytes_pending == 0:
+                            close = True
+
+                        if close:
                             self.__log_file_iterator.close()
                             self.__is_closed = True
                             return True
@@ -2334,33 +2332,33 @@ class LogMatcher(object):
             # set the matcher as finished
             self.__is_finished = True
 
-            # set any existing processors as finished
+            # set any existing processors to close when they reach eof
             for processor in self.__processors:
-                processor.finish()
+                processor.close_at_eof()
         finally:
             self.__lock.release()
 
     def is_finished( self ):
         """
-        Returns true if the log matcher and all of its processors are finished, and the matcher has
+        Returns true if the log matcher is finished and all of its processors are closed, and the matcher has
         been processed at least once
         """
-        result = False
         self.__lock.acquire()
         try:
-            # check if we are finished
-            result = self.__is_finished and self.__last_check is not None
+            # we are only finished if `is_finished` is set and we have tried to check for a match
+            # on the matcher at least once
+            if self.__is_finished and self.__last_check is None:
+                return False
 
-            # check if all the processors are finished
+            # check if all the processors are closed
             for processor in self.__processors:
-                # exit early if the matcher or a previous processor is finished
-                if not result:
-                    return result
-                result = processor.is_finished()
+                # the log matcher is not finished if any processors are still open
+                if not processor.is_closed():
+                    return False
         finally:
             self.__lock.release()
 
-        return result
+        return True
 
     def generate_status(self):
         """
@@ -2491,8 +2489,12 @@ class LogMatcher(object):
             self.__lock.acquire()
             for new_processor in result:
                 self.__processors.append(new_processor)
+                # If the log matcher is finished, then any new processors should be set to close when
+                # they reach their eof.  This catches the situation where `finish` was called on the log matcher
+                # but the log matcher didn't have any processors yet, because `find_matches` hadn't been called
+                # on it, and ensures that all processors for a `finished` log matcher are set to close at eof
                 if is_finished:
-                    new_processor.finish()
+                    new_processor.close_at_eof()
             self.__lock.release()
 
             reached_return = True
