@@ -71,11 +71,19 @@ class DynamicLogPathTest(ScalyrTestCase):
             self._controller.stop()
         shutil.rmtree(self._config_dir)
 
+    def fake_scan(self, response="success"):
+        if self._controller is not None:
+            self._controller.perform_scan()
+            _, responder_callback = self._controller.wait_for_rpc()
+            responder_callback(response)
 
-    def create_copying_manager( self, config ):
+    def create_copying_manager( self, config, monitor_agent_log=False ):
 
         if 'api_key' not in config:
             config['api_key'] = 'fake'
+
+        if not monitor_agent_log:
+            config['implicit_agent_log_collection'] = False
 
         f = open( self._config_file, "w" )
         if f:
@@ -90,7 +98,220 @@ class DynamicLogPathTest(ScalyrTestCase):
         self._manager = TestableCopyingManager(configuration, [])
         self._controller = self._manager.controller
 
-    def test_remove_path(self):
+    def test_add_path(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+    def test_add_duplicate_path_same_monitor(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+    def test_add_duplicate_path_different_monitor(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        self._manager.add_log_config( 'unittest2', log_config )
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+    def test_update_config(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+
+        log_config['parser'] = 'newParser'
+        self._manager.update_log_config( 'unittest', log_config )
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+        self.assertEquals( 'newParser', matchers[0].config['parser'] )
+
+    def test_update_config_different_monitor(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+
+        log_config['parser'] = 'newParser'
+        self._manager.update_log_config( 'unittest2', log_config )
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+        self.assertEquals( 'agent-metrics', matchers[0].config['parser'] )
+
+    def test_update_config_not_monitored(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.update_log_config( 'unittest', log_config )
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+        self.assertEquals( 0, len(matchers) )
+
+    def test_schedule_log_path_for_removal(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+        self._manager.schedule_log_path_for_removal( 'unittest', path )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 0, len(matchers) )
+
+    def test_schedule_log_path_for_removal_different_monitor(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+        self._manager.schedule_log_path_for_removal( 'unittest2', path )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+
+    def test_remove_log_path(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+        self._manager.remove_log_path( 'unittest', path )
+        matchers = self._manager.log_matchers
+        self.assertEquals( 0, len(matchers) )
+
+    def test_remove_log_path_different_monitor(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+        self._manager.remove_log_path( 'unittest2', path )
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+
+    def test_remove_glob_path(self):
 
         glob_root = os.path.join(self._temp_dir, 'containers')
         os.makedirs( glob_root )
@@ -113,27 +334,30 @@ class DynamicLogPathTest(ScalyrTestCase):
         # perform_scan() calls run_and_stop_at(SENDING, required=SLEEPING)
         # Since the test state is already SLEEPING, the required transition is 'consumed' and the require-transition
         # assertion passes and the next-round required transition becomes NONE
-        def _fake_scan():
-            self._controller.perform_scan()
-            _, responder_callback = self._controller.wait_for_rpc()
-            responder_callback('dummy')
-        _fake_scan()
+        self.fake_scan()
 
         log_config = {
             "path": path
         }
 
-        self._manager.add_log_config( 'unittest', log_config );
+        self._manager.add_log_config( 'unittest', log_config )
 
-        _fake_scan()
+        self.fake_scan()
 
         self._manager.schedule_log_path_for_removal( 'unittest', log_config['path'] )
 
         self.assertEquals( 1, self._manager.logs_pending_removal_count() )
 
-        _fake_scan()
+        self.fake_scan()
 
         self.assertEquals( 0, self._manager.logs_pending_removal_count() )
+
+    def append_log_lines(self, filename, *args):
+        fp = open(filename, 'a')
+        for l in args:
+            fp.write(l)
+            fp.write('\n')
+        fp.close()
 
 
 class CopyingParamsTest(ScalyrTestCase):
