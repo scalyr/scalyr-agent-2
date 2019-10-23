@@ -2282,6 +2282,24 @@ class LogMatcher(object):
         else:
             self.__file_system = file_system
         self.__overall_config = overall_config
+
+        # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
+        # one element if it is not a glob.
+        self.__processors = []
+        # The lock that protects the __processor, __is_finished and __last_check vars.
+        self.__lock = threading.Lock()
+
+        self.update_log_entry_config( log_entry_config )
+
+        self.__is_finished = False
+        # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
+        # This probably leads to false positives, but that's ok.
+        self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
+        # The time in seconds past epoch when we last checked for new files that match the glob.
+        self.__last_check = None
+
+    def update_log_entry_config( self, log_entry_config ):
+
         self.__log_entry_config = log_entry_config
         self.log_path = self.__log_entry_config['path']
 
@@ -2297,17 +2315,16 @@ class LogMatcher(object):
         else:
             self.__stale_threshold_secs = None
 
-        self.__is_finished = False
-        # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
-        # This probably leads to false positives, but that's ok.
-        self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
-        # The time in seconds past epoch when we last checked for new files that match the glob.
-        self.__last_check = None
-        # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
-        # one element if it is not a glob.
-        self.__processors = []
-        # The lock that protects the __processor, __is_finished and __last_check vars.
-        self.__lock = threading.Lock()
+        result = []
+        self.__lock.acquire()
+        try:
+            for p in self.__processors:
+                result.append( p.log_path )
+
+        finally:
+            self.__lock.release()
+
+        return result
 
     @property
     def config(self):
