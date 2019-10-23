@@ -2321,6 +2321,7 @@ class LogMatcher(object):
             for p in self.__processors:
                 result.append( p.log_path )
 
+            self.__processors = []
         finally:
             self.__lock.release()
 
@@ -2360,11 +2361,14 @@ class LogMatcher(object):
         Returns true if the log matcher is finished and all of its processors are closed, and the matcher has
         been processed at least once
         """
+        finished = False
         self.__lock.acquire()
         try:
+            finished = self.__is_finished
+
             # we are only finished if `is_finished` is set and we have tried to check for a match
             # on the matcher at least once
-            if self.__is_finished and self.__last_check is None:
+            if finished and self.__last_check is None:
                 return False
 
             # check if all the processors are closed
@@ -2375,7 +2379,7 @@ class LogMatcher(object):
         finally:
             self.__lock.release()
 
-        return True
+        return finished
 
     def generate_status(self):
         """

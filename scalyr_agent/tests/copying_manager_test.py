@@ -241,6 +241,7 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         self._manager.schedule_log_path_for_removal( 'unittest', path )
         self.fake_scan()
+        self.fake_scan()
         matchers = self._manager.log_matchers
         self.assertEquals( 0, len(matchers) )
 
@@ -288,6 +289,37 @@ class DynamicLogPathTest(ScalyrTestCase):
         self._manager.remove_log_path( 'unittest', path )
         matchers = self._manager.log_matchers
         self.assertEquals( 0, len(matchers) )
+
+    def test_add_after_remove(self):
+        config = {}
+        self.create_copying_manager( config )
+        self.fake_scan()
+
+        path = os.path.join( self._log_dir, "newlog.log" )
+        self.append_log_lines( path, "line1\n" )
+
+        log_config = {
+            "path": path
+        }
+
+        self._manager.add_log_config( 'unittest', log_config )
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 1, len(matchers) )
+        self.assertEquals( path, matchers[0].log_path )
+
+        self._manager.remove_log_path( 'unittest', path )
+        self.fake_scan()
+        self.fake_scan()
+        matchers = self._manager.log_matchers
+        self.assertEquals( 0, len(matchers) )
+        self.assertEquals( 0, self._manager.dynamic_matchers_count() )
+
+        self._manager.add_log_config( 'otherunittest', log_config )
+        self.fake_scan()
+        self.assertEquals( 1, self._manager.dynamic_matchers_count() )
+        self.assertEquals( path, matchers[0].log_path )
+
 
     def test_remove_log_path_different_monitor(self):
         config = {}
