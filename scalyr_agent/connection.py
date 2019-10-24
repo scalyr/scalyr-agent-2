@@ -22,6 +22,7 @@ import os
 import re
 import socket
 import subprocess
+import sys
 
 from tempfile import mkstemp
 
@@ -53,7 +54,7 @@ class ConnectionFactory:
     """
     @staticmethod
     def connection(server, request_deadline, ca_file, intermediate_certs_file,
-                   headers, use_requests, quiet=False, proxies=None):
+                   headers, use_requests, use_tlslite, quiet=False, proxies=None):
         """ Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
@@ -63,6 +64,7 @@ class ConnectionFactory:
         @param intermediate_certs_file: path to certificate bundle for trusted intermediate server certificates
         @param headers: any headers to send with each request made on the connection
         @param use_requests: whether or not to use Requests for handling queries
+        @param use_tlslite: whether or not to use TLSLite for TLS connections
         @param quiet:  Whether or not to emit non-error log messages.
         @param proxies:  A dict describing the network proxies to use or None if there aren't any.  Only valid if
             use_requests is True.
@@ -73,6 +75,7 @@ class ConnectionFactory:
         @type intermediate_certs_file: str
         @type headers: dict
         @type use_requests: bool
+        @type use_tlslite: bool
         @type quiet: bool
         @type proxies: dict
 
@@ -81,18 +84,26 @@ class ConnectionFactory:
 
         """
 
+        if use_tlslite:
+            if use_requests:
+                log.warn( "Both `use_requests_lib` and `use_tlslite` are set to True.  `use_tlslite` is ignored if `use_requests_lib` is True" )
+
+            if sys.version_info[:3] >= (2, 7, 9):
+                log.warn( "`use_tlslite` is only valid when running on Python 2.7.8 or below" )
+                use_tlslite = False
+
+
         result = None
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
-                result = RequestsConnection( server, request_deadline, ca_file, intermediate_certs_file, headers, proxies)
-                log.warn('RequestsConnection uses ssl lib and is not TLS 1.2 compliant')
+                result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
             except Exception, e:
                 log.warn( "Unable to load requests module '%s'.  Falling back to Httplib for connection handling" % str( e ) )
-                result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers)
+                result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite)
                 use_requests = False
         else:
-            result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers)
+            result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite)
 
         if not quiet:
             if use_requests:
@@ -110,7 +121,7 @@ class Connection( object ):
     An abstraction for dealing with different connection types Httplib or Requests
     """
 
-    def __init__( self, server, request_deadline, ca_file, intermediate_certs_file, headers ):
+    def __init__( self, server, request_deadline, ca_file, headers ):
 
         # Verify the server address looks right.
         parsed_server = re.match('^(http://|https://|)([^:]*)(:\d+|)$', server.lower())
@@ -135,7 +146,6 @@ class Connection( object ):
         self._standard_headers = headers
         self._full_address = server
         self._ca_file = ca_file
-        self._intermediate_certs_file = intermediate_certs_file
         self._request_deadline = request_deadline
         self.__connection = None
             
@@ -202,16 +212,21 @@ class CertValidationError(Exception):
 
 
 class ScalyrHttpConnection(Connection):
-    def __init__(self, server, request_deadline, ca_file, intermediate_certs_file, headers):
-        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, intermediate_certs_file, headers)
+    def __init__(self, server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite):
+        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, headers)
         self.__http_response = None
+        self._intermediate_certs_file = intermediate_certs_file
+
         try:
-            self._init_connection(pure_python_tls=False)
-            log.info('HttpConnection uses native os ssl')
+            self._init_connection(pure_python_tls=use_tlslite)
         except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
-            log.info('Exception while attempting to use openssl library.  Falling back to pure-python implementation')
+            log.info('Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation')
             self._init_connection(pure_python_tls=True)
+
+        if self.is_pure_python_tls:
             log.info('HttpConnection uses pure-python TLS')
+        else:
+            log.info('HttpConnection uses native os ssl')
 
     def _validate_chain_openssl(self):
         """Validate server certificate chain using openssl system callout"""
@@ -258,9 +273,14 @@ class ScalyrHttpConnection(Connection):
             file_bytes = session.serverCertChain.x509List[0].bytes
             end_entity_cert = x509.Certificate.load(str(file_bytes))
 
-            cert_dir = os.path.dirname(self._ca_file)
+            def cert_files_exist(path, file_names):
+                file_names = [os.path.join(path, f) for f in file_names]
+                for f in file_names:
+                    if not os.path.isfile( f ):
+                        return False
+                return True
 
-            def get_cert_bytes(file_names):
+            def get_cert_bytes(cert_dir, file_names):
                 file_names = [os.path.join(cert_dir, f) for f in file_names]
                 result = []
                 for fname in file_names:
@@ -269,15 +289,32 @@ class ScalyrHttpConnection(Connection):
                     result.append(cert_bytes)
                 return result
 
-            trust_roots = None
-            intermediate_certs = get_cert_bytes([
+            intermediate_cert_names = [
                 'comodo_ca_intermediate.pem',
                 'sectigo_ca_intermediate.pem'
-            ])
-            extra_trust_roots = get_cert_bytes([
+            ]
+
+            extra_trust_names = [
                 'scalyr_agent_ca_root.pem',
                 'addtrust_external_ca_root.pem'
-            ])
+            ]
+
+            # Determine the directory containing the certs.
+            # First check the directory containing the _ca_file
+            # but if we don't find the intermediate/extra certs there
+            # then look in the relative `certs` directory.  The latter
+            # will typically be required if running directly from source
+            all_cert_names = intermediate_cert_names + extra_trust_names
+            cert_dir = os.path.dirname(self._ca_file)
+            if not cert_files_exist(cert_dir, all_cert_names):
+                path = os.path.dirname(os.path.abspath(__file__))
+                path = os.path.abspath( path + '../../certs')
+                if cert_files_exist(path, all_cert_names):
+                    cert_dir = path
+
+            trust_roots = None
+            intermediate_certs = get_cert_bytes( cert_dir, intermediate_cert_names )
+            extra_trust_roots = get_cert_bytes( cert_dir, extra_trust_names )
 
             if trust_roots:
                 context = ValidationContext(

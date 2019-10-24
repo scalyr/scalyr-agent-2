@@ -729,6 +729,11 @@ class Configuration(object):
         return self.__get_config().get_bool('use_requests_lib')
 
     @property
+    def use_tlslite(self):
+        """Returns the configuration value for 'use_tlslite'."""
+        return self.__get_config().get_bool('use_tlslite')
+
+    @property
     def network_proxies(self):
         """Returns the proxy map created by the 'https_proxy' and 'http_proxy' configuration variables, or
         None if neither of those is set.
@@ -1142,6 +1147,7 @@ class Configuration(object):
         self.__verify_or_set_optional_string(config, 'ca_cert_path', Configuration.default_ca_cert_path(),
                                              description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'use_requests_lib', False, description, apply_defaults, env_aware=True)
+        self.__verify_or_set_optional_bool(config, 'use_tlslite', False, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_bool(config, 'verify_server_certificate', True, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'http_proxy', None, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'https_proxy', None, description, apply_defaults, env_aware=True)
