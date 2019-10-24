@@ -20,6 +20,7 @@ __author__ = 'czerwin@scalyr.com'
 import os
 import re
 import scalyr_agent.third_party.tcollector.tcollector as tcollector
+import time
 from Queue import Empty
 from scalyr_agent import ScalyrMonitor, BadMonitorConfiguration, define_metric, define_log_field, define_config_option
 from scalyr_agent.third_party.tcollector.tcollector import ReaderThread
@@ -243,6 +244,12 @@ define_config_option(__monitor__, 'network_interface_suffix',
                      'to create the full interface name when interating over network interfaces in /dev'
                      )
 
+define_config_option(__monitor__, 'log_all_interval',
+                     'Time in seconds between logging of the full set of metrics. Default is to log the full set '
+                     'of metrics every time the monitor runs. If this is set to a value greater than the interval '
+                     'between runs of the monitor, then intervening monitor runs will only log values that have '
+                     'changed since the last monitor run.')
+
 class TcollectorOptions(object):
     """Bare minimum implementation of an object to represent the tcollector options.
 
@@ -283,16 +290,40 @@ class WriterThread(StoppableThread):
         self.__error_logger = error_logger
         self.__timestamp_matcher = re.compile('(\\S+)\\s+\\d+\\s+(.*)')
         self.__key_value_matcher = re.compile('(\\S+)=(\\S+)')
+        self.__parts_matcher = re.compile('(\\S+)\\s+([\\d.]+)\\s*(.*)')
+        self.__last_values = {}
 
     def __rewrite_tsdb_line(self, line):
-        """Rewrites the TSDB line emitted by the collectors to the format used by the agent-metrics parser."""
+        """Rewrites the TSDB line emitted by the collectors to the format used by the agent-metrics parser.
+        Returns None if the line shouldn't be logged."""
         # Strip out the timestamp that is the second token on the line.
         match = self.__timestamp_matcher.match(line)
         if match is not None:
             line = '%s %s' % (match.group(1), match.group(2))
 
+        # Lines are of the form
+        #
+        #   metric value [key=value ...]
+        #
+        # The identity of a metric is the metric name plus all its key/value pairs; we'll
+        # need that to figure out if the value has changed.
+        if self.__monitor.log_all_interval > 0:
+            parts_match = self.__parts_matcher.match(line)
+            if parts_match is not None:
+                identity = parts_match.group(1) + ' ' + parts_match.group(3)
+                value = parts_match.group(2)
+
+                if identity in self.__last_values:
+                    (previous_value, previous_time) = self.__last_values[identity]
+                    expiration_time = previous_time + self.__monitor.log_all_interval
+                    if previous_value == value and expiration_time > time.time():
+                        return None
+
+                self.__last_values[identity] = (value, time.time())
+
         # Now rewrite any key/value pairs from foo=bar to foo="bar"
         line = self.__key_value_matcher.sub('\\1="\\2"', line)
+
         return line
 
     def run(self):
@@ -307,7 +338,8 @@ class WriterThread(StoppableThread):
                 # returned by the queue.  See the 'stop' method for details.
                 if not self._run_state.is_running():
                     continue
-                self.__logger.info(line, metric_log_for_monitor=self.__monitor)
+                if line:
+                    self.__logger.info(line, metric_log_for_monitor=self.__monitor)
                 while True:
                     try:
                         line = self.__rewrite_tsdb_line(self.__queue.get(False))
@@ -315,7 +347,8 @@ class WriterThread(StoppableThread):
                         break
                     if not self._run_state.is_running():
                         continue
-                    self.__logger.info(line, metric_log_for_monitor=self.__monitor)
+                    if line:
+                        self.__logger.info(line, metric_log_for_monitor=self.__monitor)
 
                 errors = 0  # We managed to do a successful iteration.
             except (ArithmeticError, EOFError, EnvironmentError, LookupError,
@@ -396,6 +429,8 @@ class SystemMetricsMonitor(ScalyrMonitor):
         self.options.network_interface_suffix = self._config.get('network_interface_suffix', default='[0-9A-Z]+')
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags
+
+        self.log_all_interval = int(self._config.get('log_all_interval', default='0'))
 
     def run(self):
         """Begins executing the monitor, writing metric output to self._logger."""
