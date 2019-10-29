@@ -243,6 +243,11 @@ define_config_option(__monitor__, 'network_interface_suffix',
                      'to create the full interface name when interating over network interfaces in /dev'
                      )
 
+define_config_option(__monitor__, 'local_disks_only',
+                     '(defaults to true) Limits the metrics to only locally mounted filesystems',
+                     convert_to=bool, default=True)
+
+
 class TcollectorOptions(object):
     """Bare minimum implementation of an object to represent the tcollector options.
 
@@ -256,9 +261,10 @@ class TcollectorOptions(object):
         self.no_fatal_on_error = True
         # A list of the prefixes for network interfaces to report.  Usually defaults to ["eth"]
         self.network_interface_prefixes = None
-
         # A regex applied as a suffix to the network_interface_prefixes.  Defaults to '[0-9A-Z]+'
         self.network_interface_suffix = None
+        # Whether or not to limit the metrics to only locally mounted filesystems.
+        self.local_disks_only = True
 
 
 class WriterThread(StoppableThread):
@@ -394,6 +400,8 @@ class SystemMetricsMonitor(ScalyrMonitor):
             self.options.network_interface_prefixes = [self.options.network_interface_prefixes]
 
         self.options.network_interface_suffix = self._config.get('network_interface_suffix', default='[0-9A-Z]+')
+        self.options.local_disks_only = self._config.get('local_disks_only')
+
         self.modules = tcollector.load_etc_dir(self.options, tags)
         self.tags = tags
 

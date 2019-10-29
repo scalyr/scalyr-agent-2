@@ -40,12 +40,17 @@ import time
 
 
 COLLECTION_INTERVAL = 30  # seconds
+LOCAL_DISKS_ONLY = True
 
-# Scalyr edit:  Check environment variable for collection interval.  TODO:  See if we can centralize code, but
-# difficult without requiring collectors including common module which is goes against tcollector architecture.
+# Scalyr edit:  Check environment variable for collection interval and local disks only.  TODO:  See if we can
+# centralize code, but difficult without requiring collectors including common module which is goes against tcollector
+# architecture.
+
 try:
     if "TCOLLECTOR_SAMPLE_INTERVAL" in os.environ:
         COLLECTION_INTERVAL = float(os.environ["TCOLLECTOR_SAMPLE_INTERVAL"])
+    if "TCOLLECTOR_LOCAL_DISKS_ONLY" in os.environ:
+        LOCAL_DISKS_ONLY = os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"].lower() == 'true'
 except ValueError:
     pass
 
@@ -58,9 +63,17 @@ def main():
         if os.getppid() == 1:
             sys.exit(1)
 
+        # Scalyr edit: conditional options on whether to restrict to local disks only or not.
+        if LOCAL_DISKS_ONLY:
+            df_options = '-PlTk'
+            df_inodes_options = '-PlTi'
+        else:
+            df_options = '-PTk'
+            df_inodes_options = '-PTi'
+
         ts = int(time.time())
         # 1kblocks
-        df_proc = subprocess.Popen(["df", "-PlTk"], stdout=subprocess.PIPE)
+        df_proc = subprocess.Popen(["df", df_options], stdout=subprocess.PIPE)
         stdout, _ = df_proc.communicate()
         if df_proc.returncode == 0:
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
@@ -101,11 +114,11 @@ def main():
                 print ("df.1kblocks.free %d %s mount=%s fstype=%s"
                        % (ts, fields[4], mount, fields[1]))
         else:
-            print >> sys.stderr, "df -Pltk returned %r" % df_proc.returncode
+            print >> sys.stderr, "df %s returned %r" % (df_options, df_proc.returncode)
 
         ts = int(time.time())
         # inodes
-        df_proc = subprocess.Popen(["df", "-PlTi"], stdout=subprocess.PIPE)
+        df_proc = subprocess.Popen(["df", df_inodes_options], stdout=subprocess.PIPE)
         stdout, _ = df_proc.communicate()
         if df_proc.returncode == 0:
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
@@ -130,7 +143,7 @@ def main():
                 print ("df.inodes.free %d %s mount=%s fstype=%s"
                        % (ts, fields[4], mount, fields[1]))
         else:
-            print >> sys.stderr, "df -Plti returned %r" % df_proc.returncode
+            print >> sys.stderr, "df %s returned %r" % (df_inodes_options, df_proc.returncode)
 
         sys.stdout.flush()
         time.sleep(COLLECTION_INTERVAL)

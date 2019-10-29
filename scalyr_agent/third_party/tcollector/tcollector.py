@@ -813,6 +813,8 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
     # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
     os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(options.network_interface_prefixes)
     os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
+    # Scalyr edit: Set the environment variable for dfstat.py
+    os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = str(options.local_disks_only)
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():
