@@ -2019,13 +2019,15 @@ class TestLogMatcher(ScalyrTestCase):
         self._close_processors(processors)
 
     def test_matches_recursive_glob(self):
-        matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_recursive))
-        processors = matcher.find_matches(dict(), dict())
-        self.assertEquals(len(processors), 2)
-        self.assertEquals(processors[0].log_path, self.__path_three)
-        self.assertEquals(processors[1].log_path, self.__path_four)
+        # Recursive "**" glob patterns are only supported on Python 2.6 and above.
+        if sys.version_info >= (2, 6):
+            matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_recursive))
+            processors = matcher.find_matches(dict(), dict())
+            self.assertEquals(len(processors), 2)
+            self.assertEquals(processors[0].log_path, self.__path_three)
+            self.assertEquals(processors[1].log_path, self.__path_four)
 
-        self._close_processors(processors)
+            self._close_processors(processors)
 
     def test_ignores_stale_file(self):
         staleness_threshold = 300  # 5 mins
