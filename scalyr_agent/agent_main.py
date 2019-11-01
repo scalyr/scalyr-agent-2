@@ -404,9 +404,10 @@ class ScalyrAgent(object):
                                         'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
                                         '\'api_key\' field in the configuration file' % self.__config.file_path)
                     else:
-                        raise Exception('Failed to send request to the server.  The server address could be wrong, '
-                                        'there maybe a network connectivity issue, or the provided api_token could be '
-                                        'incorrect.  You can disable this check with --no-check-remote-server.')
+                        print >> sys.stderr, ('Failed to send request to the server.  The server address could be '
+                                              'wrong, there maybe a network connectivity issue, or the provided '
+                                              'api_token could be incorrect.  You can disable this check with'
+                                              ' --no-check-remote-server. Scalyr agent will keep trying to connect.')
             finally:
                 client.close()
 
