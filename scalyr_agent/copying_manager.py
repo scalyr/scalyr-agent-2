@@ -217,7 +217,14 @@ class CopyingManager(StoppableThread, LogWatcher):
                 else:
                     self.__expanded_server_attributes[key] = value
 
+        # a dict of paths -> log matchers for log matchers that have been dynamically added
+        # this dict should only be touched by the main thread
         self.__dynamic_matchers = {}
+
+        # a dict of paths -> monitor names that have been dynamically added to the copying manager
+        # the copying manager ensures that operations on a dynamically added path can only be performed
+        # by the same monitor (i.e. only the monitor that dynamically added a path can remove or update
+        # that monitor).
         self.__dynamic_paths = {}
 
         # a dict of log paths pending removal once their bytes pending count reaches 0
@@ -386,8 +393,12 @@ class CopyingManager(StoppableThread, LogWatcher):
             matchers = []
             for m in self.__log_matchers:
                 if m.log_path == log_path:
-                    # make sure the matcher is always finished if called from a non scheduled deletion
-                    m.finish()
+                    # Make sure the matcher is always finished if called from a non scheduled deletion (e.g. on shutdown/config reload).
+                    # This ensures that the __dynamic_matchers dict on the main thread will also clean
+                    # itself up when it notices the matcher is finished.
+                    # We set the matcher to finish immediately, because we want the matcher to finish now, not when it's finished
+                    # any existing processing
+                    m.finish( immediately=True )
                 else:
                     matchers.append( m )
 
@@ -1049,12 +1060,12 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             matcher.finish()
 
-            # remove from list of logs pending removal
-            self.__lock.acquire()
-            try:
-                self.__logs_pending_removal.pop( path, None )
-            finally:
-                self.__lock.release()
+        # remove from list of logs pending removal
+        self.__lock.acquire()
+        try:
+            self.__logs_pending_removal = {}
+        finally:
+            self.__lock.release()
 
     def __purge_finished_log_matchers( self ):
         """
@@ -1103,25 +1114,15 @@ class CopyingManager(StoppableThread, LogWatcher):
                 log.log( scalyr_logging.DEBUG_LEVEL_0, "Log matcher not found for %s" % path )
                 continue
 
-            processor_paths = matcher.update_log_entry_config( log_config )
-            for processor_path in processor_paths:
-                self.__log_paths_being_processed.pop( processor_path, None )
+            # update the log config of the matcher, which closes any open processors, and returns
+            # their checkpoints
+            closed_processors = matcher.update_log_entry_config( log_config )
+            for processor_path, checkpoint in closed_processors.iteritems():
+                checkpoints[processor_path] = checkpoint
 
-                # iterate over full list of processors to see if we need to remove any.
-                # We manually iterate so that we can close the processors if necessary
-                # and also so we can get checkpoints so files aren't copied from the beginning
-                # note:  manually calculate the len each loop iteration as it changes if items
-                # are removed
-                i = 0
-                while i < len( self.__log_processors ):
-                    p = self.__log_processors[i]
-                    if p.log_path == processor_path:
-                        checkpoints[p.log_path] = p.get_checkpoint()
-                        p.close()
-                        del self.__log_processors[i]
-                    else:
-                        i += 1
             reloaded.append( matcher )
+
+        self.__remove_closed_processors()
 
         self.__create_log_processors_for_log_matchers( log_matchers, checkpoints=checkpoints, copy_at_index_zero=True )
         self.__create_log_processors_for_log_matchers( reloaded, checkpoints=checkpoints, copy_at_index_zero=True )
@@ -1132,6 +1133,23 @@ class CopyingManager(StoppableThread, LogWatcher):
             self.__pending_log_matchers = [lm for lm in self.__pending_log_matchers if lm not in log_matchers]
         finally:
             self.__lock.release()
+
+    def __remove_closed_processors( self ):
+        """
+        Removes any closed log processors from the __log_processors and __log_paths_being_processed lists
+        """
+        # shallow copy the processor list for iteration
+        processor_list = self.__log_processors[:]
+
+        # set processors to empty
+        self.__log_processors = []
+        self.__log_paths_being_processed = {}
+
+        # add back any processors that haven't been closed
+        for p in processor_list:
+            if not p.is_closed():
+                self.__log_processors.append(p)
+                self.__log_paths_being_processed[p.log_path] = p
 
     def __create_log_processors_for_log_matchers( self, log_matchers, checkpoints=None, copy_at_index_zero=False ):
         """

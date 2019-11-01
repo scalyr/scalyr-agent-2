@@ -1787,9 +1787,9 @@ class LogFileProcessor(object):
                         if close:
                             self.__log_file_iterator.close()
                             self.__is_closed = True
-                            return True
-                        else:
-                            return False
+
+                        return self.__is_closed
+
                     elif result == LogFileProcessor.FAIL_AND_DROP:
                         self.__log_file_iterator.mark(final_position, current_time=current_time)
                         self.__total_bytes_pending = self.__log_file_iterator.available
@@ -2286,12 +2286,12 @@ class LogMatcher(object):
         # The LogFileProcessor objects for all log files that have matched the log_path.  This will only have
         # one element if it is not a glob.
         self.__processors = []
-        # The lock that protects the __processor, __is_finished and __last_check vars.
+        # The lock that protects the __processor, __is_finishing and __last_check vars.
         self.__lock = threading.Lock()
 
         self.update_log_entry_config( log_entry_config )
 
-        self.__is_finished = False
+        self.__is_finishing = False
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
         # This probably leads to false positives, but that's ok.
         self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
@@ -2299,6 +2299,14 @@ class LogMatcher(object):
         self.__last_check = None
 
     def update_log_entry_config( self, log_entry_config ):
+        """
+        Updates the log config for the log matcher and any of its processors.
+        In order to update the processors, the processors are simply closed and
+        removed from the list of processors.  These processors will be recreated
+        the next time the file matcher is matched.
+
+        @return: A dict of paths -> checkpoints for any closed processors
+        """
 
         self.__log_entry_config = log_entry_config
         self.log_path = self.__log_entry_config['path']
@@ -2315,11 +2323,13 @@ class LogMatcher(object):
         else:
             self.__stale_threshold_secs = None
 
-        result = []
+        result = {}
         self.__lock.acquire()
         try:
+            # get checkpoints and close all processors
             for p in self.__processors:
-                result.append( p.log_path )
+                result[p.log_path] = p.get_checkpoint()
+                p.close();
 
             self.__processors = []
         finally:
@@ -2338,21 +2348,32 @@ class LogMatcher(object):
         """
         return self.__log_entry_config
 
-    def finish( self ):
+    def finish( self, immediately=False ):
         """
         Tells the log matcher to finish processing any processors.
 
         LogMatchers that are `finished` no longer match log files or create new processors, unless
         they haven't ever matched any files, in which case they will match at least once
+        @param immediately: If true, then the LogMatcher and all processors are closed immediately,
+            otherwise the processors are closed when they reach the end of file
         """
         self.__lock.acquire()
         try:
             # set the matcher as finished
-            self.__is_finished = True
+            self.__is_finishing = True
 
-            # set any existing processors to close when they reach eof
+            if immediately:
+                # set the last check time to now because we are closing immediately,
+                # and we don't want the matcher to wait until it has been matched
+                self.__last_check = time.time()
+
+            # set any existing processors to close immediately if immediately is True,
+            # otherwise set them to close when they reach eof
             for processor in self.__processors:
-                processor.close_at_eof()
+                if immediately:
+                    processor.close()
+                else:
+                    processor.close_at_eof()
         finally:
             self.__lock.release()
 
@@ -2364,10 +2385,13 @@ class LogMatcher(object):
         finished = False
         self.__lock.acquire()
         try:
-            finished = self.__is_finished
+            finished = self.__is_finishing
 
-            # we are only finished if `is_finished` is set and we have tried to check for a match
-            # on the matcher at least once
+            # If `is_finishing` is set to True, *but* we haven't tried to match for this LogMatcher
+            # (i.e. self.__last_check is None) then we should return `False` here to signify that
+            # the matcher is not finished, because even if we are `finishing` we shouldn't finish
+            # until we have checked at least once for matches, otherwise we will miss out on short
+            # lived logs.
             if finished and self.__last_check is None:
                 return False
 
@@ -2428,15 +2452,15 @@ class LogMatcher(object):
 
         self.__lock.acquire()
         try:
-            is_finished = self.__is_finished
+            is_finishing = self.__is_finishing
             has_been_processed = self.__last_check is not None
             self.__last_check = time.time()
             self.__removed_closed_processors()
         finally:
             self.__lock.release()
 
-        # check to see if the log matcher is finished and we have checked it at least once
-        if has_been_processed and is_finished:
+        # check to see if the log matcher is finishing and we have checked it at least once
+        if has_been_processed and is_finishing:
             # if so, then don't do any more matching on this log matcher
             return []
 
@@ -2510,11 +2534,12 @@ class LogMatcher(object):
             self.__lock.acquire()
             for new_processor in result:
                 self.__processors.append(new_processor)
-                # If the log matcher is finished, then any new processors should be set to close when
+                # If the log matcher is finishing, then any new processors should be set to close when
                 # they reach their eof.  This catches the situation where `finish` was called on the log matcher
                 # but the log matcher didn't have any processors yet, because `find_matches` hadn't been called
-                # on it, and ensures that all processors for a `finished` log matcher are set to close at eof
-                if is_finished:
+                # on it.  Now that we have found a match, we should ensures that all processors for a `finishing`
+                # log matcher are set to close at eof
+                if is_finishing:
                     new_processor.close_at_eof()
             self.__lock.release()
 
