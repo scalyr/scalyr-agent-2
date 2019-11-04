@@ -394,9 +394,9 @@ class ScalyrAgent(object):
                 if ping_result != 'success':
                     if 'badClientClockSkew' in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
-                        raise Exception('Sending request to the server failed due to bad clock skew.  The system clock '
-                                        'on this host is too off from actual time.  Please fix the clock and try to '
-                                        'restart the agent.')
+                        print >> sys.stderr, ('Sending request to the server failed due to bad clock skew.  The system '
+                                              'clock on this host is too off from actual time.  Scalyr agent will keep '
+                                              'trying to connect in the background.')
                     elif 'invalidApiKey' in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
                         raise Exception('Sending request to the server failed due to an invalid API key.  This probably '
@@ -404,9 +404,11 @@ class ScalyrAgent(object):
                                         'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
                                         '\'api_key\' field in the configuration file' % self.__config.file_path)
                     else:
-                        raise Exception('Failed to send request to the server.  The server address could be wrong, '
-                                        'there maybe a network connectivity issue, or the provided api_token could be '
-                                        'incorrect.  You can disable this check with --no-check-remote-server.')
+                        print >> sys.stderr, ('Failed to send request to the server.  The server address could be '
+                                              'wrong, there maybe a network connectivity issue, or the provided '
+                                              'api_token could be incorrect.  You can disable this check with'
+                                              ' --no-check-remote-server. Scalyr agent will keep trying to connect in '
+                                              'the background.')
             finally:
                 client.close()
 
