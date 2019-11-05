@@ -2305,7 +2305,9 @@ class LogMatcher(object):
         removed from the list of processors.  These processors will be recreated
         the next time the file matcher is matched.
 
-        @return: A dict of paths -> checkpoints for any closed processors
+        @return: A dict of paths -> checkpoints for any closed processors.  The caller should
+            retain a copy of these checkpoints and be sure they are used when next running
+            the matcher.
         """
 
         self.__log_entry_config = log_entry_config
