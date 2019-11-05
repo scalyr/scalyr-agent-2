@@ -1,19 +1,24 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.54 "Galactica" - Oct 18, 2019
+## 2.0.54 "Galactica" - Nov 7, 2019
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Oct 18, 2019 15:00 -0700
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 5, 2019 10:00 -0800
 --->
-
-Note, this release is pending an actual release date is TBD sometime in Oct.
 
 Features
 * Added TSLite support to allow customers using Python 2.6 to connect via TLSv1.1
 
+Bugs
+* Fix issue causing log copying slow down when there is a high churn in the log files it is copying (typically K8s or Docker with lots of containers coming up down)
+
 Miscellaneous changes
+* No longer fail startup if cannot connect successfully to server
+* Change default of `check_remote_if_no_tty` config option to `True`
 * Test cleanups
+
+
 
 ## 2.0.53 "Firefly" - Sep 18, 2019
 
