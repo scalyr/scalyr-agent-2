@@ -18,8 +18,6 @@ Miscellaneous changes
 * Change default of `check_remote_if_no_tty` config option to `True`
 * Test cleanups
 
-
-
 ## 2.0.53 "Firefly" - Sep 18, 2019
 
 <!---
