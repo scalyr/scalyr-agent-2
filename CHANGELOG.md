@@ -22,7 +22,7 @@ Packaged by Imron Alston <imron@scalyr.com> on Sep 18, 2019 15:00 -0700
 --->
 
 Features
-* Collection of per CPU metric data under docker/kubernetes has been placed behind a config option to prevent collecting excessive metrics on machines with a large number of cores.
+* Collection of per CPU metric data under docker/kubernetes has been placed behind the config option `docker_percpu_metrics` (defaulted to `False`) to prevent collecting excessive metrics on machines with a large number of cores.
 
 Miscellaneous changes
 * Added scripts for bringing up/tearing down large clusters for testing
