@@ -10,6 +10,7 @@ ecdsa==0.13.2
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1
+coverage==4.5.4
 
 # cffi==1.12.3
 # asyncio==3.4.3

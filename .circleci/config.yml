@@ -26,7 +26,8 @@ jobs:
       - run:
           command: |
             source venv/bin/activate
-            python run_tests.py
+            coverage run run_tests.py
+            coverage html --omit="scalyr_agent/third_party*,scalyr_agent/tests/*" -d cover
 
       - store_artifacts:
           path: xunit.xml
