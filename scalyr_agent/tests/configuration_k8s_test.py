@@ -8,6 +8,7 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
+from scalyr_agent.monitor_utils.k8s import QualifiedName
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfigurationBase
 
@@ -66,6 +67,7 @@ class TestConfigurationK8s(TestConfigurationBase):
             "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
             "k8s_ignore_pod_sandboxes": (STANDARD_PREFIX, False, bool),
             "k8s_include_all_containers": (STANDARD_PREFIX, False, bool),
+            "k8s_sidecar_mode": (STANDARD_PREFIX, True, bool),
             "k8s_parse_format": (STANDARD_PREFIX, TEST_PARSE_FORMAT, str),
             "k8s_always_use_cri": (STANDARD_PREFIX, True, bool),
             "k8s_cri_query_filesystem": (STANDARD_PREFIX, True, bool),
@@ -372,3 +374,16 @@ class TestConfigurationK8s(TestConfigurationBase):
         _test_k8s_ignore_namespaces_supersedes(None, None, kube_system)
         _test_k8s_ignore_namespaces_supersedes(None, r'""', [])
         _test_k8s_ignore_namespaces_supersedes(r'', r'""', [])
+
+
+class TestK8SUtils(TestConfigurationBase):
+    """
+    Tests for monitor_utils/k8s.py
+    """
+    def test_k8s_utils_qualified_name(self):
+        self.__pod_a = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fcl2s")
+        self.__pod_b = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fvhmw")
+
+        assert(self.__pod_a != self.__pod_b)
+        assert(self.__pod_a.is_valid())
+        assert(self.__pod_a == self.__pod_a)

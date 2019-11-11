@@ -171,6 +171,15 @@ class QualifiedName(object):
         self.namespace = namespace
         self.name = name
 
+    def __eq__(self, other):
+        return self.namespace == other.namespace and self.name == other.name
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def is_valid(self):
+        return self.namespace is not None and self.name is not None
+
 
 class PodInfo( object ):
     """
