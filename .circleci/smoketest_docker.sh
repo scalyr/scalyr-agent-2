@@ -74,6 +74,25 @@ function kill_and_delete_docker_test_containers() {
 kill_and_delete_docker_test_containers
 echo `pwd`
 
+# Create network
+docker network create mynet
+
+# Grab and run server image
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip
+sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+$(aws ecr get-login --no-include-email --region us-east-2)
+docker pull 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+docker run --net mynet --name scalyr_server -d --rm --expose 8080 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+sleep 5
+export SCALYR_SERVER=http://$(docker inspect -f "{{ .NetworkSettings.Networks.mynet.IPAddress }}" scalyr_server):8080
+
+response=$(docker exec -it scalyr_server curl -d p0=test@test.com -d p1=abc123 -d _execute=Create+Test+User --silent "http://127.0.0.1:8080/.entryPoint?class=com.scalyr.internaltools.TestingTools&method=createTestUser")
+temp=$(echo "$response" | grep "Write Logs")
+export SCALYR_API_KEY=${temp#*:}
+temp=$(echo "$response" | grep "Read Configuration")
+export READ_API_KEY=${temp#*:}
+
 # Build agent docker image packager with fake version
 fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
@@ -88,7 +107,7 @@ docker build -t ${agent_image} .
 
 
 # Launch Agent container (which begins gathering stdout logs)
-docker run -d --name ${contname_agent} \
+docker run --net mynet -d --name ${contname_agent} \
 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} \
 -v /var/run/docker.sock:/var/scalyr/docker.sock \
 ${jsonlog_containers_mount} ${syslog_driver_portmap} \
@@ -101,7 +120,7 @@ echo "Agent container ID == ${agent_hostname}"
 # Launch Uploader container (only writes to stdout, but needs to query Scalyr to verify agent liveness)
 # You MUST provide scalyr server, api key and importantly, the agent_hostname container ID for the agent-liveness
 # query to work (uploader container waits for agent to be alive before uploading data)
-docker run ${syslog_driver_option}  -d --name ${contname_uploader} ${smoketest_image} \
+docker run ${syslog_driver_option} --net mynet -d --name ${contname_uploader} ${smoketest_image} \
 bash -c "${smoketest_script} ${contname_uploader} ${max_wait} \
 --mode uploader \
 --scalyr_server ${SCALYR_SERVER} \
@@ -114,7 +133,7 @@ echo "Uploader container ID == ${uploader_hostname}"
 
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
-docker run ${syslog_driver_option} -it --name ${contname_verifier} ${smoketest_image} \
+docker run ${syslog_driver_option} -it --net mynet --name ${contname_verifier} ${smoketest_image} \
 bash -c "${smoketest_script} ${contname_verifier} ${max_wait} \
 --mode verifier \
 --scalyr_server ${SCALYR_SERVER} \

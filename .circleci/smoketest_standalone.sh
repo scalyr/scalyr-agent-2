@@ -31,6 +31,16 @@ PS1='\h:\w\$ '
 
 FILES=/tmp
 
+if [[ -n ${TLS_REVERSE_PROXY} ]]; then
+  echo TLS
+else
+  response=$(curl --retry 10 --retry-delay 5 -d p0=test@test.com -d p1=abc123 -d _execute=Create+Test+User --silent "http://localhost:8080/.entryPoint?class=com.scalyr.internaltools.TestingTools&method=createTestUser")
+  temp=$(echo "$response" | grep "Write Logs")
+  export SCALYR_API_KEY=${temp#*:}
+  temp=$(echo "$response" | grep "Read Configuration")
+  export READ_API_KEY=${temp#*:}
+fi
+
 # Parse args
 
 # Create work directory to checkout source code
@@ -107,7 +117,7 @@ sudo mv /tmp/api_key.json /etc/scalyr-agent-2/agent.d/api_key.json
 if [[ -n ${TLS_REVERSE_PROXY} ]]; then
     echo "{scalyr_server: \"${TLS_REVERSE_PROXY}\", verify_server_certificate: false, allow_http: true, debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
 else
-    echo "{scalyr_server: \"${SCALYR_SERVER}\", debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
+    echo "{scalyr_server: \"http://localhost:8080\", allow_http: true, debug_init: true, debug_level: 5}" > /tmp/scalyr_server.json
 fi
 sudo mv /tmp/scalyr_server.json /etc/scalyr-agent-2/agent.d/scalyr_server.json
 
@@ -148,8 +158,17 @@ LOGFILE='/var/log/scalyr-agent-2/data.json'
 print_header 'Querying Scalyr server to verify log upload'
 
 # The smoketest python process requires python 3
-sudo -E bash -c "source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
-ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
---scalyr_server $SCALYR_SERVER --read_api_key $READ_API_KEY \
---python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
---debug true"
+
+if [[ -n ${TLS_REVERSE_PROXY} ]]; then
+  sudo -E bash -c "source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
+  ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
+  --scalyr_server ${SCALYR_SERVER} --read_api_key $READ_API_KEY \
+  --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
+  --debug true"
+else
+  sudo -E bash -c "source ~/.bashrc && pyenv shell 3.7.3 && python $FILES/smoketest.py \
+  ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
+  --scalyr_server http://localhost:8080 --read_api_key $READ_API_KEY \
+  --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
+  --debug true"
+fi

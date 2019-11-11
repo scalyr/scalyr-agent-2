@@ -63,82 +63,118 @@ jobs:
 
   smoke-standalone-27:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.7
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-26:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.6
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-27-tls12:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.7.nossl
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-26-tls12:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.6.nossl
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6.nossl -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-25:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.5
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.5 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-24:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: scalyr/scalyr-agent-ci-unittest:4
+        environment:
+          TEST_BRANCH: ${CIRCLE_BRANCH}
+          MAX_WAIT: 300
+          PYTHON_VERSION: 2.4
+          CIRCLE_BUILD_NUM: ${CIRCLE_BUILD_NUM}
+      - image: 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
+        aws_auth:
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
     steps:
       - checkout
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
           command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy
+            $(pwd)/.circleci/smoketest_standalone.sh
   smoke-standalone-24-tlsproxy:
     docker:
       - image: circleci/python:2.7-jessie-browsers
@@ -148,14 +184,31 @@ jobs:
           docker_layer_caching: true
       - run:
           # launch mitmproxy in reverse-proxy mode with port 8080 exposed, get it's IP address.
-          # smoketest agent uploads to mitmproxy (http protocol because 2.4 pyenv currently doesn't support ssl)
+          # smoketest agent uploads to mitmproxy (no certificate validation)
           command: |
             docker network create mynet && \
-            docker run --net mynet --rm -d --name mitmproxy --expose=8080 mitmproxy/mitmproxy mitmdump --mode reverse:${SCALYR_SERVER} --set ssl_version_client=TLSv1 --set ssl_version_server=TLSv1_2 && \
+            curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
+            unzip awscli-bundle.zip && \
+            sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
+            $(aws ecr get-login --no-include-email --region us-east-2) && \
+            docker pull 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest && \
+            docker run --net mynet --name scalyr_server -d --rm --expose 8080 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest && \
+            sleep 5 && \
+            export TLS12_SCALYR_SERVER=http://$(docker inspect -f "{{ .NetworkSettings.Networks.mynet.IPAddress }}" scalyr_server):8080 && \
+            response=$(docker exec -it scalyr_server curl -d p0=test@test.com -d p1=abc123 -d _execute=Create+Test+User --silent "http://127.0.0.1:8080/.entryPoint?class=com.scalyr.internaltools.TestingTools&method=createTestUser") && \
+            temp=$(echo "$response" | grep "Write Logs") && \
+            export TLS12_SCALYR_API_KEY=${temp#*:} && \
+            export TLS12_SCALYR_API_KEY=$(echo $TLS12_SCALYR_API_KEY|tr -d '\n') && \
+            export TLS12_SCALYR_API_KEY=$(echo $TLS12_SCALYR_API_KEY|tr -d '\r') && \
+            temp=$(echo "$response" | grep "Read Configuration") && \
+            export TLS12_READ_API_KEY=${temp#*:} && \
+            export TLS12_READ_API_KEY=$(echo $TLS12_READ_API_KEY|tr -d '\n') && \
+            export TLS12_READ_API_KEY=$(echo $TLS12_READ_API_KEY|tr -d '\r') && \
+            docker run --net mynet --rm -d --name mitmproxy --expose=8080 mitmproxy/mitmproxy mitmdump --mode reverse:${TLS12_SCALYR_SERVER} --set ssl_version_client=TLSv1 --set ssl_version_server=TLSv1_2 && \
             export MITM_IPADDRESS=$(docker inspect -f "{{ .NetworkSettings.Networks.mynet.IPAddress }}" mitmproxy) && \
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run --net mynet -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${TLS12_SCALYR_API_KEY} -e READ_API_KEY=${TLS12_READ_API_KEY} -e SCALYR_SERVER=${TLS12_SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}-tlsproxy -e TLS_REVERSE_PROXY=http://${MITM_IPADDRESS}:8080 scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker run --net mynet -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.4 -e SCALYR_API_KEY=${TLS12_SCALYR_API_KEY} -e READ_API_KEY=${TLS12_READ_API_KEY} -e SCALYR_SERVER=${TLS12_SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}-tlsproxy -e TLS_REVERSE_PROXY=https://${MITM_IPADDRESS}:8080 scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker kill mitmproxy && \
             docker rm dummy
   smoke-standalone-25-tlsproxy:
@@ -170,7 +223,24 @@ jobs:
           # smoketest agent uploads to mitmproxy (no certificate validation)
           command: |
             docker network create mynet && \
-            docker run --net mynet --rm -d --name mitmproxy --expose=8080 mitmproxy/mitmproxy mitmdump --mode reverse:${SCALYR_SERVER} --set ssl_version_client=TLSv1 --set ssl_version_server=TLSv1_2 && \
+            curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip" && \
+            unzip awscli-bundle.zip && \
+            sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws && \
+            $(aws ecr get-login --no-include-email --region us-east-2) && \
+            docker pull 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest && \
+            docker run --net mynet --name scalyr_server -d --rm --expose 8080 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest && \
+            sleep 5 && \
+            export TLS12_SCALYR_SERVER=http://$(docker inspect -f "{{ .NetworkSettings.Networks.mynet.IPAddress }}" scalyr_server):8080 && \
+            response=$(docker exec -it scalyr_server curl -d p0=test@test.com -d p1=abc123 -d _execute=Create+Test+User --silent "http://127.0.0.1:8080/.entryPoint?class=com.scalyr.internaltools.TestingTools&method=createTestUser") && \
+            temp=$(echo "$response" | grep "Write Logs") && \
+            export TLS12_SCALYR_API_KEY=${temp#*:} && \
+            export TLS12_SCALYR_API_KEY=$(echo $TLS12_SCALYR_API_KEY|tr -d '\n') && \
+            export TLS12_SCALYR_API_KEY=$(echo $TLS12_SCALYR_API_KEY|tr -d '\r') && \
+            temp=$(echo "$response" | grep "Read Configuration") && \
+            export TLS12_READ_API_KEY=${temp#*:} && \
+            export TLS12_READ_API_KEY=$(echo $TLS12_READ_API_KEY|tr -d '\n') && \
+            export TLS12_READ_API_KEY=$(echo $TLS12_READ_API_KEY|tr -d '\r') && \
+            docker run --net mynet --rm -d --name mitmproxy --expose=8080 mitmproxy/mitmproxy mitmdump --mode reverse:${TLS12_SCALYR_SERVER} --set ssl_version_client=TLSv1 --set ssl_version_server=TLSv1_2 && \
             export MITM_IPADDRESS=$(docker inspect -f "{{ .NetworkSettings.Networks.mynet.IPAddress }}" mitmproxy) && \
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
@@ -245,7 +315,7 @@ jobs:
       - run:
           name: start minikube
           command: |
-            sudo -E minikube start --vm-driver=none --cpus 2 --memory 2048 --kubernetes-version=${K8S_VERSION} &> $HOME/minikube.log 2>&1 < /dev/null
+            sudo -E minikube start --vm-driver=none --cpus 2 --memory 5048 --kubernetes-version=${K8S_VERSION} &> $HOME/minikube.log 2>&1 < /dev/null
       - run:
           name: wait for minikube
           command: |
@@ -253,6 +323,15 @@ jobs:
             until kubectl get nodes -o jsonpath="$JSONPATH" 2>&1 | grep -q "Ready=True"; do
               sleep 1;
             done
+      - run:
+          name: setup aws cli and grab server image
+          # Make sure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env variables have the aws access keys
+          command: |
+            curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+            unzip awscli-bundle.zip
+            sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+            $(aws ecr get-login --no-include-email --region us-east-2)
+            docker pull 137797084791.dkr.ecr.us-east-2.amazonaws.com/scalyr-dev:latest
       - run:
           name: fix RBAC
           command: |
