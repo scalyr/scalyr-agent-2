@@ -682,7 +682,7 @@ class AddEventsRequest(object):
 
         # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
         # the request.  That includes both the threads JSON array and the client timestamp.
-        self.__post_fix_buffer = PostFixBuffer('], threads: THREADS, client_time: TIMESTAMP }')
+        self.__post_fix_buffer = PostFixBuffer('], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }')
 
         # The time that will be sent as the 'client_time' parameter for the addEvents request.
         # This may be later updated using the set_client_time method in the case where the same AddEventsRequest
@@ -715,26 +715,28 @@ class AddEventsRequest(object):
         else:
             return len(self.__body)
 
-    def add_thread(self, thread_id, thread_name):
-        """Registers the specified thread for this AddEvents request.
+    def add_log_and_thread(self, thread_id, thread_name, log_attrs):
+        """Registers the specified log for this AddEvents request.
 
         Any thread id mentioned in any event in this request should first be registered here.
 
         @param thread_id: An id for the thread.  This can then be used as the value for a ``thread`` field
             in the ``event`` object passed to ``add_event``.  Should be unique for this session.
         @param thread_name: A human-readable name for the thread
+        @param log_attrs: The metadata for this log
 
         @type thread_id: str
         @type thread_name: str
+        @type log_attrs: dict
 
-        @return: True if there was the allowed bytes to send were not exceeded by adding this thread to the
+        @return: True if there was the allowed bytes to send were not exceeded by adding this log to the
             request.
         @rtype: bool
         """
         # Have to account for the extra space this will use when serialized.  See how much space we can allow for
         # the post fix right now.
         available_size_for_post_fix = self.__max_size - self.__buffer.tell()
-        return self.__post_fix_buffer.add_thread_entry(thread_id, thread_name,
+        return self.__post_fix_buffer.add_log_and_thread_entry(thread_id, thread_name, log_attrs,
                                                        fail_if_buffer_exceeds=available_size_for_post_fix)
 
     def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
@@ -986,6 +988,45 @@ def _calculate_per_thread_extra_bytes():
     return result
 
 
+def _calculate_per_log_extra_bytes():
+    """Calculates how many extra bytes are added to the serialized form of the threads JSON array
+    when adding a new thread, excluding the bytes for serializing the thread id and name themselves.
+
+    This is used below by the PostFixBuffer abstraction to help calculate the number of bytes the serialized form
+    of the PostFixBuffer will take, without having to actually serialize it.  It was found that doing the heavy
+    weight process of serializing it over and over again to just get the size was eating too much CPU.
+
+    @return: An array of two int entries.  The first entry is how many extra bytes are added when adding the
+        first thread to the threads JSON array and the second is how many extra bytes are added for all subsequent
+        threads.  (The number differences by at least one due to the need for a comma to be inserted).
+    @rtype: [int]
+    """
+    # An array of the number of bytes used to serialize the array when there are N threads in it (where N is the
+    # index into size_by_entries).
+    sizes_by_entries = []
+
+    # Calculate sizes_by_entries by actually serialzing each case.
+    logs = []
+    test_string = 'A'
+    test_dict = {}
+    for i in range(3):
+        sizes_by_entries.append(len(scalyr_util.json_encode(logs)))
+
+        # Add in another thread for the next round through the loop.
+        logs.append({'id': test_string, 'attrs': test_dict})
+
+    # Now go back and calculate the deltas between the different cases.  We have to remember to subtract
+    # out the length due to the id and name strings.
+
+    test_string_len = len(scalyr_util.json_encode(test_string))
+    test_dict_len = len(scalyr_util.json_encode(test_dict))
+    result = []
+    for i in range(1, 3):
+        result.append(sizes_by_entries[i] - sizes_by_entries[i - 1] - (test_string_len + test_dict_len))
+
+    return result
+
+
 class PostFixBuffer(object):
     """Buffer for the items that must be written after the events JSON array, which typically means
     the client timestamp and the threads JSON array.
@@ -1006,7 +1047,10 @@ class PostFixBuffer(object):
         # Make sure the keywords are used in the format string.
         assert('THREADS' in format_string)
         assert('TIMESTAMP' in format_string)
+        assert('LOGS' in format_string)
 
+        # The entries added to include in the logs JSON array in the request.
+        self.__logs = []
         # The entries added to include in the threads JSON array in the request.
         self.__threads = []
         # The timestamp to include in the output.
@@ -1018,6 +1062,7 @@ class PostFixBuffer(object):
     # a new thread entry (beyond just the bytes due to the serialized thread id and thread name themselves).
     # This will have two entries.  See above for a better description.
     __per_thread_extra_bytes = _calculate_per_thread_extra_bytes()
+    __per_log_extra_bytes = _calculate_per_log_extra_bytes()
 
     @property
     def length(self):
@@ -1039,7 +1084,8 @@ class PostFixBuffer(object):
         @return: The post fix to include at the end of the AddEventsRequest.
         @rtype: str
         """
-        result = self.__format.replace('TIMESTAMP', str(self.__client_timestamp))
+        result = self.__format.replace('LOGS', scalyr_util.json_encode(self.__logs))
+        result = result.replace('TIMESTAMP', str(self.__client_timestamp))
         result = result.replace('THREADS', scalyr_util.json_encode(self.__threads))
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
@@ -1074,25 +1120,27 @@ class PostFixBuffer(object):
         self.__client_timestamp = new_timestamp
         return True
 
-    def add_thread_entry(self, thread_id, thread_name, fail_if_buffer_exceeds=None):
+    def add_log_and_thread_entry(self, thread_id, thread_name, log_attrs, fail_if_buffer_exceeds=None):
         """Adds in a new thread entry that will be included in the post fix.
 
 
         @param thread_id: The id of the thread.
         @param thread_name: The name of the thread.
+        @param log_attrs: Log static attributes.
         @param fail_if_buffer_exceeds: The maximum number of bytes that can be used by the post fix when serialized.
             If this is not None, and the size will exceed this amount when the thread entry is added, then the
             thread is not added and False is returned.
 
         @type thread_id: str
         @type thread_name: str
+        @type log_attrs: dict
         @type fail_if_buffer_exceeds: None|int
 
         @return: True if the thread was added (can only return False if fail_if_buffer_exceeds is not None)
         @rtype: bool
         """
         # Calculate the size difference.  It is at least the size of taken by the serialized strings.
-        size_difference = len(scalyr_util.json_encode(thread_name)) + len(scalyr_util.json_encode(thread_id))
+        size_difference = len(scalyr_util.json_encode(thread_name)) + (2*len(scalyr_util.json_encode(thread_id))) + len(scalyr_util.json_encode(log_attrs))
 
         # Use the __per_thread_extra_bytes to calculate the additional bytes that will be consumed by serializing
         # the JSON object containing the thread id and name.  The number of extra bytes depends on whether or not
@@ -1100,14 +1148,17 @@ class PostFixBuffer(object):
         num_threads = len(self.__threads)
         if num_threads < 1:
             size_difference += PostFixBuffer.__per_thread_extra_bytes[0]
+            size_difference += PostFixBuffer.__per_log_extra_bytes[0]
         else:
             size_difference += PostFixBuffer.__per_thread_extra_bytes[1]
+            size_difference += PostFixBuffer.__per_log_extra_bytes[1]
 
         if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
             return False
 
         self.__current_size += size_difference
         self.__threads.append({'id': thread_id, 'name': thread_name})
+        self.__logs.append({'id': thread_id, 'attrs': log_attrs})
         return True
 
     @property
@@ -1131,12 +1182,13 @@ class PostFixBuffer(object):
         """
         # The position value should by an array with three entries: the size, the client timestamp, and the number
         # of threads.  Since threads are always added one after another, it is sufficient just to truncate back to that
-        # previous length.
+        # previous length. Same with logs, and number of logs and threads should be the same so piggyback on the check.
         self.__current_size = position[0]
         self.__client_timestamp = position[1]
         assert(len(self.__threads) >= position[2])
         if position[2] < len(self.__threads):
             self.__threads = self.__threads[0:position[2]]
+            self.__logs = self.__logs[0:position[2]]
 
 
 class Event(object):
@@ -1206,6 +1258,7 @@ class Event(object):
 
         # We only stash a copy of attrs for debugging/testing purposes.  We really will just serialize it into
         # __serialization_base.
+        self.__log_id = None
         self.__attrs = attrs
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception('Cannot use both attrs/thread_id and base')
@@ -1246,16 +1299,19 @@ class Event(object):
             tmp_buffer.write('thread:')
             tmp_buffer.write( scalyr_util.json_encode(thread_id) )
             tmp_buffer.write(', ')
-        if attributes is not None:
+            tmp_buffer.write('log:')
+            tmp_buffer.write( scalyr_util.json_encode(thread_id) )
+            tmp_buffer.write(', ')
+        #if attributes is not None:
             # Serialize the attributes object, but we have to remove the closing brace because we want to
             # insert more fields.
-            tmp_buffer.write('attrs:')
-            tmp_buffer.write( scalyr_util.json_encode(attributes) )
-            _rewind_past_close_curly(tmp_buffer)
-            tmp_buffer.write(',')
-        else:
+        #    tmp_buffer.write('attrs:')
+        #    tmp_buffer.write( scalyr_util.json_encode(attributes) )
+        #    _rewind_past_close_curly(tmp_buffer)
+        #    tmp_buffer.write(',')
+        #else:
             # Open brace for the attributes object.
-            tmp_buffer.write('attrs:{')
+        tmp_buffer.write('attrs:{')
 
         # Add the message field into the json object.
         tmp_buffer.write('message:')
@@ -1339,6 +1395,10 @@ class Event(object):
             return long(self.__timestamp[1:-1])
         else:
             return None
+
+    @property
+    def log_id(self):
+        return self.__log_id
 
     def set_sequence_id(self, sequence_id):
         """Sets the sequence id for the event.  If this is not invoked, no sequence id will be included

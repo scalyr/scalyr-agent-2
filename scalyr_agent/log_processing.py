@@ -1382,7 +1382,7 @@ class LogFileProcessor(object):
         # happens).  However, this is how the old agent worked and the UI relies on it, so we just keep the old system
         # going for now.
         self.__thread_name = 'Lines for file %s' % file_path
-        self.__thread_id = LogFileProcessor.generate_unique_thread_id()
+        self.__thread_id = LogFileProcessor.generate_unique_id()
 
         self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system,
                                                    checkpoint=checkpoint)
@@ -1664,9 +1664,10 @@ class LogFileProcessor(object):
 
                     #time_spent_serializing -= fast_get_time()
 
-                    # Try to add the thread id if we have not done so far.  This should only be added once per file.
+                    # Try to add the thread id and log metadata if we have not done so far.  This should only be added once per file.
                     if not added_thread_id:
-                        if not add_events_request.add_thread(self.__thread_id, self.__thread_name):
+                        if not add_events_request.add_log_and_thread(self.__thread_id, self.__thread_name,
+                                                                     self.__base_event.attrs):
                             # If we got here, it means we did not have enough room to add both the thread id
                             # and the event into the events request.  So, we have to remove the event we just
                             # added to the add_events_request by setting the position to the original.
@@ -1920,21 +1921,21 @@ class LogFileProcessor(object):
         """
         return LogFileIterator.create_checkpoint(initial_position)
 
-    # Variables used to implement the static method ``generate_unique_thread_id``.
-    __thread_id_lock = threading.Lock()
-    __thread_id_counter = 0
+    # Variables used to implement the static method ``generate_unique_id``.
+    __unique_id_lock = threading.Lock()
+    __unique_id_counter = 0
 
     @staticmethod
-    def generate_unique_thread_id():
-        """Generates and returns a unique thread id that has not been issued before by this agent.
+    def generate_unique_id():
+        """Generates and returns a unique id that has not been issued before by this agent.
 
-        This is used to assign a unique thread id to all events coming from a single LogFileProcessor instance.
+        This is used to assign a unique thread and log id to all events coming from a single LogFileProcessor instance.
         @rtype: str
         """
-        LogFileProcessor.__thread_id_lock.acquire()
-        LogFileProcessor.__thread_id_counter += 1
-        new_id = LogFileProcessor.__thread_id_counter
-        LogFileProcessor.__thread_id_lock.release()
+        LogFileProcessor.__unique_id_lock.acquire()
+        LogFileProcessor.__unique_id_counter += 1
+        new_id = LogFileProcessor.__unique_id_counter
+        LogFileProcessor.__unique_id_lock.release()
 
         return 'log_%d' % new_id
 
