@@ -11,6 +11,7 @@ from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.monitor_utils.k8s import QualifiedName
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfigurationBase
+from scalyr_agent.test_base import ScalyrTestCase
 
 
 class TestConfigurationK8s(TestConfigurationBase):
@@ -376,14 +377,34 @@ class TestConfigurationK8s(TestConfigurationBase):
         _test_k8s_ignore_namespaces_supersedes(r'', r'""', [])
 
 
-class TestK8SUtils(TestConfigurationBase):
+class TestK8SUtils(ScalyrTestCase):
     """
     Tests for monitor_utils/k8s.py
     """
-    def test_k8s_utils_qualified_name(self):
-        self.__pod_a = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fcl2s")
-        self.__pod_b = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fvhmw")
+    def setUp(self):
+        super(TestK8SUtils, self).setUp()
+        self.__pod_valid_a = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fcl2s")
+        self.__pod_valid_b = QualifiedName("default", "scalyr-agent-2-75d69db5cc-fvhmw")
+        self.__pod_no_namespace = QualifiedName(None, "scalyr-agent-2-75d69db5cc-fcl2s")
+        self.__pod_no_podname = QualifiedName("default", None)
+        self.__pod_no_namespace_no_podname = QualifiedName(None, None)
 
-        assert(self.__pod_a != self.__pod_b)
-        assert(self.__pod_a.is_valid())
-        assert(self.__pod_a == self.__pod_a)
+    def test_k8s_utils_qualified_name_is_valid(self):
+        assert (self.__pod_valid_a.is_valid())
+
+    def test_k8s_utils_qualified_name_podname_is_not_valid(self):
+        assert (not self.__pod_no_namespace.is_valid())
+        assert (not self.__pod_no_podname.is_valid())
+        assert (not self.__pod_no_namespace_no_podname.is_valid())
+
+    def test_k8s_utils_qualified_name_is_eq(self):
+        assert (self.__pod_valid_a == self.__pod_valid_a)
+        assert (not self.__pod_valid_a == self.__pod_valid_b)
+        assert (not self.__pod_valid_a == self.__pod_no_podname)
+        assert (not self.__pod_valid_a == self.__pod_no_namespace_no_podname)
+
+    def test_k8s_utils_qualified_name_is_ne(self):
+        assert (self.__pod_valid_a != self.__pod_valid_b)
+        assert (self.__pod_valid_a != self.__pod_valid_b)
+        assert (self.__pod_valid_a != self.__pod_no_podname)
+        assert (self.__pod_valid_a != self.__pod_no_namespace_no_podname)
