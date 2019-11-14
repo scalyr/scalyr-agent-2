@@ -2939,6 +2939,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'SCALYR_K8S_RATELIMIT_INCREASE_FACTOR',
             'SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR',
             'SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY',
+            'SCALYR_K8S_SIDECAR_MODE'
         ]
         for envar in envars_to_log:
             self._logger.info("Environment variable %s : %s" % (envar, os.environ.get(envar, '<Not set>')))
