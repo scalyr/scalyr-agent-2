@@ -76,9 +76,6 @@ kubectl create configmap scalyr-config \
 --from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-${CIRCLE_BUILD_NUM} \
 --from-literal=SCALYR_SERVER=https://app-qatesting.scalyr.com
 
-# TODO: Debugging end to end tests
-kubectl get configmap scalyr-config --output yaml
-
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)
 
