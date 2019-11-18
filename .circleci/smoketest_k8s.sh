@@ -85,7 +85,7 @@ echo "Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
-python build_package.py k8s_builder
+python build_package.py k8s_builder --dockerfiles-path docker/coverage
 TARBALL=$(ls scalyr-k8s-agent-*)
 
 TEMP_DIRECTORY=~/temp_directory
@@ -147,3 +147,11 @@ ${contname_verifier} ${max_wait} \
 --agent_hostname ${agent_hostname} \
 --uploader_hostname ${uploader_hostname} \
 --debug true"
+
+
+echo "Stopping agent"
+k8s_docker_id=$(docker ps | grep k8s_scalyr-agent_scalyr-agent-2 | awk {'print$1'})
+docker container stop ${k8s_docker_id}
+
+echo "Agent stopped copying .coverage results."
+docker cp ${k8s_docker_id}:/.coverage .

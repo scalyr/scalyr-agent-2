@@ -53,7 +53,7 @@ __source_root__ = get_install_root()
 PACKAGE_TYPES = ['rpm', 'tarball', 'deb', 'win32', 'docker_syslog_builder', 'docker_json_builder', 'k8s_builder']
 
 
-def build_package(package_type, variant, no_versioned_file_name):
+def build_package(package_type, variant, no_versioned_file_name, dockerfiles_path):
     """Builds the scalyr-agent-2 package specified by the arguments.
 
     The package is left in the current working directory.  The file name of the
@@ -65,6 +65,7 @@ def build_package(package_type, variant, no_versioned_file_name):
         as 'rpm').
     @param no_versioned_file_name:  If True, will not embed a version number in the resulting artifact's file name.
         This only has an affect if building one of the tarball formats.
+    @param dockerfiles_path: Path to Dockerfiles. Only works with Docker builds.
 
     @return: The file name of the produced package.
     """
@@ -88,7 +89,8 @@ def build_package(package_type, variant, no_versioned_file_name):
             # backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
             # with the eventual migration.
             artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile.syslog',
+                                                         'scalyr-docker-agent.tar.gz',
+                                                         os.path.join(dockerfiles_path, 'Dockerfile.syslog'),
                                                          'docker/docker-syslog-config',
                                                          'scalyr-docker-agent-syslog',
                                                          ['scalyr/scalyr-agent-docker-syslog',
@@ -98,14 +100,16 @@ def build_package(package_type, variant, no_versioned_file_name):
             # directory is mounted to the agent container.)  This is the preferred way of running on Docker.
             # This image is published to scalyr/scalyr-agent-docker-json.
             artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-docker-agent.tar.gz', 'docker/Dockerfile',
+                                                         'scalyr-docker-agent.tar.gz',
+                                                         os.path.join(dockerfiles_path, 'Dockerfile'),
                                                          'docker/docker-json-config',
                                                          'scalyr-docker-agent-json',
                                                          ['scalyr/scalyr-agent-docker-json'])
         elif package_type == 'k8s_builder':
             # An image for running the agent on Kubernetes.
             artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-k8s-agent.tar.gz', 'docker/Dockerfile.k8s',
+                                                         'scalyr-k8s-agent.tar.gz',
+                                                         os.path.join(dockerfiles_path, 'Dockerfile.k8s'),
                                                          'docker/k8s-config',
                                                          'scalyr-k8s-agent',
                                                          ['scalyr/scalyr-k8s-agent'])
@@ -1470,6 +1474,11 @@ if __name__ == '__main__':
                       'this process will not invoke commands such as git in order to compute the build information '
                       'itself.  The file should be one built by a previous run of this script.')
 
+    parser.add_option('', '--dockerfiles-path',dest='dockerfiles_path', default='docker',
+                      help='The path to the directory with Dockerfiles for docker builds. '
+                           'This can be used to specify alternative Dockerfile. For example, with enabled coverage.'
+                           'Only works with docker and k8s builds.')
+
     (options, args) = parser.parse_args()
     # If we are just suppose to create the build_info, then do it and exit.  We do not bother to check to see
     # if they specified a package.
@@ -1494,6 +1503,6 @@ if __name__ == '__main__':
     if options.build_info is not None:
         set_build_info(options.build_info)
 
-    artifact = build_package(args[0], options.variant, options.no_versioned_file_name)
+    artifact = build_package(args[0], options.variant, options.no_versioned_file_name, options.dockerfiles_path)
     print 'Built %s' % artifact
     sys.exit(0)
