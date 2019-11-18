@@ -210,6 +210,10 @@ define_config_option( __monitor__, 'k8s_kubelet_host_ip',
                      'Optional (defaults to None). Defines the host IP address for the Kubelet API. If None, the Kubernetes API will be queried for it',
                      convert_to=str, default=None, env_aware=True)
 
+define_config_option( __monitor__, 'k8s_sidecar_mode',
+                      'Optional, (defaults to False). If true, then logs will only be collected for containers '
+                      'running in the same Pod as the agent. This is used in situations requiring very high throughput.',
+                      env_aware=True, default=False)
 
 # for now, always log timestamps to help prevent a race condition
 #define_config_option( __monitor__, 'log_timestamps',
@@ -1190,38 +1194,79 @@ class ContainerEnumerator( object):
     Base class that defines an api for enumerating all containers running on a node
     """
 
-    def __init__(self, ignored_pod):
+    def __init__(self, agent_pod, is_sidecar_mode=False):
         """
         @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
             is the agent pod.
         @type ignored_pod: QualifiedName
         """
-        self._ignored_pod = ignored_pod
+        self._agent_pod = agent_pod
+        self._is_sidecar_mode = is_sidecar_mode
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
+        if self._is_sidecar_mode:
+            self._ignored_pod = None
+        else:
+            self._ignored_pod = self._agent_pod
+
+    def _get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None):
         raise NotImplementedError()
+
+    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True,
+                        k8s_namespaces_to_exclude=None, current_time=None):
+
+        containers = self._get_containers(running_or_created_after=running_or_created_after, glob_list=glob_list, k8s_cache=k8s_cache,
+                                     k8s_include_by_default=k8s_include_by_default, k8s_namespaces_to_exclude=k8s_namespaces_to_exclude,
+                                     current_time=current_time)
+
+        # Short circuit the filtering logic if there is no pod filtering required.
+        if not self._is_sidecar_mode:
+            return containers
+
+        # Short circuit the filtering logic if sidecar mode is enabled but there's no agent_pod,
+        # As this means no logs will be sent.
+        if self._agent_pod is None:
+            global_log.warn("Sidecar_mode enabled but no agent_pod was specified",
+                             limit_once_per_x_secs=300,
+                             limit_key='sidecar-agent-pod')
+            return {}
+
+        # Filter containers to those that belong to the agent_pod, for use with using sidecar mode
+        # This is done in the parent ContainerEnumerator class so it doesn't have to be duplicated in the
+        # DockerEnumerator and CRIEnumerator
+        filtered_containers = {}
+        for cid, info in containers.iteritems():
+            k8s_info = info.get('k8s_info', {})
+            pod_name = k8s_info.get('pod_name', None)
+            pod_namespace = k8s_info.get('pod_namespace', None)
+            qualified_name = QualifiedName(pod_namespace, pod_name)
+
+            if qualified_name.is_valid() and qualified_name == self._agent_pod:
+                filtered_containers[cid] = info
+        return filtered_containers
+
 
 class DockerEnumerator( ContainerEnumerator ):
     """
     Container Enumerator that retrieves the list of containers by querying the docker remote API over the docker socket by usin
     a docker.Client
     """
-    def __init__(self, client, ignored_pod, controlled_warmer=None):
+    def __init__(self, client, agent_pod, controlled_warmer=None, is_sidecar_mode=False):
         """
         @param client: The docker client to use for accessing docker
-        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
-            is the agent pod.
+        @param agent_pod: The QualfiedName of the agent pod.
         @param controlled_warmer:  If the pod cache should be proactively warmed using the controlled warmer
             strategy, then the warmer instance to use.
+        @param restrict_to_pod: The pod name to restrict logs to
         @type client: DockerClient
-        @type ignored_pod: QualifiedName
+        @type agent_pod: QualifiedName
         @type controlled_warmer: ControlledCacheWarmer or None
+        @type restrict_to_pod: str
         """
-        super( DockerEnumerator, self).__init__(ignored_pod)
+        super( DockerEnumerator, self).__init__(agent_pod, is_sidecar_mode=is_sidecar_mode)
         self._client = client
         self.__controlled_warmer = controlled_warmer
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
+    def _get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         return _get_containers(
             self._client,
             ignored_pod=self._ignored_pod,
@@ -1240,20 +1285,19 @@ class CRIEnumerator( ContainerEnumerator ):
     Container Enumerator that retrieves the list of containers by querying the Kubelet API for a list of all pods on the node
     and then from the list of pods, retrieve all the relevant container information
     """
-    def __init__(self, global_config, ignored_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip):
+    def __init__(self, global_config, agent_pod, k8s_api_url, query_filesystem, kubelet_api_host_ip, is_sidecar_mode=False):
         """
         @param global_config: Global configuration
-        @param ignored_pod: A pod whose containers should not be included in the returned list.  Typically, this
-            is the agent pod.
+        @param agent_pod: The QualfiedName of the agent pod.
         @param k8s_api_url: The URL to use for accessing the API
         @param query_filesystem: Whether or not to get the container list using the filesystem-based approach
         @param kubelet_api_host_ip: The HOST IP to use for accessing the Kubelet API
-        @type ignored_pod: QualifiedName
+        @type agent_pod: QualifiedName
         @type k8s_api_url: str
         @type query_filesystem: bool
         @type kubelet_api_host_ip: str
         """
-        super( CRIEnumerator, self).__init__(ignored_pod)
+        super( CRIEnumerator, self).__init__(agent_pod, is_sidecar_mode=is_sidecar_mode)
         k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
         self._kubelet = KubeletApi( k8s, host_ip=kubelet_api_host_ip )
         self._query_filesystem = query_filesystem
@@ -1264,7 +1308,7 @@ class CRIEnumerator( ContainerEnumerator ):
         self._pod_re = re.compile( '^%s/([^/]+)/([^/]+)/.*\.log$' % self._pod_base )
         self._info_re = re.compile( '^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$' % self._log_base )
 
-    def get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
+    def _get_containers( self, running_or_created_after=None, glob_list=None, k8s_cache=None, k8s_include_by_default=True, k8s_namespaces_to_exclude=None, current_time=None ):
         result = {}
         container_info = []
 
@@ -1527,6 +1571,7 @@ class ContainerChecker(object):
         self.__always_use_cri = self._config.get( 'k8s_always_use_cri' )
         self.__always_use_docker = self._config.get( 'k8s_always_use_docker' )
         self.__cri_query_filesystem = self._config.get( 'k8s_cri_query_filesystem' )
+        self.__sidecar_mode = self._config.get( 'k8s_sidecar_mode' )
 
         self.__agent_pod = agent_pod
 
@@ -1588,6 +1633,9 @@ class ContainerChecker(object):
         """ Gets the node name of the node running the agent from downward API """
         return os.environ.get( 'SCALYR_K8S_NODE_NAME' )
 
+    def _get_pod_name ( self ):
+        """ Gets the pod name of the pod running the agent from downward API"""
+        return os.environ.get( 'SCALYR_K8S_POD_NAME' )
 
     def _get_container_runtime( self ):
         """ Gets the container runtime currently in use """
@@ -1647,12 +1695,12 @@ class ContainerChecker(object):
             if self.__always_use_docker or (self._container_runtime == 'docker' and not self.__always_use_cri):
                 global_log.info('kubernetes_monitor is using docker for listing containers')
                 self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
-                self._container_enumerator = DockerEnumerator( self.__client, self.__agent_pod,
-                                                               controlled_warmer=self.__controlled_warmer )
+                self._container_enumerator = DockerEnumerator( self.__client, self.__agent_pod, controlled_warmer=self.__controlled_warmer, is_sidecar_mode=self.__sidecar_mode)
             else:
                 query_fs = self.__cri_query_filesystem
                 global_log.info('kubernetes_monitor is using CRI with fs=%s for listing containers' % str(query_fs))
-                self._container_enumerator = CRIEnumerator( self._global_config, self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip') )
+                self._container_enumerator = CRIEnumerator( self._global_config, self.__agent_pod, k8s_api_url, query_fs, self._config.get('k8s_kubelet_host_ip'),
+                                                            is_sidecar_mode=self.__sidecar_mode )
 
             if self.__parse_format == 'auto':
                 # parse in json if we detect the container runtime to be 'docker' or if we detect
@@ -2174,7 +2222,7 @@ class KubernetesMonitor( ScalyrMonitor ):
 
     Containers and pods can be specifically included/excluded from having their logs collected and
     sent to Scalyr.  Unlike the normal log_config `exclude` option which takes an array of log path
-    exclusion globs, annotations simply support a Boolean true/false for a given container/pod.  
+    exclusion globs, annotations simply support a Boolean true/false for a given container/pod.
     Both `include` and `exclude` are supported, with `include` always overriding `exclude` if both
     are set. e.g.
 
@@ -2891,6 +2939,7 @@ class KubernetesMonitor( ScalyrMonitor ):
             'SCALYR_K8S_RATELIMIT_INCREASE_FACTOR',
             'SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR',
             'SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY',
+            'SCALYR_K8S_SIDECAR_MODE'
         ]
         for envar in envars_to_log:
             self._logger.info("Environment variable %s : %s" % (envar, os.environ.get(envar, '<Not set>')))
