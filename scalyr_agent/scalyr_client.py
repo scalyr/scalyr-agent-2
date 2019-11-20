@@ -737,7 +737,7 @@ class AddEventsRequest(object):
         # the post fix right now.
         available_size_for_post_fix = self.__max_size - self.__buffer.tell()
         return self.__post_fix_buffer.add_log_and_thread_entry(thread_id, thread_name, log_attrs,
-                                                       fail_if_buffer_exceeds=available_size_for_post_fix)
+                                                               fail_if_buffer_exceeds=available_size_for_post_fix)
 
     def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
@@ -961,14 +961,14 @@ def _calculate_per_thread_extra_bytes():
 
     @return: An array of two int entries.  The first entry is how many extra bytes are added when adding the
         first thread to the threads JSON array and the second is how many extra bytes are added for all subsequent
-        threads.  (The number differences by at least one due to the need for a comma to be inserted).
+        threads.  (The number differs by at least one due to the need for a comma to be inserted).
     @rtype: [int]
     """
     # An array of the number of bytes used to serialize the array when there are N threads in it (where N is the
     # index into size_by_entries).
     sizes_by_entries = []
 
-    # Calculate sizes_by_entries by actually serialzing each case.
+    # Calculate sizes_by_entries by actually serializing each case.
     threads = []
     test_string = 'A'
     for i in range(3):
@@ -998,14 +998,14 @@ def _calculate_per_log_extra_bytes():
 
     @return: An array of two int entries.  The first entry is how many extra bytes are added when adding the
         first thread to the threads JSON array and the second is how many extra bytes are added for all subsequent
-        threads.  (The number differences by at least one due to the need for a comma to be inserted).
+        threads.  (The number differs by at least one due to the need for a comma to be inserted).
     @rtype: [int]
     """
     # An array of the number of bytes used to serialize the array when there are N threads in it (where N is the
     # index into size_by_entries).
     sizes_by_entries = []
 
-    # Calculate sizes_by_entries by actually serialzing each case.
+    # Calculate sizes_by_entries by actually serializing each case.
     logs = []
     test_string = 'A'
     test_dict = {}
@@ -1182,7 +1182,8 @@ class PostFixBuffer(object):
         """
         # The position value should by an array with three entries: the size, the client timestamp, and the number
         # of threads.  Since threads are always added one after another, it is sufficient just to truncate back to that
-        # previous length. Same with logs, and number of logs and threads should be the same so piggyback on the check.
+        # previous length. Logs are also added one after another and only at the same time as a thread is added,
+        # meaning this same check will also find what position to truncate the logs to.
         self.__current_size = position[0]
         self.__client_timestamp = position[1]
         assert(len(self.__threads) >= position[2])
@@ -1302,15 +1303,6 @@ class Event(object):
             tmp_buffer.write('log:')
             tmp_buffer.write( scalyr_util.json_encode(thread_id) )
             tmp_buffer.write(', ')
-        #if attributes is not None:
-            # Serialize the attributes object, but we have to remove the closing brace because we want to
-            # insert more fields.
-        #    tmp_buffer.write('attrs:')
-        #    tmp_buffer.write( scalyr_util.json_encode(attributes) )
-        #    _rewind_past_close_curly(tmp_buffer)
-        #    tmp_buffer.write(',')
-        #else:
-            # Open brace for the attributes object.
         tmp_buffer.write('attrs:{')
 
         # Add the message field into the json object.
