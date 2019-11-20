@@ -1565,7 +1565,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.log_processor.add_sampler('INFO', 0.5)
 
         # 10 ERROR and 10 INFO lines.
-        log_content = '\n'.join(['ERROR_{i}\nINFO_{i}'.format(i=i)for i in range(10)])
+        log_content = '\n'.join(['ERROR_%i\nINFO_%i' % (i, i) for i in range(10)])
 
         self.append_file(self.__path, log_content)
 
