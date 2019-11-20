@@ -386,6 +386,12 @@ class ScalyrAgent(object):
 
         self.__verify_can_write_to_logs_and_data(self.__config)
 
+        # Begin writing to the log once we confirm we are able to, so we can log any connection errors
+        scalyr_logging.set_log_destination(use_disk=True, max_bytes=self.__config.log_rotation_max_bytes,
+                                           backup_count=self.__config.log_rotation_backup_count,
+                                           logs_directory=self.__config.agent_log_path,
+                                           agent_log_file_path='agent.log')
+
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
         if not no_check_remote:
             client = self.__create_client(quiet=True)
@@ -394,8 +400,11 @@ class ScalyrAgent(object):
                 if ping_result != 'success':
                     if 'badClientClockSkew' in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
+                        log.error('Sending request to the server failed due to bad clock skew.  The system '
+                                  'clock on this host is too far off from actual time. The agent will keep '
+                                  'trying to connect in the background.')
                         print >> sys.stderr, ('Sending request to the server failed due to bad clock skew.  The system '
-                                              'clock on this host is too off from actual time.  Scalyr agent will keep '
+                                              'clock on this host is too far off from actual time. The agent will keep '
                                               'trying to connect in the background.')
                     elif 'invalidApiKey' in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
@@ -404,11 +413,14 @@ class ScalyrAgent(object):
                                         'Please visit https://www.scalyr.com/keys and copy a Write Logs key into the '
                                         '\'api_key\' field in the configuration file' % self.__config.file_path)
                     else:
+                        log.error('Failed to send request to the server.  The server address could be '
+                                  'wrong, there could be a network connectivity issue, or the provided '
+                                  'token could be incorrect. The agent will keep trying to connect in the '
+                                  'background. You can disable this check with --no-check-remote-server.')
                         print >> sys.stderr, ('Failed to send request to the server.  The server address could be '
-                                              'wrong, there maybe a network connectivity issue, or the provided '
-                                              'api_token could be incorrect.  You can disable this check with'
-                                              ' --no-check-remote-server. Scalyr agent will keep trying to connect in '
-                                              'the background.')
+                                              'wrong, there could be a network connectivity issue, or the provided '
+                                              'token could be incorrect. The agent will keep trying to connect in the '
+                                              'background. You can disable this check with --no-check-remote-server.')
             finally:
                 client.close()
 
@@ -450,10 +462,13 @@ class ScalyrAgent(object):
             print >> sys.stderr
             print >> sys.stderr, '%s' % str(e)
             print >> sys.stderr, 'Terminating agent, please fix the error and restart the agent.'
+            log.error('%s' % str(e))
+            log.error('Terminating agent, please fix the error and restart the agent.')
             return 1
 
         if sys.version_info[:2] < (2, 6):
             print >> sys.stderr, 'Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019'
+            log.error('Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019')
 
         if not no_fork:
             # Do one last check to just cut down on the window of race conditions.
@@ -630,7 +645,7 @@ class ScalyrAgent(object):
             if not quiet:
                 print 'Agent is running, restarting now.'
             if self.__stop(quiet) != 0:
-                print >>sys.stderr, 'Failed to stop the running agent.  Cannot restart until it is killed.'
+                print >>sys.stderr,  'Failed to stop the running agent.  Cannot restart until it is killed.'
                 return 1
 
             return self.__start(quiet, no_fork, no_check_remote)
