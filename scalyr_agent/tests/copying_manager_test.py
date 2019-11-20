@@ -858,13 +858,15 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         def shift_time_in_checkpoint_file(name):
 
-            with open(os.path.join(self._config.agent_data_path, name), 'r') as fp:
-                data = json_lib.parse(fp.read())
+            fp = open(os.path.join(self._config.agent_data_path, name), 'r')
+            data = json_lib.parse(fp.read())
+            fp.close()
 
             data['time'] -= self._config.max_allowed_checkpoint_age + 1
 
-            with open(os.path.join(self._config.agent_data_path, name), 'w') as fp:
-                fp.write(json_lib.serialize(data))
+            fp = open(os.path.join(self._config.agent_data_path, name), 'w')
+            fp.write(json_lib.serialize(data))
+            fp.close()
 
         # shift time on checkpoint files in the past, to make them stale.
         shift_time_in_checkpoint_file('checkpoints.json')
@@ -891,13 +893,15 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         controller.stop()
 
-        with open(os.path.join(self._config.agent_data_path, 'active-checkpoints.json'), 'r') as fp:
-            data = json_lib.parse(fp.read())
+        fp = open(os.path.join(self._config.agent_data_path, 'active-checkpoints.json'), 'r')
+        data = json_lib.parse(fp.read())
+        fp.close()
 
         data['time'] += 100
 
-        with open(os.path.join(self._config.agent_data_path, 'active-checkpoints.json'), 'w') as fp:
-            fp.write(json_lib.serialize(data))
+        fp = open(os.path.join(self._config.agent_data_path, 'active-checkpoints.json'), 'w')
+        fp.write(json_lib.serialize(data))
+        fp.close()
 
         self.__append_log_lines('Third line', 'Fourth line')
 
