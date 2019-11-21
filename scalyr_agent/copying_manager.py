@@ -779,7 +779,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: The add events request
         @rtype: AddEventsRequest
         """
-        return self.__scalyr_client.add_events_request(session_info=session_info, max_size=max_size)
+        return self.__scalyr_client.add_events_request(session_info=session_info, max_size=max_size,
+                                                       disable_new_addevents_format=self.__config.disable_new_addevents_format)
 
     def _send_events(self, add_events_task):
         """Sends the AddEventsRequest contained in the task but does not block on the response.

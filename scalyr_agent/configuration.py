@@ -417,6 +417,10 @@ class Configuration(object):
     def profile_log_name( self ):
         return self.__get_config().get_string( 'profile_log_name' )
 
+    @property
+    def disable_new_addevents_format( self ):
+        return self.__get_config().get_bool( 'disable_new_addevents_format' )
+
     # Debug leak flags
     @property
     def disable_send_requests(self):
@@ -1240,6 +1244,10 @@ class Configuration(object):
         self.__verify_or_set_optional_int(config, 'profile_duration_minutes', 2, description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'profile_clock', 'random', description, apply_defaults, env_aware=True)
         self.__verify_or_set_optional_string(config, 'profile_log_name', 'agent.callgrind', description, apply_defaults, env_aware=True)
+
+        # AGENT-263: controls sending in the new format or not as a safety in case it is broken somewhere in the chain
+        # TODO: Remove this in a future release once we are more certain that it works
+        self.__verify_or_set_optional_bool(config, 'disable_new_addevents_format', False, description, apply_defaults, env_aware=True)
 
         #Debug leak flags
         self.__verify_or_set_optional_bool(config, 'disable_leak_monitor_threads', False, description, apply_defaults)
