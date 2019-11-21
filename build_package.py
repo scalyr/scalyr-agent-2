@@ -224,7 +224,8 @@ def build_win32_installer_package(variant, version):
     shutil.copy(make_path(agent_source_root, 'win32/ScalyrShell.cmd'), 'Scalyr/bin/ScalyrShell.cmd')
 
     # Copy the cert files.
-    cat_files(glob_files(make_path(agent_source_root, 'certs/*.pem')), 'Scalyr/certs/ca_certs.crt',
+    # AGENT-283: Certificate validation on windows seems to fail when the intermediate certs are present, skipping them
+    cat_files(glob_files(make_path(agent_source_root, 'certs/*_root.pem')), 'Scalyr/certs/ca_certs.crt',
               convert_newlines=True)
 
     # Generate the file used by WIX's candle program.
