@@ -41,7 +41,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
-          command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
+          command: echo $SCALYR_API_KEY && docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
 
   unittest-25:
     docker:
