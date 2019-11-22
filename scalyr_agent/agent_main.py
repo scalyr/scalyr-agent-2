@@ -992,14 +992,6 @@ class ScalyrAgent(object):
                 return None
 
     def __verify_can_write_to_logs_and_data(self, config):
-        """Checks to make sure the user account running the agent has permission to read and write files
-        to the log and data directories as specified in the config.
-
-        If any verification fails, an exception is raised.
-
-        @param config: The configuration
-        @type config: Configuration
-        """
         pass
 
     def __start_or_stop_unsafe_debugging(self):
