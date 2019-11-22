@@ -146,12 +146,13 @@ def value_to_bool( value ):
     value_type = type(value)
     if value_type is bool:
         return value
-    elif value_type is int:
-        return self.__num_to_bool(field, float(value))
-    elif value_type is long:
-        return self.__num_to_bool(field, float(value))
-    elif value_type is float:
-        return self.__num_to_bool(field, value)
+    elif value_type in (int, long, float):
+        value = float(value)
+        # return True if the value is one, False if it is zero
+        if abs(value) < 1E-10:
+            return False
+        if abs(1 - value) < 1E-10:
+            return True
     elif value_type is str or value_type is unicode:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
