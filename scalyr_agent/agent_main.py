@@ -984,13 +984,11 @@ class ScalyrAgent(object):
             return os.path.getsize(path)
         except OSError, e:
             if e.errno == errno.EPERM:
-                log.warn('Insufficient permissions to read agent logs initial position')
                 return None
             elif e.errno == errno.ENOENT:
                 # If file doesn't exist, just return 0 as its initial position
                 return 0
             else:
-                log.exception('Error trying to read agent logs initial position')
                 return None
 
     def __verify_can_write_to_logs_and_data(self, config):
@@ -1002,17 +1000,7 @@ class ScalyrAgent(object):
         @param config: The configuration
         @type config: Configuration
         """
-        if not os.path.isdir(config.agent_log_path):
-            raise Exception('The agent log directory \'%s\' does not exist.' % config.agent_log_path)
-
-        if not os.access(config.agent_log_path, os.W_OK):
-            raise Exception('User cannot write to agent log directory \'%s\'.' % config.agent_log_path)
-
-        if not os.path.isdir(config.agent_data_path):
-            raise Exception('The agent data directory \'%s\' does not exist.' % config.agent_data_path)
-
-        if not os.access(config.agent_data_path, os.W_OK):
-            raise Exception('User cannot write to agent data directory \'%s\'.' % config.agent_data_path)
+        pass
 
     def __start_or_stop_unsafe_debugging(self):
         """Starts or stops the debugging tool.
