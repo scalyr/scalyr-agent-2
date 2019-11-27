@@ -28,7 +28,14 @@ __author__ = 'czerwin@scalyr.com'
 import datetime
 import errno
 import fnmatch
-import glob
+import sys
+# Glob2 requires a Python version >= 2.6. This check falls back to the built-in glob module when running under
+# old Python versions. This can be removed when we no longer support Python earlier than 2.6.
+# When support for Python earlier than 3.5 is deprecated, the built-in glob with a recursive option can be used.
+if sys.version_info >= (2, 6):
+    import glob2 as glob
+else:
+    import glob as glob
 import os
 import random
 import re
@@ -2478,14 +2485,15 @@ class LogMatcher(object):
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
             for matched_file in glob.glob(self.__log_entry_config['path']):
-
                 skip = False
                 # check to see if this file matches any of the exclude globs
                 for exclude_glob in self.__log_entry_config['exclude']:
                     if fnmatch.fnmatch( matched_file, exclude_glob ):
                         skip = True
                         break
-
+                # Check if this is a directory
+                if os.path.isdir(matched_file):
+                    skip = True
                 # if so, skip it.
                 if skip:
                     continue

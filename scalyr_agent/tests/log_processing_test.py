@@ -1977,14 +1977,27 @@ class TestLogMatcher(ScalyrTestCase):
         self.__config = _create_configuration()
 
         self.__tempdir = tempfile.mkdtemp()
+
+        # Create directories for recursive ** globbing
+        self.__directory_aa = os.path.join(self.__tempdir, "recursive", "a", "a")
+        self.__directory_ab = os.path.join(self.__tempdir, "recursive", "a", "b")
+        os.makedirs(self.__directory_aa)
+        os.makedirs(self.__directory_ab)
+
         self.__file_system = FileSystem()
         self.__path_one = os.path.join(self.__tempdir, 'text.txt')
         self.__path_two = os.path.join(self.__tempdir, 'text_two.txt')
+        self.__path_three = os.path.join(self.__directory_aa, "aa.txt")
+        self.__path_four = os.path.join(self.__directory_ab, "ab.txt")
+
         self.__glob_one = os.path.join(self.__tempdir, '*.txt')
         self.__glob_two = os.path.join(self.__tempdir, '*two.txt')
+        self.__glob_recursive = os.path.join(self.__tempdir, "recursive/**/*")
 
         self._create_file(self.__path_one)
         self._create_file(self.__path_two)
+        self._create_file(self.__path_three)
+        self._create_file(self.__path_four)
 
         self.__fake_time = 10
 
@@ -2004,6 +2017,17 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEquals(len(processors), 1)
 
         self._close_processors(processors)
+
+    def test_matches_recursive_glob(self):
+        # Recursive "**" glob patterns are only supported on Python 2.6 and above.
+        if sys.version_info >= (2, 6):
+            matcher = LogMatcher(self.__config, self._create_log_config(self.__glob_recursive))
+            processors = matcher.find_matches(dict(), dict())
+            self.assertEquals(len(processors), 2)
+            self.assertEquals(processors[0].log_path, self.__path_three)
+            self.assertEquals(processors[1].log_path, self.__path_four)
+
+            self._close_processors(processors)
 
     def test_ignores_stale_file(self):
         staleness_threshold = 300  # 5 mins
