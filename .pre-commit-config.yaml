@@ -8,13 +8,12 @@ repos:
       - id: black
 #        language_version: python3.7
 
-# Not yet in use
-#  - repo: https://github.com/pre-commit/pre-commit-hooks
-#    rev: v2.4.0
-#    hooks:
-#    - id: check-yaml
-#    - id: end-of-file-fixer
-#    - id: trailing-whitespace
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.4.0
+    hooks:
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+#    - id: check-yaml # Disabled: Fails on some files in this repo.
 
 # MyPy for use later
 #- repo: https://github.com/pre-commit/mirrors-mypy
