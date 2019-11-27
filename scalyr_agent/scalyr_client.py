@@ -55,7 +55,7 @@ class ScalyrClientSession(object):
     def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0,
                  ca_file=None, intermediate_certs_file=None, use_requests_lib=False, use_tlslite=False,
                  proxies=None, compression_type=None, compression_level=9, disable_send_requests=False,
-                 disable_new_addevents_format=False):
+                 disable_logfile_addevents_format=False):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -179,7 +179,7 @@ class ScalyrClientSession(object):
         self.__disable_send_requests = disable_send_requests
 
         # flag to disable new addEvents format, TODO: remove this when we are confident it works
-        self.__disable_new_addevents_format = disable_new_addevents_format
+        self.__disable_logfile_addevents_format = disable_logfile_addevents_format
 
     def augment_user_agent(self, fragments):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
@@ -198,7 +198,7 @@ class ScalyrClientSession(object):
         @return:  The status message returned by the server.
         @rtype:
         """
-        return self.send(self.add_events_request(disable_new_addevents_format=self.__disable_new_addevents_format))[0]
+        return self.send(self.add_events_request())[0]
 
     def __send_request(self, request_path, body=None, body_func=None, is_post=True, block_on_response=True):
         """Sends a request either using POST or GET to Scalyr at the specified request path.  It may be either
@@ -469,7 +469,7 @@ class ScalyrClientSession(object):
             self.__connection = None
             self.__last_connection_close = current_time
 
-    def add_events_request(self, session_info=None, max_size=1*1024*1024*1024, disable_new_addevents_format=False):
+    def add_events_request(self, session_info=None, max_size=1*1024*1024*1024):
         """Creates and returns a new AddEventRequest that can be later sent by this session.
 
         The caller is expected to add events to this request and then submit it for transmission using
@@ -478,11 +478,11 @@ class ScalyrClientSession(object):
         @param session_info: The session info for this session, which is basically any attributes that should
             be added to all events uploaded by this agent, such as server attributes from the config file.
         @param max_size: The maximum number of bytes to send in this request.
-        @param disable_new_addevents_format: Flag to disable the improved addEvents format
+        @param disable_logfile_addevents_format: Flag to disable the improved addEvents format
 
         @type session_info: dict
         @type max_size: int
-        @type disable_new_addevents_format: bool
+        @type disable_logfile_addevents_format: bool
 
         @return:  The request that can be populated.
         @rtype: AddEventsRequest
@@ -496,7 +496,7 @@ class ScalyrClientSession(object):
         if session_info is not None:
             body['sessionInfo'] = session_info
 
-        return AddEventsRequest(body, max_size=max_size, disable_new_addevents_format=disable_new_addevents_format)
+        return AddEventsRequest(body, max_size=max_size, disable_logfile_addevents_format=self.__disable_logfile_addevents_format)
 
     def __get_user_agent(self, agent_version, fragments=None):
         """Determine the user agent to report in the request headers.
@@ -659,7 +659,7 @@ class AddEventsRequest(object):
     to the request before it is sent.  This is useful to rollback the request state to a previous state if some
     problem occurs.
     """
-    def __init__(self, base_body, max_size=1*1024*1024, disable_new_addevents_format=False):
+    def __init__(self, base_body, max_size=1*1024*1024, disable_logfile_addevents_format=False):
         """Initializes the instance.
 
         @param base_body: A JsonObject or dict containing the information to send as the body of the add_events
@@ -667,7 +667,7 @@ class AddEventsRequest(object):
             included because they will be added later. Note, base_body must have some fields set, such as 'ts' which is
             required by the server.
         @param max_size: The maximum number of bytes this request can consume when it is serialized to JSON.
-        @param disable_new_addevents_format: Flag to disable the improved addEvents format
+        @param disable_logfile_addevents_format: Flag to disable the improved addEvents format
         """
         assert len(base_body) > 0, "The base_body object must have some fields defined."
         assert not 'events' in base_body, "The base_body object cannot already have 'events' set."
@@ -689,10 +689,10 @@ class AddEventsRequest(object):
 
         # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
         # the request.  That includes both the threads JSON array and the client timestamp.
-        if disable_new_addevents_format:
-            self.__post_fix_buffer = PostFixBuffer('], threads: THREADS, client_time: TIMESTAMP }', disable_new_addevents_format)
+        if disable_logfile_addevents_format:
+            self.__post_fix_buffer = PostFixBuffer('], threads: THREADS, client_time: TIMESTAMP }', disable_logfile_addevents_format)
         else:
-            self.__post_fix_buffer = PostFixBuffer('], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }', disable_new_addevents_format)
+            self.__post_fix_buffer = PostFixBuffer('], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }', disable_logfile_addevents_format)
 
         # The time that will be sent as the 'client_time' parameter for the addEvents request.
         # This may be later updated using the set_client_time method in the case where the same AddEventsRequest
@@ -734,12 +734,12 @@ class AddEventsRequest(object):
             in the ``event`` object passed to ``add_event``.  Should be unique for this session.
         @param thread_name: A human-readable name for the thread
         @param log_attrs: The metadata for this log
-        @param disable_new_addevents_format: Flag to disable the improved addEvents format
+        @param disable_logfile_addevents_format: Flag to disable the improved addEvents format
 
         @type thread_id: str
         @type thread_name: str
         @type log_attrs: dict
-        @type disable_new_addevents_format: bool
+        @type disable_logfile_addevents_format: bool
 
         @return: True if there was the allowed bytes to send were not exceeded by adding this log to the
             request.
@@ -1048,7 +1048,7 @@ class PostFixBuffer(object):
 
     Additionally, the buffer can be reset to a previous position.
     """
-    def __init__(self, format_string, disable_new_addevents_format):
+    def __init__(self, format_string, disable_logfile_addevents_format):
         """Initializes the buffer.
 
         @param format_string: The format for the buffer.  The output of this buffer will be this format string
@@ -1059,10 +1059,10 @@ class PostFixBuffer(object):
         # Make sure the keywords are used in the format string.
         assert('THREADS' in format_string)
         assert('TIMESTAMP' in format_string)
-        if not disable_new_addevents_format:
+        if not disable_logfile_addevents_format:
             assert('LOGS' in format_string)
 
-        self.__disable_new_addevents_format = disable_new_addevents_format
+        self.__disable_logfile_addevents_format = disable_logfile_addevents_format
 
         # The entries added to include in the logs JSON array in the request.
         self.__logs = []
@@ -1101,7 +1101,7 @@ class PostFixBuffer(object):
         @rtype: str
         """
         result = self.__format
-        if not self.__disable_new_addevents_format:
+        if not self.__disable_logfile_addevents_format:
             result = result.replace('LOGS', scalyr_util.json_encode(self.__logs))
         result = result.replace('TIMESTAMP', str(self.__client_timestamp))
         result = result.replace('THREADS', scalyr_util.json_encode(self.__threads))
@@ -1159,7 +1159,7 @@ class PostFixBuffer(object):
         """
         # Calculate the size difference.  It is at least the size of taken by the serialized strings.
         size_difference = len(scalyr_util.json_encode(thread_name)) + len(scalyr_util.json_encode(thread_id))
-        if not self.__disable_new_addevents_format:
+        if not self.__disable_logfile_addevents_format:
             size_difference += len(scalyr_util.json_encode(log_attrs)) + len(scalyr_util.json_encode(thread_id))
 
         # Use the __per_thread_extra_bytes to calculate the additional bytes that will be consumed by serializing
@@ -1168,11 +1168,11 @@ class PostFixBuffer(object):
         num_threads = len(self.__threads)
         if num_threads < 1:
             size_difference += PostFixBuffer.__per_thread_extra_bytes[0]
-            if not self.__disable_new_addevents_format:
+            if not self.__disable_logfile_addevents_format:
                 size_difference += PostFixBuffer.__per_log_extra_bytes[0]
         else:
             size_difference += PostFixBuffer.__per_thread_extra_bytes[1]
-            if not self.__disable_new_addevents_format:
+            if not self.__disable_logfile_addevents_format:
                 size_difference += PostFixBuffer.__per_log_extra_bytes[1]
 
         if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
@@ -1180,7 +1180,7 @@ class PostFixBuffer(object):
 
         self.__current_size += size_difference
         self.__threads.append({'id': thread_id, 'name': thread_name})
-        if not self.__disable_new_addevents_format:
+        if not self.__disable_logfile_addevents_format:
             self.__logs.append({'id': thread_id, 'attrs': log_attrs})
         return True
 
@@ -1212,7 +1212,7 @@ class PostFixBuffer(object):
         assert(len(self.__threads) >= position[2])
         if position[2] < len(self.__threads):
             self.__threads = self.__threads[0:position[2]]
-            if not self.__disable_new_addevents_format:
+            if not self.__disable_logfile_addevents_format:
                 self.__logs = self.__logs[0:position[2]]
 
 
@@ -1221,7 +1221,7 @@ class Event(object):
 
     This abstraction has many optimizations to improve serialization time.
     """
-    def __init__(self, thread_id=None, attrs=None, base=None, disable_new_addevents_format=False):
+    def __init__(self, thread_id=None, attrs=None, base=None, disable_logfile_addevents_format=False):
         """Creates an instance of an event to include in an AddEventsRequest.
 
         This constructor has two ways of being used.
@@ -1285,7 +1285,7 @@ class Event(object):
         # __serialization_base.
         self.__log_id = None
         self.__attrs = attrs
-        self.__disable_new_addevents_format = disable_new_addevents_format
+        self.__disable_logfile_addevents_format = disable_logfile_addevents_format
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception('Cannot use both attrs/thread_id and base')
 
@@ -1295,7 +1295,7 @@ class Event(object):
             # the per-log file attributes.
             self.__serialization_base = base.__serialization_base
             self.__attrs = base.__attrs
-            self.__disable_new_addevents_format = base.__disable_new_addevents_format
+            self.__disable_logfile_addevents_format = base.__disable_logfile_addevents_format
         else:
             self.__set_attributes( thread_id, attrs )
 
@@ -1326,11 +1326,11 @@ class Event(object):
             tmp_buffer.write('thread:')
             tmp_buffer.write( scalyr_util.json_encode(thread_id) )
             tmp_buffer.write(', ')
-            if not self.__disable_new_addevents_format:
+            if not self.__disable_logfile_addevents_format:
                 tmp_buffer.write('log:')
                 tmp_buffer.write( scalyr_util.json_encode(thread_id) )
                 tmp_buffer.write(', ')
-        if self.__disable_new_addevents_format and attributes is not None:
+        if self.__disable_logfile_addevents_format and attributes is not None:
             tmp_buffer.write('attrs:')
             tmp_buffer.write( scalyr_util.json_encode(attributes) )
             _rewind_past_close_curly(tmp_buffer)

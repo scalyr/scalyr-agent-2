@@ -1404,7 +1404,7 @@ class LogFileProcessor(object):
 
         # The base event that will be used to insert all events from this log.
         self.__base_event = Event(thread_id=self.__thread_id, attrs=log_attributes,
-                                  disable_new_addevents_format=config.disable_new_addevents_format)
+                                  disable_logfile_addevents_format=config.disable_logfile_addevents_format)
         # The redacter to perform on all log lines from this log file.
         self.__redacter = LogLineRedacter(file_path)
         # The sampler to apply to all log lines from this log file.
