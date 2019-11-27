@@ -18,7 +18,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import struct
 
@@ -90,17 +90,17 @@ class ByteScanner(object):
         x = self.__start_pos
 
         self.__check_index(target_pos)
- 
+
         while x < target_pos:
             b = self.__buffer[x]
             x += 1
-            if b == '\n':
+            if b == "\n":
                 line_num += 1
-            elif b == '\r':
+            elif b == "\r":
                 line_num += 1
-                # If this CR is the first half of a CRLF sequence, 
+                # If this CR is the first half of a CRLF sequence,
                 # skip the LF; otherwise we'd double-count CRLF line breaks.
-                if x < target_pos and self.__buffer[x] == '\n':
+                if x < target_pos and self.__buffer[x] == "\n":
                     x += 1
         return line_num
 
@@ -123,7 +123,7 @@ class ByteScanner(object):
         @raise IndexError: If the end of the buffer would be reached before length bytes are read. In this case, the
             buffer is not advanced."""
         self.__check_read_size(length)
-        my_slice = self.__buffer[self.__pos:self.__pos + length]
+        my_slice = self.__buffer[self.__pos : self.__pos + length]
         self.__pos += length
         return "".join(my_slice)
 
@@ -154,8 +154,9 @@ class ByteScanner(object):
         index = self.__pos + increment
         if index < self.__start_pos or index > self.__max_pos:
             raise IndexError(
-                "Index out of range for buffer (index %i, limit %i to %i)" %
-                (index, self.__start_pos, self.__max_pos))
+                "Index out of range for buffer (index %i, limit %i to %i)"
+                % (index, self.__start_pos, self.__max_pos)
+            )
         self.__pos = index
 
     def __check_read_size(self, read_length):
@@ -163,13 +164,15 @@ class ByteScanner(object):
         if index < self.__start_pos or index >= self.__max_pos:
             raise IndexError(
                 "Ran off end of buffer (position %i, limit %i, reading %i bytes"
-                % (self.__pos, self.__max_pos, read_length))
+                % (self.__pos, self.__max_pos, read_length)
+            )
 
     def __check_index(self, index):
         if index < self.__start_pos or index >= self.__max_pos:
             raise IndexError(
-                "Index out of range for buffer (index %i, limit %i to %i)" %
-                (index, self.__start_pos, self.__max_pos))
+                "Index out of range for buffer (index %i, limit %i to %i)"
+                % (index, self.__start_pos, self.__max_pos)
+            )
 
 
 class JsonParser(object):
@@ -189,7 +192,9 @@ class JsonParser(object):
        servers.
     """
 
-    def __init__(self, input_scanner, allow_missing_commas=True, check_duplicate_keys=False):
+    def __init__(
+        self, input_scanner, allow_missing_commas=True, check_duplicate_keys=False
+    ):
         """Initializes JsonParser for the specified input."""
         self.__scanner = input_scanner
         self.allow_missing_commas = allow_missing_commas
@@ -197,36 +202,38 @@ class JsonParser(object):
 
     @staticmethod
     def parse(input_bytes, check_duplicate_keys=False):
-        return JsonParser(ByteScanner(input_bytes), True, check_duplicate_keys).parse_value()
+        return JsonParser(
+            ByteScanner(input_bytes), True, check_duplicate_keys
+        ).parse_value()
 
     def parse_value(self):
         """Parses a Json value from the input."""
         start_pos = self.__scanner.position
         try:
             c = self.__peek_next_non_whitespace()
-            if c == '{':
+            if c == "{":
                 return self.__parse_object()
-            elif c == '[':
+            elif c == "[":
                 return self.__parse_array()
             elif c == '"':
                 if self.__check_repeated_chars('"', offset=1, count=2):
                     return self.__parse_triple_quoted_string()
                 else:
                     return self.__parse_string_with_concatenation()
-            elif c == 't':
+            elif c == "t":
                 self.__match("true", "unknown identifier")
                 return True
-            elif c == 'f':
+            elif c == "f":
                 self.__match("false", "unknown identifier")
                 return False
-            elif c == 'n':
+            elif c == "n":
                 self.__match("null", "unknown identifier")
                 return None
-            elif c == '-' or '0' <= c <= '9':
+            elif c == "-" or "0" <= c <= "9":
                 return self.__parse_number()
-            elif c == '}':
+            elif c == "}":
                 return self.__error("'}' can only be used to end an object")
-            elif c == '`':
+            elif c == "`":
                 return self.__parse_length_prefixed_string()
             else:
                 if c is None:
@@ -239,9 +246,11 @@ class JsonParser(object):
         except IndexError:
             raise JsonParseException(
                 "Parser unexpectantly reached end of input probably due to "
-                "an terminated string, object, or array", start_pos,
-                self.__scanner.line_number_for_offset(start_pos))
-    
+                "an terminated string, object, or array",
+                start_pos,
+                self.__scanner.line_number_for_offset(start_pos),
+            )
+
     def __parse_object(self):
         """Parse a JSON object. The scanner must be at the first '{'."""
 
@@ -252,36 +261,35 @@ class JsonParser(object):
 
         while True:
             c = self.__peek_next_non_whitespace()
-      
+
             if c is None:
                 return self.__error("Need '}' for end of object", object_start)
             elif c == '"':
                 key = self.__parse_string()
-            elif c == '_' or 'a' <= c <= 'z' or 'A' <= c <= 'Z':
+            elif c == "_" or "a" <= c <= "z" or "A" <= c <= "Z":
                 key = self.__parse_identifier()
-    
-                next_char = self.__scanner.peek_next_ubyte(
-                    none_if_bad_index=True)
+
+                next_char = self.__scanner.peek_next_ubyte(none_if_bad_index=True)
 
                 if next_char is None:
-                    return self.__error("Need '}' for end of object",
-                                        object_start)
-                if ord(next_char) > 32 and next_char != ':':
-                    self.__error("To use character '%s' in an attribute name, "
-                                 "you must place the attribute name in "
-                                 "double-quotes" % next_char)
-            elif c == '}':
+                    return self.__error("Need '}' for end of object", object_start)
+                if ord(next_char) > 32 and next_char != ":":
+                    self.__error(
+                        "To use character '%s' in an attribute name, "
+                        "you must place the attribute name in "
+                        "double-quotes" % next_char
+                    )
+            elif c == "}":
                 # End-of-object.
                 self.__scanner.read_ubyte()
                 return result_object
             else:
-                return self.__error(
-                    "Expected string literal for object attribute name")
+                return self.__error("Expected string literal for object attribute name")
 
             self.__peek_next_non_whitespace()
             c = self.__scanner.read_ubyte()
 
-            if c != ':':
+            if c != ":":
                 self.__error("Expected ':' delimiting object attribute value")
 
             # skip any whitespace after the colon
@@ -290,24 +298,26 @@ class JsonParser(object):
                 self.__error("Duplicate key [" + key + "]", object_start)
 
             result_object.put(key, self.parse_value())
-      
+
             c = self.__peek_next_non_whitespace()
-      
+
             if c is None:
                 self.__error("Need '}' for end of object", object_start)
-            elif c == '}':
-                # do nothing we'll process the '}' back around at the top of 
+            elif c == "}":
+                # do nothing we'll process the '}' back around at the top of
                 # the loop.
                 continue
-            elif c == ',':
+            elif c == ",":
                 self.__scanner.read_ubyte()
             else:
                 if self.__preceding_line_break() and self.allow_missing_commas:
                     # proceed, inferring a comma
                     continue
                 else:
-                    self.__error("After object field, expected ',' or '}' but "
-                                 "found '%s'... are you missing a comma?" % c)
+                    self.__error(
+                        "After object field, expected ',' or '}' but "
+                        "found '%s'... are you missing a comma?" % c
+                    )
 
     def __parse_array(self):
         """Parse a JSON array. The scanner must be at the first '['."""
@@ -318,26 +328,26 @@ class JsonParser(object):
 
         while True:
             # Check for end-of-array.
-            if self.__peek_next_non_whitespace() == ']':
+            if self.__peek_next_non_whitespace() == "]":
                 self.__scanner.read_ubyte()
                 return array
-      
+
             self.__peek_next_non_whitespace()  # skip any whitespace
             # TODO:  If we ever want to put in annotated supported, uncomment the pos lines.
             # value_start_pos = self.__scanner.position
-      
+
             array.add(self.parse_value())
             # value_end_pos = self.__scanner.position
             # value_comma_pos = -1
-      
+
             c = self.__peek_next_non_whitespace()
             if c is None:
                 self.__error("Array has no terminating '['", array_start)
-            elif c == ']':
-                # do nothing we'll process the ']' back around at the top of 
+            elif c == "]":
+                # do nothing we'll process the ']' back around at the top of
                 # the loop.
                 continue
-            elif c == ',':
+            elif c == ",":
                 self.__scanner.read_ubyte()
                 # value_comma_pos = self.__scanner.position
             else:
@@ -345,8 +355,10 @@ class JsonParser(object):
                     # proceed, inferring a comma
                     continue
                 else:
-                    self.__error("Unexpected character [%s] in array... are you "
-                                 "missing a comma?" % c)
+                    self.__error(
+                        "Unexpected character [%s] in array... are you "
+                        "missing a comma?" % c
+                    )
 
     def __parse_length_prefixed_string(self):
         """Parses the string literal from the Scalyr-specific format using length prefixed strings.  The scanner must
@@ -358,12 +370,14 @@ class JsonParser(object):
         # The format is `s[x]YYYY   where [x] is a 4 byte big endian signed int containing the number of bytes
         # to read as the string, and YYYY is those number of bytes.  It is encoded as UTF-8
         self.__scanner.read_ubyte()
-        if self.__scanner.peek_next_ubyte(none_if_bad_index=True) != 's':
-            self.__error("unsupported back-tick format.  Only supports length prefixed string (`s)")
+        if self.__scanner.peek_next_ubyte(none_if_bad_index=True) != "s":
+            self.__error(
+                "unsupported back-tick format.  Only supports length prefixed string (`s)"
+            )
         self.__scanner.read_ubyte()
         # Next four bytes will be the length of the string to read, in big-endian order.  The length is a signed int.
         encoded_num_bytes = self.__scanner.read_ubytes(4)
-        num_bytes = struct.unpack('>i', encoded_num_bytes)[0]
+        num_bytes = struct.unpack(">i", encoded_num_bytes)[0]
         return self.__scanner.read_ubytes(num_bytes)
 
     def __parse_triple_quoted_string(self):
@@ -385,12 +399,14 @@ class JsonParser(object):
                 self.__error("string literal not terminated")
 
             c = self.__scanner.peek_next_ubyte(offset=length)
-            if c == '"' and self.__check_repeated_chars('"', count=2, offset=length+1):
+            if c == '"' and self.__check_repeated_chars(
+                '"', count=2, offset=length + 1
+            ):
                 break
 
             length += 1
 
-            if c == '\\':
+            if c == "\\":
                 if length >= self.__scanner.bytes_remaining:
                     self.__error("incomplete backslash sequence")
                 length += 1
@@ -399,7 +415,7 @@ class JsonParser(object):
 
         self.__consume_repeated_chars('"', count=3)
 
-        return self.__process_escapes(result.decode("utf8", 'replace'), start_pos)
+        return self.__process_escapes(result.decode("utf8", "replace"), start_pos)
 
     def __parse_string_with_concatenation(self):
         """Parse a string literal. The scanner must be at the first '"'.
@@ -408,32 +424,32 @@ class JsonParser(object):
         consume those as well, and return the concatenation. E.g. for input:
         "abc" + "def" + "ghi", we return abcdefghi."""
         value = self.__parse_string()
-    
+
         c = self.__peek_next_non_whitespace()
-        if c != '+':
+        if c != "+":
             return value
-    
+
         all_strings = [value]
 
         while True:
-            assert (self.__scanner.read_ubyte() == '+'), "No plus found"
+            assert self.__scanner.read_ubyte() == "+", "No plus found"
             c = self.__peek_next_non_whitespace()
             if c != '"':
                 self.__error("Expected string literal after + operator")
 
             all_strings.append(self.__parse_string())
-            if self.__peek_next_non_whitespace() != '+':
+            if self.__peek_next_non_whitespace() != "+":
                 break
 
-        return ''.join(all_strings)
-  
+        return "".join(all_strings)
+
     def __parse_identifier(self):
         """Parse an identifier."""
         length = 0
 
         while True:
             c = self.__scanner.peek_next_ubyte(offset=length, none_if_bad_index=True)
-            if c == '_' or 'a' <= c <= 'z' or 'A' <= c <= 'Z' or '0' <= c <= '9':
+            if c == "_" or "a" <= c <= "z" or "A" <= c <= "Z" or "0" <= c <= "9":
                 length += 1
             else:
                 break
@@ -452,26 +468,26 @@ class JsonParser(object):
         while True:
             if length >= self.__scanner.bytes_remaining:
                 self.__error("string literal not terminated")
-      
+
             c = self.__scanner.peek_next_ubyte(offset=length)
             if c == '"':
                 break
-            
+
             length += 1
-            
-            if c == '\\':
+
+            if c == "\\":
                 if length >= self.__scanner.bytes_remaining:
                     self.__error("incomplete backslash sequence")
                 length += 1
-            elif c == '\r' or c == '\n':
+            elif c == "\r" or c == "\n":
                 self.__error("string literal not terminated before end of line")
 
         result = self.__scanner.read_ubytes(length)
         # Have to consume the quote mark
         self.__scanner.read_ubyte()
 
-        return self.__process_escapes(result.decode("utf8", 'replace'), start_pos + 1)
-  
+        return self.__process_escapes(result.decode("utf8", "replace"), start_pos + 1)
+
     def __process_escapes(self, s, literal_start):
         """Convert backlash sequences in raw string literal.
 
@@ -479,7 +495,7 @@ class JsonParser(object):
 
         @return: The string with all backlash sequences converted to their chars."""
 
-        if s.find('\\') < 0:
+        if s.find("\\") < 0:
             return s
 
         slen = len(s)
@@ -487,7 +503,7 @@ class JsonParser(object):
         i = 0
         while i < slen:
             c = s[i]
-            if c != '\\':
+            if c != "\\":
                 sb.append(c)
                 i += 1
                 continue
@@ -496,29 +512,30 @@ class JsonParser(object):
 
             i += 1
             c = s[i]
-            if c == 't':
-                sb.append('\t')
-            elif c == 'n':
-                sb.append('\n')
-            elif c == 'r':
-                sb.append('\r')
-            elif c == 'b':
-                sb.append('\b')
-            elif c == 'f':
-                sb.append('\f')
+            if c == "t":
+                sb.append("\t")
+            elif c == "n":
+                sb.append("\n")
+            elif c == "r":
+                sb.append("\r")
+            elif c == "b":
+                sb.append("\b")
+            elif c == "f":
+                sb.append("\f")
             elif c == '"':
                 sb.append('"')
-            elif c == '\\':
-                sb.append('\\')
-            elif c == '/':
-                sb.append('/')
-            elif c == 'u' and i+5 <= slen:
-                hex_string = s[i+1:i+5]
+            elif c == "\\":
+                sb.append("\\")
+            elif c == "/":
+                sb.append("/")
+            elif c == "u" and i + 5 <= slen:
+                hex_string = s[i + 1 : i + 5]
                 i += 4
                 sb.append(unichr(int(hex_string, 16)))
             else:
-                self.__error("Unexpected backslash escape [" + c + "]",
-                             literal_start + i)
+                self.__error(
+                    "Unexpected backslash escape [" + c + "]", literal_start + i
+                )
             i += 1
         return "".join(sb)
 
@@ -527,47 +544,52 @@ class JsonParser(object):
         literal_buffer = []
         all_digits = True
         sign = 1
-    
+
         while not self.__scanner.at_end:
             peek = self.__scanner.peek_next_ubyte()
-            if ((peek != '+') and (peek != '-') and (peek != 'e') and
-                    (peek != 'E') and (peek != '.') and
-                    (not '0' <= peek <= '9')):
+            if (
+                (peek != "+")
+                and (peek != "-")
+                and (peek != "e")
+                and (peek != "E")
+                and (peek != ".")
+                and (not "0" <= peek <= "9")
+            ):
                 break
-      
+
             if len(literal_buffer) >= 100:
                 self.__error("numeric literal too long (limit 100 characters)")
-      
+
             next_char = self.__scanner.read_ubyte()
 
             # Never append a leading minus sign to literal_buffers, merely record the sign
-            if next_char == '-' and len(literal_buffer) == 0:
+            if next_char == "-" and len(literal_buffer) == 0:
                 sign = -1
             else:
-                all_digits = all_digits and '0' <= next_char <= '9'
+                all_digits = all_digits and "0" <= next_char <= "9"
                 literal_buffer.append(next_char)
-    
+
         if all_digits and len(literal_buffer) <= 18:
             value = 0
             for digit in literal_buffer:
-                value = (value * 10) + ord(digit) - ord('0')
+                value = (value * 10) + ord(digit) - ord("0")
             return sign * value
 
-        number_string = ''.join(literal_buffer)
-        if (number_string.find('.') < 0 and
-                number_string.find('e') < 0 and
-                number_string.find('E') < 0):
+        number_string = "".join(literal_buffer)
+        if (
+            number_string.find(".") < 0
+            and number_string.find("e") < 0
+            and number_string.find("E") < 0
+        ):
             try:
                 return sign * long(number_string)
             except ValueError:
-                self.__error(
-                    "Could not parse number as long '%s'" % number_string)
+                self.__error("Could not parse number as long '%s'" % number_string)
         else:
             try:
                 return sign * float(number_string)
             except ValueError:
-                self.__error(
-                    "Could not parse number as float '%s'" % number_string)
+                self.__error("Could not parse number as float '%s'" % number_string)
 
     def __parse_comment(self):
         """Scan through a // or /* comment."""
@@ -578,31 +600,35 @@ class JsonParser(object):
 
         if self.__scanner.at_end:
             self.__error("Unexpected character '/'")
-    
+
         c = self.__scanner.read_ubyte()
-        if c == '/':
+        if c == "/":
             # This is a "//" comment. Scan through EOL.
             while not self.__scanner.at_end:
                 c = self.__scanner.read_ubyte()
-                if c == '\n' or c == '\r':
+                if c == "\n" or c == "\r":
                     break
-      
+
             # If this is a CRLF, scan through the LF.
-            if c == '\r' and self.__scanner.peek_next_ubyte(none_if_bad_index=True) == '\n':
+            if (
+                c == "\r"
+                and self.__scanner.peek_next_ubyte(none_if_bad_index=True) == "\n"
+            ):
                 self.__scanner.read_ubyte()
-        elif c == '*':
+        elif c == "*":
             # This is a "/*" comment. Scan through "*/".
             while not self.__scanner.at_end:
                 c = self.__scanner.read_ubyte()
-                if (c == '*' and 
-                    self.__scanner.peek_next_ubyte(
-                        none_if_bad_index=True) == '/'):
+                if (
+                    c == "*"
+                    and self.__scanner.peek_next_ubyte(none_if_bad_index=True) == "/"
+                ):
                     self.__scanner.read_ubyte()
                     return
             self.__error("Unterminated comment", comment_start_pos)
         else:
             self.__error("Unexpected character '/%s'" % c)
-  
+
     def __match(self, chars, error_message):
         """Verify that the next N characters match chars,
         and consume them.  In case of a mismatch, raise an exception.
@@ -610,7 +636,7 @@ class JsonParser(object):
 
         If error_message is None, we generate a default message."""
         start_pos = self.__scanner.position
-      
+
         for i in range(0, len(chars)):
             expected = chars[i]
             if self.__scanner.at_end:
@@ -621,7 +647,7 @@ class JsonParser(object):
                 if error_message is not None:
                     self.__error(error_message, start_pos)
                 else:
-                    self.__error("Expected \"%s\"" % chars, start_pos)
+                    self.__error('Expected "%s"' % chars, start_pos)
 
     def __error(self, error_message, position=None):
         """Report an error at the character just consumed."""
@@ -629,17 +655,18 @@ class JsonParser(object):
             position = max(0, self.__scanner.position - 1)
 
         raise JsonParseException(
-            error_message, position,
-            self.__scanner.line_number_for_offset(
-                position - self.__scanner.position))
+            error_message,
+            position,
+            self.__scanner.line_number_for_offset(position - self.__scanner.position),
+        )
 
     def __preceding_line_break(self):
         i = -1
         b = self.__scanner.peek_next_ubyte(offset=i, none_if_bad_index=True)
         while not b is None:
-            if b == '\r' or b == '\n':
+            if b == "\r" or b == "\n":
                 return True
-            elif b == ' ' or b == '\t':
+            elif b == " " or b == "\t":
                 i += -1
                 b = self.__scanner.peek_next_ubyte(offset=i, none_if_bad_index=True)
             else:
@@ -705,7 +732,7 @@ class JsonParser(object):
             if c == 32 or c == 9 or c == 13 or c == 10:
                 self.__scanner.read_ubyte()
                 continue
-            elif raw_c == '/':
+            elif raw_c == "/":
                 self.__parse_comment()
                 continue
             return raw_c

@@ -21,7 +21,7 @@ import struct
 import thread
 
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import logging
 import base64
@@ -39,7 +39,6 @@ from scalyr_agent.json_lib import parse, JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 
-
 # Use sha1 from hashlib (Python 2.5 or greater) otherwise fallback to the old sha module.
 try:
     from hashlib import sha1
@@ -50,9 +49,11 @@ except ImportError:
 try:
     # For Python >= 2.5
     from hashlib import md5
+
     new_md5 = True
 except ImportError:
     import md5
+
     new_md5 = False
 
 
@@ -62,42 +63,45 @@ except ImportError:
     uuid = None
 
 
-def _fallback_json_encode( obj, sort_keys=False ):
+def _fallback_json_encode(obj, sort_keys=False):
     # json_lib.serialize() always ignores sort_keys param (always sorts regardless)
-    return json_lib.serialize( obj )
+    return json_lib.serialize(obj)
 
 
-def _fallback_json_decode( text ):
-    return json_lib.parse( text )
+def _fallback_json_decode(text):
+    return json_lib.parse(text)
 
 
 def get_json_implementation(lib_name):
 
-    if lib_name == 'json_lib':
+    if lib_name == "json_lib":
         return lib_name, _fallback_json_encode, _fallback_json_decode
 
-    elif lib_name == 'ujson':
+    elif lib_name == "ujson":
         import ujson
 
         def ujson_dumps_custom(*args, **kwargs):
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
             if isinstance(args[0], (json_lib.JsonObject, json_lib.JsonArray)):
-                raise TypeError('ujson does not correctly encode objects of type: %s' % type(args[0]))
+                raise TypeError(
+                    "ujson does not correctly encode objects of type: %s"
+                    % type(args[0])
+                )
             return ujson.dumps(*args, **kwargs)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
     else:
-        if lib_name != 'json':
-            raise ValueError('Unsupported json library %s' % lib_name)
+        if lib_name != "json":
+            raise ValueError("Unsupported json library %s" % lib_name)
 
         import json
 
         def json_dumps_custom(*args, **kwargs):
             """Eliminate spaces by default. Python 2.4 does not support partials."""
-            if 'separators' not in kwargs:
-                kwargs['separators'] = (',', ':')
+            if "separators" not in kwargs:
+                kwargs["separators"] = (",", ":")
             return json.dumps(*args, **kwargs)
 
         return lib_name, json_dumps_custom, json.loads
@@ -114,12 +118,12 @@ def _set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-_set_json_lib('json_lib')
+_set_json_lib("json_lib")
 try:
-    _set_json_lib('ujson')
+    _set_json_lib("ujson")
 except ImportError:
     try:
-        _set_json_lib('json')
+        _set_json_lib("json")
     except:
         pass
 
@@ -127,22 +131,25 @@ except ImportError:
 def get_json_lib():
     return _json_lib
 
-def json_encode( obj ):
+
+def json_encode(obj):
     """Encodes an object into a JSON string.  The underlying implementation either handles JsonObject/JsonArray
     or else complains loudly (raises Exception) if they do not correctly support encoding.
     """
-    return _json_encode( obj, sort_keys=True )
+    return _json_encode(obj, sort_keys=True)
 
-def json_decode( text ):
+
+def json_decode(text):
     """Decodes text containing json and returns either a dict or a scalyr_agent.json_lib.objects.JsonObject
     depending on which underlying decoder is used.
 
     If json or ujson are used, a dict is returned.
     If the Scalyr custom json_lib decoder is used, a JsonObject is returned
     """
-    return _json_decode( text )
+    return _json_decode(text)
 
-def value_to_bool( value ):
+
+def value_to_bool(value):
     value_type = type(value)
     if value_type is bool:
         return value
@@ -157,7 +164,10 @@ def value_to_bool( value ):
     elif value is None:
         return False
 
-    raise ValueError( "Cannot convert %s value to bool: %s" % (str(value_type), str( value ) ))
+    raise ValueError(
+        "Cannot convert %s value to bool: %s" % (str(value_type), str(value))
+    )
+
 
 def read_file_as_json(file_path):
     """Reads the entire file as a JSON value and return it.
@@ -174,22 +184,26 @@ def read_file_as_json(file_path):
     try:
         try:
             if not os.path.isfile(file_path):
-                raise JsonReadFileException(file_path, 'The file does not exist.')
+                raise JsonReadFileException(file_path, "The file does not exist.")
             if not os.access(file_path, os.R_OK):
-                raise JsonReadFileException(file_path, 'The file is not readable.')
-            f = open(file_path, 'r')
+                raise JsonReadFileException(file_path, "The file is not readable.")
+            f = open(file_path, "r")
             data = f.read()
             return parse(data)
         except IOError, e:
-            raise JsonReadFileException(file_path, 'Read error occurred: ' + str(e))
+            raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
         except JsonParseException, e:
-            raise JsonReadFileException(file_path, "JSON parsing error occurred: %s (line %i, byte position %i)" % (
-                e.raw_message, e.line_number, e.position))
+            raise JsonReadFileException(
+                file_path,
+                "JSON parsing error occurred: %s (line %i, byte position %i)"
+                % (e.raw_message, e.line_number, e.position),
+            )
     finally:
         if f is not None:
             f.close()
 
-def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
+
+def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     """Write a dict to a JSON encoded file
     The file is first completely written to tmp_path, and then renamed to file_path
 
@@ -199,11 +213,11 @@ def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
     """
     fp = None
     try:
-        fp = open(tmp_path, 'w')
+        fp = open(tmp_path, "w")
         fp.write(json_lib.serialize(info))
         fp.close()
         fp = None
-        if sys.platform == 'win32' and os.path.isfile(file_path):
+        if sys.platform == "win32" and os.path.isfile(file_path):
             os.unlink(file_path)
         os.rename(tmp_path, file_path)
     except (IOError, OSError):
@@ -212,7 +226,10 @@ def atomic_write_dict_as_json_file( file_path, tmp_path, info ):
         import scalyr_agent.scalyr_logging
 
         scalyr_agent.scalyr_logging.getLogger(__name__).exception(
-            'Could not write checkpoint file due to error', error_code='failedCheckpointWrite')
+            "Could not write checkpoint file due to error",
+            error_code="failedCheckpointWrite",
+        )
+
 
 def create_unique_id():
     """
@@ -220,21 +237,21 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    if uuid is not None and hasattr(uuid, 'uuid1'):
+    if uuid is not None and hasattr(uuid, "uuid1"):
         # Here the uuid should be based on the mac of the machine.
         base_value = uuid.uuid1().bytes
-        method = 'a'
+        method = "a"
     else:
         # Otherwise, get as good of a 16 byte random number as we can and prefix it with
         # the current time.
         try:
             base_value = os.urandom(16)
-            method = 'b'
+            method = "b"
         except NotImplementedError:
-            base_value = ''
+            base_value = ""
             for i in range(16):
                 base_value += random.randrange(256)
-            method = 'c'
+            method = "c"
         base_value = str(time.time()) + base_value
     result = base64.urlsafe_b64encode(sha1(base_value).digest()) + method
     return result
@@ -249,7 +266,7 @@ def md5_hexdigest(data):
     """
 
     if not (data and isinstance(data, basestring)):
-        raise Exception('invalid data to be hashed: %s', repr(data))
+        raise Exception("invalid data to be hashed: %s", repr(data))
 
     if not new_md5:
         m = md5.new()
@@ -258,6 +275,7 @@ def md5_hexdigest(data):
     m.update(data)
 
     return m.hexdigest()
+
 
 def remove_newlines_and_truncate(input_string, char_limit):
     """Returns the input string but with all newlines removed and truncated.
@@ -275,9 +293,10 @@ def remove_newlines_and_truncate(input_string, char_limit):
     @return:  The string with all newlines replaced with spaces and truncated.
     @rtype: str
     """
-    return input_string.replace('\n', ' ').replace('\r', ' ')[0:char_limit]
+    return input_string.replace("\n", " ").replace("\r", " ")[0:char_limit]
 
-def microseconds_since_epoch( date_time, epoch=None ):
+
+def microseconds_since_epoch(date_time, epoch=None):
     """Returns the number of microseconds since the specified date time and the epoch.
 
     @param date_time: a datetime.datetime object.
@@ -287,14 +306,15 @@ def microseconds_since_epoch( date_time, epoch=None ):
     @type epoch: datetime.datetime
     """
     if not epoch:
-        epoch = datetime.datetime.utcfromtimestamp( 0 )
+        epoch = datetime.datetime.utcfromtimestamp(0)
 
     delta = date_time - epoch
 
-    #86400 is 24 * 60 * 60 e.g. total seconds in a day
-    return (delta.microseconds + (delta.seconds + delta.days * 86400) * 10**6)
+    # 86400 is 24 * 60 * 60 e.g. total seconds in a day
+    return delta.microseconds + (delta.seconds + delta.days * 86400) * 10 ** 6
 
-def seconds_since_epoch( date_time, epoch=None ):
+
+def seconds_since_epoch(date_time, epoch=None):
     """Returns the number of seconds since the specified date time and the epoch.
 
     @param date_time: a datetime.datetime object.
@@ -305,9 +325,10 @@ def seconds_since_epoch( date_time, epoch=None ):
 
     @rtype float
     """
-    return microseconds_since_epoch( date_time ) / 10.0**6
+    return microseconds_since_epoch(date_time) / 10.0 ** 6
 
-def rfc3339_to_datetime( string ):
+
+def rfc3339_to_datetime(string):
     """Returns a date time from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -328,36 +349,37 @@ def rfc3339_to_datetime( string ):
     # single element that should end in Z.  Strip the Z if it exists
     # so we can use the same format string for processing the main
     # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith( 'Z' ):
+    if parts[0].endswith("Z"):
         parts[0] = parts[0][:-1]
 
-    #create a datetime object
+    # create a datetime object
     try:
-        tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
+        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
     except ValueError, e:
         return None
 
-    dt = datetime.datetime( *(tm[0:6]) )
+    dt = datetime.datetime(*(tm[0:6]))
 
-    #now add the fractional part
-    if len( parts ) > 1:
+    # now add the fractional part
+    if len(parts) > 1:
         fractions = parts[1]
-        #if we had a fractional component it should terminate in a Z
-        if not fractions.endswith( 'Z' ):
-            #we don't handle non UTC timezones yet
-            if any(c in fractions for c in '+-'):
+        # if we had a fractional component it should terminate in a Z
+        if not fractions.endswith("Z"):
+            # we don't handle non UTC timezones yet
+            if any(c in fractions for c in "+-"):
                 return None
             return dt
 
         # remove the Z and just process the fraction.
         fractions = fractions[:-1]
         to_micros = 6 - len(fractions)
-        micro = int( int( fractions ) * 10**to_micros )
-        dt = dt.replace( microsecond=micro )
+        micro = int(int(fractions) * 10 ** to_micros)
+        dt = dt.replace(microsecond=micro)
 
     return dt
 
-def rfc3339_to_nanoseconds_since_epoch( string ):
+
+def rfc3339_to_nanoseconds_since_epoch(string):
     """Returns nanoseconds since the epoch from a rfc3339 formatted timestamp.
 
     We have to do some tricksy things to support python 2.4, which doesn't support
@@ -378,26 +400,26 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
     # single element that should end in Z.  Strip the Z if it exists
     # so we can use the same format string for processing the main
     # date+time regardless of whether the time has a fractional component.
-    if parts[0].endswith( 'Z' ):
+    if parts[0].endswith("Z"):
         parts[0] = parts[0][:-1]
 
-    #create a datetime object
+    # create a datetime object
     try:
-        tm = time.strptime( parts[0], "%Y-%m-%dT%H:%M:%S" )
+        tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
     except ValueError, e:
         return None
 
-    nano_seconds = long( calendar.timegm( tm[0:6] ) ) * 1000000000L
+    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000L
     nanos = 0
 
-    #now add the fractional part
-    if len( parts ) > 1:
+    # now add the fractional part
+    if len(parts) > 1:
         fractions = parts[1]
         # if the fractional part doesn't end in Z we likely have a
         # malformed time, so just return the current value
-        if not fractions.endswith( 'Z' ):
-            #we don't handle non UTC timezones yet
-            if any(c in fractions for c in '+-'):
+        if not fractions.endswith("Z"):
+            # we don't handle non UTC timezones yet
+            if any(c in fractions for c in "+-"):
                 return None
 
             return nano_seconds
@@ -405,9 +427,10 @@ def rfc3339_to_nanoseconds_since_epoch( string ):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = long( long( fractions ) * 10**to_nanos )
+        nanos = long(long(fractions) * 10 ** to_nanos)
 
     return nano_seconds + nanos
+
 
 def format_time(time_value):
     """Returns the time converted to a string in the common format used throughout the agent and in UTC.
@@ -424,15 +447,16 @@ def format_time(time_value):
     @rtype: str
     """
     if time_value is None:
-        return 'Never'
+        return "Never"
     else:
-        result = '%s UTC' % (time.asctime(time.gmtime(time_value)))
+        result = "%s UTC" % (time.asctime(time.gmtime(time_value)))
         # Windows uses a leading 0 on the day of month field, which makes it different behavior from Linux
         # which uses a space in place of the leading 0.  For tests, we need this to behave the same, so we spend
         # the small effort here to make it work.  At least, that leading 0 is always in the same place.
-        if result[8] == '0':
-            result = '%s %s' % (result[:8], result[9:])
+        if result[8] == "0":
+            result = "%s %s" % (result[:8], result[9:])
         return result
+
 
 def get_pid_tid():
     """Returns a string containing the current process and thread id in the format "(pid=%pid) (tid=%tid)".
@@ -445,12 +469,13 @@ def get_pid_tid():
     except:
         return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
-def is_list_of_strings( vals ):
+
+def is_list_of_strings(vals):
     """Returns True if val is a list (or enumerable) of strings.  False otherwise"""
     try:
         # check if everything is a string
         for val in vals:
-            if not isinstance( val, basestring ):
+            if not isinstance(val, basestring):
                 return False
     except:
         # vals is not enumerable
@@ -462,11 +487,14 @@ def is_list_of_strings( vals ):
 
 class JsonReadFileException(Exception):
     """Raised when a failure occurs when reading a file as a JSON object."""
+
     def __init__(self, file_path, message):
         self.file_path = file_path
         self.raw_message = message
 
-        Exception.__init__(self, "Failed while reading file '%s': %s" % (file_path, message))
+        Exception.__init__(
+            self, "Failed while reading file '%s': %s" % (file_path, message)
+        )
 
 
 class RunState(object):
@@ -476,6 +504,7 @@ class RunState(object):
     still be running.  The expectation is that multiple threads will use this to attempt to quickly finish when
     the run state changes to false.
     """
+
     def __init__(self, fake_clock=None):
         """Creates a new instance of RunState which always is marked as running.
 
@@ -601,6 +630,7 @@ class RunState(object):
 class FakeRunState(RunState):
     """A RunState subclass that does not actually sleep when sleep_but_awaken_if_stopped that can be used for tests.
     """
+
     def __init__(self):
         # The number of times this instance would have slept.
         self.__total_times_slept = 0
@@ -618,6 +648,7 @@ class FakeRunState(RunState):
 class FakeClock(object):
     """Used to simulate time and control threads waking up for sleep for tests.
     """
+
     def __init__(self):
         """Constructs a new instance.
         """
@@ -685,6 +716,7 @@ class FakeClock(object):
             self._increment_waiting_count(1)
             self._time_condition.wait()
             self._increment_waiting_count(-1)
+
         try:
             if exit_when is None:
                 wait_block()
@@ -727,7 +759,6 @@ class FakeClock(object):
 
 
 class RealFakeClock(FakeClock):
-
     def time(self):
         return time.time()
 
@@ -736,7 +767,7 @@ class RealFakeClock(FakeClock):
         if set_to is not None:
             increment_by = set_to - time.time()
         if increment_by is None:
-            raise ValueError('Either set_to or increment_by must be supplied')
+            raise ValueError("Either set_to or increment_by must be supplied")
         increment_by = max(0, increment_by)
         time.sleep(increment_by)
         self._time_condition.notifyAll()
@@ -846,7 +877,7 @@ class StoppableThread(threading.Thread):
         name_prefix = StoppableThread._get_name_prefix()
         if name_prefix is not None:
             if name is not None:
-                name = '%s%s' % (name_prefix, name)
+                name = "%s%s" % (name_prefix, name)
             else:
                 name = name_prefix
         threading.Thread.__init__(self, name=name, target=self.__run_impl)
@@ -893,7 +924,9 @@ class StoppableThread(threading.Thread):
                 self.run_and_propagate()
         except Exception, e:
             self.__exception_info = sys.exc_info()
-            logging.getLogger().warn('Received exception from run method in StoppableThread %s' % str(e))
+            logging.getLogger().warn(
+                "Received exception from run method in StoppableThread %s" % str(e)
+            )
             return None
 
     def run_and_propagate(self):
@@ -938,7 +971,9 @@ class StoppableThread(threading.Thread):
         """
         threading.Thread.join(self, timeout)
         if not self.isAlive() and self.__exception_info is not None:
-            raise self.__exception_info[0], self.__exception_info[1], self.__exception_info[2]
+            raise self.__exception_info[0], self.__exception_info[
+                1
+            ], self.__exception_info[2]
 
 
 class RateLimiter(object):
@@ -952,6 +987,7 @@ class RateLimiter(object):
     Otherwise, the operation is rejected.  The bucket is gradually refilled at the fill rate, but the contents
     of the bucket will never exceeded the maximum bucket size.
     """
+
     def __init__(self, bucket_size, bucket_fill_rate, current_time=None):
         """Creates a new bucket.
 
@@ -984,9 +1020,13 @@ class RateLimiter(object):
         if current_time is None:
             current_time = time.time()
 
-        fill_amount = (current_time - self.__last_bucket_fill_time) * self.__bucket_fill_rate
+        fill_amount = (
+            current_time - self.__last_bucket_fill_time
+        ) * self.__bucket_fill_rate
 
-        self.__bucket_contents = min(self.__bucket_size, self.__bucket_contents + fill_amount)
+        self.__bucket_contents = min(
+            self.__bucket_size, self.__bucket_contents + fill_amount
+        )
         self.__last_bucket_fill_time = current_time
 
         if num_bytes <= self.__bucket_contents:
@@ -1007,7 +1047,13 @@ class ScriptEscalator(object):
     where as Windows will prompt the user for the Administrator's password.
     """
 
-    def __init__(self, controller, config_file_path, current_working_directory, no_change_user = False):
+    def __init__(
+        self,
+        controller,
+        config_file_path,
+        current_working_directory,
+        no_change_user=False,
+    ):
         """
         @param controller: The instance of the PlatformController being used to execute the script.
         @param config_file_path: The full path to the configuration file.
@@ -1062,28 +1108,38 @@ class ScriptEscalator(object):
 
             # See if this is a py2exe executable.  If so, then we do not have a script file, but a binary executable
             # that contains the script.
-            if hasattr(sys, 'frozen'):
+            if hasattr(sys, "frozen"):
                 script_binary = sys.executable
             else:
                 # We use the __main__ symbolic module to determine which file was invoked by the python script.
                 # noinspection PyUnresolvedReferences
                 import __main__
+
                 script_file_path = __main__.__file__
                 if not os.path.isabs(script_file_path):
-                    script_file_path = os.path.normpath(os.path.join(self.__cwd, script_file_path))
+                    script_file_path = os.path.normpath(
+                        os.path.join(self.__cwd, script_file_path)
+                    )
 
-            return self.__controller.run_as_user(self.__desired_user, script_file_path, script_binary, script_args)
+            return self.__controller.run_as_user(
+                self.__desired_user, script_file_path, script_binary, script_args
+            )
         except CannotExecuteAsUser, e:
             if not handle_error:
                 raise e
-            print >> sys.stderr, ('Failing, cannot %s as the correct user.  The command must be executed using the '
-                                  'same account that owns the configuration file.  The configuration file is owned by '
-                                  '%s whereas the current user is %s.  Changing user failed due to the following '
-                                  'error: "%s". Please try to re-execute the command as %s' % (description,
-                                                                                               self.__desired_user,
-                                                                                               self.__running_user,
-                                                                                               e.error_message,
-                                                                                               self.__desired_user))
+            print >>sys.stderr, (
+                "Failing, cannot %s as the correct user.  The command must be executed using the "
+                "same account that owns the configuration file.  The configuration file is owned by "
+                "%s whereas the current user is %s.  Changing user failed due to the following "
+                'error: "%s". Please try to re-execute the command as %s'
+                % (
+                    description,
+                    self.__desired_user,
+                    self.__running_user,
+                    e.error_message,
+                    self.__desired_user,
+                )
+            )
             return 1
 
 
@@ -1098,6 +1154,7 @@ class RedirectorServer(object):
 
     This must be used in conjunction with `RedirectorClient`.
     """
+
     def __init__(self, channel, sys_impl=sys):
         """Creates an instance.
 
@@ -1139,20 +1196,26 @@ class RedirectorServer(object):
         @raise RedirectorError: If no client connects within the timeout period.
         """
         if not self.__channel.accept_client(timeout=timeout):
-            raise RedirectorError('Client did not connect to server within %lf seconds' % timeout)
+            raise RedirectorError(
+                "Client did not connect to server within %lf seconds" % timeout
+            )
 
         self.__old_stdout = self.__sys.stdout
         self.__old_stderr = self.__sys.stderr
 
-        self.__sys.stdout = RedirectorServer.Redirector(RedirectorServer.STDOUT_STREAM_ID, self._write_stream)
-        self.__sys.stderr = RedirectorServer.Redirector(RedirectorServer.STDERR_STREAM_ID, self._write_stream)
+        self.__sys.stdout = RedirectorServer.Redirector(
+            RedirectorServer.STDOUT_STREAM_ID, self._write_stream
+        )
+        self.__sys.stderr = RedirectorServer.Redirector(
+            RedirectorServer.STDERR_STREAM_ID, self._write_stream
+        )
 
     def stop(self):
         """Signals the client connection that all bytes have been sent and then resets stdout and stderr to
         their original values.
         """
         # This will result in a -1 being written to the stream, indicating the server is closing down.
-        self._write_stream(-1, '')
+        self._write_stream(-1, "")
 
         self.__channel.close()
         self.__channel = None
@@ -1171,7 +1234,7 @@ class RedirectorServer(object):
         """
         # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
         # serialize it that way.
-        encoded_content = unicode(content).encode('utf-8')
+        encoded_content = unicode(content).encode("utf-8")
         # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
         # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
         # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is
@@ -1181,7 +1244,7 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                self.__channel.write(struct.pack('i', code) + encoded_content)
+                self.__channel.write(struct.pack("i", code) + encoded_content)
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -1197,6 +1260,7 @@ class RedirectorServer(object):
 
         Derived classes must be provided to actually implement the communication.
         """
+
         def accept_client(self, timeout=None):
             """Blocks until a client connects to the server.
 
@@ -1230,6 +1294,7 @@ class RedirectorServer(object):
         This provides the `write` method necessary for `stdout` and `stderr` such that all bytes written will
         be sent to the client.
         """
+
         def __init__(self, stream_id, writer_func):
             """Creates an instance.
 
@@ -1256,6 +1321,7 @@ class RedirectorServer(object):
 class RedirectorError(Exception):
     """Raised when an exception occurs with the RedirectionClient or RedirectionServer.
     """
+
     pass
 
 
@@ -1268,6 +1334,7 @@ class RedirectorClient(StoppableThread):
     This functionality is implemented using a thread.  This thread must be started for the process to begin
     receiving bytes from the `RedirectorServer`.
     """
+
     def __init__(self, channel, sys_impl=sys, fake_clock=None):
         """Creates a new instance.
 
@@ -1310,7 +1377,9 @@ class RedirectorClient(StoppableThread):
                     connected = True
                     break
 
-                self._sleep_for_busy_loop(overall_deadline, last_busy_loop_time, 'connection to be made.')
+                self._sleep_for_busy_loop(
+                    overall_deadline, last_busy_loop_time, "connection to be made."
+                )
                 last_busy_loop_time = self.__time()
 
             # If we aren't running any more, then return.  This could happen if the creator of this instance
@@ -1319,7 +1388,9 @@ class RedirectorClient(StoppableThread):
                 return
 
             if not connected:
-                raise RedirectorError('Could not connect to other endpoint before timeout.')
+                raise RedirectorError(
+                    "Could not connect to other endpoint before timeout."
+                )
 
             # Keep looping, accepting new bytes and writing them to the appropriate stream.
             while self._is_running():
@@ -1330,7 +1401,7 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                code = struct.unpack('i', self.__channel.read(4))[0]    # Read str length
+                code = struct.unpack("i", self.__channel.read(4))[0]  # Read str length
 
                 # The server sends -1 when it wishes to close the stream.
                 if code < 0:
@@ -1339,7 +1410,7 @@ class RedirectorClient(StoppableThread):
                 bytes_to_read = code >> 1
                 stream_id = code % 2
 
-                content = self.__channel.read(bytes_to_read).decode('utf-8')
+                content = self.__channel.read(bytes_to_read).decode("utf-8")
 
                 if stream_id == RedirectorServer.STDOUT_STREAM_ID:
                     self.__stdout.write(content)
@@ -1367,10 +1438,15 @@ class RedirectorClient(StoppableThread):
         while self._is_running():
             (num_bytes_available, result) = self.__channel.peek()
             if result != 0:
-                raise RedirectorError('Error while waiting for more bytes from redirect server error=%d' % result)
+                raise RedirectorError(
+                    "Error while waiting for more bytes from redirect server error=%d"
+                    % result
+                )
             if num_bytes_available > 0:
                 return True
-            self._sleep_for_busy_loop(overall_deadline, last_busy_loop_time, 'more bytes to be read')
+            self._sleep_for_busy_loop(
+                overall_deadline, last_busy_loop_time, "more bytes to be read"
+            )
             last_busy_loop_time = self.__time()
         return False
 
@@ -1383,7 +1459,7 @@ class RedirectorClient(StoppableThread):
 
     # The amount of time we sleep while doing a busy wait loop waiting for the client to connect or for new byte
     # to become available.
-    BUSY_LOOP_POLL_INTERVAL = .03
+    BUSY_LOOP_POLL_INTERVAL = 0.03
 
     def _sleep_for_busy_loop(self, deadline, last_loop_time, description):
         """Sleeps for a small unit of time as part of a busy wait loop.
@@ -1406,7 +1482,9 @@ class RedirectorClient(StoppableThread):
         poll_deadline = RedirectorClient.BUSY_LOOP_POLL_INTERVAL + last_loop_time
 
         if deadline - current_time < 0:
-            raise RedirectorError('Deadline exceeded while waiting for %s' % description)
+            raise RedirectorError(
+                "Deadline exceeded while waiting for %s" % description
+            )
         elif deadline > poll_deadline:
             deadline = poll_deadline
 
@@ -1435,7 +1513,9 @@ class RedirectorClient(StoppableThread):
         self._run_state.register_on_stop_callback(advance_clock)
         try:
             # Simulate the waiting, looking for the deadline to be exceeded or stop to be invoked.
-            self.__fake_clock.simulate_waiting(exit_when=deadline_exceeded_or_is_stopped)
+            self.__fake_clock.simulate_waiting(
+                exit_when=deadline_exceeded_or_is_stopped
+            )
         finally:
             # Be sure to remove our callback.
             self._run_state.remove_on_stop_callback(advance_clock)
@@ -1451,6 +1531,7 @@ class RedirectorClient(StoppableThread):
 
         Derived classes must provide the actual communication implementation.
         """
+
         def connect(self):
             """Attempts to connect to the server, but does not block.
 
@@ -1486,18 +1567,20 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = 'a' * 100
+COMPRESSION_TEST_STR = "a" * 100
 
 
 def get_compress_module(compression_type):
-    if compression_type == 'zlib':
+    if compression_type == "zlib":
         import zlib
+
         return zlib
-    elif compression_type == 'bz2':
+    elif compression_type == "bz2":
         import bz2
+
         return bz2
     else:
-        raise ValueError('Unsupported compression type')
+        raise ValueError("Unsupported compression type")
 
 
 def verify_and_get_compress_func(compression_type):
@@ -1510,13 +1593,15 @@ def verify_and_get_compress_func(compression_type):
         if underlying libs are not installed properly,
     """
     compression_type_to_module_name = {
-        'bz2': 'bz2',
-        'deflate': 'zlib',
+        "bz2": "bz2",
+        "deflate": "zlib",
     }
     if compression_type not in compression_type_to_module_name:
         return None
     try:
-        compression_module = get_compress_module(compression_type_to_module_name[compression_type])
+        compression_module = get_compress_module(
+            compression_type_to_module_name[compression_type]
+        )
         cdata = compression_module.compress(COMPRESSION_TEST_STR, 9)
         if len(cdata) < len(COMPRESSION_TEST_STR):
             return compression_module.compress
@@ -1535,7 +1620,7 @@ class RateLimiterToken(object):
         return self._token_id
 
     def __repr__(self):
-        return 'Token #%s' % self._token_id
+        return "Token #%s" % self._token_id
 
 
 class HistogramTracker(object):
@@ -1546,6 +1631,7 @@ class HistogramTracker(object):
     This abstraction also tracks several other statistics for the values, including average, minimum value, and
     maximum value.
     """
+
     def __init__(self, bucket_ranges):
         """Creates an instance with the specified bucket ranges.  The ranges are specified as an sorted array of numbers,
         where the first bucket will be from 0 >= to < bucket_ranges[0], the second bucket_ranges[0] >= to <
@@ -1560,7 +1646,7 @@ class HistogramTracker(object):
         last_value = None
         for i in self.__bucket_ranges:
             if last_value is not None and i < last_value:
-                raise ValueError('The bucket_ranges argument must be sorted.')
+                raise ValueError("The bucket_ranges argument must be sorted.")
             else:
                 last_value = i
 
@@ -1681,7 +1767,9 @@ class HistogramTracker(object):
         cumulative_count = 0
 
         # Now find the bucket by going over the buckets, keeping track of the cumulative counts across all buckets.
-        for bucket_count, lower_bound, upper_bound in self.buckets(disable_last_bucket_padding=True):
+        for bucket_count, lower_bound, upper_bound in self.buckets(
+            disable_last_bucket_padding=True
+        ):
             cumulative_count = cumulative_count + bucket_count
             if target_count <= cumulative_count:
                 # Ok, we found the bucket.  To minimize error, we estimate the value of the percentile to be the
@@ -1729,8 +1817,13 @@ class HistogramTracker(object):
         :rtype:
         """
         if self.__total_count == 0:
-            return '(count=0)'
+            return "(count=0)"
 
         # noinspection PyStringFormat
-        return '(count=%ld,avg=%.2lf,min=%.2lf,max=%.2lf,median=%.2lf)' % (self.count(), self.average(), self.min(), self.max(),
-                                                                           self.estimate_median())
+        return "(count=%ld,avg=%.2lf,min=%.2lf,max=%.2lf,median=%.2lf)" % (
+            self.count(),
+            self.average(),
+            self.min(),
+            self.max(),
+            self.estimate_median(),
+        )

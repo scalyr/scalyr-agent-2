@@ -15,7 +15,7 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import unittest
 
@@ -168,12 +168,10 @@ class JsonObjectTests(ScalyrTestCase):
         self.assertEquals(x.get_json_object("none", none_if_missing=True), None)
 
         # Raise an exception when field is missing.
-        self.assertRaises(JsonMissingFieldException,
-                          y.get_json_object, "none")
+        self.assertRaises(JsonMissingFieldException, y.get_json_object, "none")
 
         # Raise an exception if field is not JsonObject
-        self.assertRaises(JsonConversionException,
-                          x.get_json_object, "foo")
+        self.assertRaises(JsonConversionException, x.get_json_object, "foo")
 
     def test_get_or_create_json_object(self):
         x = JsonObject(foo=5, bar=True)
@@ -186,37 +184,37 @@ class JsonObjectTests(ScalyrTestCase):
         JsonObject(foo=5, bar=True)
 
     def test_equality(self):
-        x = JsonObject(foo='a', bar=10)
-        y = JsonObject(foo='a', bar=10)
-        z = JsonObject(foo='a', bar=10, zar=True)
+        x = JsonObject(foo="a", bar=10)
+        y = JsonObject(foo="a", bar=10)
+        z = JsonObject(foo="a", bar=10, zar=True)
 
         self.assertEquals(x, y)
         self.assertNotEquals(x, z)
         self.assertNotEquals(y, z)
 
     def test_keys(self):
-        x = JsonObject(foo='a', bar=10)
+        x = JsonObject(foo="a", bar=10)
 
         keys = x.keys()
         self.assertEquals(len(keys), 2)
-        self.assertTrue(keys[0] == 'foo' or keys[0] == 'bar')
-        self.assertTrue(keys[1] == 'foo' or keys[1] == 'bar')
+        self.assertTrue(keys[0] == "foo" or keys[0] == "bar")
+        self.assertTrue(keys[1] == "foo" or keys[1] == "bar")
 
     def test_contains(self):
-        x = JsonObject(foo='a', bar=10)
-        self.assertTrue('foo' in x)
-        self.assertFalse('baz' in x)
+        x = JsonObject(foo="a", bar=10)
+        self.assertTrue("foo" in x)
+        self.assertFalse("baz" in x)
 
     def test_iter(self):
-        x = JsonObject(foo='a', bar=10)
+        x = JsonObject(foo="a", bar=10)
 
         keys = []
         for key in x:
             keys.append(key)
 
         self.assertEquals(len(keys), 2)
-        self.assertTrue('foo' in keys)
-        self.assertTrue('bar' in keys)
+        self.assertTrue("foo" in keys)
+        self.assertTrue("bar" in keys)
 
 
 class JsonArrayTests(ScalyrTestCase):
@@ -231,8 +229,7 @@ class JsonArrayTests(ScalyrTestCase):
         x = JsonArray(y, "Not an object")
         self.assertEquals(len(x), 2)
         self.assertTrue(x.get_json_object(0) == y)
-        self.assertRaises(JsonConversionException,
-                          x.get_json_object, 1)
+        self.assertRaises(JsonConversionException, x.get_json_object, 1)
 
     def test_iter(self):
         y = JsonObject(foo=True)
@@ -258,11 +255,11 @@ class JsonArrayTests(ScalyrTestCase):
         self.assertTrue(x[0] == z[0])
 
     def test_set_item(self):
-        x = JsonArray('bye', 3)
-        x[0] = 'hi'
-        self.assertEquals(x[0], 'hi')
+        x = JsonArray("bye", 3)
+        x[0] = "hi"
+        self.assertEquals(x[0], "hi")
 
-        self.assertRaises(IndexError, x.__setitem__, 5, 'foo')
+        self.assertRaises(IndexError, x.__setitem__, 5, "foo")
 
     def test_equals(self):
         x = JsonArray(1, 2)
@@ -277,5 +274,6 @@ class JsonArrayTests(ScalyrTestCase):
 def main():
     unittest.main()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

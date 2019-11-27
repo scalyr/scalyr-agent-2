@@ -52,25 +52,26 @@ except ImportError:
 #
 CONFIG_OPTIONS = [
     dict(
-        option_name='module',
-        option_description='A ScalyrAgent plugin monitor module',
+        option_name="module",
+        option_description="A ScalyrAgent plugin monitor module",
         convert_to=str,
         required_option=True,
-        default='windows_system_metrics'
+        default="windows_system_metrics",
     )
 ]
 
-_ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS] # pylint: disable=star-args
+_ = [
+    define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS
+]  # pylint: disable=star-args
 # # End Monitor Configuration
 # #########################################################################################
-
 
 
 # A special value we return as the result of the disk_io_counters metric evaluation if we
 # get an exception indicating diskperf has not been run to turn on the counters.
 # We have to use this special value as a hack because there's too many layers in the way to
 # do it a more direct route.
-__NO_DISK_PERF__ = 'no_disk_perf_signal'
+__NO_DISK_PERF__ = "no_disk_perf_signal"
 
 
 # #########################################################################################
@@ -98,7 +99,7 @@ def _gather_metric(method, attribute=None, transform=None):
     def gather_metric():
         """Dynamically Generated """
         try:
-            metric = methodcaller(method)   # pylint: disable=redefined-outer-name
+            metric = methodcaller(method)  # pylint: disable=redefined-outer-name
             value = metric(psutil)
             if attribute:
                 value = attrgetter(attribute)(value)
@@ -111,7 +112,10 @@ def _gather_metric(method, attribute=None, transform=None):
             # on the exception message, but sometimes you have to do what you have to do.  At least we
             # package a specific version of psutils in with the windows executable, so we should know if
             # the message changes.
-            if e.message == "couldn't find any physical disk" and method == 'disk_io_counters':
+            if (
+                e.message == "couldn't find any physical disk"
+                and method == "disk_io_counters"
+            ):
                 yield __NO_DISK_PERF__, None
             else:
                 raise e
@@ -137,7 +141,7 @@ def partion_disk_usage(sub_metric):
         for mountpoint in mountpoints:
             try:
                 diskusage = psutil.disk_usage(mountpoint)
-                yield getattr(diskusage, sub_metric), {'partition': mountpoint}
+                yield getattr(diskusage, sub_metric), {"partition": mountpoint}
             except OSError:
                 # Certain partitions, like a CD/DVD drive, are expected to fail
                 pass
@@ -153,32 +157,41 @@ def uptime(start_time):
     @type float
     """
     from datetime import datetime
+
     return datetime.now() - datetime.fromtimestamp(start_time)
 
 
 try:
     from operator import methodcaller, attrgetter
 except ImportError:
+
     def methodcaller(name, *args, **kwargs):
         def caller(obj):
             return getattr(obj, name)(*args, **kwargs)
+
         return caller
+
 
 try:
     from collections import namedtuple
-    METRIC = namedtuple('METRIC', 'config dispatch')
+
+    METRIC = namedtuple("METRIC", "config dispatch")
 except ImportError:
 
     class NamedTupleHack(object):
         def __init__(self, *args):
             self._typename = args[0]
             self._fieldnames = args[1:]
+
         def __str__(self):
-            return "<{typename}: ({fieldnames})...>".format(self._typename, self._fieldnames[0])
-    METRIC = NamedTupleHack('Metric', 'config dispatch')
+            return "<{typename}: ({fieldnames})...>".format(
+                self._typename, self._fieldnames[0]
+            )
+
+    METRIC = NamedTupleHack("Metric", "config dispatch")
 
 
-METRIC_CONFIG = dict    # pylint: disable=invalid-name
+METRIC_CONFIG = dict  # pylint: disable=invalid-name
 GATHER_METRIC = _gather_metric
 
 
@@ -187,46 +200,39 @@ GATHER_METRIC = _gather_metric
 # ============================    System CPU    ===================================
 # =================================================================================
 _SYSTEM_CPU_METRICS = [
-    METRIC( ## ------------------  User CPU ----------------------------
+    METRIC(  ## ------------------  User CPU ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.cpu',
-            description     = 'The amount of time in seconds the CPU has spent executing instructions in user space.',
-            category        = 'CPU',
-            unit            = 'secs',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'user'
-            },
+            metric_name="winsys.cpu",
+            description="The amount of time in seconds the CPU has spent executing instructions in user space.",
+            category="CPU",
+            unit="secs",
+            cumulative=True,
+            extra_fields={"type": "user"},
         ),
-        GATHER_METRIC('cpu_times', 'user')
+        GATHER_METRIC("cpu_times", "user"),
     ),
-    METRIC( ## ------------------  System CPU ----------------------------
+    METRIC(  ## ------------------  System CPU ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.cpu',
-            description     = 'The amount of time in seconds the CPU has spent executing instructions in kernel space.',
-            category        = 'CPU',
-            unit            = 'secs',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'system'
-            },
+            metric_name="winsys.cpu",
+            description="The amount of time in seconds the CPU has spent executing instructions in kernel space.",
+            category="CPU",
+            unit="secs",
+            cumulative=True,
+            extra_fields={"type": "system"},
         ),
-        GATHER_METRIC('cpu_times', 'system')
+        GATHER_METRIC("cpu_times", "system"),
     ),
-    METRIC( ## ------------------  Idle CPU ----------------------------
+    METRIC(  ## ------------------  Idle CPU ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.cpu',
-            description     = 'The amount of time in seconds the CPU has been idle.',
-            category        = 'CPU',
-            unit            = 'secs',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'idle'
-            },
+            metric_name="winsys.cpu",
+            description="The amount of time in seconds the CPU has been idle.",
+            category="CPU",
+            unit="secs",
+            cumulative=True,
+            extra_fields={"type": "idle"},
         ),
-        GATHER_METRIC('cpu_times', 'idle')
+        GATHER_METRIC("cpu_times", "idle"),
     ),
-
     # TODO: Additional attributes for this section
     #  * ...
 ]
@@ -243,23 +249,22 @@ def calculate_uptime(boot_time):
     """
     return time.time() - boot_time
 
+
 # =================================================================================
 # ========================    UPTIME METRICS     ===============================
 # =================================================================================
 _UPTIME_METRICS = [
-
-    METRIC( ## ------------------  System Boot Time   ----------------------------
+    METRIC(  ## ------------------  System Boot Time   ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.uptime',
-            description     = 'Seconds since the system boot time.',
-            category        = 'Uptime',
-            unit            = 'secs',
-            cumulative      = True,
-            extra_fields    = {}
+            metric_name="winsys.uptime",
+            description="Seconds since the system boot time.",
+            category="Uptime",
+            unit="secs",
+            cumulative=True,
+            extra_fields={},
         ),
-        GATHER_METRIC('boot_time', None, transform=calculate_uptime)
+        GATHER_METRIC("boot_time", None, transform=calculate_uptime),
     ),
-
     # TODO: Additional attributes for this section
     #  * ...
 ]
@@ -268,47 +273,39 @@ _UPTIME_METRICS = [
 # ========================    Swap Memory    ===============================
 # =================================================================================
 _VIRTUAL_MEMORY_METRICS = [
-
-    METRIC( ## ------------------    Total Swap Memory    ----------------------------
+    METRIC(  ## ------------------    Total Swap Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.total',
-            description     = 'The number of bytes of swap space available.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'swap',
-            }
+            metric_name="winsys.memory.total",
+            description="The number of bytes of swap space available.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "swap",},
         ),
-        GATHER_METRIC('swap_memory', 'total')
+        GATHER_METRIC("swap_memory", "total"),
     ),
-    METRIC( ## ------------------    Used Virtual Memory    ----------------------------
+    METRIC(  ## ------------------    Used Virtual Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.used',
-            description     = 'The number of bytes of swap currently in use.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'swap',
-            }
+            metric_name="winsys.memory.used",
+            description="The number of bytes of swap currently in use.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "swap",},
         ),
-        GATHER_METRIC('swap_memory', 'used')
+        GATHER_METRIC("swap_memory", "used"),
     ),
-    METRIC( ## ------------------    Free Virtual Memory    ----------------------------
+    METRIC(  ## ------------------    Free Virtual Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.free',
-            description     = 'The number of bytes of swap currently free.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'swap',
-            }
+            metric_name="winsys.memory.free",
+            description="The number of bytes of swap currently free.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "swap",},
         ),
-        GATHER_METRIC('swap_memory', 'free')
+        GATHER_METRIC("swap_memory", "free"),
     ),
-
     # TODO: Additional attributes for this section
     #  * ...
 ]
@@ -317,61 +314,51 @@ _VIRTUAL_MEMORY_METRICS = [
 # ========================    Physical Memory    ===============================
 # =================================================================================
 _PHYSICAL_MEMORY_METRICS = [
-
-    METRIC( ## ------------------    Total Physical Memory    ----------------------------
+    METRIC(  ## ------------------    Total Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.total',
-            description     = 'The number of bytes of RAM.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'physical',
-            }
+            metric_name="winsys.memory.total",
+            description="The number of bytes of RAM.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "physical",},
         ),
-        GATHER_METRIC('virtual_memory', 'total')
+        GATHER_METRIC("virtual_memory", "total"),
     ),
-    METRIC( ## ------------------    Used Physical Memory    ----------------------------
+    METRIC(  ## ------------------    Used Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.used',
-            description     = 'The number of bytes of RAM currently in use.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'physical',
-            }
+            metric_name="winsys.memory.used",
+            description="The number of bytes of RAM currently in use.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "physical",},
         ),
-        GATHER_METRIC('virtual_memory', 'used')
+        GATHER_METRIC("virtual_memory", "used"),
     ),
-    METRIC( ## ------------------    Free Physical Memory    ----------------------------
+    METRIC(  ## ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.free',
-            description     = 'The number of bytes of RAM that are not in use.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'physical',
-            }
+            metric_name="winsys.memory.free",
+            description="The number of bytes of RAM that are not in use.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "physical",},
         ),
-        GATHER_METRIC('virtual_memory', 'free')
+        GATHER_METRIC("virtual_memory", "free"),
     ),
-    METRIC( ## ------------------    Free Physical Memory    ----------------------------
+    METRIC(  ## ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.memory.available',
-            description     = 'The number of bytes of RAM that are available for allocation.  This includes memory '
-                              'currently in use for caches but can be freed for other purposes.',
-            category        = 'Memory',
-            unit            = 'bytes',
-            #cumulative      = {cumulative},
-            extra_fields    = {
-                'type': 'physical',
-            }
+            metric_name="winsys.memory.available",
+            description="The number of bytes of RAM that are available for allocation.  This includes memory "
+            "currently in use for caches but can be freed for other purposes.",
+            category="Memory",
+            unit="bytes",
+            # cumulative      = {cumulative},
+            extra_fields={"type": "physical",},
         ),
-        GATHER_METRIC('virtual_memory', 'available')
+        GATHER_METRIC("virtual_memory", "available"),
     ),
-
     # TODO: Additional attributes for this section
     #  * ...
 ]
@@ -383,60 +370,50 @@ _PHYSICAL_MEMORY_METRICS = [
 _NETWORK_IO_METRICS = [
     # TODO: Add in per-interface metrics.  This can be gathered using psutils.  You just have to set pernic=True
     # on the call to network_io_counters.  The current structure of this code makes it difficult though.
-    METRIC( ## ------------------   Bytes Sent  ----------------------------
+    METRIC(  ## ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.network.bytes',
-            description     = 'The number of bytes transmitted by the network interfaces.',
-            category        = 'Network',
-            unit            = 'bytes',
-            cumulative      = True,
-            extra_fields    = {
-                'direction': 'sent',
-            }
+            metric_name="winsys.network.bytes",
+            description="The number of bytes transmitted by the network interfaces.",
+            category="Network",
+            unit="bytes",
+            cumulative=True,
+            extra_fields={"direction": "sent",},
         ),
-        GATHER_METRIC('network_io_counters', 'bytes_sent')
+        GATHER_METRIC("network_io_counters", "bytes_sent"),
     ),
-    METRIC( ## ------------------   Bytes Recv  ----------------------------
+    METRIC(  ## ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.network.bytes',
-            description     = 'The number of bytes received by the network interfaces.',
-            category        = 'Network',
-            unit            = 'bytes',
-            cumulative      = True,
-            extra_fields    = {
-                'direction': 'recv',
-            }
+            metric_name="winsys.network.bytes",
+            description="The number of bytes received by the network interfaces.",
+            category="Network",
+            unit="bytes",
+            cumulative=True,
+            extra_fields={"direction": "recv",},
         ),
-        GATHER_METRIC('network_io_counters', 'bytes_recv')
+        GATHER_METRIC("network_io_counters", "bytes_recv"),
     ),
-    METRIC( ## ------------------   Packets Sent  ----------------------------
+    METRIC(  ## ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.network.packets',
-            description     = 'The number of packets transmitted by the network intefaces.',
-            category        = 'Network',
-            unit            = 'packets',
-            cumulative      = True,
-            extra_fields    = {
-                'direction': 'sent',
-            }
+            metric_name="winsys.network.packets",
+            description="The number of packets transmitted by the network intefaces.",
+            category="Network",
+            unit="packets",
+            cumulative=True,
+            extra_fields={"direction": "sent",},
         ),
-        GATHER_METRIC('network_io_counters', 'packets_sent')
+        GATHER_METRIC("network_io_counters", "packets_sent"),
     ),
-    METRIC( ## ------------------   Packets Recv  ----------------------------
+    METRIC(  ## ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.network.packets',
-            description     = 'The number of packets received by the network interfaces.',
-            category        = 'Network',
-            unit            = 'packets',
-            cumulative      = True,
-            extra_fields    = {
-                'direction': 'recv',
-            }
+            metric_name="winsys.network.packets",
+            description="The number of packets received by the network interfaces.",
+            category="Network",
+            unit="packets",
+            cumulative=True,
+            extra_fields={"direction": "recv",},
         ),
-        GATHER_METRIC('network_io_counters', 'packets_recv')
+        GATHER_METRIC("network_io_counters", "packets_recv"),
     ),
-
-
     # TODO: Additional attributes for this section
     #  * dropped packets in/out
     #  * error packets in/out
@@ -448,61 +425,50 @@ _NETWORK_IO_METRICS = [
 # ========================     Disk IO Counters     ===============================
 # =================================================================================
 _DISK_IO_METRICS = [
-
-    METRIC( ## ------------------   Disk Bytes Read    ----------------------------
+    METRIC(  ## ------------------   Disk Bytes Read    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.io.bytes',
-            description     = 'The number of bytes read from disk.',
-            category        = 'Disk',
-            unit            = 'bytes',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'read'
-            }
+            metric_name="winsys.disk.io.bytes",
+            description="The number of bytes read from disk.",
+            category="Disk",
+            unit="bytes",
+            cumulative=True,
+            extra_fields={"type": "read"},
         ),
-        GATHER_METRIC('disk_io_counters', 'read_bytes')
+        GATHER_METRIC("disk_io_counters", "read_bytes"),
     ),
-    METRIC( ## ------------------  Disk Bytes Written  ----------------------------
+    METRIC(  ## ------------------  Disk Bytes Written  ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.io.bytes',
-            description     = 'The number of bytes written to disk.',
-            category        = 'Disk',
-            unit            = 'bytes',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'write'
-            }
+            metric_name="winsys.disk.io.bytes",
+            description="The number of bytes written to disk.",
+            category="Disk",
+            unit="bytes",
+            cumulative=True,
+            extra_fields={"type": "write"},
         ),
-        GATHER_METRIC('disk_io_counters', 'write_bytes')
+        GATHER_METRIC("disk_io_counters", "write_bytes"),
     ),
-    METRIC( ## ------------------   Disk Read Count    ----------------------------
+    METRIC(  ## ------------------   Disk Read Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.io.ops',
-            description     = 'The number of disk read operations issued since boot time.',
-            category        = 'Disk',
-            unit            = 'count',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'read'
-            }
+            metric_name="winsys.disk.io.ops",
+            description="The number of disk read operations issued since boot time.",
+            category="Disk",
+            unit="count",
+            cumulative=True,
+            extra_fields={"type": "read"},
         ),
-        GATHER_METRIC('disk_io_counters', 'read_count')
+        GATHER_METRIC("disk_io_counters", "read_count"),
     ),
-    METRIC( ## ------------------   Disk Write Count    ----------------------------
+    METRIC(  ## ------------------   Disk Write Count    ----------------------------
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.io.ops',
-            description     = 'The number of disk write operations issued since boot time.',
-            category        = 'Disk',
-            unit            = 'count',
-            cumulative      = True,
-            extra_fields    = {
-                'type': 'write'
-            }
+            metric_name="winsys.disk.io.ops",
+            description="The number of disk write operations issued since boot time.",
+            category="Disk",
+            unit="count",
+            cumulative=True,
+            extra_fields={"type": "write"},
         ),
-        GATHER_METRIC('disk_io_counters', 'write_count')
+        GATHER_METRIC("disk_io_counters", "write_count"),
     ),
-
-
     # TODO: Additional attributes for this section
     #  * ...
 ]
@@ -512,59 +478,72 @@ _DISK_IO_METRICS = [
 _DISK_USAGE_METRICS = [
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.usage.percent',
-            description     = 'Disk usage percentage for each disk partition.',
-            category        = 'Disk',
-            unit            = 'percent',
-            cumulative      = False,
-            extra_fields    = { 'partition': ''}
+            metric_name="winsys.disk.usage.percent",
+            description="Disk usage percentage for each disk partition.",
+            category="Disk",
+            unit="percent",
+            cumulative=False,
+            extra_fields={"partition": ""},
         ),
-        partion_disk_usage('percent')
+        partion_disk_usage("percent"),
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.usage.used',
-            description     = 'The number of bytes used for each disk partition',
-            category        = 'Disk',
-            unit            = 'byte',
-            cumulative      = False,
-            extra_fields    = { 'partition': ''}
+            metric_name="winsys.disk.usage.used",
+            description="The number of bytes used for each disk partition",
+            category="Disk",
+            unit="byte",
+            cumulative=False,
+            extra_fields={"partition": ""},
         ),
-        partion_disk_usage('used')
+        partion_disk_usage("used"),
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.usage.total',
-            description     = 'The maximum number of bytes that can be used on each disk partition.',
-            category        = 'Disk',
-            unit            = 'byte',
-            cumulative      = False,
-            extra_fields    = { 'partition': ''}
+            metric_name="winsys.disk.usage.total",
+            description="The maximum number of bytes that can be used on each disk partition.",
+            category="Disk",
+            unit="byte",
+            cumulative=False,
+            extra_fields={"partition": ""},
         ),
-        partion_disk_usage('total')
+        partion_disk_usage("total"),
     ),
     METRIC(
         METRIC_CONFIG(
-            metric_name     = 'winsys.disk.usage.free',
-            description     = 'The number of free bytes on each disk partition.',
-            category        = 'Disk',
-            unit            = 'byte',
-            cumulative      = False,
-            extra_fields    = { 'partition': ''}
+            metric_name="winsys.disk.usage.free",
+            description="The number of free bytes on each disk partition.",
+            category="Disk",
+            unit="byte",
+            cumulative=False,
+            extra_fields={"partition": ""},
         ),
-        partion_disk_usage('free')
-    ),]
+        partion_disk_usage("free"),
+    ),
+]
 # pylint: enable=bad-whitespace
 
-METRICS = _SYSTEM_CPU_METRICS + _UPTIME_METRICS + _VIRTUAL_MEMORY_METRICS + _PHYSICAL_MEMORY_METRICS + _NETWORK_IO_METRICS + _DISK_IO_METRICS + _DISK_USAGE_METRICS
-_ = [define_metric(__monitor__, **metric.config) for metric in METRICS]     # pylint: disable=star-args
+METRICS = (
+    _SYSTEM_CPU_METRICS
+    + _UPTIME_METRICS
+    + _VIRTUAL_MEMORY_METRICS
+    + _PHYSICAL_MEMORY_METRICS
+    + _NETWORK_IO_METRICS
+    + _DISK_IO_METRICS
+    + _DISK_USAGE_METRICS
+)
+_ = [
+    define_metric(__monitor__, **metric.config) for metric in METRICS
+]  # pylint: disable=star-args
 
 #
 # Logging / Reporting - defines the method and content in which the metrics are reported.
 #
-define_log_field(__monitor__, 'monitor', 'Always ``windows_system_metrics``.')
-define_log_field(__monitor__, 'metric', 'The name of a metric being measured, e.g. "winsys.cpu".')
-define_log_field(__monitor__, 'value', 'The metric value.')
+define_log_field(__monitor__, "monitor", "Always ``windows_system_metrics``.")
+define_log_field(
+    __monitor__, "metric", 'The name of a metric being measured, e.g. "winsys.cpu".'
+)
+define_log_field(__monitor__, "value", "The metric value.")
 
 
 class SystemMonitor(ScalyrMonitor):
@@ -580,34 +559,40 @@ class SystemMonitor(ScalyrMonitor):
         """TODO: Fucntion documentation
         """
         if psutil is None:
-            raise UnsupportedSystem('windows_system_metrics',
-                                    'You must install the python module "psutil" to use this module.  Typically, this'
-                                    'can be done with the following command:'
-                                    '  pip install psutil')
-        sampling_rate = kwargs.get('sampling_interval_secs', 30)
-        global_config = kwargs.get('global_config')
-        super(SystemMonitor, self).__init__(config, logger, sampling_rate, global_config=global_config)
+            raise UnsupportedSystem(
+                "windows_system_metrics",
+                'You must install the python module "psutil" to use this module.  Typically, this'
+                "can be done with the following command:"
+                "  pip install psutil",
+            )
+        sampling_rate = kwargs.get("sampling_interval_secs", 30)
+        global_config = kwargs.get("global_config")
+        super(SystemMonitor, self).__init__(
+            config, logger, sampling_rate, global_config=global_config
+        )
 
     def gather_sample(self):
         """TODO: Fucntion documentation
         """
         try:
             for idx, metric in enumerate(METRICS):
-                metric_name = metric.config['metric_name']
+                metric_name = metric.config["metric_name"]
                 for (metric_value, extra_fields) in metric.dispatch():
                     # We might get this metric value if we were doing the io counters metrics and the user has
                     # not turned on disk performance yet.
                     if metric_value == __NO_DISK_PERF__:
-                        self._logger.warn('disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
-                                          'to enable IO counters', limit_once_per_x_secs=3600, limit_key='win_diskperf',
-                                          error_code='win32DiskPerDisabled')
+                        self._logger.warn(
+                            'disk.io metrics disabled.  You may need to run "diskperf -y" on machine'
+                            "to enable IO counters",
+                            limit_once_per_x_secs=3600,
+                            limit_key="win_diskperf",
+                            error_code="win32DiskPerDisabled",
+                        )
                     else:
                         if extra_fields is None:
-                            extra_fields = metric.config['extra_fields']
+                            extra_fields = metric.config["extra_fields"]
                         self._logger.emit_value(
-                            metric_name,
-                            metric_value,
-                            extra_fields=extra_fields
-                    )
+                            metric_name, metric_value, extra_fields=extra_fields
+                        )
         except:
-            self._logger.exception('Failed to gather sample due to exception')
+            self._logger.exception("Failed to gather sample due to exception")

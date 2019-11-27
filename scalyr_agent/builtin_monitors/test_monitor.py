@@ -20,7 +20,7 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import random
 
@@ -30,6 +30,7 @@ from scalyr_agent import ScalyrMonitor
 class RandomMonitor(ScalyrMonitor):
     """A Scalyr agent monitor that records random numbers.
     """
+
     def _initialize(self):
         """Performs monitor-specific initialization."""
         # TODO:  Is it better to have this, or just require that classes override __init__ and do their
@@ -56,19 +57,30 @@ class RandomMonitor(ScalyrMonitor):
         #                              algorithm, where this is the bucket size.
         self.__counter = 0
         # A required configuration field.
-        self.__gauss_mean = self._config.get('gauss_mean',  convert_to=float, min_value=0, max_value=10,
-                                             required_field=True)
+        self.__gauss_mean = self._config.get(
+            "gauss_mean",
+            convert_to=float,
+            min_value=0,
+            max_value=10,
+            required_field=True,
+        )
         # An optional configuration field.
-        self.__gauss_stddev = self._config.get('gauss_stddev', default=0.25, convert_to=float,
-                                               min_value=0, max_value=5)
+        self.__gauss_stddev = self._config.get(
+            "gauss_stddev", default=0.25, convert_to=float, min_value=0, max_value=5
+        )
 
     def gather_sample(self):
         """Invoked once per sample interval to gather a statistic."""
         self.__counter += 1
         # Be sure to use emit_values to record the statistics the monitor wishes to send to Scalyr.
-        self._logger.emit_value('uniform', random.random(), extra_fields={'count': self.__counter})
-        self._logger.emit_value('gauss', random.gauss(self.__gauss_mean, self.__gauss_stddev),
-                                extra_fields={'count': self.__counter})
+        self._logger.emit_value(
+            "uniform", random.random(), extra_fields={"count": self.__counter}
+        )
+        self._logger.emit_value(
+            "gauss",
+            random.gauss(self.__gauss_mean, self.__gauss_stddev),
+            extra_fields={"count": self.__counter},
+        )
 
         # You may also emit full log lines to the metric log by using the special emit_to_metric_log=True parameter.
         # Otherwise, the log lines will be assumed to be errors and will go to the agent.log

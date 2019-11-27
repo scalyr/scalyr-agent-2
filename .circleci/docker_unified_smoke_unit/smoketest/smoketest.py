@@ -69,7 +69,7 @@ Note:
     This test code require python 3 with specific packages installed (i.e. requests)
 """
 
-__author__ = 'echee@scalyr.com'
+__author__ = "echee@scalyr.com"
 
 
 import argparse
@@ -84,40 +84,36 @@ import urllib
 from copy import deepcopy
 
 
-NAME_SUFFIX_UPLOADER = 'uploader'
-NAME_SUFFIX_VERIFIER = 'verifier'
+NAME_SUFFIX_UPLOADER = "uploader"
+NAME_SUFFIX_VERIFIER = "verifier"
 # no actual Actor will run as the this name but the constant is needed for logic that checks on the Agent container
-NAME_SUFFIX_AGENT = 'agent'
+NAME_SUFFIX_AGENT = "agent"
 
-NAME_SUFFIXES = [
-    NAME_SUFFIX_UPLOADER,
-    NAME_SUFFIX_VERIFIER,
-    NAME_SUFFIX_AGENT
-]
+NAME_SUFFIXES = [NAME_SUFFIX_UPLOADER, NAME_SUFFIX_VERIFIER, NAME_SUFFIX_AGENT]
 
 
-def _pretty_print(header='', message='', file=sys.stdout):
+def _pretty_print(header="", message="", file=sys.stdout):
     if header:
-        print('', file=file)
-        print("="*79, file=file)
+        print("", file=file)
+        print("=" * 79, file=file)
         print(header, file=file)
-        print("="*79, file=file)
+        print("=" * 79, file=file)
     if len(message) > 0:  # message can be spaces
         print(message, file=file)
 
 
-def _exit(code, show_agent_status=True, header='', message=''):
+def _exit(code, show_agent_status=True, header="", message=""):
     """Prints agent status before exiting"""
-    file = sys.stdout if code==0 else sys.stderr
+    file = sys.stdout if code == 0 else sys.stderr
     if show_agent_status:
-        _pretty_print(header='BEGIN AGENT STATUS')
+        _pretty_print(header="BEGIN AGENT STATUS")
         # TODO fix this to work under python 3
-        print('TODO: Scalyr agent status does not work under python 3 yet')
+        print("TODO: Scalyr agent status does not work under python 3 yet")
         # agent_exec = '/usr/share/scalyr-agent-2/bin/scalyr-agent-2'
         # if os.path.isfile(agent_exec):
         #     os.system('{} status -v'.format(agent_exec))
-        _pretty_print(header='END AGENT STATUS')
-        _pretty_print(message=' ')
+        _pretty_print(header="END AGENT STATUS")
+        _pretty_print(message=" ")
     _pretty_print(header, message, file=file)
     # exit even if other threads are running
     os._exit(code)
@@ -130,13 +126,14 @@ class SmokeTestActor(object):
     Others may only verify.
     Some may do both, in which case we may need a barrier
     """
+
     DEFAULT_POLL_INTERVAL_SEC = 10
 
     def __init__(self, **kwargs):
-        self._process_name = kwargs.get('process_name')
-        self._scalyr_server = kwargs.get('scalyr_server')
-        self._read_api_key = kwargs.get('read_api_key')
-        self._max_wait = float(kwargs.get('max_wait'))
+        self._process_name = kwargs.get("process_name")
+        self._scalyr_server = kwargs.get("scalyr_server")
+        self._read_api_key = kwargs.get("read_api_key")
+        self._max_wait = float(kwargs.get("max_wait"))
         self._localhostname = socket.gethostname()
         self._barrier = None
         self._barrier_lock = threading.Lock()
@@ -145,7 +142,13 @@ class SmokeTestActor(object):
         self._agent_started_lock = threading.Lock()
         self._agent_started = False
 
-        self._debug = (kwargs.get('debug') or '').lower() in ('true', 'y', 'yes', 't', '1')
+        self._debug = (kwargs.get("debug") or "").lower() in (
+            "true",
+            "y",
+            "yes",
+            "t",
+            "1",
+        )
 
     def _get_uploader_output_streams(self):
         """Returns list of streams to write log data"""
@@ -187,9 +190,9 @@ class SmokeTestActor(object):
         """
         barrier = self._get_barrier()
         if barrier:
-            print('... Blocking at barrier')
+            print("... Blocking at barrier")
             barrier.wait()
-            print('... Unblocked')
+            print("... Unblocked")
 
     def exit(self, code, **kwargs):
         _exit(code, **kwargs)
@@ -235,67 +238,86 @@ class SmokeTestActor(object):
         while time.time() < self.get_hard_kill_time():
             for stream in streams:
                 stream.write(self._make_log_line(count, stream))
-                stream.write('\n')
+                stream.write("\n")
                 stream.flush()
                 if count >= self._lines_to_upload:
                     time.sleep(1)  # slow down if threshold is reached
             # Write to all streams for a given count
             count += 1
 
-    def _make_query_url(self, filter_dict=None, message='', override_serverHost=None,
-                        override_log=None, override_log_regex=None):
+    def _make_query_url(
+        self,
+        filter_dict=None,
+        message="",
+        override_serverHost=None,
+        override_log=None,
+        override_log_regex=None,
+    ):
         """
         Make url for querying Scalyr server.  Any str filter values will be url-encoded
         """
 
         base_params = self._get_base_query_params()
 
-        url = 'https://' if not self._scalyr_server.startswith('http') else ''
-        url += '{}/api/query?queryType=log&{}'.format(
-            self._scalyr_server,
-            urllib.parse.urlencode(base_params)
+        url = "https://" if not self._scalyr_server.startswith("http") else ""
+        url += "{}/api/query?queryType=log&{}".format(
+            self._scalyr_server, urllib.parse.urlencode(base_params)
         )
 
         # Set serverHost/logfile from object state if not overridden
         if not filter_dict:
             filter_dict = {}
-        filter_dict['$serverHost'] = (override_serverHost or self._process_name)
+        filter_dict["$serverHost"] = override_serverHost or self._process_name
 
         # only if no log regex is provided do we then add an exact logfile match
         if not override_log_regex:
-            filter_dict['$logfile'] = (override_log or self._logfile)
+            filter_dict["$logfile"] = override_log or self._logfile
 
         filter_frags = []
         for k, v in filter_dict.items():
             if type(v) == str:
                 v = '"{}"'.format(urllib.parse.quote_plus(v))
-            filter_frags.append('{}=={}'.format(k, v))
+            filter_frags.append("{}=={}".format(k, v))
 
         # If log regex is provided, add a regex matches clause
         if override_log_regex:
-            filter_frags.append('{} matches "{}"'.format('$logfile', override_log_regex))
+            filter_frags.append(
+                '{} matches "{}"'.format("$logfile", override_log_regex)
+            )
 
         # Add message
         if message:
-            filter_frags.append('$message{}'.format(urllib.parse.quote_plus(' contains "{}"'.format(message))))
+            filter_frags.append(
+                "$message{}".format(
+                    urllib.parse.quote_plus(' contains "{}"'.format(message))
+                )
+            )
 
-        url += '&filter={}'.format('+and+'.join(filter_frags))
+        url += "&filter={}".format("+and+".join(filter_frags))
         if self._debug:
-            print('\nURL quoted = {}'.format(url))
-            print('  unquoted = {}'.format(urllib.parse.unquote_plus(url)))
+            print("\nURL quoted = {}".format(url))
+            print("  unquoted = {}".format(urllib.parse.unquote_plus(url)))
         return url
 
     def _get_base_query_params(self):
         """Get base query params (not including filter)"""
         params = {
-            'maxCount': 1,
-            'startTime': '10m',
-            'token': self._read_api_key,
+            "maxCount": 1,
+            "startTime": "10m",
+            "token": self._read_api_key,
         }
         return params
 
-    def poll_until_max_wait(self, verify_func, description, success_mesg, fail_mesg,
-                            exit_on_success=False, exit_on_fail=False, poll_interval=None):
+    def poll_until_max_wait(
+        self,
+        verify_func,
+        description,
+        success_mesg,
+        fail_mesg,
+        exit_on_success=False,
+        exit_on_fail=False,
+        poll_interval=None,
+    ):
         """
         Template design pattern method for polling until a maximum time.  Each poll executes the provided verify_func().
         fail/success messages are parameterized, as well as whether to exit.
@@ -314,13 +336,13 @@ class SmokeTestActor(object):
         while time.time() < self.get_hard_kill_time():
 
             # Try to verify upload by querying Scalyr server
-            sys.stdout.write('. ')
+            sys.stdout.write(". ")
             sys.stdout.flush()
             verified = verify_func()
 
             # query backend to confirm.
             if verified:
-                success_mesg = '\nSUCCESS !!. ' + success_mesg
+                success_mesg = "\nSUCCESS !!. " + success_mesg
                 if exit_on_success:
                     self.exit(0, message=success_mesg)
                 else:
@@ -331,10 +353,12 @@ class SmokeTestActor(object):
             time.sleep(poll_interval or SmokeTestActor.DEFAULT_POLL_INTERVAL_SEC)
             cur = time.time()
             if cur - prev > 10:
-                print('{} seconds remaining'.format(int(self.get_hard_kill_time() - cur)))
+                print(
+                    "{} seconds remaining".format(int(self.get_hard_kill_time() - cur))
+                )
                 prev = cur
         else:
-            fail_mesg = 'FAILED. Time limit reached. ' + fail_mesg
+            fail_mesg = "FAILED. Time limit reached. " + fail_mesg
             if exit_on_fail:
                 self.exit(1, message=fail_mesg)
             else:
@@ -352,12 +376,13 @@ class StandaloneSmokeTestActor(SmokeTestActor):
     Then writes to a Json file which is picked up by Agent.
     Finally, queries Scalyr backend to condfirm Json file was uploaded.
     """
-    VERIFIER_TYPE = 'Standalone'
+
+    VERIFIER_TYPE = "Standalone"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._logfile = kwargs.get('monitored_logfile')
-        self._python_version = kwargs.get('python_version')
+        self._logfile = kwargs.get("monitored_logfile")
+        self._python_version = kwargs.get("python_version")
 
     def is_verifier(self):
         return True
@@ -367,7 +392,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
 
     def _get_uploader_output_streams(self):
         """Returns stream to write log data into"""
-        return [open(self._logfile, 'w+')]
+        return [open(self._logfile, "w+")]
 
     def _get_uploader_stream_names(self):
         """Returns stream to read log data from"""
@@ -379,26 +404,28 @@ class StandaloneSmokeTestActor(SmokeTestActor):
             "verifier_type": self.VERIFIER_TYPE,
             "count": count,
             "hostname": self._localhostname,
-            "python_version": 'python{}'.format(self._python_version),
-            "line_stream": stream.name
+            "python_version": "python{}".format(self._python_version),
+            "line_stream": stream.name,
         }
         return json.dumps(obj)
 
     def verify_agent_started_or_die(self):
         """Poll for agent pid and log file"""
+
         def _check_agent_pid_and_log_files():
             # If agent is not started, print agent.log if it exists
-            agent_logfile = '/var/log/scalyr-agent-2/agent.log'
-            agent_pid_file = '/var/log/scalyr-agent-2/agent.pid'
+            agent_logfile = "/var/log/scalyr-agent-2/agent.log"
+            agent_pid_file = "/var/log/scalyr-agent-2/agent.pid"
             if not os.path.isfile(agent_pid_file) or not os.path.isfile(agent_logfile):
                 return False
             return True
+
         self.poll_until_max_wait(
             _check_agent_pid_and_log_files,
-            'Checking for agent pid and log files',
-            'Agent is running.',
-            'No agent running.',
-            poll_interval=1
+            "Checking for agent pid and log files",
+            "Agent is running.",
+            "No agent running.",
+            poll_interval=1,
         )
 
     def verify_logs_uploaded(self):
@@ -409,6 +436,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
         python_version matches the standalone agent python version
         hostname matches the docker container hostname running the standalone agent
         """
+
         def _query_scalyr_for_monitored_log_upload():
 
             # TODO: This should be self._lines_to_upload (i.e. 1000, but it doesn't work
@@ -416,39 +444,45 @@ class StandaloneSmokeTestActor(SmokeTestActor):
             # of the time.  Once that bug is fixed, change this back to self._lines_to_upload
             expected_count = 1000
 
-            resp = requests.get(self._make_query_url({
-                '$verifier_type': self.VERIFIER_TYPE,
-                '$python_version': 'python{}'.format(self._python_version),
-                '$hostname': self._localhostname,
-                '$count': expected_count,
-            }))
+            resp = requests.get(
+                self._make_query_url(
+                    {
+                        "$verifier_type": self.VERIFIER_TYPE,
+                        "$python_version": "python{}".format(self._python_version),
+                        "$hostname": self._localhostname,
+                        "$count": expected_count,
+                    }
+                )
+            )
 
             if resp.ok:
                 data = json.loads(resp.content)
-                if not 'matches' in data:
+                if not "matches" in data:
                     return False
-                matches = data['matches']
+                matches = data["matches"]
                 if len(matches) == 0:
                     return False
-                att = matches[0]['attributes']
-                verifier_type = att['verifier_type']
-                python_version = att['python_version']
-                hostname = att['hostname']
-                cnt = att['count']
-                if all([
-                    verifier_type == self.VERIFIER_TYPE,
-                    python_version == 'python{}'.format(self._python_version),
-                    hostname == self._localhostname,
-                    cnt == expected_count
-                ]):
+                att = matches[0]["attributes"]
+                verifier_type = att["verifier_type"]
+                python_version = att["python_version"]
+                hostname = att["hostname"]
+                cnt = att["count"]
+                if all(
+                    [
+                        verifier_type == self.VERIFIER_TYPE,
+                        python_version == "python{}".format(self._python_version),
+                        hostname == self._localhostname,
+                        cnt == expected_count,
+                    ]
+                ):
                     return True
             return False
 
         self.poll_until_max_wait(
             _query_scalyr_for_monitored_log_upload,
-            'Querying server to verify monitored logfile was uploaded.',
-            'Monitored logfile upload verified',
-            'Monitored logfile upload not verified',
+            "Querying server to verify monitored logfile was uploaded.",
+            "Monitored logfile upload verified",
+            "Monitored logfile upload not verified",
             exit_on_success=True,
             exit_on_fail=True,
         )
@@ -471,16 +505,17 @@ class DockerSmokeTestActor(SmokeTestActor):
     different from the Standalone actor where a single process runs both upload and verify and checks the local agent
     via file system).
     """
+
     def __init__(self, **kwargs):
         """
         :param max_wait: Max seconds before exiting
         :param mode: One of 'query', 'upload_and_ verify'
         """
         super().__init__(**kwargs)
-        self.mode = kwargs.get('mode')
-        self._logfile = '/docker/{}.log'.format(self._process_name)
-        self._agent_hostname = kwargs.get('agent_hostname')
-        self._uploader_hostname = kwargs.get('uploader_hostname')
+        self.mode = kwargs.get("mode")
+        self._logfile = "/docker/{}.log".format(self._process_name)
+        self._agent_hostname = kwargs.get("agent_hostname")
+        self._uploader_hostname = kwargs.get("uploader_hostname")
         _pretty_print('Agent hostname="{}"'.format(self._agent_hostname))
         _pretty_print('Uploader hostname="{}"'.format(self._uploader_hostname))
 
@@ -493,17 +528,19 @@ class DockerSmokeTestActor(SmokeTestActor):
     def _serialize_row(self, obj):
         """Write a single row of key=value, separated by commas. Standardize by sorting keys"""
         keyvals = [(key, obj.get(key)) for key in sorted(obj.keys())]
-        return ','.join(['{}={}'.format(k, v) for k, v in keyvals])
+        return ",".join(["{}={}".format(k, v) for k, v in keyvals])
 
     def _make_log_line(self, count, stream):
-        return self._serialize_row({
-            "verifier_type": self.VERIFIER_TYPE,
-            "count": count,
-            "line_stream": self._get_stream_name_from_stream(stream),
-            # No need hostname in logline. The agent_container_id & remote-container-logfile name uniquely identify the
-            # correct log.
-            # "hostname": self._localhostname,
-        })
+        return self._serialize_row(
+            {
+                "verifier_type": self.VERIFIER_TYPE,
+                "count": count,
+                "line_stream": self._get_stream_name_from_stream(stream),
+                # No need hostname in logline. The agent_container_id & remote-container-logfile name uniquely identify the
+                # correct log.
+                # "hostname": self._localhostname,
+            }
+        )
 
     def _get_process_name_for_suffix(self, suffix):
         assert suffix in [
@@ -511,9 +548,9 @@ class DockerSmokeTestActor(SmokeTestActor):
             NAME_SUFFIX_UPLOADER,
             NAME_SUFFIX_VERIFIER,
         ]
-        parts = self._process_name.split('-')[:-1]
+        parts = self._process_name.split("-")[:-1]
         parts.append(suffix)
-        return '-'.join(parts)
+        return "-".join(parts)
 
     def _get_stream_name_from_stream(self, stream):
         return stream.name[1:-1]
@@ -533,35 +570,43 @@ class DockerSmokeTestActor(SmokeTestActor):
         serverHost=<agent_short_container_id>, logfile=/var/log/scalyr-agent-2/docker_monitor.log
         filter="Starting monitor docker_monitor()"
         """
+
         def _query_scalyr_for_agent_logfile(logfile):
             def _func():
-                resp = requests.get(self._make_query_url(
-                    override_serverHost=self._agent_hostname,
-                    override_log=logfile,
-                ))
+                resp = requests.get(
+                    self._make_query_url(
+                        override_serverHost=self._agent_hostname, override_log=logfile,
+                    )
+                )
                 if resp.ok:
                     data = json.loads(resp.content)
-                    if not 'matches' in data:
+                    if not "matches" in data:
                         return False
-                    matches = data['matches']
+                    matches = data["matches"]
                     if len(matches) == 0:
                         return False
                     return True
                 return False
+
             return _func
 
         for filename in self._get_expected_agent_logfiles():
             self.poll_until_max_wait(
                 _query_scalyr_for_agent_logfile(filename),
-                'Check if Agent is running: query scalyr for agent container file: {}'.format(filename),
-                '{} found'.format(filename),
-                'Time limit reached.  Could not verify liveness of Agent Docker Container.',
+                "Check if Agent is running: query scalyr for agent container file: {}".format(
+                    filename
+                ),
+                "{} found".format(filename),
+                "Time limit reached.  Could not verify liveness of Agent Docker Container.",
                 exit_on_success=False,
                 exit_on_fail=True,
             )
 
     def _get_expected_agent_logfiles(self):
-        return ['/var/log/scalyr-agent-2/agent.log', '/var/log/scalyr-agent-2/docker_monitor.log']
+        return [
+            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/docker_monitor.log",
+        ]
 
     def _get_uploader_override_logfilename_regex(self, process_name):
         """All logfile filters are exact and therefore we return None in the general case"""
@@ -575,7 +620,7 @@ class DockerSmokeTestActor(SmokeTestActor):
         raise NotImplementedError
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
-        if att.get('containerName') != process_name:
+        if att.get("containerName") != process_name:
             return False
         return True
 
@@ -586,31 +631,43 @@ class DockerSmokeTestActor(SmokeTestActor):
          1. uploader: uploads data to Scalyr (can easily support multiple but for now, just 1)
          2. verifier: verifies data was uploaded by uploader
         """
+
         def _query_scalyr_for_upload_activity(contname_suffix, stream_name):
             def _func():
                 process_name = self._get_process_name_for_suffix(contname_suffix)
-                resp = requests.get(self._make_query_url(
-                    self._get_extra_query_attributes(stream_name, process_name),
-                    override_serverHost=self._agent_hostname,
-                    override_log='{}/{}.log'.format(self._get_mapped_logfile_prefix(), process_name),
-                    override_log_regex=self._get_uploader_override_logfilename_regex(process_name),
-                    message=self._serialize_row({
-                        "verifier_type": self.VERIFIER_TYPE,
-                        "count": self._lines_to_upload,
-                        "line_stream": stream_name,
-                    }),
-                ))
+                resp = requests.get(
+                    self._make_query_url(
+                        self._get_extra_query_attributes(stream_name, process_name),
+                        override_serverHost=self._agent_hostname,
+                        override_log="{}/{}.log".format(
+                            self._get_mapped_logfile_prefix(), process_name
+                        ),
+                        override_log_regex=self._get_uploader_override_logfilename_regex(
+                            process_name
+                        ),
+                        message=self._serialize_row(
+                            {
+                                "verifier_type": self.VERIFIER_TYPE,
+                                "count": self._lines_to_upload,
+                                "line_stream": stream_name,
+                            }
+                        ),
+                    )
+                )
                 if resp.ok:
                     data = json.loads(resp.content)
-                    if not 'matches' in data:
+                    if not "matches" in data:
                         return False
-                    matches = data['matches']
+                    matches = data["matches"]
                     if len(matches) == 0:
                         return False
-                    att = matches[0]['attributes']
-                    return self._verify_queried_attributes(att, stream_name, process_name)
+                    att = matches[0]["attributes"]
+                    return self._verify_queried_attributes(
+                        att, stream_name, process_name
+                    )
 
                 return False  # Non-ok response
+
             return _func
 
         suffixes_to_check = [NAME_SUFFIX_UPLOADER]
@@ -621,52 +678,53 @@ class DockerSmokeTestActor(SmokeTestActor):
                     "Querying server to verify upload: container[stream]='{}[{}].".format(
                         self._get_process_name_for_suffix(suffix), stream_name
                     ),
-                    'Upload verified for {}[{}].'.format(suffix, stream_name),
-                    'Upload not verified for {}[{}].'.format(suffix, stream_name),
-                    exit_on_success = count == len(suffixes_to_check),
-                    exit_on_fail = True,
+                    "Upload verified for {}[{}].".format(suffix, stream_name),
+                    "Upload not verified for {}[{}].".format(suffix, stream_name),
+                    exit_on_success=count == len(suffixes_to_check),
+                    exit_on_fail=True,
                 )
 
 
 class DockerJsonActor(DockerSmokeTestActor):
     """These subclasses capture differences between JSON and Syslog implementations"""
 
-    VERIFIER_TYPE = 'Docker JSON'
+    VERIFIER_TYPE = "Docker JSON"
 
     def _get_mapped_logfile_prefix(self):
-        return '/docker'
+        return "/docker"
 
     def _get_extra_query_attributes(self, stream_name, process_name):
-        return {'$stream': stream_name}
+        return {"$stream": stream_name}
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
         if not super()._verify_queried_attributes(att, stream_name, process_name):
             return False
-        if not all([
-            att.get('stream') in stream_name,
-            att.get('monitor') == 'agentDocker'
-        ]):
+        if not all(
+            [att.get("stream") in stream_name, att.get("monitor") == "agentDocker"]
+        ):
             return False
         return True
 
 
 class DockerSyslogActor(DockerSmokeTestActor):
 
-    VERIFIER_TYPE = 'Docker Syslog'
+    VERIFIER_TYPE = "Docker Syslog"
 
     def _get_extra_query_attributes(self, stream_name, process_name):
         return {}
 
     def _get_mapped_logfile_prefix(self):
-        return '/var/log/scalyr-agent-2/containers'
+        return "/var/log/scalyr-agent-2/containers"
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
         if not super()._verify_queried_attributes(att, stream_name, process_name):
             return False
-        if not all([
-            att.get('monitor') == 'agentSyslog',
-            att.get('parser') == 'agentSyslogDocker'
-        ]):
+        if not all(
+            [
+                att.get("monitor") == "agentSyslog",
+                att.get("parser") == "agentSyslogDocker",
+            ]
+        ):
             return False
         return True
 
@@ -677,16 +735,19 @@ class K8sActor(DockerSmokeTestActor):
     Verifiers query for 'stdout', 'stderr'
     """
 
-    VERIFIER_TYPE = 'Kubernetes'
+    VERIFIER_TYPE = "Kubernetes"
 
     def _get_expected_agent_logfiles(self):
-        return ['/var/log/scalyr-agent-2/agent.log', '/var/log/scalyr-agent-2/kubernetes_monitor.log']
+        return [
+            "/var/log/scalyr-agent-2/agent.log",
+            "/var/log/scalyr-agent-2/kubernetes_monitor.log",
+        ]
 
     def _get_mapped_logfile_prefix(self):
-        return '/docker'
+        return "/docker"
 
     def _get_extra_query_attributes(self, stream_name, process_name):
-        return {'$stream': stream_name}
+        return {"$stream": stream_name}
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
         """
@@ -716,11 +777,13 @@ class K8sActor(DockerSmokeTestActor):
             }
         ],
         """
-        if not all([
-            att.get('stream') in stream_name,
-            att.get('monitor') == 'agentKubernetes',
-            process_name in att.get('pod_name'),
-        ]):
+        if not all(
+            [
+                att.get("stream") in stream_name,
+                att.get("monitor") == "agentKubernetes",
+                process_name in att.get("pod_name"),
+            ]
+        ):
             return False
         return True
 
@@ -729,8 +792,7 @@ class K8sActor(DockerSmokeTestActor):
 
         The regex clause becomes: $logfile+matches+"/docker/k8s_ci-agent-k8s-7777-uploader.*"
         """
-        return '{}/k8s_{}*'.format(self._get_mapped_logfile_prefix(), process_name)
-
+        return "{}/k8s_{}*".format(self._get_mapped_logfile_prefix(), process_name)
 
 
 class LogstashActor(DockerSmokeTestActor):
@@ -739,15 +801,15 @@ class LogstashActor(DockerSmokeTestActor):
     Verifier reads from common shareed logfile
     """
 
-    VERIFIER_TYPE = 'Logstash'
+    VERIFIER_TYPE = "Logstash"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._monitored_logfile = kwargs.get('monitored_logfile')
+        self._monitored_logfile = kwargs.get("monitored_logfile")
 
     def _get_uploader_output_streams(self):
         """Returns stream for Uploader to write log data into"""
-        return [open(self._monitored_logfile, 'w+')]
+        return [open(self._monitored_logfile, "w+")]
 
     def _get_uploader_stream_names(self):
         """Returns stream to read log data from"""
@@ -757,10 +819,10 @@ class LogstashActor(DockerSmokeTestActor):
         return stream.name
 
     def _get_expected_agent_logfiles(self):
-        return ['scalyr_logstash.log']
+        return ["scalyr_logstash.log"]
 
     def _get_mapped_logfile_prefix(self):
-        return '/logstash'
+        return "/logstash"
 
     def _get_extra_query_attributes(self, stream_name, process_name):
         # {'$stream': stream.name}
@@ -768,18 +830,20 @@ class LogstashActor(DockerSmokeTestActor):
         return {}
 
     def _verify_queried_attributes(self, att, stream_name, process_name):
-        if not all([
-            # att.get('stream') in stream.name,  # we haven't setup server-side parser so $stream is not available
-            # Since the input streams are locally mounted, the event origins are all the same as the agent hostname
-            att.get('origin') == self._agent_hostname,
-            # the following fields are added on in the logstash pipeline config
-            # and should appear in every event
-            att.get('output_attribute1') == 'output_value1',
-            att.get('output_attribute2') == 'output_value2',
-            att.get('output_attribute3') == 'output_value3',
-            # TODO: adjust if these are eventually split into "booleans"a
-            att.get('tags') == '[tag_t1, tag_t2]',
-        ]):
+        if not all(
+            [
+                # att.get('stream') in stream.name,  # we haven't setup server-side parser so $stream is not available
+                # Since the input streams are locally mounted, the event origins are all the same as the agent hostname
+                att.get("origin") == self._agent_hostname,
+                # the following fields are added on in the logstash pipeline config
+                # and should appear in every event
+                att.get("output_attribute1") == "output_value1",
+                att.get("output_attribute2") == "output_value2",
+                att.get("output_attribute3") == "output_value3",
+                # TODO: adjust if these are eventually split into "booleans"a
+                att.get("tags") == "[tag_t1, tag_t2]",
+            ]
+        ):
             return False
         return True
 
@@ -793,43 +857,67 @@ class LogstashActor(DockerSmokeTestActor):
 
 # Select verifier class based on containers name (prefix)
 CONTAINER_PREFIX_2_VERIFIER_CLASS = {
-    'ci-agent-standalone': StandaloneSmokeTestActor,
-    'ci-agent-docker-json': DockerJsonActor,
-    'ci-agent-docker-syslog': DockerSyslogActor,
-    'ci-agent-k8s': K8sActor,
-    'ci-plugin-logstash': LogstashActor,
+    "ci-agent-standalone": StandaloneSmokeTestActor,
+    "ci-agent-docker-json": DockerJsonActor,
+    "ci-agent-docker-syslog": DockerSyslogActor,
+    "ci-agent-k8s": K8sActor,
+    "ci-plugin-logstash": LogstashActor,
 }
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('process_name', type=str,
-                        help="name of process running this instance of test code. Prefix should be a key in "
-                             "CONTAINER_PREFIX_2_VERIFIER_CLASS so that the correct verifier can be chosen.")
-    parser.add_argument('max_wait', type=int, help="max seconds this test will run (will force-quit)")
+    parser.add_argument(
+        "process_name",
+        type=str,
+        help="name of process running this instance of test code. Prefix should be a key in "
+        "CONTAINER_PREFIX_2_VERIFIER_CLASS so that the correct verifier can be chosen.",
+    )
+    parser.add_argument(
+        "max_wait", type=int, help="max seconds this test will run (will force-quit)"
+    )
 
     # Generic param that can be used by any test as needed
-    parser.add_argument('--mode', type=str, help="mode switch", choices=NAME_SUFFIXES)
+    parser.add_argument("--mode", type=str, help="mode switch", choices=NAME_SUFFIXES)
 
     # For connecting to Scalyr.  Note that we need not supply SCALYR_API_KEY as the Agent gets it from it's own config
     # or the environment.
-    parser.add_argument('--scalyr_server', type=str,
-                        help="Scalyr backend server (required by Agent or Verifier containers)")
-    parser.add_argument('--read_api_key', type=str, help="read api key (required all Verifier containers)")
+    parser.add_argument(
+        "--scalyr_server",
+        type=str,
+        help="Scalyr backend server (required by Agent or Verifier containers)",
+    )
+    parser.add_argument(
+        "--read_api_key",
+        type=str,
+        help="read api key (required all Verifier containers)",
+    )
 
     # For Standalone testing
-    parser.add_argument('--monitored_logfile', type=str,
-                        help="absolute path of data file to write to (must match Agent config).  "
-                             "Logstash producers also write to this, which are then picked up by the Logstash agent.")
-    parser.add_argument('--python_version', type=str,
-                        help="python version agent is running on (will be added into generated test data)")
+    parser.add_argument(
+        "--monitored_logfile",
+        type=str,
+        help="absolute path of data file to write to (must match Agent config).  "
+        "Logstash producers also write to this, which are then picked up by the Logstash agent.",
+    )
+    parser.add_argument(
+        "--python_version",
+        type=str,
+        help="python version agent is running on (will be added into generated test data)",
+    )
 
     # For Docker testing
-    parser.add_argument('--agent_hostname', type=str,
-                        help="hostname of Agent container (required by Docker/k8s Verifier containers")
-    parser.add_argument('--uploader_hostname', type=str,
-                        help="hostname of Uploader container (required by Docker/k8s Verifier containers")
-    parser.add_argument('--debug', type=str, help="turn on debugging")
+    parser.add_argument(
+        "--agent_hostname",
+        type=str,
+        help="hostname of Agent container (required by Docker/k8s Verifier containers",
+    )
+    parser.add_argument(
+        "--uploader_hostname",
+        type=str,
+        help="hostname of Uploader container (required by Docker/k8s Verifier containers",
+    )
+    parser.add_argument("--debug", type=str, help="turn on debugging")
     args = parser.parse_args()
 
     klass = None
@@ -839,27 +927,30 @@ if __name__ == '__main__':
             break
 
     # Display args to stdout, redacting sensitive keys
-    _pretty_print('Launching actor', message='Class={}'.format(klass))
+    _pretty_print("Launching actor", message="Class={}".format(klass))
     if not klass:
-        _exit(1, message='Bad test config: process_name must start with one of {}'.format(
-            CONTAINER_PREFIX_2_VERIFIER_CLASS.keys())
+        _exit(
+            1,
+            message="Bad test config: process_name must start with one of {}".format(
+                CONTAINER_PREFIX_2_VERIFIER_CLASS.keys()
+            ),
         )
 
     args_copy = deepcopy(vars(args))
-    if 'read_api_key' in args_copy:
-        args_copy['read_api_key'] = args_copy['read_api_key'][:4] + "xxxxxxxxx"
-    _pretty_print('smoketest.py command line args', str(args_copy))
+    if "read_api_key" in args_copy:
+        args_copy["read_api_key"] = args_copy["read_api_key"][:4] + "xxxxxxxxx"
+    _pretty_print("smoketest.py command line args", str(args_copy))
     actor = klass(**vars(args))
 
     # Optionally start upload in a separate thread.  Verifiers should not upload.
     uploader_thread = None
     if actor.is_uploader():
-        _pretty_print('START UPLOAD', actor._process_name)
+        _pretty_print("START UPLOAD", actor._process_name)
         uploader_thread = threading.Thread(target=actor.trigger_log_upload, args=())
         uploader_thread.start()
 
     if actor.is_verifier():
-        _pretty_print('START VERIFIER', actor._process_name)
+        _pretty_print("START VERIFIER", actor._process_name)
         actor.verify_or_die()
 
     # If verify_or_die hasn't force-killed the program, wait for uploader to finish

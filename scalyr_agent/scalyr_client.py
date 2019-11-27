@@ -15,7 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import httplib
 import platform
@@ -30,6 +30,7 @@ from scalyr_agent.util import verify_and_get_compress_func
 # noinspection PyBroadException
 try:
     import ssl
+
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
@@ -45,6 +46,7 @@ from cStringIO import StringIO
 
 log = scalyr_logging.getLogger(__name__)
 
+
 class ScalyrClientSession(object):
     """Encapsulates the connection between the agent and the Scalyr servers.
 
@@ -52,9 +54,23 @@ class ScalyrClientSession(object):
     The session aspect is important because we must ensure that the timestamps we include in the AddEventRequests
     are monotonically increasing within a session.
     """
-    def __init__(self, server, api_key, agent_version, quiet=False, request_deadline=60.0,
-                 ca_file=None, intermediate_certs_file=None, use_requests_lib=False, use_tlslite=False,
-                 proxies=None, compression_type=None, compression_level=9, disable_send_requests=False):
+
+    def __init__(
+        self,
+        server,
+        api_key,
+        agent_version,
+        quiet=False,
+        request_deadline=60.0,
+        ca_file=None,
+        intermediate_certs_file=None,
+        use_requests_lib=False,
+        use_tlslite=False,
+        proxies=None,
+        compression_type=None,
+        compression_level=9,
+        disable_send_requests=False,
+    ):
         """Initializes the connection.
 
         This does not actually try to connect to the server.
@@ -91,11 +107,10 @@ class ScalyrClientSession(object):
         self.__full_address = server
 
         # Verify the server address looks right.
-        parsed_server = re.match('^(http://|https://|)([^:]*)(:\d+|)$', server.lower())
+        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
-
 
         # The Connection object that has been opened to the servers, if one has been opened.
         self.__connection = None
@@ -106,7 +121,10 @@ class ScalyrClientSession(object):
         self.__quiet = quiet
 
         if not quiet:
-            log.info('Using session_id=%s %s' % (self.__session_id, scalyr_util.get_pid_tid()))
+            log.info(
+                "Using session_id=%s %s"
+                % (self.__session_id, scalyr_util.get_pid_tid())
+            )
 
         # The time of the last success.
         self.__last_success = None
@@ -118,9 +136,9 @@ class ScalyrClientSession(object):
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self.__standard_headers = {
-            'Connection': 'Keep-Alive',
-            'Accept': 'application/json',
-            'User-Agent': self.__get_user_agent(agent_version)
+            "Connection": "Keep-Alive",
+            "Accept": "application/json",
+            "User-Agent": self.__get_user_agent(agent_version),
         }
 
         # Configure compression type
@@ -128,22 +146,28 @@ class ScalyrClientSession(object):
         encoding = None
 
         if compression_type:
-            if compression_type in ('deflate', 'bz2'):
+            if compression_type in ("deflate", "bz2"):
                 compress_func = verify_and_get_compress_func(compression_type)
                 if compress_func:
                     self.__compress = compress_func
                     encoding = compression_type
 
             if not self.__compress:
-                log.warning("'%s' compression specified, but '%s' compression is not available.  No compression will be used." % (compression_type, compression_type) )
+                log.warning(
+                    "'%s' compression specified, but '%s' compression is not available.  No compression will be used."
+                    % (compression_type, compression_type)
+                )
 
         if encoding:
-            self.__standard_headers['Content-Encoding'] = encoding
+            self.__standard_headers["Content-Encoding"] = encoding
 
         # Configure compression level
         if self.__compress:
             if compression_level < 1 or compression_level > 9:
-                log.warning("Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression." % (compression_level) )
+                log.warning(
+                    "Invalid compression level used - %d.  Range must be 1-9.  Defaulting to 9 - maximum compression."
+                    % (compression_level)
+                )
                 compression_level = 9
 
         self.__compression_level = compression_level
@@ -183,7 +207,9 @@ class ScalyrClientSession(object):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of str
         """
-        self.__standard_headers['User-Agent'] = self.__get_user_agent(self.__agent_version, fragments)
+        self.__standard_headers["User-Agent"] = self.__get_user_agent(
+            self.__agent_version, fragments
+        )
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -196,7 +222,14 @@ class ScalyrClientSession(object):
         """
         return self.send(self.add_events_request())[0]
 
-    def __send_request(self, request_path, body=None, body_func=None, is_post=True, block_on_response=True):
+    def __send_request(
+        self,
+        request_path,
+        body=None,
+        body_func=None,
+        is_post=True,
+        block_on_response=True,
+    ):
         """Sends a request either using POST or GET to Scalyr at the specified request path.  It may be either
         a POST or GET.
 
@@ -225,26 +258,37 @@ class ScalyrClientSession(object):
 
         # Refuse to try to send the message if the connection has been recently closed and we have not waited
         # long enough to try to re-open it.  We do this to avoid excessive connection opens and SYN floods.
-        if self.__last_connection_close is not None and current_time - self.__last_connection_close < 30:
-            return self.__wrap_response_if_necessary('client/connectionClosed', 0, '', block_on_response)
+        if (
+            self.__last_connection_close is not None
+            and current_time - self.__last_connection_close < 30
+        ):
+            return self.__wrap_response_if_necessary(
+                "client/connectionClosed", 0, "", block_on_response
+            )
 
         self.total_requests_sent += 1
-
 
         was_sent = False
 
         try:
             try:
                 if self.__connection is None:
-                    self.__connection = ConnectionFactory.connection( self.__full_address, self.__request_deadline,
-                                                                      self.__ca_file,  self.__intermediate_certs_file,
-                                                                      self.__standard_headers,
-                                                                      self.__use_requests, self.__use_tlslite,
-                                                                      quiet=self.__quiet,
-                                                                      proxies=self.__proxies)
+                    self.__connection = ConnectionFactory.connection(
+                        self.__full_address,
+                        self.__request_deadline,
+                        self.__ca_file,
+                        self.__intermediate_certs_file,
+                        self.__standard_headers,
+                        self.__use_requests,
+                        self.__use_tlslite,
+                        quiet=self.__quiet,
+                        proxies=self.__proxies,
+                    )
                     self.total_connections_created += 1
             except Exception, e:
-                return self.__wrap_response_if_necessary('client/connectionFailed', 0, '', block_on_response)
+                return self.__wrap_response_if_necessary(
+                    "client/connectionFailed", 0, "", block_on_response
+                )
 
             if is_post:
                 if body is None:
@@ -257,33 +301,56 @@ class ScalyrClientSession(object):
             self.total_request_bytes_sent += len(body_str) + len(request_path)
 
             if self.__compress:
-                body_str = self.__compress( body_str, self.__compression_level )
+                body_str = self.__compress(body_str, self.__compression_level)
 
-            self.total_compressed_request_bytes_sent += len(body_str) + len(request_path)
+            self.total_compressed_request_bytes_sent += len(body_str) + len(
+                request_path
+            )
 
             # noinspection PyBroadException
             try:
                 if self.__disable_send_requests:
-                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Send requests disabled.  %d bytes dropped" % self.total_request_bytes_sent,
-                             limit_once_per_x_secs=60, limit_key='send-requests-disabled')
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_0,
+                        "Send requests disabled.  %d bytes dropped"
+                        % self.total_request_bytes_sent,
+                        limit_once_per_x_secs=60,
+                        limit_key="send-requests-disabled",
+                    )
                 else:
                     if is_post:
-                        log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending POST %s with body \"%s\"', request_path, body_str)
-                        self.__connection.post( request_path, body=body_str )
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_5,
+                            'Sending POST %s with body "%s"',
+                            request_path,
+                            body_str,
+                        )
+                        self.__connection.post(request_path, body=body_str)
                     else:
-                        log.log(scalyr_logging.DEBUG_LEVEL_5, 'Sending GET %s', request_path)
-                        self.__connection.get( request_path )
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_5, "Sending GET %s", request_path
+                        )
+                        self.__connection.get(request_path)
 
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, 'errno') and error.errno is not None:
-                    log.error('Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
-                              'will re-attempt', self.__full_address, error.errno, str(error),
-                              error_code='client/requestFailed')
+                if hasattr(error, "errno") and error.errno is not None:
+                    log.error(
+                        'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
+                        "will re-attempt",
+                        self.__full_address,
+                        error.errno,
+                        str(error),
+                        error_code="client/requestFailed",
+                    )
                 else:
-                    log.exception('Failed to send request due to exception.  Closing connection, will re-attempt',
-                                  error_code='requestFailed')
-                return self.__wrap_response_if_necessary('requestFailed', len(body_str), '', block_on_response)
+                    log.exception(
+                        "Failed to send request due to exception.  Closing connection, will re-attempt",
+                        error_code="requestFailed",
+                    )
+                return self.__wrap_response_if_necessary(
+                    "requestFailed", len(body_str), "", block_on_response
+                )
 
             was_sent = True
 
@@ -297,7 +364,7 @@ class ScalyrClientSession(object):
 
         finally:
             if not was_sent:
-                self.total_request_latency_secs += (time.time() - current_time)
+                self.total_request_latency_secs += time.time() - current_time
                 self.total_requests_failed += 1
                 self.close(current_time=current_time)
 
@@ -313,7 +380,7 @@ class ScalyrClientSession(object):
             sent, and the full response.
         @rtype: (str, int, str)
         """
-        response = ''
+        response = ""
         was_success = False
         bytes_received = 0
 
@@ -327,33 +394,51 @@ class ScalyrClientSession(object):
                     response = self.__connection.response()
                 bytes_received = len(response)
             except httplib.HTTPException, httpError:
-                log.error('Failed to receive response due to HTTPException \'%s\'. Closing connection, will re-attempt' % ( httpError.__class__.__name__ ),
-                                  error_code='requestFailed')
-                return 'requestFailed', len(body_str), response
+                log.error(
+                    "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
+                    % (httpError.__class__.__name__),
+                    error_code="requestFailed",
+                )
+                return "requestFailed", len(body_str), response
 
             except Exception, error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, 'errno') and error.errno is not None:
-                    log.error('Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
-                              'connection, will re-attempt', self.__full_address, error.errno, str(error),
-                              error_code='client/requestFailed')
+                if hasattr(error, "errno") and error.errno is not None:
+                    log.error(
+                        'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
+                        "connection, will re-attempt",
+                        self.__full_address,
+                        error.errno,
+                        str(error),
+                        error_code="client/requestFailed",
+                    )
                 else:
-                    log.exception('Failed to receive response due to exception.  Closing connection, will re-attempt',
-                                  error_code='requestFailed')
-                return 'requestFailed', len(body_str), response
+                    log.exception(
+                        "Failed to receive response due to exception.  Closing connection, will re-attempt",
+                        error_code="requestFailed",
+                    )
+                return "requestFailed", len(body_str), response
 
-            log.log(scalyr_logging.DEBUG_LEVEL_5, 'Response was received with body \"%s\"', response)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_5,
+                'Response was received with body "%s"',
+                response,
+            )
 
             if status_code == 429:
-                log.error('Received "too busy" response from server.  Will re-attempt',
-                          error_code='serverTooBusy')
-                return 'serverTooBusy', len(body_str), response
+                log.error(
+                    'Received "too busy" response from server.  Will re-attempt',
+                    error_code="serverTooBusy",
+                )
+                return "serverTooBusy", len(body_str), response
 
             # If we got back an empty result, that often means the connection has been closed or reset.
             if len(response) == 0:
-                log.error('Received empty response, server may have reset connection.  Will re-attempt',
-                          error_code='emptyResponse')
-                return 'emptyResponse', len(body_str), response
+                log.error(
+                    "Received empty response, server may have reset connection.  Will re-attempt",
+                    error_code="emptyResponse",
+                )
+                return "emptyResponse", len(body_str), response
 
             # Try to parse the response
             # noinspection PyBroadException
@@ -361,38 +446,53 @@ class ScalyrClientSession(object):
                 response_as_json = json_lib.parse(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
-                log.error('Failed to parse response of \'%s\' due to exception.  Closing connection, will '
-                          're-attempt', scalyr_util.remove_newlines_and_truncate(response, 1000),
-                          error_code='parseResponseFailed')
-                return 'parseResponseFailed', len(body_str), response
+                log.error(
+                    "Failed to parse response of '%s' due to exception.  Closing connection, will "
+                    "re-attempt",
+                    scalyr_util.remove_newlines_and_truncate(response, 1000),
+                    error_code="parseResponseFailed",
+                )
+                return "parseResponseFailed", len(body_str), response
 
             self.__last_success = send_time
 
-            if 'status' in response_as_json:
-                status = response_as_json['status']
-                if status == 'success':
+            if "status" in response_as_json:
+                status = response_as_json["status"]
+                if status == "success":
                     was_success = True
-                elif status == 'error/client/badParam':
-                    log.error('Request to \'%s\' failed due to a bad parameter value.  This may be caused by an '
-                              'invalid write logs api key in the configuration', self.__full_address,
-                              error_code='error/client/badParam')
+                elif status == "error/client/badParam":
+                    log.error(
+                        "Request to '%s' failed due to a bad parameter value.  This may be caused by an "
+                        "invalid write logs api key in the configuration",
+                        self.__full_address,
+                        error_code="error/client/badParam",
+                    )
                 else:
-                    log.error('Request to \'%s\' failed due to an error.  Returned error code was \'%s\'',
-                              self.__full_address, status, error_code='error/client/badParam')
+                    log.error(
+                        "Request to '%s' failed due to an error.  Returned error code was '%s'",
+                        self.__full_address,
+                        status,
+                        error_code="error/client/badParam",
+                    )
                 return status, len(body_str), response
             else:
-                log.error('No status message provided in response.  Unknown error.  Response was \'%s\'',
-                          scalyr_util.remove_newlines_and_truncate(response, 1000), error_code='unknownError')
-                return 'unknownError', len(body_str), response
+                log.error(
+                    "No status message provided in response.  Unknown error.  Response was '%s'",
+                    scalyr_util.remove_newlines_and_truncate(response, 1000),
+                    error_code="unknownError",
+                )
+                return "unknownError", len(body_str), response
 
         finally:
-            self.total_request_latency_secs += (time.time() - send_time)
+            self.total_request_latency_secs += time.time() - send_time
             if not was_success:
                 self.total_requests_failed += 1
                 self.close(current_time=send_time)
             self.total_response_bytes_received += bytes_received
 
-    def __wrap_response_if_necessary(self, status_message, bytes_sent, response, block_on_response):
+    def __wrap_response_if_necessary(
+        self, status_message, bytes_sent, response, block_on_response
+    ):
         """Wraps the response as appropriate based on whether or not the caller is expecting to block on the
         response or not.
 
@@ -450,7 +550,9 @@ class ScalyrClientSession(object):
 
             return add_events_request.get_payload()
 
-        return self.__send_request('/addEvents', body_func=generate_body, block_on_response=block_on_response)
+        return self.__send_request(
+            "/addEvents", body_func=generate_body, block_on_response=block_on_response
+        )
 
     def close(self, current_time=None):
         """Closes the underlying connection to the Scalyr server.
@@ -465,7 +567,7 @@ class ScalyrClientSession(object):
             self.__connection = None
             self.__last_connection_close = current_time
 
-    def add_events_request(self, session_info=None, max_size=1*1024*1024*1024):
+    def add_events_request(self, session_info=None, max_size=1 * 1024 * 1024 * 1024):
         """Creates and returns a new AddEventRequest that can be later sent by this session.
 
         The caller is expected to add events to this request and then submit it for transmission using
@@ -482,13 +584,13 @@ class ScalyrClientSession(object):
         @rtype: AddEventsRequest
         """
         body = {
-            'token': self.__api_key,
-            'session': self.__session_id,
-            'threads': [],
+            "token": self.__api_key,
+            "session": self.__session_id,
+            "threads": [],
         }
 
         if session_info is not None:
-            body['sessionInfo'] = session_info
+            body["sessionInfo"] = session_info
 
         return AddEventsRequest(body, max_size=max_size)
 
@@ -511,9 +613,13 @@ class ScalyrClientSession(object):
 
         python_version = sys.version_info
         if len(python_version) >= 5:
-            python_version_str = 'python-%s.%s.%s' % (python_version[0], python_version[1], python_version[2])
+            python_version_str = "python-%s.%s.%s" % (
+                python_version[0],
+                python_version[1],
+                python_version[2],
+            )
         else:
-            python_version_str = 'python-unknown'
+            python_version_str = "python-unknown"
 
         # Try for a linux distribution first.  This doesn't seem to work for Amazon AMIs, but for most
         # distributions it hopefully will provide something readable.
@@ -522,7 +628,7 @@ class ScalyrClientSession(object):
         try:
             distribution = platform.dist()
             if len(distribution[0]) > 0:
-                platform_value = 'Linux-%s-%s' % (distribution[0], distribution[1])
+                platform_value = "Linux-%s-%s" % (distribution[0], distribution[1])
         except Exception:
             platform_value = None
 
@@ -532,7 +638,7 @@ class ScalyrClientSession(object):
             try:
                 mac_ver = platform.mac_ver()[0]
                 if len(mac_ver) > 0:
-                    platform_value = 'MacOS-%s' % mac_ver
+                    platform_value = "MacOS-%s" % mac_ver
             except Exception:
                 platform_value = None
 
@@ -544,26 +650,34 @@ class ScalyrClientSession(object):
         # Include a string to indicate if python has a true ssl library available to record
         # whether or not the client is doing server certificate verification.
         if __has_ssl__:
-            ssl_str = 'ssllib'
+            ssl_str = "ssllib"
             if self.__connection and self.__connection.is_pure_python_tls:
-                ssl_str = 'tlslite'
+                ssl_str = "tlslite"
         else:
-            ssl_str = 'nossllib'
+            ssl_str = "nossllib"
 
-        parts = [platform_value, python_version_str, 'agent-%s' % agent_version, ssl_str]
+        parts = [
+            platform_value,
+            python_version_str,
+            "agent-%s" % agent_version,
+            ssl_str,
+        ]
         if fragments:
             parts.extend(fragments)
-        return ';'.join(map(str, parts))
+        return ";".join(map(str, parts))
 
-    def perform_agent_version_check(self, track='stable'):
+    def perform_agent_version_check(self, track="stable"):
         """Query the Scalyr API to determine if a newer version is available
         """
-        url_path = "/ajax?method=performAgentVersionCheck&installedVersion=%s&track=%s" % (self.__agent_version, track)
+        url_path = (
+            "/ajax?method=performAgentVersionCheck&installedVersion=%s&track=%s"
+            % (self.__agent_version, track)
+        )
 
         return self.__send_request(url_path, is_post=False)
 
 
-class EventSequencer( object ):
+class EventSequencer(object):
     """Responsible for keeping track of sequences for an AddEventsRequest
 
     This abstraction keeps track of previously seen sequence_ids and numbers
@@ -574,7 +688,7 @@ class EventSequencer( object ):
     logic
     """
 
-    def __init__( self ):
+    def __init__(self):
         # the previously used sequence_id, used to determine if we need to send the sequence_id
         # with an event
         self.__previous_sequence_id = None
@@ -582,26 +696,25 @@ class EventSequencer( object ):
         # the previously seen sequence_number - used to calculate deltas for the sequence_number
         self.__previous_sequence_number = None
 
-    def reset( self ):
+    def reset(self):
         """Resets the sequence tracking"""
         self.__previous_sequence_id = None
         self.__previous_sequence_number = None
 
-    def get_memento( self ):
+    def get_memento(self):
         """returns internal state of the sequencer as a tuple
         Callers can use this method to set and restore the internal state of the sequencer
         """
         return (self.__previous_sequence_id, self.__previous_sequence_number)
 
-
-    def restore_from_memento( self, memento ):
+    def restore_from_memento(self, memento):
         """Restores the state of the EventSequencer with the values from a previous
         call to get_memento
         """
         self.__previous_sequence_id = memento[0]
         self.__previous_sequence_number = memento[1]
 
-    def add_sequence_fields( self, event, sequence_id, sequence_number ):
+    def add_sequence_fields(self, event, sequence_id, sequence_number):
         """
         If sequence_id and sequence_number are non-None then this method will automatically add the following
         fields:
@@ -637,7 +750,9 @@ class EventSequencer( object ):
             if self.__previous_sequence_number is None:
                 event.set_sequence_number(sequence_number)
             else:
-                event.set_sequence_number_delta(sequence_number - self.__previous_sequence_number)
+                event.set_sequence_number_delta(
+                    sequence_number - self.__previous_sequence_number
+                )
 
             self.__previous_sequence_number = sequence_number
 
@@ -653,7 +768,8 @@ class AddEventsRequest(object):
     to the request before it is sent.  This is useful to rollback the request state to a previous state if some
     problem occurs.
     """
-    def __init__(self, base_body, max_size=1*1024*1024):
+
+    def __init__(self, base_body, max_size=1 * 1024 * 1024):
         """Initializes the instance.
 
         @param base_body: A JsonObject or dict containing the information to send as the body of the add_events
@@ -663,8 +779,12 @@ class AddEventsRequest(object):
         @param max_size: The maximum number of bytes this request can consume when it is serialized to JSON.
         """
         assert len(base_body) > 0, "The base_body object must have some fields defined."
-        assert not 'events' in base_body, "The base_body object cannot already have 'events' set."
-        assert not 'client_time' in base_body, "The base_body object cannot already have 'client_time' set."
+        assert (
+            not "events" in base_body
+        ), "The base_body object cannot already have 'events' set."
+        assert (
+            not "client_time" in base_body
+        ), "The base_body object cannot already have 'client_time' set."
 
         # As an optimization, we use a StringIO object to serialize the request.  We also
         # do a little bit of the JSON object assembly by hand.  Specifically, we serialize the request
@@ -678,11 +798,13 @@ class AddEventsRequest(object):
         _rewind_past_close_curly(string_buffer)
 
         # Append the start of our events field.
-        string_buffer.write(', events: [')
+        string_buffer.write(", events: [")
 
         # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
         # the request.  That includes both the threads JSON array and the client timestamp.
-        self.__post_fix_buffer = PostFixBuffer('], threads: THREADS, client_time: TIMESTAMP }')
+        self.__post_fix_buffer = PostFixBuffer(
+            "], threads: THREADS, client_time: TIMESTAMP }"
+        )
 
         # The time that will be sent as the 'client_time' parameter for the addEvents request.
         # This may be later updated using the set_client_time method in the case where the same AddEventsRequest
@@ -734,8 +856,9 @@ class AddEventsRequest(object):
         # Have to account for the extra space this will use when serialized.  See how much space we can allow for
         # the post fix right now.
         available_size_for_post_fix = self.__max_size - self.__buffer.tell()
-        return self.__post_fix_buffer.add_thread_entry(thread_id, thread_name,
-                                                       fail_if_buffer_exceeds=available_size_for_post_fix)
+        return self.__post_fix_buffer.add_thread_entry(
+            thread_id, thread_name, fail_if_buffer_exceeds=available_size_for_post_fix
+        )
 
     def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
         """Adds the serialized JSON for event if it does not cause the maximum request size to be exceeded.
@@ -771,7 +894,7 @@ class AddEventsRequest(object):
         start_pos = self.__buffer.tell()
         # If we already added an event before us, then make sure we add in a comma to separate us from the last event.
         if self.__events_added > 0:
-            self.__buffer.write(',')
+            self.__buffer.write(",")
 
         timestamp = self.__get_valid_timestamp(timestamp=timestamp)
 
@@ -787,7 +910,7 @@ class AddEventsRequest(object):
         # Also reset previously seen sequence numbers and ids
         if self.current_size > self.__max_size:
             self.__buffer.truncate(start_pos)
-            self.__event_sequencer.restore_from_memento( memento )
+            self.__event_sequencer.restore_from_memento(memento)
             return False
 
         self.__events_added += 1
@@ -884,11 +1007,11 @@ class AddEventsRequest(object):
 
         for key, value in self.__timing_data.iteritems():
             if not first_time:
-                output_buffer.write(' ')
+                output_buffer.write(" ")
             else:
                 first_time = False
             output_buffer.write(key)
-            output_buffer.write('=')
+            output_buffer.write("=")
             output_buffer.write(str(value))
 
         return output_buffer.getvalue()
@@ -924,7 +1047,9 @@ class AddEventsRequest(object):
         """Returns a position such that if it is passed to 'set_position', all events added since this method was
         invoked are removed."""
 
-        return AddEventsRequest.Position(self.__events_added, self.__buffer.tell(), self.__post_fix_buffer.position)
+        return AddEventsRequest.Position(
+            self.__events_added, self.__buffer.tell(), self.__post_fix_buffer.position
+        )
 
     def set_position(self, position):
         """Reverts this object to only contain the events contained by the object when position was invoked to
@@ -936,12 +1061,13 @@ class AddEventsRequest(object):
         self.__buffer.truncate(position.buffer_size)
         self.__post_fix_buffer.set_position(position.postfix_buffer_position)
 
-        #reset previously seen sequence id and numbers
+        # reset previously seen sequence id and numbers
         self.__event_sequencer.reset()
 
     class Position(object):
         """Represents a position in the added events.
         """
+
         def __init__(self, events_added, buffer_size, postfix_buffer_position):
             self.events_added = events_added
             self.buffer_size = buffer_size
@@ -968,12 +1094,12 @@ def _calculate_per_thread_extra_bytes():
 
     # Calculate sizes_by_entries by actually serialzing each case.
     threads = []
-    test_string = 'A'
+    test_string = "A"
     for i in range(3):
         sizes_by_entries.append(len(scalyr_util.json_encode(threads)))
 
         # Add in another thread for the next round through the loop.
-        threads.append({'id': test_string, 'name': test_string})
+        threads.append({"id": test_string, "name": test_string})
 
     # Now go back and calculate the deltas between the different cases.  We have to remember to subtract
     # out the length due to the id and name strings.
@@ -981,7 +1107,9 @@ def _calculate_per_thread_extra_bytes():
     test_string_len = len(scalyr_util.json_encode(test_string))
     result = []
     for i in range(1, 3):
-        result.append(sizes_by_entries[i] - sizes_by_entries[i - 1] - 2 * test_string_len)
+        result.append(
+            sizes_by_entries[i] - sizes_by_entries[i - 1] - 2 * test_string_len
+        )
 
     return result
 
@@ -995,6 +1123,7 @@ class PostFixBuffer(object):
 
     Additionally, the buffer can be reset to a previous position.
     """
+
     def __init__(self, format_string):
         """Initializes the buffer.
 
@@ -1004,8 +1133,8 @@ class PostFixBuffer(object):
         @type format_string: str
         """
         # Make sure the keywords are used in the format string.
-        assert('THREADS' in format_string)
-        assert('TIMESTAMP' in format_string)
+        assert "THREADS" in format_string
+        assert "TIMESTAMP" in format_string
 
         # The entries added to include in the threads JSON array in the request.
         self.__threads = []
@@ -1039,8 +1168,8 @@ class PostFixBuffer(object):
         @return: The post fix to include at the end of the AddEventsRequest.
         @rtype: str
         """
-        result = self.__format.replace('TIMESTAMP', str(self.__client_timestamp))
-        result = result.replace('THREADS', scalyr_util.json_encode(self.__threads))
+        result = self.__format.replace("TIMESTAMP", str(self.__client_timestamp))
+        result = result.replace("THREADS", scalyr_util.json_encode(self.__threads))
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
         # assert here to make sure it's always equal (it should be) but we don't want errors to cause issues for
@@ -1067,7 +1196,10 @@ class PostFixBuffer(object):
         new_timestamp = int(timestamp)
         size_difference = len(str(new_timestamp)) - len(str(self.__client_timestamp))
 
-        if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
+        if (
+            fail_if_buffer_exceeds is not None
+            and self.__current_size + size_difference > fail_if_buffer_exceeds
+        ):
             return False
 
         self.__current_size += size_difference
@@ -1092,7 +1224,9 @@ class PostFixBuffer(object):
         @rtype: bool
         """
         # Calculate the size difference.  It is at least the size of taken by the serialized strings.
-        size_difference = len(scalyr_util.json_encode(thread_name)) + len(scalyr_util.json_encode(thread_id))
+        size_difference = len(scalyr_util.json_encode(thread_name)) + len(
+            scalyr_util.json_encode(thread_id)
+        )
 
         # Use the __per_thread_extra_bytes to calculate the additional bytes that will be consumed by serializing
         # the JSON object containing the thread id and name.  The number of extra bytes depends on whether or not
@@ -1103,11 +1237,14 @@ class PostFixBuffer(object):
         else:
             size_difference += PostFixBuffer.__per_thread_extra_bytes[1]
 
-        if fail_if_buffer_exceeds is not None and self.__current_size + size_difference > fail_if_buffer_exceeds:
+        if (
+            fail_if_buffer_exceeds is not None
+            and self.__current_size + size_difference > fail_if_buffer_exceeds
+        ):
             return False
 
         self.__current_size += size_difference
-        self.__threads.append({'id': thread_id, 'name': thread_name})
+        self.__threads.append({"id": thread_id, "name": thread_name})
         return True
 
     @property
@@ -1134,9 +1271,9 @@ class PostFixBuffer(object):
         # previous length.
         self.__current_size = position[0]
         self.__client_timestamp = position[1]
-        assert(len(self.__threads) >= position[2])
+        assert len(self.__threads) >= position[2]
         if position[2] < len(self.__threads):
-            self.__threads = self.__threads[0:position[2]]
+            self.__threads = self.__threads[0 : position[2]]
 
 
 class Event(object):
@@ -1144,6 +1281,7 @@ class Event(object):
 
     This abstraction has many optimizations to improve serialization time.
     """
+
     def __init__(self, thread_id=None, attrs=None, base=None):
         """Creates an instance of an event to include in an AddEventsRequest.
 
@@ -1208,7 +1346,7 @@ class Event(object):
         # __serialization_base.
         self.__attrs = attrs
         if (attrs is not None or thread_id is not None) and base is not None:
-            raise Exception('Cannot use both attrs/thread_id and base')
+            raise Exception("Cannot use both attrs/thread_id and base")
 
         self.__thread_id = None
         if base is not None:
@@ -1217,7 +1355,7 @@ class Event(object):
             self.__serialization_base = base.__serialization_base
             self.__attrs = base.__attrs
         else:
-            self.__set_attributes( thread_id, attrs )
+            self.__set_attributes(thread_id, attrs)
 
         # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
         # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
@@ -1234,34 +1372,32 @@ class Event(object):
         self.__has_non_optimal_fields = False
         self.__num_optimal_fields = 0
 
-
-    def __set_attributes( self, thread_id, attributes ):
+    def __set_attributes(self, thread_id, attributes):
         self.__thread_id = thread_id
         self.__attrs = attributes
         # A new event.  We have to create the serialization base using provided information/
         tmp_buffer = StringIO()
         # Open base for the event object.
-        tmp_buffer.write('{')
+        tmp_buffer.write("{")
         if thread_id is not None:
-            tmp_buffer.write('thread:')
-            tmp_buffer.write( scalyr_util.json_encode(thread_id) )
-            tmp_buffer.write(', ')
+            tmp_buffer.write("thread:")
+            tmp_buffer.write(scalyr_util.json_encode(thread_id))
+            tmp_buffer.write(", ")
         if attributes is not None:
             # Serialize the attributes object, but we have to remove the closing brace because we want to
             # insert more fields.
-            tmp_buffer.write('attrs:')
-            tmp_buffer.write( scalyr_util.json_encode(attributes) )
+            tmp_buffer.write("attrs:")
+            tmp_buffer.write(scalyr_util.json_encode(attributes))
             _rewind_past_close_curly(tmp_buffer)
-            tmp_buffer.write(',')
+            tmp_buffer.write(",")
         else:
             # Open brace for the attributes object.
-            tmp_buffer.write('attrs:{')
+            tmp_buffer.write("attrs:{")
 
         # Add the message field into the json object.
-        tmp_buffer.write('message:')
+        tmp_buffer.write("message:")
 
         self.__serialization_base = tmp_buffer.getvalue()
-
 
     def add_missing_attributes(self, attributes):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
@@ -1300,7 +1436,7 @@ class Event(object):
         if self.__message is None and message is not None:
             self.__num_optimal_fields += 1
         if message is unicode:
-            self.__message = message.encode('utf-8')
+            self.__message = message.encode("utf-8")
         else:
             self.__message = message
         return self
@@ -1448,22 +1584,28 @@ class Event(object):
 
         # We fast path the very common case of just a timestamp and sequence delta fields.
         if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:
-            output_buffer.write('}')
-            output_buffer.write(',sd:')
+            output_buffer.write("}")
+            output_buffer.write(",sd:")
             output_buffer.write(self.__sequence_number_delta)
-            output_buffer.write(',ts:')
+            output_buffer.write(",ts:")
             output_buffer.write(self.__timestamp)
         else:
-            self.__write_field_if_not_none(',sample_rate:', self.__sampling_rate, output_buffer)
+            self.__write_field_if_not_none(
+                ",sample_rate:", self.__sampling_rate, output_buffer
+            )
             # close off attrs object.
-            output_buffer.write('}')
+            output_buffer.write("}")
 
-            self.__write_field_if_not_none(',ts:', self.__timestamp, output_buffer)
-            self.__write_field_if_not_none(',si:', self.__sequence_id, output_buffer)
-            self.__write_field_if_not_none(',sn:', self.__sequence_number, output_buffer)
-            self.__write_field_if_not_none(',sd:', self.__sequence_number_delta, output_buffer)
+            self.__write_field_if_not_none(",ts:", self.__timestamp, output_buffer)
+            self.__write_field_if_not_none(",si:", self.__sequence_id, output_buffer)
+            self.__write_field_if_not_none(
+                ",sn:", self.__sequence_number, output_buffer
+            )
+            self.__write_field_if_not_none(
+                ",sd:", self.__sequence_number_delta, output_buffer
+            )
         # close off the event object.
-        output_buffer.write('}')
+        output_buffer.write("}")
 
     def __write_field_if_not_none(self, field_name, field_value, output_buffer):
         """If the specified field value is not None, then emit the field name and the value to the output buffer.
@@ -1495,7 +1637,7 @@ def _rewind_past_close_curly(output_buffer):
     while location > 0:
         location -= 1
         output_buffer.seek(location)
-        if output_buffer.read(1) == '}':
+        if output_buffer.read(1) == "}":
             break
 
     # Now look for the first non-white character.  We need to add in a comma after it.
@@ -1508,11 +1650,13 @@ def _rewind_past_close_curly(output_buffer):
             break
 
     # If the character happened to a comma, back up over that since we want to write our own comma.
-    if location > 0 and last_char == ',':
+    if location > 0 and last_char == ",":
         location -= 1
 
     if location < 0:
-        raise Exception('Could not locate trailing "}" and non-whitespace in JSON serialization')
+        raise Exception(
+            'Could not locate trailing "}" and non-whitespace in JSON serialization'
+        )
 
     # Now chop off everything after the character at the location.
     location += 1
@@ -1524,7 +1668,8 @@ def _rewind_past_close_curly(output_buffer):
 # increasing so we track it in a global var.
 __last_time_stamp__ = None
 
-def _set_last_timestamp( val ):
+
+def _set_last_timestamp(val):
     """
     exposed for testing
     """

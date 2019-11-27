@@ -15,14 +15,15 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@scalyr.com'
+__author__ = "imron@scalyr.com"
 
-class LogWatcher( object ):
+
+class LogWatcher(object):
     """An interface class that contains methods allowing the caller
     to add/remove a set of log paths
     """
 
-    def add_log_config( self, monitor_name, log_config ):
+    def add_log_config(self, monitor_name, log_config):
         """Add the path specified by the log_config to the list of paths being watched
         param: monitor_name - the name of the monitor adding the log_config
         param: log_config - a log_config object containing at least a path
@@ -30,20 +31,20 @@ class LogWatcher( object ):
         """
         pass
 
-    def remove_log_path( self, monitor_name, log_path ):
+    def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
         param: monitor - the monitor removing the path
         param: log_path - a string containing path of the log file to remove
         """
         pass
 
-    def update_log_config( self, monitor_name, log_config ):
+    def update_log_config(self, monitor_name, log_config):
         """Update the config of any logs that match the
            path of the log_config param
         """
         pass
 
-    def schedule_log_path_for_removal( self, monitor_name, log_path ):
+    def schedule_log_path_for_removal(self, monitor_name, log_path):
         """
             Schedules a log path for removal.  The logger will only
             be removed once the number of pending bytes for that log reaches 0
