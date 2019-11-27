@@ -169,7 +169,7 @@ class LineMatcherCollection(LineMatcher):
 
     def _readline(self, file_like, max_length=0):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
-        and checks all self.__matchers to see if any of them match.  If so then return the 
+        and checks all self.__matchers to see if any of them match.  If so then return the
         first matching line, otherwise return a single newline terminated line from the input.
 
         @param file_like: a file like object (e.g. StringIO)

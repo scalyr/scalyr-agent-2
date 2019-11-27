@@ -317,7 +317,7 @@ dashboard entries independently (if desired) for each instance.
 
 ## Configuring TomcatMonitor
 
-In order to use this monitor, you will need to configure a couple of things in your Tomcat 
+In order to use this monitor, you will need to configure a couple of things in your Tomcat
 instance:
 
 - Installation of the management utilities
@@ -326,13 +326,13 @@ instance:
 Installation of the Management Utilities
 
 If you are (or have) installed Tomcat from sources, please consult the documentation for your
-version of Tomcat at http://tomcat.apache.org.  For Redhat (and related variants), the 
+version of Tomcat at http://tomcat.apache.org.  For Redhat (and related variants), the
 administrator webapps are contained in a package  named tomcat<version>-admin-webapps.
 For Debian (and related variants) the administrator webapps are contained in the package
 named tomcat<version>-admin.
 
-To check to see, say for Tomcat version 7, if you already have the admin webapps already 
-installed, you can issue the command 'dpkg -l | grep tomcat7' or look for the file 
+To check to see, say for Tomcat version 7, if you already have the admin webapps already
+installed, you can issue the command 'dpkg -l | grep tomcat7' or look for the file
 manager.xml in the directory /etc/tomcat7/Catalina/localhost.
 
 Adding a User Role with Monitoring Privileges
@@ -362,10 +362,10 @@ file.  A typical fragment resembles:
       id:                  "tomcat",
       monitor_url:         "http://localhost:8080/manager/status",
       monitor_username:    "statusmon",
-      monitor_password:    "getstatus" 
+      monitor_password:    "getstatus"
     }
   ]
-  
+
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
 instance."""

@@ -183,9 +183,9 @@ class SmokeTestActor(object):
 
     def __wait_at_barrier(self):
         """
-        For coordinating processes.  
+        For coordinating processes.
         Currently only used to prevent uploader OR verifier from proceeding until agent is verified up and running.
-        Note: uploader and verifier do not block each other, regardless of whether they 
+        Note: uploader and verifier do not block each other, regardless of whether they
         run within same process or in different processes.
         """
         barrier = self._get_barrier()

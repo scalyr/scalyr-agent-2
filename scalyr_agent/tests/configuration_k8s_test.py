@@ -121,7 +121,7 @@ class TestConfigurationK8s(TestConfigurationBase):
             """ {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
-        }      
+        }
         """
         )
         self._write_config_fragment_file_with_separator_conversion(
@@ -130,11 +130,11 @@ class TestConfigurationK8s(TestConfigurationBase):
             "monitors": [
                 {
                     "module": "scalyr_agent.builtin_monitors.kubernetes_monitor",
-                    "report_k8s_metrics": false,                    
+                    "report_k8s_metrics": false,
                 },
                 {
                     "module": "scalyr_agent.builtin_monitors.kubernetes_events_monitor"
-                }            
+                }
             ]
         }
         """,
@@ -194,7 +194,7 @@ class TestConfigurationK8s(TestConfigurationBase):
 
     def test_k8s_event_object_filter_from_config(self):
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [
@@ -240,12 +240,12 @@ class TestConfigurationK8s(TestConfigurationBase):
         elems = ["CronJob", "DaemonSet", "Deployment"]
         os.environ["SCALYR_K8S_EVENT_OBJECT_FILTER"] = environment_value
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [
                 {
-                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",                    
+                    module: "scalyr_agent.builtin_monitors.kubernetes_events_monitor",
                 }
             ]
           }
@@ -265,7 +265,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         def _assert_environment_variable(env_var_name, env_var_value, expected_value):
             os.environ[env_var_name] = env_var_value
             self._write_file_with_separator_conversion(
-                """ { 
+                """ {
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [
@@ -315,7 +315,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 k8s_config_line = ", k8s_ignore_namespaces: %s" % test_str
 
             self._write_file_with_separator_conversion(
-                """ { 
+                """ {
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [
@@ -332,7 +332,7 @@ class TestConfigurationK8s(TestConfigurationBase):
 
         def _test_k8s_ignore_namespaces_global(test_str, expected):
             self._write_file_with_separator_conversion(
-                """ { 
+                """ {
                 api_key: "hi there",
                 k8s_ignore_namespaces: %s,
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
@@ -361,7 +361,7 @@ class TestConfigurationK8s(TestConfigurationBase):
         def _test_k8s_ignore_namespaces_environ(test_str, expected):
             _set_env_val(test_str)
             self._write_file_with_separator_conversion(
-                """ { 
+                """ {
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [
@@ -382,7 +382,7 @@ class TestConfigurationK8s(TestConfigurationBase):
                 k8s_config_line = ", k8s_ignore_namespaces: %s" % local_str
 
             self._write_file_with_separator_conversion(
-                """ { 
+                """ {
                 api_key: "hi there",
                 logs: [ { path:"/var/log/tomcat6/access.log" }],
                 monitors: [

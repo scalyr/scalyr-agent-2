@@ -398,8 +398,8 @@ class PostgreSQLDb(object):
         return self.__str__()
 
     def __init__(self, host, port, database, username, password, logger=None):
-        """Constructor: 
-    
+        """Constructor:
+
         @param database: database we are connecting to
         @param host: database host being connected to
         @param port: database port being connected to
@@ -436,7 +436,7 @@ To configure PostgreSQL for password authentication, you will need a line like t
 file:
 
     host    all             all             127.0.0.1/32            md5
-    
+
 To create a user and enable password authentication, please consult the PostgreSQL documentation.  For version
 9.3, that documentation can be found here:  http://www.postgresql.org/docs/9.3/static/sql-createrole.html
 
@@ -457,7 +457,7 @@ A basic PostgreSQL monitor configuration entry might resemble:
       database_password:   "<password>"
     }
   ]
-  
+
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of PostgreSQL and will make it easier to filter on metrics specific to that
 instance."""

@@ -25,7 +25,7 @@ from scalyr_agent.test_util import FakePlatform
 class TestSystemMetricConfiguration(TestConfigurationBase):
     def test_log_write_rate(self):
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [

@@ -1361,12 +1361,12 @@ class TestConfiguration(TestConfigurationBase):
 
     def test_log_excludes_from_config(self):
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [
-                { 
+                {
                     path: "/var/log/tomcat6/access.log",
-                    exclude: ["*.[0-9]*", "*.bak"]  
+                    exclude: ["*.[0-9]*", "*.bak"]
                 }
             ],
           }

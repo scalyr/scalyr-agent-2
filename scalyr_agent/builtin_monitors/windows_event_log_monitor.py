@@ -645,7 +645,7 @@ For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 ###Windows Vista and later
 
-On Windows Vista and later, the Scalyr agent uses the EvtLog API, and you can configure it to query events on any channel, using the standard XPath query mechanism.  See: https://msdn.microsoft.com/en-us/library/windows/desktop/dd996910(v=vs.85).aspx 
+On Windows Vista and later, the Scalyr agent uses the EvtLog API, and you can configure it to query events on any channel, using the standard XPath query mechanism.  See: https://msdn.microsoft.com/en-us/library/windows/desktop/dd996910(v=vs.85).aspx
 
 For example, the following will configure the agent to listen to Critical, Error and Warning level events from the Application, Security and System channels:
 

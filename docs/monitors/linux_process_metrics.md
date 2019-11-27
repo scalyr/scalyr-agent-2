@@ -32,7 +32,7 @@ your configuration.
 
 ## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
 click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux Process Metrics}}. (The dashboard will not be
 listed until the agent begins sending data.)
 
@@ -80,7 +80,7 @@ Some metrics have additional fields, as documented in the table below.
 
 This table lists all metrics recorded by the Linux Process Metrics plugin.
 
-|||# Metric                               ||| Description 
+|||# Metric                               ||| Description
 |||# ``app.cpu type=user``                ||| User-mode CPU usage, in 1/100ths of a second.
 |||# ``app.cpu type=system``              ||| System-mode CPU usage, in 1/100ths of a second,
 |||# ``app.uptime``                       ||| Process uptime, in milliseconds,
@@ -94,4 +94,3 @@ This table lists all metrics recorded by the Linux Process Metrics plugin.
 |||# ``app.disk.requests type=read``      ||| Total disk read requests.
 |||# ``app.disk.bytes type=write``        ||| Total bytes written to disk.
 |||# ``app.disk.requests type=write``     ||| Total disk write requests.
-      

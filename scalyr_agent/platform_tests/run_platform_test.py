@@ -18,7 +18,7 @@
 __author__ = "saurabh@scalyr.com"
 
 """
-This module is used to run the tests under scalyr_agent/tests on different OS platforms 
+This module is used to run the tests under scalyr_agent/tests on different OS platforms
 with different Python versions.
 
 We do this by:

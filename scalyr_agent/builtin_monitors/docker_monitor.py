@@ -1971,7 +1971,7 @@ class DockerMonitor(ScalyrMonitor):
 
     You can also use docker labels to configure the log settings for a specific container, such as setting the parser or setting redaction rules.
 
-    The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix). 
+    The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix).
 
     For example, if you add the following label to your container:
 
@@ -1995,7 +1995,7 @@ class DockerMonitor(ScalyrMonitor):
     * rename_logfile
     * redaction_rules
 
-    Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels: 
+    Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels:
 
     ```
     com.scalyr.config.log.rename-logfile

@@ -232,7 +232,7 @@ class Connection(object):
 
     def response(self):
         """Subclasses override to return the text contents of a response from a server
-        
+
         @return: The text contents of a requests
         @rtype: str
         """
@@ -240,7 +240,7 @@ class Connection(object):
 
     def status_code(self):
         """Subclasses override to return the status code of a request
-        
+
         @return: The status code of a request
         """
         pass

@@ -894,7 +894,7 @@ class MysqlDB(object):
         logger=None,
     ):
         """Constructor: handles both socket files as well as host/port connectivity.
-    
+
         @param type: is the connection a "socket" or "host:port"
         @param sockfile: if socket connection, the location of the sockfile
         @param host: if host:port connection, the name of the host

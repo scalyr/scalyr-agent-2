@@ -78,7 +78,7 @@ class ByteScanner(object):
 
     def line_number_for_offset(self, offset):
         """The line number of a position relative to the current position.
-        
+
         @param offset: Offset to the current position for which to determine the line position. It may be negative.
 
         @return: The line number for the specified position.
@@ -128,7 +128,7 @@ class ByteScanner(object):
         return "".join(my_slice)
 
     def peek_next_ubyte(self, offset=0, none_if_bad_index=False):
-        """Returns the next byte that will be returned when read_ubyte is 
+        """Returns the next byte that will be returned when read_ubyte is
         invoked.
 
         @param offset: Optional argument to allow peeking at not just the next byte but bytes beyond that as well. A
@@ -185,7 +185,7 @@ class JsonParser(object):
 
      - // and /* comments
      - Concatenation of string literals using '+'
-     - Unquoted identifiers can be used as field names in an object literal 
+     - Unquoted identifiers can be used as field names in an object literal
      - Not requiring commas between array elements and object fields
 
      - TODO:  support `b (backtick-b) binary data format used by Scalyr
@@ -420,7 +420,7 @@ class JsonParser(object):
     def __parse_string_with_concatenation(self):
         """Parse a string literal. The scanner must be at the first '"'.
 
-        If the string is followed by one or more "+", string literal sequences, 
+        If the string is followed by one or more "+", string literal sequences,
         consume those as well, and return the concatenation. E.g. for input:
         "abc" + "def" + "ghi", we return abcdefghi."""
         value = self.__parse_string()

@@ -107,7 +107,7 @@ class TestConfigurationDocker(TestConfiguration):
             """ {
             logs: [ { path:"/var/log/tomcat6/$DIR_VAR.log" }],
             api_key: "abcd1234",
-        }      
+        }
         """
         )
         self._write_config_fragment_file_with_separator_conversion(
@@ -173,7 +173,7 @@ class TestConfigurationDocker(TestConfiguration):
 
     def test_label_include_globs_from_config(self):
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [
@@ -210,12 +210,12 @@ class TestConfigurationDocker(TestConfiguration):
             "SCALYR_LABEL_EXCLUDE_GLOBS"
         ] = "*env_glob1_exclude_1, *env_glob1_exclude_2, *env_glob1_exclude_3"
         self._write_file_with_separator_conversion(
-            """ { 
+            """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/tomcat6/access.log" }],
             monitors: [
                 {
-                    module: "scalyr_agent.builtin_monitors.docker_monitor",                    
+                    module: "scalyr_agent.builtin_monitors.docker_monitor",
                     docker_raw_logs: true
                 }
             ]

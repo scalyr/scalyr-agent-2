@@ -8,7 +8,7 @@ the Scalyr plugin framework.
 The two most important object in this monitor are:
 
  1. The METRICS list; which defines the metrics that this module will collect
- 2. The ProcessMonitor class which drives the collection of each defined metric and emits 
+ 2. The ProcessMonitor class which drives the collection of each defined metric and emits
     its associated value at a specified sampling rate.
 
 
@@ -20,7 +20,7 @@ The two most important object in this monitor are:
 ...     match = any
 ... )
 >>> predicates = [(operator.itemgetter(k), re.compile(v))
-...                 for k,v in criteria.items() 
+...                 for k,v in criteria.items()
 ...                 if k is not 'match']
 >>> Telemetry = collections.namedtuple('Telemetry', 'match metric attribute fetcher matcher')
 >>> for metric in METRICS:
@@ -39,10 +39,10 @@ The two most important object in this monitor are:
 >>> cmdline = ['-p', monitors_path, -c, '{commandline:cmd}', 'windows_process_metrics' ]
 >>> parser = run_monitor.create_parser()
 >>> options, args = parser.parse_args(cmdline)
->>> run_monitor.run_standalone_monitor(args[0], options.monitor_module, options.monitors_path, 
+>>> run_monitor.run_standalone_monitor(args[0], options.monitor_module, options.monitors_path,
 ...     options.monitor_config options.monitor_sample_interval)
 0
->>> 
+>>>
 
 Author: Scott Sullivan <guy.hoozdis+scalyr@gmail.com>
 License: Apache 2.0
