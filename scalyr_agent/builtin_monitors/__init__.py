@@ -1,1 +1,1 @@
-all = [ 'linux_system_metrics']
+all = ["linux_system_metrics"]

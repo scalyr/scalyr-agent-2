@@ -16,7 +16,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import copy
 import datetime
@@ -39,7 +39,8 @@ log = scalyr_logging.getLogger(__name__)
 
 SCHEDULED_DELETION = "scheduled-deletion"
 
-class CopyingParameters( object ):
+
+class CopyingParameters(object):
     """Tracks the copying parameters that should be used for sending requests to Scalyr and adjusts them over time
     according to success and failures of requests.
 
@@ -49,6 +50,7 @@ class CopyingParameters( object ):
 
     This implements a truncated binary backoff algorithm.
     """
+
     def __init__(self, configuration):
         """Initialize the parameters based on the thresholds defined in the configuration file.
 
@@ -73,21 +75,29 @@ class CopyingParameters( object ):
         self.__min_request_spacing_interval = configuration.min_request_spacing_interval
 
         # The maximum value current_sleep_interval can take when there has been an error.
-        self.__max_error_request_spacing_interval = configuration.max_error_request_spacing_interval
+        self.__max_error_request_spacing_interval = (
+            configuration.max_error_request_spacing_interval
+        )
 
         # The low water mark for the number of bytes sent in a request.  If, when we go to collect the lines that
         # need to be sent from all logs, the amount is lower than this, then we will sleep more between requests.
         self.__low_water_bytes_sent = configuration.low_water_bytes_sent
         # The percentage to adjust the sleeping time if the lower_water_bytes_sent mark is not met.
-        self.__low_water_request_spacing_adjustment = configuration.low_water_request_spacing_adjustment
+        self.__low_water_request_spacing_adjustment = (
+            configuration.low_water_request_spacing_adjustment
+        )
         # The high water mark for the number of bytes sent in a request.  If, when we go to collect the lines that
         # need to be sent from all logs, the amount is higher than this, then we will sleep less between requests.
         self.__high_water_bytes_sent = configuration.high_water_bytes_sent
         # The percentage to adjust the sleeping time if the high_water_bytes_sent mark is exceeded.
-        self.__high_water_request_spacing_adjustment = configuration.high_water_request_spacing_adjustment
+        self.__high_water_request_spacing_adjustment = (
+            configuration.high_water_request_spacing_adjustment
+        )
 
         # The percentage to adjust the sleeping time if the last request was a failure.
-        self.__failure_request_spacing_adjustment = configuration.failure_request_spacing_adjustment
+        self.__failure_request_spacing_adjustment = (
+            configuration.failure_request_spacing_adjustment
+        )
 
         # The percentage to adjust the allowed request size if we get a back a 'requestTooLarge' response from
         # the server.
@@ -109,28 +119,38 @@ class CopyingParameters( object ):
         #      If the request was a failure, we adjust it by the failure request failure adjustment.
         #   For the size, we only adjust the request downwards if we get a 'requestTooLarge' message from the server,
         #      but on success, we put the allowed size back up to the maximum.
-        if result == 'success':
+        if result == "success":
             max_request_spacing_interval = self.__max_request_spacing_interval
             if bytes_sent < self.__low_water_bytes_sent:
-                self.current_sleep_interval *= self.__low_water_request_spacing_adjustment
+                self.current_sleep_interval *= (
+                    self.__low_water_request_spacing_adjustment
+                )
             elif bytes_sent > self.__high_water_bytes_sent:
-                self.current_sleep_interval *= self.__high_water_request_spacing_adjustment
+                self.current_sleep_interval *= (
+                    self.__high_water_request_spacing_adjustment
+                )
         else:
             self.current_sleep_interval *= self.__failure_request_spacing_adjustment
             max_request_spacing_interval = self.__max_error_request_spacing_interval
 
-        if result == 'success':
+        if result == "success":
             self.current_bytes_allowed_to_send = self.__max_allowed_request_size
-        elif 'requestTooLarge' in result:
-            self.current_bytes_allowed_to_send = int(bytes_sent * self.__request_too_large_adjustment)
+        elif "requestTooLarge" in result:
+            self.current_bytes_allowed_to_send = int(
+                bytes_sent * self.__request_too_large_adjustment
+            )
 
-        self.current_bytes_allowed_to_send = self.__ensure_within(self.current_bytes_allowed_to_send,
-                                                                  self.__min_allowed_request_size,
-                                                                  self.__max_allowed_request_size)
+        self.current_bytes_allowed_to_send = self.__ensure_within(
+            self.current_bytes_allowed_to_send,
+            self.__min_allowed_request_size,
+            self.__max_allowed_request_size,
+        )
 
-        self.current_sleep_interval = self.__ensure_within(self.current_sleep_interval,
-                                                           self.__min_request_spacing_interval,
-                                                           max_request_spacing_interval)
+        self.current_sleep_interval = self.__ensure_within(
+            self.current_sleep_interval,
+            self.__min_request_spacing_interval,
+            max_request_spacing_interval,
+        )
 
     def __ensure_within(self, value, min_value, max_value):
         """Return value subject to the constraints that it must be greater than min_value and less than max_value.
@@ -156,6 +176,7 @@ class CopyingParameters( object ):
 
 class AddEventsTask(object):
     """Encapsulates the state for a pending AddEventRequest."""
+
     def __init__(self, add_events_request, completion_callback):
         """Initializes the instance.
 
@@ -180,6 +201,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
     This is run as its own thread.
     """
+
     def __init__(self, configuration, monitors):
         """Initializes the manager.
 
@@ -196,24 +218,28 @@ class CopyingManager(StoppableThread, LogWatcher):
         @type configuration: configuration.Configuration
         @type monitors: list<ScalyrMonitor>
         """
-        StoppableThread.__init__(self, name='log copier thread')
+        StoppableThread.__init__(self, name="log copier thread")
         self.__config = configuration
         # Keep track of monitors
         self.__monitors = monitors
 
         # collect monitor-specific extra server-attributes
-        self.__expanded_server_attributes = copy.deepcopy(self.__config.server_attributes)
+        self.__expanded_server_attributes = copy.deepcopy(
+            self.__config.server_attributes
+        )
         for monitor in monitors:
             monitor_attribs = monitor.get_extra_server_attributes()
             if not monitor_attribs:
                 continue
             for key, value in monitor_attribs.items():
                 if key in self.__expanded_server_attributes:
-                    log.log(scalyr_logging.DEBUG_LEVEL_0,
-                            "Extra server attribute already defined. Cannot add extra server attribute '%s' from monitor %s"
-                            % (key, monitor.module_name),
-                            limit_once_per_x_secs=300,
-                            limit_key='extra-server-attrib-%s' % key)
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_0,
+                        "Extra server attribute already defined. Cannot add extra server attribute '%s' from monitor %s"
+                        % (key, monitor.module_name),
+                        limit_once_per_x_secs=300,
+                        limit_key="extra-server-attrib-%s" % key,
+                    )
                 else:
                     self.__expanded_server_attributes[key] = value
 
@@ -245,7 +271,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         self.__pending_log_matchers = []
 
         # The list of LogMatcher objects that are watching for new files to appear.
-        self.__log_matchers = self.__create_log_matches(configuration, monitors )
+        self.__log_matchers = self.__create_log_matches(configuration, monitors)
 
         # The list of LogFileProcessors that are processing the lines from matched log files.
         self.__log_processors = []
@@ -283,10 +309,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         # A semaphore that we increment when this object has begun copying files (after first scan).
         self.__copying_semaphore = threading.Semaphore()
 
-        #set the log watcher variable of all monitors.  Do this last so everything is set up
-        #and configured when the monitor receives this call
+        # set the log watcher variable of all monitors.  Do this last so everything is set up
+        # and configured when the monitor receives this call
         for monitor in monitors:
-            monitor.set_log_watcher( self )
+            monitor.set_log_watcher(self)
 
         # debug leaks
         self.__disable_new_file_matches = configuration.disable_new_file_matches
@@ -309,87 +335,134 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         return self.__log_matchers
 
-    def __path_in_globs( self, path, path_globs ):
+    def __path_in_globs(self, path, path_globs):
         """ Returns the first glob pattern in 'path_globs' that matches 'path' if one exists."""
         for p in path_globs:
-            if fnmatch.fnmatch( path, p ):
+            if fnmatch.fnmatch(path, p):
                 return p
 
         return None
 
-    def add_log_config( self, monitor_name, log_config ):
+    def add_log_config(self, monitor_name, log_config):
         """Add the log_config item to the list of paths being watched
         param: monitor_name - the name of the monitor adding the log config
         param: log_config - a log_config object containing the path to be added
         returns: an updated log_config object
         """
-        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Additional log entry requested by module "%s"' % monitor_name).copy()
+        log_config = self.__config.parse_log_config(
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Additional log entry requested by module "%s"'
+            % monitor_name,
+        ).copy()
 
         self.__lock.acquire()
         try:
             # Make sure the path isn't already being dynamically monitored
-            path = log_config['path']
+            path = log_config["path"]
             if path in self.__dynamic_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried to add new log file \'%s\' for monitor \'%s\', but it is already being monitored by \'%s\'' % (path, monitor_name, self.__dynamic_paths[path] ) )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to add new log file '%s' for monitor '%s', but it is already being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
                 return log_config
 
             # add the path and matcher
-            matcher = LogMatcher( self.__config, log_config )
+            matcher = LogMatcher(self.__config, log_config)
             self.__dynamic_paths[path] = monitor_name
-            self.__pending_log_matchers.append( matcher )
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Adding new log file \'%s\' for monitor \'%s\'' % (path, monitor_name ) )
+            self.__pending_log_matchers.append(matcher)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Adding new log file '%s' for monitor '%s'" % (path, monitor_name),
+            )
 
             # If the log was previously pending removal, cancel the pending removal
-            self.__logs_pending_removal.pop( path, None )
+            self.__logs_pending_removal.pop(path, None)
 
         finally:
             self.__lock.release()
 
         return log_config
 
-    def update_log_config( self, monitor_name, log_config ):
+    def update_log_config(self, monitor_name, log_config):
         """ Updates the log config of the log matcher that has the same
         path as the one specified in the log_config param
         """
-        log_config = self.__config.parse_log_config( log_config, default_parser='agent-metrics', context_description='Updating log entry requested by module "%s"' % monitor_name).copy()
+        log_config = self.__config.parse_log_config(
+            log_config,
+            default_parser="agent-metrics",
+            context_description='Updating log entry requested by module "%s"'
+            % monitor_name,
+        ).copy()
         try:
             self.__lock.acquire()
 
-            path = log_config['path']
+            path = log_config["path"]
             # Make sure the log path is being dynamically monitored
             if path not in self.__dynamic_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried to updating a log file \'%s\' for monitor \'%s\', but it is not being monitored' % (path, monitor_name) )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (path, monitor_name),
+                )
                 return
 
             # Make sure only the monitor that added this path can update it
-            if path in self.__dynamic_paths and self.__dynamic_paths[path] != monitor_name:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried to updating a log file \'%s\' for monitor \'%s\', but it is currently being monitored by \'%s\'' % (path, monitor_name, self.__dynamic_paths[path] ) )
+            if (
+                path in self.__dynamic_paths
+                and self.__dynamic_paths[path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried to updating a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (path, monitor_name, self.__dynamic_paths[path]),
+                )
                 return
 
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Updating config for log file \'%s\' for monitor \'%s\'' % (path, monitor_name ) )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Updating config for log file '%s' for monitor '%s'"
+                % (path, monitor_name),
+            )
             self.__logs_pending_reload[path] = log_config
         finally:
             self.__lock.release()
 
-    def remove_log_path( self, monitor_name, log_path ):
+    def remove_log_path(self, monitor_name, log_path):
         """Remove the log_path from the list of paths being watched
         params: log_path - a string containing the path to the file no longer being watched
         """
-        #get the list of paths with 0 reference counts
+        # get the list of paths with 0 reference counts
         self.__lock.acquire()
         try:
             # Make sure the log path is being dynamically monitored
             if log_path not in self.__dynamic_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried removing a log file \'%s\' for monitor \'%s\', but it is not being monitored' % (log_path, monitor_name) )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
+                )
                 return
 
             # If we are not a scheduled deletion, make sure only the monitor that added this path can remove it
-            if monitor_name != SCHEDULED_DELETION and log_path in self.__dynamic_paths and self.__dynamic_paths[log_path] != monitor_name:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried removing a log file \'%s\' for monitor \'%s\', but it is currently being monitored by \'%s\'' % (log_path, monitor_name, self.__dynamic_paths[log_path] ) )
+            if (
+                monitor_name != SCHEDULED_DELETION
+                and log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried removing a log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
                 return
 
-            log.log(scalyr_logging.DEBUG_LEVEL_0, 'Removing log file \'%s\' for \'%s\'' % (log_path, monitor_name ) )
-            #do the removals
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Removing log file '%s' for '%s'" % (log_path, monitor_name),
+            )
+            # do the removals
             matchers = []
             for m in self.__log_matchers:
                 if m.log_path == log_path:
@@ -398,19 +471,19 @@ class CopyingManager(StoppableThread, LogWatcher):
                     # itself up when it notices the matcher is finished.
                     # We set the matcher to finish immediately, because we want the matcher to finish now, not when it's finished
                     # any existing processing
-                    m.finish( immediately=True )
+                    m.finish(immediately=True)
                 else:
-                    matchers.append( m )
+                    matchers.append(m)
 
             self.__log_matchers[:] = matchers
-            self.__logs_pending_removal.pop( log_path, None )
-            self.__logs_pending_reload.pop( log_path, None )
-            self.__dynamic_paths.pop( log_path, None )
+            self.__logs_pending_removal.pop(log_path, None)
+            self.__logs_pending_reload.pop(log_path, None)
+            self.__dynamic_paths.pop(log_path, None)
 
         finally:
             self.__lock.release()
 
-    def schedule_log_path_for_removal( self, monitor_name, log_path ):
+    def schedule_log_path_for_removal(self, monitor_name, log_path):
         """
             Schedules a log path for removal.  The logger will only
             be removed once the number of pending bytes reaches 0
@@ -419,37 +492,53 @@ class CopyingManager(StoppableThread, LogWatcher):
         try:
             # Make sure the log path is being dynamically monitored
             if log_path not in self.__dynamic_paths:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried scheduling the removal of log file \'%s\' for monitor \'%s\', but it is not being monitored' % (log_path, monitor_name) )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is not being monitored"
+                    % (log_path, monitor_name),
+                )
                 return
 
             # Make sure only the monitor that added this path can remove it
-            if log_path in self.__dynamic_paths and self.__dynamic_paths[log_path] != monitor_name:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'Tried scheduling the removal of log file \'%s\' for monitor \'%s\', but it is currently being monitored by \'%s\'' % (log_path, monitor_name, self.__dynamic_paths[log_path] ) )
+            if (
+                log_path in self.__dynamic_paths
+                and self.__dynamic_paths[log_path] != monitor_name
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Tried scheduling the removal of log file '%s' for monitor '%s', but it is currently being monitored by '%s'"
+                    % (log_path, monitor_name, self.__dynamic_paths[log_path]),
+                )
                 return
 
             if log_path not in self.__logs_pending_removal:
                 self.__logs_pending_removal[log_path] = True
-                log.log(scalyr_logging.DEBUG_LEVEL_0, 'log path \'%s\' for monitor \'%s\' is pending removal' % (log_path, monitor_name ) )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "log path '%s' for monitor '%s' is pending removal"
+                    % (log_path, monitor_name),
+                )
         finally:
             self.__lock.release()
 
-    def dynamic_matchers_count( self ):
+    def dynamic_matchers_count(self):
         """
             Used for testing - returns the number of dynamic matchers
         """
-        return len( self.__dynamic_matchers )
+        return len(self.__dynamic_matchers)
 
-    def logs_pending_removal_count( self ):
+    def logs_pending_removal_count(self):
         """
             Used for testing - returns the number of logs pending removal
         """
 
         self.__lock.acquire()
         try:
-            return len( self.__logs_pending_removal )
+            return len(self.__logs_pending_removal)
         finally:
             self.__lock.release()
-    def __create_log_matches(self, configuration, monitors ):
+
+    def __create_log_matches(self, configuration, monitors):
         """Creates the log matchers that should be used based on the configuration and the list of monitors.
 
         @param configuration: The Configuration object.
@@ -469,16 +558,19 @@ class CopyingManager(StoppableThread, LogWatcher):
         all_paths = {}
         for entry in configuration.log_configs:
             configs.append(entry.copy())
-            all_paths[entry['path']] = 1
+            all_paths[entry["path"]] = 1
 
         for monitor in monitors:
             log_config = configuration.parse_log_config(
-                monitor.log_config, default_parser='agent-metrics',
-                context_description='log entry requested by module "%s"' % monitor.module_name).copy()
+                monitor.log_config,
+                default_parser="agent-metrics",
+                context_description='log entry requested by module "%s"'
+                % monitor.module_name,
+            ).copy()
 
-            if log_config['path'] not in all_paths:
+            if log_config["path"] not in all_paths:
                 configs.append(log_config)
-                all_paths[log_config['path']] = 1
+                all_paths[log_config["path"]] = 1
 
             monitor.log_config = log_config
 
@@ -522,11 +614,14 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         # Debug leak
         if self.__disable_copying_thread:
-            log.log( scalyr_logging.DEBUG_LEVEL_0, "Copying thread disabled.  No log copying will occur" )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Copying thread disabled.  No log copying will occur",
+            )
             self.__copying_semaphore.release()
             # sit here and do nothing
             while self._run_state.is_running():
-                self._sleep_but_awaken_if_stopped( 1 )
+                self._sleep_but_awaken_if_stopped(1)
             # early return
             return
 
@@ -543,6 +638,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         if self.__config.copying_thread_profile_interval > 0:
             import cProfile
+
             profiler = cProfile.Profile()
             profiler.enable()
             profile_dump_interval = self.__config.copying_thread_profile_interval
@@ -559,23 +655,31 @@ class CopyingManager(StoppableThread, LogWatcher):
                 checkpoints_state = self.__read_checkpoint_state()
                 if checkpoints_state is None:
                     log.info(
-                        'The checkpoints were not read.  All logs will be copied starting at their current end')
-                elif (current_time - checkpoints_state['time']) > self.__config.max_allowed_checkpoint_age:
-                    log.warn('The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
-                             'be copied starting at their current end.', scalyr_util.format_time(
-                             checkpoints_state['time']), error_code='staleCheckpointFile')
+                        "The checkpoints were not read.  All logs will be copied starting at their current end"
+                    )
+                elif (
+                    current_time - checkpoints_state["time"]
+                ) > self.__config.max_allowed_checkpoint_age:
+                    log.warn(
+                        'The current checkpoint is too stale (written at "%s").  Ignoring it.  All log files will '
+                        "be copied starting at their current end.",
+                        scalyr_util.format_time(checkpoints_state["time"]),
+                        error_code="staleCheckpointFile",
+                    )
                     checkpoints_state = None
 
                 if checkpoints_state is None:
                     checkpoints = None
                 else:
-                    checkpoints = checkpoints_state['checkpoints']
+                    checkpoints = checkpoints_state["checkpoints"]
 
                 # Do the initial scan for any log files that match the configured logs we should be copying.  If there
                 # are checkpoints for them, make sure we start copying from the position we left off at.
-                self.__scan_for_new_logs_if_necessary(current_time=current_time,
-                                                      checkpoints=checkpoints,
-                                                      logs_initial_positions=self.__logs_initial_positions)
+                self.__scan_for_new_logs_if_necessary(
+                    current_time=current_time,
+                    checkpoints=checkpoints,
+                    logs_initial_positions=self.__logs_initial_positions,
+                )
 
                 # The copying params that tell us how much we are allowed to send and how long we have to wait between
                 # attempts.
@@ -588,13 +692,17 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                 last_full_checkpoint_write = current_time
 
-                pipeline_byte_threshold = self.__config.pipeline_threshold * float(self.__config.max_allowed_request_size)
+                pipeline_byte_threshold = self.__config.pipeline_threshold * float(
+                    self.__config.max_allowed_request_size
+                )
 
                 # We are about to start copying.  We can tell waiting threads.
                 self.__copying_semaphore.release()
 
                 while self._run_state.is_running():
-                    log.log(scalyr_logging.DEBUG_LEVEL_1, 'At top of copy log files loop.')
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_1, "At top of copy log files loop."
+                    )
                     current_time = time.time()
                     pipeline_time = 0.0
                     # noinspection PyBroadException
@@ -603,25 +711,36 @@ class CopyingManager(StoppableThread, LogWatcher):
                         # on the ground and advance.
                         if current_time - last_success > self.__config.max_retry_time:
                             if self.__pending_add_events_task is not None:
-                                self.__pending_add_events_task.completion_callback(LogFileProcessor.FAIL_AND_DROP)
+                                self.__pending_add_events_task.completion_callback(
+                                    LogFileProcessor.FAIL_AND_DROP
+                                )
                                 self.__pending_add_events_task = None
                             # Tell all of the processors to go to the end of the current log file.  We will start
                             # copying
                             # from there.
                             for processor in self.__log_processors:
-                                processor.skip_to_end('Too long since last successful request to server.',
-                                                      'skipNoServerSuccess', current_time=current_time)
+                                processor.skip_to_end(
+                                    "Too long since last successful request to server.",
+                                    "skipNoServerSuccess",
+                                    current_time=current_time,
+                                )
 
                         # Check for new logs.  If we do detect some new log files, they must have been created since our
                         # last scan.  In this case, we start copying them from byte zero instead of the end of the file.
-                        self.__scan_for_new_logs_if_necessary(current_time=current_time, copy_at_index_zero=True)
+                        self.__scan_for_new_logs_if_necessary(
+                            current_time=current_time, copy_at_index_zero=True
+                        )
 
                         # Collect log lines to send if we don't have one already.
                         if self.__pending_add_events_task is None:
                             self.__pending_add_events_task = self.__get_next_add_events_task(
-                                copying_params.current_bytes_allowed_to_send)
+                                copying_params.current_bytes_allowed_to_send
+                            )
                         else:
-                            log.log(scalyr_logging.DEBUG_LEVEL_1, 'Have pending batch of events, retrying to send.')
+                            log.log(
+                                scalyr_logging.DEBUG_LEVEL_1,
+                                "Have pending batch of events, retrying to send.",
+                            )
                             # Take a look at the file system and see if there are any new bytes pending.  This updates
                             # the statistics for each pending file.  This is important to do for status purposes if we
                             # have not tried to invoke get_next_send_events_task in a while (since that already updates
@@ -630,9 +749,14 @@ class CopyingManager(StoppableThread, LogWatcher):
 
                         # Try to send the request if we have one.
                         if self.__pending_add_events_task is not None:
-                            log.log(scalyr_logging.DEBUG_LEVEL_1, 'Sending an add event request')
+                            log.log(
+                                scalyr_logging.DEBUG_LEVEL_1,
+                                "Sending an add event request",
+                            )
                             # Send the request, but don't block for the response yet.
-                            get_response = self._send_events(self.__pending_add_events_task)
+                            get_response = self._send_events(
+                                self.__pending_add_events_task
+                            )
 
                             # Check to see if pipelining should be disabled
                             disable_pipelining = self.__has_pending_log_changes()
@@ -640,15 +764,21 @@ class CopyingManager(StoppableThread, LogWatcher):
                             # If we are sending very large requests, we will try to optimize for future requests
                             # by overlapping building the request with waiting for the response on the current request
                             # (pipelining).
-                            if (self.__pending_add_events_task.add_events_request.current_size >= pipeline_byte_threshold
-                                and self.__pending_add_events_task.next_pipelined_task is None
-                                and not disable_pipelining):
+                            if (
+                                self.__pending_add_events_task.add_events_request.current_size
+                                >= pipeline_byte_threshold
+                                and self.__pending_add_events_task.next_pipelined_task
+                                is None
+                                and not disable_pipelining
+                            ):
 
                                 # Time how long it takes us to build it because we will subtract it from how long we
                                 # have to wait before we send the next request.
                                 pipeline_time = time.time()
                                 self.__pending_add_events_task.next_pipelined_task = self.__get_next_add_events_task(
-                                    copying_params.current_bytes_allowed_to_send, for_pipelining=True)
+                                    copying_params.current_bytes_allowed_to_send,
+                                    for_pipelining=True,
+                                )
                             else:
                                 pipeline_time = 0.0
 
@@ -660,37 +790,52 @@ class CopyingManager(StoppableThread, LogWatcher):
                             else:
                                 pipeline_time = 0.0
 
-                            log.log(scalyr_logging.DEBUG_LEVEL_1,
-                                    'Sent %ld bytes and received response with status="%s".',
-                                    bytes_sent, result)
+                            log.log(
+                                scalyr_logging.DEBUG_LEVEL_1,
+                                'Sent %ld bytes and received response with status="%s".',
+                                bytes_sent,
+                                result,
+                            )
 
-                            if result == 'success' or 'discardBuffer' in result or 'requestTooLarge' in result:
+                            if (
+                                result == "success"
+                                or "discardBuffer" in result
+                                or "requestTooLarge" in result
+                            ):
                                 next_add_events_task = None
                                 try:
-                                    if result == 'success':
-                                        self.__pending_add_events_task.completion_callback(LogFileProcessor.SUCCESS)
-                                        next_add_events_task = self.__pending_add_events_task.next_pipelined_task
-                                    elif 'discardBuffer' in result:
+                                    if result == "success":
                                         self.__pending_add_events_task.completion_callback(
-                                            LogFileProcessor.FAIL_AND_DROP)
+                                            LogFileProcessor.SUCCESS
+                                        )
+                                        next_add_events_task = (
+                                            self.__pending_add_events_task.next_pipelined_task
+                                        )
+                                    elif "discardBuffer" in result:
+                                        self.__pending_add_events_task.completion_callback(
+                                            LogFileProcessor.FAIL_AND_DROP
+                                        )
                                     else:
                                         self.__pending_add_events_task.completion_callback(
-                                            LogFileProcessor.FAIL_AND_RETRY)
+                                            LogFileProcessor.FAIL_AND_RETRY
+                                        )
                                 finally:
                                     # No matter what, we want to throw away the current event since the server said we
                                     # could.  We have seen some bugs where we did not throw away the request because
                                     # an exception was thrown during the callback.
-                                    self.__pending_add_events_task = next_add_events_task
-                                    self.__write_active_checkpoint_state( current_time )
+                                    self.__pending_add_events_task = (
+                                        next_add_events_task
+                                    )
+                                    self.__write_active_checkpoint_state(current_time)
 
-                            if result == 'success':
+                            if result == "success":
                                 last_success = current_time
                         else:
-                            result = 'failedReadingLogs'
+                            result = "failedReadingLogs"
                             bytes_sent = 0
-                            full_response = ''
+                            full_response = ""
 
-                            log.error('Failed to read logs for copying.  Will re-try')
+                            log.error("Failed to read logs for copying.  Will re-try")
 
                         # Update the statistics and our copying parameters.
                         self.__lock.acquire()
@@ -700,7 +845,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                         self.__last_attempt_size = bytes_sent
                         self.__last_response = full_response
                         self.__last_response_status = result
-                        if result == 'success':
+                        if result == "success":
                             self.__total_bytes_uploaded += bytes_sent
                         self.__lock.release()
 
@@ -712,30 +857,47 @@ class CopyingManager(StoppableThread, LogWatcher):
                             seconds_past_epoch = int(time.time())
                             if seconds_past_epoch % profile_dump_interval == 0:
                                 profiler.disable()
-                                profiler.dump_stats('%s%s' % (self.__config.copying_thread_profile_output_path,
-                                                              datetime.datetime.now().strftime("%H_%M_%S.out")))
+                                profiler.dump_stats(
+                                    "%s%s"
+                                    % (
+                                        self.__config.copying_thread_profile_output_path,
+                                        datetime.datetime.now().strftime(
+                                            "%H_%M_%S.out"
+                                        ),
+                                    )
+                                )
                                 profiler.enable()
                     except Exception:
                         # TODO: Do not catch Exception here.  That is too broad.  Disabling warning for now.
-                        log.exception('Failed while attempting to scan and transmit logs')
-                        log.log(scalyr_logging.DEBUG_LEVEL_1, 'Failed while attempting to scan and transmit logs')
+                        log.exception(
+                            "Failed while attempting to scan and transmit logs"
+                        )
+                        log.log(
+                            scalyr_logging.DEBUG_LEVEL_1,
+                            "Failed while attempting to scan and transmit logs",
+                        )
                         self.__lock.acquire()
                         self.__last_attempt_time = current_time
                         self.__total_errors += 1
                         self.__lock.release()
 
-                    if current_time - last_full_checkpoint_write > self.__config.full_checkpoint_interval:
-                        self.__write_full_checkpoint_state( current_time )
+                    if (
+                        current_time - last_full_checkpoint_write
+                        > self.__config.full_checkpoint_interval
+                    ):
+                        self.__write_full_checkpoint_state(current_time)
                         last_full_checkpoint_write = current_time
 
                     if pipeline_time < copying_params.current_sleep_interval:
-                        self._sleep_but_awaken_if_stopped(copying_params.current_sleep_interval - pipeline_time)
+                        self._sleep_but_awaken_if_stopped(
+                            copying_params.current_sleep_interval - pipeline_time
+                        )
             except Exception:
                 # If we got an exception here, it is caused by a bug in the program, so let's just terminate.
-                log.exception('Log copying failed due to exception')
+                log.exception("Log copying failed due to exception")
                 sys.exit(1)
         finally:
-            self.__write_full_checkpoint_state( current_time )
+            self.__write_full_checkpoint_state(current_time)
             for processor in self.__log_processors:
                 processor.close()
             if profiler is not None:
@@ -812,7 +974,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: The add events request
         @rtype: AddEventsRequest
         """
-        return self.__scalyr_client.add_events_request(session_info=session_info, max_size=max_size)
+        return self.__scalyr_client.add_events_request(
+            session_info=session_info, max_size=max_size
+        )
 
     def _send_events(self, add_events_task):
         """Sends the AddEventsRequest contained in the task but does not block on the response.
@@ -829,9 +993,11 @@ class CopyingManager(StoppableThread, LogWatcher):
         # TODO: Re-enable not actually sending an event if it is empty.  However, if we turn this on, it
         # currently causes too much error output and the client connection closes too frequently.  We need to
         # actually send some sort of application level keep alive.
-        #if add_events_task.add_events_request.total_events > 0:
-        return self.__scalyr_client.send(add_events_task.add_events_request, block_on_response=False)
-        #else:
+        # if add_events_task.add_events_request.total_events > 0:
+        return self.__scalyr_client.send(
+            add_events_task.add_events_request, block_on_response=False
+        )
+        # else:
         #    return "success", 0, "{ status: \"success\", message: \"RPC not sent to server because it was empty\"}"
 
     def __read_checkpoint_state(self):
@@ -842,37 +1008,51 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return:  The checkpoint state
         @rtype: dict
         """
-        full_checkpoint_file_path = os.path.join(self.__config.agent_data_path, 'checkpoints.json')
+        full_checkpoint_file_path = os.path.join(
+            self.__config.agent_data_path, "checkpoints.json"
+        )
 
         if not os.path.isfile(full_checkpoint_file_path):
-            log.info('The log copying checkpoint file "%s" does not exist, skipping.' % full_checkpoint_file_path)
+            log.info(
+                'The log copying checkpoint file "%s" does not exist, skipping.'
+                % full_checkpoint_file_path
+            )
             return None
 
         # noinspection PyBroadException
         try:
             full_checkpoints = scalyr_util.read_file_as_json(full_checkpoint_file_path)
-            active_checkpoint_file_path = os.path.join(self.__config.agent_data_path, 'active-checkpoints.json')
+            active_checkpoint_file_path = os.path.join(
+                self.__config.agent_data_path, "active-checkpoints.json"
+            )
 
             if not os.path.isfile(active_checkpoint_file_path):
                 return full_checkpoints
 
             # if the active checkpoint file is newer, overwrite any checkpoint values with the
             # updated full checkpoint
-            active_checkpoints = scalyr_util.read_file_as_json(active_checkpoint_file_path)
+            active_checkpoints = scalyr_util.read_file_as_json(
+                active_checkpoint_file_path
+            )
 
-            if active_checkpoints['time'] > full_checkpoints['time']:
-                full_checkpoints['time'] = active_checkpoints['time']
-                for path, checkpoint in active_checkpoints['checkpoints'].iteritems():
+            if active_checkpoints["time"] > full_checkpoints["time"]:
+                full_checkpoints["time"] = active_checkpoints["time"]
+                for path, checkpoint in active_checkpoints["checkpoints"].iteritems():
                     full_checkpoints[path] = checkpoint
 
             return full_checkpoints
 
         except Exception:
             # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
-            log.exception('Could not read checkpoint file due to error.', error_code='failedCheckpointRead')
+            log.exception(
+                "Could not read checkpoint file due to error.",
+                error_code="failedCheckpointRead",
+            )
             return None
 
-    def __write_checkpoint_state(self, log_processors, base_file, current_time, full_checkpoint ):
+    def __write_checkpoint_state(
+        self, log_processors, base_file, current_time, full_checkpoint
+    ):
         """Writes the current checkpoint state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
@@ -882,8 +1062,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         # and then an entry for each file path.
         checkpoints = {}
         state = {
-            'time': current_time,
-            'checkpoints': checkpoints,
+            "time": current_time,
+            "checkpoints": checkpoints,
         }
 
         for processor in log_processors:
@@ -896,24 +1076,34 @@ class CopyingManager(StoppableThread, LogWatcher):
         # We write to a temporary file and then rename it to the real file name to make the write more atomic.
         # We have had problems in the past with corrupted checkpoint files due to failures during the write.
         file_path = os.path.join(self.__config.agent_data_path, base_file)
-        tmp_path = os.path.join(self.__config.agent_data_path, base_file + '~')
-        scalyr_util.atomic_write_dict_as_json_file( file_path, tmp_path, state )
+        tmp_path = os.path.join(self.__config.agent_data_path, base_file + "~")
+        scalyr_util.atomic_write_dict_as_json_file(file_path, tmp_path, state)
 
-    def __write_full_checkpoint_state( self, current_time ):
+    def __write_full_checkpoint_state(self, current_time):
         """Writes the full checkpont state to disk.
 
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
         from where we left off copying each file.
 
         """
-        self.__write_checkpoint_state( self.__log_processors, 'checkpoints.json', current_time, full_checkpoint=True )
+        self.__write_checkpoint_state(
+            self.__log_processors,
+            "checkpoints.json",
+            current_time,
+            full_checkpoint=True,
+        )
         self.__active_log_processors = {}
-        self.__write_active_checkpoint_state( current_time )
+        self.__write_active_checkpoint_state(current_time)
 
-    def __write_active_checkpoint_state( self, current_time ):
+    def __write_active_checkpoint_state(self, current_time):
         """Writes checkpoints only for logs that have been active since the last full checkpoint write
         """
-        self.__write_checkpoint_state( self.__log_processors, 'active-checkpoints.json', current_time, full_checkpoint=False )
+        self.__write_checkpoint_state(
+            self.__log_processors,
+            "active-checkpoints.json",
+            current_time,
+            full_checkpoint=False,
+        )
 
     def __get_next_add_events_task(self, bytes_allowed_to_send, for_pipelining=False):
         """Returns a new AddEventsTask getting all of the pending bytes from the log files that need to be copied.
@@ -929,8 +1119,10 @@ class CopyingManager(StoppableThread, LogWatcher):
         @return: The new AddEventsTask
         @rtype: AddEventsTask
         """
-        log.log(scalyr_logging.DEBUG_LEVEL_1,
-                'Getting batch of events to send. (pipelining=%s)' % str(for_pipelining))
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "Getting batch of events to send. (pipelining=%s)" % str(for_pipelining),
+        )
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
         # collect all of the callback that they give us and wrap it into one massive one.
@@ -950,16 +1142,19 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Whether or not the max bytes allowed to send has been reached.
         buffer_filled = False
 
-        add_events_request = self._create_add_events_request(session_info=self.__expanded_server_attributes,
-                                                             max_size=bytes_allowed_to_send)
+        add_events_request = self._create_add_events_request(
+            session_info=self.__expanded_server_attributes,
+            max_size=bytes_allowed_to_send,
+        )
 
         if for_pipelining:
             add_events_request.increment_timing_data(pipelined=1.0)
 
         while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
-            (callback, buffer_filled) = self.__log_processors[current_processor].perform_processing(
-                add_events_request)
+            (callback, buffer_filled) = self.__log_processors[
+                current_processor
+            ].perform_processing(add_events_request)
 
             # A callback of None indicates there was some error reading the log.  Just retry again later.
             if callback is None:
@@ -1020,23 +1215,29 @@ class CopyingManager(StoppableThread, LogWatcher):
             handle_completed_callback(LogFileProcessor.SUCCESS)
             return None
 
-        log.log(scalyr_logging.DEBUG_LEVEL_1,
-                'Information for batch of events. (pipelining=%s): %s' % (str(for_pipelining),
-                                                                          add_events_request.get_timing_data()))
+        log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "Information for batch of events. (pipelining=%s): %s"
+            % (str(for_pipelining), add_events_request.get_timing_data()),
+        )
         return AddEventsTask(add_events_request, handle_completed_callback)
 
-    def __has_pending_log_changes( self ):
+    def __has_pending_log_changes(self):
         """
         Returns true if there are any pending changes to set of logs being monitored
         """
         self.__lock.acquire()
         try:
-            pending_count = len(self.__pending_log_matchers) + len(self.__logs_pending_reload) + len(self.__logs_pending_removal)
+            pending_count = (
+                len(self.__pending_log_matchers)
+                + len(self.__logs_pending_reload)
+                + len(self.__logs_pending_removal)
+            )
             return pending_count > 0
         finally:
             self.__lock.release()
 
-    def __remove_logs_scheduled_for_deletion( self ):
+    def __remove_logs_scheduled_for_deletion(self):
         """
             Removes any logs scheduled for deletion, if there are 0 bytes left to copy and
             the log file has been matched/processed at least once
@@ -1053,9 +1254,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # if we have a log matcher for the path, then set it to finished
         for path in pending_removal.iterkeys():
-            matcher = self.__dynamic_matchers.get( path, None )
+            matcher = self.__dynamic_matchers.get(path, None)
             if matcher is None:
-                log.warn( "Log scheduled for removal is not being monitored: %s" % path )
+                log.warn("Log scheduled for removal is not being monitored: %s" % path)
                 continue
 
             matcher.finish()
@@ -1067,7 +1268,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-    def __purge_finished_log_matchers( self ):
+    def __purge_finished_log_matchers(self):
         """
         Removes from the list of log matchers any log matchers that are finished
         """
@@ -1076,10 +1277,10 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         for path, m in matchers.iteritems():
             if m.is_finished():
-                self.remove_log_path( SCHEDULED_DELETION, path )
-                self.__dynamic_matchers.pop( path, None )
+                self.remove_log_path(SCHEDULED_DELETION, path)
+                self.__dynamic_matchers.pop(path, None)
 
-    def __scan_for_pending_log_files( self ):
+    def __scan_for_pending_log_files(self):
         """
         Creates log processors for any recent, dynamically added log matchers
         """
@@ -1101,40 +1302,48 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        checkpoints={}
+        checkpoints = {}
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []
         for path, log_config in pending_reload.iteritems():
-            log.log( scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % path )
+            log.log(scalyr_logging.DEBUG_LEVEL_1, "Pending reload for %s" % path)
 
             # only reload matchers that have been dynamically added
-            matcher = self.__dynamic_matchers.get( path, None )
+            matcher = self.__dynamic_matchers.get(path, None)
             if matcher is None:
-                log.log( scalyr_logging.DEBUG_LEVEL_0, "Log matcher not found for %s" % path )
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0, "Log matcher not found for %s" % path
+                )
                 continue
 
             # update the log config of the matcher, which closes any open processors, and returns
             # their checkpoints
-            closed_processors = matcher.update_log_entry_config( log_config )
+            closed_processors = matcher.update_log_entry_config(log_config)
             for processor_path, checkpoint in closed_processors.iteritems():
                 checkpoints[processor_path] = checkpoint
 
-            reloaded.append( matcher )
+            reloaded.append(matcher)
 
         self.__remove_closed_processors()
 
-        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints=checkpoints, copy_at_index_zero=True )
-        self.__create_log_processors_for_log_matchers( reloaded, checkpoints=checkpoints, copy_at_index_zero=True )
+        self.__create_log_processors_for_log_matchers(
+            log_matchers, checkpoints=checkpoints, copy_at_index_zero=True
+        )
+        self.__create_log_processors_for_log_matchers(
+            reloaded, checkpoints=checkpoints, copy_at_index_zero=True
+        )
 
         self.__lock.acquire()
         try:
-            self.__log_matchers.extend( log_matchers )
-            self.__pending_log_matchers = [lm for lm in self.__pending_log_matchers if lm not in log_matchers]
+            self.__log_matchers.extend(log_matchers)
+            self.__pending_log_matchers = [
+                lm for lm in self.__pending_log_matchers if lm not in log_matchers
+            ]
         finally:
             self.__lock.release()
 
-    def __remove_closed_processors( self ):
+    def __remove_closed_processors(self):
         """
         Removes any closed log processors from the __log_processors and __log_paths_being_processed lists
         """
@@ -1151,7 +1360,9 @@ class CopyingManager(StoppableThread, LogWatcher):
                 self.__log_processors.append(p)
                 self.__log_paths_being_processed[p.log_path] = p
 
-    def __create_log_processors_for_log_matchers( self, log_matchers, checkpoints=None, copy_at_index_zero=False ):
+    def __create_log_processors_for_log_matchers(
+        self, log_matchers, checkpoints=None, copy_at_index_zero=False
+    ):
         """
         Creates log processors for any files on disk that match any file matching the
         passed in log_matchers
@@ -1182,8 +1393,11 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # iterate over the log_matchers while we create the LogFileProcessors
         for matcher in log_matchers:
-            for new_processor in matcher.find_matches(self.__log_paths_being_processed, checkpoints,
-                                                      copy_at_index_zero=copy_at_index_zero):
+            for new_processor in matcher.find_matches(
+                self.__log_paths_being_processed,
+                checkpoints,
+                copy_at_index_zero=copy_at_index_zero,
+            ):
                 self.__log_processors.append(new_processor)
                 self.__log_paths_being_processed[new_processor.log_path] = new_processor
 
@@ -1194,13 +1408,18 @@ class CopyingManager(StoppableThread, LogWatcher):
             # check to see if no matches were found for pending removal
             # if none were found, this is indicative that the log file has already been
             # removed
-            if matcher.config['path'] in pending_removal and not pending_removal[matcher.config['path']]:
-                log.warn( "No log matches were found for %s.  This is likely indicative that the log file no longer exists.\n", matcher.config['path'] )
+            if (
+                matcher.config["path"] in pending_removal
+                and not pending_removal[matcher.config["path"]]
+            ):
+                log.warn(
+                    "No log matches were found for %s.  This is likely indicative that the log file no longer exists.\n",
+                    matcher.config["path"],
+                )
 
                 # remove it anyway, otherwise the logs_`pending_removal list will just
                 # grow and grow
-                pending_removal[matcher.config['path']] = True
-
+                pending_removal[matcher.config["path"]] = True
 
         # require the lock to update the pending removal dict to
         # mark which logs have been matched.
@@ -1216,9 +1435,13 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-
-    def __scan_for_new_logs_if_necessary(self, current_time=None, checkpoints=None, logs_initial_positions=None,
-                                         copy_at_index_zero=False):
+    def __scan_for_new_logs_if_necessary(
+        self,
+        current_time=None,
+        checkpoints=None,
+        logs_initial_positions=None,
+        copy_at_index_zero=False,
+    ):
         """If it has been sufficient time since we last checked, scan the file system for new files that match the
         logs that should be copied.
 
@@ -1239,14 +1462,19 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Debug leak, if not the initial request, and disable_leak flag is true, then don't scan
         # for new logs
         if logs_initial_positions is None and self.__disable_new_file_matches:
-            log.log(scalyr_logging.DEBUG_LEVEL_0, "Scanning for new file matches disabled" )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0, "Scanning for new file matches disabled"
+            )
             return
 
         if current_time is None:
             current_time = time.time()
 
-        if (self.__last_new_file_scan_time is None or
-                current_time - self.__last_new_file_scan_time < self.__config.max_new_log_detection_time):
+        if (
+            self.__last_new_file_scan_time is None
+            or current_time - self.__last_new_file_scan_time
+            < self.__config.max_new_log_detection_time
+        ):
             return
 
         self.__last_new_file_scan_time = current_time
@@ -1257,8 +1485,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         if logs_initial_positions is not None:
             for log_path in logs_initial_positions:
                 if not log_path in checkpoints:
-                    checkpoints[log_path] = LogFileProcessor.create_checkpoint(logs_initial_positions[log_path])
-
+                    checkpoints[log_path] = LogFileProcessor.create_checkpoint(
+                        logs_initial_positions[log_path]
+                    )
 
         # make a shallow copy of log_matchers
         log_matchers = []
@@ -1268,8 +1497,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         finally:
             self.__lock.release()
 
-        self.__create_log_processors_for_log_matchers( log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero )
-
+        self.__create_log_processors_for_log_matchers(
+            log_matchers, checkpoints=checkpoints, copy_at_index_zero=copy_at_index_zero
+        )
 
     def __scan_for_new_bytes(self, current_time=None):
         """For any existing LogProcessors, have them scan the file system to see if their underlying files have
@@ -1281,7 +1511,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         of pending bytes, etc).
         """
         if self.__disable_scan_for_new_bytes:
-            log.log( scalyr_logging.DEBUG_LEVEL_0, "Scanning for new bytes disabled." )
+            log.log(scalyr_logging.DEBUG_LEVEL_0, "Scanning for new bytes disabled.")
             return
 
         if current_time is None:

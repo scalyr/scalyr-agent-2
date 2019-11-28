@@ -23,8 +23,8 @@ here:  http://www.postgresql.org/docs/9.3/static/auth-pg-hba-conf.html
 In the above configuration, we are interested in the line:
 
     host    all             all             127.0.0.1/32            md5
-    
-This line specifies that the server will allow users to connect from localhost using a 
+
+This line specifies that the server will allow users to connect from localhost using a
 password.
 
 If you have an existing user that requires a password, please consult the documentation
@@ -40,15 +40,15 @@ things are configured correctly by using the psql command as follows:
     SSL connection (cipher: DHE-RSA-AES256-SHA, bits: 256)
     Type "help" for help.
 
-    postgres=# 
-      
-If the configuration is incorrect or you enter an invalid password, you will see something 
+    postgres=#
+
+If the configuration is incorrect or you enter an invalid password, you will see something
 similar to:
 
     $ psql -U statusmon -W postgres -h localhost
     psql: FATAL:  password authentication failed for user "statusmon"
     FATAL:  password authentication failed for user "statusmon"
-    
+
 
 Configuring Scalyr Agent
 
@@ -62,10 +62,10 @@ file.  A typical fragment resembles:
       database_host:       "localhost",
       database_name:       "mydb",
       database_username:   "statusmon",
-      database_password:   "getstatus" 
+      database_password:   "getstatus"
     }
   ]
-  
+
 The valid configuration options for the module are:
 
 'database_host'       -- Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.

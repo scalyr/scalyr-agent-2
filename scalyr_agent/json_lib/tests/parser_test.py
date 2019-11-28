@@ -15,7 +15,7 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import unittest
 
@@ -48,7 +48,7 @@ class ByteScannerTests(ScalyrTestCase):
 
     def test_properties(self):
         x = ByteScanner("Hi \n")
-        
+
         self.assertEquals(x.position, 0)
         self.assertFalse(x.at_end)
         self.assertEquals(x.bytes_remaining, 4)
@@ -145,33 +145,29 @@ class JsonParserTests(ScalyrTestCase):
         self.assertRaises(JsonParseException, JsonParser.parse, "1..e")
 
     def test_parsing_strings(self):
-        x = JsonParser.parse("\"Hi there\"")
+        x = JsonParser.parse('"Hi there"')
         self.assertEquals(x, "Hi there")
 
-        x = JsonParser.parse("\"Hi there\" \n + \" Bye there\"")
+        x = JsonParser.parse('"Hi there" \n + " Bye there"')
         self.assertEquals(x, "Hi there Bye there")
 
-        x = JsonParser.parse("\"Hi there\\n\"")
+        x = JsonParser.parse('"Hi there\\n"')
         self.assertEquals(x, "Hi there\n")
 
-        x = JsonParser.parse("\"Hi there\\ua000\"")
+        x = JsonParser.parse('"Hi there\\ua000"')
         self.assertEquals(x, u"Hi there\ua000")
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "\"Hi there")
+        self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there')
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "\"Hi there \n ok bye \"")
+        self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there \n ok bye "')
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "\"Hi there \\")
+        self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there \\')
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "\"Hi there\" + Hi")
+        self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there" + Hi')
 
     def test_parsing_length_prefixed_strings(self):
-        x = JsonParser.parse('`s\x00\x00\x00\x0cHowdy folks!')
-        self.assertEquals('Howdy folks!', x)
+        x = JsonParser.parse("`s\x00\x00\x00\x0cHowdy folks!")
+        self.assertEquals("Howdy folks!", x)
 
     def test_triple_quoted_strings(self):
         x = JsonParser.parse('"""Howdy\n"folks"!"""')
@@ -184,18 +180,15 @@ class JsonParserTests(ScalyrTestCase):
         x = JsonParser.parse("false")
         self.assertEquals(x, False)
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "tuto")
+        self.assertRaises(JsonParseException, JsonParser.parse, "tuto")
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "foo")
+        self.assertRaises(JsonParseException, JsonParser.parse, "foo")
 
     def test_parsing_null(self):
         x = JsonParser.parse("null")
         self.assertEquals(x, None)
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "nill")
+        self.assertRaises(JsonParseException, JsonParser.parse, "nill")
 
     def test_parsing_comment(self):
         x = JsonParser.parse(" // Hi there\n  45")
@@ -204,11 +197,11 @@ class JsonParserTests(ScalyrTestCase):
         x = JsonParser.parse(" /* Hi there */ 45")
         self.assertEquals(x, 45)
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "/* Unterminated comment")
+        self.assertRaises(
+            JsonParseException, JsonParser.parse, "/* Unterminated comment"
+        )
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "/ Hi there")
+        self.assertRaises(JsonParseException, JsonParser.parse, "/ Hi there")
 
     def test_parsing_array(self):
         x = JsonParser.parse("[1, 2, 3]")
@@ -217,11 +210,9 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x[1], 2)
         self.assertEquals(x[2], 3)
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "[ 1, 2,")
+        self.assertRaises(JsonParseException, JsonParser.parse, "[ 1, 2,")
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "[ 1, 2 3]")
+        self.assertRaises(JsonParseException, JsonParser.parse, "[ 1, 2 3]")
 
         x = JsonParser.parse("[1, 2\n 3]")
         self.assertEquals(len(x), 3)
@@ -237,24 +228,23 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x.get("b"), 3)
         self.assertEquals(x.get("c"), True)
 
-        x = JsonParser.parse("{ \"a\": 5}")
+        x = JsonParser.parse('{ "a": 5}')
         self.assertEquals(len(x), 1)
         self.assertEquals(x.get("a"), 5)
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "{ a 5}")
+        self.assertRaises(JsonParseException, JsonParser.parse, "{ a 5}")
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "{ a: 5")
+        self.assertRaises(JsonParseException, JsonParser.parse, "{ a: 5")
 
-        self.assertRaises(JsonParseException, JsonParser.parse, 
-                          "{ a")
+        self.assertRaises(JsonParseException, JsonParser.parse, "{ a")
 
     def test_inferring_missing_comma(self):
-        x = JsonParser.parse("""{
+        x = JsonParser.parse(
+            """{
                                    a: 5
                                    b: 7
-                                 }""")
+                                 }"""
+        )
         self.assertEquals(len(x), 2)
         self.assertEquals(x.get("a"), 5)
         self.assertEquals(x.get("b"), 7)
@@ -263,5 +253,6 @@ class JsonParserTests(ScalyrTestCase):
 def main():
     unittest.main()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
