@@ -33,11 +33,11 @@ locally:
 
     virtualenv ENV
     source ENV/bin/activate
-
+    
 Install the Scalyr Agent 2 Python package:
 
     pip install scalyr-agent-2
-
+    
 You may optionally test that your environment is set up by running a test plugin:
 
     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.test_monitor
@@ -46,7 +46,7 @@ If everything has been set up correctly, you should see lines being written to s
 numbers from uniform and gaussian distributions.
 
 ## Defining the Monitor Plugin
-Next, you need to actually create your plugin.  You can use `test_monitor.py` as a starting point.  This file should
+Next, you need to actually create your plugin.  You can use `test_monitor.py` as a starting point.  This file should 
 be located in the `builtin_monitors` directory in the `scalyr_agent` package installed in your local environment.
   Generally, this is `ENV/lib/python*/site-packages/scalyr_agent/builtin_monitors`.
 
@@ -78,7 +78,7 @@ about the `ScalyrMonitor` class and its interface down below.  For this example,
             # configuration  field by supplying the argument
             # ‘require_field=True’.  Then, if the user does not supply the
             # field in the monitor’s configuration, an exception will be raised.
-            self.__gauss_mean = self._config.get('gauss_mean',
+            self.__gauss_mean = self._config.get('gauss_mean', 
                                                  default=0.5,
                                                  convert_to=float,
                                                  min_value=0,
@@ -107,22 +107,22 @@ samples it has recorded, including that count in the reported metrics.
 As you can probably guess, the `ScalyrMonitor` class is responsible for invoking the `gather_sample` method once per
 sample interval.  It also provides several important instance variables that derived classes can use.
 
-You can read the full documentation for `ScalyrMonitor` in the
+You can read the full documentation for `ScalyrMonitor` in the 
 `ENV/lib/python*/site-packages/scalyr_agent/scalyr_monitor.py` file, but let’s go over a few of the important methods
 here.
 
 Important ScalyrMonitor methods:
 
-  * `_initialize`: Invoked during instance initialization.  Derived classes may optionally override this method to
-    initialize instance variables.  Additionally, derived classes may verify the configuration parameters for
+  * `_initialize`: Invoked during instance initialization.  Derived classes may optionally override this method to 
+    initialize instance variables.  Additionally, derived classes may verify the configuration parameters for 
     the plugin as read from the config file is valid (stored in `self._config`).  This method should throw an Exception
-    if the config is not valid.   Overriding this method is suggested as an alternative to overriding the base
+    if the config is not valid.   Overriding this method is suggested as an alternative to overriding the base 
     `__init__` method.
   * `run`: Invoked to run the plugin.  The default implementation will invoke `self.gather_sample` once every sample
     interval. Most plugins will not need to override this method, but they may do so.  This method is invoked on a
     separate thread for each Monitor Plugin instance.
   * `gather_sample`: The default implementation of `self.run` will invoke this method once every sample interval.  The
-    derived classes are expected to override this method and perform any metric reporting required by the plugin.
+    derived classes are expected to override this method and perform any metric reporting required by the plugin.  
 
 As the example above illustrated, your plugin implementation will heavily rely on the instance variables defined by the
 `ScalyrMonitor` class.
@@ -133,16 +133,16 @@ Listed below are important `ScalyrMonitor` instance variables that can be used b
     section of the configuration.  This object works much like a `dict` but has extra functionality to help Monitor
     developers validate configuration options.  See documentation for the `MonitorConfig.get` method in
     `scalyr_monitor.py` for more details or see the example above.
-
+    
     The standard configuration fields for each monitor instance are “module” and “id”, but you may use any other field
     to allow users to provide configuration options specific to your plugin.  Generally, `_config` should be read
     during initialization and if it is invalid, throw an Exception explaining the error.  The `get` method can perform
-    validation and will throw an appropriate Exception if needed.
+    validation and will throw an appropriate Exception if needed.  
   * `_logger`: The `logging.Logger` instance to use to report errors and, more importantly, metrics to Scalyr.  All
     records created with INFO or higher will be sent to Scalyr.  This `_logger` is specific to this Monitor Plugin
     instance and should be used only for the metrics and messages generated by it.
   * `_sample_interval_secs`: The number of seconds between calls to `gather_sample`.  This may be overridden by the
-    derived class during initialization.  This defaults to 30 seconds, but when run by the `run_monitor` script
+    derived class during initialization.  This defaults to 30 seconds, but when run by the `run_monitor` script 
     (for testing) it is set to 5 seconds.
   * `log_config`: A `dict` containing the entry that determines how the metric log generated by this
     Monitor Plugin instance will be copied to Scalyr.  This has the same fields as the entries in the “logs” section
@@ -163,7 +163,7 @@ be parsed by the Scalyr servers.  Otherwise, you will have to define your own pa
 The method for reporting metrics is `emit_value` and has the following arguments:
 
   * `metric_name`: The name of the metric to report.  It must start with a letter and can only contain alphanumeric
-    characters, periods, and underscores.
+    characters, periods, and underscores.  
   * `metric_value`: The value for the metric.  Only int, long, float, boolean, str, and unicode are allowed.
   * `extra_fields`: An optional `dict` that if specified, will be included as extra fields on the logged line.
      These fields can be used in future searches/graphs expressions to restrict which specific instances of the
@@ -184,7 +184,7 @@ sample interval.
 Here’s how we would use it to test our plugin:
 
     python -m scalyr_agent.run_monitor random_coin_monitor
-
+    
 The output will look something like this:
 
     2014-07-29 20:22:06.789Z INFO [monitor:random_coin_monitor()] [scalyr_monitor.py:158] Starting monitor
@@ -195,25 +195,25 @@ The output will look something like this:
 
 You can use Control-C to stop the process.
 
-If you wish to change the Monitor configuration passed to your instance, you may supply a string containing a JSON
+If you wish to change the Monitor configuration passed to your instance, you may supply a string containing a JSON 
 object with the desired configuration.  Here’s an example where we set the monitor’s id and supply a custom `foo`
 option:
 
     python -m scalyr_agent.run_monitor -c "{ gauss_mean:8.5 }" random_coin_monitor
-
-There also are options to change the sampling interval as well as the Python path use to locate plugins.
+    
+There also are options to change the sampling interval as well as the Python path use to locate plugins.  
 Run `python -m scalyr_agent.run_monitor -h` for more details.
 
 ## Deploying your Plugin
-To deploy your Monitor Plugin, you simply have to install it into a location where Scalyr Agent 2 will look for it and
+To deploy your Monitor Plugin, you simply have to install it into a location where Scalyr Agent 2 will look for it and 
 then add appropriate entries to the “monitors” section of your configuration file.
 
 You may place your module in `/usr/share/scalyr-agent-2/local/monitors`.  This path is always included in the Python
 search path when locating plugins.
 
 Alternatively, you may make your own directory to hold your custom plugins, and then include the path to your directory
-in the `additional_monitor_module_paths` in your configuration file.  This is a string that specifies additional paths
-to search for modules beyond the default locations.  It defaults to empty string.     It can contain multiple paths,
+in the `additional_monitor_module_paths` in your configuration file.  This is a string that specifies additional paths 
+to search for modules beyond the default locations.  It defaults to empty string.     It can contain multiple paths, 
 separated by the system specific path separator (colon for Unix, semi-colon for Windows).  Note, the `PYTHONPATH`,
 the Scalyr Agent 2 package, the local monitor path, and the contrib monitor path are always searched.
 
@@ -224,14 +224,14 @@ example, we would add the following:
 
     {
     …
-       monitors: [ {
+       monitors: [ { 
            module: "random_coin_test",
            gauss_mean: 8.5,
            gauss_stddev: 5.0
        }]
     …
     }
-
+    
 You should not have to restart the agent to have the new monitor to begin running.  The change should be noticed in 30
 seconds.  However, if you have changed the contents of your Python module, you may wish to restart the agent to ensure
 the changes the Python files are picked up.
@@ -294,12 +294,12 @@ First, clone the `scalyr-agent-2` repository:
 
     cd ~/
     git clone https://github.com/scalyr/scalyr-agent-2.git --branch release
-
+    
 Next, add the source tree to your `PYTHONPATH`.  The instructions to do this will be platform and shell dependent,
 but for Linux running bash, you just need to execute:
 
     export PYTHONPATH=$PYTHONPATH:~/scalyr-agent-2/
-
+ 
 You can then add your plugin to either the `~/scalyr-agent-2/monitors/contrib` or `~/scalyr-agent-2/monitors/local`
 directory.  The `contrib` directory should be used for plugins you plan on submitting to Scalyr.  The `local`
 directory should be used if the plugin is just for your own use.  If you use the `build_package.py` script, any
@@ -311,7 +311,7 @@ or `local` directory for `~/my-plugin` in the instructions.
 ### Using already installed Scalyr Agent 2 package
 
 If you are developing on a machine that has the Scalyr Agent 2 package already install on it (because you installed
-the RPM or Debian packages) then you can directly use that package instead of installing it again.
+the RPM or Debian packages) then you can directly use that package instead of installing it again.  
 
 You simply have to set the `PYTHONPATH` to include the `scalyr-agent-2/py` directory, where ever that is installed
 on your machine.
@@ -323,6 +323,9 @@ For packages installed using RPM or Debian, it will be located in `/usr/share/sc
 For packages installed using the tarball method, it will be located in `~/scalyr-agent-2/py`:
 
     export PYTHONPATH=$PYTHONPATH:~/scalyr-agent-2/py
-
+    
 You may follow the rest of the instructions from above, including creating a `~/my-plugin` directory to hold
 your plugin.
+
+
+  

@@ -15,7 +15,7 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
-__author__ = "echee@scalyr.com"
+__author__ = 'echee@scalyr.com'
 
 import random
 import threading
@@ -25,8 +25,8 @@ from collections import deque
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 
-MULTIPLY = "multiply"
-RESET_THE_MULTIPLY = "reset_then_multiply"
+MULTIPLY = 'multiply'
+RESET_THE_MULTIPLY = 'reset_then_multiply'
 
 
 class RateLimiterToken(object):
@@ -39,7 +39,7 @@ class RateLimiterToken(object):
         return self._token_id
 
     def __repr__(self):
-        return "Token #%s" % self._token_id
+        return 'Token #%s' % self._token_id
 
 
 class BlockingRateLimiter(object):
@@ -54,7 +54,6 @@ class BlockingRateLimiter(object):
     multiplying by increase_factor or resetting to initial rate, depending on the strategy.
     (Note: if cluster rate is already greater or equal to initial rate, it will be multiplied by the increase factor)
     """
-
     STRATEGY_MULTIPLY = MULTIPLY
     STRATEGY_RESET_THEN_MULTIPLY = RESET_THE_MULTIPLY
 
@@ -70,7 +69,7 @@ class BlockingRateLimiter(object):
     registry_lock = threading.Lock()
 
     def __repr__(self):
-        return "%s/%s" % (self.__class__.__name__, self._name)
+        return '%s/%s' % (self.__class__.__name__, self._name)
 
     @classmethod
     def get_instance(cls, key, global_config, logger=None):
@@ -98,21 +97,10 @@ class BlockingRateLimiter(object):
         finally:
             cls.registry_lock.release()
 
-    def __init__(
-        self,
-        num_agents,
-        initial_cluster_rate,
-        max_cluster_rate,
-        min_cluster_rate,
-        consecutive_success_threshold,
-        strategy=MULTIPLY,
-        increase_factor=2.0,
-        backoff_factor=0.5,
-        max_concurrency=1,
-        logger=None,
-        fake_clock=None,
-        name=None,
-    ):
+    def __init__(self, num_agents, initial_cluster_rate, max_cluster_rate, min_cluster_rate,
+                 consecutive_success_threshold,
+                 strategy=MULTIPLY, increase_factor=2.0, backoff_factor=0.5,
+                 max_concurrency=1, logger=None, fake_clock=None, name=None):
         """
         @param num_agents: Number of agents in the cluster
         @param initial_cluster_rate: initial cluster rate (requests/sec)
@@ -141,31 +129,23 @@ class BlockingRateLimiter(object):
         # Validate input (Note: will raise exception and thus kill the agent process if invalid)
         strategies = [self.STRATEGY_MULTIPLY, self.STRATEGY_RESET_THEN_MULTIPLY]
         if strategy not in strategies:
-            raise ValueError("Increase strategy must be one of %s" % strategies)
+            raise ValueError('Increase strategy must be one of %s' % strategies)
 
         if max_concurrency < 1:
-            raise ValueError("max_concurrency must be greater than 0")
+            raise ValueError('max_concurrency must be greater than 0')
 
         if consecutive_success_threshold < 1:
             raise ValueError(
-                "consecutive_success_threshold must be a positive int. Value=%s"
-                % consecutive_success_threshold
-            )
+                'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
 
         if int(consecutive_success_threshold) != consecutive_success_threshold:
             raise ValueError(
-                "consecutive_success_threshold must be a positive int. Value=%s"
-                % consecutive_success_threshold
-            )
+                'consecutive_success_threshold must be a positive int. Value=%s' % consecutive_success_threshold)
 
-        if (
-            initial_cluster_rate < min_cluster_rate
-            or initial_cluster_rate > max_cluster_rate
-        ):
+        if initial_cluster_rate < min_cluster_rate or initial_cluster_rate > max_cluster_rate:
             raise ValueError(
-                "Initial cluster rate must be between lower and upper rates. Initial=%s, Lower=%s, Upper=%s."
-                % (initial_cluster_rate, min_cluster_rate, max_cluster_rate)
-            )
+                'Initial cluster rate must be between lower and upper rates. Initial=%s, Lower=%s, Upper=%s.' % (
+                    initial_cluster_rate, min_cluster_rate, max_cluster_rate))
 
         self._logger = logger
         self._num_agents = num_agents
@@ -222,7 +202,7 @@ class BlockingRateLimiter(object):
                 self._initial_cluster_rate = self.HARD_LIMIT_INITIAL_CLUSTER_RATE
                 if self._logger:
                     self._logger.warn(
-                        "RateLimiter: initial cluster rate of %.2f is too high.  Limiting to %.2f."
+                        'RateLimiter: initial cluster rate of %.2f is too high.  Limiting to %.2f.'
                         % (old_initial_cluster_rate, self._initial_cluster_rate)
                     )
             if self._min_cluster_rate < self.HARD_LIMIT_MIN_CLUSTER_RATE:
@@ -230,7 +210,7 @@ class BlockingRateLimiter(object):
                 self._min_cluster_rate = self.HARD_LIMIT_MIN_CLUSTER_RATE
                 if self._logger:
                     self._logger.warn(
-                        "RateLimiter: min cluster rate of %.2f is too low.  Increasing to %.2f."
+                        'RateLimiter: min cluster rate of %.2f is too low.  Increasing to %.2f.'
                         % (old_min_cluster_rate, self._min_cluster_rate)
                     )
             if self._initial_cluster_rate < self._min_cluster_rate:
@@ -239,7 +219,7 @@ class BlockingRateLimiter(object):
                 self._current_cluster_rate = self._initial_cluster_rate
                 if self._logger:
                     self._logger.warn(
-                        "RateLimiter: initial cluster rate of %.2f is too low.  Increasing to %.2f."
+                        'RateLimiter: initial cluster rate of %.2f is too low.  Increasing to %.2f.'
                         % (old_initial_cluster_rate, self._initial_cluster_rate)
                     )
             self._lazy_adjusted = True
@@ -253,11 +233,7 @@ class BlockingRateLimiter(object):
         try:
             if self._num_actions < 2:
                 return None
-            rate = (
-                float(self._num_actions - 1)
-                * self._num_agents
-                / (self._last_action_time - self._first_action_time)
-            )
+            rate = float(self._num_actions - 1) * self._num_agents / (self._last_action_time - self._first_action_time)
             return rate
         finally:
             self._cluster_rate_lock.release()
@@ -334,8 +310,8 @@ class BlockingRateLimiter(object):
         if self._logger:
             self._logger.log(
                 scalyr_logging.DEBUG_LEVEL_3,
-                "RateLimiter: increase cluster rate %s (%s) x %s -> %s"
-                % (current_target_rate, actual_rate, self._increase_factor, new_rate),
+                'RateLimiter: increase cluster rate %s (%s) x %s -> %s' %
+                (current_target_rate, actual_rate, self._increase_factor, new_rate)
             )
 
         self._reset_actual_rate()
@@ -368,8 +344,8 @@ class BlockingRateLimiter(object):
         if self._logger:
             self._logger.log(
                 scalyr_logging.DEBUG_LEVEL_3,
-                "RateLimiter: decrease cluster rate %s (%s) x %s -> %s"
-                % (current_target_rate, actual_rate, self._backoff_factor, new_rate),
+                'RateLimiter: decrease cluster rate %s (%s) x %s -> %s' %
+                (current_target_rate, actual_rate, self._backoff_factor, new_rate)
             )
         self._reset_actual_rate()
 
@@ -463,9 +439,7 @@ class BlockingRateLimiter(object):
             self._token_queue.append(token)
         finally:
             self._test_mode_lock.release()
-        self._fake_clock.advance_time(
-            increment_by=self._ripe_time - self._fake_clock.time()
-        )
+        self._fake_clock.advance_time(increment_by=self._ripe_time - self._fake_clock.time())
 
     def acquire_token(self):
         """Acquires a token, blocking until a token becomes available.
@@ -483,11 +457,8 @@ class BlockingRateLimiter(object):
 
         # block until a token is available from the token heap
         if self._logger:
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_5,
-                "[%s] RateLimiter.acquire_token : acquire()    "
-                % threading.current_thread().name,
-            )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                             '[%s] RateLimiter.acquire_token : acquire()    ' % threading.current_thread().name)
         self._token_queue_cv.acquire()
 
         try:
@@ -496,22 +467,17 @@ class BlockingRateLimiter(object):
                 if len(self._token_queue) == 0:
                     # queue contained no tokens so wait indefinitely
                     if self._logger:
-                        self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_5,
-                            "[%s] RateLimiter.acquire_token : wait()"
-                            % threading.current_thread().name,
-                        )
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                         '[%s] RateLimiter.acquire_token : wait()' % threading.current_thread().name)
                     self._token_queue_cv.wait()
                 else:
                     # queue contained at least one token so sleep until the head token becomes ripe
                     sleep_time = max(0, self._ripe_time - self._time())
                     if sleep_time > 0:
                         if self._logger:
-                            self._logger.log(
-                                scalyr_logging.DEBUG_LEVEL_5,
-                                "[%s] RateLimiter.acquire_token : wait(%s)"
-                                % (threading.current_thread().name, sleep_time),
-                            )
+                            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                             '[%s] RateLimiter.acquire_token : wait(%s)'
+                                             % (threading.current_thread().name, sleep_time))
                         self._token_queue_cv.wait(sleep_time)
 
             # Head token is ripe.
@@ -519,17 +485,14 @@ class BlockingRateLimiter(object):
             if self._logger:
                 self._logger.log(
                     scalyr_logging.DEBUG_LEVEL_5,
-                    "[%s] RateLimiter grant token %s at %.2f"
-                    % (threading.current_thread().name, token, self._time()),
+                    '[%s] RateLimiter grant token %s at %.2f' % (threading.current_thread().name, token, self._time())
                 )
             self._ripe_time = self._get_next_ripe_time()
 
             if self._logger:
-                self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_5,
-                    "[%s] RateLimiter.acquire_token : returning token %s"
-                    % (threading.current_thread().name, token),
-                )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                 '[%s] RateLimiter.acquire_token : returning token %s'
+                                 % (threading.current_thread().name, token))
             return token
 
         finally:
@@ -546,9 +509,7 @@ class BlockingRateLimiter(object):
         @type success: bool
         """
         if not isinstance(token, RateLimiterToken):
-            raise TypeError(
-                "Rate limiting token must be of type %s" % type(RateLimiterToken)
-            )
+            raise TypeError('Rate limiting token must be of type %s' % type(RateLimiterToken))
 
         self._record_actual_rate()
 
@@ -556,11 +517,8 @@ class BlockingRateLimiter(object):
             return self._simulate_release_token(token, success)
 
         if self._logger:
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_5,
-                "[%s] RateLimiter.release_token : before acquire"
-                % threading.current_thread().name,
-            )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                             '[%s] RateLimiter.release_token : before acquire' % threading.current_thread().name)
         self._token_queue_cv.acquire()
 
         try:
@@ -572,11 +530,8 @@ class BlockingRateLimiter(object):
 
             # awaken threads waiting for tokens
             if self._logger:
-                self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_5,
-                    "[%s] RateLimiter.release_token : notifyAll()"
-                    % threading.current_thread().name,
-                )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_5,
+                                 '[%s] RateLimiter.release_token : notifyAll()' % threading.current_thread().name)
             self._token_queue_cv.notifyAll()
 
         finally:

@@ -18,11 +18,10 @@
 # An empty monitor, that will return immediately without doing anything
 
 
-__author__ = "imron@scalyr.com"
+__author__ = 'imron@scalyr.com'
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
-
-class EmptyMonitor(ScalyrMonitor):
-    def run(self):
+class EmptyMonitor( ScalyrMonitor ):
+    def run( self ):
         pass

@@ -33,7 +33,7 @@ Here is an example with two hosts with passwords:
         hosts: [
            { "host": "redis.example.com", "password": "secret" },
            { "host": "localhost", "password": "anothersecret", port: 6380 }
-        ]
+        ]  
       }
     ]
 

@@ -117,7 +117,7 @@ Edit the ``path`` field as appropriate for your system setup.
 
 ## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:Apache}}. (The dashboard may not be listed until
 the agent begins sending Apache data.) You will see an overview of Apache data across all servers where you are
 running the Apache plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.

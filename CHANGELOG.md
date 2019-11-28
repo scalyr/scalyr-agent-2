@@ -421,7 +421,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on May 11, 2017 16:45 -0700
 New features:
 
 * Added feature to allow completely disabling the use of the Docker socket in certain Docker configurations.
-* New `max_log_size` and `max_log_rotations` configuration options that can be used to set the maximum length an agent-generated log file can grow before it is rotated and the maximum number of rotations to keep.
+* New `max_log_size` and `max_log_rotations` configuration options that can be used to set the maximum length an agent-generated log file can grow before it is rotated and the maximum number of rotations to keep. 
 
 Bug fixes:
 
@@ -561,7 +561,7 @@ Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jul 19, 2016 13:30 -0700
 Features:
 
 * Release of new ``snmp_monitor`` plugin, used to monitor SNMP devices
-
+ 
 Bug fixes:
 
 * Fix bug in ``windows_process_metrics`` when matching by commandline.
@@ -746,7 +746,7 @@ New features:
 * Add a new option ``--set-server-host`` in scalyr-agent-2-config to set the server host from the commandline.
 * Add new instance variables ``_log_write_rate`` and ``_log_max_write_burst`` to ScalyrMonitor to allow monitor developers to override the rate limits imposed on their monitor's log.  See the comments in test_monitor.py for more details.
 * Add new parameter ``emit_to_metric_log=True`` to force a log line to go to the metric log instead of the agent log for monitors.  See the comments in test_monitor.py for more details.
-* Added new configuration parameters to easily change any or all monitor's sample rate.  Use ``global_monitor_sample_interval`` in the general configuration to set it for all monitors, or ``sample_interval`` in an individual monitor's config.  The value should be the number of seconds between samples and can be fractional.
+* Added new configuration parameters to easily change any or all monitor's sample rate.  Use ``global_monitor_sample_interval`` in the general configuration to set it for all monitors, or ``sample_interval`` in an individual monitor's config.  The value should be the number of seconds between samples and can be fractional.  
 
 Bug fixes:
 

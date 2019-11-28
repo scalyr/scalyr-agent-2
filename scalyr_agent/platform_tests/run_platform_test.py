@@ -15,10 +15,10 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
-__author__ = "saurabh@scalyr.com"
+__author__ = 'saurabh@scalyr.com'
 
 """
-This module is used to run the tests under scalyr_agent/tests on different OS platforms
+This module is used to run the tests under scalyr_agent/tests on different OS platforms 
 with different Python versions.
 
 We do this by:
@@ -42,7 +42,6 @@ class WorkingDirectory:
     """Context manager for changing the current working directory
     From: https://stackoverflow.com/questions/431684/how-do-i-cd-in-python
     """
-
     def __init__(self, newPath):
         self.newPath = os.path.expanduser(newPath)
 
@@ -58,24 +57,15 @@ class RunPlatformTests(unittest.TestCase):
     """
     Runs Scalyr Agent Tests on all platforms
     """
-
     @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def test_alpine(self):
         wd = WorkingDirectory("scalyr_agent/platform_tests/alpine")
         try:
             wd.__enter__()
-            call(["docker", "build", "-t", "scalyr:python_2-alpine", "."])
+            call(["docker", "build", "-t",  "scalyr:python_2-alpine", "."])
             call(
-                [
-                    "docker",
-                    "run",
-                    "--name",
-                    "scalyr_container_alpine",
-                    "scalyr:python_2-alpine",
-                    "python",
-                    "run_tests.py",
-                    "--verbose",
-                ]
+                ["docker", "run", "--name", "scalyr_container_alpine", "scalyr:python_2-alpine",
+                 "python", "run_tests.py", "--verbose"]
             )
         finally:
             wd.__exit__()
@@ -85,18 +75,10 @@ class RunPlatformTests(unittest.TestCase):
         wd = WorkingDirectory("scalyr_agent/platform_tests/wheezy")
         try:
             wd.__enter__()
-            call(["docker", "build", "-t", "scalyr:python_2-wheezy", "."])
+            call(["docker", "build", "-t",  "scalyr:python_2-wheezy", "."])
             call(
-                [
-                    "docker",
-                    "run",
-                    "--name",
-                    "scalyr_container_wheezy",
-                    "scalyr:python_2-wheezy",
-                    "python",
-                    "run_tests.py",
-                    "--verbose",
-                ]
+                ["docker", "run", "--name", "scalyr_container_wheezy", "scalyr:python_2-wheezy",
+                 "python", "run_tests.py", "--verbose"]
             )
         finally:
             wd.__exit__()
@@ -106,18 +88,10 @@ class RunPlatformTests(unittest.TestCase):
         wd = WorkingDirectory("scalyr_agent/platform_tests/jessie")
         try:
             wd.__enter__()
-            call(["docker", "build", "-t", "scalyr:python_2-jessie", "."])
+            call(["docker", "build", "-t",  "scalyr:python_2-jessie", "."])
             call(
-                [
-                    "docker",
-                    "run",
-                    "--name",
-                    "scalyr_container_jessie",
-                    "scalyr:python_2-jessie",
-                    "python",
-                    "run_tests.py",
-                    "--verbose",
-                ]
+                ["docker", "run", "--name", "scalyr_container_jessie", "scalyr:python_2-jessie",
+                 "python", "run_tests.py", "--verbose"]
             )
         finally:
             wd.__exit__()
@@ -125,30 +99,6 @@ class RunPlatformTests(unittest.TestCase):
     @classmethod
     @skipUnless(os.environ.get("SCALYR_NO_SKIP_TESTS"), "Platform Tests")
     def tearDownClass(cls):
-        call(
-            [
-                "docker",
-                "stop",
-                "scalyr_container_alpine",
-                "scalyr_container_wheezy",
-                "scalyr_container_jessie",
-            ]
-        )
-        call(
-            [
-                "docker",
-                "rm",
-                "scalyr_container_alpine",
-                "scalyr_container_wheezy",
-                "scalyr_container_jessie",
-            ]
-        )
-        call(
-            [
-                "docker",
-                "rmi",
-                "scalyr:python_2-alpine",
-                "scalyr:python_2-wheezy",
-                "scalyr:python_2-jessie",
-            ]
-        )
+        call(["docker", "stop", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])
+        call(["docker", "rm", "scalyr_container_alpine", "scalyr_container_wheezy", "scalyr_container_jessie"])
+        call(["docker", "rmi", "scalyr:python_2-alpine", "scalyr:python_2-wheezy", "scalyr:python_2-jessie"])

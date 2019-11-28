@@ -107,7 +107,7 @@ Edit the ``path`` field as appropriate for your system setup.
 
 ## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:Nginx}}. (The dashboard may not be listed until
 the agent begins sending nginx data.) You will see an overview of nginx data across all servers where you are
 running the nginx plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.

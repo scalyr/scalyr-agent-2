@@ -16,7 +16,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import sys
 import threading
@@ -32,19 +32,13 @@ PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
 def _noop_skip(reason):
     def decorator(test_func_or_obj):
         if not isinstance(test_func_or_obj, type):
-
             def skip_wrapper(*args, **kwargs):
-                print (
-                    'Skipping test %s. Reason: "%s"'
-                    % (test_func_or_obj.__name__, reason)
-                )
-
+                print('Skipping test %s. Reason: "%s"' % (test_func_or_obj.__name__, reason))
             return skip_wrapper
         else:
             test_func_or_obj.__unittest_skip__ = True
             test_func_or_obj.__unittest_skip_why__ = reason
             return test_func_or_obj
-
     return decorator
 
 
@@ -65,17 +59,17 @@ def _noop_skip_unless(condition, reason):
 
 
 skip = _noop_skip
-if hasattr(unittest, "skip"):
+if hasattr(unittest, 'skip'):
     skip = unittest.skip
 
 
 skipUnless = _noop_skip_unless
-if hasattr(unittest, "skipUnless"):
+if hasattr(unittest, 'skipUnless'):
     skipUnless = unittest.skipUnless
 
 
 skipIf = _noop_skip_if
-if hasattr(unittest, "skipIf"):
+if hasattr(unittest, 'skipIf'):
     skipIf = unittest.skipIf
 
 # Global state as to whether or not we've started the thread watcher.  We only want one instance of this
@@ -94,10 +88,10 @@ def _thread_watcher():
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
-    print "Detected hung test run.  Active threads are:"
+    print 'Detected hung test run.  Active threads are:'
     for t in threading.enumerate():
-        print "Active thread %s daemon=%s" % (t.getName(), str(t.isDaemon()))
-    print "Done"
+        print 'Active thread %s daemon=%s' % (t.getName(), str(t.isDaemon()))
+    print 'Done'
 
 
 def _start_thread_watcher_if_necessary():
@@ -106,7 +100,7 @@ def _start_thread_watcher_if_necessary():
     global __thread_watcher_started
 
     if not __thread_watcher_started:
-        thread = threading.Thread(name="hung thread watcher", target=_thread_watcher)
+        thread = threading.Thread(name='hung thread watcher', target=_thread_watcher)
         thread.setDaemon(True)
         thread.start()
         __thread_watcher_started = True
@@ -118,9 +112,8 @@ class BaseScalyrTestCase(unittest.TestCase):
     This augments the standard TestCase by capturing all logged lines to stdout and
     adds protection to help detect hung test threads.
     """
-
     # noinspection PyPep8Naming
-    def __init__(self, methodName="runTest", verify_setup_invoked=False):
+    def __init__(self, methodName='runTest', verify_setup_invoked=False):
         unittest.TestCase.__init__(self, methodName=methodName)
         # Add in some code to check to make sure that derived classed invoked this classes `setUp` method if
         # they overrode it.
@@ -136,18 +129,14 @@ class BaseScalyrTestCase(unittest.TestCase):
 
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
-        StoppableThread.set_name_prefix("TestCase %s: " % str(self))
+        StoppableThread.set_name_prefix('TestCase %s: ' % str(self))
         return unittest.TestCase.run(self, result=result)
 
     def verify_setup_invoked(self):
-        self.assertTrue(
-            self.__setup_invoked,
-            msg="Inherited setUp method was not invoked by class derived from ScalyrTestCase",
-        )
-
+        self.assertTrue(self.__setup_invoked,
+                        msg='Inherited setUp method was not invoked by class derived from ScalyrTestCase')
 
 if sys.version_info[:2] < (2, 7):
-
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -156,19 +145,16 @@ if sys.version_info[:2] < (2, 7):
 
         WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
-
         # noinspection PyPep8Naming
-        def __init__(self, methodName="runTest"):
+        def __init__(self, methodName='runTest'):
             # Do not verify the setup was invoked since it relies on addCleanup which is only available in 2.7
-            BaseScalyrTestCase.__init__(
-                self, methodName=methodName, verify_setup_invoked=False
-            )
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=False)
 
         def assertIs(self, obj1, obj2, msg=None):
             """Just like self.assertTrue(a is b), but with a nicer default message."""
             if obj1 is not obj2:
                 if msg is None:
-                    msg = "%s is not %s" % (obj1, obj2)
+                    msg = '%s is not %s' % (obj1, obj2)
                 self.fail(msg)
 
         def assertIsNone(self, obj, msg=None):
@@ -176,30 +162,28 @@ if sys.version_info[:2] < (2, 7):
             if msg is not None:
                 self.assertTrue(obj is None, msg)
             else:
-                self.assertTrue(obj is None, "%s is not None" % (str(obj)))
+                self.assertTrue(obj is None, '%s is not None' % (str(obj)))
 
         def assertIsNotNone(self, obj, msg=None):
             """Included for symmetry with assertIsNone."""
             if msg is not None:
                 self.assertTrue(obj is not None, msg)
             else:
-                self.assertTrue(obj is not None, "%s is None" % (str(obj)))
+                self.assertTrue(obj is not None, '%s is None' % (str(obj)))
 
         def assertGreater(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a > b, msg)
             else:
-                self.assertTrue(a > b, "%s is greater than %s" % (str(a), str(b)))
+                self.assertTrue(a > b, '%s is greater than %s' % (str(a), str(b)))
 
         def assertLess(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a < b, msg)
             else:
-                self.assertTrue(a < b, "%s is greater than %s" % (str(a), str(b)))
-
+                self.assertTrue(a < b, '%s is greater than %s' % (str(a), str(b)))
 
 else:
-
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -208,12 +192,9 @@ else:
 
         WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
         """
-
         # noinspection PyPep8Naming
-        def __init__(self, methodName="runTest"):
-            BaseScalyrTestCase.__init__(
-                self, methodName=methodName, verify_setup_invoked=True
-            )
+        def __init__(self, methodName='runTest'):
+            BaseScalyrTestCase.__init__(self, methodName=methodName, verify_setup_invoked=True)
 
         def assertIs(self, obj1, obj2, msg=None):
             unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)

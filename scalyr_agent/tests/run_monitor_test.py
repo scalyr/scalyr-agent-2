@@ -16,7 +16,7 @@
 # author: Imron Alston <imron@scalyr.com>
 
 
-__author__ = "imron@scalyr.com"
+__author__ = 'imron@scalyr.com'
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -26,15 +26,12 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 
 class RunMonitorTest(ScalyrTestCase):
-    def test_run_standalone_monitor(self):
+    def test_run_standalone_monitor( self ):
         config = """{
                  }"""
 
-        run_standalone_monitor(
-            "scalyr_agent.tests.empty_monitor",
-            ".",
-            config,
-            float(0.5),
-            scalyr_logging.DEBUG_LEVEL_0,
-            None,
-        )
+        run_standalone_monitor("scalyr_agent.tests.empty_monitor", ".", config, float(0.5),
+                               scalyr_logging.DEBUG_LEVEL_0, None)
+
+
+

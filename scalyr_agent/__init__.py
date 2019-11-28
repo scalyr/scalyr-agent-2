@@ -34,7 +34,7 @@ The packages exported are:
   monitor_utils  -- A collection of abstractions that can be used to implement monitors.
 """
 
-__author__ = "Steven Czerwinski <czerwin@scalyr.com>"
+__author__ = 'Steven Czerwinski <czerwin@scalyr.com>'
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
@@ -56,25 +56,7 @@ from scalyr_agent.scalyr_logging import AutoFlushingRotatingFileHandler
 import json_lib
 import monitor_utils
 
-__all__ = [
-    "ScalyrMonitor",
-    "MonitorConfig",
-    "BadMonitorConfiguration",
-    "UnsupportedSystem",
-    "getLogger",
-    "AgentLogger",
-    "StoppableThread",
-    "RunState",
-    "DEBUG_LEVEL_0",
-    "DEBUG_LEVEL_1",
-    "DEBUG_LEVEL_2",
-    "DEBUG_LEVEL_3",
-    "DEBUG_LEVEL_4",
-    "DEBUG_LEVEL_5",
-    "json_lib",
-    "monitor_utils",
-    "define_metric",
-    "define_config_option",
-    "define_log_field",
-    "AutoFlushingRotatingFileHandler",
-]
+__all__ = ['ScalyrMonitor', 'MonitorConfig', 'BadMonitorConfiguration', 'UnsupportedSystem', 'getLogger', 'AgentLogger',
+           'StoppableThread', 'RunState', 'DEBUG_LEVEL_0', 'DEBUG_LEVEL_1', 'DEBUG_LEVEL_2', 'DEBUG_LEVEL_3',
+           'DEBUG_LEVEL_4', 'DEBUG_LEVEL_5', 'json_lib', 'monitor_utils', 'define_metric', 'define_config_option',
+           'define_log_field', 'AutoFlushingRotatingFileHandler']

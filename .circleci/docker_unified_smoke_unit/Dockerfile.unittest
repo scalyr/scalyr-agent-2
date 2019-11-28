@@ -132,3 +132,4 @@ RUN /bin/rm -f /home/scalyr/.pyenv/versions/2.7.2/lib/python2.7/ssl.pyc
 # Copy and run test scripts
 #------------------------------------------------------
 COPY unittest smoketest /tmp/
+

@@ -17,7 +17,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import unittest
 import os
@@ -43,30 +43,29 @@ def find_all_tests(directory=None, base_path=None):
         full_path = os.path.join(directory, path)
         if os.path.isdir(full_path):
             result.extend(find_all_tests(directory=full_path, base_path=base_path))
-        elif full_path.endswith("_test.py"):
+        elif full_path.endswith('_test.py'):
             # We need to strip off the leading directory and replace the
             # directory separators with periods.
-            x = full_path[len(base_path) + 1 : len(full_path) - 3]
-            result.append("scalyr_agent." + x.replace(os.sep, "."))
+            x = full_path[len(base_path)+1:len(full_path) - 3]
+            result.append('scalyr_agent.' + x.replace(os.sep, '.'))
 
     return result
 
 
 PYTHON24_WHITELIST = [
-    "scalyr_agent.tests.url_monitor_test",
+    'scalyr_agent.tests.url_monitor_test',
 ]
 
 PRE_PYTHON27_WHITELIST = [
-    "scalyr_agent.tests.configuration_docker_test",
-    "scalyr_agent.tests.configuration_k8s_test",
-    "scalyr_agent.builtin_monitors.tests.docker_monitor_test",
-    "scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test",
-    "scalyr_agent.monitor_utils.tests.k8s_test",
-    "scalyr_agent.tests.syslog_request_parser_test",
-    "scalyr_agent.tests.syslog_monitor_test",
-    "scalyr_agent.tests.redis_monitor_test",
+    'scalyr_agent.tests.configuration_docker_test',
+    'scalyr_agent.tests.configuration_k8s_test',
+    'scalyr_agent.builtin_monitors.tests.docker_monitor_test',
+    'scalyr_agent.builtin_monitors.tests.kubernetes_monitor_test',
+    'scalyr_agent.monitor_utils.tests.k8s_test',
+    'scalyr_agent.tests.syslog_request_parser_test',
+    'scalyr_agent.tests.syslog_monitor_test',
+    'scalyr_agent.tests.redis_monitor_test',
 ]
-
 
 def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
@@ -81,28 +80,18 @@ def run_all_tests():
                 suites.append(test_loader.loadTestsFromName(test_case))
             except Exception, ex:
                 if sys.version_info[:2] < (2, 5) and test_case in PYTHON24_WHITELIST:
-                    print(
-                        "Warning. Skipping unloadable module '%s'.\n"
-                        "This module was whitelisted as non-critical for Python 2.4 testing.\n"
-                        "Module-load exception message: '%s'\n" % (test_case, ex)
-                    )
-                elif (
-                    sys.version_info[:2] < (2, 7)
-                    and test_case in PRE_PYTHON27_WHITELIST
-                ):
-                    print(
-                        "Warning. Skipping unloadable module '%s'.\n"
-                        "This module was whitelisted as non-critical for pre-2.7 testing.\n"
-                        "Module-load exception message: '%s'\n" % (test_case, ex)
-                    )
+                    print("Warning. Skipping unloadable module '%s'.\n"
+                          "This module was whitelisted as non-critical for Python 2.4 testing.\n"
+                          "Module-load exception message: '%s'\n" % (test_case, ex))
+                elif sys.version_info[:2] < (2, 7) and test_case in PRE_PYTHON27_WHITELIST:
+                    print("Warning. Skipping unloadable module '%s'.\n"
+                          "This module was whitelisted as non-critical for pre-2.7 testing.\n"
+                          "Module-load exception message: '%s'\n" % (test_case, ex))
                 else:
                     raise
         except Exception, e:
             error = True
-            print(
-                "Error loading test_case '%s'.  %s, %s"
-                % (test_case, str(e), traceback.format_exc())
-            )
+            print( "Error loading test_case '%s'.  %s, %s" % (test_case, str(e), traceback.format_exc()) )
 
     test_suite = unittest.TestSuite(suites)
     if sys.version_info[:2] < (2, 7):
@@ -114,6 +103,5 @@ def run_all_tests():
         error = True
     sys.exit(error)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     run_all_tests()

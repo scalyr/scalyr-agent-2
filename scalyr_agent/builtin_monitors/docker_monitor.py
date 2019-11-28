@@ -14,7 +14,7 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-__author__ = "imron@scalyr.com"
+__author__ = 'imron@scalyr.com'
 
 import datetime
 import docker
@@ -43,648 +43,259 @@ global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
-DOCKER_LABEL_CONFIG_RE = re.compile("^(com\.scalyr\.config\.log\.)(.+)")
+DOCKER_LABEL_CONFIG_RE = re.compile( '^(com\.scalyr\.config\.log\.)(.+)' )
 
-define_config_option(
-    __monitor__,
-    "module",
-    "Always ``scalyr_agent.builtin_monitors.docker_monitor``",
-    convert_to=str,
-    required_option=True,
-)
+define_config_option(__monitor__, 'module',
+                     'Always ``scalyr_agent.builtin_monitors.docker_monitor``',
+                     convert_to=str, required_option=True)
 
-define_config_option(
-    __monitor__,
-    "container_name",
-    "Optional (defaults to None). Defines a regular expression that matches the name given to the "
-    "container running the scalyr-agent.\n"
-    "If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n",
-    convert_to=str,
-    default=None,
-)
+define_config_option( __monitor__, 'container_name',
+                     'Optional (defaults to None). Defines a regular expression that matches the name given to the '
+                     'container running the scalyr-agent.\n'
+                     'If this is None, the scalyr agent will look for a container running /usr/sbin/scalyr-agent-2 as the main process.\n',
+                     convert_to=str, default=None)
 
-define_config_option(
-    __monitor__,
-    "container_check_interval",
-    "Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.",
-    convert_to=int,
-    default=5,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'container_check_interval',
+                     'Optional (defaults to 5). How often (in seconds) to check if containers have been started or stopped.',
+                     convert_to=int, default=5, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "api_socket",
-    "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
-    "the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the "
-    "`docker_api_socket` configuration option in the syslog monitor to this same value\n"
-    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n"
-    "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=str,
-    default="/var/scalyr/docker.sock",
-)
+define_config_option( __monitor__, 'api_socket',
+                     'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
+                     'the docker API.   WARNING, if you have `mode` set to `syslog`, you must also set the '
+                     '`docker_api_socket` configuration option in the syslog monitor to this same value\n'
+                     'Note:  You need to map the host\'s /run/docker.sock to the same value as specified here, using the -v parameter, e.g.\n'
+                     '\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...',
+                     convert_to=str, default='/var/scalyr/docker.sock')
 
-define_config_option(
-    __monitor__,
-    "docker_api_version",
-    "Optional (defaults to 'auto'). The version of the Docker API to use.  WARNING, if you have "
-    "`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the "
-    "syslog monitor to this same value\n",
-    convert_to=str,
-    default="auto",
-    env_aware=True,
-)
+define_config_option( __monitor__, 'docker_api_version',
+                     'Optional (defaults to \'auto\'). The version of the Docker API to use.  WARNING, if you have '
+                     '`mode` set to `syslog`, you must also set the `docker_api_version` configuration option in the '
+                     'syslog monitor to this same value\n',
+                     convert_to=str, default='auto', env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "docker_log_prefix",
-    "Optional (defaults to docker). Prefix added to the start of all docker logs. ",
-    convert_to=str,
-    default="docker",
-    env_aware=True,
-)
+define_config_option( __monitor__, 'docker_log_prefix',
+                     'Optional (defaults to docker). Prefix added to the start of all docker logs. ',
+                     convert_to=str, default='docker', env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "docker_percpu_metrics",
-    "Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by "
-    "default because it can result in an excessive amount of metric data on cpus with a large number of cores.",
-    convert_to=bool,
-    default=False,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'docker_percpu_metrics',
+                     'Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by '
+                     'default because it can result in an excessive amount of metric data on cpus with a large number of cores.',
+                     convert_to=bool, default=False, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "max_previous_lines",
-    "Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n"
-    "when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.",
-    convert_to=int,
-    default=5000,
-)
+define_config_option( __monitor__, 'max_previous_lines',
+                     'Optional (defaults to 5000). The maximum number of lines to read backwards from the end of the stdout/stderr logs\n'
+                     'when starting to log a containers stdout/stderr to find the last line that was sent to Scalyr.',
+                     convert_to=int, default=5000)
 
-define_config_option(
-    __monitor__,
-    "readback_buffer_size",
-    "Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n"
-    "when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file "
-    "was sent to Scalyr.",
-    convert_to=int,
-    default=5 * 1024,
-)
+define_config_option( __monitor__, 'readback_buffer_size',
+                     'Optional (defaults to 5k). The maximum number of bytes to read backwards from the end of any log files on disk\n'
+                     'when starting to log a containers stdout/stderr.  This is used to find the most recent timestamp logged to file '
+                     'was sent to Scalyr.',
+                     convert_to=int, default=5*1024)
 
-define_config_option(
-    __monitor__,
-    "log_mode",
-    'Optional (defaults to "docker_api"). Determine which method is used to gather logs from the '
-    'local containers. If "docker_api", then this agent will use the docker API to contact the local '
-    'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
-    'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
-    "preferred method due to bugs/issues found with the docker API (To protect legacy behavior, "
-    'the default method is "docker_api").',
-    convert_to=str,
-    default="docker_api",
-    env_aware=True,
-    env_name="SCALYR_DOCKER_LOG_MODE",
-)
+define_config_option( __monitor__, 'log_mode',
+                     'Optional (defaults to "docker_api"). Determine which method is used to gather logs from the '
+                     'local containers. If "docker_api", then this agent will use the docker API to contact the local '
+                     'containers and pull logs from them.  If "syslog", then this agent expects the other containers '
+                     'to push logs to this one using the Docker syslog logging driver.  Currently, "syslog" is the '
+                     'preferred method due to bugs/issues found with the docker API (To protect legacy behavior, '
+                     'the default method is "docker_api").',
+                     convert_to=str, default="docker_api", env_aware=True, env_name='SCALYR_DOCKER_LOG_MODE')
 
-define_config_option(
-    __monitor__,
-    "docker_raw_logs",
-    "Optional (defaults to True). If True, the docker monitor will use the raw log files on disk to read logs."
-    "The location of the raw log file is obtained by querying the path from the Docker API. "
-    "If false, the logs will be streamed over the Docker API.",
-    convert_to=bool,
-    default=True,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'docker_raw_logs',
+                     'Optional (defaults to True). If True, the docker monitor will use the raw log files on disk to read logs.'
+                     'The location of the raw log file is obtained by querying the path from the Docker API. '
+                     'If false, the logs will be streamed over the Docker API.',
+                     convert_to=bool, default=True, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "metrics_only",
-    "Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information "
-    "about running containers.  If set to true, this value overrides the config item 'report_container_metrics'\n",
-    convert_to=bool,
-    default=False,
-    env_aware=True,
-    env_name="SCALYR_DOCKER_METRICS_ONLY",
-)
+define_config_option( __monitor__, 'metrics_only',
+                     'Optional (defaults to False). If true, the docker monitor will only log docker metrics and not any other information '
+                     'about running containers.  If set to true, this value overrides the config item \'report_container_metrics\'\n',
+                     convert_to=bool, default=False, env_aware=True, env_name='SCALYR_DOCKER_METRICS_ONLY')
 
-define_config_option(
-    __monitor__,
-    "container_globs",
-    "Optional (defaults to None). A whitelist of container name glob patterns to monitor.  Only containers whose name "
-    "matches one of the glob patterns will be monitored.  If `None`, all container names are matched.  This value "
-    "is applied *before* `container_globs_exclude`",
-    convert_to=ArrayOfStrings,
-    default=None,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'container_globs',
+                     'Optional (defaults to None). A whitelist of container name glob patterns to monitor.  Only containers whose name '
+                     'matches one of the glob patterns will be monitored.  If `None`, all container names are matched.  This value '
+                     'is applied *before* `container_globs_exclude`',
+                      convert_to=ArrayOfStrings, default=None, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "container_globs_exclude",
-    "Optional (defaults to None). A blacklist of container name glob patterns to exclude from monitoring.  Any container whose name "
-    "matches one of the glob patterns will not be monitored.  If `None`, all container names matched by `container_globs` are monitored.  This value "
-    "is applied *after* `container_globs`",
-    convert_to=ArrayOfStrings,
-    default=None,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'container_globs_exclude',
+                     'Optional (defaults to None). A blacklist of container name glob patterns to exclude from monitoring.  Any container whose name '
+                     'matches one of the glob patterns will not be monitored.  If `None`, all container names matched by `container_globs` are monitored.  This value '
+                     'is applied *after* `container_globs`',
+                      convert_to=ArrayOfStrings, default=None, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "report_container_metrics",
-    "Optional (defaults to True). If true, metrics will be collected from the container and reported  "
-    "to Scalyr.",
-    convert_to=bool,
-    default=True,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'report_container_metrics',
+                      'Optional (defaults to True). If true, metrics will be collected from the container and reported  '
+                      'to Scalyr.', convert_to=bool, default=True, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "label_include_globs",
-    "Optional (defaults to ['*']). If `labels_as_attributes` is True then this option is a list of glob strings used to "
-    "include labels that should be uploaded as log attributes.  The docker monitor first gets all container labels that "
-    "match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then "
-    "uploaded as log attributes. ",
-    convert_to=ArrayOfStrings,
-    default=["*"],
-    env_aware=True,
-)
+define_config_option( __monitor__, 'label_include_globs',
+                     'Optional (defaults to [\'*\']). If `labels_as_attributes` is True then this option is a list of glob strings used to '
+                     'include labels that should be uploaded as log attributes.  The docker monitor first gets all container labels that '
+                     'match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then '
+                     'uploaded as log attributes. ',
+                      convert_to=ArrayOfStrings, default=['*'], env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "label_exclude_globs",
-    "Optional (defaults to ['com.scalyr.config.*']). If `labels_as_attributes` is True, then this is a list of glob strings used to "
-    "exclude labels from being uploaded as log attributes.  Any label whose key matches any glob on this list will not be added as a "
-    "log attribute.  Note: the globs in this list are applied *after* `label_include_globs`",
-    convert_to=ArrayOfStrings,
-    default=["com.scalyr.config.*"],
-    env_aware=True,
-)
+define_config_option( __monitor__, 'label_exclude_globs',
+                     'Optional (defaults to [\'com.scalyr.config.*\']). If `labels_as_attributes` is True, then this is a list of glob strings used to '
+                     'exclude labels from being uploaded as log attributes.  Any label whose key matches any glob on this list will not be added as a '
+                     'log attribute.  Note: the globs in this list are applied *after* `label_include_globs`',
+                      convert_to=ArrayOfStrings, default=['com.scalyr.config.*'], env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "labels_as_attributes",
-    "Optional (defaults to False). If true, the docker monitor will add any labels found on the container as log attributes, after "
-    "applying `label_include_globs` and `label_exclude_globs`.",
-    convert_to=bool,
-    default=False,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'labels_as_attributes',
+                     'Optional (defaults to False). If true, the docker monitor will add any labels found on the container as log attributes, after '
+                     'applying `label_include_globs` and `label_exclude_globs`.',
+                     convert_to=bool, default=False, env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "label_prefix",
-    'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
-    "adding it to the log attributes ",
-    convert_to=str,
-    default="",
-    env_aware=True,
-)
+define_config_option( __monitor__, 'label_prefix',
+                     'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
+                     'adding it to the log attributes ',
+                     convert_to=str, default="", env_aware=True)
 
-define_config_option(
-    __monitor__,
-    "use_labels_for_log_config",
-    "Optional (defaults to True). If true, the docker monitor will check each container for any labels that begin with "
-    "`com.scalyr.config.log.` and use those labels (minus the prefix) as fields in the containers log_config.  Keys that "
-    "contain hyphens will automatically be converted to underscores.",
-    convert_to=bool,
-    default=True,
-    env_aware=True,
-)
+define_config_option( __monitor__, 'use_labels_for_log_config',
+                     'Optional (defaults to True). If true, the docker monitor will check each container for any labels that begin with '
+                     '`com.scalyr.config.log.` and use those labels (minus the prefix) as fields in the containers log_config.  Keys that '
+                     'contain hyphens will automatically be converted to underscores.',
+                     convert_to=bool, default=True, env_aware=True)
 
 # for now, always log timestamps to help prevent a race condition
-# define_config_option( __monitor__, 'log_timestamps',
+#define_config_option( __monitor__, 'log_timestamps',
 #                     'Optional (defaults to False). If true, stdout/stderr logs will contain docker timestamps at the beginning of the line\n',
 #                     convert_to=bool, default=False)
 
-define_metric(
-    __monitor__,
-    "docker.net.rx_bytes",
-    "Total received bytes on the network interface",
-    cumulative=True,
-    unit="bytes",
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.rx_dropped",
-    "Total receive packets dropped on the network interface",
-    cumulative=True,
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.rx_errors",
-    "Total receive errors on the network interface",
-    cumulative=True,
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.rx_packets",
-    "Total received packets on the network interface",
-    cumulative=True,
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.tx_bytes",
-    "Total transmitted bytes on the network interface",
-    cumulative=True,
-    unit="bytes",
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.tx_dropped",
-    "Total transmitted packets dropped on the network interface",
-    cumulative=True,
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.tx_errors",
-    "Total transmission errors on the network interface",
-    cumulative=True,
-    category="Network",
-)
-define_metric(
-    __monitor__,
-    "docker.net.tx_packets",
-    "Total packets transmitted on the network intervace",
-    cumulative=True,
-    category="Network",
-)
+define_metric( __monitor__, "docker.net.rx_bytes", "Total received bytes on the network interface", cumulative=True, unit="bytes", category="Network" )
+define_metric( __monitor__, "docker.net.rx_dropped", "Total receive packets dropped on the network interface", cumulative=True, category="Network" )
+define_metric( __monitor__, "docker.net.rx_errors", "Total receive errors on the network interface", cumulative=True, category="Network" )
+define_metric( __monitor__, "docker.net.rx_packets", "Total received packets on the network interface", cumulative=True, category="Network" )
+define_metric( __monitor__, "docker.net.tx_bytes", "Total transmitted bytes on the network interface", cumulative=True, unit="bytes", category="Network" )
+define_metric( __monitor__, "docker.net.tx_dropped", "Total transmitted packets dropped on the network interface", cumulative=True, category="Network" )
+define_metric( __monitor__, "docker.net.tx_errors", "Total transmission errors on the network interface", cumulative=True, category="Network" )
+define_metric( __monitor__, "docker.net.tx_packets", "Total packets transmitted on the network intervace", cumulative=True, category="Network" )
 
-define_metric(
-    __monitor__,
-    "docker.mem.stat.active_anon",
-    "The number of bytes of active memory backed by anonymous pages, excluding sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.active_file",
-    "The number of bytes of active memory backed by files, excluding sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.cache",
-    "The number of bytes used for the cache, excluding sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.hierarchical_memory_limit",
-    "The memory limit in bytes for the container.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.inactive_anon",
-    "The number of bytes of inactive memory in anonymous pages, excluding sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.inactive_file",
-    "The number of bytes of inactive memory in file pages, excluding sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.mapped_file",
-    "The number of bytes of mapped files, excluding sub-groups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.pgfault",
-    "The total number of page faults, excluding sub-cgroups.",
-    cumulative=True,
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.pgmajfault",
-    "The number of major page faults, excluding sub-cgroups",
-    cumulative=True,
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.pgpgin",
-    "The number of charging events, excluding sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.pgpgout",
-    "The number of uncharging events, excluding sub-groups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.rss",
-    "The number of bytes of anonymous and swap cache memory (includes transparent hugepages), excluding sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.rss_huge",
-    "The number of bytes of anonymous transparent hugepages, excluding sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.unevictable",
-    "The number of bytes of memory that cannot be reclaimed (mlocked etc), excluding sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.writeback",
-    "The number of bytes being written back to disk, excluding sub-cgroups",
-    category="Memory",
-)
+define_metric( __monitor__, "docker.mem.stat.active_anon", "The number of bytes of active memory backed by anonymous pages, excluding sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.active_file", "The number of bytes of active memory backed by files, excluding sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.cache", "The number of bytes used for the cache, excluding sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.hierarchical_memory_limit", "The memory limit in bytes for the container.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.inactive_anon", "The number of bytes of inactive memory in anonymous pages, excluding sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.inactive_file", "The number of bytes of inactive memory in file pages, excluding sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.mapped_file", "The number of bytes of mapped files, excluding sub-groups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.pgfault", "The total number of page faults, excluding sub-cgroups.", cumulative=True, category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.pgmajfault", "The number of major page faults, excluding sub-cgroups", cumulative=True, category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.pgpgin", "The number of charging events, excluding sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.pgpgout", "The number of uncharging events, excluding sub-groups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.rss", "The number of bytes of anonymous and swap cache memory (includes transparent hugepages), excluding sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.rss_huge", "The number of bytes of anonymous transparent hugepages, excluding sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.unevictable", "The number of bytes of memory that cannot be reclaimed (mlocked etc), excluding sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.writeback", "The number of bytes being written back to disk, excluding sub-cgroups", category="Memory" )
 
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_active_anon",
-    "The number of bytes of active memory backed by anonymous pages, including sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_active_file",
-    "The number of bytes of active memory backed by files, including sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_cache",
-    "The number of bytes used for the cache, including sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_inactive_anon",
-    "The number of bytes of inactive memory in anonymous pages, including sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_inactive_file",
-    "The number of bytes of inactive memory in file pages, including sub-cgroups.",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_mapped_file",
-    "The number of bytes of mapped files, including sub-groups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_pgfault",
-    "The total number of page faults, including sub-cgroups.",
-    cumulative=True,
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_pgmajfault",
-    "The number of major page faults, including sub-cgroups",
-    cumulative=True,
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_pgpgin",
-    "The number of charging events, including sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_pgpgout",
-    "The number of uncharging events, including sub-groups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_rss",
-    "The number of bytes of anonymous and swap cache memory (includes transparent hugepages), including sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_rss_huge",
-    "The number of bytes of anonymous transparent hugepages, including sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_unevictable",
-    "The number of bytes of memory that cannot be reclaimed (mlocked etc), including sub-cgroups",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.stat.total_writeback",
-    "The number of bytes being written back to disk, including sub-cgroups",
-    category="Memory",
-)
+define_metric( __monitor__, "docker.mem.stat.total_active_anon", "The number of bytes of active memory backed by anonymous pages, including sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_active_file", "The number of bytes of active memory backed by files, including sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_cache", "The number of bytes used for the cache, including sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_inactive_anon", "The number of bytes of inactive memory in anonymous pages, including sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_inactive_file", "The number of bytes of inactive memory in file pages, including sub-cgroups.", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_mapped_file", "The number of bytes of mapped files, including sub-groups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_pgfault", "The total number of page faults, including sub-cgroups.", cumulative=True, category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_pgmajfault","The number of major page faults, including sub-cgroups", cumulative=True, category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_pgpgin", "The number of charging events, including sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_pgpgout", "The number of uncharging events, including sub-groups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_rss", "The number of bytes of anonymous and swap cache memory (includes transparent hugepages), including sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_rss_huge", "The number of bytes of anonymous transparent hugepages, including sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_unevictable", "The number of bytes of memory that cannot be reclaimed (mlocked etc), including sub-cgroups", category="Memory" )
+define_metric( __monitor__, "docker.mem.stat.total_writeback",  "The number of bytes being written back to disk, including sub-cgroups", category="Memory" )
 
 
-define_metric(
-    __monitor__,
-    "docker.mem.max_usage",
-    "The max amount of memory used by container in bytes.",
-    unit="bytes",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.usage",
-    "The current number of bytes used for memory including cache.",
-    unit="bytes",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.fail_cnt",
-    "The number of times the container hit its memory limit",
-    category="Memory",
-)
-define_metric(
-    __monitor__,
-    "docker.mem.limit",
-    "The memory limit for the container in bytes.",
-    unit="bytes",
-    category="Memory",
-)
 
-define_metric(
-    __monitor__,
-    "docker.cpu.usage",
-    "Total CPU consumed by container in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.system_cpu_usage",
-    "Total CPU consumed by container in kernel mode in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.usage_in_usermode",
-    "Total CPU consumed by tasks of the cgroup in user mode in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.total_usage",
-    "Total CPU consumed by tasks of the cgroup in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.usage_in_kernelmode",
-    "Total CPU consumed by tasks of the cgroup in kernel mode in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
+define_metric( __monitor__, "docker.mem.max_usage", "The max amount of memory used by container in bytes.", unit="bytes", category="Memory"  )
+define_metric( __monitor__, "docker.mem.usage", "The current number of bytes used for memory including cache.", unit="bytes", category="Memory"  )
+define_metric( __monitor__, "docker.mem.fail_cnt", "The number of times the container hit its memory limit", category="Memory" )
+define_metric( __monitor__, "docker.mem.limit", "The memory limit for the container in bytes.", unit="bytes", category="Memory")
 
-define_metric(
-    __monitor__,
-    "docker.cpu.throttling.periods",
-    "The number of of periods with throttling active.",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.throttling.throttled_periods",
-    "The number of periods where the container hit its throttling limit",
-    cumulative=True,
-    category="CPU",
-)
-define_metric(
-    __monitor__,
-    "docker.cpu.throttling.throttled_time",
-    "The aggregate amount of time the container was throttled in nanoseconds",
-    cumulative=True,
-    category="CPU",
-)
+define_metric( __monitor__, "docker.cpu.usage", "Total CPU consumed by container in nanoseconds", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.system_cpu_usage", "Total CPU consumed by container in kernel mode in nanoseconds", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.usage_in_usermode", "Total CPU consumed by tasks of the cgroup in user mode in nanoseconds", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.total_usage", "Total CPU consumed by tasks of the cgroup in nanoseconds", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.usage_in_kernelmode", "Total CPU consumed by tasks of the cgroup in kernel mode in nanoseconds", cumulative=True, category="CPU" )
 
+define_metric( __monitor__, "docker.cpu.throttling.periods", "The number of of periods with throttling active.", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.throttling.throttled_periods", "The number of periods where the container hit its throttling limit", cumulative=True, category="CPU" )
+define_metric( __monitor__, "docker.cpu.throttling.throttled_time", "The aggregate amount of time the container was throttled in nanoseconds", cumulative=True, category="CPU" )
 
-class WrappedStreamResponse(object):
+class WrappedStreamResponse( object ):
     """ Wrapper for generator returned by docker.Client._stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
     """
-
-    def __init__(self, client, response, decode):
+    def __init__( self, client, response, decode ):
         self.client = client
         self.response = response
         self.decode = self.decode
 
-    def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_helper(
-            self.response, self.decode
-        ):
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._stream_helper( self.response, self.decode ):
             yield item
 
-
-class WrappedRawResponse(object):
+class WrappedRawResponse( object ):
     """ Wrapper for generator returned by docker.Client._stream_raw_result
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
     """
-
-    def __init__(self, client, response):
+    def __init__( self, client, response ):
         self.client = client
         self.response = response
 
-    def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._stream_raw_result( self.response ):
             yield item
 
-
-class WrappedMultiplexedStreamResponse(object):
+class WrappedMultiplexedStreamResponse( object ):
     """ Wrapper for generator returned by docker.Client._multiplexed_response_stream_helper
         that gives us access to the response, and therefore the socket, so that
         we can shutdown the socket from another thread if needed
     """
-
-    def __init__(self, client, response):
+    def __init__( self, client, response ):
         self.client = client
         self.response = response
 
-    def __iter__(self):
-        for item in super(
-            DockerClient, self.client
-        )._multiplexed_response_stream_helper(self.response):
+    def __iter__( self ):
+        for item in super( DockerClient, self.client )._multiplexed_response_stream_helper( self.response ):
             yield item
 
-
-class DockerClient(docker.Client):
+class DockerClient( docker.Client ):
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
         shutdown
     """
+    def _stream_helper( self, response, decode=False ):
+        return WrappedStreamResponse( self, response, decode )
 
-    def _stream_helper(self, response, decode=False):
-        return WrappedStreamResponse(self, response, decode)
+    def _stream_raw_result( self, response ):
+        return WrappedRawResponse( self, response )
 
-    def _stream_raw_result(self, response):
-        return WrappedRawResponse(self, response)
-
-    def _multiplexed_response_stream_helper(self, response):
-        return WrappedMultiplexedStreamResponse(self, response)
+    def _multiplexed_response_stream_helper( self, response ):
+        return WrappedMultiplexedStreamResponse( self, response )
 
     def _get_raw_response_socket(self, response):
         if response.raw._fp.fp:
-            return super(DockerClient, self)._get_raw_response_socket(response)
+            return super( DockerClient, self )._get_raw_response_socket( response )
 
         return None
 
-
-def _split_datetime_from_line(line):
+def _split_datetime_from_line( line ):
     """Docker timestamps are in RFC3339 format: 2015-08-03T09:12:43.143757463Z, with everything up to the first space
     being the timestamp.
     """
     log_line = line
     dt = datetime.datetime.utcnow()
-    pos = line.find(" ")
+    pos = line.find( ' ' )
     if pos > 0:
-        dt = scalyr_util.rfc3339_to_datetime(line[0:pos])
-        log_line = line[pos + 1 :]
+        dt = scalyr_util.rfc3339_to_datetime( line[0:pos] )
+        log_line = line[pos+1:]
 
     return (dt, log_line)
 
-
-def _get_containers(
-    client,
-    ignore_container=None,
-    restrict_to_container=None,
-    logger=None,
-    only_running_containers=True,
-    glob_list=None,
-    include_log_path=False,
-    get_labels=False,
-):
+def _get_containers(client, ignore_container=None, restrict_to_container=None, logger=None,
+                    only_running_containers=True, glob_list=None, include_log_path=False, get_labels=False):
     """Gets a dict of running containers that maps container id to container name
     """
     if logger is None:
@@ -693,23 +304,21 @@ def _get_containers(
     if glob_list is None:
         glob_list = {}
 
-    include_globs = glob_list.get("include", None)
-    exclude_globs = glob_list.get("exclude", None)
+    include_globs = glob_list.get( 'include', None )
+    exclude_globs = glob_list.get( 'exclude', None )
 
     result = {}
     try:
-        filters = (
-            {"id": restrict_to_container} if restrict_to_container is not None else None
-        )
+        filters = {"id": restrict_to_container} if restrict_to_container is not None else None
         response = client.containers(filters=filters, all=not only_running_containers)
         for container in response:
-            cid = container["Id"]
+            cid = container['Id']
 
             if ignore_container is not None and cid == ignore_container:
                 continue
 
-            if len(container["Names"]) > 0:
-                name = container["Names"][0].lstrip("/")
+            if len( container['Names'] ) > 0:
+                name = container['Names'][0].lstrip('/')
 
                 add_container = True
 
@@ -717,27 +326,19 @@ def _get_containers(
                 if include_globs:
                     add_container = False
                     for glob in include_globs:
-                        if fnmatch.fnmatch(name, glob):
+                        if fnmatch.fnmatch( name, glob ):
                             add_container = True
                             break
 
                     if not add_container:
-                        global_log.log(
-                            scalyr_logging.DEBUG_LEVEL_2,
-                            "Excluding container '%s', because it does not match any glob in `container_globs`"
-                            % name,
-                        )
+                        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s', because it does not match any glob in `container_globs`" % name )
 
                 # see if this container name should be excluded
                 if add_container and exclude_globs is not None:
                     for glob in exclude_globs:
-                        if fnmatch.fnmatch(name, glob):
+                        if fnmatch.fnmatch( name, glob ):
                             add_container = False
-                            global_log.log(
-                                scalyr_logging.DEBUG_LEVEL_2,
-                                "Excluding container '%s', because it matches '%s' in `container_globs_exclude`"
-                                % (name, glob),
-                            )
+                            global_log.log( scalyr_logging.DEBUG_LEVEL_2, "Excluding container '%s', because it matches '%s' in `container_globs_exclude`" % (name, glob) )
                             break
 
                 if add_container:
@@ -745,40 +346,31 @@ def _get_containers(
                     labels = None
                     if include_log_path or get_labels:
                         try:
-                            info = client.inspect_container(cid)
+                            info = client.inspect_container( cid )
                             if include_log_path:
-                                log_path = (
-                                    info["LogPath"] if "LogPath" in info else None
-                                )
+                                log_path = info['LogPath'] if 'LogPath' in info else None
 
                             if get_labels:
-                                config = info.get("Config", {})
-                                labels = config.get("Labels", None)
+                                config = info.get( 'Config', {} )
+                                labels = config.get( 'Labels', None )
                         except Exception, e:
-                            logger.error(
-                                "Error inspecting container '%s'" % cid,
-                                limit_once_per_x_secs=300,
-                                limit_key="docker-api-inspect",
-                            )
+                          logger.error("Error inspecting container '%s'" % cid, limit_once_per_x_secs=300,limit_key="docker-api-inspect")
 
-                    result[cid] = {"name": name, "log_path": log_path, "labels": labels}
+                    result[cid] = {'name': name, 'log_path': log_path, 'labels': labels }
 
             else:
-                result[cid] = {"name": cid, "log_path": None, "labels": None}
+                result[cid] = {'name': cid, 'log_path': None, 'labels': None }
 
     except Exception, e:  # container querying failed
-        logger.exception(
-            "Error querying running containers: %s, filters=%s, only_running_containers=%s"
-            % (str(e), filters, only_running_containers),
-            limit_once_per_x_secs=300,
-            limit_key="docker-api-running-containers",
-        )
+        logger.exception("Error querying running containers: %s, filters=%s, only_running_containers=%s"
+                         % (str(e), filters, only_running_containers),
+                         limit_once_per_x_secs=300,
+                         limit_key='docker-api-running-containers')
         result = None
 
     return result
 
-
-def get_attributes_and_config_from_labels(labels, docker_options):
+def get_attributes_and_config_from_labels( labels, docker_options ):
     """
         Takes a dict of labels and splits it in to two separate attributes and config dicts.
 
@@ -791,7 +383,7 @@ def get_attributes_and_config_from_labels(labels, docker_options):
         @rtype: (dict, JsonObject)
 
     """
-    config = JsonObject({})
+    config = JsonObject( {} )
     attributes = {}
 
     if labels:
@@ -802,7 +394,7 @@ def get_attributes_and_config_from_labels(labels, docker_options):
             # apply include globs
             for key, value in labels.iteritems():
                 for glob in docker_options.label_include_globs:
-                    if fnmatch.fnmatch(key, glob):
+                    if fnmatch.fnmatch( key, glob ):
                         included[key] = value
                         break
 
@@ -810,7 +402,7 @@ def get_attributes_and_config_from_labels(labels, docker_options):
             for key, value in included.iteritems():
                 add_label = True
                 for glob in docker_options.label_exclude_globs:
-                    if fnmatch.fnmatch(key, glob):
+                    if fnmatch.fnmatch( key, glob ):
                         add_label = False
                         break
 
@@ -820,16 +412,11 @@ def get_attributes_and_config_from_labels(labels, docker_options):
 
         # see if we need to configure the log file from labels
         if docker_options.use_labels_for_log_config:
-            config = annotation_config.process_annotations(
-                labels,
-                annotation_prefix_re=DOCKER_LABEL_CONFIG_RE,
-                hyphens_as_underscores=True,
-            )
+            config = annotation_config.process_annotations( labels, annotation_prefix_re=DOCKER_LABEL_CONFIG_RE, hyphens_as_underscores=True )
 
     return (attributes, config)
 
-
-def get_parser_from_config(base_config, attributes, default_parser):
+def get_parser_from_config( base_config, attributes, default_parser ):
     """
     Checks the various places that the parser option could be set and returns
     the value with the highest precedence, or `default_parser` if no parser was found
@@ -840,81 +427,65 @@ def get_parser_from_config(base_config, attributes, default_parser):
     # check all the places `parser` might be set
     # highest precedence is base_config['attributes']['parser'] - this is if
     # `com.scalyr.config.log.attributes.parser is set as a label
-    if "attributes" in base_config and "parser" in base_config["attributes"]:
-        return base_config["attributes"]["parser"]
+    if 'attributes' in base_config and 'parser' in base_config['attributes']:
+        return base_config['attributes']['parser']
 
     # next precedence is base_config['parser'] - this is if
     # `com.scalyr.config.log.parser` is set as a label
-    if "parser" in base_config:
-        return base_config["parser"]
+    if 'parser' in base_config:
+        return base_config['parser']
 
     # lowest precedence is attributes['parser'] - this is if
     # `parser` is a label and labels are being uploaded as attributes
     # and the `parser` label passes the attribute filters
-    if "parser" in attributes:
-        return attributes["parser"]
+    if 'parser' in attributes:
+        return attributes['parser']
 
     # if we are here, then we found nothing so return the default
     return default_parser
 
-
-class ContainerChecker(StoppableThread):
+class ContainerChecker( StoppableThread ):
     """
         Monitors containers to check when they start and stop running.
     """
 
-    def __init__(
-        self,
-        config,
-        logger,
-        socket_file,
-        docker_api_version,
-        host_hostname,
-        data_path,
-        log_path,
-    ):
+    def __init__( self, config, logger, socket_file, docker_api_version, host_hostname, data_path, log_path ):
 
         self._config = config
         self._logger = logger
 
-        self._use_raw_logs = config.get("docker_raw_logs")
+        self._use_raw_logs = config.get('docker_raw_logs')
 
-        self.__delay = self._config.get("container_check_interval")
-        self.__log_prefix = self._config.get("docker_log_prefix")
-        name = self._config.get("container_name")
+        self.__delay = self._config.get( 'container_check_interval' )
+        self.__log_prefix = self._config.get( 'docker_log_prefix' )
+        name = self._config.get( 'container_name' )
 
         self.__docker_options = DockerOptions(
-            labels_as_attributes=self._config.get("labels_as_attributes"),
-            label_prefix=self._config.get("label_prefix"),
-            label_include_globs=self._config.get("label_include_globs"),
-            label_exclude_globs=self._config.get("label_exclude_globs"),
-            use_labels_for_log_config=self._config.get("use_labels_for_log_config"),
+            labels_as_attributes=self._config.get( 'labels_as_attributes' ),
+            label_prefix=self._config.get( 'label_prefix' ),
+            label_include_globs=self._config.get( 'label_include_globs' ),
+            label_exclude_globs=self._config.get( 'label_exclude_globs' ),
+            use_labels_for_log_config=self._config.get( 'use_labels_for_log_config' )
         )
 
-        self.__get_labels = (
-            self.__docker_options.use_labels_for_log_config
-            or self.__docker_options.labels_as_attributes
-        )
+        self.__get_labels = self.__docker_options.use_labels_for_log_config or self.__docker_options.labels_as_attributes
 
         self.__socket_file = socket_file
         self.__docker_api_version = docker_api_version
-        self.__client = DockerClient(
-            base_url=("unix:/%s" % self.__socket_file),
-            version=self.__docker_api_version,
-        )
+        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
-        self.container_id = self.__get_scalyr_container_id(self.__client, name)
+        self.container_id = self.__get_scalyr_container_id( self.__client, name )
 
-        self.__checkpoint_file = os.path.join(data_path, "docker-checkpoints.json")
+        self.__checkpoint_file = os.path.join( data_path, "docker-checkpoints.json" )
         self.__log_path = log_path
 
         self.__host_hostname = host_hostname
 
-        self.__readback_buffer_size = self._config.get("readback_buffer_size")
+        self.__readback_buffer_size = self._config.get( 'readback_buffer_size' )
 
         self.__glob_list = {
-            "include": self._config.get("container_globs"),
-            "exclude": self._config.get("container_globs_exclude"),
+            'include': self._config.get( 'container_globs' ),
+            'exclude': self._config.get( 'container_globs_exclude' ),
         }
 
         self.containers = {}
@@ -923,149 +494,105 @@ class ContainerChecker(StoppableThread):
         self.__log_watcher = None
         self.__module = None
         self.__start_time = time.time()
-        self.__thread = StoppableThread(
-            target=self.check_containers, name="Container Checker"
-        )
+        self.__thread = StoppableThread( target=self.check_containers, name="Container Checker" )
 
-    def start(self):
+    def start( self ):
         self.__load_checkpoints()
-        self.containers = _get_containers(
-            self.__client,
-            ignore_container=self.container_id,
-            glob_list=self.__glob_list,
-            include_log_path=self._use_raw_logs,
-            get_labels=self.__get_labels,
-        )
+        self.containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs, get_labels=self.__get_labels)
 
         # if querying the docker api fails, set the container list to empty
         if self.containers == None:
             self.containers = {}
 
-        self.docker_logs = self.__get_docker_logs(self.containers)
+
+        self.docker_logs = self.__get_docker_logs( self.containers )
         self.docker_loggers = []
         self.raw_logs = []
 
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2,
-            "container_globs: %s" % self.__glob_list["include"],
-        )
-        global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2,
-            "container_globs_exclude: %s" % self.__glob_list["exclude"],
-        )
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "container_globs: %s" % self.__glob_list['include'] )
+        global_log.log( scalyr_logging.DEBUG_LEVEL_2, "container_globs_exclude: %s" % self.__glob_list['exclude'] )
 
-        # create and start the DockerLoggers
-        self.__start_docker_logs(self.docker_logs)
-        self._logger.log(
-            scalyr_logging.DEBUG_LEVEL_0,
-            "Starting docker monitor (raw_logs=%s)" % self._use_raw_logs,
-        )
+        #create and start the DockerLoggers
+        self.__start_docker_logs( self.docker_logs )
+        self._logger.log(scalyr_logging.DEBUG_LEVEL_0, "Starting docker monitor (raw_logs=%s)" % self._use_raw_logs)
         self.__thread.start()
 
-    def stop(self, wait_on_join=True, join_timeout=5):
-        self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+    def stop( self, wait_on_join=True, join_timeout=5 ):
+        self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
-        # stop the DockerLoggers
+        #stop the DockerLoggers
         if self._use_raw_logs:
             for logger in self.raw_logs:
-                path = logger["log_config"]["path"]
+                path = logger['log_config']['path']
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path(self.__module.module_name, path)
-                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path))
+                    self.__log_watcher.remove_log_path( self.__module.module_name, path )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s" % (path) )
         else:
             for logger in self.docker_loggers:
                 if self.__log_watcher:
-                    self.__log_watcher.remove_log_path(
-                        self.__module.module_name, logger.log_path
-                    )
-                logger.stop(wait_on_join, join_timeout)
-                self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_1,
-                    "Stopping %s - %s" % (logger.name, logger.stream),
-                )
+                    self.__log_watcher.remove_log_path( self.__module.module_name, logger.log_path )
+                logger.stop( wait_on_join, join_timeout )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping %s - %s" % (logger.name, logger.stream) )
 
         self.__update_checkpoints()
 
         self.docker_loggers = []
         self.raw_logs = []
 
-    def check_containers(self, run_state):
+    def check_containers( self, run_state ):
 
         while run_state.is_running():
             try:
                 self.__update_checkpoints()
 
-                self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_2,
-                    "Attempting to retrieve list of containers:",
-                )
-                running_containers = _get_containers(
-                    self.__client,
-                    ignore_container=self.container_id,
-                    glob_list=self.__glob_list,
-                    include_log_path=self._use_raw_logs,
-                    get_labels=self.__get_labels,
-                )
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Attempting to retrieve list of containers:' )
+                running_containers = _get_containers(self.__client, ignore_container=self.container_id, glob_list=self.__glob_list, include_log_path=self._use_raw_logs, get_labels=self.__get_labels)
 
                 # if running_containers is None, that means querying the docker api failed.
                 # rather than resetting the list of running containers to empty
                 # continue using the previous list of containers
                 if running_containers is None:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_2, "Failed to get list of containers"
-                    )
+                    self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Failed to get list of containers')
                     running_containers = self.containers
 
-                self._logger.log(
-                    scalyr_logging.DEBUG_LEVEL_2,
-                    "Found %d containers" % len(running_containers),
-                )
-                # get the containers that have started since the last sample
+                self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Found %d containers' % len(running_containers))
+                #get the containers that have started since the last sample
                 starting = {}
 
                 for cid, info in running_containers.iteritems():
                     if cid not in self.containers:
-                        self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_1,
-                            "Starting loggers for container '%s'" % info["name"],
-                        )
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Starting loggers for container '%s'" % info['name'] )
                         starting[cid] = info
 
-                # get the containers that have stopped
+                #get the containers that have stopped
                 stopping = {}
                 for cid, info in self.containers.iteritems():
                     if cid not in running_containers:
-                        self._logger.log(
-                            scalyr_logging.DEBUG_LEVEL_1,
-                            "Stopping logger for container '%s' (%s)"
-                            % (info["name"], cid[:6]),
-                        )
+                        self._logger.log(scalyr_logging.DEBUG_LEVEL_1, "Stopping logger for container '%s' (%s)" % (info['name'], cid[:6] ) )
                         stopping[cid] = info
 
-                # stop the old loggers
-                self.__stop_loggers(stopping)
+                #stop the old loggers
+                self.__stop_loggers( stopping )
 
-                # update the list of running containers
-                # do this before starting new ones, as starting up new ones
-                # will access self.containers
+                #update the list of running containers
+                #do this before starting new ones, as starting up new ones
+                #will access self.containers
                 self.containers = running_containers
 
-                # start the new ones
-                self.__start_loggers(starting)
+                #start the new ones
+                self.__start_loggers( starting )
 
             except Exception, e:
-                self._logger.warn(
-                    "Exception occurred when checking containers %s\n%s"
-                    % (str(e), traceback.format_exc())
-                )
+                self._logger.warn( "Exception occurred when checking containers %s\n%s" % (str( e ), traceback.format_exc()) )
 
-            run_state.sleep_but_awaken_if_stopped(self.__delay)
+            run_state.sleep_but_awaken_if_stopped( self.__delay )
 
-    def set_log_watcher(self, log_watcher, module):
+
+    def set_log_watcher( self, log_watcher, module ):
         self.__log_watcher = log_watcher
         self.__module = module
 
-    def __get_scalyr_container_id(self, client, name):
+    def __get_scalyr_container_id( self, client, name ):
         """Gets the container id of the scalyr-agent container
         If the config option container_name is empty, then it is assumed that the scalyr agent is running
         on the host and not in a container and None is returned.
@@ -1074,7 +601,7 @@ class ContainerChecker(StoppableThread):
 
         regex = None
         if name is not None:
-            regex = re.compile(name)
+            regex = re.compile( name )
 
         # get all the containers
         containers = client.containers()
@@ -1086,17 +613,17 @@ class ContainerChecker(StoppableThread):
                 # if so, loop over all container names for this container
                 # Note: containers should only have one name, but the 'Names' field
                 # is a list, so iterate over it just in case
-                for cname in container["Names"]:
-                    cname = cname.lstrip("/")
+                for cname in container['Names']:
+                    cname = cname.lstrip( '/' )
                     # check if the name regex matches
-                    m = regex.match(cname)
+                    m = regex.match( cname )
                     if m:
-                        result = container["Id"]
+                        result = container['Id']
                         break
             # not checking container name, so check the Command instead to see if it's the agent
             else:
-                if container["Command"].startswith("/usr/sbin/scalyr-agent-2"):
-                    result = container["Id"]
+                if container['Command'].startswith( '/usr/sbin/scalyr-agent-2' ):
+                    result = container['Id']
 
             if result:
                 break
@@ -1104,15 +631,12 @@ class ContainerChecker(StoppableThread):
         if not result:
             # only raise an exception if we were looking for a specific name but couldn't find it
             if name is not None:
-                raise Exception(
-                    "Unable to find a matching container id for container '%s'.  Please make sure that a "
-                    "container matching the regular expression '%s' is running."
-                    % (name, name)
-                )
+                raise Exception( "Unable to find a matching container id for container '%s'.  Please make sure that a "
+                                 "container matching the regular expression '%s' is running." % (name, name) )
 
         return result
 
-    def __update_checkpoints(self):
+    def __update_checkpoints( self ):
         """Update the checkpoints for when each docker logger logged a request, and save the checkpoints
         to file.
         """
@@ -1126,26 +650,21 @@ class ContainerChecker(StoppableThread):
 
             # save to disk
             if self.__checkpoints:
-                tmp_file = self.__checkpoint_file + "~"
-                scalyr_util.atomic_write_dict_as_json_file(
-                    self.__checkpoint_file, tmp_file, self.__checkpoints
-                )
+                tmp_file = self.__checkpoint_file + '~'
+                scalyr_util.atomic_write_dict_as_json_file( self.__checkpoint_file, tmp_file, self.__checkpoints )
 
-    def __load_checkpoints(self):
+    def __load_checkpoints( self ):
         try:
-            checkpoints = scalyr_util.read_file_as_json(self.__checkpoint_file)
+            checkpoints = scalyr_util.read_file_as_json( self.__checkpoint_file )
         except:
-            self._logger.info(
-                "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.",
-                self.__checkpoint_file,
-            )
+            self._logger.info( "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.", self.__checkpoint_file )
             checkpoints = {}
 
         if checkpoints:
             for name, last_request in checkpoints.iteritems():
                 self.__checkpoints[name] = last_request
 
-    def __stop_loggers(self, stopping):
+    def __stop_loggers( self, stopping ):
         """
         Stops any DockerLoggers in the 'stopping' dict
         @param stopping: a dict of container ids => container names. Any running containers that have
@@ -1153,97 +672,72 @@ class ContainerChecker(StoppableThread):
         @type stopping: dict
         """
         if stopping:
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_2, "Stopping all docker loggers"
-            )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Stopping all docker loggers')
 
             if self._use_raw_logs:
                 for logger in self.raw_logs:
-                    if logger["cid"] in stopping:
-                        path = logger["log_config"]["path"]
+                    if logger['cid'] in stopping:
+                        path = logger['log_config']['path']
                         if self.__log_watcher:
-                            self.__log_watcher.schedule_log_path_for_removal(
-                                self.__module.module_name, path
-                            )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, path )
 
-                self.raw_logs[:] = [
-                    l for l in self.raw_logs if l["cid"] not in stopping
-                ]
+                self.raw_logs[:] = [l for l in self.raw_logs if l['cid'] not in stopping]
             else:
                 for logger in self.docker_loggers:
                     if logger.cid in stopping:
-                        logger.stop(wait_on_join=True, join_timeout=1)
+                        logger.stop( wait_on_join=True, join_timeout=1 )
                         if self.__log_watcher:
-                            self.__log_watcher.schedule_log_path_for_removal(
-                                self.__module.module_name, logger.log_path
-                            )
+                            self.__log_watcher.schedule_log_path_for_removal( self.__module.module_name, logger.log_path )
 
-                self.docker_loggers[:] = [
-                    l for l in self.docker_loggers if l.cid not in stopping
-                ]
+                self.docker_loggers[:] = [l for l in self.docker_loggers if l.cid not in stopping]
 
-            self.docker_logs[:] = [
-                l for l in self.docker_logs if l["cid"] not in stopping
-            ]
+            self.docker_logs[:] = [l for l in self.docker_logs if l['cid'] not in stopping]
 
-    def __start_loggers(self, starting):
+    def __start_loggers( self, starting ):
         """
         Starts a list of DockerLoggers
         @param starting: a list of DockerLoggers to start
         @type starting: list
         """
         if starting:
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_2, "Starting all docker loggers"
-            )
-            docker_logs = self.__get_docker_logs(starting)
-            self.__start_docker_logs(docker_logs)
-            self.docker_logs.extend(docker_logs)
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Starting all docker loggers')
+            docker_logs = self.__get_docker_logs( starting )
+            self.__start_docker_logs( docker_logs )
+            self.docker_logs.extend( docker_logs )
 
-    def __start_docker_logs(self, docker_logs):
+    def __start_docker_logs( self, docker_logs ):
         for log in docker_logs:
             if self.__log_watcher:
                 try:
-                    log["log_config"] = self.__log_watcher.add_log_config(
-                        self.__module.module_name, log["log_config"]
-                    )
+                    log['log_config'] = self.__log_watcher.add_log_config( self.__module.module_name, log['log_config'] )
                 except Exception, e:
-                    global_log.info(
-                        "Error adding log '%s' to log watcher - %s"
-                        % (log["log_config"]["path"], e)
-                    )
+                    global_log.info( "Error adding log '%s' to log watcher - %s" % (log['log_config']['path'], e) )
 
             if self._use_raw_logs:
-                log_path = log["log_config"]["path"]
+                log_path = log['log_config']['path']
                 if not os.path.exists(log_path):
-                    global_log.warn(
-                        "Missing file detected for container log path '%s'. Please ensure that the host's "
-                        "Docker container directory (by default /var/lib/docker/containers) has been "
-                        "mounted in the Scalyr Agent container." % log_path
-                    )
-                self.raw_logs.append(log)
+                    global_log.warn("Missing file detected for container log path '%s'. Please ensure that the host's "
+                                    "Docker container directory (by default /var/lib/docker/containers) has been "
+                                    "mounted in the Scalyr Agent container." % log_path)
+                self.raw_logs.append( log )
             else:
-                last_request = self.__get_last_request_for_log(
-                    log["log_config"]["path"]
-                )
-                self.docker_loggers.append(
-                    self.__create_docker_logger(log, last_request)
-                )
+                last_request = self.__get_last_request_for_log( log['log_config']['path'] )
+                self.docker_loggers.append( self.__create_docker_logger( log, last_request ) )
 
-    def __get_last_request_for_log(self, path):
-        result = datetime.datetime.fromtimestamp(self.__start_time)
+    def __get_last_request_for_log( self, path ):
+        result = datetime.datetime.fromtimestamp( self.__start_time )
 
         try:
-            full_path = os.path.join(self.__log_path, path)
-            fp = open(full_path, "r", self.__readback_buffer_size)
+            full_path = os.path.join( self.__log_path, path )
+            fp = open( full_path, 'r', self.__readback_buffer_size )
 
             # seek readback buffer bytes from the end of the file
-            fp.seek(0, os.SEEK_END)
+            fp.seek( 0, os.SEEK_END )
             size = fp.tell()
             if size < self.__readback_buffer_size:
-                fp.seek(0, os.SEEK_SET)
+                fp.seek( 0, os.SEEK_SET )
             else:
-                fp.seek(size - self.__readback_buffer_size, os.SEEK_SET)
+                fp.seek( size - self.__readback_buffer_size, os.SEEK_SET )
 
             first = True
             for line in fp:
@@ -1253,18 +747,16 @@ class ContainerChecker(StoppableThread):
                     first = False
                     continue
 
-                dt, _ = _split_datetime_from_line(line)
+                dt, _ = _split_datetime_from_line( line )
                 if dt:
                     result = dt
             fp.close()
         except Exception, e:
-            global_log.info("%s", str(e))
+            global_log.info( "%s", str(e) )
 
-        return scalyr_util.seconds_since_epoch(result)
+        return scalyr_util.seconds_since_epoch( result )
 
-    def __create_log_config(
-        self, default_parser, path, attributes, base_config={}, parse_as_json=False
-    ):
+    def __create_log_config( self, default_parser, path, attributes, base_config={}, parse_as_json=False ):
         """Convenience function to create a log_config dict
         @param default_parser: a parser to use if no parser is found in the attributes or base_config
         @param path: the path of the log file being configured
@@ -1281,25 +773,25 @@ class ContainerChecker(StoppableThread):
         # Set the parser the log_config['parser'] level
         # otherwise it will be overwritten by a default value due to the way
         # log_config verification works
-        result["parser"] = get_parser_from_config(result, attributes, default_parser)
+        result['parser'] = get_parser_from_config( result, attributes, default_parser )
 
-        result["path"] = path
-        result["parse_lines_as_json"] = parse_as_json
+        result['path'] = path
+        result['parse_lines_as_json'] = parse_as_json
 
-        if "attributes" in result:
+        if 'attributes' in result:
             # if 'attributes' exists in `result`, then it must have come from
             # base config, which should already be a JsonObject, so no need to
             # explicitly convert the `attributes` dict, just update the existing object.
-            result["attributes"].update(attributes)
+            result['attributes'].update( attributes )
         else:
             # make sure the log_config attributes are a JsonObject
             # because the code for verifying log configs explicitly checks for JsonObjects
             # and throws an error if other types are found
-            result["attributes"] = JsonObject(attributes)
+            result['attributes'] = JsonObject( attributes )
 
         return result
 
-    def __get_docker_logs(self, containers):
+    def __get_docker_logs( self, containers ):
         """Returns a list of dicts containing the container id, stream, and a log_config
         for each container in the 'containers' param.
         """
@@ -1308,63 +800,43 @@ class ContainerChecker(StoppableThread):
 
         attributes = None
         try:
-            attributes = JsonObject({"monitor": "agentDocker"})
+            attributes = JsonObject( { "monitor": "agentDocker" } )
             if self.__host_hostname:
-                attributes["serverHost"] = self.__host_hostname
+                attributes['serverHost'] = self.__host_hostname
 
         except Exception, e:
-            self._logger.error("Error setting monitor attribute in DockerMonitor")
+            self._logger.error( "Error setting monitor attribute in DockerMonitor" )
             raise
 
-        prefix = self.__log_prefix + "-"
+        prefix = self.__log_prefix + '-'
 
         for cid, info in containers.iteritems():
             container_attributes = attributes.copy()
-            container_attributes["containerName"] = info["name"]
-            container_attributes["containerId"] = cid
+            container_attributes['containerName'] = info['name']
+            container_attributes['containerId'] = cid
 
             # get the attributes and config items from the labels
-            attrs, base_config = get_attributes_and_config_from_labels(
-                info.get("labels", None), self.__docker_options
-            )
+            attrs, base_config = get_attributes_and_config_from_labels( info.get('labels', None), self.__docker_options )
 
-            attrs.update(container_attributes)
+            attrs.update( container_attributes )
 
-            if self._use_raw_logs and "log_path" in info and info["log_path"]:
-                log_config = self.__create_log_config(
-                    default_parser="docker",
-                    path=info["log_path"],
-                    attributes=attrs,
-                    base_config=base_config,
-                    parse_as_json=True,
-                )
-                if "rename_logfile" not in log_config:
-                    log_config["rename_logfile"] = "/docker/%s.log" % info["name"]
+            if self._use_raw_logs and 'log_path' in info and info['log_path']:
+                log_config = self.__create_log_config( default_parser='docker', path=info['log_path'], attributes=attrs, base_config=base_config, parse_as_json=True )
+                if 'rename_logfile' not in log_config:
+                    log_config['rename_logfile'] = '/docker/%s.log' % info['name']
 
-                result.append({"cid": cid, "stream": "raw", "log_config": log_config})
+                result.append( { 'cid': cid, 'stream': 'raw', 'log_config': log_config } )
             else:
-                path = prefix + info["name"] + "-stdout.log"
-                log_config = self.__create_log_config(
-                    default_parser="dockerStdout",
-                    path=path,
-                    attributes=attrs,
-                    base_config=base_config,
-                )
-                result.append(
-                    {"cid": cid, "stream": "stdout", "log_config": log_config}
-                )
+                path =  prefix + info['name'] + '-stdout.log'
+                log_config = self.__create_log_config( default_parser='dockerStdout', path=path, attributes=attrs, base_config=base_config )
+                result.append( { 'cid': cid, 'stream': 'stdout', 'log_config': log_config } )
 
-                path = prefix + info["name"] + "-stderr.log"
-                log_config = self.__create_log_config(
-                    default_parser="dockerStderr",
-                    path=path,
-                    attributes=attrs,
-                    base_config=base_config,
-                )
+                path = prefix + info['name'] + '-stderr.log'
+                log_config = self.__create_log_config( default_parser='dockerStderr', path=path, attributes=attrs, base_config=base_config )
 
         return result
 
-    def __create_docker_logger(self, log, last_request):
+    def __create_docker_logger( self, log, last_request ):
         """Creates a new DockerLogger object, based on the parameters passed in in the 'log' param.
 
         @param log: a dict consisting of:
@@ -1373,61 +845,40 @@ class ContainerChecker(StoppableThread):
                         log_config - the log config used by the scalyr-agent for this log file
         @type log: dict
         """
-        cid = log["cid"]
-        name = self.containers[cid]["name"]
-        stream = log["stream"]
-        stream_name = name + "-" + stream
+        cid = log['cid']
+        name = self.containers[cid]['name']
+        stream = log['stream']
+        stream_name = name + '-' + stream
         if stream_name in self.__checkpoints:
             checkpoint = self.__checkpoints[stream_name]
             if last_request < checkpoint:
                 last_request = checkpoint
 
-        logger = DockerLogger(
-            self.__socket_file,
-            cid,
-            name,
-            stream,
-            log["log_config"]["path"],
-            self._config,
-            last_request,
-        )
+        logger = DockerLogger( self.__socket_file, cid, name, stream, log['log_config']['path'], self._config, last_request )
         logger.start()
         return logger
 
 
-class DockerLogger(object):
+
+class DockerLogger( object ):
     """Abstraction for logging either stdout or stderr from a given container
 
     Logging is performed on a separate thread because each log is read from a continuous stream
     over the docker socket.
     """
-
-    def __init__(
-        self,
-        socket_file,
-        cid,
-        name,
-        stream,
-        log_path,
-        config,
-        last_request=None,
-        max_log_size=20 * 1024 * 1024,
-        max_log_rotations=2,
-    ):
+    def __init__( self, socket_file, cid, name, stream, log_path, config, last_request=None, max_log_size=20*1024*1024, max_log_rotations=2 ):
         self.__socket_file = socket_file
         self.cid = cid
         self.name = name
 
-        # stderr or stdout
+        #stderr or stdout
         self.stream = stream
         self.log_path = log_path
         self.stream_name = name + "-" + stream
 
-        self.__max_previous_lines = config.get("max_previous_lines")
-        self.__log_timestamps = (
-            True  # Note: always log timestamps for now.  config.get( 'log_timestamps' )
-        )
-        self.__docker_api_version = config.get("docker_api_version")
+        self.__max_previous_lines = config.get( 'max_previous_lines' )
+        self.__log_timestamps = True # Note: always log timestamps for now.  config.get( 'log_timestamps' )
+        self.__docker_api_version = config.get( 'docker_api_version' )
 
         self.__last_request_lock = threading.Lock()
 
@@ -1435,67 +886,53 @@ class DockerLogger(object):
         if last_request:
             self.__last_request = last_request
 
-        self.__logger = logging.Logger(cid + "." + stream)
+        self.__logger = logging.Logger( cid + '.' + stream )
 
-        self.__log_handler = logging.handlers.RotatingFileHandler(
-            filename=log_path, maxBytes=max_log_size, backupCount=max_log_rotations
-        )
+        self.__log_handler = logging.handlers.RotatingFileHandler( filename = log_path, maxBytes = max_log_size, backupCount = max_log_rotations )
         formatter = logging.Formatter()
-        self.__log_handler.setFormatter(formatter)
-        self.__logger.addHandler(self.__log_handler)
-        self.__logger.setLevel(logging.INFO)
+        self.__log_handler.setFormatter( formatter )
+        self.__logger.addHandler( self.__log_handler )
+        self.__logger.setLevel( logging.INFO )
 
         self.__client = None
         self.__logs = None
 
-        self.__thread = StoppableThread(
-            target=self.process_request,
-            name="Docker monitor logging thread for %s" % (name + "." + stream),
-        )
+        self.__thread = StoppableThread( target=self.process_request, name="Docker monitor logging thread for %s" % (name + '.' + stream) )
 
-    def start(self):
+    def start( self ):
         self.__thread.start()
 
-    def stop(self, wait_on_join=True, join_timeout=5):
+    def stop( self, wait_on_join=True, join_timeout=5 ):
         if self.__client and self.__logs and self.__logs.response:
-            sock = self.__client._get_raw_response_socket(self.__logs.response)
+            sock = self.__client._get_raw_response_socket( self.__logs.response )
             if sock:
-                sock.shutdown(socket.SHUT_RDWR)
-        self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
+                sock.shutdown( socket.SHUT_RDWR )
+        self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
 
-    def last_request(self):
+    def last_request( self ):
         self.__last_request_lock.acquire()
         result = self.__last_request
         self.__last_request_lock.release()
         return result
 
-    def process_request(self, run_state):
+    def process_request( self, run_state ):
         """This function makes a log request on the docker socket for a given container and continues
         to read from the socket until the connection is closed
         """
         try:
             # random delay to prevent all requests from starting at the same time
-            delay = random.randint(500, 5000) / 1000
-            run_state.sleep_but_awaken_if_stopped(delay)
+            delay = random.randint( 500, 5000 ) / 1000
+            run_state.sleep_but_awaken_if_stopped( delay )
 
-            self.__logger.log(
-                scalyr_logging.DEBUG_LEVEL_3,
-                "Starting to retrieve logs for cid=%s" % str(self.cid),
-            )
-            self.__client = DockerClient(
-                base_url=("unix:/%s" % self.__socket_file),
-                version=self.__docker_api_version,
-            )
+            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Starting to retrieve logs for cid=%s' % str(self.cid))
+            self.__client = DockerClient( base_url=('unix:/%s' % self.__socket_file ), version=self.__docker_api_version )
 
-            epoch = datetime.datetime.utcfromtimestamp(0)
+            epoch = datetime.datetime.utcfromtimestamp( 0 )
             while run_state.is_running():
-                self.__logger.log(
-                    scalyr_logging.DEBUG_LEVEL_3,
-                    "Attempting to retrieve logs for cid=%s" % str(self.cid),
-                )
-                sout = False
-                serr = False
-                if self.stream == "stdout":
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve logs for cid=%s' % str(self.cid))
+                sout=False
+                serr=False
+                if self.stream == 'stdout':
                     sout = True
                 else:
                     serr = True
@@ -1507,93 +944,69 @@ class DockerLogger(object):
                     stream=True,
                     timestamps=True,
                     tail=self.__max_previous_lines,
-                    follow=True,
+                    follow=True
                 )
 
                 # self.__logs is a generator so don't call len( self.__logs )
-                self.__logger.log(
-                    scalyr_logging.DEBUG_LEVEL_3,
-                    "Found log lines for cid=%s" % (str(self.cid)),
-                )
+                self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Found log lines for cid=%s' % (str(self.cid)))
                 try:
                     for line in self.__logs:
-                        # split the docker timestamp from the frest of the line
-                        dt, log_line = _split_datetime_from_line(line)
+                        #split the docker timestamp from the frest of the line
+                        dt, log_line = _split_datetime_from_line( line )
                         if not dt:
-                            global_log.error("No timestamp found on line: '%s'", line)
+                            global_log.error( 'No timestamp found on line: \'%s\'', line )
                         else:
-                            timestamp = scalyr_util.seconds_since_epoch(dt, epoch)
+                            timestamp = scalyr_util.seconds_since_epoch( dt, epoch )
 
-                            # see if we log the entire line including timestamps
+                            #see if we log the entire line including timestamps
                             if self.__log_timestamps:
                                 log_line = line
 
-                            # check to make sure timestamp is >= to the last request
-                            # Note: we can safely read last_request here because we are the only writer
+                            #check to make sure timestamp is >= to the last request
+                            #Note: we can safely read last_request here because we are the only writer
                             if timestamp >= self.__last_request:
-                                self.__logger.info(log_line.strip())
+                                self.__logger.info( log_line.strip() )
 
-                                # but we need to lock for writing
+                                #but we need to lock for writing
                                 self.__last_request_lock.acquire()
                                 self.__last_request = timestamp
                                 self.__last_request_lock.release()
 
                         if not run_state.is_running():
-                            self.__logger.log(
-                                scalyr_logging.DEBUG_LEVEL_3,
-                                "Exiting out of container log for cid=%s"
-                                % str(self.cid),
-                            )
+                            self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Exiting out of container log for cid=%s' % str(self.cid))
                             break
                 except ProtocolError, e:
                     if run_state.is_running():
-                        global_log.warning(
-                            "Stream closed due to protocol error: %s" % str(e)
-                        )
+                        global_log.warning( "Stream closed due to protocol error: %s" % str( e ) )
 
                 if run_state.is_running():
-                    global_log.warning(
-                        "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost"
-                        % (self.name),
-                        limit_once_per_x_secs=300,
-                        limit_key="stream-closed-%s" % self.name,
-                    )
-                    delay = random.randint(500, 3000) / 1000
-                    run_state.sleep_but_awaken_if_stopped(delay)
+                    global_log.warning( "Log stream has been closed for '%s'.  Check docker.log on the host for possible errors.  Attempting to reconnect, some logs may be lost" % (self.name), limit_once_per_x_secs=300, limit_key='stream-closed-%s'%self.name )
+                    delay = random.randint( 500, 3000 ) / 1000
+                    run_state.sleep_but_awaken_if_stopped( delay )
+
 
             # we are shutting down, so update our last request to be slightly later than it's current
             # value to prevent duplicate logs when starting up again.
             self.__last_request_lock.acquire()
 
-            # can't be any smaller than 0.01 because the time value is only saved to 2 decimal places
-            # on disk
+            #can't be any smaller than 0.01 because the time value is only saved to 2 decimal places
+            #on disk
             self.__last_request += 0.01
 
             self.__last_request_lock.release()
 
         except Exception, e:
-            global_log.warn(
-                "Unhandled exception in DockerLogger.process_request for %s:\n\t%s"
-                % (self.name, str(e))
-            )
+            global_log.warn('Unhandled exception in DockerLogger.process_request for %s:\n\t%s' % (self.name, str( e )))
 
 
-class ContainerIdResolver:
+class ContainerIdResolver():
     """Abstraction that can be used to look up Docker container names based on their id.
 
     This has a caching layer built in to minimize lookups to actual Docker and make this as efficient as possible.
 
     This abstraction is thread-safe.
     """
-
-    def __init__(
-        self,
-        docker_api_socket,
-        docker_api_version,
-        logger,
-        cache_expiration_secs=300,
-        cache_clean_secs=5,
-    ):
+    def __init__(self, docker_api_socket, docker_api_version, logger, cache_expiration_secs=300, cache_clean_secs=5):
         """
         Initializes one instance.
 
@@ -1617,9 +1030,7 @@ class ContainerIdResolver:
         self.__last_cache_clean = time.time()
         self.__cache_expiration_secs = cache_expiration_secs
         self.__cache_clean_secs = cache_clean_secs
-        self.__docker_client = docker.Client(
-            base_url=("unix:/%s" % docker_api_socket), version=docker_api_version
-        )
+        self.__docker_client = docker.Client(base_url=('unix:/%s' % docker_api_socket), version=docker_api_version)
         # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.
         self.__untouched_ids = dict()
         self.__logger = logger
@@ -1637,7 +1048,7 @@ class ContainerIdResolver:
         @rtype: (str, dict) or (None, None)
         """
         try:
-            # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Looking up cid="%s"', container_id)
             current_time = time.time()
 
             self.__lock.acquire()
@@ -1648,29 +1059,25 @@ class ContainerIdResolver:
                 if container_id in self.__cache:
                     entry = self.__cache[container_id]
                     self._touch(entry, current_time)
-                    # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
-                    # entry.container_name)
+                    #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Cache hit for cid="%s" -> "%s"', container_id,
+                                      #entry.container_name)
                     return (entry.container_name, entry.labels)
             finally:
                 self.__lock.release()
 
-            (container_name, labels) = self._fetch_id_from_docker(
-                container_id, get_labels=True
-            )
+            (container_name, labels) = self._fetch_id_from_docker(container_id, get_labels=True)
 
             if container_name is not None:
-                # self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
+                #self.__logger.log(scalyr_logging.DEBUG_LEVEL_1, 'Docker resolved id for cid="%s" -> "%s"', container_id,
                 #                  container_name)
 
                 self._insert_entry(container_id, container_name, labels, current_time)
                 return (container_name, labels)
 
-            # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
 
         except Exception, e:
-            self.__logger.error(
-                'Error seen while attempting resolving docker cid="%s"', container_id
-            )
+            self.__logger.error('Error seen while attempting resolving docker cid="%s"', container_id)
 
         return (None, None)
 
@@ -1685,7 +1092,7 @@ class ContainerIdResolver:
         if self.__last_cache_clean + self.__cache_clean_secs > current_time:
             return
 
-        # self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Cleaning cid cache. Before clean=%d:%d', len(self.__cache),
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'Cleaning cid cache. Before clean=%d:%d', len(self.__cache),
         #                  len(self.__untouched_ids))
 
         self.__last_cache_clean = current_time
@@ -1702,7 +1109,7 @@ class ContainerIdResolver:
         for key in self.__cache:
             self.__untouched_ids[key] = True
 
-        # self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'After clean=%d:%d', len(self.__cache),
+        #self.__logger.log(scalyr_logging.DEBUG_LEVEL_2, 'After clean=%d:%d', len(self.__cache),
         #                  len(self.__untouched_ids))
 
     def _touch(self, cache_entry, last_access_time):
@@ -1729,34 +1136,26 @@ class ContainerIdResolver:
                     if `get_labels` is False then the returned labels will always be an empty dict
         @rtype: (str, dict) or (None, None)
         """
-        matches = _get_containers(
-            self.__docker_client,
-            restrict_to_container=container_id,
-            logger=self.__logger,
-            only_running_containers=False,
-            get_labels=get_labels,
-        )
+        matches = _get_containers(self.__docker_client, restrict_to_container=container_id,
+                                  logger=self.__logger, only_running_containers=False, get_labels=get_labels)
         if len(matches) == 0:
-            # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
+            #self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'No matches found in docker for cid="%s"', container_id)
             return (None, None)
 
         if len(matches) > 1:
-            self.__logger.warning(
-                "Container id matches %d containers for id='%s'."
-                % (len(matches), container_id),
-                limit_once_per_x_secs=300,
-                limit_key="docker_container_id_more_than_one",
-            )
+            self.__logger.warning("Container id matches %d containers for id='%s'." % (len(matches), container_id),
+                                  limit_once_per_x_secs=300,
+                                  limit_key='docker_container_id_more_than_one')
             return (None, None)
 
         # Note, the cid used as the key for the returned matches is the long container id, not the short one that
         # we were passed in as `container_id`.
         match = matches[matches.keys()[0]]
-        labels = match.get("labels", {})
+        labels = match.get( 'labels', {} )
         if labels is None:
             labels = {}
 
-        return (match["name"], labels)
+        return (match['name'], labels)
 
     def _insert_entry(self, container_id, container_name, labels, last_access_time):
         """Inserts a new cache entry mapping the specified id to the container name.
@@ -1775,16 +1174,13 @@ class ContainerIdResolver:
             if labels is None:
                 labels = {}
 
-            self.__cache[container_id] = ContainerIdResolver.Entry(
-                container_id, container_name, labels, last_access_time
-            )
+            self.__cache[container_id] = ContainerIdResolver.Entry(container_id, container_name, labels, last_access_time)
         finally:
             self.__lock.release()
 
-    class Entry:
+    class Entry():
         """Helper abstraction representing a single cache entry mapping a container id to its name.
         """
-
         def __init__(self, container_id, container_name, labels, last_access_time):
             """
             @param container_id: The id of the container.
@@ -1840,20 +1236,12 @@ class ContainerIdResolver:
             """
             self.__last_access_time = access_time
 
-
-class DockerOptions(object):
+class DockerOptions( object ):
     """
     A class representing label configuration options from the docker monitor
     """
 
-    def __init__(
-        self,
-        labels_as_attributes=False,
-        label_prefix="",
-        label_include_globs=None,
-        label_exclude_globs=None,
-        use_labels_for_log_config=True,
-    ):
+    def __init__(self, labels_as_attributes=False, label_prefix='', label_include_globs=None, label_exclude_globs=None, use_labels_for_log_config=True):
         """
         @param labels_as_attributes: If True any labels that are not excluded will be added to the attributes result dict
         @param label_prefix: A prefix to add to the key of any labels added to the attributes result dict
@@ -1870,9 +1258,9 @@ class DockerOptions(object):
         @type use_labels_for_log_config: bool
         """
         if label_include_globs is None:
-            label_include_globs = ["*"]
+            label_include_globs = [ '*' ]
         if label_exclude_globs is None:
-            label_exclude_globs = ["com.scalyr.config.*"]
+            label_exclude_globs = [ 'com.scalyr.config.*' ]
 
         self.label_exclude_globs = label_exclude_globs
         self.label_include_globs = label_include_globs
@@ -1884,18 +1272,15 @@ class DockerOptions(object):
         """
         String representation of a DockerOption
         """
-        return (
-            "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s"
-            % (
-                str(self.labels_as_attributes),
-                self.label_prefix,
-                str(self.label_include_globs),
-                str(self.label_exclude_globs),
-                str(self.use_labels_for_log_config),
-            )
-        )
+        return "\n\tLabels as Attributes:%s\n\tLabel Prefix: '%s'\n\tLabel Include Globs: %s\n\tLabel Exclude Globs: %s\n\tUse Labels for Log Config: %s" % (
+                   str(self.labels_as_attributes),
+                   self.label_prefix,
+                   str(self.label_include_globs),
+                   str(self.label_exclude_globs),
+                   str(self.use_labels_for_log_config)
+               )
 
-    def configure_from_monitor(self, monitor):
+    def configure_from_monitor( self, monitor ):
         """
         Configures the options based on the values from the docker monitor
         @param monitor: a docker monitor that can be used to configure the options
@@ -1917,10 +1302,7 @@ class DockerOptions(object):
             self.label_prefix = monitor.label_prefix
             self.labels_as_attributes = monitor.labels_as_attributes
         except Exception, e:
-            global_log.warning(
-                "Error getting docker config from docker monitor - %s.  Using defaults"
-                % str(e)
-            )
+            global_log.warning( "Error getting docker config from docker monitor - %s.  Using defaults" % str(e) )
             # if there was an error, reset all values back to defaults
             label_exclude_globs = self.label_exclude_globs
             label_include_globs = self.label_include_globs
@@ -1929,7 +1311,7 @@ class DockerOptions(object):
             labels_as_attributes = self.labels_as_attributes
 
 
-class DockerMonitor(ScalyrMonitor):
+class DockerMonitor( ScalyrMonitor ):
     """Monitor plugin for docker containers
 
     This plugin uses the Docker API to detect all containers running on the local host, retrieves metrics for each of
@@ -1971,7 +1353,7 @@ class DockerMonitor(ScalyrMonitor):
 
     You can also use docker labels to configure the log settings for a specific container, such as setting the parser or setting redaction rules.
 
-    The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix).
+    The agent takes any label on a container that begins with `com.scalyr.config.log.` and maps it to the corresponding option in the `log_config` stanza for that container's logs (minus the prefix). 
 
     For example, if you add the following label to your container:
 
@@ -1995,7 +1377,7 @@ class DockerMonitor(ScalyrMonitor):
     * rename_logfile
     * redaction_rules
 
-    Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels:
+    Note: keys for docker labels cannot include underscores, so for all options that have an underscore in their name, replace it with a hyphen, and the Scalyr agent will map this to the appropriate option name. e.g. the labels: 
 
     ```
     com.scalyr.config.log.rename-logfile
@@ -2059,24 +1441,21 @@ class DockerMonitor(ScalyrMonitor):
     TODO:  Back fill the instructions here.
     """
 
-    def __get_socket_file(self):
+    def __get_socket_file( self ):
         """Gets the Docker API socket file and validates that it is a UNIX socket
         """
-        # make sure the API socket exists and is a valid socket
-        api_socket = self._config.get("api_socket")
+        #make sure the API socket exists and is a valid socket
+        api_socket = self._config.get( 'api_socket' )
         try:
-            st = os.stat(api_socket)
-            if not stat.S_ISSOCK(st.st_mode):
+            st = os.stat( api_socket )
+            if not stat.S_ISSOCK( st.st_mode ):
                 raise Exception()
         except:
-            raise Exception(
-                "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory."
-                % api_socket
-            )
+            raise Exception( "The file '%s' specified by the 'api_socket' configuration option does not exist or is not a socket.\n\tPlease make sure you have mapped the docker socket from the host to this container using the -v parameter.\n\tNote: Due to problems Docker has mapping symbolic links, you should specify the final file and not a path that contains a symbolic link, e.g. map /run/docker.sock rather than /var/run/docker.sock as on many unices /var/run is a symbolic link to the /run directory." % api_socket )
 
         return api_socket
 
-    def _initialize(self):
+    def _initialize( self ):
         data_path = ""
         log_path = ""
         host_hostname = ""
@@ -2086,146 +1465,128 @@ class DockerMonitor(ScalyrMonitor):
             log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
-                if "serverHost" in self._global_config.server_attributes:
-                    host_hostname = self._global_config.server_attributes["serverHost"]
+                if 'serverHost' in self._global_config.server_attributes:
+                    host_hostname = self._global_config.server_attributes['serverHost']
                 else:
-                    self._logger.info("no server host in server attributes")
+                    self._logger.info( "no server host in server attributes" )
             else:
-                self._logger.info("no server attributes in global config")
+                self._logger.info( "no server attributes in global config" )
 
         self.__socket_file = self.__get_socket_file()
-        self.__docker_api_version = self._config.get("docker_api_version")
+        self.__docker_api_version = self._config.get( 'docker_api_version' )
 
-        self.__client = DockerClient(
-            base_url=("unix:/%s" % self.__socket_file),
-            version=self.__docker_api_version,
-        )
+        self.__client = DockerClient( base_url=('unix:/%s'%self.__socket_file), version=self.__docker_api_version )
 
         self.__glob_list = {
-            "include": self._config.get("container_globs"),
-            "exclude": self._config.get("container_globs_exclude"),
+            'include': self._config.get( 'container_globs' ),
+            'exclude': self._config.get( 'container_globs_exclude' ),
         }
 
-        self.__report_container_metrics = self._config.get("report_container_metrics")
+        self.__report_container_metrics = self._config.get('report_container_metrics')
 
-        self.__percpu_metrics = self._config.get("docker_percpu_metrics")
+        self.__percpu_metrics = self._config.get('docker_percpu_metrics')
 
-        metrics_only = self._config.get("metrics_only")
+        metrics_only = self._config.get('metrics_only')
 
-        self.label_exclude_globs = self._config.get("label_exclude_globs")
-        self.label_include_globs = self._config.get("label_include_globs")
+        self.label_exclude_globs = self._config.get( 'label_exclude_globs' )
+        self.label_include_globs = self._config.get( 'label_include_globs' )
 
-        if not scalyr_util.is_list_of_strings(self.label_include_globs):
-            raise BadMonitorConfiguration(
-                "label_include_globs contains a non-string value: %s"
-                % str(self.label_include_globs),
-                "label_include_globs",
-            )
+        if not scalyr_util.is_list_of_strings( self.label_include_globs):
+            raise BadMonitorConfiguration( "label_include_globs contains a non-string value: %s" % str( self.label_include_globs ), 'label_include_globs' )
 
-        if not scalyr_util.is_list_of_strings(self.label_exclude_globs):
-            raise BadMonitorConfiguration(
-                "label_exclude_globs contains a non-string value: %s"
-                % str(self.label_exclude_globs),
-                "label_exclude_globs",
-            )
+        if not scalyr_util.is_list_of_strings( self.label_exclude_globs):
+            raise BadMonitorConfiguration( "label_exclude_globs contains a non-string value: %s" % str( self.label_exclude_globs ), 'label_exclude_globs' )
 
-        self.use_labels_for_log_config = self._config.get("use_labels_for_log_config")
-        self.label_prefix = self._config.get("label_prefix")
-        self.labels_as_attributes = self._config.get("labels_as_attributes")
+        self.use_labels_for_log_config = self._config.get( 'use_labels_for_log_config' )
+        self.label_prefix = self._config.get( 'label_prefix' )
+        self.labels_as_attributes = self._config.get( 'labels_as_attributes' )
 
         # always force reporting of container metrics if metrics_only is True
         if metrics_only:
             self.__report_container_metrics = True
 
         self.__container_checker = None
-        if not metrics_only and self._config.get("log_mode") != "syslog":
-            self.__container_checker = ContainerChecker(
-                self._config,
-                self._logger,
-                self.__socket_file,
-                self.__docker_api_version,
-                host_hostname,
-                data_path,
-                log_path,
-            )
+        if not metrics_only and self._config.get('log_mode') != 'syslog':
+            self.__container_checker = ContainerChecker( self._config, self._logger, self.__socket_file, self.__docker_api_version, host_hostname, data_path, log_path )
 
-        self.__network_metrics = self.__build_metric_dict(
-            "docker.net.",
-            [
-                "rx_bytes",
-                "rx_dropped",
-                "rx_errors",
-                "rx_packets",
-                "tx_bytes",
-                "tx_dropped",
-                "tx_errors",
-                "tx_packets",
-            ],
-        )
+        self.__network_metrics = self.__build_metric_dict( 'docker.net.', [
+            "rx_bytes",
+            "rx_dropped",
+            "rx_errors",
+            "rx_packets",
+            "tx_bytes",
+            "tx_dropped",
+            "tx_errors",
+            "tx_packets",
+        ])
 
-        self.__mem_stat_metrics = self.__build_metric_dict(
-            "docker.mem.stat.",
-            [
-                "total_pgmajfault",
-                "cache",
-                "mapped_file",
-                "total_inactive_file",
-                "pgpgout",
-                "rss",
-                "total_mapped_file",
-                "writeback",
-                "unevictable",
-                "pgpgin",
-                "total_unevictable",
-                "pgmajfault",
-                "total_rss",
-                "total_rss_huge",
-                "total_writeback",
-                "total_inactive_anon",
-                "rss_huge",
-                "hierarchical_memory_limit",
-                "total_pgfault",
-                "total_active_file",
-                "active_anon",
-                "total_active_anon",
-                "total_pgpgout",
-                "total_cache",
-                "inactive_anon",
-                "active_file",
-                "pgfault",
-                "inactive_file",
-                "total_pgpgin",
-            ],
-        )
+        self.__mem_stat_metrics = self.__build_metric_dict( 'docker.mem.stat.', [
+            "total_pgmajfault",
+            "cache",
+            "mapped_file",
+            "total_inactive_file",
+            "pgpgout",
+            "rss",
+            "total_mapped_file",
+            "writeback",
+            "unevictable",
+            "pgpgin",
+            "total_unevictable",
+            "pgmajfault",
+            "total_rss",
+            "total_rss_huge",
+            "total_writeback",
+            "total_inactive_anon",
+            "rss_huge",
+            "hierarchical_memory_limit",
+            "total_pgfault",
+            "total_active_file",
+            "active_anon",
+            "total_active_anon",
+            "total_pgpgout",
+            "total_cache",
+            "inactive_anon",
+            "active_file",
+            "pgfault",
+            "inactive_file",
+            "total_pgpgin"
+        ])
 
-        self.__mem_metrics = self.__build_metric_dict(
-            "docker.mem.", ["max_usage", "usage", "fail_cnt", "limit"]
-        )
+        self.__mem_metrics = self.__build_metric_dict( 'docker.mem.', [
+            "max_usage",
+            "usage",
+            "fail_cnt",
+            "limit"
+        ])
 
-        self.__cpu_usage_metrics = self.__build_metric_dict(
-            "docker.cpu.", ["usage_in_usermode", "total_usage", "usage_in_kernelmode"]
-        )
+        self.__cpu_usage_metrics = self.__build_metric_dict( 'docker.cpu.', [
+            "usage_in_usermode",
+            "total_usage",
+            "usage_in_kernelmode"
+        ])
 
-        self.__cpu_throttling_metrics = self.__build_metric_dict(
-            "docker.cpu.throttling.", ["periods", "throttled_periods", "throttled_time"]
-        )
+        self.__cpu_throttling_metrics = self.__build_metric_dict( 'docker.cpu.throttling.', [
+            "periods",
+            "throttled_periods",
+            "throttled_time"
+        ])
 
         self.__version = None
         self.__version_lock = threading.RLock()
 
-    def set_log_watcher(self, log_watcher):
+    def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
         if self.__container_checker:
-            self.__container_checker.set_log_watcher(log_watcher, self)
+            self.__container_checker.set_log_watcher( log_watcher, self )
 
-    def __build_metric_dict(self, prefix, names):
+    def __build_metric_dict( self, prefix, names ):
         result = {}
         for name in names:
-            result["%s%s" % (prefix, name)] = name
+            result["%s%s"%(prefix, name)] = name
         return result
 
-    def __log_metrics(self, container, metrics_to_emit, metrics, extra=None):
+    def __log_metrics( self, container, metrics_to_emit, metrics, extra=None ):
         if metrics is None:
             return
 
@@ -2235,91 +1596,72 @@ class DockerMonitor(ScalyrMonitor):
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
                 # to help auto generate dashboards.  So, we want a monitor name like `docker_monitor(foo_container)`
                 # for each running container.
-                self._logger.emit_value(
-                    key, metrics[value], extra, monitor_id_override=container
-                )
+                self._logger.emit_value( key, metrics[value], extra, monitor_id_override=container )
 
-    def __log_network_interface_metrics(self, container, metrics, interface=None):
+    def __log_network_interface_metrics( self, container, metrics, interface=None ):
         extra = {}
         if interface:
-            extra["interface"] = interface
+            extra['interface'] = interface
 
-        self.__log_metrics(container, self.__network_metrics, metrics, extra)
+        self.__log_metrics( container, self.__network_metrics, metrics, extra )
 
-    def __log_memory_stats_metrics(self, container, metrics):
-        if "stats" in metrics:
-            self.__log_metrics(container, self.__mem_stat_metrics, metrics["stats"])
+    def __log_memory_stats_metrics( self, container, metrics ):
+        if 'stats' in metrics:
+            self.__log_metrics( container, self.__mem_stat_metrics, metrics['stats'] )
 
-        self.__log_metrics(container, self.__mem_metrics, metrics)
+        self.__log_metrics( container, self.__mem_metrics, metrics )
 
-    def __log_cpu_stats_metrics(self, container, metrics):
-        if "cpu_usage" in metrics:
-            cpu_usage = metrics["cpu_usage"]
-            if self.__percpu_metrics and "percpu_usage" in cpu_usage:
-                percpu = cpu_usage["percpu_usage"]
+    def __log_cpu_stats_metrics( self, container, metrics ):
+        if 'cpu_usage' in metrics:
+            cpu_usage = metrics['cpu_usage']
+            if self.__percpu_metrics and 'percpu_usage' in cpu_usage:
+                percpu = cpu_usage['percpu_usage']
                 count = 1
                 if percpu:
                     for usage in percpu:
-                        extra = {"cpu": count}
-                        self._logger.emit_value(
-                            "docker.cpu.usage",
-                            usage,
-                            extra,
-                            monitor_id_override=container,
-                        )
+                        extra = { 'cpu' : count }
+                        self._logger.emit_value( 'docker.cpu.usage', usage, extra, monitor_id_override=container )
                         count += 1
-            self.__log_metrics(container, self.__cpu_usage_metrics, cpu_usage)
+            self.__log_metrics( container, self.__cpu_usage_metrics, cpu_usage )
 
-        if "system_cpu_usage" in metrics:
-            self._logger.emit_value(
-                "docker.cpu.system_cpu_usage",
-                metrics["system_cpu_usage"],
-                monitor_id_override=container,
-            )
+        if 'system_cpu_usage' in metrics:
+            self._logger.emit_value( 'docker.cpu.system_cpu_usage', metrics['system_cpu_usage'],
+                                     monitor_id_override=container )
 
-        if "throttling_data" in metrics:
-            self.__log_metrics(
-                container, self.__cpu_throttling_metrics, metrics["throttling_data"]
-            )
+        if 'throttling_data' in metrics:
+            self.__log_metrics( container, self.__cpu_throttling_metrics, metrics['throttling_data'] )
 
-    def __log_json_metrics(self, container, metrics):
+    def __log_json_metrics( self, container, metrics ):
         for key, value in metrics.iteritems():
             if value is None:
                 continue
 
-            if key == "networks":
+            if key == 'networks':
                 for interface, network_metrics in value.iteritems():
-                    self.__log_network_interface_metrics(
-                        container, network_metrics, interface
-                    )
-            elif key == "network":
-                self.__log_network_interface_metrics(container, value)
-            elif key == "memory_stats":
-                self.__log_memory_stats_metrics(container, value)
-            elif key == "cpu_stats":
-                self.__log_cpu_stats_metrics(container, value)
+                    self.__log_network_interface_metrics( container, network_metrics, interface )
+            elif key == 'network':
+                self.__log_network_interface_metrics( container, value )
+            elif key == 'memory_stats':
+                self.__log_memory_stats_metrics( container, value )
+            elif key == 'cpu_stats':
+                self.__log_cpu_stats_metrics( container, value )
 
-    def __gather_metrics_from_api_for_container(self, container):
+    def __gather_metrics_from_api_for_container( self, container ):
         try:
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_3,
-                "Attempting to retrieve metrics for cid=%s" % container,
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for cid=%s' % container)
+            result = self.__client.stats(
+                container=container,
+                stream=False
             )
-            result = self.__client.stats(container=container, stream=False)
             if result is not None:
-                self.__log_json_metrics(container, result)
+                self.__log_json_metrics( container, result )
         except Exception, e:
-            self._logger.error(
-                "Error readings stats for '%s': %s\n%s"
-                % (container, str(e), traceback.format_exc()),
-                limit_once_per_x_secs=300,
-                limit_key="api-stats-%s" % container,
-            )
+            self._logger.error( "Error readings stats for '%s': %s\n%s" % (container, str(e), traceback.format_exc()), limit_once_per_x_secs=300, limit_key='api-stats-%s'%container )
 
-    def __gather_metrics_from_api(self, containers):
+    def __gather_metrics_from_api( self, containers ):
 
         for cid, info in containers.iteritems():
-            self.__gather_metrics_from_api_for_container(info["name"])
+            self.__gather_metrics_from_api_for_container( info['name'] )
 
     def get_user_agent_fragment(self):
         """This method is periodically invoked by a separate (MonitorsManager) thread and must be thread safe."""
@@ -2328,13 +1670,13 @@ class DockerMonitor(ScalyrMonitor):
             # Helper function to transform docker version to user-agent fragment
             if not ver:
                 # version not yet set: return 'docker=yes' to signify docker
-                return "docker=true"
-            log_mode = self._config.get("log_mode")
-            if log_mode == "syslog":
-                extra = ""
+                return 'docker=true'
+            log_mode = self._config.get('log_mode')
+            if log_mode == 'syslog':
+                extra = ''
             else:
-                extra = "|raw" if self._config.get("docker_raw_logs") else "|api"
-            return "docker=%s|%s%s" % (ver, log_mode, extra)
+                extra = '|raw' if self._config.get('docker_raw_logs') else '|api'
+            return 'docker=%s|%s%s' % (ver, log_mode, extra)
 
         self.__version_lock.acquire()
         try:
@@ -2346,9 +1688,9 @@ class DockerMonitor(ScalyrMonitor):
         """Fetch and record the docker system version via the docker API"""
         ver = None
         try:
-            ver = self.__client.version().get("Version")
+            ver = self.__client.version().get('Version')
         except Exception:
-            self._logger.exception("Could not determine Docker system version")
+            self._logger.exception('Could not determine Docker system version')
 
         if not ver:
             return
@@ -2359,7 +1701,7 @@ class DockerMonitor(ScalyrMonitor):
         finally:
             self.__version_lock.release()
 
-    def gather_sample(self):
+    def gather_sample( self ):
         """Besides gathering data, this main-loop method also queries the docker API for version number.
 
         Due to potential race condition between the MonitorsManager and this manager at start up, we set the version
@@ -2373,29 +1715,25 @@ class DockerMonitor(ScalyrMonitor):
 
         # gather metrics
         if self.__report_container_metrics:
-            containers = _get_containers(
-                self.__client, ignore_container=None, glob_list=self.__glob_list
-            )
-            self._logger.log(
-                scalyr_logging.DEBUG_LEVEL_3,
-                "Attempting to retrieve metrics for %d containers" % len(containers),
-            )
-            self.__gather_metrics_from_api(containers)
+            containers = _get_containers(self.__client, ignore_container=None, glob_list=self.__glob_list )
+            self._logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Attempting to retrieve metrics for %d containers' % len(containers))
+            self.__gather_metrics_from_api( containers )
 
-    def run(self):
+
+    def run( self ):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        tm = time.strptime( "2016-08-29", "%Y-%m-%d" )
 
         if self.__container_checker:
             self.__container_checker.start()
 
-        ScalyrMonitor.run(self)
+        ScalyrMonitor.run( self )
 
     def stop(self, wait_on_join=True, join_timeout=5):
-        # stop the main server
-        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
+        #stop the main server
+        ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
 
         if self.__container_checker:
-            self.__container_checker.stop(wait_on_join, join_timeout)
+            self.__container_checker.stop( wait_on_join, join_timeout )

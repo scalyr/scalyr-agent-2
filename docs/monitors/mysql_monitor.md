@@ -42,7 +42,7 @@ see Configuration Reference.
 
 ## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
 click the {{menuRef:Dashboards}} menu and select {{menuRef:MySQL}}. (The dashboard may not be listed until
 the agent begins sending MySQL data.) You will see an overview of MySQL performance statistics across all
 servers where you are running the MySQL plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a
@@ -87,7 +87,7 @@ Each event recorded by this plugin will have the following fields:
 
 
 ### Data Categories
-
+  
 This plugin records an extensive array of values, in several categories. The exact list of metrics will vary,
 depending on which version of MySQL you are using and how you have configured MySQL.
 
@@ -151,7 +151,7 @@ in the MySQL documentation chapter "SHOW ENGINE INNODB STATUS and the InnoDB Mon
 |||``mysql.innodb.innodb.ibuf.merged_recs``        ||| The total number of records merged in the insert buffer since \
                                                        server start.
 |||``mysql.innodb.innodb.ibuf.merges``             ||| The total number of merges for the insert buffer since \
-                                                       server start.
+                                                       server start.   
 |||``mysql.innodb.queries_queued``                 ||| The number of queries waiting to be processed.  The value is \
                                                        based on the time the monitor sample is run.
 |||``mysql.innodb.opened_read_views``              ||| The number of views into the db, this is "started transactions" \
@@ -161,7 +161,7 @@ in the MySQL documentation chapter "SHOW ENGINE INNODB STATUS and the InnoDB Mon
 #### mysql.process
 
 The result of "SHOW PROCESSLIST". These show the types of commands being run and the number of threads performing each
-command.
+command. 
 
 |||#Metric name                                    ||| Description
 |||``mysql.process.query``                         ||| The number of threads performing a query.
@@ -178,8 +178,9 @@ Currently, the monitor only records two specific variables.
 |||#Metric name                  ||| Description
 |||``mysql.max_connections``     ||| The maximum number of allowed open connections to server.
 |||``mysql.open_files_limit``    ||| The maximum number of allowed open files.
-
+ 
 #### mysql.slave
 
 If your MySQL instance is configured as a slave, the values from "SHOW SLAVE STATUS" are listed in this category. See the MySQL documentation
 chapter "Checking Replication Status".
+

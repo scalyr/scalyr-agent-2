@@ -124,3 +124,4 @@ bash -c "${smoketest_script} ${contname_verifier} ${max_wait} \
 --debug true"
 
 kill_and_delete_docker_test_containers
+

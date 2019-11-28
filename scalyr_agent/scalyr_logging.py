@@ -25,7 +25,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 import inspect
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import logging
 import logging.handlers
@@ -76,17 +76,9 @@ def getLogger(name):
 __log_manager__ = None
 
 
-def set_log_destination(
-    use_stdout=False,
-    use_disk=False,
-    logs_directory=None,
-    agent_log_file_path="agent.log",
-    agent_debug_log_file_suffix="_debug",
-    max_bytes=20 * 1024 * 1024,
-    backup_count=2,
-    log_write_rate=2000,
-    max_write_burst=100000,
-):
+def set_log_destination(use_stdout=False, use_disk=False, logs_directory=None, agent_log_file_path='agent.log',
+                        agent_debug_log_file_suffix='_debug', max_bytes=20*1024*1024, backup_count=2,
+                        log_write_rate=2000, max_write_burst=100000):
     """Updates where the log records are written for the Scalyr-controlled logs, such as the main agent log,
     the metric logs, and the debug log.
 
@@ -130,17 +122,11 @@ def set_log_destination(
         essentially the maximum bucket size used by the "leaky-bucket" algorithm used to rate limit the log write rate.
     """
     # Just delegate to the manager's implementation.
-    __log_manager__.set_log_destination(
-        use_stdout=use_stdout,
-        use_disk=use_disk,
-        logs_directory=logs_directory,
-        agent_log_file_path=agent_log_file_path,
-        agent_debug_log_file_suffix=agent_debug_log_file_suffix,
-        max_bytes=max_bytes,
-        backup_count=backup_count,
-        log_write_rate=log_write_rate,
-        max_write_burst=max_write_burst,
-    )
+    __log_manager__.set_log_destination(use_stdout=use_stdout, use_disk=use_disk, logs_directory=logs_directory,
+                                        agent_log_file_path=agent_log_file_path,
+                                        agent_debug_log_file_suffix=agent_debug_log_file_suffix,
+                                        max_bytes=max_bytes, backup_count=backup_count, log_write_rate=log_write_rate,
+                                        max_write_burst=max_write_burst)
 
 
 def set_log_level(level):
@@ -170,7 +156,6 @@ def __determine_file():
     file_path = os.path.dirname(os.path.realpath(file_path))
     return file_path
 
-
 _srcfile = os.path.normcase(__determine_file())
 
 
@@ -189,8 +174,7 @@ def alternateCurrentFrame():
     # noinspection PyProtectedMember
     return sys._getframe(3)
 
-
-if hasattr(sys, "_getframe"):
+if hasattr(sys, '_getframe'):
     currentframe = alternateCurrentFrame
 # done filching
 
@@ -225,7 +209,6 @@ class AgentLogger(logging.Logger):
     consistency, ranging from DEBUG_LEVEL_0 for no debugging (equal to logging.INFO) to DEBUG_LEVEL_5 for very
     verbose debug logging.
     """
-
     def __init__(self, name):
         """Initializes the logger instance with the specified name.
 
@@ -240,7 +223,7 @@ class AgentLogger(logging.Logger):
         self.__logger_name = name
 
         # Look for the monitor id, which is at the end surrounded by brackets.
-        m = re.match("([^\[]*)(\(.*\))", name)
+        m = re.match('([^\[]*)(\(.*\))', name)
         if m:
             module_path = m.group(1)
             self.__monitor_id = m.group(2)[1:-1]
@@ -249,27 +232,21 @@ class AgentLogger(logging.Logger):
             self.__monitor_id = None
 
         # If it is from the scaly_agent module, then it is 'core' unless it is one of the monitors.
-        if (
-            module_path.find("scalyr_agent") == 0
-            and not module_path.find("scalyr_agent.builtin_monitors.") == 0
-        ):
-            self.component = "core"
+        if module_path.find('scalyr_agent') == 0 and not module_path.find('scalyr_agent.builtin_monitors.') == 0:
+            self.component = 'core'
             self.monitor_name = None
             self.monitor_name_base = None
         else:
             # Note, we only use the last part of the module name for the name we use in the logs.  We rely on the
             # monitor_id to make it unique.  This is calculated in configuration.py.  We need to make sure this
             # code is in sync with that file.
-            self.monitor_name_base = module_path.split(".")[-1]
+            self.monitor_name_base = module_path.split('.')[-1]
             if self.__monitor_id is not None:
-                self.monitor_name = "%s(%s)" % (
-                    self.monitor_name_base,
-                    self.__monitor_id,
-                )
+                self.monitor_name = '%s(%s)' % (self.monitor_name_base, self.__monitor_id)
             else:
                 self.monitor_name = self.monitor_name_base
 
-            self.component = "monitor:%s" % self.monitor_name
+            self.component = 'monitor:%s' % self.monitor_name
 
         # If this logger is for a particular monitor instance, then we will eventually call openMetricLoggerForMonitor
         # on it to set which output file its metrics should be reported.  When that happens, these will be set to
@@ -280,7 +257,7 @@ class AgentLogger(logging.Logger):
         # The regular expression that must match for metric and field names.  Essentially, it has to begin with
         # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this, be
         # sure to fix the __force_valid_metric_or_field_name method below.
-        self.__metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
+        self.__metric_or_field_name_rule = re.compile('[_a-zA-Z][\w\.\-]*$')
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
@@ -294,14 +271,7 @@ class AgentLogger(logging.Logger):
         # right level.
         __log_manager__.add_logger_instance(self)
 
-    def emit_value(
-        self,
-        metric_name,
-        metric_value,
-        extra_fields=None,
-        monitor=None,
-        monitor_id_override=None,
-    ):
+    def emit_value(self, metric_name, metric_value, extra_fields=None, monitor=None, monitor_id_override=None):
         """Emits a metric and its value to the underlying log to be transmitted to Scalyr.
 
         Adds a new line to the metric log recording the specified value for the metric.  Additional fields
@@ -330,21 +300,15 @@ class AgentLogger(logging.Logger):
             monitor = self.__monitor
 
         if monitor is None or monitor not in AgentLogger.__opened_monitors__:
-            raise Exception(
-                "Cannot report metric values until metric log file is opened."
-            )
+            raise Exception('Cannot report metric values until metric log file is opened.')
 
         string_buffer = StringIO()
         if not type(metric_name) in (str, unicode):
             raise UnsupportedValueType(metric_name=metric_name)
-        metric_name = self.__force_valid_metric_or_field_name(
-            metric_name, is_metric=True
-        )
+        metric_name = self.__force_valid_metric_or_field_name(metric_name, is_metric=True)
 
         if not type(metric_value) in (str, unicode, bool, int, long, float):
-            raise UnsupportedValueType(
-                metric_name=metric_name, metric_value=metric_value
-            )
+            raise UnsupportedValueType(metric_name=metric_name, metric_value=metric_value)
 
         string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
 
@@ -355,41 +319,18 @@ class AgentLogger(logging.Logger):
 
                 field_value = extra_fields[field_name]
                 if not type(field_value) in (str, unicode, bool, int, long, float):
-                    raise UnsupportedValueType(
-                        field_name=field_name, field_value=field_value
-                    )
+                    raise UnsupportedValueType(field_name=field_name, field_value=field_value)
 
-                field_name = self.__force_valid_metric_or_field_name(
-                    field_name, is_metric=False
-                )
+                field_name = self.__force_valid_metric_or_field_name(field_name, is_metric=False)
 
-                string_buffer.write(
-                    " %s=%s" % (field_name, util.json_encode(field_value))
-                )
+                string_buffer.write(' %s=%s' % (field_name, util.json_encode(field_value)))
 
-        self.info(
-            string_buffer.getvalue(),
-            metric_log_for_monitor=monitor,
-            monitor_id_override=monitor_id_override,
-        )
+        self.info(string_buffer.getvalue(), metric_log_for_monitor=monitor, monitor_id_override=monitor_id_override)
         string_buffer.close()
 
-    def _log(
-        self,
-        level,
-        msg,
-        args,
-        exc_info=None,
-        extra=None,
-        error_code=None,
-        metric_log_for_monitor=None,
-        error_for_monitor=None,
-        limit_once_per_x_secs=None,
-        limit_key=None,
-        current_time=None,
-        emit_to_metric_log=False,
-        monitor_id_override=None,
-    ):
+    def _log(self, level, msg, args, exc_info=None, extra=None, error_code=None, metric_log_for_monitor=None,
+             error_for_monitor=None, limit_once_per_x_secs=None, limit_key=None, current_time=None,
+             emit_to_metric_log=False, monitor_id_override=None):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
         New arguments (beyond inherited arguments):
@@ -417,18 +358,12 @@ class AgentLogger(logging.Logger):
             current_time = time.time()
 
         if limit_once_per_x_secs is not None and limit_key is None:
-            raise Exception(
-                "You must specify a limit key if you specify limit_once_per_x_secs"
-            )
+            raise Exception('You must specify a limit key if you specify limit_once_per_x_secs')
         if limit_once_per_x_secs is None and limit_key is not None:
-            raise Exception(
-                "You cannot set a limit key if you did not specify limit_once_per_x_secs"
-            )
+            raise Exception('You cannot set a limit key if you did not specify limit_once_per_x_secs')
 
         if emit_to_metric_log and self.__monitor is None:
-            raise Exception(
-                "You cannot set emit_to_metric_log=True on a non-monitor logger instance"
-            )
+            raise Exception('You cannot set emit_to_metric_log=True on a non-monitor logger instance')
         elif emit_to_metric_log:
             metric_log_for_monitor = self.__monitor
 
@@ -469,22 +404,14 @@ class AgentLogger(logging.Logger):
 
         return result
 
-    def makeRecord(
-        self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None
-    ):
+    def makeRecord(self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None):
         # Invoke the super class's method to make the base record.
         if extra is not None:
-            result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info, func, extra
-            )
+            result = logging.Logger.makeRecord(self, name, level, fn, lno, msg, args, exc_info, func, extra)
         elif func is not None:
-            result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info, func
-            )
+            result = logging.Logger.makeRecord(self, name, level, fn, lno, msg, args, exc_info, func)
         else:
-            result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info
-            )
+            result = logging.Logger.makeRecord(self, name, level, fn, lno, msg, args, exc_info)
 
         # Attach the special fields for the scalyr agent logging code.  These are passed from _log through a thread
         # local variable.
@@ -500,11 +427,8 @@ class AgentLogger(logging.Logger):
         monitor_id_override = __thread_local__.last_monitor_id_override
 
         if monitor_id_override is not None:
-            result.monitor_name = "%s(%s)" % (
-                self.monitor_name_base,
-                monitor_id_override,
-            )
-            result.component = "monitor:%s" % self.monitor_name
+            result.monitor_name = '%s(%s)' % (self.monitor_name_base, monitor_id_override)
+            result.component = 'monitor:%s' % self.monitor_name
 
         # We also mark this record as being generated by a AgentLogger.  We use this in the root logger to
         # decide if it should be included in the agent.log output.
@@ -518,23 +442,16 @@ class AgentLogger(logging.Logger):
         return result
 
     def exception(self, msg, *args, **kwargs):
-        kwargs["exc_info"] = 1
+        kwargs['exc_info'] = 1
         self.error(msg, *args, **kwargs)
 
     # The set of ScalyrMonitor instances that current have only metric logs associated with them.  This is used
     # for error checking.
     __opened_monitors__ = {}
 
-    def openMetricLogForMonitor(
-        self,
-        path,
-        monitor,
-        max_bytes=20 * 1024 * 1024,
-        backup_count=5,
-        max_write_burst=100000,
-        log_write_rate=2000,
-        flush_delay=0.0,
-    ):
+    def openMetricLogForMonitor(self, path, monitor, max_bytes=20*1024*1024, backup_count=5,
+                                max_write_burst=100000, log_write_rate=2000,
+                                flush_delay=0.0):
         """Open the metric log for this logger instance for the specified monitor.
 
         This must be called before any metrics are reported using the 'emit_value' method.  This opens the
@@ -561,14 +478,11 @@ class AgentLogger(logging.Logger):
         if self.__metric_handler is not None:
             self.closeMetricLog()
 
-        self.__metric_handler = MetricLogHandler.get_handler_for_path(
-            path,
-            max_bytes=max_bytes,
-            backup_count=backup_count,
-            max_write_burst=max_write_burst,
-            log_write_rate=log_write_rate,
-            flush_delay=flush_delay,
-        )
+        self.__metric_handler = MetricLogHandler.get_handler_for_path(path, max_bytes=max_bytes,
+                                                                      backup_count=backup_count,
+                                                                      max_write_burst=max_write_burst,
+                                                                      log_write_rate=log_write_rate,
+                                                                      flush_delay=flush_delay)
         self.__metric_handler.open_for_monitor(monitor)
         self.__monitor = monitor
         AgentLogger.__opened_monitors__[monitor] = True
@@ -603,29 +517,21 @@ class AgentLogger(logging.Logger):
             return name
 
         if is_metric:
-            self.warn(
-                'Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
-                "alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been "
-                "fixed by replacing invalid characters with underscores.  Other metric names may be invalid "
-                "(only reporting first occurrence)." % name,
-                limit_once_per_x_secs=86400,
-                limit_key="badmetricname",
-                error_code="client/badMetricName",
-            )
+            self.warn('Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
+                      'alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been '
+                      'fixed by replacing invalid characters with underscores.  Other metric names may be invalid '
+                      '(only reporting first occurrence).' % name, limit_once_per_x_secs=86400, limit_key='badmetricname',
+                      error_code='client/badMetricName')
         else:
-            self.warn(
-                'Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
-                "alphanumeric characters as well as periods, underscores, and dashes.  The field name has been "
-                "fixed by replacing invalid characters with underscores.  Other field names may be invalid "
-                "(only reporting first occurrence)." % name,
-                limit_once_per_x_secs=86400,
-                limit_key="badfieldname",
-                error_code="client/badFieldName",
-            )
+            self.warn('Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
+                      'alphanumeric characters as well as periods, underscores, and dashes.  The field name has been '
+                      'fixed by replacing invalid characters with underscores.  Other field names may be invalid '
+                      '(only reporting first occurrence).' % name, limit_once_per_x_secs=86400, limit_key='badfieldname',
+                      error_code='client/badFieldName')
 
-        if not re.match("^[_a-zA-Z]", name):
-            name = "sa_" + name
-        return re.sub("[^\w\-\.]", "_", name)
+        if not re.match('^[_a-zA-Z]', name):
+            name = 'sa_' + name
+        return re.sub("[^\w\-\.]", '_', name)
 
     def report_values(self, values, monitor=None):
         """Records the specified values (a dict) to the underlying log.
@@ -663,9 +569,7 @@ class AgentLogger(logging.Logger):
             monitor = self.__monitor
 
         if monitor is None or monitor not in AgentLogger.__opened_monitors__:
-            raise Exception(
-                "Cannot report metric values until metric log file is opened."
-            )
+            raise Exception('Cannot report metric values until metric log file is opened.')
 
         string_entries = []
         for key in values:
@@ -674,9 +578,9 @@ class AgentLogger(logging.Logger):
             if value_type is int or value_type is long or value_type is float:
                 string_entries.append("%s=%s" % (key, str(value)))
             elif value_type is bool:
-                value_str = "true"
+                value_str = 'true'
                 if not value:
-                    value_str = "false"
+                    value_str = 'false'
                 string_entries.append("%s=%s" % (key, value_str))
             elif value_type is str or value_type is unicode:
                 string_entries.append("%s=%s" % (key, str(value).replace('"', '\\"')))
@@ -690,8 +594,8 @@ class AgentLogger(logging.Logger):
         file name, line number and function name.
         """
         f = currentframe()
-        # On some versions of IronPython, currentframe() returns None if
-        # IronPython isn't run with -X:Frames.
+        #On some versions of IronPython, currentframe() returns None if
+        #IronPython isn't run with -X:Frames.
         if f is not None:
             f = f.f_back
         rv = "(unknown file)", 0, "(unknown function)"
@@ -714,7 +618,6 @@ class AgentLogger(logging.Logger):
         else:
             return rv
 
-
 # To help with a hack of extending the Logger class, we need a thread local storage
 # to store the last error status code and metric information seen by this thread.
 __thread_local__ = threading.local()
@@ -727,7 +630,6 @@ class BaseFormatter(logging.Formatter):
     Specifically, it caches the result of the format operation so that multiple calls do not result in reformatting.
     Also, it appends a warning message when records were dropped due to rate limiting.
     """
-
     def __init__(self, fmt, format_name):
         """Creates an instance of the formatter.
 
@@ -735,7 +637,7 @@ class BaseFormatter(logging.Formatter):
         @param format_name: A name that is unique to the derived format class. This is used to make sure different
             format results are cached under different keys.
         """
-        self.__cache_key = "cached_format_%s" % format_name
+        self.__cache_key = 'cached_format_%s' % format_name
         logging.Formatter.__init__(self, fmt=fmt)
 
     def format(self, record):
@@ -744,18 +646,9 @@ class BaseFormatter(logging.Formatter):
             return getattr(record, self.__cache_key)
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
-        if (
-            hasattr(record, "rate_limited_dropped_records")
-            and record.rate_limited_dropped_records > 0
-        ):
-            result = (
-                ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
-                % (
-                    record.rate_limited_dropped_records,
-                    "monitor_log_write_rate",
-                    logging.Formatter.format(self, record),
-                )
-            )
+        if hasattr(record, 'rate_limited_dropped_records') and record.rate_limited_dropped_records > 0:
+            result = '.... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s' % (
+                record.rate_limited_dropped_records, 'monitor_log_write_rate', logging.Formatter.format(self, record))
         else:
             result = logging.Formatter.format(self, record)
 
@@ -785,28 +678,23 @@ class AgentLogFormatter(BaseFormatter):
         error (the error code)
         message (the logged message)
     """
-
     def __init__(self):
         # TODO: It seems on Python 2.4 the filename and line number do not work correctly.  I think we need to
         # define a custom findCaller method to actually fix the problem.
-        BaseFormatter.__init__(
-            self,
-            "%(asctime)s %(levelname)s [%(component)s] [%(filename)s:%(lineno)d] "
-            "%(error_message)s%(message)s%(stack_token)s",
-            "agent_formatter",
-        )
+        BaseFormatter.__init__(self, '%(asctime)s %(levelname)s [%(component)s] [%(filename)s:%(lineno)d] '
+                                     '%(error_message)s%(message)s%(stack_token)s', 'agent_formatter')
 
     def format(self, record):
         # Optionally add in the error code if there is one present.
         if record.error_code is not None:
             record.error_message = '[error="%s"] ' % record.error_code
         else:
-            record.error_message = ""
+            record.error_message = ''
 
         if record.exc_info:
-            record.stack_token = " :stack_trace:"
+            record.stack_token = ' :stack_trace:'
         else:
-            record.stack_token = ""
+            record.stack_token = ''
         return BaseFormatter.format(self, record)
 
     def formatException(self, ei):
@@ -814,7 +702,7 @@ class AgentLogFormatter(BaseFormatter):
         output = StringIO()
         try:
             for line in logging.Formatter.formatException(self, ei).splitlines(True):
-                output.write("  ")
+                output.write('  ')
                 output.write(line)
             return output.getvalue()
         finally:
@@ -829,13 +717,10 @@ class MetricLogFormatter(BaseFormatter):
         component (which component of the agent produced the problem such as 'core' or a monitor.)
         message (the logged message)
     """
-
     def __init__(self):
         # TODO: It seems on Python 2.4 the filename and line number do not work correctly.  I think we need to
         # define a custom findCaller method to actually fix the problem.
-        BaseFormatter.__init__(
-            self, "%(asctime)s [%(monitor_name)s] %(message)s", "metric-formatter"
-        )
+        BaseFormatter.__init__(self, '%(asctime)s [%(monitor_name)s] %(message)s', 'metric-formatter')
 
 
 class AgentLogFilter(object):
@@ -844,7 +729,6 @@ class AgentLogFilter(object):
     Also will filter records with logging.DEBUG and lower if this filter is not meant for a debug handler,
     and greater than logging.DEBUG if it is.
     """
-
     def __init__(self, is_debug):
         """Initializes the filter.
 
@@ -869,17 +753,12 @@ class AgentLogFilter(object):
         elif not self.__is_debug and record.levelno <= logging.DEBUG:
             return False
 
-        return (
-            hasattr(record, "agent_logger")
-            and record.agent_logger
-            and record.metric_log_for_monitor is None
-        )
+        return hasattr(record, 'agent_logger') and record.agent_logger and record.metric_log_for_monitor is None
 
 
 class RateLimiterLogFilter(object):
     """A filter that rejects records when a maximum write rate has been exceeded, as calculated by
     a leaky bucket algorithm."""
-
     def __init__(self, formatter, max_write_burst=100000, log_write_rate=2000):
         """Creates an instance.
 
@@ -892,23 +771,19 @@ class RateLimiterLogFilter(object):
             bucket fill rate in the "leaky bucket" algorithm.
 
         @return: """
-        self.__rate_limiter = RateLimiter(
-            bucket_size=max_write_burst, bucket_fill_rate=log_write_rate
-        )
+        self.__rate_limiter = RateLimiter(bucket_size=max_write_burst, bucket_fill_rate=log_write_rate)
         self.__dropped_records = 0
         self.__formatter = formatter
 
     def filter(self, record):
-        if hasattr(record, "rate_limited_set"):
+        if hasattr(record, 'rate_limited_set'):
             return record.rate_limited_result
         record.rate_limited_set = True
         # Note, it is important we set rate_limited_droppped_records before we invoke the formatter since the
         # formatting is dependent on that value and our formatters cache the result.
         record.rate_limited_dropped_records = self.__dropped_records
         record_str = self.__formatter.format(record)
-        record.rate_limited_result = self.__rate_limiter.charge_if_available(
-            len(record_str)
-        )
+        record.rate_limited_result = self.__rate_limiter.charge_if_available(len(record_str))
 
         if record.rate_limited_result:
             self.__dropped_records = 0
@@ -927,7 +802,6 @@ class MetricLogHandler(object):
     This is a base class that is used below to implement different versions of the MetricLogHandler that either
     uses a rotating log file or writes to stdout.
     """
-
     def __init__(self, file_path, max_write_burst=10000, log_write_rate=2000):
         """Creates the handler instance.  This should not be used directly.  Use MetricLogHandler.get_handler_for_path
         instead.
@@ -950,27 +824,18 @@ class MetricLogHandler(object):
             """The filter used by the MetricLogHandler that only returns true if the record is for a metric for one of
             the monitors associated with the metric log file.
             """
-
             def __init__(self, allowed_monitors):
                 self.__monitors = allowed_monitors
 
             def filter(self, record):
-                return (
-                    hasattr(record, "metric_log_for_monitor")
-                    and record.metric_log_for_monitor in self.__monitors
-                )
+                return hasattr(record, 'metric_log_for_monitor') and record.metric_log_for_monitor in self.__monitors
 
         # Add the filter and our formatter to this handler.
         self.addFilter(Filter(self.__monitors))
         formatter = MetricLogFormatter()
         if max_write_burst >= 0 and log_write_rate >= 0:
-            self.addFilter(
-                RateLimiterLogFilter(
-                    formatter,
-                    max_write_burst=max_write_burst,
-                    log_write_rate=log_write_rate,
-                )
-            )
+            self.addFilter(RateLimiterLogFilter(formatter, max_write_burst=max_write_burst,
+                                                log_write_rate=log_write_rate))
         self.setFormatter(formatter)
 
     # noinspection PyPep8Naming
@@ -1011,14 +876,8 @@ class MetricLogHandler(object):
         MetricLogHandler.__use_stdout__ = use_stdout
 
     @staticmethod
-    def get_handler_for_path(
-        file_path,
-        max_bytes=20 * 1024 * 1024,
-        backup_count=5,
-        max_write_burst=100000,
-        log_write_rate=2000,
-        flush_delay=0.0,
-    ):
+    def get_handler_for_path(file_path, max_bytes=20*1024*1024, backup_count=5, max_write_burst=100000,
+                             log_write_rate=2000, flush_delay=0.0):
         """Returns the MetricLogHandler to use for the specified file path.  This must be used to get
         MetricLogHandler instances.
 
@@ -1045,20 +904,12 @@ class MetricLogHandler(object):
         """
         if not file_path in MetricLogHandler.__metric_log_handlers__:
             if not MetricLogHandler.__use_stdout__:
-                result = MetricRotatingLogHandler(
-                    file_path,
-                    max_bytes=max_bytes,
-                    backup_count=backup_count,
-                    max_write_burst=max_write_burst,
-                    log_write_rate=log_write_rate,
-                    flush_delay=flush_delay,
-                )
+                result = MetricRotatingLogHandler(file_path, max_bytes=max_bytes, backup_count=backup_count,
+                                                  max_write_burst=max_write_burst, log_write_rate=log_write_rate,
+                                                  flush_delay=flush_delay)
             else:
-                result = MetricStdoutLogHandler(
-                    file_path,
-                    max_write_burst=max_write_burst,
-                    log_write_rate=log_write_rate,
-                )
+                result = MetricStdoutLogHandler(file_path, max_write_burst=max_write_burst,
+                                                log_write_rate=log_write_rate)
             MetricLogHandler.__metric_log_handlers__[file_path] = result
         return MetricLogHandler.__metric_log_handlers__[file_path]
 
@@ -1101,32 +952,22 @@ class MetricLogHandler(object):
             del MetricLogHandler.__metric_log_handlers__[self.__file_path]
 
 
-class AutoFlushingRotatingFileHandler(logging.handlers.RotatingFileHandler):
+class AutoFlushingRotatingFileHandler( logging.handlers.RotatingFileHandler ):
     """
     An extension to the RotatingFileHandler for logging that does not flush after every line is emitted.
     Instead, it is guaranteed to flush once every ``flushDelay`` seconds.
 
     This helps reduce the disk requests for high syslog traffic.
     """
-
-    def __init__(
-        self, filename, mode="a", maxBytes=0, backupCount=0, delay=0, flushDelay=0.0
-    ):
+    def __init__(self, filename, mode='a', maxBytes=0, backupCount=0, delay=0, flushDelay=0.0):
         # We handle delay specially because it is not a valid option for the Python 2.4 logging libraries, so we
         # really only pass it if the caller is really trying to set it to something other than the default.
         if delay != 0:
-            logging.handlers.RotatingFileHandler.__init__(
-                self,
-                filename,
-                mode=mode,
-                maxBytes=maxBytes,
-                backupCount=backupCount,
-                delay=delay,
-            )
+            logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                          backupCount=backupCount, delay=delay)
         else:
-            logging.handlers.RotatingFileHandler.__init__(
-                self, filename, mode=mode, maxBytes=maxBytes, backupCount=backupCount
-            )
+            logging.handlers.RotatingFileHandler.__init__(self, filename, mode=mode, maxBytes=maxBytes,
+                                                          backupCount=backupCount)
 
         self.__flushDelay = flushDelay
         # If this is not None, then it is set to a timer that when it expires will flush the log handler.
@@ -1153,9 +994,7 @@ class AutoFlushingRotatingFileHandler(logging.handlers.RotatingFileHandler):
             self.acquire()
             try:
                 if self.__timer is None:
-                    self.__timer = threading.Timer(
-                        self.__flushDelay, self._internal_flush
-                    )
+                    self.__timer = threading.Timer(self.__flushDelay, self._internal_flush)
                     self.__timer.start()
             finally:
                 self.release()
@@ -1185,40 +1024,18 @@ class AutoFlushingRotatingFileHandler(logging.handlers.RotatingFileHandler):
 
 
 class MetricRotatingLogHandler(AutoFlushingRotatingFileHandler, MetricLogHandler):
-    def __init__(
-        self,
-        file_path,
-        max_bytes,
-        backup_count,
-        max_write_burst=100000,
-        log_write_rate=2000,
-        flush_delay=0.0,
-    ):
-        AutoFlushingRotatingFileHandler.__init__(
-            self,
-            file_path,
-            maxBytes=max_bytes,
-            backupCount=backup_count,
-            flushDelay=flush_delay,
-        )
-        MetricLogHandler.__init__(
-            self,
-            file_path,
-            max_write_burst=max_write_burst,
-            log_write_rate=log_write_rate,
-        )
+    def __init__(self, file_path, max_bytes, backup_count, max_write_burst=100000, log_write_rate=2000,
+                 flush_delay=0.0):
+        AutoFlushingRotatingFileHandler.__init__(self, file_path, maxBytes=max_bytes, backupCount=backup_count,
+                                                 flushDelay=flush_delay)
+        MetricLogHandler.__init__(self, file_path, max_write_burst=max_write_burst, log_write_rate=log_write_rate)
         self.propagate = False
 
 
 class MetricStdoutLogHandler(logging.StreamHandler, MetricLogHandler):
     def __init__(self, file_path, max_write_burst=100000, log_write_rate=2000):
         logging.StreamHandler.__init__(self, WrapStdout())
-        MetricLogHandler.__init__(
-            self,
-            file_path,
-            max_write_burst=max_write_burst,
-            log_write_rate=log_write_rate,
-        )
+        MetricLogHandler.__init__(self, file_path, max_write_burst=max_write_burst, log_write_rate=log_write_rate)
         self.propagate = False
 
 
@@ -1230,17 +1047,16 @@ class WrapStdout(object):
     go to the most up-to-date `sys.stdout` value.  This is useful when we do change where `stdout` is going, such
     as on the Windows redirect.
     """
-
     def flush(self):
-        if hasattr(sys.stdout, "flush"):
+        if hasattr(sys.stdout, 'flush'):
             sys.stdout.flush()
 
     def write(self, content):
-        if hasattr(sys.stdout, "write"):
+        if hasattr(sys.stdout, 'write'):
             sys.stdout.write(content)
 
     def close(self):
-        if hasattr(sys.stdout, "close"):
+        if hasattr(sys.stdout, 'close'):
             sys.stdout.close()
 
 
@@ -1251,7 +1067,6 @@ class AgentLogManager(object):
     variables necessary to coordinate using single handlers for all the logger instances, as well as setting
     a global log level on all AgentLogger instances.
     """
-
     def __init__(self):
         # The file names for the main and debug log.  The main log is usually 'agent.log' and contains all the
         # non-debug level log records created by the AgentLogger instances.  This log is typically copied to
@@ -1271,7 +1086,7 @@ class AgentLogManager(object):
         self.__use_stdout = True
 
         # If using a rotating log, this is the maximum number of bytes that can be written before it is rotated.
-        self.__rotation_max_bytes = 20 * 1024 * 1024
+        self.__rotation_max_bytes = 20*1024*1024
         # The number of previous logs that will be kept from the rotation.
         self.__rotation_backup_count = 2
 
@@ -1297,23 +1112,14 @@ class AgentLogManager(object):
         # never be garbage collected, but the logging classes already do that to implement features like getLogger.
         self.__loggers = []
 
-    def set_log_destination(
-        self,
-        use_stdout=False,
-        use_disk=False,
-        logs_directory=None,
-        agent_log_file_path="agent.log",
-        agent_debug_log_file_suffix="_debug",
-        max_bytes=20 * 1024 * 1024,
-        backup_count=2,
-        log_write_rate=2000,
-        max_write_burst=100000,
-    ):
+    def set_log_destination(self, use_stdout=False, use_disk=False, logs_directory=None,
+                            agent_log_file_path='agent.log', agent_debug_log_file_suffix='_debug',
+                            max_bytes=20*1024*1024, backup_count=2, log_write_rate=2000, max_write_burst=100000):
         """For documentation, see the scalyr_logging.set_log_destination method."""
         if use_stdout and use_disk:
-            raise Exception("You cannot specify both use_disk and use_stdout")
+            raise Exception('You cannot specify both use_disk and use_stdout')
         elif not use_stdout and not use_disk:
-            raise Exception("You must specify at least one of use_stdout or use_diskk.")
+            raise Exception('You must specify at least one of use_stdout or use_diskk.')
 
         self.__use_stdout = use_stdout
         self.__rotation_max_bytes = max_bytes
@@ -1323,12 +1129,8 @@ class AgentLogManager(object):
 
         # We only update the file paths if we are going to be using the disk.
         if use_disk:
-            self.__main_log_fn = self.__create_main_log_path(
-                agent_log_file_path, logs_directory
-            )
-            self.__debug_log_fn = self.__create_debug_log_path(
-                self.__main_log_fn, agent_debug_log_file_suffix
-            )
+            self.__main_log_fn = self.__create_main_log_path(agent_log_file_path, logs_directory)
+            self.__debug_log_fn = self.__create_debug_log_path(self.__main_log_fn, agent_debug_log_file_suffix)
 
         self.__recreate_main_handler()
         self.__recreate_debug_handler()
@@ -1402,9 +1204,7 @@ class AgentLogManager(object):
 
         You must invoke `__reset_root_logger` at some point after this call for it to take effect.
         """
-        self.__main_log_handler = self.__recreate_handler(
-            self.__main_log_fn, is_debug=False
-        )
+        self.__main_log_handler = self.__recreate_handler(self.__main_log_fn, is_debug=False)
 
     def __recreate_debug_handler(self):
         """Recreates the debug log handler according to the variables set on this instance.
@@ -1420,9 +1220,7 @@ class AgentLogManager(object):
 
         You must invoke `__reset_root_logger` at some point after this call for it to take effect.
         """
-        self.__debug_log_handler = self.__recreate_handler(
-            self.__debug_log_fn, is_debug=True
-        )
+        self.__debug_log_handler = self.__recreate_handler(self.__debug_log_fn, is_debug=True)
 
     def __recreate_handler(self, file_path, is_debug=False):
         """Creates and returns an appropriate handler for either the main or debug log.
@@ -1444,24 +1242,16 @@ class AgentLogManager(object):
         if self.__use_stdout:
             handler = logging.StreamHandler(sys.stdout)
         else:
-            handler = logging.handlers.RotatingFileHandler(
-                file_path,
-                maxBytes=self.__rotation_max_bytes,
-                backupCount=self.__rotation_backup_count,
-            )
+            handler = logging.handlers.RotatingFileHandler(file_path, maxBytes=self.__rotation_max_bytes,
+                                                           backupCount=self.__rotation_backup_count)
 
         # Limit to only emitting the write log records.
         handler.addFilter(AgentLogFilter(is_debug))
         formatter = AgentLogFormatter()
         # Rate limit the log if this is the main log since we are copying it up to Scalyr as well.
         if not is_debug:
-            handler.addFilter(
-                RateLimiterLogFilter(
-                    formatter,
-                    max_write_burst=self.__max_write_burst,
-                    log_write_rate=self.__log_write_rate,
-                )
-            )
+            handler.addFilter(RateLimiterLogFilter(formatter, max_write_burst=self.__max_write_burst,
+                                                   log_write_rate=self.__log_write_rate))
         handler.setFormatter(formatter)
         return handler
 
@@ -1523,19 +1313,12 @@ class AgentLogManager(object):
         """
         dir_name = os.path.dirname(agent_log)
         file_name = os.path.basename(agent_log)
-        if "." in file_name:
-            index_of_first = file_name.find(".")
-            return os.path.join(
-                dir_name,
-                "%s%s.%s"
-                % (
-                    file_name[0:index_of_first],
-                    agent_debug_log_file_suffix,
-                    file_name[index_of_first + 1 :],
-                ),
-            )
+        if '.' in file_name:
+            index_of_first = file_name.find('.')
+            return os.path.join(dir_name, '%s%s.%s' % (file_name[0:index_of_first], agent_debug_log_file_suffix,
+                                                       file_name[index_of_first+1:]))
         else:
-            return "%s%s" % (agent_log, agent_debug_log_file_suffix)
+            return '%s%s' % (agent_log, agent_debug_log_file_suffix)
 
 
 # noinspection PyRedeclaration
@@ -1544,14 +1327,10 @@ __log_manager__ = AgentLogManager()
 
 class BadMetricOrFieldName(Exception):
     """Exception raised when a metric or field name used to report a metric value is invalid."""
-
     def __init__(self, metric_or_field_name):
-        Exception.__init__(
-            self,
-            'A bad metric or field name of "%s" was seen when reporting metrics.  '
-            "It must begin with a letter and only contain alphanumeric characters as well as periods,"
-            "underscores, and dashes." % metric_or_field_name,
-        )
+        Exception.__init__(self, 'A bad metric or field name of "%s" was seen when reporting metrics.  '
+                           'It must begin with a letter and only contain alphanumeric characters as well as periods,'
+                           'underscores, and dashes.' % metric_or_field_name)
 
 
 # A sentinel value used to indicate an argument was not specified.  We do not use None to indicate
@@ -1561,14 +1340,8 @@ __NOT_GIVEN__ = {}
 
 class UnsupportedValueType(Exception):
     """Exception raised when an MetricValueLogger is asked to emit a metric with an unsupported type."""
-
-    def __init__(
-        self,
-        metric_name=__NOT_GIVEN__,
-        metric_value=__NOT_GIVEN__,
-        field_name=__NOT_GIVEN__,
-        field_value=__NOT_GIVEN__,
-    ):
+    def __init__(self, metric_name=__NOT_GIVEN__, metric_value=__NOT_GIVEN__, field_name=__NOT_GIVEN__,
+                 field_value=__NOT_GIVEN__):
         """Constructs an exception.
 
         There are several different modes of operation for this exception.  If only metric_name or field_name
@@ -1582,37 +1355,20 @@ class UnsupportedValueType(Exception):
         self.field_value = field_value
 
         if metric_name is not __NOT_GIVEN__ and metric_value is __NOT_GIVEN__:
-            message = (
-                "An unsupported type for a metric name was given.  It must be either str or unicode, but was"
-                '"%s".  This was for metric "%s"'
-                % (str(type(metric_name)), str(metric_name))
-            )
+            message = ('An unsupported type for a metric name was given.  It must be either str or unicode, but was'
+                       '"%s".  This was for metric "%s"' % (str(type(metric_name)), str(metric_name)))
         elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
-            message = (
-                "An unsupported type for a field name was given.  It must be either str or unicode, but was"
-                '"%s".  This was for field "%s"'
-                % (str(type(field_name)), str(field_name))
-            )
+            message = ('An unsupported type for a field name was given.  It must be either str or unicode, but was'
+                       '"%s".  This was for field "%s"' % (str(type(field_name)), str(field_name)))
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
-            message = (
-                'Unsupported metric value type of "%s" with value "%s" for metric="%s".'
-                "Only int, long, float, and str are supported."
-                % (str(type(metric_value)), str(metric_value), metric_name)
-            )
+            message = ('Unsupported metric value type of "%s" with value "%s" for metric="%s".'
+                       'Only int, long, float, and str are supported.' % (str(type(metric_value)), str(metric_value),
+                                                                          metric_name))
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
-            message = (
-                'Unsupported field value type of "%s" with value "%s" for field="%s".'
-                "Only int, long, float, and str are supported."
-                % (str(type(field_value)), str(field_value), field_name)
-            )
+            message = ('Unsupported field value type of "%s" with value "%s" for field="%s".'
+                       'Only int, long, float, and str are supported.' % (str(type(field_value)), str(field_value),
+                                                                          field_name))
         else:
-            raise Exception(
-                'Bad combination of fields given for UnsupportedValueType: "%s" "%s" "%s" "%s"'
-                % (
-                    str(metric_name),
-                    str(metric_value),
-                    str(field_name),
-                    str(field_value),
-                )
-            )
+            raise Exception('Bad combination of fields given for UnsupportedValueType: "%s" "%s" "%s" "%s"' %
+                            (str(metric_name), str(metric_value), str(field_name), str(field_value)))
         Exception.__init__(self, message)

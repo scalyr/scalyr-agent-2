@@ -5,7 +5,7 @@ This Solution describes how to setup and make use of the MySQL Monitor included 
 Prerequisites:
 
 1.  MySQL is installed and running.  To verify:
-    - At a terminal prompt, enter the command "ps aux | grep mysql".
+    - At a terminal prompt, enter the command "ps aux | grep mysql".  
     - If you are running Ubuntu, you should see something resembling:
         mysql     1104  0.0  6.7 689840 50692    Ssl  Jun28   4:36 /usr/sbin/mysqld
     - If it is not running, consult the specifics for your OS / Distribution on how to start MySQL
@@ -21,34 +21,34 @@ Steps:
 1.  In your Scalyr Agent configuration file, you will need to add one of the following stanzas to the monitor section to enable the MySQL Monitor:
 
     - If you are using "socket" with the default location:
-
+    
         {
             module: "scalyr_agent.builtin_monitors.mysql_monitor",
             database_socket: "default",
             database_username: "<username>",
             database_password: "<password>"
         },
-
+        
     - If you are using "socket" with a custom location:
-
+    
         {
             module: "scalyr_agent.builtin_monitors.mysql_monitor",
             database_socket: "<path to your socket file>",
             database_username: "<username>",
             database_password: "<password>"
         }
-
+        
     - If you are using "host:port" with the default values:
-
+    
         {
             module: "scalyr_agent.builtin_monitors.mysql_monitor",
             database_hostport: "default",
             database_username: "<username>",
             database_password: "<password>"
         },
-
+        
     - If you are using "socket" with a custom location:
-
+    
         {
             module: "scalyr_agent.builtin_monitors.mysql_monitor",
             database_hostport: "<hostname>:<port number>",
@@ -70,7 +70,7 @@ There are a number of pre-configured graphs that are part of the MySQL dashboard
         - Total connections in use
         - Connection threads cached
         - Temporary tables spooled to disk
-
+        
     - Application behavior:
         - Read requests
         - Write requests
@@ -78,7 +78,7 @@ There are a number of pre-configured graphs that are part of the MySQL dashboard
         - Client connections that abort
         - Number of slow queries
         - Number of joins without indexes
-
+    
     - A mix of both:
         - Query cache efficiency
         - Table cache hit rate
@@ -107,8 +107,8 @@ Each graph corresponds to a "derived" metric outlined in the "MySQL Monitor" doc
 
     - Write requests
         - metric: mysql.derived.write_percentage
-        - The graph shows the percentage of client requests that are writes.  This value is basically 100% minus the percentage that are reads.
-
+        - The graph shows the percentage of client requests that are writes.  This value is basically 100% minus the percentage that are reads.  
+        
     - Query cache efficiency
         - metric: mysql.derived.query_cache_efficiency
         - MySQL can be configured to allow memory resources to be used to cache queries.  If the percentage is low and performance is being impacted, consider configuring more resources.
@@ -127,7 +127,7 @@ Each graph corresponds to a "derived" metric outlined in the "MySQL Monitor" doc
 
     - Table locks acquired immediately
         - metric: mysql.derived.immediate_table_lock_percentage
-        - Certain operations require that a table be locked before they can be performed.  If the percentage of tables that can't be locked immediately is low, this could have a performance impact.
+        - Certain operations require that a table be locked before they can be performed.  If the percentage of tables that can't be locked immediately is low, this could have a performance impact.  
 
     - Table cache hit rate
         - metric: mysql.derived.thread_cache_hit_rate
@@ -147,10 +147,10 @@ You can setup alerts on any of the metrics mentioned above.  Some useful alerts 
 
 - mysql.derived.read_percentage (or mysql.derived.write_percentage)
     This will allow you to understand the nature of the transactions on your database.  In general, one knows the expected behavior of an application in rough terms of reads to writes on the DB.  So, if you are expecting roughly 25% writes, 75% reads, setting an alert on writes hitting 40% or more might be useful to note a difference in application behavior.
-
+    
 - mysql.derived.slow_query_percentage
     Too many slow queries can affect the overall load and performance of the database.  Most queries should be performant, so if you are seeing a relatively high percentage of such it might be worth using the various MySQL tools to investigate the slow queries.  Or maybe, if slow queries occur at only certain times, being alerted to the incident would allow coordination with other parts of the system.
-
+    
 Say you wanted to create an alert when the average "mysql.derived.read_percentage" dropped below 60% or when the "mysql.derived.slow_query_percentage" jumped to 20%, for each you would need to do the following:
 
     1) Go to the MySQL dashboard

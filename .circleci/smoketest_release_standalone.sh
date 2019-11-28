@@ -133,3 +133,4 @@ ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
 --scalyr_server $SCALYR_SERVER --read_api_key $READ_API_KEY \
 --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
 --debug true
+

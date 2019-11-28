@@ -1,8 +1,8 @@
 # Creates a five-zone cluster but only with a small number of workers nodes.
-#
-# Small number of worker nodes is advisable as setting it to a large number (e.g. 1000)
+# 
+# Small number of worker nodes is advisable as setting it to a large number (e.g. 1000) 
 # leads to situations where the cluster ultimately does not start but you'd find out after
-# 1.5-2 hours (on AWS).  Therefore, create the cluster with a small number of nodes, then
+# 1.5-2 hours (on AWS).  Therefore, create the cluster with a small number of nodes, then 
 # go into the AWS EC2 console and increase the autoscaling group limits to expand the number
 # of nodes.
 #

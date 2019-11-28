@@ -2,3 +2,4 @@
   "import_vars": [ { "var": "SCALYR_SERVER", "default": "https://agent.scalyr.com" } ],
   "scalyr_server": "$SCALYR_SERVER"
 }
+

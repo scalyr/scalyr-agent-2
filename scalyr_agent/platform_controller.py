@@ -15,7 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 
 import sys
@@ -38,17 +38,14 @@ class PlatformController:
         """Adds all available platforms to the '__platforms_registered__' array.
          a new platform class that could be instantiated during the 'new_platform' method.
         """
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             from scalyr_agent.platform_windows import WindowsPlatformController
-
             PlatformController.__platform_classes__.append(WindowsPlatformController)
         else:
             from scalyr_agent.platform_linux import LinuxPlatformController
-
             PlatformController.__platform_classes__.append(LinuxPlatformController)
 
             from scalyr_agent.platform_posix import PosixPlatformController
-
             PlatformController.__platform_classes__.append(PosixPlatformController)
 
         PlatformController.__platforms_registered__ = True
@@ -343,7 +340,6 @@ class DefaultPaths(object):
 
     The default values are platform specific so must be created by a PlatformController instance.
     """
-
     def __init__(self, agent_log_path, config_file_path, agent_data_path):
         self.agent_log_path = agent_log_path
         self.config_file_path = config_file_path
@@ -353,14 +349,12 @@ class DefaultPaths(object):
 class AgentAlreadyRunning(Exception):
     """Raised to signal the agent is already running.
     """
-
     pass
 
 
 class AgentNotRunning(Exception):
     """Raised to signal the agent is not running.
     """
-
     pass
 
 
@@ -368,7 +362,6 @@ class CannotExecuteAsUser(Exception):
     """Raised to signal that the platform cannot change to the requested user.
 
     This usually means the current user is not privileged (root)."""
-
     def __init__(self, error_message):
         self.error_message = error_message
 
@@ -376,5 +369,4 @@ class CannotExecuteAsUser(Exception):
 class ChangeUserNotSupported(Exception):
     """Raised to signal that this platform has not implemented the operation of changing its executing user.
     """
-
     pass

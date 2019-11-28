@@ -21,7 +21,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import sys
 import socket
@@ -40,7 +40,6 @@ class SocketWrapper(object):
 
     It implements only the methods necessary to be used in place of stdin.
     """
-
     def __init__(self, my_socket):
         """Initializes the wrapper.
 
@@ -86,7 +85,7 @@ class SocketWrapper(object):
         @return: The line
         @rtype: str
         """
-        data = ""
+        data = ''
         while True:
             try:
                 iota = self.read(1)
@@ -96,7 +95,7 @@ class SocketWrapper(object):
                 break
             else:
                 data += iota
-            if iota in "\n":
+            if iota in '\n':
                 break
         return data
 
@@ -109,8 +108,7 @@ class DebugServer(StoppableThread):
 
     This currently creates a new thread for every incoming connection.
     """
-
-    def __init__(self, local=None, host="localhost", port=2000):
+    def __init__(self, local=None, host='localhost', port=2000):
         self.__server_socket = None
         # The open connections.
         self.__connections = []
@@ -120,7 +118,7 @@ class DebugServer(StoppableThread):
         self.__host = host
         # The port.
         self.__port = port
-        StoppableThread.__init__(self, "debug server thread")
+        StoppableThread.__init__(self, 'debug server thread')
 
     def run(self):
         """Run the server, accepting new connections and handling them.
@@ -166,9 +164,7 @@ class DebugServer(StoppableThread):
         except socket.timeout:
             return None
         except Exception:
-            log.exception(
-                "Failure while accepting new debug connection.  Resetting socket"
-            )
+            log.exception('Failure while accepting new debug connection.  Resetting socket')
             self.__close_socket()
         return None
 
@@ -187,9 +183,7 @@ class DebugServer(StoppableThread):
             self.__server_socket.bind((self.__host, self.__port))
             self.__server_socket.listen(5)
         except Exception:
-            log.exception(
-                "Failure while accepting new debug connection.  Resetting socket"
-            )
+            log.exception('Failure while accepting new debug connection.  Resetting socket')
             self.__close_socket()
 
     def __close_socket(self):
@@ -208,7 +202,6 @@ class DebugConnection(StoppableThread):
 
     This is run as a thread.
     """
-
     def __init__(self, local, client_connection, host, port):
         """Initializes the connection.
         @param local: The dict of local variables to populate into the envinroment the interactive shell is run in.
@@ -225,7 +218,7 @@ class DebugConnection(StoppableThread):
         self.__client_connection = client_connection
         self.__host = host
         self.__port = port
-        StoppableThread.__init__(self, "Debug connection thread")
+        StoppableThread.__init__(self, 'Debug connection thread')
 
     def run(self):
         """Handle the incoming connection, connecting it to the interactive shell.
@@ -233,14 +226,13 @@ class DebugConnection(StoppableThread):
         Will terminate either when the connection closes or the stop method in this thread is invoked.
         """
         import traceback
-
         # Wrap the socket so we can tie it to stdin,stdout.
         link = SocketWrapper(self.__client_connection)
-        banner = "connected to %s:%d" % (self.__host, self.__port)
-        banner += "\nStack Trace\n"
-        banner += "----------------------------------------\n"
-        banner += "".join(traceback.format_stack()[:-2])
-        banner += "----------------------------------------\n"
+        banner = 'connected to %s:%d' % (self.__host, self.__port)
+        banner += '\nStack Trace\n'
+        banner += '----------------------------------------\n'
+        banner += ''.join(traceback.format_stack()[:-2])
+        banner += '----------------------------------------\n'
         # In order to hook it up shell, we need to set the stdin,stdout,stderr global variables. Luckily, no
         # other agent really should using these variables when running as daemon, so we should not have any
         # race conditiosn before we set it back.
@@ -252,14 +244,13 @@ class DebugConnection(StoppableThread):
             # Restore the original values.
             sys.stdin, sys.stdout, sys.stderr = orig_fds
 
-    def __interactive_shell(self, banner="interactive shell"):
+    def __interactive_shell(self, banner='interactive shell'):
         """Run an interactive shell.
 
         @param banner: The banner (message) to show the user when the shell starts up
         @type banner: str
         """
         import code
-
         if self.__local:
             local = dict(globals(), **self.__local)
         else:

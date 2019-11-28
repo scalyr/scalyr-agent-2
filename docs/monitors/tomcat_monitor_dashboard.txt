@@ -1,6 +1,6 @@
 {
   duration: "4h",
-
+  
   graphs: [
     {
       label: "Free memory",

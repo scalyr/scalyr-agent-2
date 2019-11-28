@@ -25,17 +25,13 @@ import os
 import sys
 import time
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 from threading import Lock
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
-from scalyr_agent.config_util import (
-    convert_config_param,
-    get_config_from_env,
-    BadConfiguration,
-)
+from scalyr_agent.config_util import convert_config_param, get_config_from_env, BadConfiguration
 from scalyr_agent.util import StoppableThread
 
 log = scalyr_logging.getLogger(__name__)
@@ -45,7 +41,6 @@ class ScalyrMonitor(StoppableThread):
     """The default number of seconds between gathering a sample.  This is the global default, which should
     be set from the configuration file.
     """
-
     DEFAULT_SAMPLE_INTERVAL_SECS = 30.0
 
     """The base class for all monitors used by the agent.
@@ -70,10 +65,7 @@ class ScalyrMonitor(StoppableThread):
         disabled:  A boolean indicating if this module instance should be
             run.
     """
-
-    def __init__(
-        self, monitor_config, logger, sample_interval_secs=None, global_config=None
-    ):
+    def __init__(self, monitor_config, logger, sample_interval_secs=None, global_config=None):
         """Constructs an instance of the monitor.
 
         It is optional for derived classes to override this method.  The can instead
@@ -100,18 +92,18 @@ class ScalyrMonitor(StoppableThread):
         """
         # The logger instance that this monitor should use to report all information and metric values.
         self._logger = logger
-        self.monitor_name = monitor_config["module"]
+        self.monitor_name = monitor_config['module']
 
         # save the global config
         self._global_config = global_config
 
         # The MonitorConfig object created from the config for this monitor instance.
         self._config = MonitorConfig(monitor_config, monitor_module=self.monitor_name)
-        log_path = self.monitor_name.split(".")[-1] + ".log"
+        log_path = self.monitor_name.split('.')[-1] + '.log'
         self.disabled = False
         # TODO: For now, just leverage the logic in the loggers for naming this monitor.  However,
         # we should have it be more dynamic where the monitor can override it.
-        if logger.component.find("monitor:") == 0:
+        if logger.component.find('monitor:') == 0:
             self.monitor_name = logger.component[8:]
         else:
             self.monitor_name = logger.component
@@ -129,40 +121,31 @@ class ScalyrMonitor(StoppableThread):
         if sample_interval_secs is not None:
             self._sample_interval_secs = sample_interval_secs
         else:
-            self._sample_interval_secs = self._config.get(
-                "sample_interval",
-                convert_to=float,
-                default=ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS,
-            )
+            self._sample_interval_secs = self._config.get('sample_interval', convert_to=float,
+                                                          default=ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS)
 
         self.__metric_log_open = False
 
         # These variables control the rate limiter on how fast we can write to the metric log.
         # The first one is the average number of bytes that can be written per second.  This is the bucket fill rate
         # in the "leaky bucket" algorithm used to calculate the rate limit.  Derived classes may change this.
-        self._log_write_rate = self._config.get(
-            "monitor_log_write_rate", convert_to=int, default=2000
-        )
+        self._log_write_rate = self._config.get('monitor_log_write_rate', convert_to=int, default=2000)
         # This is the maximum size of a write burst to the log.  This is the bucket size in the "leaky bucket" algorithm
         # used to calculate the rate limit.  Derived classes may change this.
-        self._log_max_write_burst = self._config.get(
-            "monitor_log_max_write_burst", convert_to=int, default=100000
-        )
+        self._log_max_write_burst = self._config.get('monitor_log_max_write_burst', convert_to=int, default=100000)
         # This is the number of seconds between waiting to flush the metric log (if there are pending bytes that
         # need to be flushed to disk).  If this is greater than zero, then it will reduce the amount of disk
         # flushing, but at the cost of possible loss of data if the agent shutdowns down unexpectantly.
-        self._log_flush_delay = self._config.get(
-            "monitor_log_flush_delay", convert_to=float, default=0.0, min_value=0
-        )
+        self._log_flush_delay = self._config.get('monitor_log_flush_delay', convert_to=float, default=0.0, min_value=0)
 
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
         # than sleeping the full sample_interval_secs time.
         self._adjust_sleep_by_gather_time = False
         self._initialize()
 
-        StoppableThread.__init__(self, name="metric thread")
+        StoppableThread.__init__(self, name='metric thread')
 
-    def _initialize(self):
+    def _initialize( self ):
         """Can be overridden by derived classes to perform initialization functions before the monitor is run.
 
         This is meant to allow derived monitors to perform some initialization and configuration validation
@@ -184,7 +167,7 @@ class ScalyrMonitor(StoppableThread):
     def module_name(self):
         """Returns the name of the module that will run this monitor.
         """
-        return self._config["module"]
+        return self._config['module']
 
     def reported_lines(self):
         """Returns the number of metric lines emitted to the metric log for this monitor.
@@ -218,7 +201,7 @@ class ScalyrMonitor(StoppableThread):
         self.__errors += errors
         self.__lock.release()
 
-    def config_from_monitors(self, manager):
+    def config_from_monitors( self, manager ):
         """
         Called directly before running the `run` method.
         This method passes in the module manager object to a monitor before
@@ -255,26 +238,18 @@ class ScalyrMonitor(StoppableThread):
                     start_time = time.time()
                     self.gather_sample()
                     if self._adjust_sleep_by_gather_time:
-                        adjustment = min(
-                            time.time() - start_time, self._sample_interval_secs
-                        )
+                        adjustment = min(time.time() - start_time, self._sample_interval_secs)
                 except Exception:
-                    self._logger.exception(
-                        "Failed to gather sample due to the following exception"
-                    )
+                    self._logger.exception('Failed to gather sample due to the following exception')
                     self.increment_counter(errors=1)
 
-                self._sleep_but_awaken_if_stopped(
-                    self._sample_interval_secs - adjustment
-                )
+                self._sleep_but_awaken_if_stopped(self._sample_interval_secs - adjustment)
 
-            self._logger.info("Monitor has finished")
+            self._logger.info('Monitor has finished')
         except Exception:
             # TODO:  Maybe remove this catch here and let the higher layer catch it.  However, we do not
             # right now join on the monitor threads, so no one would catch it.  We should change that.
-            self._logger.exception(
-                "Monitor died from due to exception:", error_code="failedMonitor"
-            )
+            self._logger.exception('Monitor died from due to exception:', error_code='failedMonitor')
 
     def get_extra_server_attributes(self):
         """Derived classes may optionally return a dict of server attributes to be added to the main config
@@ -326,19 +301,19 @@ class ScalyrMonitor(StoppableThread):
         """
         self._sample_interval_secs = secs
 
-    def set_log_watcher(self, log_watcher):
+    def set_log_watcher( self, log_watcher ):
         """Provides a log_watcher object that monitors can use to add/remove log files
         """
         pass
 
-    def _get_log_rotation_configuration(self):
+    def _get_log_rotation_configuration( self ):
         """Gets the log rotation backup count and maximum byte settings from the monitor config,
         and if not specified by the monitor config then from the global config
         @return: A tuple containing the log_rotation_backup_count and the log_rotation_max_bytes
                  for this monitor.
         """
 
-        rotation_count = self._config.get("log_rotation_backup_count")
+        rotation_count = self._config.get( "log_rotation_backup_count" )
         if rotation_count is None:
             # Sometimes global_config can be null if derived monitor did not pass one in.
             if self._global_config is not None:
@@ -346,7 +321,7 @@ class ScalyrMonitor(StoppableThread):
             else:
                 rotation_count = 2
 
-        max_bytes = self._config.get("log_rotation_max_bytes")
+        max_bytes = self._config.get( "log_rotation_max_bytes" )
         if max_bytes is None:
             if self._global_config is not None:
                 max_bytes = self._global_config.log_rotation_max_bytes
@@ -361,15 +336,9 @@ class ScalyrMonitor(StoppableThread):
         This must be invoked before the monitor is started."""
         backup_count, max_bytes = self._get_log_rotation_configuration()
 
-        self._logger.openMetricLogForMonitor(
-            self.log_config["path"],
-            self,
-            max_bytes=max_bytes,
-            backup_count=backup_count,
-            max_write_burst=self._log_max_write_burst,
-            log_write_rate=self._log_write_rate,
-            flush_delay=self._log_flush_delay,
-        )
+        self._logger.openMetricLogForMonitor(self.log_config['path'], self, max_bytes=max_bytes, backup_count=backup_count,
+                                             max_write_burst=self._log_max_write_burst,
+                                             log_write_rate=self._log_write_rate, flush_delay=self._log_flush_delay)
         self.__metric_log_open = True
         return True
 
@@ -434,10 +403,8 @@ def load_monitor_class(module_name, additional_python_paths):
             value = getattr(module, attr)
             if not inspect.isclass(value):
                 continue
-            if "ScalyrMonitor" in str(value.__bases__):
-                MonitorInformation.set_monitor_info(
-                    module_name, description=value.__doc__
-                )
+            if 'ScalyrMonitor' in str(value.__bases__):
+                MonitorInformation.set_monitor_info(module_name, description=value.__doc__)
                 return value, MonitorInformation.get_monitor_info(module_name)
 
         return None, None
@@ -446,18 +413,8 @@ def load_monitor_class(module_name, additional_python_paths):
         sys.path = original_path
 
 
-def define_config_option(
-    monitor_module,
-    option_name,
-    option_description,
-    required_option=False,
-    max_value=None,
-    min_value=None,
-    convert_to=None,
-    default=None,
-    env_aware=False,
-    env_name=None,
-):
+def define_config_option(monitor_module, option_name, option_description, required_option=False,
+                         max_value=None, min_value=None, convert_to=None, default=None, env_aware=False, env_name=None):
     """Defines a configuration option for the specified monitor.
 
     Once this is invoked, any validation rules supplied here are applied to all MonitorConfig objects created
@@ -502,15 +459,8 @@ def define_config_option(
     return None
 
 
-def define_metric(
-    monitor_module,
-    metric_name,
-    description,
-    extra_fields=None,
-    unit=None,
-    cumulative=False,
-    category=None,
-):
+def define_metric(monitor_module, metric_name, description, extra_fields=None, unit=None, cumulative=False,
+                  category=None):
     """Defines description information for a metric with the specified name and extra fields.
 
     This will overwrite previous metric information recorded for the same ``metric_name`` and ``extra_fields``.
@@ -576,7 +526,6 @@ class MonitorInformation(object):
 
     This is generally used to create documentation pages for the monitor.
     """
-
     def __init__(self, monitor_module):
         self.__monitor_module = monitor_module
         self.__description = None
@@ -632,9 +581,7 @@ class MonitorInformation(object):
         @return: A list of the log fields.
         @rtype: list of LogFieldDescription
         """
-        return sorted(
-            self.__log_fields.itervalues(), key=self.__get_insert_sort_position
-        )
+        return sorted(self.__log_fields.itervalues(), key=self.__get_insert_sort_position)
 
     def __get_insert_sort_position(self, item):
         """Returns the key to use for sorting the item by its insert position.
@@ -648,14 +595,12 @@ class MonitorInformation(object):
         @return: The insert position of the item
         @rtype: int
         """
-        return getattr(item, "sort_pos")
+        return getattr(item, 'sort_pos')
 
     __monitor_info__ = {}
 
     @staticmethod
-    def set_monitor_info(
-        monitor_module, description=None, option=None, metric=None, log_field=None
-    ):
+    def set_monitor_info(monitor_module, description=None, option=None, metric=None, log_field=None):
         """Sets information for the specified monitor.
 
         @param monitor_module: The module the monitor is defined in.
@@ -671,9 +616,7 @@ class MonitorInformation(object):
         @type log_field: LogFieldDescription
         """
         if monitor_module not in MonitorInformation.__monitor_info__:
-            MonitorInformation.__monitor_info__[monitor_module] = MonitorInformation(
-                monitor_module
-            )
+            MonitorInformation.__monitor_info__[monitor_module] = MonitorInformation(monitor_module)
 
         info = MonitorInformation.__monitor_info__[monitor_module]
         if description is not None:
@@ -685,7 +628,7 @@ class MonitorInformation(object):
         if option is not None:
             info.__options[option.option_name] = option
             # Stash a position attribute to capture what the insert order was for the options.
-            setattr(option, "sort_pos", info.__counter)
+            setattr(option, 'sort_pos', info.__counter)
 
         if metric is not None:
             if metric.extra_fields is None:
@@ -693,16 +636,14 @@ class MonitorInformation(object):
             else:
                 # If there are extra fields, we use that as part of the key name to store the metric under to
                 # avoid collisions with the same metric but different extra fields registered.
-                info.__metrics[
-                    "%s%s" % (metric.metric_name, str(metric.extra_fields))
-                ] = metric
+                info.__metrics['%s%s' % (metric.metric_name, str(metric.extra_fields))] = metric
             # Stash a position attribute to capture what the insert order was for the metrics.
-            setattr(metric, "sort_pos", info.__counter)
+            setattr(metric, 'sort_pos', info.__counter)
 
         if log_field is not None:
             info.__log_fields[log_field.field] = log_field
             # Stash a position attribute to capture what the insert order was for the log fields.
-            setattr(log_field, "sort_pos", info.__counter)
+            setattr(log_field, 'sort_pos', info.__counter)
 
     @staticmethod
     def get_monitor_info(monitor_module):
@@ -723,7 +664,6 @@ class MonitorInformation(object):
 class ConfigOption(object):
     """Simple object to hold the fields for a single configuration option.
     """
-
     def __init__(self):
         # The name of the option.
         self.option_name = None
@@ -745,12 +685,10 @@ class ConfigOption(object):
         self.env_name = None
 
     def __repr__(self):
-        return "%s %s %s" % (self.option_name, self.env_aware, self.env_name)
-
+        return '%s %s %s' % (self.option_name, self.env_aware, self.env_name)
 
 class MetricDescription(object):
     """Simple object to hold fields describing a monitor's metric."""
-
     def __init__(self):
         # The name of the metric.
         self.metric_name = None
@@ -772,7 +710,6 @@ class MetricDescription(object):
 
 class LogFieldDescription(object):
     """Simple object to hold fields describing the entries that are parsed from a log line produced by the monitor."""
-
     def __init__(self):
         # The name of the field in the log line.
         self.field = None
@@ -812,38 +749,21 @@ class MonitorConfig(object):
                 # Config option is environment aware if either of the following are Truthy
                 env_aware = x.env_aware or x.env_name
                 if env_aware:
-                    env_name = x.env_name or ("SCALYR_%s" % x.option_name.upper())
+                    env_name = x.env_name or ('SCALYR_%s' % x.option_name.upper())
                     self._environment_aware_map[x.option_name] = env_name
 
-                if (
-                    x.required_option
-                    or x.default is not None
-                    or x.option_name in self.__map
-                ):
-                    self.__map[x.option_name] = self.get(
-                        x.option_name,
-                        required_field=x.required_option,
-                        max_value=x.max_value,
-                        min_value=x.min_value,
-                        convert_to=x.convert_to,
-                        default=x.default,
-                        report_conflicting_environment_value=True,
-                    )
+                if x.required_option or x.default is not None or x.option_name in self.__map:
+                    self.__map[x.option_name] = self.get(x.option_name, required_field=x.required_option,
+                                                         max_value=x.max_value, min_value=x.min_value,
+                                                         convert_to=x.convert_to, default=x.default,
+                                                         report_conflicting_environment_value=True)
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""
         return len(self.__map)
 
-    def get(
-        self,
-        field,
-        required_field=False,
-        max_value=None,
-        min_value=None,
-        convert_to=None,
-        default=None,
-        report_conflicting_environment_value=False,
-    ):
+    def get(self, field, required_field=False, max_value=None, min_value=None,
+            convert_to=None, default=None, report_conflicting_environment_value=False):
         """Returns the value for the requested field.
 
         If the value is not set via config file, also look for it in the environment.
@@ -875,11 +795,7 @@ class MonitorConfig(object):
         """
         try:
             result = self.__map.get(field)
-            if (
-                result is not None
-                and convert_to is not None
-                and type(result) != convert_to
-            ):
+            if result is not None and convert_to is not None and type(result) != convert_to:
                 result = convert_config_param(field, result, convert_to)
 
             # Param not found in config file, so check environment
@@ -888,23 +804,15 @@ class MonitorConfig(object):
                 logger = None
                 if report_conflicting_environment_value:
                     logger = log
-                envar_val = get_config_from_env(
-                    field,
-                    envar_name,
-                    convert_to=convert_to,
-                    logger=logger,
-                    param_val=result,
-                    monitor_name=self.__monitor_module,
-                )
+                envar_val = get_config_from_env(field, envar_name, convert_to=convert_to,
+                                                logger=logger, param_val=result, monitor_name=self.__monitor_module)
                 if result is None:
                     result = envar_val
 
             # Required field not found in environment nor in config
             if result is None:
                 if required_field and field not in self.__map:
-                    raise BadMonitorConfiguration(
-                        'Missing required field "%s"' % field, field
-                    )
+                    raise BadMonitorConfiguration('Missing required field "%s"' % field, field)
                 result = self.__map.get(field, default)
 
             if result is None:
@@ -913,21 +821,15 @@ class MonitorConfig(object):
             # Perform conversion again in case both config-file and environment values were absent and the default
             # value requires conversion.
             if convert_to is not None and not issubclass(convert_to, type(result)):
-                result = convert_config_param(field, result, convert_to)
+                    result = convert_config_param(field, result, convert_to)
 
             if max_value is not None and result > max_value:
-                raise BadMonitorConfiguration(
-                    'Value of %s in field "%s" is invalid; maximum is %s'
-                    % (str(result), field, str(max_value)),
-                    field,
-                )
+                raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; maximum is %s' % (
+                                              str(result), field, str(max_value)), field)
 
             if min_value is not None and result < min_value:
-                raise BadMonitorConfiguration(
-                    'Value of %s in field "%s" is invalid; minimum is %s'
-                    % (str(result), field, str(min_value)),
-                    field,
-                )
+                raise BadMonitorConfiguration('Value of %s in field "%s" is invalid; minimum is %s' % (
+                                              str(result), field, str(min_value)), field)
 
             return result
         except BadConfiguration, e:
@@ -988,7 +890,6 @@ class MonitorConfig(object):
 
 class BadMonitorConfiguration(Exception):
     """Exception indicating a bad monitor configuration, such as missing a required field."""
-
     def __init__(self, message, field):
         self.message = message
         self.field = field
@@ -997,7 +898,6 @@ class BadMonitorConfiguration(Exception):
 
 class UnsupportedSystem(Exception):
     """Exception indicating a particular monitor is not supported on this system."""
-
     def __init__(self, monitor_name, message):
         """Constructs an instance of the exception.
 

@@ -25,7 +25,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import os
 
@@ -35,7 +35,6 @@ import scalyr_agent.util as scalyr_util
 class AgentStatus(object):
     """The main status container object, holding references to all other status elements.
     """
-
     def __init__(self):
         # The time (in seconds past epoch) when the agent process was launched.
         self.launch_time = None
@@ -63,7 +62,6 @@ class AgentStatus(object):
 class OverallStats(object):
     """Used to track stats that are calculated over the lifetime of the agent.
     """
-
     def __init__(self):
         # The time in seconds past epoch when the agent was started.
         self.launch_time = None
@@ -123,53 +121,27 @@ class OverallStats(object):
         """
         result = OverallStats()
         result.total_bytes_copied = self.total_bytes_copied + other.total_bytes_copied
-        result.total_bytes_skipped = (
-            self.total_bytes_skipped + other.total_bytes_skipped
-        )
-        result.total_bytes_subsampled = (
-            self.total_bytes_subsampled + other.total_bytes_subsampled
-        )
+        result.total_bytes_skipped = self.total_bytes_skipped + other.total_bytes_skipped
+        result.total_bytes_subsampled = self.total_bytes_subsampled + other.total_bytes_subsampled
         result.total_bytes_failed = self.total_bytes_failed + other.total_bytes_failed
         result.total_redactions = self.total_redactions + other.total_redactions
-        result.total_copy_requests_errors = (
-            self.total_copy_requests_errors + other.total_copy_requests_errors
-        )
-        result.total_monitor_reported_lines = (
-            self.total_monitor_reported_lines + other.total_monitor_reported_lines
-        )
-        result.total_monitor_errors = (
-            self.total_monitor_errors + other.total_monitor_errors
-        )
+        result.total_copy_requests_errors = self.total_copy_requests_errors + other.total_copy_requests_errors
+        result.total_monitor_reported_lines = self.total_monitor_reported_lines + other.total_monitor_reported_lines
+        result.total_monitor_errors = self.total_monitor_errors + other.total_monitor_errors
 
-        result.total_requests_sent = (
-            self.total_requests_sent + other.total_requests_sent
-        )
-        result.total_requests_failed = (
-            self.total_requests_failed + other.total_requests_failed
-        )
-        result.total_request_bytes_sent = (
-            self.total_request_bytes_sent + other.total_request_bytes_sent
-        )
-        result.total_compressed_request_bytes_sent = (
-            self.total_compressed_request_bytes_sent
-            + other.total_compressed_request_bytes_sent
-        )
-        result.total_response_bytes_received = (
-            self.total_response_bytes_received + other.total_response_bytes_received
-        )
-        result.total_request_latency_secs = (
-            self.total_request_latency_secs + other.total_request_latency_secs
-        )
-        result.total_connections_created = (
-            self.total_connections_created + other.total_connections_created
-        )
+        result.total_requests_sent = self.total_requests_sent + other.total_requests_sent
+        result.total_requests_failed = self.total_requests_failed + other.total_requests_failed
+        result.total_request_bytes_sent = self.total_request_bytes_sent + other.total_request_bytes_sent
+        result.total_compressed_request_bytes_sent = self.total_compressed_request_bytes_sent + other.total_compressed_request_bytes_sent
+        result.total_response_bytes_received = self.total_response_bytes_received + other.total_response_bytes_received
+        result.total_request_latency_secs = self.total_request_latency_secs + other.total_request_latency_secs
+        result.total_connections_created = self.total_connections_created + other.total_connections_created
 
         return result
 
 
 class ConfigStatus(object):
     """The status pertaining to parsing of the configuration file."""
-
     def __init__(self):
         # The path of the configuration file.
         self.path = None
@@ -189,7 +161,6 @@ class ConfigStatus(object):
 
 class CopyingManagerStatus(object):
     """The status object containing information about the agent's copying components."""
-
     def __init__(self):
         # The total number of bytes successfully uploaded.
         self.total_bytes_uploaded = 0
@@ -213,7 +184,6 @@ class CopyingManagerStatus(object):
 class LogMatcherStatus(object):
     """The status object containing information about all of the copying being performed for a particular
     log path including globbing."""
-
     def __init__(self):
         # The path.
         self.log_path = None
@@ -228,7 +198,6 @@ class LogMatcherStatus(object):
 class LogProcessorStatus(object):
     """The status object containing information about the progress of the bytes being copied for a particular
     file."""
-
     def __init__(self):
         # The path of the file (will not contain glob characters).  This will be a path to an existing file.
         self.log_path = None
@@ -254,7 +223,6 @@ class LogProcessorStatus(object):
 
 class MonitorManagerStatus(object):
     """The status object containing information about all of the running monitors."""
-
     def __init__(self):
         # The total number of monitors that are currently running.
         self.total_alive_monitors = 0
@@ -264,7 +232,6 @@ class MonitorManagerStatus(object):
 
 class MonitorStatus(object):
     """The status object for a specific instance of a ScalyrMonitor."""
-
     def __init__(self):
         # The name of the monitor.
         self.monitor_name = None
@@ -277,194 +244,146 @@ class MonitorStatus(object):
 
 
 def report_status(output, status, current_time):
-    print >> output, "Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help"
-    print >> output, ""
-    print >> output, "Current time:     %s" % scalyr_util.format_time(current_time)
-    print >> output, "Agent started at: %s" % scalyr_util.format_time(
-        status.launch_time
-    )
-    print >> output, "Version:          %s" % status.version
-    print >> output, "Agent running as: %s" % status.user
-    print >> output, "Agent log:        %s" % status.log_path
-    print >> output, "ServerHost:       %s" % status.server_host
-    print >> output, ""
+    print >>output, 'Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help'
+    print >>output, ''
+    print >>output, 'Current time:     %s' % scalyr_util.format_time(current_time)
+    print >>output, 'Agent started at: %s' % scalyr_util.format_time(status.launch_time)
+    print >>output, 'Version:          %s' % status.version
+    print >>output, 'Agent running as: %s' % status.user
+    print >>output, 'Agent log:        %s' % status.log_path
+    print >>output, 'ServerHost:       %s' % status.server_host
+    print >>output, ''
     server = status.scalyr_server
     # We default to https://agent.scalyr.com for the Scalyr server, but to see the status on the web,
     # you should go to https://www.scalyr.com.  So, we do a little clean up before sticking it in
     # the url.  Same goes for https://log.scalyr.com  -- it is really is just https://www.scalyr.com
-    server = server.replace("https://agent.", "https://www.")
-    server = server.replace("https://log.", "https://www.")
-    print >> output, "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27" % (
-        server,
-        status.server_host,
-    )
-    print >> output, ""
-    print >> output, ""
+    server = server.replace('https://agent.', 'https://www.')
+    server = server.replace('https://log.', 'https://www.')
+    print >>output, 'View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27' % (
+        server, status.server_host)
+    print >>output, ''
+    print >>output, ''
 
     # Configuration file status:
-    print >> output, "Agent configuration:"
-    print >> output, "===================="
-    print >> output, ""
+    print >>output, 'Agent configuration:'
+    print >>output, '===================='
+    print >>output, ''
     if len(status.config_status.additional_paths) == 0:
-        print >> output, "Configuration file:    %s" % status.config_status.path
+        print >>output, 'Configuration file:    %s' % status.config_status.path
     else:
-        print >> output, "Configuration files:   %s" % status.config_status.path
+        print >>output, 'Configuration files:   %s' % status.config_status.path
         for x in status.config_status.additional_paths:
-            print >> output, "                       %s" % x
+            print >>output, '                       %s' % x
 
     if status.config_status.last_error is None:
-        print >> output, "Status:                Good (files parsed successfully)"
+        print >>output, 'Status:                Good (files parsed successfully)'
     else:
-        print >> output, "Status:                Bad (could not parse, using last good version)"
-    print >> output, "Last checked:          %s" % scalyr_util.format_time(
-        status.config_status.last_check_time
-    )
-    print >> output, "Last changed observed: %s" % scalyr_util.format_time(
-        status.config_status.last_read_time
-    )
+        print >>output, 'Status:                Bad (could not parse, using last good version)'
+    print >>output, 'Last checked:          %s' % scalyr_util.format_time(status.config_status.last_check_time)
+    print >>output, 'Last changed observed: %s' % scalyr_util.format_time(status.config_status.last_read_time)
 
     if status.config_status.last_error is not None:
-        print >> output, "Parsing error:         %s" % str(
-            status.config_status.last_error
-        )
+        print >>output, 'Parsing error:         %s' % str(status.config_status.last_error)
 
     def print_environment():
 
         # Print scalyr-related env variables in sorted order with critical variables up top. Redact API key.
-        main_keys = ["SCALYR_API_KEY", "SCALYR_SERVER"]
-        special_case_keys = set(["K8S_EVENT_DISABLE"])
-        redacted_keys = set(["SCALYR_API_KEY"])
+        main_keys = ['SCALYR_API_KEY', 'SCALYR_SERVER']
+        special_case_keys = set(['K8S_EVENT_DISABLE'])
+        redacted_keys = set(['SCALYR_API_KEY'])
 
         # Make a map of uppercase keys -> relevant environment vars (beginning with SCALYR)
         upper2actualkey = {}
         for k in os.environ.keys():
             kup = k.upper()
-            if kup.startswith("SCALYR") or kup in special_case_keys:
+            if kup.startswith('SCALYR') or kup in special_case_keys:
                 upper2actualkey[kup] = k
 
         # Sorted list of all scalyr keys, including main_keys which may not be present
         # Sort order does not consider letter case.
-        sorted_upperkeys = main_keys + sorted(
-            set(upper2actualkey.keys()) - set(main_keys)
-        )
+        sorted_upperkeys = main_keys + sorted(set(upper2actualkey.keys()) - set(main_keys))
 
-        print >> output, ""
+        print >>output, ''
         row = 0
         for kup in sorted_upperkeys:
             key = upper2actualkey.get(kup, kup)
             val = os.getenv(key)
             if not val:
-                val = "<Missing>"
+                val = '<Missing>'
             elif key.upper() in redacted_keys:
-                val = "<Redacted>"
+                val = '<Redacted>'
 
             if row == 0:
-                print >> output, "Environment variables: %s = %s" % (key, val)
+                print >>output, 'Environment variables: %s = %s' % (key, val)
             else:
-                print >> output, "                       %s = %s" % (key, val)
+                print >>output, '                       %s = %s' % (key, val)
             row += 1
 
     print_environment()
 
     if status.copying_manager_status is not None:
-        print >> output, ""
-        print >> output, ""
-        __report_copying_manager(
-            output,
-            status.copying_manager_status,
-            status.log_path,
-            status.config_status.last_read_time,
-        )
+        print >>output, ''
+        print >>output, ''
+        __report_copying_manager(output, status.copying_manager_status, status.log_path,
+                                 status.config_status.last_read_time)
 
     if status.monitor_manager_status is not None:
-        print >> output, ""
-        print >> output, ""
-        __report_monitor_manager(
-            output, status.monitor_manager_status, status.config_status.last_read_time
-        )
+        print >>output, ''
+        print >>output, ''
+        __report_monitor_manager(output, status.monitor_manager_status, status.config_status.last_read_time)
 
 
 def __report_copying_manager(output, manager_status, agent_log_file_path, read_time):
-    print >> output, "Log transmission:"
-    print >> output, "================="
-    print >> output, ""
-    print >> output, "(these statistics cover the period from %s)" % scalyr_util.format_time(
-        read_time
-    )
-    print >> output, ""
+    print >>output, 'Log transmission:'
+    print >>output, '================='
+    print >>output, ''
+    print >>output, '(these statistics cover the period from %s)' % scalyr_util.format_time(read_time)
+    print >>output, ''
 
-    print >> output, "Bytes uploaded successfully:               %ld" % manager_status.total_bytes_uploaded
-    print >> output, "Last successful communication with Scalyr: %s" % scalyr_util.format_time(
-        manager_status.last_success_time
-    )
-    print >> output, "Last attempt:                              %s" % scalyr_util.format_time(
-        manager_status.last_attempt_time
-    )
+    print >>output, 'Bytes uploaded successfully:               %ld' % manager_status.total_bytes_uploaded
+    print >>output, 'Last successful communication with Scalyr: %s' % scalyr_util.format_time(
+        manager_status.last_success_time)
+    print >>output, 'Last attempt:                              %s' % scalyr_util.format_time(
+        manager_status.last_attempt_time)
     if manager_status.last_attempt_size is not None:
-        print >> output, "Last copy request size:                    %ld" % manager_status.last_attempt_size
+        print >>output, 'Last copy request size:                    %ld' % manager_status.last_attempt_size
     if manager_status.last_response is not None:
-        print >> output, "Last copy response size:                   %ld" % len(
-            manager_status.last_response
-        )
-        print >> output, "Last copy response status:                 %s" % manager_status.last_response_status
-        if manager_status.last_response_status != "success":
-            print >> output, "Last copy response:                        %s" % scalyr_util.remove_newlines_and_truncate(
-                manager_status.last_response, 1000
-            )
+        print >>output, 'Last copy response size:                   %ld' % len(manager_status.last_response)
+        print >>output, 'Last copy response status:                 %s' % manager_status.last_response_status
+        if manager_status.last_response_status != 'success':
+            print >>output, 'Last copy response:                        %s' % scalyr_util.remove_newlines_and_truncate(
+                manager_status.last_response, 1000)
     if manager_status.total_errors > 0:
-        print >> output, "Total responses with errors:               %d (see '%s' for details)" % (
-            manager_status.total_errors,
-            agent_log_file_path,
-        )
-    print >> output, ""
+        print >>output, 'Total responses with errors:               %d (see \'%s\' for details)' % (
+            manager_status.total_errors, agent_log_file_path)
+    print >>output, ''
 
     for matcher_status in manager_status.log_matchers:
         if not matcher_status.is_glob:
             if len(matcher_status.log_processors_status) == 0:
                 # This is an absolute file path (no wildcards) and there are not matches.
-                print >> output, "Path %s: no matching readable file, last checked %s" % (
-                    matcher_status.log_path,
-                    scalyr_util.format_time(matcher_status.last_check_time),
-                )
+                print >>output, 'Path %s: no matching readable file, last checked %s' % (
+                    matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time))
             else:
                 # We have a match.. matcher_status.log_processors_status should really only have one
                 # entry, but we loop anyway.
                 for processor_status in matcher_status.log_processors_status:
-                    output.write(
-                        "Path %s: copied %ld bytes (%ld lines), %ld bytes pending, "
-                        % (
-                            processor_status.log_path,
-                            processor_status.total_bytes_copied,
-                            processor_status.total_lines_copied,
-                            processor_status.total_bytes_pending,
-                        )
-                    )
+                    output.write('Path %s: copied %ld bytes (%ld lines), %ld bytes pending, ' % (
+                        processor_status.log_path, processor_status.total_bytes_copied,
+                        processor_status.total_lines_copied, processor_status.total_bytes_pending))
                     if processor_status.total_bytes_skipped > 0:
-                        output.write(
-                            "%ld bytes skipped, " % processor_status.total_bytes_skipped
-                        )
+                        output.write('%ld bytes skipped, ' % processor_status.total_bytes_skipped)
                     if processor_status.total_bytes_failed > 0:
-                        output.write(
-                            "%ld bytes failed, " % processor_status.total_bytes_failed
-                        )
+                        output.write('%ld bytes failed, ' % processor_status.total_bytes_failed)
                     if processor_status.total_bytes_dropped_by_sampling > 0:
-                        output.write(
-                            "%ld bytes dropped by sampling (%ld lines), "
-                            % (
-                                processor_status.total_bytes_dropped_by_sampling,
-                                processor_status.total_lines_dropped_by_sampling,
-                            )
-                        )
+                        output.write('%ld bytes dropped by sampling (%ld lines), ' % (
+                            processor_status.total_bytes_dropped_by_sampling,
+                            processor_status.total_lines_dropped_by_sampling))
 
                     if processor_status.total_redactions > 0:
-                        output.write(
-                            "%ld redactions, " % processor_status.total_redactions
-                        )
-                    output.write(
-                        "last checked %s"
-                        % scalyr_util.format_time(processor_status.last_scan_time)
-                    )
-                    output.write("\n")
+                        output.write('%ld redactions, ' % processor_status.total_redactions)
+                    output.write('last checked %s' % scalyr_util.format_time(processor_status.last_scan_time))
+                    output.write('\n')
                     output.flush()
 
     need_to_add_extra_line = True
@@ -472,82 +391,52 @@ def __report_copying_manager(output, manager_status, agent_log_file_path, read_t
         if matcher_status.is_glob:
             if need_to_add_extra_line:
                 need_to_add_extra_line = False
-                print >> output, ""
-            print >> output, "Glob: %s:: last scanned for glob matches at %s" % (
-                matcher_status.log_path,
-                scalyr_util.format_time(matcher_status.last_check_time),
-            )
+                print >>output, ''
+            print >>output, 'Glob: %s:: last scanned for glob matches at %s' % (
+                matcher_status.log_path, scalyr_util.format_time(matcher_status.last_check_time))
 
             for processor_status in matcher_status.log_processors_status:
-                output.write(
-                    "  %s: copied %ld bytes (%ld lines), %ld bytes pending, "
-                    % (
-                        processor_status.log_path,
-                        processor_status.total_bytes_copied,
-                        processor_status.total_lines_copied,
-                        processor_status.total_bytes_pending,
-                    )
-                )
+                output.write('  %s: copied %ld bytes (%ld lines), %ld bytes pending, ' % (
+                    processor_status.log_path, processor_status.total_bytes_copied,
+                    processor_status.total_lines_copied, processor_status.total_bytes_pending))
                 if processor_status.total_bytes_skipped > 0:
-                    output.write(
-                        "%ld bytes skipped, " % processor_status.total_bytes_skipped
-                    )
+                    output.write('%ld bytes skipped, ' % processor_status.total_bytes_skipped)
                 if processor_status.total_bytes_failed > 0:
-                    output.write(
-                        "%ld bytes failed, " % processor_status.total_bytes_failed
-                    )
+                    output.write('%ld bytes failed, ' % processor_status.total_bytes_failed)
                 if processor_status.total_bytes_dropped_by_sampling > 0:
-                    output.write(
-                        "%ld bytes dropped by sampling (%ld lines), "
-                        % (
-                            processor_status.total_bytes_dropped_by_sampling,
-                            processor_status.total_lines_dropped_by_sampling,
-                        )
-                    )
+                    output.write('%ld bytes dropped by sampling (%ld lines), ' % (
+                        processor_status.total_bytes_dropped_by_sampling,
+                        processor_status.total_lines_dropped_by_sampling))
 
                 if processor_status.total_redactions > 0:
-                    output.write("%ld redactions, " % processor_status.total_redactions)
-                output.write(
-                    "last checked %s"
-                    % scalyr_util.format_time(processor_status.last_scan_time)
-                )
-                output.write("\n")
+                    output.write('%ld redactions, ' % processor_status.total_redactions)
+                output.write('last checked %s' % scalyr_util.format_time(processor_status.last_scan_time))
+                output.write('\n')
                 output.flush()
 
 
 def __report_monitor_manager(output, manager_status, read_time):
-    print >> output, "Monitors:"
-    print >> output, "========="
-    print >> output, ""
-    print >> output, "(these statistics cover the period from %s)" % scalyr_util.format_time(
-        read_time
-    )
-    print >> output, ""
+    print >>output, 'Monitors:'
+    print >>output, '========='
+    print >>output, ''
+    print >>output, '(these statistics cover the period from %s)' % scalyr_util.format_time(read_time)
+    print >>output, ''
     if manager_status.total_alive_monitors < len(manager_status.monitors_status):
-        print >> output, "Running monitors:"
-        padding = "  "
+        print >>output, 'Running monitors:'
+        padding = '  '
     else:
-        padding = ""
+        padding = ''
 
     for entry in manager_status.monitors_status:
         if entry.is_alive:
-            print >> output, "%s%s: %d lines emitted, %d errors" % (
-                padding,
-                entry.monitor_name,
-                entry.reported_lines,
-                entry.errors,
-            )
+            print >>output, '%s%s: %d lines emitted, %d errors' % (
+                padding, entry.monitor_name, entry.reported_lines, entry.errors)
 
-    dead_monitors = (
-        len(manager_status.monitors_status) - manager_status.total_alive_monitors
-    )
+    dead_monitors = len(manager_status.monitors_status) - manager_status.total_alive_monitors
     if dead_monitors > 0:
-        print >> output, ""
-        print >> output, "Failed monitors:"
+        print >>output, ''
+        print >>output, 'Failed monitors:'
         for entry in manager_status.monitors_status:
             if not entry.is_alive:
-                print >> output, "  %s %d lines emitted, %d errors" % (
-                    entry.monitor_name,
-                    entry.reported_lines,
-                    entry.errors,
-                )
+                print >>output, '  %s %d lines emitted, %d errors' % (
+                    entry.monitor_name, entry.reported_lines, entry.errors)

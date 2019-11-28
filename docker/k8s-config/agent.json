@@ -1,5 +1,5 @@
 // Configuration for the Scalyr Agent while running on Kubernetes. For help:
-//
+// 
 // https://www.scalyr.com/help/scalyr-agent-2
 
 {

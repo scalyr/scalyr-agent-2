@@ -15,29 +15,18 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import cStringIO
 import os
 
-from scalyr_agent.agent_status import (
-    OverallStats,
-    AgentStatus,
-    ConfigStatus,
-    LogProcessorStatus,
-    MonitorStatus,
-)
-from scalyr_agent.agent_status import (
-    CopyingManagerStatus,
-    MonitorManagerStatus,
-    LogMatcherStatus,
-    report_status,
-)
+from scalyr_agent.agent_status import OverallStats, AgentStatus, ConfigStatus, LogProcessorStatus, MonitorStatus
+from scalyr_agent.agent_status import CopyingManagerStatus, MonitorManagerStatus, LogMatcherStatus, report_status
 
 from scalyr_agent.test_base import ScalyrTestCase
 
-
 class TestOverallStats(ScalyrTestCase):
+
     def test_read_file_as_json(self):
         a = OverallStats()
         b = OverallStats()
@@ -108,26 +97,26 @@ class TestReportStatus(ScalyrTestCase):
         self.time = 1409958853
         self.status = AgentStatus()
         self.status.launch_time = self.time - 86400
-        self.status.log_path = "/var/logs/scalyr-agent/agent.log"
-        self.status.scalyr_server = "https://agent.scalyr.com"
-        self.status.server_host = "test_machine"
-        self.status.user = "root"
-        self.status.version = "2.0.0.beta.7"
+        self.status.log_path = '/var/logs/scalyr-agent/agent.log'
+        self.status.scalyr_server = 'https://agent.scalyr.com'
+        self.status.server_host = 'test_machine'
+        self.status.user = 'root'
+        self.status.version = '2.0.0.beta.7'
 
         config_status = ConfigStatus()
         self.status.config_status = config_status
         config_status.last_read_time = self.time - 43200
         config_status.last_check_time = self.time
         config_status.last_good_read = self.time - 43000
-        config_status.path = "/etc/scalyr-agent-2/agent.json"
-        config_status.status = "Good"
-        config_status.additional_paths = ["/etc/scalyr-agent-2/agent.d/server.json"]
+        config_status.path = '/etc/scalyr-agent-2/agent.json'
+        config_status.status = 'Good'
+        config_status.additional_paths = ['/etc/scalyr-agent-2/agent.d/server.json']
 
         copying_status = CopyingManagerStatus()
         self.status.copying_manager_status = copying_status
         copying_status.last_attempt_size = 10000
         copying_status.last_attempt_time = self.time - 60
-        copying_status.last_response_status = "success"
+        copying_status.last_response_status = 'success'
         copying_status.total_errors = 0
         copying_status.total_bytes_uploaded = 10000
         copying_status.last_success_time = self.time - 60
@@ -137,17 +126,17 @@ class TestReportStatus(ScalyrTestCase):
         copying_status.log_matchers.append(log_matcher)
         log_matcher.is_glob = False
         log_matcher.last_check_time = self.time - 10
-        log_matcher.log_path = "/var/logs/tomcat6/access.log"
+        log_matcher.log_path = '/var/logs/tomcat6/access.log'
 
         # Add in another matcher that isn't a glob but does have a match.
         log_matcher = LogMatcherStatus()
         copying_status.log_matchers.append(log_matcher)
         log_matcher.is_glob = False
         log_matcher.last_check_time = self.time - 10
-        log_matcher.log_path = "/var/logs/tomcat6/catalina.log"
+        log_matcher.log_path = '/var/logs/tomcat6/catalina.log'
         process_status = LogProcessorStatus()
         log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/tomcat6/catalina.log"
+        process_status.log_path = '/var/logs/tomcat6/catalina.log'
         process_status.last_scan_time = self.time - 120
         process_status.total_bytes_copied = 2341234
         process_status.total_bytes_pending = 1243
@@ -163,10 +152,10 @@ class TestReportStatus(ScalyrTestCase):
         copying_status.log_matchers.append(log_matcher)
         log_matcher.is_glob = True
         log_matcher.last_check_time = self.time - 10
-        log_matcher.log_path = "/var/logs/cron/*.log"
+        log_matcher.log_path = '/var/logs/cron/*.log'
         process_status = LogProcessorStatus()
         log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/cron/logrotate.log"
+        process_status.log_path = '/var/logs/cron/logrotate.log'
         process_status.last_scan_time = self.time - 120
         process_status.total_bytes_copied = 2341234
         process_status.total_bytes_pending = 1243
@@ -178,7 +167,7 @@ class TestReportStatus(ScalyrTestCase):
         process_status.total_redactions = 0
         process_status = LogProcessorStatus()
         log_matcher.log_processors_status.append(process_status)
-        process_status.log_path = "/var/logs/cron/ohno.log"
+        process_status.log_path = '/var/logs/cron/ohno.log'
         process_status.last_scan_time = self.time - 120
         process_status.total_bytes_copied = 23434
         process_status.total_bytes_pending = 12943
@@ -194,7 +183,7 @@ class TestReportStatus(ScalyrTestCase):
         copying_status.log_matchers.append(log_matcher)
         log_matcher.is_glob = True
         log_matcher.last_check_time = self.time - 10
-        log_matcher.log_path = "/var/logs/silly/*.log"
+        log_matcher.log_path = '/var/logs/silly/*.log'
 
         # Now for the monitors.
         monitor_manager = MonitorManagerStatus()
@@ -204,21 +193,21 @@ class TestReportStatus(ScalyrTestCase):
         monitor_status = MonitorStatus()
         monitor_manager.monitors_status.append(monitor_status)
         monitor_status.is_alive = True
-        monitor_status.monitor_name = "linux_process_metrics(agent)"
+        monitor_status.monitor_name = 'linux_process_metrics(agent)'
         monitor_status.reported_lines = 50
         monitor_status.errors = 2
 
         monitor_status = MonitorStatus()
         monitor_manager.monitors_status.append(monitor_status)
         monitor_status.is_alive = True
-        monitor_status.monitor_name = "linux_system_metrics()"
+        monitor_status.monitor_name = 'linux_system_metrics()'
         monitor_status.reported_lines = 20
         monitor_status.errors = 0
 
         monitor_status = MonitorStatus()
         monitor_manager.monitors_status.append(monitor_status)
         monitor_status.is_alive = False
-        monitor_status.monitor_name = "bad_monitor()"
+        monitor_status.monitor_name = 'bad_monitor()'
         monitor_status.reported_lines = 20
         monitor_status.errors = 40
 
@@ -226,17 +215,15 @@ class TestReportStatus(ScalyrTestCase):
         output = cStringIO.StringIO()
 
         # Environment variables
-        os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
+        os.environ['SCALYR_API_KEY'] = 'This private key should be redacted'
         # intentionally leave out required scalyr_server
-        os.environ["scalyr_K8S_CLUSTER_NAME"] = "test_cluster"
-        os.environ[
-            "K8S_EVENT_DISABLE"
-        ] = "Special-case-included despite missing prefix.  Appears at end of main keys."
-        os.environ["SCALYR_K8S_EVENT_DISABLE"] = "true"
-        os.environ["SCALYR_AAA"] = "Should appear just after main keys"
-        os.environ["SCALYR_XXX_A"] = "A before b (ignores case)"
-        os.environ["sCaLyR_XXX_b"] = "b after A (ignores case)"
-        os.environ["SCALYR_ZZZ"] = "Should appear at the end"
+        os.environ['scalyr_K8S_CLUSTER_NAME'] = 'test_cluster'
+        os.environ['K8S_EVENT_DISABLE'] = 'Special-case-included despite missing prefix.  Appears at end of main keys.'
+        os.environ['SCALYR_K8S_EVENT_DISABLE'] = 'true'
+        os.environ['SCALYR_AAA'] = 'Should appear just after main keys'
+        os.environ['SCALYR_XXX_A'] = 'A before b (ignores case)'
+        os.environ['sCaLyR_XXX_b'] = 'b after A (ignores case)'
+        os.environ['SCALYR_ZZZ'] = 'Should appear at the end'
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
@@ -305,7 +292,7 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_config(self):
-        self.status.config_status.last_error = "Bad stuff"
+        self.status.config_status.last_error = 'Bad stuff'
 
         output = cStringIO.StringIO()
         report_status(output, self.status, self.time)
@@ -370,8 +357,8 @@ Failed monitors:
         self.assertEquals(expected_output, output.getvalue())
 
     def test_bad_copy_response(self):
-        self.status.copying_manager_status.last_response = "Some weird stuff"
-        self.status.copying_manager_status.last_response_status = "error"
+        self.status.copying_manager_status.last_response = 'Some weird stuff'
+        self.status.copying_manager_status.last_response_status = 'error'
         self.status.copying_manager_status.total_errors = 5
 
         output = cStringIO.StringIO()

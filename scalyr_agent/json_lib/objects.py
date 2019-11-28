@@ -23,7 +23,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException
 from scalyr_agent.json_lib.exceptions import JsonMissingFieldException
@@ -64,7 +64,7 @@ class JsonObject(object):
         # ???? TODO
 
     def __repr__(self):
-        return repr(self.__map)
+        return repr( self.__map )
 
     def __len__(self):
         """Returns the number of keys in the JsonObject"""
@@ -103,9 +103,9 @@ class JsonObject(object):
     def __iter__(self):
         return self.__map.iterkeys()
 
-    def update(self, other):
+    def update( self, other ):
         """Updates the map with key/value pairs from other.  Overwriting existing keys"""
-        return self.__map.update(other)
+        return self.__map.update( other )
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
@@ -133,9 +133,7 @@ class JsonObject(object):
 
     def __getitem__(self, field):
         if not field in self:
-            raise JsonMissingFieldException(
-                'The missing field "%s" in JsonObject.' % field
-            )
+            raise JsonMissingFieldException('The missing field "%s" in JsonObject.' % field)
         return self.__map[field]
 
     def copy(self):
@@ -163,7 +161,8 @@ class JsonObject(object):
             be returned using default_value or none_if_missing."""
 
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         return self.__map[field]
 
@@ -194,7 +193,8 @@ class JsonObject(object):
             be returned using default_value or none_if_missing."""
 
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         value = self.__map[field]
         value_type = type(value)
@@ -221,10 +221,10 @@ class JsonObject(object):
             raises a JsonConversionError.
 
         @raise JsonConversionError: If the value is not either zero or one."""
-        if abs(value) < 1e-10:
+        if abs(value) < 1E-10:
             return False
 
-        if abs(1 - value) < 1e-10:
+        if abs(1 - value) < 1E-10:
             return True
 
         return self.__conversion_error(field, value, "boolean")
@@ -257,18 +257,14 @@ class JsonObject(object):
             be returned using default_value or none_if_missing."""
 
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         value = self.__map[field]
         value_type = type(value)
 
-        if (
-            value_type is int
-            or value_type is long
-            or value_type is float
-            or value_type is str
-            or value_type is unicode
-        ):
+        if (value_type is int or value_type is long or value_type is float or value_type is str
+                or value_type is unicode):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then int.. that way we will just truncate the
@@ -309,18 +305,14 @@ class JsonObject(object):
             be returned using default_value or none_if_missing."""
 
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         value = self.__map[field]
         value_type = type(value)
 
-        if (
-            value_type is int
-            or value_type is long
-            or value_type is float
-            or value_type is str
-            or value_type is unicode
-        ):
+        if (value_type is int or value_type is long or value_type is float or value_type is str or
+                value_type is unicode):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then long.. that way we will just truncate the
@@ -358,18 +350,14 @@ class JsonObject(object):
             be returned using default_value or none_if_missing."""
 
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         value = self.__map[field]
         value_type = type(value)
 
-        if (
-            value_type is int
-            or value_type is long
-            or value_type is float
-            or value_type is str
-            or value_type is unicode
-        ):
+        if (value_type is int or value_type is long or value_type is float or value_type is str or
+                value_type is unicode):
             try:
                 return float(value)
             except ValueError:
@@ -396,7 +384,8 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
 
         value = self.__map[field]
         if value is None:
@@ -404,13 +393,8 @@ class JsonObject(object):
 
         value_type = type(value)
 
-        if (
-            value_type is int
-            or value_type is long
-            or value_type is float
-            or value_type is str
-            or value_type is unicode
-        ):
+        if (value_type is int or value_type is long or value_type is float or value_type is str or
+                value_type is unicode):
             return str(value)
         else:
             return self.__conversion_error(field, value, "str")
@@ -435,7 +419,8 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
         if not field in self:
-            return self.__compute_missing_value(field, default_value, none_if_missing)
+            return self.__compute_missing_value(
+                field, default_value, none_if_missing)
         value = self.__map[field]
         if isinstance(value, JsonObject):
             return value
@@ -501,8 +486,7 @@ class JsonObject(object):
         @raise JsonConversionException: The conversion error."""
         raise JsonConversionException(
             "Failed converting %s of type %s for field %s to desired type %s"
-            % (str(value), type(value), field_name, desired_type)
-        )
+            % (str(value), type(value), field_name, desired_type))
 
     def __compute_missing_value(self, field_name, default_value, none_if_missing):
         """Perform the appropriate action for a missing value.
@@ -522,8 +506,7 @@ class JsonObject(object):
         if none_if_missing:
             return None
         raise JsonMissingFieldException(
-            "The required field %s was not found in object." % field_name
-        )
+            "The required field %s was not found in object." % field_name)
 
     def __eq__(self, other):
         if other is None:
@@ -587,9 +570,7 @@ class JsonArray(object):
         @raise IndexError: If there is no entry at that index."""
         if index >= len(self._items) or index < 0:
             raise IndexError(
-                "The index=%i is out of bounds of array size=%i"
-                % (index, len(self._items))
-            )
+                "The index=%i is out of bounds of array size=%i" % (index, len(self._items)))
         return self._items[index]
 
     def __setitem__(self, index, value):
@@ -601,9 +582,7 @@ class JsonArray(object):
         @raise IndexError: If there is no entry at that index."""
         if index >= len(self._items) or index < 0:
             raise IndexError(
-                "The index=%i is out of bounds of array size=%i"
-                % (index, len(self._items))
-            )
+                "The index=%i is out of bounds of array size=%i" % (index, len(self._items)))
         self._items[index] = value
 
     def add(self, value):
@@ -639,13 +618,12 @@ class JsonArray(object):
 
     def __raise_not_json_object(self, index):
         raise JsonConversionException(
-            "A non-JsonObject entry was found in array at index=%i" % index
-        )
+            "A non-JsonObject entry was found in array at index=%i" % index)
 
 
 class ArrayOfStrings(JsonArray):
 
-    separators = [","]
+    separators = [',']
 
     def __init__(self, values=None):
         """Imposes additional constraint that each element must be a string
@@ -655,9 +633,10 @@ class ArrayOfStrings(JsonArray):
         if values:
             for val in values:
                 if type(val) not in (str, unicode):
-                    raise TypeError("A non-string element was found: %s" % str(val))
+                    raise TypeError('A non-string element was found: %s' % str(val))
                 self._items.append(val)
 
 
 class SpaceAndCommaSeparatedArrayOfStrings(ArrayOfStrings):
-    separators = [None, ","]
+    separators = [None, ',']
+

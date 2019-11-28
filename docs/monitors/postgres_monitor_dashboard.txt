@@ -1,6 +1,6 @@
 {
   duration: "4h",
-
+  
   graphs: [
     {
       label: "Active Connections",
@@ -21,7 +21,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Deadlocks",
       plots: [
@@ -41,7 +41,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Disk Blocks in Buffer Cache",
       plots: [
@@ -61,7 +61,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Amount of data written to temp files.",
       plots: [
@@ -71,7 +71,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of transactions committed.",
       plots: [
@@ -81,7 +81,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of transactions rolled back.",
       plots: [
@@ -91,7 +91,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of rows returned.",
       plots: [
@@ -101,7 +101,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of rows touched (looked at/read/fetched).",
       plots: [
@@ -111,7 +111,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of rows inserted.",
       plots: [
@@ -131,7 +131,7 @@
           label: "number"
         }
       ]
-    },
+    },    
     {
       label: "Number of rows deleted.",
       plots: [

@@ -17,7 +17,7 @@
 #
 # author:  Imron Alston <imron@scalyr.com>
 
-__author__ = "imron@scalyr.com"
+__author__ = 'imron@scalyr.com'
 
 import binascii
 import codecs
@@ -29,15 +29,14 @@ from scalyr_agent import ScalyrMonitor
 from redis.client import Redis
 from redis.exceptions import ConnectionError, TimeoutError
 
-MORE_BYTES = re.compile("\.\.\. \(\d+ more bytes\)$")
+MORE_BYTES = re.compile( '\.\.\. \(\d+ more bytes\)$' )
 
 
-class RedisHost(object):
+class RedisHost( object ):
     """Class that holds various information about a specific redis connection
     """
-
-    def __init__(self, host, port, password, connection_timeout):
-        # redis instance information
+    def __init__( self, host, port, password, connection_timeout ):
+        #redis instance information
         self.__host = host
         self.__port = port
         self.__password = password
@@ -67,14 +66,16 @@ class RedisHost(object):
         # run_id of the redis server
         self.__run_id = None
 
+
         # String for display purposes
         self.__display_string = ""
 
-    def valid(self):
+
+    def valid( self ):
         """Check if we are currently connected to a redis instance"""
         return self.__redis != None
 
-    def __update_latest(self, redis):
+    def __update_latest( self, redis ):
         """Get the most recent entry in the slow log and store its ID.
 
         If it's the first connection for this RedisHost just get the
@@ -82,30 +83,29 @@ class RedisHost(object):
         previous values for the last_id and timestamp.
         """
         if self.__first_connection:
-            pipeline = redis.pipeline(transaction=False)
-            results = pipeline.info().slowlog_get(1).execute()
-            if len(results) != 2:
-                raise Exception("Error initializing slowlog data")
+            pipeline = redis.pipeline( transaction=False )
+            results = pipeline.info().slowlog_get( 1 ).execute()
+            if len( results ) != 2:
+                raise Exception( "Error initializing slowlog data" )
 
             self.__first_connection = False
-            self.check_for_reset(results[0])
+            self.check_for_reset( results[0] )
             self.__reset = False
             latest = results[1]
             if latest:
-                self.last_id = latest[0]["id"]
-                self.last_timestamp = latest[0]["start_time"]
+                self.last_id = latest[0]['id']
+                self.last_timestamp = latest[0]['start_time']
 
-    def check_for_reset(self, info):
-        if not "run_id" in info:
-            raise Exception(
-                "Unsupported redis version.  redis_monitor requires a version of redis >= 2.4.17"
-            )
 
-        if self.__run_id != info["run_id"]:
+    def check_for_reset( self, info ):
+        if not 'run_id' in info:
+            raise Exception( "Unsupported redis version.  redis_monitor requires a version of redis >= 2.4.17" )
+
+        if self.__run_id != info['run_id']:
             self.__reset = True
-            self.__run_id = info["run_id"]
+            self.__run_id = info['run_id']
 
-    def log_slowlog_entries(self, logger, lines_to_fetch):
+    def log_slowlog_entries( self, logger, lines_to_fetch ):
         """Fetch entries from the redis slowlog and emit them to Scalyr
         if they pass a predicate test - which will either be on the id
         or the timestamp, depending on whether or not the connection
@@ -113,33 +113,30 @@ class RedisHost(object):
         """
 
         # pipeline info and slowlog calls
-        pipe = self.redis.pipeline(transaction=False)
+        pipe = self.redis.pipeline( transaction=False )
 
-        results = pipe.info().slowlog_get(lines_to_fetch).execute()
+        results = pipe.info().slowlog_get( lines_to_fetch ).execute()
 
-        if len(results) != 2:
-            raise Exception("Error fetching slowlog data")
+        if len( results ) != 2:
+            raise Exception( "Error fetching slowlog data" )
 
-        self.check_for_reset(results[0])
+        self.check_for_reset( results[0] )
 
         entries = results[1]
 
         # by default use the id based predicate to get the entries
-        key = "id"
+        key = 'id'
         value = self.last_id
 
-        # default warning message
+        #default warning message
         warning = "Too many log messages since last query.  Some log lines may have been dropped"
 
         # if our connection was reset since the last time we checked the slowlog then
         # get entries based on timestamp instead, because the server might have been restarted
         # which will invalidate any previous ids
         if self.__reset:
-            warning = (
-                "Redis server reset detected for %s.  Some log lines may have been dropped"
-                % self.display_string
-            )
-            key = "start_time"
+            warning = "Redis server reset detected for %s.  Some log lines may have been dropped" % self.display_string
+            key = 'start_time'
             value = self.last_timestamp
 
             # reset the last id to 0 if there were no entries
@@ -158,41 +155,39 @@ class RedisHost(object):
         # True if entries is empty, false if it contains items
         # This is to prevent issuing a warning message when nothing
         # was returned
-        found_previous = len(entries) == 0
+        found_previous = len( entries ) == 0
 
         for entry in entries:
             if entry[key] > value:
-                unseen_entries.append(entry)
+                unseen_entries.append( entry )
             else:
                 # If we are here then entry[key] is <= value
                 # That being the case, then if the id and timestamp matches then we haven't
                 # dropped any messages
-                if (
-                    entry["id"] == self.last_id
-                    and entry["start_time"] == self.last_timestamp
-                ):
+                if entry['id'] == self.last_id and entry['start_time'] == self.last_timestamp:
                     found_previous = True
 
                 # break the loop because all other entries should fail the predicate
                 break
 
         if not found_previous:
-            logger.warn(warning)
+            logger.warn( warning )
 
         # print it out in reverse because redis sends entries in reverse order
-        for entry in reversed(unseen_entries):
-            self.log_entry(logger, entry)
+        for entry in reversed( unseen_entries ):
+            self.log_entry( logger, entry )
 
-    def log_entry(self, logger, entry):
+
+    def log_entry( self, logger, entry ):
         # check to see if redis truncated the command
-        match = MORE_BYTES.search(entry["command"])
+        match = MORE_BYTES.search( entry['command'] )
         if match:
             pos, length = match.span()
             pos -= 1
             # find the first byte which is not a 'middle' byte in utf8
             # middle bytes always begin with b10xxxxxx which means they
             # will be >= b10000000 and <= b10111111
-            while pos > 0 and 0x80 <= ord(entry["command"][pos]) <= 0xBF:
+            while pos > 0 and 0x80 <= ord( entry['command'][pos] ) <= 0xBF:
                 pos -= 1
 
             # at this point, entry['command'][pos] will either be a single byte character or
@@ -200,43 +195,34 @@ class RedisHost(object):
             # If it's a single character, skip over it so it's included in the slice
             # If it's the start of a truncated multibyte character don't do anything
             # and the truncated bytes will be removed with the slice
-            if ord(entry["command"][pos]) < 0x80:
+            if ord( entry['command'][pos] ) < 0x80:
                 pos += 1
 
-            # slice off any unwanted parts of the string
-            entry["command"] = entry["command"][:pos] + match.group()
+            #slice off any unwanted parts of the string
+            entry['command'] = entry['command'][:pos] + match.group()
 
         command = ""
         try:
-            command = entry["command"].decode("utf8")
+            command = entry['command'].decode( 'utf8' )
         except UnicodeDecodeError, e:
             if self.utf8_warning_interval:
-                logger.warn(
-                    "Redis command contains invalid utf8: %s"
-                    % binascii.hexlify(entry["command"]),
-                    limit_once_per_x_secs=self.utf8_warning_interval,
-                    limit_key="redis-utf8",
-                )
-            command = entry["command"].decode("utf8", "replace")
+                logger.warn( "Redis command contains invalid utf8: %s" % binascii.hexlify( entry['command'] ), limit_once_per_x_secs=self.utf8_warning_interval, limit_key="redis-utf8" )
+            command = entry['command'].decode('utf8', "replace")
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
-        logger.emit_value(
-            "redis",
-            "slowlog",
-            extra_fields={
-                "host": self.display_string,
-                "ts": time.strftime(time_format, time.gmtime(entry["start_time"])),
-                "exectime": entry["duration"],
-                "command": command,
-            },
-        )
-        self.last_id = entry["id"]
-        self.last_timestamp = entry["start_time"]
+        logger.emit_value( 'redis', 'slowlog', extra_fields={
+            'host': self.display_string,
+            'ts': time.strftime( time_format, time.gmtime( entry['start_time'] ) ),
+            'exectime' : entry['duration'],
+            'command' : command
+        } )
+        self.last_id = entry['id']
+        self.last_timestamp = entry['start_time']
 
     @property
     def display_string(self):
         if not self.__display_string:
-            self.__display_string = "%s:%d" % (self.__host, self.__port)
+            self.__display_string = "%s:%d" % ( self.__host, self.__port )
         return self.__display_string
 
     @property
@@ -245,18 +231,12 @@ class RedisHost(object):
         Performing lazy initialization if it hasn't already been created
         """
         if not self.__redis:
-            redis = Redis(
-                host=self.__host,
-                port=self.__port,
-                password=self.__password,
-                socket_timeout=self.__connection_timeout,
-            )
-            self.__update_latest(redis)
-            # __update_latest can raise an exception, so don't assign to self until it
-            # completes successfully
+            redis = Redis( host=self.__host, port=self.__port, password=self.__password, socket_timeout=self.__connection_timeout )
+            self.__update_latest( redis )
+            #__update_latest can raise an exception, so don't assign to self until it
+            #completes successfully
             self.__redis = redis
         return self.__redis
-
 
 class RedisMonitor(ScalyrMonitor):
     """
@@ -325,36 +305,19 @@ Additional configuration options are as follows:
     some log lines will be dropped.
 
     """
-
     def _initialize(self):
         """Performs monitor-specific initialization."""
         # The number of entries to request each pass
-        self.__lines_to_fetch = self._config.get(
-            "lines_to_fetch", default=500, convert_to=int, min_value=10, max_value=5000
-        )
+        self.__lines_to_fetch = self._config.get('lines_to_fetch', default=500, convert_to=int, min_value=10, max_value=5000)
 
         # The number of seconds to wait before redisplaying connection errors
-        self.__connection_error_repeat_interval = self._config.get(
-            "connection_error_repeat_interval",
-            default=300,
-            convert_to=int,
-            min_value=10,
-            max_value=6000,
-        )
+        self.__connection_error_repeat_interval = self._config.get('connection_error_repeat_interval', default=300, convert_to=int, min_value=10, max_value=6000)
 
         # The number of seconds to wait when querying the redis server
-        self.__connection_timeout = self._config.get(
-            "connection_timeout", default=5, convert_to=int, min_value=0, max_value=60
-        )
+        self.__connection_timeout = self._config.get('connection_timeout', default=5, convert_to=int, min_value=0, max_value=60)
 
         # The number of seconds to wait before reissuing warnings about invalid utf8 in slowlog messages.
-        self.__utf8_warning_interval = self._config.get(
-            "utf8_warning_interval",
-            default=600,
-            convert_to=int,
-            min_value=0,
-            max_value=6000,
-        )
+        self.__utf8_warning_interval = self._config.get('utf8_warning_interval', default=600, convert_to=int, min_value=0, max_value=6000)
 
         # Redis-py requires None rather than 0 if no timeout
         if self.__connection_timeout == 0:
@@ -363,45 +326,36 @@ Additional configuration options are as follows:
         # A list of RedisHosts
         self.__redis_hosts = []
 
-        hosts = self._config.get("hosts")
+        hosts = self._config.get( 'hosts' )
 
-        default_config = {"host": "localhost", "port": 6379, "password": None}
+        default_config = { "host" : "localhost", "port" : 6379, "password" : None }
 
         # add at least one host if none were specified
         if not hosts:
-            hosts = [default_config]
+            hosts = [ default_config ]
 
         for host in hosts:
-            # update the config, using default values for anything that was unspecified
+            #update the config, using default values for anything that was unspecified
             config = default_config.copy()
-            config.update(host)
+            config.update( host )
 
-            # create a new redis host
-            redis_host = RedisHost(
-                config["host"],
-                config["port"],
-                config["password"],
-                self.__connection_timeout,
-            )
+            #create a new redis host
+            redis_host = RedisHost( config['host'], config['port'], config['password'], self.__connection_timeout ) 
             redis_host.utf8_warning_interval = self.__utf8_warning_interval
-            self.__redis_hosts.append(redis_host)
+            self.__redis_hosts.append( redis_host )
 
     def gather_sample(self):
 
         for host in self.__redis_hosts:
             new_connection = not host.valid()
             try:
-                entries = host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
+                entries = host.log_slowlog_entries( self._logger, self.__lines_to_fetch )
             except ConnectionError, e:
                 if new_connection:
-                    self._logger.error(
-                        "Unable to establish connection: %s" % (host.display_string),
-                        limit_once_per_x_secs=self.__connection_error_repeat_interval,
-                        limit_key=host.display_string,
-                    )
+                    self._logger.error( "Unable to establish connection: %s" % ( host.display_string ), limit_once_per_x_secs=self.__connection_error_repeat_interval, limit_key=host.display_string )
                 else:
-                    self._logger.error(
-                        "Connection to redis lost: %s" % host.display_string
-                    )
+                    self._logger.error( "Connection to redis lost: %s" % host.display_string )
             except TimeoutError, e:
-                self._logger.warn("Connection timed out: %s" % host.display_string)
+                self._logger.warn( "Connection timed out: %s" % host.display_string )
+
+

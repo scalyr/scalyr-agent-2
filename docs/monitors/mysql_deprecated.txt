@@ -11,7 +11,7 @@ the MySQL server was last started.
                                                         config file (the default as of MySQL 5.0 is 10 seconds). \
                                                         The higher the percentage, the more your server is being kept \
                                                         busy fulfilling requests and the possible higher load on your \
-                                                        server.
+                                                        server. 
 |||``mysql.derived.connections_used_percentage``    ||| Measure, as a percentage, of how many of simultaneous \
                                                         connections were used out of the number of connections \
                                                         configured within the MySQL configuration file.  If connections\
@@ -26,7 +26,7 @@ the MySQL server was last started.
                                                         is slow in sending it's connect message.  This could \
                                                         indicate something wrong with the clients or possibly even \
                                                         attempts to break into the server.
-|||``mysql.derived.aborted_clients_percentage``     ||| A measure of the number of clients that disconnect improperly\
+|||``mysql.derived.aborted_clients_percentage``     ||| A measure of the number of clients that disconnect improperly\ 
                                                         (the don't close the connection).  This could indicate a \
                                                         poorly written client, inactivity on the part of clients, or \
                                                         possibly a problematic connection to the database.
@@ -35,7 +35,7 @@ the MySQL server was last started.
                                                         be expected or might be a problem.  If you have setup read \
                                                         slaves and write masters and the masters show heavy reads, that\
                                                         could indicate a problem.
-|||``mysql.derived.write_percentage``               ||| Measure of what percentage of database activity is writes. \
+|||``mysql.derived.write_percentage``               ||| Measure of what percentage of database activity is writes. \ 
                                                         Writes are generally quite costly and could impact read \
                                                         performance.
 |||``mysql.derived.query_cache_efficiency``         ||| Measure of what percentage of queries are cached.  A higher \
@@ -63,7 +63,7 @@ the MySQL server was last started.
                                                         at the table structure or possibly replication.
 |||``mysql.derived.thread_cache_hit_rate``          ||| For each connection, a thread is needed.  If this value is low,\
                                                         it indicates that either you have unexpected traffic loads or \
-                                                        need to allocate more resources to the thread cache.
+                                                        need to allocate more resources to the thread cache.   
 |||``mysql.derived.tmp_disk_table_percentage``      ||| When MySQL needs to create a temp table (for instance due to \
                                                         a join), how many of the tables created need to be written to \
                                                         disk?  A high percentage could indicate that either your \

@@ -19,7 +19,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = "czerwin@scalyr.com"
+__author__ = 'czerwin@scalyr.com'
 
 import cStringIO
 import errno
@@ -29,9 +29,7 @@ import struct
 import time
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-
 global_log = scalyr_logging.getLogger(__name__)
-
 
 class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     """Base class for simple servers that only need to accept incoming connections, perform some actions on
@@ -46,16 +44,8 @@ class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     methods.  Additionally, you should probably provide an implementation of report_connection_problem so
     that errors generated will handling an individual connection can be recorded.
     """
-
-    def __init__(
-        self,
-        server_port,
-        localhost_socket=True,
-        max_connection_idle_time=300,
-        max_request_size=100 * 1024,
-        buffer_size=100 * 1024,
-        run_state=None,
-    ):
+    def __init__(self, server_port, localhost_socket=True, max_connection_idle_time=300, max_request_size=100*1024,
+                 buffer_size=100*1024, run_state=None):
         """Creates a new instance that will accept new connections on the specified port.
 
         To begin accepting connections, you must invoke the 'run' method.
@@ -72,9 +62,9 @@ class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
             connections.
         """
         if localhost_socket:
-            server_address = ("localhost", server_port)
+            server_address = ('localhost', server_port)
         else:
-            server_address = ("", server_port)
+            server_address = ('', server_port)
         # Allow for quick server socket re-use.  This helps prevent problems if we are quickly restarting the agent.
         self.allow_reuse_address = True
         self.max_connection_idle_time = max_connection_idle_time
@@ -146,7 +136,6 @@ class LineRequestParser(object):
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming requests
     that are terminated by either '\n' or '\r\n'.
     """
-
     def __init__(self, max_request_size, eof_as_eol=False):
         """Creates a new instance.
 
@@ -186,15 +175,15 @@ class LineRequestParser(object):
             # it will return whatever line was left without a newline.
             return_line = False
             if bytes_received > 0:
-                if line[-1] == "\n":
+                if line[-1] == '\n':
                     return_line = True
                 else:
                     # check if we want to return the remaining text when EOF is hit
                     if self.__eof_as_eol:
-                        # this will return an empty string if EOF is reached
-                        last_line = input_buffer.read(1)
-                        if len(last_line) == 0:
-                            # we have reach eof so also return
+                        #this will return an empty string if EOF is reached
+                        last_line = input_buffer.read( 1 )
+                        if len( last_line ) == 0:
+                            #we have reach eof so also return
                             return_line = True
 
             if return_line:
@@ -214,7 +203,6 @@ class Int32RequestParser(object):
 
     Some monitor protocols, such as Graphite's pickle protocol uses this format.
     """
-
     def __init__(self, max_request_size):
         """Creates a new instance.
 
@@ -246,9 +234,7 @@ class Int32RequestParser(object):
             # Make sure we have 4 bytes so that we can at least read the length prefix, and then try to read
             # the complete data payload.
             if num_bytes > self.__prefix_length:
-                (length,) = struct.unpack(
-                    self.__format, input_buffer.read(self.__prefix_length)
-                )
+                length, = struct.unpack(self.__format, input_buffer.read(self.__prefix_length))
                 if length > self.__max_request_size:
                     raise RequestSizeExceeded(length, self.__max_request_size)
                 if length + self.__prefix_length <= num_bytes:
@@ -265,25 +251,17 @@ class ConnectionIdleTooLong(Exception):
     """Raised when the time since a connection last received a complete request has exceeded the maximum connection
     idle time.
     """
-
     def __init__(self, time_since_last_activity, max_inactivity):
-        Exception.__init__(
-            self,
-            "Connection has been idle too long. No data has been received for "
-            "%d seconds and limit is %d" % (time_since_last_activity, max_inactivity),
-        )
+        Exception.__init__(self, 'Connection has been idle too long. No data has been received for '
+                                 '%d seconds and limit is %d' % (time_since_last_activity, max_inactivity))
 
 
 class RequestSizeExceeded(Exception):
     """Raised when an incoming request has exceeded the maximum allowed request size.
     """
-
     def __init__(self, request_size, max_request_size):
-        Exception.__init__(
-            self,
-            "The current request size of %d exceeded maximum allowed of %d"
-            % (request_size, max_request_size),
-        )
+        Exception.__init__(self, 'The current request size of %d exceeded maximum allowed of %d' % (
+                           request_size, max_request_size))
 
 
 class ConnectionProcessor(object):
@@ -293,14 +271,11 @@ class ConnectionProcessor(object):
     complete request has not been received in the allowed time.
 
     """
-
     # This abstraction exists really only for testing purposes.  It could have been implemented as part of
     # 'ConnectionHandler', but since that class derives from 'SocketServer.BaseRequestHandler', it is
     # difficult to test.  That is because 'SocketServer.BaseRequestHandler' does non-test-friendly things like
     # invoking 'handle' as part of instance initialization.
-    def __init__(
-        self, request_stream, request_executor, run_state, max_connection_idle_time
-    ):
+    def __init__(self, request_stream, request_executor, run_state, max_connection_idle_time):
         """Returns a new instance.  You must invoke 'run' to begin processing requests.
 
         @param request_stream: An instance of 'RequestSream' containing the incoming bytes for a connection.
@@ -341,41 +316,29 @@ class ConnectionProcessor(object):
         if self.__last_request_time is None:
             self.__last_request_time = current_time
 
-        request = self.__request_stream.read_request(
-            timeout=self.__polling_interval, run_state=self.__run_state
-        )
+        request = self.__request_stream.read_request(timeout=self.__polling_interval, run_state=self.__run_state)
         if request is not None:
             self.__request_executor(request)
             self.__last_request_time = current_time
         elif current_time - self.__last_request_time > self.__max_connection_idle_time:
-            raise ConnectionIdleTooLong(
-                self.__last_request_time - time.time(), self.__max_connection_idle_time
-            )
+            raise ConnectionIdleTooLong(self.__last_request_time - time.time(), self.__max_connection_idle_time)
         return self.__run_state.is_running() and not self.__request_stream.at_end()
 
 
 class ConnectionHandler(SocketServer.BaseRequestHandler):
     """The handler class that is used by ServerProcess to handle incoming connections.
     """
-
     # The bulk of the work for this class is actually implemented in ConnectionProcess to allow for
     # easier testing.
     def handle(self):
         try:
             # Create an instance of RequestStream for the incoming connection and then use a ConnectionProcessor
             # to handle it.
-            request_stream = RequestStream(
-                self.request,
-                self.server.parse_request,
-                max_buffer_size=self.server.buffer_size,
-                max_request_size=self.server.max_request_size,
-            )
-            processor = ConnectionProcessor(
-                request_stream,
-                self.server.execute_request,
-                self.server.run_state,
-                self.server.max_connection_idle_time,
-            )
+            request_stream = RequestStream(self.request, self.server.parse_request,
+                                           max_buffer_size=self.server.buffer_size,
+                                           max_request_size=self.server.max_request_size)
+            processor = ConnectionProcessor(request_stream, self.server.execute_request, self.server.run_state,
+                                            self.server.max_connection_idle_time)
             processor.run()
         except Exception, e:
             self.server.report_connection_problem(e)
@@ -387,15 +350,7 @@ class RequestStream(object):
     This essentially puts a memory buffer in front of an incoming socket to efficiently read requests from
     the incoming stream and reset the read position when required by incomplete requests.
     """
-
-    def __init__(
-        self,
-        incoming_socket,
-        request_parser,
-        max_buffer_size=100 * 1024,
-        max_request_size=100 * 1024,
-        blocking=True,
-    ):
+    def __init__(self, incoming_socket, request_parser, max_buffer_size=100*1024, max_request_size=100*1024, blocking=True):
         """Creates a new instance.
 
         @param incoming_socket: The incoming socket.
@@ -418,10 +373,8 @@ class RequestStream(object):
         self.__blocking = blocking
 
         if self.__max_buffer_size < self.__max_request_size:
-            raise Exception(
-                "You cannot have a max buffer size smaller than your max request size (%d > %d)"
-                % (self.__max_buffer_size, self.__max_request_size)
-            )
+            raise Exception('You cannot have a max buffer size smaller than your max request size (%d > %d)' % (
+                            self.__max_buffer_size, self.__max_request_size))
 
         # The number of bytes in _buffer.
         self.__current_buffer_size = 0
@@ -455,23 +408,16 @@ class RequestStream(object):
         try:
             try:
                 # Try to read the request from the already existing buffered input if possible.
-                bytes_available_to_read = (
-                    self.__get_buffer_write_position()
-                    - self.__get_buffer_read_position()
-                )
+                bytes_available_to_read = self.__get_buffer_write_position() - self.__get_buffer_read_position()
                 if bytes_available_to_read > 0:
-                    parsed_request = self.__request_parser(
-                        self.__buffer, bytes_available_to_read
-                    )
+                    parsed_request = self.__request_parser(self.__buffer, bytes_available_to_read)
                     if parsed_request is not None:
                         do_full_compaction = False
                         return parsed_request
                     elif bytes_available_to_read >= self.__max_request_size:
                         # The parser didn't return a request even though the maximum request size has been reached..
                         # This should never happen (if parser is written correctly), so throw an error
-                        raise RequestSizeExceeded(
-                            bytes_available_to_read, bytes_available_to_read
-                        )
+                        raise RequestSizeExceeded(bytes_available_to_read, bytes_available_to_read)
                     elif self.__max_buffer_size == self.__get_buffer_write_position():
                         # If there are pending bytes left in the buffer, then they didn't form a full request.  We
                         # definitely need to read more bytes from the network, so do a full compaction if we have to.
@@ -485,20 +431,13 @@ class RequestStream(object):
                 do_full_compaction = True
 
                 if self.__max_buffer_size - self.__get_buffer_write_position() == 0:
-                    global_log.warning(
-                        "RequestStream: write_position == max_buffer.  No room in recv buffer"
-                    )
+                    global_log.warning( "RequestStream: write_position == max_buffer.  No room in recv buffer" )
 
-                data = self.__socket.recv(
-                    self.__max_buffer_size - self.__get_buffer_write_position()
-                )
+                data = self.__socket.recv(self.__max_buffer_size - self.__get_buffer_write_position())
                 # If we get nothing back, then the connection has been closed.  If it is not closed and there is
                 # no data, then we would get a socket.timeout or socket.error which are handled below.
                 if not data:
-                    global_log.log(
-                        scalyr_logging.DEBUG_LEVEL_1,
-                        "RequestStream.read_request: No data received, flagging end of stream",
-                    )
+                    global_log.log(scalyr_logging.DEBUG_LEVEL_1, "RequestStream.read_request: No data received, flagging end of stream" )
                     self.__at_end = True
                     return None
 
@@ -507,26 +446,20 @@ class RequestStream(object):
                 self.__add_to_buffer(data)
 
                 # Attempt to parse.
-                parsed_request = self.__request_parser(
-                    self.__buffer, bytes_available_to_read
-                )
+                parsed_request = self.__request_parser(self.__buffer, bytes_available_to_read)
 
                 if parsed_request is not None:
                     # The parser should be checking the max request size as well, but we do a quick double
                     # check here as well.
                     if len(parsed_request) > self.__max_request_size:
-                        raise RequestSizeExceeded(
-                            len(parsed_request), self.__max_request_size
-                        )
+                        raise RequestSizeExceeded(len(parsed_request), self.__max_request_size)
                     do_full_compaction = False
                     return parsed_request
 
                 # If we didn't find a complete request but we are at our maximum buffer size, then we are screwed.. we
                 # don't any more room to try to read more bytes to complete that request.. so just call it an error.
                 if bytes_available_to_read == self.__max_buffer_size:
-                    raise RequestSizeExceeded(
-                        self.__max_buffer_size, self.__max_buffer_size
-                    )
+                    raise RequestSizeExceeded(self.__max_buffer_size, self.__max_buffer_size)
 
                 return None
 
@@ -542,10 +475,7 @@ class RequestStream(object):
         finally:
             # We do a full compaction in general if we did not return anything and there is no room
             # left to copy new bytes in.
-            if (
-                do_full_compaction
-                and self.__get_buffer_write_position() == self.__max_buffer_size
-            ):
+            if do_full_compaction and self.__get_buffer_write_position() == self.__max_buffer_size:
                 # Do a compaction if our buffer is at the limit, but we also have bytes at the front of it that have
                 # already been consumed (i.e., are read position is not at the beginning of the buffer.. so we can
                 # reclaiming the bytes before it to make room.)

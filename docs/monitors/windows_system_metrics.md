@@ -11,7 +11,7 @@ This agent monitor plugin records CPU consumption, memory usage, and other metri
 the agent is running.
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file 
 (``C:\Program Files (x86)\Scalyr\config\agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
@@ -83,3 +83,4 @@ The tables below list all metrics recorded by the monitor.  They are broken up i
 |||# ``winsys.disk.usage.total``   ||| ``partition``  ||| The maximum number of bytes that can be used on each disk \
                                                           partition.
 |||# ``winsys.disk.usage.free``    ||| ``partition``  ||| The number of free bytes on each disk partition.
+
