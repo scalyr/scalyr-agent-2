@@ -1732,12 +1732,12 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEquals('scalyr-1', events.events[1].attrs['host'])
 
     def test_unique_id(self):
-        first_thread_id = LogFileProcessor.generate_unique_thread_id()
+        first_thread_id = LogFileProcessor.generate_unique_id()
         self.assertTrue(first_thread_id.startswith('log_'))
         sequence = int(first_thread_id[4:])
         self.assertTrue(sequence > 0)
         self.assertEquals(first_thread_id, 'log_%d' % sequence)
-        self.assertEquals(LogFileProcessor.generate_unique_thread_id(), 'log_%d' % (sequence + 1))
+        self.assertEquals(LogFileProcessor.generate_unique_id(), 'log_%d' % (sequence + 1))
 
     def test_thread_id_fails_to_be_added(self):
         log_processor = self.log_processor
@@ -1933,6 +1933,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             self.__limit = limit
             self.__thread_limit = thread_limit
             self.threads = {}
+            self.logs = {}
             self.__event_sequencer = EventSequencer()
 
         def add_event(self, event, timestamp=None, sequence_id=None, sequence_number=None):
@@ -1954,6 +1955,13 @@ class TestLogFileProcessor(ScalyrTestCase):
             if self.__thread_limit == len(self.threads):
                 return False
             self.threads[thread_id] = thread_name
+            return True
+
+        def add_log_and_thread(self, thread_id, thread_name, log_attr):
+            if self.__thread_limit == len(self.threads):
+                return False
+            self.threads[thread_id] = thread_name
+            self.logs[thread_id] = log_attr
             return True
 
         def get_message(self, index):

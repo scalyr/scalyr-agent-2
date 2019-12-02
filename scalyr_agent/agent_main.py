@@ -969,7 +969,8 @@ class ScalyrAgent(object):
                                    use_requests_lib=use_requests_lib, use_tlslite=use_tlslite, compression_type=self.__config.compression_type,
                                    compression_level=self.__config.compression_level,
                                    proxies=self.__config.network_proxies,
-                                   disable_send_requests=self.__config.disable_send_requests)
+                                   disable_send_requests=self.__config.disable_send_requests,
+                                   disable_logfile_addevents_format=self.__config.disable_logfile_addevents_format)
 
     def __get_file_initial_position(self, path):
         """Returns the file size for the specified file.
