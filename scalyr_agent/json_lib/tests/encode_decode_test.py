@@ -15,7 +15,7 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
-__author__ = 'echee@scalyr.com'
+__author__ = "echee@scalyr.com"
 
 
 import sys
@@ -36,66 +36,76 @@ class EncodeDecodeTest(ScalyrTestCase):
 
     def _setlib(self, library):
         if library == JSON:
-            util._set_json_lib('json')
+            util._set_json_lib("json")
         elif library == UJSON:
-            util._set_json_lib('ujson')
+            util._set_json_lib("ujson")
         else:
-            util._set_json_lib('json_lib')
+            util._set_json_lib("json_lib")
 
     def test_invalid_lib(self):
-        self.assertRaises(ValueError, lambda: util._set_json_lib('BAD JSON LIBRARY NAME'))
+        self.assertRaises(
+            ValueError, lambda: util._set_json_lib("BAD JSON LIBRARY NAME")
+        )
 
     def test_dict(self):
-        self.__test_encode_decode('{"a":1,"b":2}', {u'a': 1, u'b': 2})
+        self.__test_encode_decode('{"a":1,"b":2}', {u"a": 1, u"b": 2})
 
     def test_dict2(self):
-        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {u'a': 1, u'b': {u'c': 2}})
+        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {u"a": 1, u"b": {u"c": 2}})
 
     def test_str(self):
-        self.__test_encode_decode(r'"a"', u'a')
+        self.__test_encode_decode(r'"a"', u"a")
 
     def test_int(self):
-        self.__test_encode_decode(r'1', 1)
+        self.__test_encode_decode(r"1", 1)
 
     def test_negative_int(self):
-        self.__test_encode_decode(r'-1', -1)
+        self.__test_encode_decode(r"-1", -1)
 
-    def test_long( self ):
-        self.__test_encode_decode( r'1234567890123456789', 1234567890123456789 )
+    def test_long(self):
+        self.__test_encode_decode(r"1234567890123456789", 1234567890123456789)
 
-    def test_negative_long( self ):
-        self.__test_encode_decode( r'-1234567890123456789', -1234567890123456789 )
+    def test_negative_long(self):
+        self.__test_encode_decode(r"-1234567890123456789", -1234567890123456789)
 
     def test_bool(self):
-        self.__test_encode_decode(r'false', False)
-        self.__test_encode_decode(r'true', True)
+        self.__test_encode_decode(r"false", False)
+        self.__test_encode_decode(r"true", True)
 
     def test_float(self):
-        self.__test_encode_decode(r'1.0003', 1.0003)
+        self.__test_encode_decode(r"1.0003", 1.0003)
 
-    def test_negative_float( self ):
-        self.__test_encode_decode(r'-1.0003', -1.0003)
+    def test_negative_float(self):
+        self.__test_encode_decode(r"-1.0003", -1.0003)
 
     def test_list(self):
-        self.__test_encode_decode(r'[1,2,3]', [1, 2, 3])
+        self.__test_encode_decode(r"[1,2,3]", [1, 2, 3])
 
     def test_list2(self):
-        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u'a'])
+        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u"a"])
 
     def test_jsonarray(self):
-        self.__test_encode_decode(r'[1,2,3]', JsonArray(1, 2, 3))
+        self.__test_encode_decode(r"[1,2,3]", JsonArray(1, 2, 3))
 
     def test_jsonobject(self):
-        self.__test_encode_decode(r'{"a":1,"b":2}', JsonObject({u'a': 1, u'b': 2}))
+        self.__test_encode_decode(r'{"a":1,"b":2}', JsonObject({u"a": 1, u"b": 2}))
 
     def test_jsonobject_nested_dict(self):
-        self.__test_encode_decode(r'{"a":{"b":{"c":3}}}', JsonObject({u'a': JsonObject({u'b': JsonObject({u'c': 3})})}))
+        self.__test_encode_decode(
+            r'{"a":{"b":{"c":3}}}',
+            JsonObject({u"a": JsonObject({u"b": JsonObject({u"c": 3})})}),
+        )
 
     def test_jsonobject_nested_jsonarray(self):
-        self.__test_encode_decode(r'{"a":[1,2,3]}', JsonObject({u'a': JsonArray(1, 2, 3)}))
+        self.__test_encode_decode(
+            r'{"a":[1,2,3]}', JsonObject({u"a": JsonArray(1, 2, 3)})
+        )
 
     def test_jsonobject_nested_jsonarray2(self):
-        self.__test_encode_decode(r'{"a":[1,2,3,[1,2,3]]}', JsonObject({u'a': JsonArray(1, 2, 3, JsonArray(1, 2, 3))}))
+        self.__test_encode_decode(
+            r'{"a":[1,2,3,[1,2,3]]}',
+            JsonObject({u"a": JsonArray(1, 2, 3, JsonArray(1, 2, 3))}),
+        )
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):
@@ -121,5 +131,5 @@ def main():
     unittest.main()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

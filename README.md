@@ -69,17 +69,13 @@ packaging systems.
 To build the RPM package, execute the following command in the root directory of this repository
 
     python build_package.py rpm
-    
+
 To build the Debian package, execute the following command in the root directory of this repository
 
     python build_package.py deb
-  
+
 Contributing
 ============
 
 In the future, we will be pushing guidelines on how to contribute to this repository.  For now, please just
 feel free to submit pull requests to the `master` branch and we will work with you.
-
-
-
-

@@ -23,8 +23,8 @@ On versions of Windows from Vista onwards, the newer Evt API is used which can b
 
 ### Windows Vista and later
 
-On Windows Vista and later, the Scalyr agent uses the EvtLog API, and you can configure it to query events on any 
-channel, using the standard XPath query mechanism.  See the 
+On Windows Vista and later, the Scalyr agent uses the EvtLog API, and you can configure it to query events on any
+channel, using the standard XPath query mechanism.  See the
 [Event log](https://msdn.microsoft.com/en-us/library/windows/desktop/dd996910.aspx) documentation for more
 details.
 
@@ -64,7 +64,7 @@ and warning messages for System and Security channels.
 
 For Windows versions earlier than Vista, the Scalyr agent will use the older Event Log API.
 
-This sample will configure the agent running on Windows Server 2003 to listen to Error and Warning level events from 
+This sample will configure the agent running on Windows Server 2003 to listen to Error and Warning level events from
 the Application, Security and System sources:
 
     monitors: [
@@ -115,5 +115,3 @@ Each event recorded by this plugin will have the following fields:
 |||#``EventId``        ||| The event id, taken from the Windows field ``event.EventID``.
 |||#``Category``       ||| The event category, taken from the Windows field ``event.EventCategory``.
 |||#``EventMsg``       ||| The contents of the event message from the Windows Event Log.
-
-

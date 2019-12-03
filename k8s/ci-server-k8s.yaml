@@ -34,7 +34,7 @@ spec:
         ports:
         - containerPort: 8080
           protocol: TCP
-        resources: 
+        resources:
           requests:
             memory: "1.5G"
         terminationMessagePath: /dev/termination-log

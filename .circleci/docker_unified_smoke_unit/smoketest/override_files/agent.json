@@ -4,7 +4,7 @@
   server_attributes: {
      // Fill in this field if you'd like to override the server's hostname.
      serverHost: "ci-agent-standalone-CIRCLE_BUILD_NUM",
-     
+
      // You can add whatever additional fields you'd like.
      // tier: "production"
   }
