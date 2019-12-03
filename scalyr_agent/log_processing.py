@@ -2741,7 +2741,8 @@ class LogMatcher(object):
 
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
-            for matched_file in glob.glob(self.__log_entry_config["path"]):
+            # glob.glob is sorted here because otherwise it returns non-deterministic results
+            for matched_file in sorted(glob.glob(self.__log_entry_config["path"])):
                 skip = False
                 # check to see if this file matches any of the exclude globs
                 for exclude_glob in self.__log_entry_config["exclude"]:
@@ -2828,7 +2829,6 @@ class LogMatcher(object):
                     new_processor.close_at_eof()
             self.__lock.release()
 
-            result.sort() # Sort the result so it is deterministic
             reached_return = True
             return result
 
