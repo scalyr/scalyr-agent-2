@@ -2156,9 +2156,10 @@ class TestLogMatcher(ScalyrTestCase):
                 self.__config, self._create_log_config(self.__glob_recursive)
             )
             processors = matcher.find_matches(dict(), dict())
+            processors.sort() # required to make this test deterministic.
             self.assertEquals(len(processors), 2)
-            self.assertEquals(processors[0].log_path, self.__path_three)
-            self.assertEquals(processors[1].log_path, self.__path_four)
+            self.assertEquals(processors[1].log_path, self.__path_three)
+            self.assertEquals(processors[0].log_path, self.__path_four)
 
             self._close_processors(processors)
 
