@@ -2828,6 +2828,7 @@ class LogMatcher(object):
                     new_processor.close_at_eof()
             self.__lock.release()
 
+            result.sort() # Sort the result so it is deterministic
             reached_return = True
             return result
 
