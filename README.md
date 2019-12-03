@@ -74,6 +74,25 @@ To build the Debian package, execute the following command in the root directory
 
     python build_package.py deb
 
+## Code Formatting
+This project uses the [Black](http://black.readthedocs.io) code autoformatting tool with default settings.
+
+[Pre-commit](https://pre-commit.com) is used to automatically run checks including Black formatting
+prior to a git commit.
+
+To use pre-commit:
+- Use one of the [Installation Methods](https://pre-commit.com/#install) from the documentation
+- Install the hooks with `pre-commit install`
+- To manually execute the pre-commit hooks (including black), run `pre-commit run --all-files`
+
+#### Pre-commit and Black Configuration
+- `.pre-commit-config.yaml` configures the scripts run by pre-commit
+- `pyproject.toml` configures the Black settings including folder exclusions for `third_party`
+
+To update the Pre-commit hooks including black, run `pre-commit autoupdate`.
+This will update `.pre-commit-config.yaml` and will need to be committed to the repository.
+
+
 Contributing
 ============
 
