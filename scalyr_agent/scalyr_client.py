@@ -1048,7 +1048,7 @@ class PostFixBuffer(object):
 
     Additionally, the buffer can be reset to a previous position.
     """
-    def __init__(self, format_string, disable_logfile_addevents_format):
+    def __init__(self, format_string, disable_logfile_addevents_format=False):
         """Initializes the buffer.
 
         @param format_string: The format for the buffer.  The output of this buffer will be this format string
