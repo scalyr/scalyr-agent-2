@@ -43,6 +43,9 @@ define_config_option(__monitor__, 'max_characters',
                      'Optional (defaults to 200). At most this many characters of output are recorded. You may specify '
                      'a value up to 10000, but the Scalyr server currently truncates all fields to 3500 characters.',
                      default=200, convert_to=int, min_value=0, max_value=10000)
+define_config_option(__monitor__, 'interval_secs',
+                     'Optional (defaults to 30). The sample interval in seconds.  Min 1, Max 86400 (one day)',
+                     default=30, convert_to=int, min_value=1, max_value=86400)
 
 define_log_field(__monitor__, 'monitor', 'Always ``shell_monitor``.')
 define_log_field(__monitor__, 'instance', 'The ``id`` value from the monitor configuration, e.g. ``kernel-version``.')
@@ -65,6 +68,7 @@ class ShellMonitor(ScalyrMonitor):
         self.command = self._config.get("command")
         self.max_characters = self._config.get("max_characters")
         self.log_all_lines = self._config.get("log_all_lines")
+        self._sample_interval_secs = self._config.get("interval_secs")
 
         extract_expression = self._config.get("extract")
         if extract_expression:
