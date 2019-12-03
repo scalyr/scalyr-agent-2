@@ -20,7 +20,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import cStringIO
 import glob
@@ -37,15 +37,23 @@ from distutils import spawn
 from optparse import OptionParser
 
 # TODO: The following two imports have been modified to facilitate Windows platforms
-if 'win32' != sys.platform:
+if "win32" != sys.platform:
     from pwd import getpwnam
 
 import urllib
 
-from __scalyr__ import scalyr_init, get_install_root, TARBALL_INSTALL, MSI_INSTALL, SCALYR_VERSION
+from __scalyr__ import (
+    scalyr_init,
+    get_install_root,
+    TARBALL_INSTALL,
+    MSI_INSTALL,
+    SCALYR_VERSION,
+)
+
 scalyr_init()
 
 from scalyr_agent.scalyr_logging import set_log_destination
+
 set_log_destination(use_stdout=True)
 
 from scalyr_agent.scalyr_client import ScalyrClientSession
@@ -73,8 +81,8 @@ def set_api_key(config, config_file_path, new_api_key):
         try:
             # Create a temporary file that we will write the new file into.  We will just rename it when we are done
             # to the original file name.
-            tmp_file_path = '%s.tmp' % config_file_path
-            tmp_file = open(tmp_file_path, 'w')
+            tmp_file_path = "%s.tmp" % config_file_path
+            tmp_file = open(tmp_file_path, "w")
 
             # Open up the current file for reading.
             original_file = open(config_file_path)
@@ -85,14 +93,14 @@ def set_api_key(config, config_file_path, new_api_key):
                 # we are replacing the correct thing.
                 found += s.count(current_key)
                 if found > 1:
-                    print >>sys.stderr, 'The existing API key was found in more than one place.  Config file has been'
-                    print >>sys.stderr, 'modified already.  Cannot safely update modified config file so failing.'
+                    print >> sys.stderr, "The existing API key was found in more than one place.  Config file has been"
+                    print >> sys.stderr, "modified already.  Cannot safely update modified config file so failing."
                     sys.exit(1)
                 s = s.replace(current_key, new_api_key)
-                print >>tmp_file, s,
+                print >> tmp_file, s,
 
             if found != 1:
-                print >>sys.stderr, 'The existing API key could not be found in file, failing'
+                print >> sys.stderr, "The existing API key could not be found in file, failing"
                 sys.exit(1)
 
             # For Win32, we must make sure the files are closed before rename.
@@ -101,7 +109,7 @@ def set_api_key(config, config_file_path, new_api_key):
             original_file.close()
             original_file = None
 
-            if 'win32' == sys.platform:
+            if "win32" == sys.platform:
                 os.unlink(config_file_path)
 
             # Determine how to make the file have the same permissions as the original config file.  For now, it
@@ -109,16 +117,18 @@ def set_api_key(config, config_file_path, new_api_key):
             # be owned by root already.
             os.rename(tmp_file_path, config_file_path)
         except IOError, error:
-                if error.errno == 13:
-                    print >>sys.stderr, 'You do not have permission to write to the file and directory required '
-                    print >>sys.stderr, 'to update the API key.  Ensure you can write to the file at path'
-                    print >>sys.stderr, '\'%s\' and create files in its parent directory.' % config_file_path
-                else:
-                    print >>sys.stderr, 'Error attempting to update the key: %s' % str(error)
-                    print >>sys.stderr, traceback.format_exc()
-                sys.exit(1)
+            if error.errno == 13:
+                print >> sys.stderr, "You do not have permission to write to the file and directory required "
+                print >> sys.stderr, "to update the API key.  Ensure you can write to the file at path"
+                print >> sys.stderr, "'%s' and create files in its parent directory." % config_file_path
+            else:
+                print >> sys.stderr, "Error attempting to update the key: %s" % str(
+                    error
+                )
+                print >> sys.stderr, traceback.format_exc()
+            sys.exit(1)
         except Exception, err:
-            print >>sys.stderr, 'Error attempting to update the key: %s' % str(err)
+            print >> sys.stderr, "Error attempting to update the key: %s" % str(err)
             print >> sys.stderr, traceback.format_exc()
             sys.exit(1)
     finally:
@@ -137,8 +147,12 @@ def set_scalyr_server(config, new_scalyr_server):
     @param new_scalyr_server: The new value
     @type new_scalyr_server: str
     """
-    write_config_fragment(config, 'scalyr_server.json', 'scalyr_server field',
-                          {"scalyr_server": new_scalyr_server})
+    write_config_fragment(
+        config,
+        "scalyr_server.json",
+        "scalyr_server field",
+        {"scalyr_server": new_scalyr_server},
+    )
 
 
 def set_server_host(config, new_server_host):
@@ -148,8 +162,12 @@ def set_server_host(config, new_server_host):
     @param config: The Configuration object.
     @param new_server_host: The value for the ``serverHost`` server attribute.
     """
-    write_config_fragment(config, 'server_host.json', 'server host attribute',
-                          {'server_attributes': {'serverHost': new_server_host}})
+    write_config_fragment(
+        config,
+        "server_host.json",
+        "server host attribute",
+        {"server_attributes": {"serverHost": new_server_host}},
+    )
 
 
 def write_config_fragment(config, file_name, field_description, config_json):
@@ -165,7 +183,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
     @type config_json: dict
     """
     host_path = os.path.join(config.config_directory, file_name)
-    tmp_host_path = '%s.tmp' % host_path
+    tmp_host_path = "%s.tmp" % host_path
 
     try:
         try:
@@ -174,26 +192,32 @@ def write_config_fragment(config, file_name, field_description, config_json):
 
             config_content = json_lib.serialize(config_json)
 
-            tmp_file = open(tmp_host_path, 'w')
-            print >>tmp_file, '// Sets the %s.' % field_description
-            print >>tmp_file, config_content
+            tmp_file = open(tmp_host_path, "w")
+            print >> tmp_file, "// Sets the %s." % field_description
+            print >> tmp_file, config_content
             tmp_file.close()
 
-            if 'win32' == sys.platform and os.path.isfile(host_path):
+            if "win32" == sys.platform and os.path.isfile(host_path):
                 os.unlink(host_path)
 
             os.rename(tmp_host_path, host_path)
         except IOError, error:
-                if error.errno == 13:
-                    print >>sys.stderr, 'You do not have permission to write to the file and directory required '
-                    print >>sys.stderr, 'to set the %s.  Ensure you can write to the file at path' % field_description
-                    print >>sys.stderr, '\'%s\' and create files in its parent directory.' % host_path
-                else:
-                    print >>sys.stderr, 'Error attempting to update the %s: %s' % (field_description, str(error))
-                    print >>sys.stderr, traceback.format_exc()
-                sys.exit(1)
+            if error.errno == 13:
+                print >> sys.stderr, "You do not have permission to write to the file and directory required "
+                print >> sys.stderr, "to set the %s.  Ensure you can write to the file at path" % field_description
+                print >> sys.stderr, "'%s' and create files in its parent directory." % host_path
+            else:
+                print >> sys.stderr, "Error attempting to update the %s: %s" % (
+                    field_description,
+                    str(error),
+                )
+                print >> sys.stderr, traceback.format_exc()
+            sys.exit(1)
         except Exception, err:
-            print >>sys.stderr, 'Error attempting to update the %s: %s' % (field_description, str(err))
+            print >> sys.stderr, "Error attempting to update the %s: %s" % (
+                field_description,
+                str(err),
+            )
             print >> sys.stderr, traceback.format_exc()
             sys.exit(1)
     finally:
@@ -211,7 +235,10 @@ def update_user_id(file_path, new_uid):
         group_id = os.stat(file_path).st_gid
         os.chown(file_path, new_uid, group_id)
     except Exception, err:
-        print >>sys.stderr, 'Error attempting to update permission on file "%s": %s' % (file_path, str(err))
+        print >> sys.stderr, 'Error attempting to update permission on file "%s": %s' % (
+            file_path,
+            str(err),
+        )
         print >> sys.stderr, traceback.format_exc()
         sys.exit(1)
 
@@ -231,7 +258,10 @@ def update_user_id_recursively(path, new_uid):
             elif os.path.isdir(full_path):
                 update_user_id_recursively(full_path, new_uid)
     except Exception, err:
-        print >>sys.stderr, 'Error attempting to update permissions on files in dir "%s": %s' % (path, str(err))
+        print >> sys.stderr, 'Error attempting to update permissions on files in dir "%s": %s' % (
+            path,
+            str(err),
+        )
         print >> sys.stderr, traceback.format_exc()
         sys.exit(1)
 
@@ -246,7 +276,7 @@ def set_executing_user(config, config_file_path, new_executing_user):
     try:
         uid = getpwnam(new_executing_user).pw_uid
     except KeyError:
-        print >>sys.stderr, 'User "%s" does not exist.  Failing.' % new_executing_user
+        print >> sys.stderr, 'User "%s" does not exist.  Failing.' % new_executing_user
         sys.exit(1)
 
     # The agent looks to the owner of the configuration file to determine what user to run as.  So, change that
@@ -290,65 +320,98 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
 
             # Ensure that this is a tarball install
             if platform_controller.install_type != TARBALL_INSTALL:
-                raise UpgradeFailure('The current agent was not installed using a tarball, so you may not use the '
-                                     'upgrade tarball command.')
+                raise UpgradeFailure(
+                    "The current agent was not installed using a tarball, so you may not use the "
+                    "upgrade tarball command."
+                )
 
             # Ensure that the user has not changed the defaults for the config, data, and log directory.
             if my_default_paths.config_file_path != config.file_path:
-                raise UpgradeFailure('The agent is not using the default configuration file so you may not use the '
-                                     'upgrade tarball command.')
+                raise UpgradeFailure(
+                    "The agent is not using the default configuration file so you may not use the "
+                    "upgrade tarball command."
+                )
             if my_default_paths.agent_data_path != config.agent_data_path:
-                raise UpgradeFailure('The agent is not using the default data directory so you may not use the upgrade '
-                                     'tarball command.')
+                raise UpgradeFailure(
+                    "The agent is not using the default data directory so you may not use the upgrade "
+                    "tarball command."
+                )
             if my_default_paths.agent_log_path != config.agent_log_path:
-                raise UpgradeFailure('The agent is not using the default log directory so you may not use the upgrade '
-                                     'tarball command.')
+                raise UpgradeFailure(
+                    "The agent is not using the default log directory so you may not use the upgrade "
+                    "tarball command."
+                )
 
             # We rely on the current installation being included in the PATH variable.
-            if spawn.find_executable('scalyr-agent-2-config') is None:
-                raise UpgradeFailure('Could not locate the scalyr-agent-2-config command from the current '
-                                     'installation. Please ensure that the agent\'s bin directory is in the system\'s '
-                                     'PATH variable.')
+            if spawn.find_executable("scalyr-agent-2-config") is None:
+                raise UpgradeFailure(
+                    "Could not locate the scalyr-agent-2-config command from the current "
+                    "installation. Please ensure that the agent's bin directory is in the system's "
+                    "PATH variable."
+                )
 
             if not os.path.isfile(new_tarball):
-                raise UpgradeFailure('The tarball file %s does not exist.' % new_tarball)
+                raise UpgradeFailure(
+                    "The tarball file %s does not exist." % new_tarball
+                )
 
             file_name = os.path.basename(new_tarball)
-            if re.match('^scalyr-agent-2\..*\.tar\.gz$', file_name) is None:
-                raise UpgradeFailure('The supplied tarball file name does not match the expected format.')
+            if re.match("^scalyr-agent-2\..*\.tar\.gz$", file_name) is None:
+                raise UpgradeFailure(
+                    "The supplied tarball file name does not match the expected format."
+                )
             tarball_directory = file_name[0:-7]
 
             # We will be installing in the same directory where scalyr-agent-2 is currently installed.
             install_directory = os.path.dirname(get_install_root())
 
-            if not os.path.isdir(os.path.join(install_directory, 'scalyr-agent-2')):
-                raise UpgradeFailure('Could not determine the install directory.  Either the main directory is no '
-                                     'longer called scalyr-agent-2, or the directory structure has changed.')
+            if not os.path.isdir(os.path.join(install_directory, "scalyr-agent-2")):
+                raise UpgradeFailure(
+                    "Could not determine the install directory.  Either the main directory is no "
+                    "longer called scalyr-agent-2, or the directory structure has changed."
+                )
 
             # Compute the full paths to the scalyr-agent-2 directories for both the new install and old install.
             tmp_new_install_location = os.path.join(tmp_install_dir, tarball_directory)
-            old_install_location = os.path.join(install_directory, 'scalyr-agent-2')
+            old_install_location = os.path.join(install_directory, "scalyr-agent-2")
 
             # Untar the new package into the temp location.
-            tar = tarfile.open(new_tarball, 'r:gz')
+            tar = tarfile.open(new_tarball, "r:gz")
             for member in tar.getmembers():
                 tar.extract(member, path=tmp_install_dir)
 
             # Check to see if the agent is running.  If so, stop it.
-            was_running = run_command('scalyr-agent-2 stop', grep_for='Agent has stopped',
-                                      command_name='scalyr-agent-2 stop')[0] == 0
+            was_running = (
+                run_command(
+                    "scalyr-agent-2 stop",
+                    grep_for="Agent has stopped",
+                    command_name="scalyr-agent-2 stop",
+                )[0]
+                == 0
+            )
 
             # Copy the config, data, and log directories.
-            for dir_name in ['config', 'log', 'data']:
-                copy_dir_to_new_agent(old_install_location, tmp_new_install_location, dir_name)
+            for dir_name in ["config", "log", "data"]:
+                copy_dir_to_new_agent(
+                    old_install_location, tmp_new_install_location, dir_name
+                )
 
             # Allow the new agent code to perform any actions it deems necessary.  We do the special commandline
             # here where to pass in both directories to the --upgrade-tarball-command
-            result = subprocess.call([os.path.join(tmp_new_install_location, 'bin', 'scalyr-agent-2-config'),
-                                      '--upgrade-tarball', '%s%s%s' % (old_install_location, os.pathsep,
-                                                                       tmp_new_install_location)])
+            result = subprocess.call(
+                [
+                    os.path.join(
+                        tmp_new_install_location, "bin", "scalyr-agent-2-config"
+                    ),
+                    "--upgrade-tarball",
+                    "%s%s%s"
+                    % (old_install_location, os.pathsep, tmp_new_install_location),
+                ]
+            )
             if result != 0:
-                raise UpgradeFailure('New package failed to finish the upgrade process.')
+                raise UpgradeFailure(
+                    "New package failed to finish the upgrade process."
+                )
 
             # Move the old install directory to a temporary location, so we can undo the next move if we need to.
             preserve_dir = tempfile.mkdtemp()
@@ -362,30 +425,42 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             finally:
                 if not success:
                     # Move the old install back in place just to be safe.
-                    shutil.move(os.path.join(preserve_dir, 'scalyr-agent-2'), old_install_location)
+                    shutil.move(
+                        os.path.join(preserve_dir, "scalyr-agent-2"),
+                        old_install_location,
+                    )
                 if success and not preserve_old_install:
                     shutil.rmtree(preserve_dir)
                     preserve_dir = None
 
-            print 'New agent installed.'
+            print "New agent installed."
 
             # Start the agent if it was previously running.
             if was_running:
-                if run_command('scalyr-agent-2 start', exit_on_fail=False, command_name='scalyr-agent-2 start')[0] == 0:
-                    print 'Agent has successfully restarted.'
-                    print '  You may execute the following command for status details:  scalyr-agent-2 status -v'
+                if (
+                    run_command(
+                        "scalyr-agent-2 start",
+                        exit_on_fail=False,
+                        command_name="scalyr-agent-2 start",
+                    )[0]
+                    == 0
+                ):
+                    print "Agent has successfully restarted."
+                    print "  You may execute the following command for status details:  scalyr-agent-2 status -v"
                     was_restarted = True
                 else:
-                    raise UpgradeFailure('Could not start the agent.  Execute the following command for more details: '
-                                         'scalyr-agent-2 start')
+                    raise UpgradeFailure(
+                        "Could not start the agent.  Execute the following command for more details: "
+                        "scalyr-agent-2 start"
+                    )
             else:
-                print 'Execute the following command to start the agent:  scalyr-agent-2 start'
+                print "Execute the following command to start the agent:  scalyr-agent-2 start"
 
             return 0
 
         except UpgradeFailure, error:
-            print >>sys.stderr
-            print >>sys.stderr, 'The upgrade failed due to the following reason: %s' % error.message
+            print >> sys.stderr
+            print >> sys.stderr, "The upgrade failed due to the following reason: %s" % error.message
             return 1
 
     finally:
@@ -394,15 +469,17 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
 
         # Warn if we should have restarted the agent but did not.
         if was_running and not was_restarted:
-            print ''
-            print ('WARNING, due to failure, the agent may no longer be running.  Restart it with: scalyr-agent-2 '
-                   'start')
+            print ""
+            print (
+                "WARNING, due to failure, the agent may no longer be running.  Restart it with: scalyr-agent-2 "
+                "start"
+            )
 
         # If there is still a preserve_directory, there must be a reason for it, so tell the user where it is.
         if preserve_dir is not None:
-            print ''
-            print 'The previous agent installation was left in \'%s\'' % preserve_dir
-            print 'You should be sure to delete this directory once you no longer need it.'
+            print ""
+            print "The previous agent installation was left in '%s'" % preserve_dir
+            print "You should be sure to delete this directory once you no longer need it."
 
 
 # noinspection PyUnusedLocal
@@ -437,7 +514,9 @@ def finish_upgrade_tarball_install(old_install_dir_path, new_install_dir_path):
     return 0
 
 
-def upgrade_windows_install(config, release_track="stable", preserve_msi=False, use_ui=True):
+def upgrade_windows_install(
+    config, release_track="stable", preserve_msi=False, use_ui=True
+):
     """Performs an upgrade for an existing Scalyr Agent 2 that was previously installed using a Windows MSI install
     file.
 
@@ -467,60 +546,79 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False, 
 
         # Ensure agent was installed via MSI
         if MSI_INSTALL != platform_controller.install_type:
-            raise UpgradeFailure('The current agent was not installed via MSI, so you may not use the upgrade windows '
-                                 'command.')
+            raise UpgradeFailure(
+                "The current agent was not installed via MSI, so you may not use the upgrade windows "
+                "command."
+            )
 
         # Ensure that the user has not changed the defaults for the config, data, and log directory.
         if my_default_paths.config_file_path != config.file_path:
-            raise UpgradeFailure('The agent is not using the default configuration file so you may not use the '
-                                 'upgrade windows command.')
+            raise UpgradeFailure(
+                "The agent is not using the default configuration file so you may not use the "
+                "upgrade windows command."
+            )
         if my_default_paths.agent_data_path != config.agent_data_path:
-            raise UpgradeFailure('The agent is not using the default data directory so you may not use the upgrade '
-                                 'windows command.')
+            raise UpgradeFailure(
+                "The agent is not using the default data directory so you may not use the upgrade "
+                "windows command."
+            )
         if my_default_paths.agent_log_path != config.agent_log_path:
-            raise UpgradeFailure('The agent is not using the default log directory so you may not use the upgrade '
-                                 'windows command.')
+            raise UpgradeFailure(
+                "The agent is not using the default log directory so you may not use the upgrade "
+                "windows command."
+            )
 
         # Determine if a newer version is available
-        client = ScalyrClientSession(config.scalyr_server, config.api_key, SCALYR_VERSION, quiet=True,
-                                     ca_file=config.ca_cert_path,
-                                     intermediate_certs_file=config.intermediate_certs_path,
-                                     proxies=config.network_proxies)
+        client = ScalyrClientSession(
+            config.scalyr_server,
+            config.api_key,
+            SCALYR_VERSION,
+            quiet=True,
+            ca_file=config.ca_cert_path,
+            intermediate_certs_file=config.intermediate_certs_path,
+            proxies=config.network_proxies,
+        )
 
         status, size, response = client.perform_agent_version_check(release_track)
 
-        if status.lower() != 'success':
-            raise UpgradeFailure('Failed to contact the Scalyr servers to check for latest update.  Error code '
-                                 'was "%s"' % status)
+        if status.lower() != "success":
+            raise UpgradeFailure(
+                "Failed to contact the Scalyr servers to check for latest update.  Error code "
+                'was "%s"' % status
+            )
 
         # TODO:  We shouldn't have to reparse response on JSON, but for now that, that's what the client library
         # does.
-        data_payload = json_lib.parse(response)['data']
+        data_payload = json_lib.parse(response)["data"]
 
-        if not data_payload['update_required']:
-            print 'The latest version is already installed.'
+        if not data_payload["update_required"]:
+            print "The latest version is already installed."
             return 0
 
-        print 'Attempting to upgrade agent from version %s to version %s.' % (SCALYR_VERSION,
-                                                                              data_payload['current_version'])
-        url_path = data_payload['urls']['win32']
+        print "Attempting to upgrade agent from version %s to version %s." % (
+            SCALYR_VERSION,
+            data_payload["current_version"],
+        )
+        url_path = data_payload["urls"]["win32"]
 
-        file_portion = url_path[url_path.rfind('/')+1:]
+        file_portion = url_path[url_path.rfind("/") + 1 :]
         download_location = os.path.join(tempfile.gettempdir(), file_portion)
 
         try:
             try:
-                print 'Downloading agent from %s.' % url_path
+                print "Downloading agent from %s." % url_path
                 urllib.urlretrieve(url_path, download_location)
 
                 if not os.path.isfile(download_location):
-                    raise UpgradeFailure('Failed to download installation package')
+                    raise UpgradeFailure("Failed to download installation package")
 
                 if use_ui:
-                    print ('Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to '
-                           'complete the upgrade process.')
+                    print (
+                        "Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to "
+                        "complete the upgrade process."
+                    )
                 else:
-                    print ('Executing upgrade.  It will finish in the background.')
+                    print ("Executing upgrade.  It will finish in the background.")
 
                 # Because this file, config_main.py, is part of the currently installed Scalyr Agent package, we have
                 # to finish our use of it before the upgrade can proceed.  So, we just fork off the msiexec process
@@ -528,31 +626,40 @@ def upgrade_windows_install(config, release_track="stable", preserve_msi=False, 
                 # here, but I don't see a way around this for now.
                 # noinspection PyUnresolvedReferences
                 from win32process import DETACHED_PROCESS
-                upgrade_command = ['msiexec.exe', '/i', "{}".format(download_location)]
+
+                upgrade_command = ["msiexec.exe", "/i", "{}".format(download_location)]
                 if not use_ui:
-                    upgrade_command.append('/qn')
-                subprocess.Popen(upgrade_command,
-                                 shell=False, stdin=None, stdout=None, stderr=None, close_fds=True,
-                                 creationflags=DETACHED_PROCESS)
+                    upgrade_command.append("/qn")
+                subprocess.Popen(
+                    upgrade_command,
+                    shell=False,
+                    stdin=None,
+                    stdout=None,
+                    stderr=None,
+                    close_fds=True,
+                    creationflags=DETACHED_PROCESS,
+                )
 
                 return 0
             except IOError, error:
-                raise UpgradeFailure('Could not download the installer, returned error %s' % str(error))
+                raise UpgradeFailure(
+                    "Could not download the installer, returned error %s" % str(error)
+                )
 
         finally:
             # TODO:  Actually delete the temporary file.  We cannot right now since our execution finishes
             # before the msiexec process runs, but maybe we can do something like have a small shell script
             # that runs the upgrader and then deletes the file.  Something to consider post-alpha release.
             if preserve_msi:
-                print 'Downloaded installer file has been left at %s' % download_location
+                print "Downloaded installer file has been left at %s" % download_location
 
     except UpgradeFailure, error:
-        print >>sys.stderr
-        print >>sys.stderr, 'The upgrade failed due to the following reason: %s' % error.message
+        print >> sys.stderr
+        print >> sys.stderr, "The upgrade failed due to the following reason: %s" % error.message
         if url_path is not None:
-            print >>sys.stderr, 'You may try downloading and running the installer file yourself.'
-            print >>sys.stderr, 'The installer can be downloaded from %s' % url_path
-        print >>sys.stderr, 'Please e-mail contact@scalyr.com for help resolving this issue.'
+            print >> sys.stderr, "You may try downloading and running the installer file yourself."
+            print >> sys.stderr, "The installer can be downloaded from %s" % url_path
+        print >> sys.stderr, "Please e-mail contact@scalyr.com for help resolving this issue."
         return 1
 
 
@@ -571,16 +678,18 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
     """
     # We have to use a temporary file to hold the output to stdout and stderr.
     output_file = tempfile.mktemp()
-    output_fp = open(output_file, 'w')
+    output_fp = open(output_file, "w")
 
     try:
-        return_code = subprocess.call(command_str, stdin=None, stderr=output_fp, stdout=output_fp, shell=True)
+        return_code = subprocess.call(
+            command_str, stdin=None, stderr=output_fp, stdout=output_fp, shell=True
+        )
         output_fp.flush()
 
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
         output_buffer = cStringIO.StringIO()
-        input_fp = open(output_file, 'r')
+        input_fp = open(output_file, "r")
         for line in input_fp:
             output_buffer.write(line)
         input_fp.close()
@@ -590,18 +699,22 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
 
         if return_code != 0:
             if command_name is not None:
-                print >>sys.stderr, 'Executing %s failed and returned a non-zero result of %d' % (command_name,
-                                                                                                  return_code)
+                print >> sys.stderr, "Executing %s failed and returned a non-zero result of %d" % (
+                    command_name,
+                    return_code,
+                )
             else:
-                print >>sys.stderr, ('Executing the following command failed and returned a non-zero result of %d' %
-                                     return_code)
-                print >>sys.stderr, '  Command: "%s"' % command_str
+                print >> sys.stderr, (
+                    "Executing the following command failed and returned a non-zero result of %d"
+                    % return_code
+                )
+                print >> sys.stderr, '  Command: "%s"' % command_str
 
-            print >>sys.stderr, 'The output was:'
-            print >>sys.stderr, output_str
+            print >> sys.stderr, "The output was:"
+            print >> sys.stderr, output_str
 
             if exit_on_fail:
-                print >>sys.stderr, 'Exiting due to failure.'
+                print >> sys.stderr, "Exiting due to failure."
                 sys.exit(1)
         elif grep_for is not None:
             if output_str.find(grep_for) < 0:
@@ -640,6 +753,7 @@ def copy_dir_to_new_agent(old_install_dir, new_install_dir, directory):
 class UpgradeFailure(Exception):
     """Raised when a failure occurs in the tarball upgrade process.
     """
+
     pass
 
 
@@ -652,7 +766,7 @@ def conditional_marker_path(config):
     @return: The pat to the conditional restart marker file.
     @rtype: str
     """
-    return os.path.join(config.agent_data_path, 'cond_restart')
+    return os.path.join(config.agent_data_path, "cond_restart")
 
 
 def mark_conditional_restart(platform_controller, config):
@@ -675,9 +789,9 @@ def mark_conditional_restart(platform_controller, config):
         os.unlink(path)
 
     if platform_controller.is_agent_running():
-        fp = open(path, 'w')
+        fp = open(path, "w")
         try:
-            fp.write('yes')
+            fp.write("yes")
             return True
         finally:
             fp.close()
@@ -734,7 +848,7 @@ def relative_path(base_directory, path):
     # Work out how much of the filepath is shared by start and path.
     i = len(os.path.commonprefix([start_list, path_list]))
 
-    rel_list = [os.path.pardir] * (len(start_list)-i) + path_list[i:]
+    rel_list = [os.path.pardir] * (len(start_list) - i) + path_list[i:]
     if not rel_list:
         return os.curdir
     return os.path.join(*rel_list)
@@ -780,12 +894,14 @@ def export_config(config_dest, config_file_path, configuration):
 
         # If it was absolute, try to make it relative.
         if os.path.isabs(fragment_dir):
-            fragment_dir = relative_path(real_absolute_path(config_dir), real_absolute_path(fragment_dir))
+            fragment_dir = relative_path(
+                real_absolute_path(config_dir), real_absolute_path(fragment_dir)
+            )
 
-        if config_dest != '-':
-            out_tar = tarfile.open(config_dest, mode='w:gz')
+        if config_dest != "-":
+            out_tar = tarfile.open(config_dest, mode="w:gz")
         else:
-            out_tar = tarfile.open(fileobj=sys.stdout, mode='w|gz')
+            out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
         out_tar.add(os.path.basename(config_file_path))
 
         for x in glob.glob(os.path.join(fragment_dir, "*.json")):
@@ -809,10 +925,10 @@ def get_tarinfo(path):
     # The `tarfile` library does not let us get this directly.  We need to actually open a tarfile for writing
     # and have it look at the file path.  So, we create a temporary file to write it to.
     fd, fn = tempfile.mkstemp()
-    file_obj = os.fdopen(fd, 'wb')
+    file_obj = os.fdopen(fd, "wb")
 
     try:
-        tmp_tar = tarfile.open(fn, fileobj=file_obj, mode='w:gz')
+        tmp_tar = tarfile.open(fn, fileobj=file_obj, mode="w:gz")
         result = tmp_tar.gettarinfo(path)
         tmp_tar.close()
 
@@ -850,10 +966,10 @@ def import_config(config_src, config_file_path, configuration):
     existing_config_tarinfo = get_tarinfo(config_file_path)
 
     try:
-        if config_src != '-':
-            in_tar = tarfile.open(config_src, 'r:gz')
+        if config_src != "-":
+            in_tar = tarfile.open(config_src, "r:gz")
         else:
-            in_tar = tarfile.open(fileobj=sys.stdin, mode='r|gz')
+            in_tar = tarfile.open(fileobj=sys.stdin, mode="r|gz")
 
         # Track which files were in the tarball so that we can delete unused ones later.
         used_files = dict()
@@ -879,7 +995,13 @@ def import_config(config_src, config_file_path, configuration):
         os.chdir(original_dir)
 
 
-def create_custom_dockerfile(tarball_path, config_file_path, configuration, label='-docker', docker_config_name='.custom_agent_config'):
+def create_custom_dockerfile(
+    tarball_path,
+    config_file_path,
+    configuration,
+    label="-docker",
+    docker_config_name=".custom_agent_config",
+):
     """Creates a gzipped tarball that, when unpacked, contains a Dockerfile that can be used to create a custom
     Docker image that includes whatever configuration files this agent install currently has.
 
@@ -892,134 +1014,229 @@ def create_custom_dockerfile(tarball_path, config_file_path, configuration, labe
     @type config_file_path: str
     @type configuration: Configuration
     """
-    if tarball_path != '-':
-        out_tar = tarfile.open(tarball_path, mode='w:gz')
+    if tarball_path != "-":
+        out_tar = tarfile.open(tarball_path, mode="w:gz")
     else:
-        out_tar = tarfile.open(fileobj=sys.stdout, mode='w|gz')
+        out_tar = tarfile.open(fileobj=sys.stdout, mode="w|gz")
 
     # Read the Dockerfile.custom_agent_config out of the misc directory and replace :latest with the version used
     # by this current agent install.  We want the version of this install in order to make sure the new docker image
     # is as close to what is currently running as possible.
-    dockerfile_path = os.path.join(get_install_root(), 'misc', 'Dockerfile%s' % docker_config_name)
+    dockerfile_path = os.path.join(
+        get_install_root(), "misc", "Dockerfile%s" % docker_config_name
+    )
     fp = open(dockerfile_path)
-    dockerfile_contents = fp.read().replace('/scalyr%s-agent:latest' % label, '/scalyr%s-agent:%s' % (label, SCALYR_VERSION))
+    dockerfile_contents = fp.read().replace(
+        "/scalyr%s-agent:latest" % label, "/scalyr%s-agent:%s" % (label, SCALYR_VERSION)
+    )
     fp.close()
 
     dockerfile_fp = cStringIO.StringIO(dockerfile_contents)
     # Use the original Dockerfile's attributes (permissions, owner) as a template for the attributes in the archive.
     tarinfo = out_tar.gettarinfo(dockerfile_path)
     tarinfo.size = len(dockerfile_contents)
-    tarinfo.name = 'Dockerfile'
+    tarinfo.name = "Dockerfile"
     out_tar.addfile(tarinfo, fileobj=dockerfile_fp)
     dockerfile_fp.close()
 
     # Now, generate a tarball containing the exported config for this agent and save it in the tar.
     # Use a temporary file to save the config tarball in.
     config_tarball_fd, config_tarball_path = tempfile.mkstemp()
-    config_tarball_fp = os.fdopen(config_tarball_fd, 'wb')
+    config_tarball_fp = os.fdopen(config_tarball_fd, "wb")
 
     export_config(config_tarball_path, config_file_path, configuration)
 
-    out_tar.add(config_tarball_path, arcname='agent_config.tar.gz')
+    out_tar.add(config_tarball_path, arcname="agent_config.tar.gz")
     config_tarball_fp.close()
 
     out_tar.close()
 
 
-if __name__ == '__main__':
-    parser = OptionParser(usage='Usage: scalyr-agent-2-config [options]')
-    parser.add_option("-c", "--config-file", dest="config_filename",
-                      help="Read configuration from FILE", metavar="FILE")
-    parser.add_option("", "--set-key-from-stdin", action="store_true", dest="set_key_from_stdin", default=False,
-                      help="Update the configuration file with a new API key read from standard input.  "
-                           "The API key is used to authenticate requests to the Scalyr servers for the account.")
-    parser.add_option("", "--set-key", dest="api_key",
-                      help="Update the configuration file with the new API key."
-                           "The API key is used to authenticate requests to the Scalyr servers for the account.")
-    parser.add_option("", "--set-scalyr-server", dest="scalyr_server",
-                      help="Updates the configuration to send all log uploads to the specified server.  This will "
-                           "create a configuration file fragment `scalyr_server.json` in the config directory.  It "
-                           "will overwrite any existing file at that path.")
-    parser.add_option("", "--set-server-host", dest="server_host",
-                      help="Adds a new configuration file in the ``agent.d`` directory to set the serverHost "
-                           "server attribute.  Warning, if there are any other Scalyr configuration files that sets "
-                           "a value for ``serverHost``, that value may override the one trying to be set here.  You "
-                           "must be sure the ``agent.json`` file nor any file in ``agent.d`` sets a value for "
-                           "``serverHost`` otherwise this might not work.")
-    parser.add_option("", "--set-user", dest="executing_user",
-                      help="Update which user account is used to run the agent.")
-    parser.add_option("", "--upgrade-tarball", dest="upgrade_tarball",
-                      help="Upgrade the agent to the new version contained in the specified tarball file."
-                           "This agent must have been previously installed using the tarball method."
-                           "The tarball must have been downloaded from Scalyr."
-                           "You may only use this if you have not changed the locations for the config file, "
-                           "log directory, and data directory from the default values."
-                           "This will copy your existing config, log, and data directory and place them in the "
-                           "new agent.  It will also restart the agent if it is currently running. "
-                           "WARNING, this will delete the old install directory (excluding the log, data, config "
-                           "which will be copied over to the new installation).  If you may have modified other files "
-                           "then use the --preserve-old-install option to prevent it from being deleted.")
-    parser.add_option("", "--preserve-old-install", action="store_true", dest="preserve_old_install", default=False,
-                      help="When performing a tarball upgrade, move the old install to a temporary directory "
-                           "instead of deleting it.")
-    parser.add_option("", "--import-config", dest="import_config",
-                      help="Extracts the agent configuration files from the provided gzipped tarball, overwriting the"
-                           "current configuration files (stored in `agent.json` and the `agent.d` directory, and"
-                           "removing any files not present in tarball.  Pass `-` to read the tarball from stdin.  Note,"
-                           "it only affects files that end in `.json`.  Also, all the owner and group users for all "
-                           "extracted files are reset to be the same owner/group of the current configuration file to "
-                           "avoid permission problems.")
-    parser.add_option("", "--export-config", dest="export_config",
-                      help="Creates a new gzipped tarball using the current agent configuration files stored in the "
-                           "`agent.json` file and the `agent.d` directory.  Pass `-` to write the tarball to stdout. "
-                           "Note, this only copies files that end in `.json`.")
-    parser.add_option("", "--docker-create-custom-dockerfile", dest="create_custom_dockerfile",
-                      help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
-                           "Docker image that includes the configuration from this agent installation and based off "
-                           "of the same Scalyr Agent version as this agent.  Essentially, it is a snapshot of this "
-                           "agent so that its configuration can be more easily used again for other Docker "
-                           "containers.  The option value should either be a path to write the tarball or `-` to "
-                           "write it to stdout.")
-    parser.add_option("", "--k8s-create-custom-dockerfile", dest="create_custom_k8s_dockerfile",
-                      help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
-                           "Docker image that includes the configuration from this agent installation and based off "
-                           "of the same Scalyr Agent version as this agent, and suitable for running on a Kubernetes "
-                           "cluster.  Essentially, it is a snapshot of this agent so that its configuration can be "
-                           "more easily used again when running as a Kubernetes Daemonset."
-                           "The option value should either be a path to write the tarball or `-` to "
-                           "write it to stdout.")
+if __name__ == "__main__":
+    parser = OptionParser(usage="Usage: scalyr-agent-2-config [options]")
+    parser.add_option(
+        "-c",
+        "--config-file",
+        dest="config_filename",
+        help="Read configuration from FILE",
+        metavar="FILE",
+    )
+    parser.add_option(
+        "",
+        "--set-key-from-stdin",
+        action="store_true",
+        dest="set_key_from_stdin",
+        default=False,
+        help="Update the configuration file with a new API key read from standard input.  "
+        "The API key is used to authenticate requests to the Scalyr servers for the account.",
+    )
+    parser.add_option(
+        "",
+        "--set-key",
+        dest="api_key",
+        help="Update the configuration file with the new API key."
+        "The API key is used to authenticate requests to the Scalyr servers for the account.",
+    )
+    parser.add_option(
+        "",
+        "--set-scalyr-server",
+        dest="scalyr_server",
+        help="Updates the configuration to send all log uploads to the specified server.  This will "
+        "create a configuration file fragment `scalyr_server.json` in the config directory.  It "
+        "will overwrite any existing file at that path.",
+    )
+    parser.add_option(
+        "",
+        "--set-server-host",
+        dest="server_host",
+        help="Adds a new configuration file in the ``agent.d`` directory to set the serverHost "
+        "server attribute.  Warning, if there are any other Scalyr configuration files that sets "
+        "a value for ``serverHost``, that value may override the one trying to be set here.  You "
+        "must be sure the ``agent.json`` file nor any file in ``agent.d`` sets a value for "
+        "``serverHost`` otherwise this might not work.",
+    )
+    parser.add_option(
+        "",
+        "--set-user",
+        dest="executing_user",
+        help="Update which user account is used to run the agent.",
+    )
+    parser.add_option(
+        "",
+        "--upgrade-tarball",
+        dest="upgrade_tarball",
+        help="Upgrade the agent to the new version contained in the specified tarball file."
+        "This agent must have been previously installed using the tarball method."
+        "The tarball must have been downloaded from Scalyr."
+        "You may only use this if you have not changed the locations for the config file, "
+        "log directory, and data directory from the default values."
+        "This will copy your existing config, log, and data directory and place them in the "
+        "new agent.  It will also restart the agent if it is currently running. "
+        "WARNING, this will delete the old install directory (excluding the log, data, config "
+        "which will be copied over to the new installation).  If you may have modified other files "
+        "then use the --preserve-old-install option to prevent it from being deleted.",
+    )
+    parser.add_option(
+        "",
+        "--preserve-old-install",
+        action="store_true",
+        dest="preserve_old_install",
+        default=False,
+        help="When performing a tarball upgrade, move the old install to a temporary directory "
+        "instead of deleting it.",
+    )
+    parser.add_option(
+        "",
+        "--import-config",
+        dest="import_config",
+        help="Extracts the agent configuration files from the provided gzipped tarball, overwriting the"
+        "current configuration files (stored in `agent.json` and the `agent.d` directory, and"
+        "removing any files not present in tarball.  Pass `-` to read the tarball from stdin.  Note,"
+        "it only affects files that end in `.json`.  Also, all the owner and group users for all "
+        "extracted files are reset to be the same owner/group of the current configuration file to "
+        "avoid permission problems.",
+    )
+    parser.add_option(
+        "",
+        "--export-config",
+        dest="export_config",
+        help="Creates a new gzipped tarball using the current agent configuration files stored in the "
+        "`agent.json` file and the `agent.d` directory.  Pass `-` to write the tarball to stdout. "
+        "Note, this only copies files that end in `.json`.",
+    )
+    parser.add_option(
+        "",
+        "--docker-create-custom-dockerfile",
+        dest="create_custom_dockerfile",
+        help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
+        "Docker image that includes the configuration from this agent installation and based off "
+        "of the same Scalyr Agent version as this agent.  Essentially, it is a snapshot of this "
+        "agent so that its configuration can be more easily used again for other Docker "
+        "containers.  The option value should either be a path to write the tarball or `-` to "
+        "write it to stdout.",
+    )
+    parser.add_option(
+        "",
+        "--k8s-create-custom-dockerfile",
+        dest="create_custom_k8s_dockerfile",
+        help="Creates a gzipped tarball that will extract to a Dockerfile that will build a custom "
+        "Docker image that includes the configuration from this agent installation and based off "
+        "of the same Scalyr Agent version as this agent, and suitable for running on a Kubernetes "
+        "cluster.  Essentially, it is a snapshot of this agent so that its configuration can be "
+        "more easily used again when running as a Kubernetes Daemonset."
+        "The option value should either be a path to write the tarball or `-` to "
+        "write it to stdout.",
+    )
 
     # TODO: These options are only available on Windows platforms
-    if 'win32' == sys.platform:
-        parser.add_option("", "--upgrade-windows", dest="upgrade_windows", action="store_true", default=False,
-                          help='Upgrade the agent if a new version is available')
-        parser.add_option("", "--release-track", dest="release_track", default="stable",
-                          help='The release track to use when upgrading using --upgrade-windows.  This defaults to '
-                          '"stable" and is what consumers should use.')
-        parser.add_option("", "--upgrade-without-ui", dest="upgrade_windows_no_ui", action="store_true", default=False,
-                          help='If specified, will request the upgrade for the Windows agent will be run without the '
-                          'UI.')
+    if "win32" == sys.platform:
+        parser.add_option(
+            "",
+            "--upgrade-windows",
+            dest="upgrade_windows",
+            action="store_true",
+            default=False,
+            help="Upgrade the agent if a new version is available",
+        )
+        parser.add_option(
+            "",
+            "--release-track",
+            dest="release_track",
+            default="stable",
+            help="The release track to use when upgrading using --upgrade-windows.  This defaults to "
+            '"stable" and is what consumers should use.',
+        )
+        parser.add_option(
+            "",
+            "--upgrade-without-ui",
+            dest="upgrade_windows_no_ui",
+            action="store_true",
+            default=False,
+            help="If specified, will request the upgrade for the Windows agent will be run without the "
+            "UI.",
+        )
         # TODO: Once other packages (rpm, debian) include the 'templates' directory, we can make this available
         # beyond just Windows.
-        parser.add_option("", "--init-config", dest="init_config", action="store_true", default=False,
-                          help='Create an initial copy of the configuration file in the appropriate location.')
-        parser.add_option("", "--no-error-if-config-exists", dest="init_config_ignore_exists", action="store_true",
-                          default=False,
-                          help='If using "--init-config", exit with success if the file already exists.')
+        parser.add_option(
+            "",
+            "--init-config",
+            dest="init_config",
+            action="store_true",
+            default=False,
+            help="Create an initial copy of the configuration file in the appropriate location.",
+        )
+        parser.add_option(
+            "",
+            "--no-error-if-config-exists",
+            dest="init_config_ignore_exists",
+            action="store_true",
+            default=False,
+            help='If using "--init-config", exit with success if the file already exists.',
+        )
         # These are a weird options we use to start the agent after the Windows install process finishes if there
         # was an agent running before.  If there was an agent, the write a special file
         # called the conditional restart marker.  So, if it exists, then we should start the agent.
-        parser.add_option("", "--mark-conditional-restart", dest="mark_conditional_restart", action="store_true",
-                          default=False,
-                          help='Creates the marker file to restart the agent next time --conditional-restart is '
-                               'specified if the agent is currently running.')
-        parser.add_option("", "--conditional-restart", dest="conditional_restart", action="store_true",
-                          default=False,
-                          help='Starts the agent if the conditional restart file marker exists.')
+        parser.add_option(
+            "",
+            "--mark-conditional-restart",
+            dest="mark_conditional_restart",
+            action="store_true",
+            default=False,
+            help="Creates the marker file to restart the agent next time --conditional-restart is "
+            "specified if the agent is currently running.",
+        )
+        parser.add_option(
+            "",
+            "--conditional-restart",
+            dest="conditional_restart",
+            action="store_true",
+            default=False,
+            help="Starts the agent if the conditional restart file marker exists.",
+        )
 
     (options, args) = parser.parse_args()
     if len(args) > 1:
-        print >> sys.stderr, 'Could not parse commandline arguments.'
+        print >> sys.stderr, "Could not parse commandline arguments."
         parser.print_help(sys.stderr)
         sys.exit(1)
 
@@ -1032,58 +1249,64 @@ if __name__ == '__main__':
     if not os.path.isabs(options.config_filename):
         options.config_filename = os.path.abspath(options.config_filename)
 
-    if 'win32' == sys.platform and options.init_config:
+    if "win32" == sys.platform and options.init_config:
         # Create a copy of the configuration file and set the owner to be the current user.
         config_path = options.config_filename
-        template_dir = os.path.join(os.path.dirname(config_path), 'templates')
-        template = os.path.join(template_dir, 'agent_config.tmpl')
+        template_dir = os.path.join(os.path.dirname(config_path), "templates")
+        template = os.path.join(template_dir, "agent_config.tmpl")
 
         if os.path.exists(config_path):
             if not options.init_config_ignore_exists:
-                print >> sys.stderr, ('Cannot initialize configuration file at %s because file already exists.' %
-                                      config_path)
+                print >> sys.stderr, (
+                    "Cannot initialize configuration file at %s because file already exists."
+                    % config_path
+                )
                 sys.exit(1)
             else:
-                print >> sys.stderr, 'Configuration file already exists at %s, so doing nothing.' % config_path
+                print >> sys.stderr, "Configuration file already exists at %s, so doing nothing." % config_path
         else:
             if not os.path.isdir(template_dir):
-                print >> sys.stderr, ('Cannot initialize configuration file because template directory does not exist '
-                                      'at %s' % template_dir)
+                print >> sys.stderr, (
+                    "Cannot initialize configuration file because template directory does not exist "
+                    "at %s" % template_dir
+                )
                 sys.exit(1)
             if not os.path.isfile(template):
-                print >> sys.stderr, ('Cannot initialize configuration file because template file does not exist at'
-                                      '%s' % template)
+                print >> sys.stderr, (
+                    "Cannot initialize configuration file because template file does not exist at"
+                    "%s" % template
+                )
                 sys.exit(1)
 
             # Copy the file.
             shutil.copy(template, config_path)
             controller.set_file_owner(config_path, controller.get_current_user())
-            print 'Successfully initialized the configuration file.'
+            print "Successfully initialized the configuration file."
 
-    if options.executing_user and controller.get_current_user() != 'root':
-        print >> sys.stderr, 'You must be root to update the user account that is used to run the agent.'
+    if options.executing_user and controller.get_current_user() != "root":
+        print >> sys.stderr, "You must be root to update the user account that is used to run the agent."
         sys.exit(1)
 
     try:
         config_file = Configuration(options.config_filename, default_paths, None)
         config_file.parse()
     except Exception, e:
-        print >> sys.stderr, 'Error reading configuration file: %s' % str(e)
+        print >> sys.stderr, "Error reading configuration file: %s" % str(e)
         print >> sys.stderr, traceback.format_exc()
-        print >> sys.stderr, 'Terminating, please fix the configuration file and restart agent.'
+        print >> sys.stderr, "Terminating, please fix the configuration file and restart agent."
         sys.exit(1)
 
     controller.consume_config(config_file, options.config_filename)
 
     # See if we have to start the agent.  This is only used by Windows right now as part of its install process.
-    if 'win32' == sys.platform and options.mark_conditional_restart:
+    if "win32" == sys.platform and options.mark_conditional_restart:
         mark_conditional_restart(controller, config_file)
 
-    if 'win32' == sys.platform and options.conditional_restart:
+    if "win32" == sys.platform and options.conditional_restart:
         restart_if_conditional_marker_exists(controller, config_file)
 
     if options.set_key_from_stdin:
-        api_key = raw_input('Please enter key: ')
+        api_key = raw_input("Please enter key: ")
         set_api_key(config_file, options.config_filename, api_key)
     elif options.api_key is not None:
         set_api_key(config_file, options.config_filename, options.api_key)
@@ -1100,7 +1323,11 @@ if __name__ == '__main__':
     if options.upgrade_tarball is not None:
         paths = options.upgrade_tarball.split(os.pathsep)
         if len(paths) == 1:
-            sys.exit(upgrade_tarball_install(config_file, options.upgrade_tarball, options.preserve_old_install))
+            sys.exit(
+                upgrade_tarball_install(
+                    config_file, options.upgrade_tarball, options.preserve_old_install
+                )
+            )
         else:
             # During the upgrade tarball process, the old agent code will execute the new agent's
             # scalyr-agent-2-config command with --upgrade-tarball set to two paths pointing to the old
@@ -1109,8 +1336,14 @@ if __name__ == '__main__':
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
 
-    if 'win32' == sys.platform and options.upgrade_windows:
-        sys.exit(upgrade_windows_install(config_file, options.release_track, use_ui=not options.upgrade_windows_no_ui))
+    if "win32" == sys.platform and options.upgrade_windows:
+        sys.exit(
+            upgrade_windows_install(
+                config_file,
+                options.release_track,
+                use_ui=not options.upgrade_windows_no_ui,
+            )
+        )
 
     if options.export_config is not None:
         export_config(options.export_config, options.config_filename, config_file)
@@ -1119,9 +1352,17 @@ if __name__ == '__main__':
         import_config(options.import_config, options.config_filename, config_file)
 
     if options.create_custom_dockerfile is not None:
-        create_custom_dockerfile(options.create_custom_dockerfile, options.config_filename, config_file)
+        create_custom_dockerfile(
+            options.create_custom_dockerfile, options.config_filename, config_file
+        )
 
     if options.create_custom_k8s_dockerfile is not None:
-        create_custom_dockerfile(options.create_custom_k8s_dockerfile, options.config_filename, config_file, label="-k8s", docker_config_name=".custom_k8s_config")
+        create_custom_dockerfile(
+            options.create_custom_k8s_dockerfile,
+            options.config_filename,
+            config_file,
+            label="-k8s",
+            docker_config_name=".custom_k8s_config",
+        )
 
     sys.exit(0)

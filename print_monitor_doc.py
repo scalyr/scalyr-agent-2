@@ -24,7 +24,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import sys
 
@@ -50,18 +50,18 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     @type additional_module_paths: str
     """
     info = load_monitor_class(monitor_module, additional_module_paths)[1]
-    print 'Description:'
+    print "Description:"
     print info.description
 
-    print 'Options:'
+    print "Options:"
     print_options(info.config_options, column_size)
-    print ''
+    print ""
 
-    print 'Log reference:'
+    print "Log reference:"
     print_log_fields(info.log_fields, column_size)
-    print ''
+    print ""
 
-    print 'Metrics:'
+    print "Metrics:"
     # Have to break the metrics up into their categories if they have them.
     all_metrics = info.metrics
 
@@ -78,12 +78,12 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     metrics_with_no_categories = filter_metric_by_category(all_metrics, None)
     if len(metrics_with_no_categories) > 0:
         print_metrics(metrics_with_no_categories, column_size)
-    print ''
+    print ""
 
     for category in categories:
-        print '%s metrics' % category
+        print "%s metrics" % category
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
-        print ''
+        print ""
 
 
 def print_options(option_list, column_size):
@@ -96,13 +96,13 @@ def print_options(option_list, column_size):
     @type column_size: int
     """
     # First, prepare a list of lists representing the table contents.  Each row has two elements.
-    rows = [['# Option', 'Usage']]
+    rows = [["# Option", "Usage"]]
     for x in option_list:
-        rows.append(['# ``%s``' % x.option_name, x.description])
+        rows.append(["# ``%s``" % x.option_name, x.description])
 
     # We let the second column take up as much room as it needs, so find out how large the first column is
     # by finding the longest string in it.
-    longest_first_column = ''
+    longest_first_column = ""
     for x in rows:
         if len(x[0]) > len(longest_first_column):
             longest_first_column = x[0]
@@ -112,8 +112,15 @@ def print_options(option_list, column_size):
 
     sys.stdout.flush()
     for row in rows:
-        sys.stdout.write('|||%s%s||| ' % (row[0], space_filler(first_column_length - len(row[0]) - 3)))
-        write_wrapped_line(row[1], column_size - first_column_length - 4, ' ' * (first_column_length + 4))
+        sys.stdout.write(
+            "|||%s%s||| "
+            % (row[0], space_filler(first_column_length - len(row[0]) - 3))
+        )
+        write_wrapped_line(
+            row[1],
+            column_size - first_column_length - 4,
+            " " * (first_column_length + 4),
+        )
     sys.stdout.flush()
 
 
@@ -127,13 +134,13 @@ def print_log_fields(log_fields_list, column_size):
     @type column_size: int
     """
     # First, prepare a list of lists representing the table contents.  Each row has two elements.
-    rows = [['# Field', 'Meaning']]
+    rows = [["# Field", "Meaning"]]
     for x in log_fields_list:
-        rows.append(['# ``%s``' % x.field, x.description])
+        rows.append(["# ``%s``" % x.field, x.description])
 
     # We let the second column take up as much room as it needs, so find out how large the first column is
     # by finding the longest string in it.
-    longest_first_column = ''
+    longest_first_column = ""
     for x in rows:
         if len(x[0]) > len(longest_first_column):
             longest_first_column = x[0]
@@ -143,8 +150,15 @@ def print_log_fields(log_fields_list, column_size):
 
     sys.stdout.flush()
     for row in rows:
-        sys.stdout.write('|||%s%s||| ' % (row[0], space_filler(first_column_length - len(row[0]) - 3)))
-        write_wrapped_line(row[1], column_size - first_column_length - 4, ' ' * (first_column_length + 4))
+        sys.stdout.write(
+            "|||%s%s||| "
+            % (row[0], space_filler(first_column_length - len(row[0]) - 3))
+        )
+        write_wrapped_line(
+            row[1],
+            column_size - first_column_length - 4,
+            " " * (first_column_length + 4),
+        )
     sys.stdout.flush()
 
 
@@ -161,18 +175,18 @@ def print_metrics(metric_list, column_size):
     # Create the contents of the table, split up by the different columns.  We populate each column with
     # its header row.
     # The metric name column will be the first be displayed.
-    metric_name_column = ['Metric']
+    metric_name_column = ["Metric"]
     # The extra fields column is optional, only used if any of the metrics has extra fields.  The content
     # for each cell will be a list of strings, one for each extra field.
-    extra_fields_column = [['Fields']]
+    extra_fields_column = [["Fields"]]
     # The description is the last column.
-    description_column = ['Description']
+    description_column = ["Description"]
 
     total_extra_fields = 0
 
     for metric in metric_list:
         # Create the metric name cell for this row.
-        metric_name_column.append('``%s``' % metric.metric_name)
+        metric_name_column.append("``%s``" % metric.metric_name)
 
         # Create the description
         description_column.append(metric.description)
@@ -184,10 +198,10 @@ def print_metrics(metric_list, column_size):
             # Create an entry for each extra field.  We create a string representation that is
             # field_name=value if value is not an empty string, otherwise just field_name.
             for key, value in metric.extra_fields.iteritems():
-                if value == '':
-                    str_rep = '``%s``' % key
+                if value == "":
+                    str_rep = "``%s``" % key
                 else:
-                    str_rep = '``%s=%s``' % (key, value)
+                    str_rep = "``%s=%s``" % (key, value)
                 cell.append(str_rep)
                 total_extra_fields += 1
 
@@ -205,32 +219,42 @@ def print_metrics(metric_list, column_size):
     for cell in metric_name_column:
         metric_name_column_width = max(metric_name_column_width, len(cell) + 6)
 
-    description_column_width = column_size - metric_name_column_width - extra_field_column_width
+    description_column_width = (
+        column_size - metric_name_column_width - extra_field_column_width
+    )
 
     # Actually print out the rows.
     for row in range(len(metric_name_column)):
         # Print the metric name with enough padding to get to the end of the column.
-        metric_cell = '|||# %s ' % metric_name_column[row]
-        sys.stdout.write('%s%s' % (metric_cell, space_filler(metric_name_column_width - len(metric_cell))))
+        metric_cell = "|||# %s " % metric_name_column[row]
+        sys.stdout.write(
+            "%s%s"
+            % (metric_cell, space_filler(metric_name_column_width - len(metric_cell)))
+        )
 
         # If we have an extra field column, print it out.
         if extra_field_column_width > 0:
-            sys.stdout.write('||| ')
+            sys.stdout.write("||| ")
             extra_cell = extra_fields_column[row]
             # If there are multiple fields, then we want to stick a newline and padding in the next line to
             # get the next field lined up with the previous one.  We can do this trick with str.join
-            line_join = ', \\\n%s' % space_filler(metric_name_column_width + 4)
+            line_join = ", \\\n%s" % space_filler(metric_name_column_width + 4)
             sys.stdout.write(line_join.join(extra_cell))
             # Have to print enough spaces to fill out the rest of the space to the description column.
             if len(extra_cell) > 0:
-                sys.stdout.write(space_filler(extra_field_column_width - len(extra_cell[-1]) - 4))
+                sys.stdout.write(
+                    space_filler(extra_field_column_width - len(extra_cell[-1]) - 4)
+                )
             else:
                 sys.stdout.write(space_filler(extra_field_column_width - 4))
 
         # The description gets line wrapped in the final column.
-        sys.stdout.write('||| ')
-        write_wrapped_line(description_column[row], description_column_width,
-                           space_filler(column_size - description_column_width + 4))
+        sys.stdout.write("||| ")
+        write_wrapped_line(
+            description_column[row],
+            description_column_width,
+            space_filler(column_size - description_column_width + 4),
+        )
 
     sys.stdout.flush()
 
@@ -248,21 +272,21 @@ def write_wrapped_line(content, wrap_length, line_prefix):
     @type wrap_length: int
     @type line_prefix: str
     """
-    current_line = ''
-    for word in content.split(' '):
+    current_line = ""
+    for word in content.split(" "):
         if len(current_line) + len(word) + 3 > wrap_length:
             sys.stdout.write(current_line)
-            sys.stdout.write(' \\\n')
+            sys.stdout.write(" \\\n")
             sys.stdout.write(line_prefix)
             current_line = word
         elif len(current_line) == 0:
             current_line = word
         else:
-            current_line = '%s %s' % (current_line, word)
+            current_line = "%s %s" % (current_line, word)
 
     if len(current_line) > 0:
         sys.stdout.write(current_line)
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
 
 
 def space_filler(num_spaces):
@@ -273,7 +297,7 @@ def space_filler(num_spaces):
     @return: The string
     @rtype: str
     """
-    return ' ' * num_spaces
+    return " " * num_spaces
 
 
 def filter_metric_by_category(metrics, category):
@@ -295,26 +319,46 @@ def filter_metric_by_category(metrics, category):
             result.append(metric)
     return result
 
-if __name__ == '__main__':
-    parser = OptionParser(usage='Usage: python print_monitor_doc.py [options] monitor_module')
-    parser.add_option('', '--no-warning', action='store_true', dest='no_warning', default=False,
-                      help='Suppresses warning that you should not rely format of the output on this tool yet since it '
-                           'may change.')
-    parser.add_option('-c', '--column-size', dest='column_size', default=120,
-                      help='Sets the number of columns to constrain the output to.')
-    parser.add_option('-p', '--additional-module-paths', dest='module_paths',
-                      help='Additional paths to examine to search for the monitor module, beyond the standard ones.')
+
+if __name__ == "__main__":
+    parser = OptionParser(
+        usage="Usage: python print_monitor_doc.py [options] monitor_module"
+    )
+    parser.add_option(
+        "",
+        "--no-warning",
+        action="store_true",
+        dest="no_warning",
+        default=False,
+        help="Suppresses warning that you should not rely format of the output on this tool yet since it "
+        "may change.",
+    )
+    parser.add_option(
+        "-c",
+        "--column-size",
+        dest="column_size",
+        default=120,
+        help="Sets the number of columns to constrain the output to.",
+    )
+    parser.add_option(
+        "-p",
+        "--additional-module-paths",
+        dest="module_paths",
+        help="Additional paths to examine to search for the monitor module, beyond the standard ones.",
+    )
 
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
-        print >> sys.stderr, 'You must specify the module for the monitor whose documentation you wish to print.'
+        print >> sys.stderr, "You must specify the module for the monitor whose documentation you wish to print."
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     if not options.no_warning:
-        print >> sys.stderr, ('Warning, this tool is still experimental.  The format of the output may change in the'
-                              'future.  Use with caution.')
+        print >> sys.stderr, (
+            "Warning, this tool is still experimental.  The format of the output may change in the"
+            "future.  Use with caution."
+        )
 
     print_monitor_documentation(args[0], int(options.column_size), options.module_paths)
     sys.exit(0)
