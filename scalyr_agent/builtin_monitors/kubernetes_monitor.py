@@ -2895,6 +2895,7 @@ class ContainerChecker(object):
         parser = "docker"
         common_annotations = {}
         container_annotations = {}
+        extended_config = {}
         # pod name and namespace are set to an invalid value for cases where errors occur and a log
         # message is produced, so that the log message has clearly invalid values for these rather
         # than just being empty
@@ -2926,6 +2927,12 @@ class ContainerChecker(object):
             rename_vars["namespace"] = pod_namespace
             container_attributes["pod_name"] = pod_name
             container_attributes["pod_namespace"] = pod_namespace
+
+            # attempt to match pod_name on extended_logs config
+            extended_logs = self._global_config.get_extended_logs("pod_name")
+            for extended_log in extended_logs:
+                if True:  # TODO: this
+                    pass
 
             # get the cluster name
             cluster_name = self.get_cluster_name(k8s_cache)
