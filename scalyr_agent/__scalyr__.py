@@ -15,14 +15,14 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import inspect
 import os
 import sys
 
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
-# type:
+# type :
 #   package_root:  The directory containing the Scalyr source (contains files like 'agent_main.py', etc)
 #   install_root:  The top-level directory where Scalyr is currently installed (contains files like 'CHANGELOG.md')
 #
@@ -63,7 +63,7 @@ import sys
 
 # Indicates if this code was compiled into a single Windows executable via Py2exe.  If that's the case,
 # then we cannot rely on __file__ and the source is kind of through into the same directory.
-__is_py2exe__ = hasattr(sys, 'frozen')
+__is_py2exe__ = hasattr(sys, "frozen")
 
 
 def scalyr_init():
@@ -103,6 +103,7 @@ def __determine_package_root():
 
     return file_path
 
+
 __package_root__ = __determine_package_root()
 
 
@@ -130,7 +131,7 @@ def get_install_root():
     parent_of_package_install = os.path.dirname(get_package_root())
     if __is_py2exe__:  # win32 install
         return parent_of_package_install
-    elif os.path.basename(parent_of_package_install) != 'py':   # Running from Source
+    elif os.path.basename(parent_of_package_install) != "py":  # Running from Source
         return parent_of_package_install
     else:  # Installed using tarball or rpm/debian package
         return os.path.dirname(parent_of_package_install)
@@ -141,11 +142,11 @@ def __add_scalyr_package_to_path():
     """
     # prepend the third party directory first so it appears after the package root and
     # third_party_tls directories
-    sys.path.insert(0, os.path.join(get_package_root(), 'third_party'))
+    sys.path.insert(0, os.path.join(get_package_root(), "third_party"))
 
     # if we are not on windows, prepend the third party tls directory first so it appears after the package root
     if not __is_py2exe__:
-        sys.path.insert(0, os.path.join(get_package_root(), 'third_party_tls'))
+        sys.path.insert(0, os.path.join(get_package_root(), "third_party_tls"))
 
     sys.path.insert(0, os.path.dirname(get_package_root()))
 
@@ -163,6 +164,7 @@ def __add_backport_hack():
     try:
         # First, check to see if the ssl_match_hostname can be imported already, hence not needing fix.
         from backports.ssl_match_hostname import match_hostname
+
         return
     except ImportError:
         pass
@@ -171,12 +173,13 @@ def __add_backport_hack():
     # third_party/backports directory.. and then monkey patch it into the system.
     original_path = list(sys.path)
     try:
-        sys.path.insert(0, os.path.join(get_package_root(), 'third_party', 'backports'))
+        sys.path.insert(0, os.path.join(get_package_root(), "third_party", "backports"))
         import ssl_match_hostname
         import backports
+
         backports.ssl_match_hostname = ssl_match_hostname
-        ssl_match_hostname.__name__ = 'backports.ssl_match_hostname'
-        sys.modules['backports.ssl_match_hostname'] = ssl_match_hostname
+        ssl_match_hostname.__name__ = "backports.ssl_match_hostname"
+        sys.modules["backports.ssl_match_hostname"] = ssl_match_hostname
         from backports.ssl_match_hostname import match_hostname
     finally:
         sys.path = original_path
@@ -195,17 +198,17 @@ def __determine_version():
     """
     # This file can be either in the package root or the install root (if you examine the cases
     # from above).  So, just check both locations.
-    in_install = os.path.join(get_install_root(), 'VERSION')
-    in_package = os.path.join(get_package_root(), 'VERSION')
+    in_install = os.path.join(get_install_root(), "VERSION")
+    in_package = os.path.join(get_package_root(), "VERSION")
 
     if os.path.isfile(in_package):
         version_path = in_package
     elif os.path.isfile(in_install):
         version_path = in_install
     else:
-        raise Exception('Could not locate VERSION file!')
+        raise Exception("Could not locate VERSION file!")
 
-    version_fp = open(version_path, 'r')
+    version_fp = open(version_path, "r")
     try:
         return version_fp.readline().strip()
     finally:
@@ -216,10 +219,10 @@ SCALYR_VERSION = __determine_version()
 
 
 # The constants for INSTALL_TYPE, a variable declared down below.
-PACKAGE_INSTALL = 1    # Indicates source code was installed via a package manager such as RPM or Windows executable.
-TARBALL_INSTALL = 2    # Indicates source code was installed via a tarball created by the build_package.py script.
-DEV_INSTALL = 3        # Indicates source code is running out of the original source tree, usually during dev testing.
-MSI_INSTALL = 4        # Indicates source code was installed via a Windows MSI package
+PACKAGE_INSTALL = 1  # Indicates source code was installed via a package manager such as RPM or Windows executable.
+TARBALL_INSTALL = 2  # Indicates source code was installed via a tarball created by the build_package.py script.
+DEV_INSTALL = 3  # Indicates source code is running out of the original source tree, usually during dev testing.
+MSI_INSTALL = 4  # Indicates source code was installed via a Windows MSI package
 
 
 def __determine_install_type():
@@ -231,11 +234,11 @@ def __determine_install_type():
     # Determine which type of install this is.  We do this based on
     # whether or not certain files exist in the root of the source tree.
     install_root = get_install_root()
-    if os.path.exists(os.path.join(install_root, 'packageless')):
+    if os.path.exists(os.path.join(install_root, "packageless")):
         install_type = TARBALL_INSTALL
-    elif os.path.exists(os.path.join(install_root, 'run_tests.py')):
+    elif os.path.exists(os.path.join(install_root, "run_tests.py")):
         install_type = DEV_INSTALL
-    elif hasattr(sys, 'frozen'):
+    elif hasattr(sys, "frozen"):
         install_type = MSI_INSTALL
     else:
         install_type = PACKAGE_INSTALL
