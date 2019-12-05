@@ -1461,6 +1461,7 @@ class Event(object):
             # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
             # the per-log file attributes.
             self.__serialization_base = base.__serialization_base
+            self.__thread_id = base.__thread_id
             self.__attrs = base.__attrs
             self.__disable_logfile_addevents_format = (
                 base.__disable_logfile_addevents_format
