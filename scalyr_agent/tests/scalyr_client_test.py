@@ -604,6 +604,26 @@ class EventTest(ScalyrTestCase):
             output_buffer.getvalue(),
         )
 
+    def test_create_from_template_with_add_attributes(self):
+        x = Event(thread_id="foo", attrs={"parser": "bar"})
+        x = Event(base=x)
+        x.set_message("my_message")
+        x.set_sampling_rate(0.5)
+        x.set_sequence_id(1)
+        x.set_sequence_number(2)
+        x.set_sequence_number_delta(3)
+        x.set_timestamp(42L)
+
+        x.add_missing_attributes({"trigger_update": "yes"})
+
+        output_buffer = StringIO()
+        x.serialize(output_buffer)
+
+        self.assertEquals(
+            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            output_buffer.getvalue(),
+        )
+
 
 class EventSequencerTest(ScalyrTestCase):
     def setUp(self):
