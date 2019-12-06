@@ -15,6 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 import threading
+from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 

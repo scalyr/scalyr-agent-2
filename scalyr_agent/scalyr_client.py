@@ -17,7 +17,7 @@
 
 __author__ = "czerwin@scalyr.com"
 
-import httplib
+import six.moves.http_client
 import platform
 import re
 import socket
@@ -25,6 +25,9 @@ import sys
 import time
 
 from scalyr_agent.util import verify_and_get_compress_func
+import six
+from six.moves import map
+from six.moves import range
 
 
 # noinspection PyBroadException
@@ -289,7 +292,7 @@ class ScalyrClientSession(object):
                         proxies=self.__proxies,
                     )
                     self.total_connections_created += 1
-            except Exception, e:
+            except Exception as e:
                 return self.__wrap_response_if_necessary(
                     "client/connectionFailed", 0, "", block_on_response
                 )
@@ -336,7 +339,7 @@ class ScalyrClientSession(object):
                         )
                         self.__connection.get(request_path)
 
-            except Exception, error:
+            except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, "errno") and error.errno is not None:
                     log.error(
@@ -397,7 +400,7 @@ class ScalyrClientSession(object):
                     status_code = self.__connection.status_code()
                     response = self.__connection.response()
                 bytes_received = len(response)
-            except httplib.HTTPException, httpError:
+            except six.moves.http_client.HTTPException as httpError:
                 log.error(
                     "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
                     % (httpError.__class__.__name__),
@@ -405,7 +408,7 @@ class ScalyrClientSession(object):
                 )
                 return "requestFailed", len(body_str), response
 
-            except Exception, error:
+            except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, "errno") and error.errno is not None:
                     log.error(
@@ -1018,7 +1021,7 @@ class AddEventsRequest(object):
 
         If this is the first time a timing component is being incremented, the initial value is set to zero.
         """
-        for key, value in key_values.iteritems():
+        for key, value in six.iteritems(key_values):
             if key in self.__timing_data:
                 amount = self.__timing_data[key]
             else:
@@ -1035,7 +1038,7 @@ class AddEventsRequest(object):
         output_buffer = StringIO()
         first_time = True
 
-        for key, value in self.__timing_data.iteritems():
+        for key, value in six.iteritems(self.__timing_data):
             if not first_time:
                 output_buffer.write(" ")
             else:
@@ -1060,10 +1063,10 @@ class AddEventsRequest(object):
         global __last_time_stamp__
 
         if timestamp is None:
-            timestamp = long(time.time() * 1000000000L)
+            timestamp = int(time.time() * 1000000000)
 
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
-            timestamp = __last_time_stamp__ + 1L
+            timestamp = __last_time_stamp__ + 1
         __last_time_stamp__ = timestamp
 
         return timestamp
@@ -1519,7 +1522,7 @@ class Event(object):
         if self.__attrs:
             changed = False
             new_attrs = dict(self.__attrs)
-            for key, value in attributes.iteritems():
+            for key, value in six.iteritems(attributes):
                 if not key in new_attrs:
                     changed = True
                     new_attrs[key] = value
@@ -1548,7 +1551,7 @@ class Event(object):
         """
         if self.__message is None and message is not None:
             self.__num_optimal_fields += 1
-        if message is unicode:
+        if message is six.text_type:
             self.__message = message.encode("utf-8")
         else:
             self.__message = message
@@ -1585,7 +1588,7 @@ class Event(object):
         """
         # We have to cut off the quotes we surrounded the field with when we serialized it.
         if self.__timestamp is not None:
-            return long(self.__timestamp[1:-1])
+            return int(self.__timestamp[1:-1])
         else:
             return None
 
@@ -1645,7 +1648,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number is not None:
-            return long(self.__sequence_number)
+            return int(self.__sequence_number)
         else:
             return None
 
@@ -1672,7 +1675,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number_delta is not None:
-            return long(self.__sequence_number_delta)
+            return int(self.__sequence_number_delta)
         else:
             return None
 
@@ -1818,7 +1821,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error, _:
+        except socket.error as _:
             err = _
             if sock is not None:
                 sock.close()

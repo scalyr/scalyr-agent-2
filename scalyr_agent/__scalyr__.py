@@ -20,6 +20,7 @@ __author__ = "czerwin@scalyr.com"
 import inspect
 import os
 import sys
+import six
 
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
 # type :
@@ -99,7 +100,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(six.text_type(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 

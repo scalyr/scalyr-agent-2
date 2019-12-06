@@ -25,6 +25,7 @@ import tempfile
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
 )
+from six.moves import range
 
 
 class AutoFlushingRotatingFileTestCase(unittest.TestCase):

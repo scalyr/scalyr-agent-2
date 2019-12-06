@@ -230,7 +230,7 @@ class TestPidfileManager(ScalyrTestCase):
         while True:
             try:
                 os.kill(result, 0)
-            except OSError, e:
+            except OSError as e:
                 # ESRCH indicates the process is not running, in which case we ignore the pidfile.
                 if e.errno == errno.ESRCH:
                     return result

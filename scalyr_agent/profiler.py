@@ -172,7 +172,7 @@ class Profiler(object):
             else:
                 if current_time > self._profile_start:
                     self._start(config, current_time)
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
                 "Failed to update profiler: %s, %s" % (str(e), traceback.format_exc()),

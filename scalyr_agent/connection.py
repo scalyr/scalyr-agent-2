@@ -17,7 +17,7 @@
 
 __author__ = "imron@scalyr.com"
 
-import httplib
+import six.moves.http_client
 import os
 import re
 import socket
@@ -27,6 +27,7 @@ import sys
 from tempfile import mkstemp
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+import six
 
 
 log = scalyr_logging.getLogger(__name__)
@@ -116,7 +117,7 @@ class ConnectionFactory:
                 result = RequestsConnection(
                     server, request_deadline, ca_file, headers, proxies
                 )
-            except Exception, e:
+            except Exception as e:
                 log.warn(
                     "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
                     % str(e)
@@ -277,7 +278,7 @@ class ScalyrHttpConnection(Connection):
 
         try:
             self._init_connection(pure_python_tls=use_tlslite)
-        except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+        except Exception as e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
             log.info(
                 "Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation"
             )
@@ -405,11 +406,11 @@ class ScalyrHttpConnection(Connection):
             validator = CertificateValidator(
                 end_entity_cert, validation_context=context
             )
-            validator.validate_tls(unicode(self._host))
+            validator.validate_tls(six.text_type(self._host))
             log.info(
                 "Scalyr server cert chain successfully validated via certvalidator library"
             )
-        except Exception, ce:
+        except Exception as ce:
             log.exception("Error validating server certificate chain: %s" % ce)
             raise
 
@@ -445,7 +446,7 @@ class ScalyrHttpConnection(Connection):
                     if self._ca_file:
                         try:
                             self._validate_chain_certvalidator(self.__connection)
-                        except Exception, e:
+                        except Exception as e:
                             log.exception("Failure in _validate_chain_certvalidator()")
                             self._validate_chain_openssl()
             else:
@@ -454,7 +455,7 @@ class ScalyrHttpConnection(Connection):
                     self._host, self._port, self._request_deadline
                 )
                 self.__connection.connect()
-        except Exception, error:
+        except Exception as error:
             if hasattr(error, "errno"):
                 errno = error.errno
             else:
@@ -541,7 +542,7 @@ class ScalyrHttpConnection(Connection):
         )
 
 
-class HTTPConnectionWithTimeout(httplib.HTTPConnection):
+class HTTPConnectionWithTimeout(six.moves.http_client.HTTPConnection):
     """An HTTPConnection replacement with added support for setting a timeout on all blocking operations.
 
     Older versions of Python (2.4, 2.5) do not allow for setting a timeout directly on httplib.HTTPConnection
@@ -550,7 +551,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
 
     def __init__(self, host, port, timeout):
         self.__timeout = timeout
-        httplib.HTTPConnection.__init__(self, host, port)
+        six.moves.http_client.HTTPConnection.__init__(self, host, port)
 
     def connect(self):
         # This method is essentially copied from 2.7's httplib.HTTPConnection.connect.
@@ -566,7 +567,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
             self._tunnel()
 
 
-class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
+class HTTPSConnectionWithTimeoutAndVerification(six.moves.http_client.HTTPSConnection):
     """An HTTPSConnection replacement that adds support for setting a timeout as well as performing server
     certificate validation.
 
@@ -598,7 +599,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
         self.__timeout = timeout
         self.__ca_file = ca_file
         self.__has_ssl = has_ssl
-        httplib.HTTPSConnection.__init__(self, host, port)
+        six.moves.http_client.HTTPSConnection.__init__(self, host, port)
 
     def connect(self):
         # Do not delete the next line:
@@ -614,7 +615,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
             try:
                 old_timeout = socket.getdefaulttimeout()
                 socket.setdefaulttimeout(self.__timeout)
-                httplib.HTTPSConnection.connect(self)
+                six.moves.http_client.HTTPSConnection.connect(self)
                 return
             finally:
                 socket.setdefaulttimeout(old_timeout)
@@ -663,7 +664,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error, _:
+        except socket.error as _:
             err = _
             if sock is not None:
                 sock.close()
