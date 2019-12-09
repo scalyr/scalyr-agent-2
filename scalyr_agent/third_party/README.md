@@ -33,6 +33,7 @@ The following libraries are included:
   * [asn1crypto](#asn1crypto)
   * [cffi](#cffi)
   * [oscrypto](#oscrypto)
+  * [glob2](#glob2)
 
 ## tcollector<a name="tcollector">
 
@@ -104,7 +105,7 @@ A pure Python implementation of lex and yacc.
 
 Used by PySMI.
 
-## pg8000<a name="pg8000"
+## pg8000<a name="pg8000">
 
 A Pure-Python interface to the PostgreSQL database engine
 
@@ -169,3 +170,7 @@ C Foreign Function Interface for Python.  Allows you to interact with almost any
 `certvalidator` requires this library.
 
 An encryption library that `tlslite-ng` depends on.  See project home [here](https://github.com/wbond/oscrypto).
+
+## glob2<a name="glob2">
+
+An extended version of Python's builtin glob module which adds support for recursive '**' globbing syntax. See project home [here](https://github.com/miracle2k/python-glob2).
