@@ -15,7 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import os
 import time
@@ -38,6 +38,7 @@ class MonitorsManager(StoppableThread):
     Also periodically polls all monitors for user-agent fragments that are then immediately reflected in all requests
     sent to Scalyr.
     """
+
     def __init__(self, configuration, platform_controller):
         """Initializes the manager.
         @param configuration: The agent configuration that controls what monitors should be run.
@@ -46,12 +47,17 @@ class MonitorsManager(StoppableThread):
         @type configuration: scalyr_agent.Configuration
         @type platform_controller: scalyr_agent.platform_controller.PlatformController
         """
-        StoppableThread.__init__(self, name='monitor manager thread')
+        StoppableThread.__init__(self, name="monitor manager thread")
         if configuration.disable_monitors_creation:
-            log.log( scalyr_logging.DEBUG_LEVEL_0, "Creation of Scalyr Monitors disabled.  No monitors created." )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Creation of Scalyr Monitors disabled.  No monitors created.",
+            )
             self.__monitors = []
         else:
-            self.__monitors = MonitorsManager.__create_monitors(configuration, platform_controller)
+            self.__monitors = MonitorsManager.__create_monitors(
+                configuration, platform_controller
+            )
 
         self.__disable_monitor_threads = configuration.disable_monitor_threads
 
@@ -59,7 +65,7 @@ class MonitorsManager(StoppableThread):
         self.__user_agent_callback = None
         self._user_agent_refresh_interval = configuration.user_agent_refresh_interval
 
-    def find_monitor( self, module_name ):
+    def find_monitor(self, module_name):
         """Finds a monitor with a specific name
            @param module_name: the module name of the monitor to find
            @return: a monitor object if a monitor matches `module_name`, or None
@@ -105,24 +111,36 @@ class MonitorsManager(StoppableThread):
             for monitor in self.__monitors:
                 # Debug Leaks
                 if self.__disable_monitor_threads:
-                    log.log( scalyr_logging.DEBUG_LEVEL_0, "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name )
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_0,
+                        "Scalyr Monitors disabled.  Skipping %s" % monitor.monitor_name,
+                    )
                     continue
                 # Check to see if we can open the metric log.  Maybe we should not silently fail here but instead fail.
                 if monitor.open_metric_log():
-                    monitor.config_from_monitors( self )
-                    log.info('Starting monitor %s', monitor.monitor_name)
+                    monitor.config_from_monitors(self)
+                    log.info("Starting monitor %s", monitor.monitor_name)
                     monitor.start()
                     self.__running_monitors.append(monitor)
                 else:
-                    log.warn('Could not start monitor %s because its log could not be opened', monitor.monitor_name)
+                    log.warn(
+                        "Could not start monitor %s because its log could not be opened",
+                        monitor.monitor_name,
+                    )
             # Start the monitor manager thread. Do not wait for all monitor threads to start as some may misbehave
             if not self.__disable_monitor_threads:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, "Starting Scalyr Monitors manager thread")
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Starting Scalyr Monitors manager thread",
+                )
                 self.start()
             else:
-                log.log(scalyr_logging.DEBUG_LEVEL_0, "Scalyr Monitors disabled.  Skipping monitor manager thread")
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "Scalyr Monitors disabled.  Skipping monitor manager thread",
+                )
         except:
-            log.exception('Failed to start the monitors due to an exception')
+            log.exception("Failed to start the monitors due to an exception")
 
     def stop_manager(self, wait_on_join=True, join_timeout=5):
         """Stops all of the monitors.
@@ -139,10 +157,12 @@ class MonitorsManager(StoppableThread):
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
-                log.info('Stopping monitor %s', monitor.monitor_name)
+                log.info("Stopping monitor %s", monitor.monitor_name)
                 monitor.stop(wait_on_join=False)
             except:
-                log.exception('Failed to stop the metric log without join due to an exception')
+                log.exception(
+                    "Failed to stop the metric log without join due to an exception"
+                )
 
         if wait_on_join:
             for monitor in self.__running_monitors:
@@ -153,14 +173,14 @@ class MonitorsManager(StoppableThread):
                 try:
                     monitor.stop(join_timeout=max_wait)
                 except:
-                    log.exception('Failed to stop the metric log due to an exception')
+                    log.exception("Failed to stop the metric log due to an exception")
 
         for monitor in self.__running_monitors:
             # noinspection PyBroadException
             try:
                 monitor.close_metric_log()
             except:
-                log.exception('Failed to close the metric log due to an exception')
+                log.exception("Failed to close the metric log due to an exception")
 
         self.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
@@ -194,10 +214,17 @@ class MonitorsManager(StoppableThread):
                         self.__user_agent_callback(sorted(user_agent_frags))
                     prev_user_agent_frags = user_agent_frags
                 except Exception:
-                    log.exception('Monitor manager failed to query monitor %s' % monitor.monitor_name)
-                self._run_state.sleep_but_awaken_if_stopped(self._user_agent_refresh_interval)
+                    log.exception(
+                        "Monitor manager failed to query monitor %s"
+                        % monitor.monitor_name
+                    )
+                self._run_state.sleep_but_awaken_if_stopped(
+                    self._user_agent_refresh_interval
+                )
             except Exception:
-                log.exception('Monitor manager failed due to exception', limit_once_per_x_secs=300)
+                log.exception(
+                    "Monitor manager failed due to exception", limit_once_per_x_secs=300
+                )
 
     @property
     def monitors(self):
@@ -229,8 +256,13 @@ class MonitorsManager(StoppableThread):
             all_monitors.append(monitor.copy())
 
         for monitor in platform_controller.get_default_monitors(configuration):
-            all_monitors.append(configuration.parse_monitor_config(
-                monitor, 'monitor with module name "%s" requested by platform' % monitor['module']).copy())
+            all_monitors.append(
+                configuration.parse_monitor_config(
+                    monitor,
+                    'monitor with module name "%s" requested by platform'
+                    % monitor["module"],
+                ).copy()
+            )
 
         # We need to go back and fill in the monitor id if it is not set.  We do this by keeping a count of
         # how many monitors we have with the same module name (just considering the last element of the module
@@ -241,13 +273,13 @@ class MonitorsManager(StoppableThread):
         had_id = {}
 
         for entry in all_monitors:
-            module_name = entry['module'].split('.')[-1]
+            module_name = entry["module"].split(".")[-1]
             if not module_name in monitors_by_module_name:
                 index = 1
             else:
                 index = monitors_by_module_name[module_name] + 1
-            if 'id' not in entry:
-                entry['id'] = index
+            if "id" not in entry:
+                entry["id"] = index
             else:
                 had_id[module_name] = True
 
@@ -256,9 +288,9 @@ class MonitorsManager(StoppableThread):
         # Just as a simplification, if there is only one monitor with a given name, we remove the monitor_id
         # to clean up it's name in the logs.
         for entry in all_monitors:
-            module_name = entry['module'].split('.')[-1]
+            module_name = entry["module"].split(".")[-1]
             if monitors_by_module_name[module_name] == 1 and not module_name in had_id:
-                entry['id'] = ''
+                entry["id"] = ""
 
         result = []
 
@@ -266,8 +298,14 @@ class MonitorsManager(StoppableThread):
             # we pass the configuration separately even though additional paths and sample interval come
             # from there, because other places (e.g. run_standalone_monitor) may call build_monitor with
             # values for those that don't come from a configuration file
-            result.append(MonitorsManager.build_monitor(entry, configuration.additional_monitor_module_paths,
-                          configuration.global_monitor_sample_interval, configuration))
+            result.append(
+                MonitorsManager.build_monitor(
+                    entry,
+                    configuration.additional_monitor_module_paths,
+                    configuration.global_monitor_sample_interval,
+                    configuration,
+                )
+            )
         return result
 
     @staticmethod
@@ -290,8 +328,10 @@ class MonitorsManager(StoppableThread):
         # Also add in scalyr_agent/../monitors/local and scalyr_agent/../monitors/contrib to the Python path to search
         # for monitors.  (They are always in the parent directory of the scalyr_agent package.
         path_to_package_parent = os.path.dirname(get_package_root())
-        paths_to_pass.append(os.path.join(path_to_package_parent, 'monitors', 'local'))
-        paths_to_pass.append(os.path.join(path_to_package_parent, 'monitors', 'contrib'))
+        paths_to_pass.append(os.path.join(path_to_package_parent, "monitors", "local"))
+        paths_to_pass.append(
+            os.path.join(path_to_package_parent, "monitors", "contrib")
+        )
 
         # Add in the additional paths.
         if additional_python_paths is not None and len(additional_python_paths) > 0:
@@ -301,7 +341,12 @@ class MonitorsManager(StoppableThread):
         return load_monitor_class(monitor_module, os.pathsep.join(paths_to_pass))[0]
 
     @staticmethod
-    def build_monitor(monitor_config, additional_python_paths, default_sample_interval_secs, global_config ):
+    def build_monitor(
+        monitor_config,
+        additional_python_paths,
+        default_sample_interval_secs,
+        global_config,
+    ):
         """Builds an instance of a ScalyrMonitor for the specified monitor configuration.
 
         @param monitor_config: The monitor configuration object for the monitor that should be created.  It will
@@ -317,14 +362,20 @@ class MonitorsManager(StoppableThread):
         @rtype: scalyr_monitor.ScalyrMonitor
         """
         # Set up the logs to do the right thing.
-        module_name = monitor_config['module']
-        monitor_id = monitor_config['id']
+        module_name = monitor_config["module"]
+        monitor_id = monitor_config["id"]
 
         # We have to update this variable before we create monitor instances so that it is used.
         ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS = default_sample_interval_secs
 
         # Load monitor.
-        monitor_class = MonitorsManager.load_monitor(module_name, additional_python_paths)
+        monitor_class = MonitorsManager.load_monitor(
+            module_name, additional_python_paths
+        )
 
         # Instantiate and initialize it.
-        return monitor_class(monitor_config, scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)), global_config=global_config)
+        return monitor_class(
+            monitor_config,
+            scalyr_logging.getLogger("%s(%s)" % (module_name, monitor_id)),
+            global_config=global_config,
+        )

@@ -16,7 +16,7 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
-__author__ = 'echee@scalyr.com'
+__author__ = "echee@scalyr.com"
 
 
 import atexit
@@ -37,7 +37,6 @@ from scalyr_agent.scalyr_logging import AgentLogger
 
 
 class ScalyrTestUtils(object):
-
     @staticmethod
     def create_configuration(extra_toplevel_config=None):
         """Creates a blank configuration file with default values. Optionally overwrites top-level key/values.
@@ -48,20 +47,23 @@ class ScalyrTestUtils(object):
         @rtype: Configuration
         """
         config_dir = tempfile.mkdtemp()
-        config_file = os.path.join(config_dir, 'agentConfig.json')
-        config_fragments_dir = os.path.join(config_dir, 'configs.d')
+        config_file = os.path.join(config_dir, "agentConfig.json")
+        config_fragments_dir = os.path.join(config_dir, "configs.d")
         os.makedirs(config_fragments_dir)
 
-        toplevel_config = {'api_key': 'fake'}
+        toplevel_config = {"api_key": "fake"}
         if extra_toplevel_config:
             toplevel_config.update(extra_toplevel_config)
 
-        fp = open(config_file, 'w')
+        fp = open(config_file, "w")
         fp.write(json_lib.serialize(JsonObject(**toplevel_config)))
         fp.close()
 
-        default_paths = DefaultPaths('/var/log/scalyr-agent-2', '/etc/scalyr-agent-2/agent.json',
-                                     '/var/lib/scalyr-agent-2')
+        default_paths = DefaultPaths(
+            "/var/log/scalyr-agent-2",
+            "/etc/scalyr-agent-2/agent.json",
+            "/var/lib/scalyr-agent-2",
+        )
 
         config = Configuration(config_file, default_paths, None)
         config.parse()
@@ -72,8 +74,13 @@ class ScalyrTestUtils(object):
         return config
 
     @staticmethod
-    def create_test_monitors_manager(config_monitors=None, platform_monitors=None, extra_toplevel_config=None,
-                                     null_logger=False, fake_clock=False):
+    def create_test_monitors_manager(
+        config_monitors=None,
+        platform_monitors=None,
+        extra_toplevel_config=None,
+        null_logger=False,
+        fake_clock=False,
+    ):
         """Create a test MonitorsManager
 
         @param config_monitors: config monitors
@@ -87,7 +94,7 @@ class ScalyrTestUtils(object):
             for entry in config_monitors:
                 monitors_json_array.add(JsonObject(content=entry))
 
-        extras = {'monitors': monitors_json_array}
+        extras = {"monitors": monitors_json_array}
         if extra_toplevel_config:
             extras.update(extra_toplevel_config)
 
@@ -102,7 +109,7 @@ class ScalyrTestUtils(object):
         if null_logger:
             # Override Agent Logger to prevent writing to disk
             for monitor in test_manager.monitors:
-                monitor._logger = FakeAgentLogger('fake_agent_logger')
+                monitor._logger = FakeAgentLogger("fake_agent_logger")
 
         if fake_clock:
             for monitor in test_manager.monitors + [test_manager]:
@@ -134,6 +141,7 @@ class FakePlatform(object):
 
     Only implements the one method required for testing MonitorsManager.
     """
+
     def __init__(self, default_monitors):
         self.__monitors = default_monitors
 

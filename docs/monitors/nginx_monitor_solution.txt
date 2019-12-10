@@ -5,7 +5,7 @@ This Solution describes how to setup and make use of the Nginx Monitor included 
 Prerequisites:
 
 1.  Nginx is installed and running.  To verify:
-    - At a terminal prompt, enter the command "ps aux | grep nginx".  
+    - At a terminal prompt, enter the command "ps aux | grep nginx".
     - You should see something resembling:
 
         root      5806  0.0  0.1  85872 1340 ?   Ss   07:58   0:00 nginx: master process /usr/sbin/nginx
@@ -13,7 +13,7 @@ Prerequisites:
         www-data  5809  0.0  0.2  86152 1760 ?   S    07:58   0:00 nginx: worker process
         www-data  5810  0.0  0.2  86152 2016 ?   S    07:58   0:00 nginx: worker process
         www-data  5811  0.0  0.2  86152 1760 ?   S    07:58   0:00 nginx: worker process
-        
+
     - If it is not running, consult the specifics for your OS / Distribution on how to start Nginx
 
 2.  Root access to edit the Nginx configuration
@@ -23,22 +23,22 @@ Steps:
 1.  In your Nginx configuration, under the "server" directive, add the following:
 
         location /nginx_status {
-          stub_status on; 
-          allow 127.0.0.1; 
-          deny all;        
+          stub_status on;
+          allow 127.0.0.1;
+          deny all;
         }
-        
+
 2.  Restart Nginx.
 
 3.  Verify you can get to the status page, using curl, you would type the following:
 
         curl --interface "127.0.0.1" http://localhost/nginx_status
-        
+
 4.  The output should resemble:
 
-        Active connections: 1 
+        Active connections: 1
         server accepts handled requests
-         58 58 58 
+         58 58 58
         Reading: 0 Writing: 1 Waiting: 0
 
 5.  In your Scalyr Agent configuration file, you will need to add one of the following stanza to the monitor section to enable the Nginx Monitor:
@@ -61,12 +61,11 @@ There are a number of pre-configured graphs that are part of the MySQL dashboard
     - Connections Reading
         - metric: nginx.connections.reading
         - The graph shows the number of connections currently reading data from the connected clients.
-        
+
     - Connections Writing
         - metric: nginx.connections.writing
         - The graph shows the number of connections currently writing data to the connected clients.
-        
+
     - Connections Waiting
         - metric: nginx.connections.waiting
         - The graph shows the number of connections currently idle / sending keep-alives.
-        
