@@ -14,7 +14,7 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@scalyr.com'
+__author__ = "imron@scalyr.com"
 
 import errno
 import glob
@@ -32,179 +32,289 @@ import time
 import traceback
 from string import Template
 
-from scalyr_agent import ScalyrMonitor, define_config_option, AutoFlushingRotatingFileHandler
+from scalyr_agent import (
+    ScalyrMonitor,
+    define_config_option,
+    AutoFlushingRotatingFileHandler,
+)
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-from scalyr_agent.monitor_utils.auto_flushing_rotating_file import AutoFlushingRotatingFile
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
+    AutoFlushingRotatingFile,
+)
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.builtin_monitors.docker_monitor import get_attributes_and_config_from_labels
+from scalyr_agent.builtin_monitors.docker_monitor import (
+    get_attributes_and_config_from_labels,
+)
 from scalyr_agent.builtin_monitors.docker_monitor import get_parser_from_config
 from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+
 global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
 RUN_EXPIRE_COUNT = 100
 
-define_config_option(__monitor__, 'module',
-                     'Always ``scalyr_agent.builtin_monitors.syslog_monitor``',
-                     convert_to=str, required_option=True)
-define_config_option( __monitor__, 'protocols',
-                     'Optional (defaults to ``tcp:601``). Lists the protocols and ports on which the agent will accept '
-                     'messages. You can include one or more entries, separated by commas. Each entry must be of the '
-                     'form ``tcp:NNN`` or ``udp:NNN``. Port numbers are optional, defaulting to 601 for TCP and 514 '
-                     'for UDP',
-                     convert_to=str, default='tcp')
+define_config_option(
+    __monitor__,
+    "module",
+    "Always ``scalyr_agent.builtin_monitors.syslog_monitor``",
+    convert_to=str,
+    required_option=True,
+)
+define_config_option(
+    __monitor__,
+    "protocols",
+    "Optional (defaults to ``tcp:601``). Lists the protocols and ports on which the agent will accept "
+    "messages. You can include one or more entries, separated by commas. Each entry must be of the "
+    "form ``tcp:NNN`` or ``udp:NNN``. Port numbers are optional, defaulting to 601 for TCP and 514 "
+    "for UDP",
+    convert_to=str,
+    default="tcp",
+)
 
-define_config_option(__monitor__, 'accept_remote_connections',
-                     'Optional (defaults to false). If true, the plugin will accept network connections from any host; '
-                     'otherwise, it will only accept connections from localhost.',
-                     default=False, convert_to=bool)
+define_config_option(
+    __monitor__,
+    "accept_remote_connections",
+    "Optional (defaults to false). If true, the plugin will accept network connections from any host; "
+    "otherwise, it will only accept connections from localhost.",
+    default=False,
+    convert_to=bool,
+)
 
-define_config_option( __monitor__, 'message_log',
-                     'Optional (defaults to ``agent_syslog.log``). Specifies the file name under which syslog messages '
-                     'are stored. The file will be placed in the default Scalyr log directory, unless it is an '
-                     'absolute path',
-                     convert_to=str, default='agent_syslog.log')
+define_config_option(
+    __monitor__,
+    "message_log",
+    "Optional (defaults to ``agent_syslog.log``). Specifies the file name under which syslog messages "
+    "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
+    "absolute path",
+    convert_to=str,
+    default="agent_syslog.log",
+)
 
-define_config_option( __monitor__, 'parser',
-                     'Optional (defaults to ``agentSyslog``). Defines the parser name associated with the log file',
-                     convert_to=str, default='agentSyslog')
+define_config_option(
+    __monitor__,
+    "parser",
+    "Optional (defaults to ``agentSyslog``). Defines the parser name associated with the log file",
+    convert_to=str,
+    default="agentSyslog",
+)
 
-define_config_option( __monitor__, 'tcp_buffer_size',
-                     'Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog message.  '
-                     'Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD '
-                     'support messages up to 8192 bytes long.',
-                     default=8192, min_value=2048, max_value=65536*1024, convert_to=int)
+define_config_option(
+    __monitor__,
+    "tcp_buffer_size",
+    "Optional (defaults to 8K).  The maximum buffer size for a single TCP syslog message.  "
+    "Note: RFC 5425 (syslog over TCP/TLS) says syslog receivers MUST be able to support messages at least 2048 bytes long, and recommends they SHOULD "
+    "support messages up to 8192 bytes long.",
+    default=8192,
+    min_value=2048,
+    max_value=65536 * 1024,
+    convert_to=int,
+)
 
-define_config_option( __monitor__, 'max_log_size',
-                     'Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the '
-                     'default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero '
-                     'for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing '
-                     'disk space on the host running the agent. However, a very small limit could cause logs to be '
-                     'dropped if there is a temporary network outage and the log overflows before it can be sent to '
-                     'Scalyr',
-                     convert_to=int, default=None)
+define_config_option(
+    __monitor__,
+    "max_log_size",
+    "Optional (defaults to None). How large the log file will grow before it is rotated. If None, then the "
+    "default value will be taken from the monitor level or the global level log_rotation_max_bytes config option.  Set to zero "
+    "for infinite size. Note that rotation is not visible in Scalyr; it is only relevant for managing "
+    "disk space on the host running the agent. However, a very small limit could cause logs to be "
+    "dropped if there is a temporary network outage and the log overflows before it can be sent to "
+    "Scalyr",
+    convert_to=int,
+    default=None,
+)
 
-define_config_option( __monitor__, 'max_log_rotations',
-                     'Optional (defaults to None). The maximum number of log rotations before older log files are '
-                     'deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. '
-                     'Set to zero for infinite rotations.',
-                     convert_to=int, default=None)
+define_config_option(
+    __monitor__,
+    "max_log_rotations",
+    "Optional (defaults to None). The maximum number of log rotations before older log files are "
+    "deleted. If None, then the value is taken from the monitor level or the global level log_rotation_backup_count option. "
+    "Set to zero for infinite rotations.",
+    convert_to=int,
+    default=None,
+)
 
-define_config_option( __monitor__, 'log_flush_delay',
-                     'Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing '
-                     'the syslog messages.',
-                     convert_to=float, default=1.0)
+define_config_option(
+    __monitor__,
+    "log_flush_delay",
+    "Optional (defaults to 1.0). The time to wait in seconds between flushing the log file containing "
+    "the syslog messages.",
+    convert_to=float,
+    default=1.0,
+)
 
-define_config_option(__monitor__, 'mode',
-                     'Optional (defaults to "syslog"). If set to "docker", the plugin will enable extra functionality '
-                     'to properly receive log lines sent via the `docker_monitor`.  In particular, the plugin will '
-                     'check for container ids in the tags of the incoming lines and create log files based on their '
-                     'container names.',
-                     default='syslog', convert_to=str)
+define_config_option(
+    __monitor__,
+    "mode",
+    'Optional (defaults to "syslog"). If set to "docker", the plugin will enable extra functionality '
+    "to properly receive log lines sent via the `docker_monitor`.  In particular, the plugin will "
+    "check for container ids in the tags of the incoming lines and create log files based on their "
+    "container names.",
+    default="syslog",
+    convert_to=str,
+)
 
-define_config_option( __monitor__, 'docker_regex',
-                     'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
-                     'only has the container id.  If a message matches this regex then everything *after* '
-                     'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([a-z0-9]{12})\[\d+\]: ?')
+define_config_option(
+    __monitor__,
+    "docker_regex",
+    "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
+    "only has the container id.  If a message matches this regex then everything *after* "
+    "the full matching expression will be logged to a file called docker-<container-name>.log",
+    convert_to=str,
+    default="^.*([a-z0-9]{12})\[\d+\]: ?",
+)
 
-define_config_option( __monitor__, 'docker_regex_full',
-                     'Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog '
-                     'included both the container name and id.  If a message matches this regex then everything *after* '
-                     'the full matching expression will be logged to a file called docker-<container-name>.log',
-                     convert_to=str, default='^.*([^/]+)/([^[]+)\[\d+\]: ?')
+define_config_option(
+    __monitor__,
+    "docker_regex_full",
+    "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
+    "included both the container name and id.  If a message matches this regex then everything *after* "
+    "the full matching expression will be logged to a file called docker-<container-name>.log",
+    convert_to=str,
+    default="^.*([^/]+)/([^[]+)\[\d+\]: ?",
+)
 
-define_config_option( __monitor__, 'docker_expire_log',
-                     'Optional (defaults to 300).  The number of seconds of inactivity from a specific container before '
-                     'the log file is removed.  The log will be created again if a new message comes in from the container',
-                     default=300, convert_to=int)
+define_config_option(
+    __monitor__,
+    "docker_expire_log",
+    "Optional (defaults to 300).  The number of seconds of inactivity from a specific container before "
+    "the log file is removed.  The log will be created again if a new message comes in from the container",
+    default=300,
+    convert_to=int,
+)
 
-define_config_option( __monitor__, 'docker_accept_ips',
-                     'Optional.  A list of ip addresses to accept connections from if being run in a docker container. '
-                     'Defaults to a list with the ip address of the default docker bridge gateway. '
-                     'If accept_remote_connections is true, this option does nothing.')
+define_config_option(
+    __monitor__,
+    "docker_accept_ips",
+    "Optional.  A list of ip addresses to accept connections from if being run in a docker container. "
+    "Defaults to a list with the ip address of the default docker bridge gateway. "
+    "If accept_remote_connections is true, this option does nothing.",
+)
 
-define_config_option(__monitor__, 'docker_api_socket',
-                     'Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with '
-                     'the docker API. This is only used when `mode` is set to `docker` to look up container '
-                     'names by their ids.  WARNING, you must also set the `api_socket` configuration option in the '
-                     'docker monitor to this same value.\n'
-                     'Note:  You need to map the host\'s /run/docker.sock to the same value as specified here, using '
-                     'the -v parameter, e.g.\n'
-                     '\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...',
-                     convert_to=str, default='/var/scalyr/docker.sock')
+define_config_option(
+    __monitor__,
+    "docker_api_socket",
+    "Optional (defaults to /var/scalyr/docker.sock). Defines the unix socket used to communicate with "
+    "the docker API. This is only used when `mode` is set to `docker` to look up container "
+    "names by their ids.  WARNING, you must also set the `api_socket` configuration option in the "
+    "docker monitor to this same value.\n"
+    "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using "
+    "the -v parameter, e.g.\n"
+    "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
+    convert_to=str,
+    default="/var/scalyr/docker.sock",
+)
 
-define_config_option(__monitor__, 'docker_api_version',
-                     'Optional (defaults to \'auto\'). The version of the Docker API to use when communicating to '
-                     'docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker '
-                     'monitor to this same value.', convert_to=str, default='auto')
+define_config_option(
+    __monitor__,
+    "docker_api_version",
+    "Optional (defaults to 'auto'). The version of the Docker API to use when communicating to "
+    "docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker "
+    "monitor to this same value.",
+    convert_to=str,
+    default="auto",
+)
 
-define_config_option(__monitor__, 'docker_logfile_template',
-                     'Optional (defaults to \'containers/${CNAME}.log\'). The template used to create the log '
-                     'file paths for save docker logs sent by other containers via syslog.  The variables $CNAME and '
-                     '$CID will be substituted with the name and id of the container that is emitting the logs.  If '
-                     'the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log '
-                     'directory.', convert_to=str, default='containers/${CNAME}.log')
+define_config_option(
+    __monitor__,
+    "docker_logfile_template",
+    "Optional (defaults to 'containers/${CNAME}.log'). The template used to create the log "
+    "file paths for save docker logs sent by other containers via syslog.  The variables $CNAME and "
+    "$CID will be substituted with the name and id of the container that is emitting the logs.  If "
+    "the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log "
+    "directory.",
+    convert_to=str,
+    default="containers/${CNAME}.log",
+)
 
-define_config_option(__monitor__, 'docker_cid_cache_lifetime_secs',
-                     'Optional (defaults to 300). Controls the docker id to container name cache expiration.  After '
-                     'this number of seconds of inactivity, the cache entry will be evicted.',
-                     convert_to=float, default=300.0)
+define_config_option(
+    __monitor__,
+    "docker_cid_cache_lifetime_secs",
+    "Optional (defaults to 300). Controls the docker id to container name cache expiration.  After "
+    "this number of seconds of inactivity, the cache entry will be evicted.",
+    convert_to=float,
+    default=300.0,
+)
 
-define_config_option(__monitor__, 'docker_cid_clean_time_secs',
-                     'Optional (defaults to 5.0). The number seconds to wait between cleaning the docker id to '
-                     'container name cache.',
-                     convert_to=float, default=5.0)
+define_config_option(
+    __monitor__,
+    "docker_cid_clean_time_secs",
+    "Optional (defaults to 5.0). The number seconds to wait between cleaning the docker id to "
+    "container name cache.",
+    convert_to=float,
+    default=5.0,
+)
 
-define_config_option(__monitor__, 'docker_use_daemon_to_resolve',
-                     'Optional (defaults to True). If True, will use the Docker daemon (via the docker_api_socket to '
-                     'resolve container ids to container names.  If you set this to False, you must be sure to add the '
-                     '--log-opt tag="/{{.Name}}/{{.ID}}" to your running containers to pass the container name in the '
-                     'log messages.',
-                     convert_to=bool, default=True)
+define_config_option(
+    __monitor__,
+    "docker_use_daemon_to_resolve",
+    "Optional (defaults to True). If True, will use the Docker daemon (via the docker_api_socket to "
+    "resolve container ids to container names.  If you set this to False, you must be sure to add the "
+    '--log-opt tag="/{{.Name}}/{{.ID}}" to your running containers to pass the container name in the '
+    "log messages.",
+    convert_to=bool,
+    default=True,
+)
 
-define_config_option(__monitor__, 'docker_check_for_unused_logs_mins',
-                     'Optional (defaults to 60). The number of minutes to wait between checking to see if there are any '
-                     'log files matchings the docker_logfile_template that haven\'t been written to for a while and can '
-                     'be deleted',
-                     convert_to=int, default=60)
+define_config_option(
+    __monitor__,
+    "docker_check_for_unused_logs_mins",
+    "Optional (defaults to 60). The number of minutes to wait between checking to see if there are any "
+    "log files matchings the docker_logfile_template that haven't been written to for a while and can "
+    "be deleted",
+    convert_to=int,
+    default=60,
+)
 
-define_config_option(__monitor__, 'docker_delete_unused_logs_hours',
-                     'Optional (defaults to 24). The number of hours to wait before deleting any '
-                     'log files matchings the docker_logfile_template',
-                     convert_to=int, default=24)
+define_config_option(
+    __monitor__,
+    "docker_delete_unused_logs_hours",
+    "Optional (defaults to 24). The number of hours to wait before deleting any "
+    "log files matchings the docker_logfile_template",
+    convert_to=int,
+    default=24,
+)
 
-define_config_option(__monitor__, 'docker_check_rotated_timestamps',
-                     'Optional (defaults to True). If True, will check timestamps of all file rotations to see if they '
-                     'should be individually deleted based on the the log deletion configuration options. '
-                     'If False, only the file modification time of the main log file is checked, and the rotated files '
-                     'will only be deleted when the main log file is deleted.',
-                     convert_to=bool, default=True)
+define_config_option(
+    __monitor__,
+    "docker_check_rotated_timestamps",
+    "Optional (defaults to True). If True, will check timestamps of all file rotations to see if they "
+    "should be individually deleted based on the the log deletion configuration options. "
+    "If False, only the file modification time of the main log file is checked, and the rotated files "
+    "will only be deleted when the main log file is deleted.",
+    convert_to=bool,
+    default=True,
+)
+
 
 def _get_default_gateway():
     """Read the default gateway directly from /proc."""
-    result = 'localhost'
+    result = "localhost"
     fh = None
     try:
         fh = open("/proc/net/route")
         for line in fh:
             fields = line.strip().split()
-            if fields[1] != '00000000' or not int(fields[3], 16) & 2:
+            if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
 
             result = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
     except IOError, e:
-        global_log.error('Error while getting the default gateway: %s', str(e), limit_once_per_x_secs=300,
-                           limit_key='_get_default_gateway_error')
+        global_log.error(
+            "Error while getting the default gateway: %s",
+            str(e),
+            limit_once_per_x_secs=300,
+            limit_key="_get_default_gateway_error",
+        )
     finally:
         if fh:
             fh.close()
 
     return result
+
 
 class SyslogFrameParser(object):
     """Simple abstraction that implements a 'parse_request' that can be used to parse incoming syslog
@@ -212,6 +322,7 @@ class SyslogFrameParser(object):
     integer specifying the number of octects in the message.  The parser performs detection of
     which type the message is and handles it appropriately.
     """
+
     def __init__(self, max_request_size):
         """Creates a new instance.
 
@@ -240,87 +351,90 @@ class SyslogFrameParser(object):
         new_position = None
         try:
             new_position = input_buffer.tell()
-            buf = input_buffer.read( self.__max_request_size + 1)
+            buf = input_buffer.read(self.__max_request_size + 1)
 
             bytes_received = len(buf)
 
             if bytes_received > self.__max_request_size:
                 # We just consume these bytes if the line did exceeded the maximum.  To some degree, this
                 # typically does not matter since once we see any error on a connection, we close it down.
-                global_log.warning( "SyslogFrameParser - bytes received exceed buffer size.  Some logs may be lost." )
+                global_log.warning(
+                    "SyslogFrameParser - bytes received exceed buffer size.  Some logs may be lost."
+                )
                 new_position = None
                 raise RequestSizeExceeded(bytes_received, self.__max_request_size)
 
             framed = False
             if bytes_received > 0:
                 c = buf[0]
-                framed = (c >= '0' and c <= '9')
+                framed = c >= "0" and c <= "9"
             else:
                 return None
 
-            #offsets contains the start and end offsets of the message within the buffer.
-            #an end offset of 0 indicates there is not a valid message in the buffer yet
+            # offsets contains the start and end offsets of the message within the buffer.
+            # an end offset of 0 indicates there is not a valid message in the buffer yet
             offsets = (0, 0)
             if framed:
-                offsets = self._framed_offsets( buf, bytes_received )
+                offsets = self._framed_offsets(buf, bytes_received)
             else:
-                offsets = self._unframed_offsets( buf, bytes_received )
+                offsets = self._unframed_offsets(buf, bytes_received)
 
             if offsets[1] != 0:
-                #our new position is going to be the previous position plus the end offset
+                # our new position is going to be the previous position plus the end offset
                 new_position += offsets[1]
 
-                #return a slice containing the full message
-                return buf[ offsets[0]:offsets[1] ]
+                # return a slice containing the full message
+                return buf[offsets[0] : offsets[1]]
 
             return None
         finally:
             if new_position is not None:
                 input_buffer.seek(new_position)
 
-    def _framed_offsets( self, frame_buffer, length ):
+    def _framed_offsets(self, frame_buffer, length):
         result = (0, 0)
-        pos = frame_buffer.find( ' ' )
+        pos = frame_buffer.find(" ")
         if pos != -1:
-            frame_size = int( frame_buffer[0:pos] )
+            frame_size = int(frame_buffer[0:pos])
             message_offset = pos + 1
             if length - message_offset >= frame_size:
                 result = (message_offset, message_offset + frame_size)
 
         return result
 
-    def _unframed_offsets( self, frame_buffer, length ):
+    def _unframed_offsets(self, frame_buffer, length):
         result = (0, 0)
-        pos = frame_buffer.find( '\n' )
+        pos = frame_buffer.find("\n")
         if pos != -1:
             result = (0, pos + 1)
 
         return result
 
 
-class SyslogUDPHandler( SocketServer.BaseRequestHandler ):
+class SyslogUDPHandler(SocketServer.BaseRequestHandler):
     """Class that reads data from a UDP request and passes it to
     a protocol neutral handler
     """
-    def handle( self ):
-        self.server.syslog_handler.handle( self.request[0].strip() )
+
+    def handle(self):
+        self.server.syslog_handler.handle(self.request[0].strip())
 
 
-class SyslogRequestParser( object ):
-    def __init__( self, socket, max_buffer_size ):
+class SyslogRequestParser(object):
+    def __init__(self, socket, max_buffer_size):
         self._socket = socket
         if socket:
-            self._socket.setblocking( False )
+            self._socket.setblocking(False)
         self._remaining = None
         self._max_buffer_size = max_buffer_size
         self.is_closed = False
 
-    def read( self ):
+    def read(self):
         """Reads self._max_buffer_size bytes from the buffer"""
 
         data = None
         try:
-            data = self._socket.recv( self._max_buffer_size )
+            data = self._socket.recv(self._max_buffer_size)
             if not data:
                 self.is_closed = True
         except socket.timeout:
@@ -330,19 +444,26 @@ class SyslogRequestParser( object ):
             if e.errno == errno.EAGAIN:
                 return None
             else:
-                global_log.warning('Network error while reading from syslog: %s', str(e), limit_once_per_x_secs=300,
-                                   limit_key='syslog-network-error')
+                global_log.warning(
+                    "Network error while reading from syslog: %s",
+                    str(e),
+                    limit_once_per_x_secs=300,
+                    limit_key="syslog-network-error",
+                )
                 self._socket_error = True
                 raise e
 
         return data
 
-    def process( self, data, handle_frame ):
+    def process(self, data, handle_frame):
         """Processes data returned from a previous call to read
         """
         if not data:
-            global_log.warning('Syslog has seen an empty request, could be an indication of missing data',
-                               limit_once_per_x_secs=600, limit_key='syslog-empty-request')
+            global_log.warning(
+                "Syslog has seen an empty request, could be an indication of missing data",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-empty-request",
+            )
             return
 
         # append data to what we had remaining from the previous call
@@ -352,7 +473,7 @@ class SyslogRequestParser( object ):
             self._remaining = data
             self._offset = 0
 
-        size = len( self._remaining )
+        size = len(self._remaining)
 
         # process the buffer until we are out of bytes
         frames_handled = 0
@@ -361,81 +482,93 @@ class SyslogRequestParser( object ):
 
             # get the first byte to determine if framed or not
             c = self._remaining[self._offset]
-            framed = (c >= '0' and c <= '9')
+            framed = c >= "0" and c <= "9"
 
-            skip = 0 # do we need to skip any bytes at the end of the frame (e.g. newlines)
+            skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
 
-            #if framed, read the frame size
+            # if framed, read the frame size
             if framed:
                 frame_end = -1
-                pos = self._remaining.find( " ", self._offset )
+                pos = self._remaining.find(" ", self._offset)
                 if pos != -1:
-                    frame_size = int( self._remaining[self._offset:pos] )
+                    frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
                     if size - message_offset >= frame_size:
                         self._offset = message_offset
                         frame_end = self._offset + frame_size
             else:
                 # not framed, find the first newline
-                frame_end = self._remaining.find( "\n", self._offset )
+                frame_end = self._remaining.find("\n", self._offset)
                 skip = 1
 
             # if we couldn't find the end of a frame, then it's time
             # to exit the loop and wait for more data
             if frame_end == -1:
 
-                #if the remaining bytes exceed the maximum buffer size, issue a warning
-                #and dump existing contents to the handler
+                # if the remaining bytes exceed the maximum buffer size, issue a warning
+                # and dump existing contents to the handler
                 if size - self._offset >= self._max_buffer_size:
-                    global_log.warning( "Syslog frame exceeded maximum buffer size",
-                                         limit_once_per_x_secs=300,
-                                         limit_key='syslog-max-buffer-exceeded')
-                    handle_frame( self._remaining )
+                    global_log.warning(
+                        "Syslog frame exceeded maximum buffer size",
+                        limit_once_per_x_secs=300,
+                        limit_key="syslog-max-buffer-exceeded",
+                    )
+                    handle_frame(self._remaining)
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
-                    self._remaining = ' '
+                    self._remaining = " "
                     self._offset = 0
 
                 break
 
             # output the frame
             frame_length = frame_end - self._offset
-            handle_frame( self._remaining[self._offset:frame_end].strip() )
+            handle_frame(self._remaining[self._offset : frame_end].strip())
             frames_handled += 1
 
             self._offset += frame_length + skip
 
         if frames_handled == 0:
-            global_log.info('No frames ready to be handled in syslog.. advisory notice',
-                            limit_once_per_x_secs=600, limit_key='syslog-no-frames')
+            global_log.info(
+                "No frames ready to be handled in syslog.. advisory notice",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-no-frames",
+            )
 
-        self._remaining = self._remaining[self._offset:]
+        self._remaining = self._remaining[self._offset :]
         self._offset = 0
 
 
-class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
+class SyslogTCPHandler(SocketServer.BaseRequestHandler):
     """Class that reads data from a TCP request and passes it to
     a protocol neutral handler
     """
-    def handle( self ):
+
+    def handle(self):
         try:
-            request_stream = SyslogRequestParser( self.request, self.server.tcp_buffer_size )
-            global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - created request_stream. Thread: %d", threading.current_thread().ident )
+            request_stream = SyslogRequestParser(
+                self.request, self.server.tcp_buffer_size
+            )
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_1,
+                "SyslogTCPHandler.handle - created request_stream. Thread: %d",
+                threading.current_thread().ident,
+            )
             count = 0
             while not request_stream.is_closed:
                 check_running = False
 
                 data = request_stream.read()
                 if data is not None:
-                    request_stream.process( data, self.server.syslog_handler.handle )
+                    request_stream.process(data, self.server.syslog_handler.handle)
                     count += 1
                     if count > 1000:
                         check_running = True
                         count = 0
                 else:
                     # don't hog the CPU
-                    time.sleep( 0.01 )
+                    time.sleep(0.01)
                     check_running = True
 
                 # limit the amount of times we check if the server is still running
@@ -444,123 +577,169 @@ class SyslogTCPHandler( SocketServer.BaseRequestHandler ):
                     break
 
         except Exception, e:
-            global_log.warning( "Error handling request: %s\n\t%s", str( e ), traceback.format_exc() )
+            global_log.warning(
+                "Error handling request: %s\n\t%s", str(e), traceback.format_exc()
+            )
 
-        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "SyslogTCPHandler.handle - closing request_stream. Thread: %d", threading.current_thread().ident )
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "SyslogTCPHandler.handle - closing request_stream. Thread: %d",
+            threading.current_thread().ident,
+        )
 
 
-class SyslogUDPServer( SocketServer.ThreadingMixIn, SocketServer.UDPServer ):
+class SyslogUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
     """Class that creates a UDP SocketServer on a specified port
     """
-    def __init__( self, port, bind_address, verifier ):
+
+    def __init__(self, port, bind_address, verifier):
 
         self.__verifier = verifier
-        address = ( bind_address, port )
-        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "UDP Server: binding socket to %s" % str( address ) )
+        address = (bind_address, port)
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "UDP Server: binding socket to %s" % str(address),
+        )
 
         self.allow_reuse_address = True
-        SocketServer.UDPServer.__init__( self, address, SyslogUDPHandler )
+        SocketServer.UDPServer.__init__(self, address, SyslogUDPHandler)
 
-    def verify_request( self, request, client_address ):
-        return self.__verifier.verify_request( client_address )
+    def verify_request(self, request, client_address):
+        return self.__verifier.verify_request(client_address)
 
-    def set_run_state( self, run_state ):
+    def set_run_state(self, run_state):
         """Do Nothing only TCP connections need the runstate"""
         pass
 
-class SyslogTCPServer( SocketServer.ThreadingMixIn, SocketServer.TCPServer ):
+
+class SyslogTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     """Class that creates a TCP SocketServer on a specified port
     """
-    def __init__( self, port, tcp_buffer_size, bind_address, verifier ):
+
+    def __init__(self, port, tcp_buffer_size, bind_address, verifier):
 
         self.__verifier = verifier
-        address = ( bind_address, port )
-        global_log.log(scalyr_logging.DEBUG_LEVEL_1, "TCP Server: binding socket to %s" % str( address ) )
+        address = (bind_address, port)
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_1,
+            "TCP Server: binding socket to %s" % str(address),
+        )
 
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
-        SocketServer.TCPServer.__init__( self, address, SyslogTCPHandler )
+        SocketServer.TCPServer.__init__(self, address, SyslogTCPHandler)
 
-    def verify_request( self, request, client_address ):
-        return self.__verifier.verify_request( client_address )
+    def verify_request(self, request, client_address):
+        return self.__verifier.verify_request(client_address)
 
-    def set_run_state( self, run_state ):
+    def set_run_state(self, run_state):
         self.__run_state = run_state
 
-    def is_running( self ):
+    def is_running(self):
         if self.__run_state:
             return self.__run_state.is_running()
 
         return False
 
-class LogDeleter( object ):
+
+class LogDeleter(object):
     """Deletes unused log files that match a log_file_template"""
 
-    def __init__( self, check_interval_mins, delete_interval_hours, check_rotated_timestamps, max_log_rotations, log_path, log_file_template ):
+    def __init__(
+        self,
+        check_interval_mins,
+        delete_interval_hours,
+        check_rotated_timestamps,
+        max_log_rotations,
+        log_path,
+        log_file_template,
+    ):
         self._check_interval = check_interval_mins * 60
         self._delete_interval = delete_interval_hours * 60 * 60
         self._check_rotated_timestamps = check_rotated_timestamps
         self._max_log_rotations = max_log_rotations
-        self._log_glob = os.path.join( log_path, log_file_template.safe_substitute( CID='*', CNAME='*' ) )
+        self._log_glob = os.path.join(
+            log_path, log_file_template.safe_substitute(CID="*", CNAME="*")
+        )
 
         self._last_check = time.time()
 
-    def _get_old_logs_for_glob( self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations ):
+    def _get_old_logs_for_glob(
+        self, current_time, glob_pattern, existing_logs, check_rotated, max_rotations
+    ):
 
         result = []
 
-        for matching_file in glob.glob( glob_pattern ):
+        for matching_file in glob.glob(glob_pattern):
             try:
                 added = False
                 mtime = os.path.getmtime(matching_file)
-                if current_time - mtime > self._delete_interval and matching_file not in existing_logs:
-                    result.append( matching_file )
+                if (
+                    current_time - mtime > self._delete_interval
+                    and matching_file not in existing_logs
+                ):
+                    result.append(matching_file)
                     added = True
 
-                for i in range( max_rotations, 0, -1 ):
-                    rotated_file = matching_file + ('.%d' % i)
+                for i in range(max_rotations, 0, -1):
+                    rotated_file = matching_file + (".%d" % i)
                     try:
-                        if not os.path.isfile( rotated_file ):
+                        if not os.path.isfile(rotated_file):
                             continue
 
                         if check_rotated:
                             mtime = os.path.getmtime(rotated_file)
                             if current_time - mtime > self._delete_interval:
-                                result.append( rotated_file )
+                                result.append(rotated_file)
                         else:
                             if added:
-                                result.append( rotated_file )
+                                result.append(rotated_file)
 
                     except OSError, e:
-                        global_log.warn( "Unable to read modification time for file '%s', %s" % (rotated_file, str(e)),
-                                          limit_once_per_x_secs=300,
-                                          limit_key='mtime-%s'%rotated_file)
-
+                        global_log.warn(
+                            "Unable to read modification time for file '%s', %s"
+                            % (rotated_file, str(e)),
+                            limit_once_per_x_secs=300,
+                            limit_key="mtime-%s" % rotated_file,
+                        )
 
             except OSError, e:
-                global_log.warn( "Unable to read modification time for file '%s', %s" % (matching_file, str(e)),
-                                  limit_once_per_x_secs=300,
-                                  limit_key='mtime-%s'%matching_file)
+                global_log.warn(
+                    "Unable to read modification time for file '%s', %s"
+                    % (matching_file, str(e)),
+                    limit_once_per_x_secs=300,
+                    limit_key="mtime-%s" % matching_file,
+                )
         return result
 
-    def check_for_old_logs( self, existing_logs ):
+    def check_for_old_logs(self, existing_logs):
 
         old_logs = []
         current_time = time.time()
         if current_time - self._last_check > self._check_interval:
 
-            old_logs = self._get_old_logs_for_glob( current_time, self._log_glob, existing_logs, self._check_rotated_timestamps, self._max_log_rotations )
+            old_logs = self._get_old_logs_for_glob(
+                current_time,
+                self._log_glob,
+                existing_logs,
+                self._check_rotated_timestamps,
+                self._max_log_rotations,
+            )
             self._last_check = current_time
 
         for filename in old_logs:
             try:
-                os.remove( filename )
-                global_log.log(scalyr_logging.DEBUG_LEVEL_1, "Deleted old log file '%s'" % filename )
+                os.remove(filename)
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_1, "Deleted old log file '%s'" % filename
+                )
             except OSError, e:
-                global_log.warn( "Error deleting old log file '%s', %s" % (filename, str(e)),
-                                  limit_once_per_x_secs=300,
-                                  limit_key='delete-%s'%filename)
+                global_log.warn(
+                    "Error deleting old log file '%s', %s" % (filename, str(e)),
+                    limit_once_per_x_secs=300,
+                    limit_key="delete-%s" % filename,
+                )
 
 
 class SyslogHandler(object):
@@ -569,9 +748,20 @@ class SyslogHandler(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options, docker_options ):
 
-        docker_logging = config.get('mode') == 'docker'
+    def __init__(
+        self,
+        logger,
+        line_reporter,
+        config,
+        server_host,
+        log_path,
+        get_log_watcher,
+        rotate_options,
+        docker_options,
+    ):
+
+        docker_logging = config.get("mode") == "docker"
         self.__docker_regex = None
         self.__docker_regex_full = None
         self.__docker_id_resolver = None
@@ -581,15 +771,15 @@ class SyslogHandler(object):
         self._docker_options = None
 
         if rotate_options is None:
-            rotate_options = (2, 20*1024*1024)
+            rotate_options = (2, 20 * 1024 * 1024)
 
         default_rotation_count, default_max_bytes = rotate_options
 
-        rotation_count = config.get( 'max_log_rotations' )
+        rotation_count = config.get("max_log_rotations")
         if rotation_count is None:
             rotation_count = default_rotation_count
 
-        max_log_size = config.get( 'max_log_size' )
+        max_log_size = config.get("max_log_size")
         if max_log_size is None:
             max_log_size = default_max_bytes
 
@@ -598,25 +788,32 @@ class SyslogHandler(object):
             if self._docker_options is None:
                 self._docker_options = DockerOptions()
 
-            self.__docker_regex_full = self.__get_regex(config, 'docker_regex_full')
-            self.__docker_regex = self.__get_regex(config, 'docker_regex')
-            self.__docker_file_template = Template(config.get('docker_logfile_template'))
-            self.__docker_log_deleter = LogDeleter( config.get( 'docker_check_for_unused_logs_mins' ),
-                                                    config.get( 'docker_delete_unused_logs_hours' ),
-                                                    config.get( 'docker_check_rotated_timestamps' ),
-                                                    rotation_count,
-                                                    log_path,
-                                                    self.__docker_file_template )
+            self.__docker_regex_full = self.__get_regex(config, "docker_regex_full")
+            self.__docker_regex = self.__get_regex(config, "docker_regex")
+            self.__docker_file_template = Template(
+                config.get("docker_logfile_template")
+            )
+            self.__docker_log_deleter = LogDeleter(
+                config.get("docker_check_for_unused_logs_mins"),
+                config.get("docker_delete_unused_logs_hours"),
+                config.get("docker_check_rotated_timestamps"),
+                rotation_count,
+                log_path,
+                self.__docker_file_template,
+            )
 
-            if config.get('docker_use_daemon_to_resolve'):
-                from scalyr_agent.builtin_monitors.docker_monitor import ContainerIdResolver
-                self.__docker_id_resolver = ContainerIdResolver(config.get('docker_api_socket'),
-                                                                config.get('docker_api_version'),
-                                                                global_log,
-                                                                cache_expiration_secs=config.get(
-                                                                   'docker_cid_cache_lifetime_secs'),
-                                                                cache_clean_secs=config.get(
-                                                                    'docker_cid_clean_time_secs'))
+            if config.get("docker_use_daemon_to_resolve"):
+                from scalyr_agent.builtin_monitors.docker_monitor import (
+                    ContainerIdResolver,
+                )
+
+                self.__docker_id_resolver = ContainerIdResolver(
+                    config.get("docker_api_socket"),
+                    config.get("docker_api_version"),
+                    global_log,
+                    cache_expiration_secs=config.get("docker_cid_cache_lifetime_secs"),
+                    cache_clean_secs=config.get("docker_cid_clean_time_secs"),
+                )
 
         self.__log_path = log_path
         self.__server_host = server_host
@@ -631,11 +828,11 @@ class SyslogHandler(object):
         self.__expire_count = 0
         self.__logger_lock = threading.Lock()
 
-        self.__docker_expire_log = config.get( 'docker_expire_log' )
+        self.__docker_expire_log = config.get("docker_expire_log")
 
         self.__max_log_rotations = rotation_count
         self.__max_log_size = max_log_size
-        self.__flush_delay = config.get('log_flush_delay')
+        self.__flush_delay = config.get("log_flush_delay")
 
     def __get_regex(self, config, field_name):
         value = config.get(field_name)
@@ -644,61 +841,64 @@ class SyslogHandler(object):
         else:
             return None
 
-    def __create_log_config( self, cname, cid, base_config, attributes ):
+    def __create_log_config(self, cname, cid, base_config, attributes):
 
         # Set the parser the log_config['parser'] level
         # otherwise it will be overwritten by a default value due to the way
         # log_config verification works
-        base_config['parser'] = get_parser_from_config( base_config, attributes, 'agentSyslogDocker' )
+        base_config["parser"] = get_parser_from_config(
+            base_config, attributes, "agentSyslogDocker"
+        )
 
         # config attributes override passed in attributes
-        attributes.update( base_config.get( 'attributes', {} ) )
+        attributes.update(base_config.get("attributes", {}))
 
         # extra attributes override passed in attributes and config attributes
-        extra_attributes = self.__extra_attributes( cname, cid )
+        extra_attributes = self.__extra_attributes(cname, cid)
         if extra_attributes:
-            attributes.update( extra_attributes )
+            attributes.update(extra_attributes)
 
-        base_config['attributes'] = JsonObject( attributes )
+        base_config["attributes"] = JsonObject(attributes)
 
-        full_path = os.path.join( self.__log_path, self.__docker_file_template.safe_substitute(
-            {'CID': cid, 'CNAME': cname}))
-        base_config['path'] = full_path
+        full_path = os.path.join(
+            self.__log_path,
+            self.__docker_file_template.safe_substitute({"CID": cid, "CNAME": cname}),
+        )
+        base_config["path"] = full_path
 
         return base_config
 
-    def __extra_attributes( self, cname, cid ):
+    def __extra_attributes(self, cname, cid):
 
         attributes = None
         try:
-            attributes = JsonObject( {
-                "monitor": "agentSyslog",
-                "containerName": cname,
-                "containerId": cid
-            } )
+            attributes = JsonObject(
+                {"monitor": "agentSyslog", "containerName": cname, "containerId": cid}
+            )
 
             if self.__server_host:
-                attributes['serverHost'] = self.__server_host
-
+                attributes["serverHost"] = self.__server_host
 
         except Exception, e:
-            global_log.error( "Error setting docker logger attribute in SyslogMonitor" )
+            global_log.error("Error setting docker logger attribute in SyslogMonitor")
             raise
 
         return attributes
 
-    def __create_log_file( self, cname, cid, log_config ):
+    def __create_log_file(self, cname, cid, log_config):
         """create our own rotating logger which will log raw messages out to disk.
         """
         result = None
         try:
-            result = AutoFlushingRotatingFile( filename = log_config['path'],
-                                                                  max_bytes = self.__max_log_size,
-                                                                  backup_count = self.__max_log_rotations,
-                                                                  flush_delay = self.__flush_delay)
+            result = AutoFlushingRotatingFile(
+                filename=log_config["path"],
+                max_bytes=self.__max_log_size,
+                backup_count=self.__max_log_rotations,
+                flush_delay=self.__flush_delay,
+            )
 
         except Exception, e:
-            global_log.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+            global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
             result = None
 
         return result
@@ -718,47 +918,53 @@ class SyslogHandler(object):
         """
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.
-        reason_flags = ''
+        reason_flags = ""
         if self.__docker_regex is not None and self.__docker_id_resolver is not None:
-            reason_flags += '1'
+            reason_flags += "1"
             m = self.__docker_regex.match(data)
             if m is not None:
-                reason_flags += '2'
-                #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
+                reason_flags += "2"
+                # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid-only syslog format')
                 cid = m.group(1)
                 cname = None
                 clabels = None
                 self.__logger_lock.acquire()
                 try:
                     if cid not in self.__container_info:
-                        reason_flags += '3'
-                        self.__container_info[cid] = self.__docker_id_resolver.lookup(cid)
+                        reason_flags += "3"
+                        self.__container_info[cid] = self.__docker_id_resolver.lookup(
+                            cid
+                        )
                     cname, clabels = self.__container_info[cid]
                 finally:
                     self.__logger_lock.release()
 
                 if cid is not None and cname is not None and clabels is not None:
-                    #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
-                    return cname, cid, clabels, data[m.end():]
+                    # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
+                    return cname, cid, clabels, data[m.end() :]
 
         if self.__docker_regex_full is not None:
-            reason_flags += '4'
+            reason_flags += "4"
             m = self.__docker_regex_full.match(data)
             if m is not None:
-                reason_flags += '5'
+                reason_flags += "5"
 
             if m is not None and m.lastindex == 2:
-                #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
-                return m.group(1), m.group(2), {}, data[m.end():]
+                # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
+                return m.group(1), m.group(2), {}, data[m.end() :]
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
 
-        global_log.warn('Could not determine container from following incoming data.  Container logs may be '
-                        'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
-                        'regex: "%s" or full regex: "%s"' % (reason_flags, data[:70], regex_str, regex_full_str),
-                        limit_once_per_x_secs=300, limit_key='syslog_docker_cid_not_extracted')
-        #global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
+        global_log.warn(
+            "Could not determine container from following incoming data.  Container logs may be "
+            'missing, performance could be impacted.  Data(%s): "%s" Did not match either single '
+            'regex: "%s" or full regex: "%s"'
+            % (reason_flags, data[:70], regex_str, regex_full_str),
+            limit_once_per_x_secs=300,
+            limit_key="syslog_docker_cid_not_extracted",
+        )
+        # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Could not extract cid/cname for "%s"', data)
 
         return None, None, None, None
 
@@ -771,7 +977,7 @@ class SyslogHandler(object):
             result = regex_value.pattern
         return str(result)
 
-    def __handle_docker_logs( self, data ):
+    def __handle_docker_logs(self, data):
 
         watcher = None
         module = None
@@ -795,33 +1001,41 @@ class SyslogHandler(object):
                 if cname not in self.__docker_loggers:
                     info = dict()
 
-                    attrs, base_config = get_attributes_and_config_from_labels( labels, self._docker_options )
+                    attrs, base_config = get_attributes_and_config_from_labels(
+                        labels, self._docker_options
+                    )
 
                     # get the config and set the attributes
-                    info['log_config'] = self.__create_log_config( cname, cid, base_config, attrs  )
-                    info['cid'] = cid
+                    info["log_config"] = self.__create_log_config(
+                        cname, cid, base_config, attrs
+                    )
+                    info["cid"] = cid
 
                     # create the physical log files
-                    info['logger'] = self.__create_log_file( cname, cid, info['log_config'] )
-                    info['last_seen'] = current_time
+                    info["logger"] = self.__create_log_file(
+                        cname, cid, info["log_config"]
+                    )
+                    info["last_seen"] = current_time
 
                     # if we created the log file
-                    if info['logger']:
+                    if info["logger"]:
                         # add it to the main scalyr log watcher
                         if watcher and module:
-                            info['log_config'] = watcher.add_log_config( module.module_name, info['log_config'] )
+                            info["log_config"] = watcher.add_log_config(
+                                module.module_name, info["log_config"]
+                            )
 
                         # and keep a record for ourselves
                         self.__docker_loggers[cname] = info
                     else:
-                        global_log.warn( "Unable to create logger for %s." % cname )
+                        global_log.warn("Unable to create logger for %s." % cname)
                         return
 
                 # at this point __docker_loggers will always contain
                 # a logger for this container name, so log the message
                 # and mark the time
                 logger = self.__docker_loggers[cname]
-                logger['last_seen'] = current_time
+                logger["last_seen"] = current_time
 
             if self.__expire_count >= RUN_EXPIRE_COUNT:
                 self.__expire_count = 0
@@ -831,59 +1045,68 @@ class SyslogHandler(object):
                 expired = []
 
                 for key, info in self.__docker_loggers.iteritems():
-                    if current_time - info['last_seen'] > self.__docker_expire_log:
-                        expired.append( key )
+                    if current_time - info["last_seen"] > self.__docker_expire_log:
+                        expired.append(key)
 
                 # remove all the expired loggers
                 for key in expired:
-                    info = self.__docker_loggers.pop( key, None )
+                    info = self.__docker_loggers.pop(key, None)
                     if info:
-                        info['logger'].close()
+                        info["logger"].close()
                         if watcher and module:
-                            watcher.remove_log_path( module.module_name, info['log_config']['path'] )
+                            watcher.remove_log_path(
+                                module.module_name, info["log_config"]["path"]
+                            )
             self.__expire_count += 1
 
             for key, info in self.__docker_loggers.iteritems():
-                current_log_files.append( info['log_config']['path'] )
+                current_log_files.append(info["log_config"]["path"])
         finally:
             self.__logger_lock.release()
 
         if logger:
-            logger['logger'].write(line_content)
+            logger["logger"].write(line_content)
         else:
-            global_log.warning('Syslog writing docker logs to syslog file instead of container log',
-                               limit_once_per_x_secs=600, limit_key='syslog-docker-not-container-log')
-            self.__logger.info( data )
+            global_log.warning(
+                "Syslog writing docker logs to syslog file instead of container log",
+                limit_once_per_x_secs=600,
+                limit_key="syslog-docker-not-container-log",
+            )
+            self.__logger.info(data)
 
         if self.__docker_log_deleter:
-            self.__docker_log_deleter.check_for_old_logs( current_log_files )
+            self.__docker_log_deleter.check_for_old_logs(current_log_files)
 
-    def handle( self, data ):
+    def handle(self, data):
         if self.__docker_logging:
-            self.__handle_docker_logs( data )
+            self.__handle_docker_logs(data)
         else:
-            self.__logger.info( data )
+            self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        self.__line_reporter(data.count('\n') + 1)
+        self.__line_reporter(data.count("\n") + 1)
 
-class RequestVerifier( object ):
+
+class RequestVerifier(object):
     """Determines whether or not a request should be processed
        based on the state of various config options
     """
 
-    def __init__( self, accept_remote, accept_ips, docker_logging ):
+    def __init__(self, accept_remote, accept_ips, docker_logging):
         self.__accept_remote = accept_remote
         self.__accept_ips = accept_ips
         self.__docker_logging = docker_logging
 
-    def verify_request( self, client_address ):
+    def verify_request(self, client_address):
         result = True
         address, port = client_address
         if self.__docker_logging:
             result = self.__accept_remote or address in self.__accept_ips
 
         if not result:
-            global_log.log(scalyr_logging.DEBUG_LEVEL_4, "Rejecting request from %s" % str( client_address ) )
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_4,
+                "Rejecting request from %s" % str(client_address),
+            )
 
         return result
 
@@ -897,88 +1120,128 @@ class SyslogServer(object):
     @param line_reporter A function to invoke whenever the server handles lines.  The number of lines
         must be supplied as the first argument.
     """
-    def __init__( self, protocol, port, logger, config, line_reporter, accept_remote=False, server_host=None, log_path=None, get_log_watcher=None, rotate_options=None,
-                  docker_options=None):
+
+    def __init__(
+        self,
+        protocol,
+        port,
+        logger,
+        config,
+        line_reporter,
+        accept_remote=False,
+        server_host=None,
+        log_path=None,
+        get_log_watcher=None,
+        rotate_options=None,
+        docker_options=None,
+    ):
         server = None
 
-        accept_ips = config.get( 'docker_accept_ips' )
+        accept_ips = config.get("docker_accept_ips")
         if accept_ips == None:
             accept_ips = []
             gateway_ip = _get_default_gateway()
             if gateway_ip:
-                accept_ips = [ gateway_ip ]
+                accept_ips = [gateway_ip]
 
-        global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str( accept_ips ) );
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str(accept_ips)
+        )
 
-        docker_logging = config.get( 'mode' ) == 'docker'
+        docker_logging = config.get("mode") == "docker"
 
-        verifier = RequestVerifier( accept_remote, accept_ips, docker_logging )
+        verifier = RequestVerifier(accept_remote, accept_ips, docker_logging)
 
         try:
-            bind_address = self.__get_bind_address( docker_logging=docker_logging, accept_remote=accept_remote )
-            if protocol == 'tcp':
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting TCP Server" )
-                server = SyslogTCPServer( port, config.get( 'tcp_buffer_size' ), bind_address=bind_address, verifier=verifier )
-            elif protocol == 'udp':
-                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server" )
-                server = SyslogUDPServer( port, bind_address=bind_address, verifier=verifier )
+            bind_address = self.__get_bind_address(
+                docker_logging=docker_logging, accept_remote=accept_remote
+            )
+            if protocol == "tcp":
+                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting TCP Server")
+                server = SyslogTCPServer(
+                    port,
+                    config.get("tcp_buffer_size"),
+                    bind_address=bind_address,
+                    verifier=verifier,
+                )
+            elif protocol == "udp":
+                global_log.log(scalyr_logging.DEBUG_LEVEL_2, "Starting UDP Server")
+                server = SyslogUDPServer(
+                    port, bind_address=bind_address, verifier=verifier
+                )
 
         except socket_error, e:
             if e.errno == errno.EACCES and port < 1024:
-                raise Exception( 'Access denied when trying to create a %s server on a low port (%d). '
-                                 'Please try again on a higher port, or as root.' % (protocol, port)  )
+                raise Exception(
+                    "Access denied when trying to create a %s server on a low port (%d). "
+                    "Please try again on a higher port, or as root." % (protocol, port)
+                )
             else:
                 raise
 
-        #don't continue if the config had a protocol we don't recognize
+        # don't continue if the config had a protocol we don't recognize
         if server is None:
-            raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
+            raise Exception(
+                "Unknown value '%s' specified for SyslogServer 'protocol'." % protocol
+            )
 
-        #create the syslog handler, and add to the list of servers
-        server.syslog_handler = SyslogHandler( logger, line_reporter, config, server_host, log_path, get_log_watcher, rotate_options, docker_options )
+        # create the syslog handler, and add to the list of servers
+        server.syslog_handler = SyslogHandler(
+            logger,
+            line_reporter,
+            config,
+            server_host,
+            log_path,
+            get_log_watcher,
+            rotate_options,
+            docker_options,
+        )
         server.syslog_transport_protocol = protocol
         server.syslog_port = port
 
         self.__server = server
         self.__thread = None
 
-    def __get_bind_address( self, docker_logging=False, accept_remote=False ):
-        result = 'localhost'
+    def __get_bind_address(self, docker_logging=False, accept_remote=False):
+        result = "localhost"
         if accept_remote:
-            result = ''
+            result = ""
         else:
             # check if we are running inside a docker container
-            if docker_logging and os.path.isfile( '/.dockerenv' ):
+            if docker_logging and os.path.isfile("/.dockerenv"):
                 # need to accept from remote ips
-                result = ''
+                result = ""
         return result
 
-
-    def __prepare_run_state( self, run_state ):
+    def __prepare_run_state(self, run_state):
         if run_state is not None:
             server = self.__server
-            server.set_run_state( run_state )
-            #shutdown is only available from python 2.6 onwards
-            #need to think of what to do for 2.4, which will hang on shutdown when run as standalone
-            if hasattr( server, 'shutdown' ):
-                run_state.register_on_stop_callback( server.shutdown )
+            server.set_run_state(run_state)
+            # shutdown is only available from python 2.6 onwards
+            # need to think of what to do for 2.4, which will hang on shutdown when run as standalone
+            if hasattr(server, "shutdown"):
+                run_state.register_on_stop_callback(server.shutdown)
 
-    def start( self, run_state ):
-        self.__prepare_run_state( run_state )
+    def start(self, run_state):
+        self.__prepare_run_state(run_state)
         self.__server.serve_forever()
         self.__server.socket.close()
 
-    def start_threaded( self, run_state ):
-        self.__prepare_run_state( run_state )
-        self.__thread = StoppableThread( target=self.start, name="Syslog monitor thread for %s:%d" % (self.__server.syslog_transport_protocol, self.__server.syslog_port) )
+    def start_threaded(self, run_state):
+        self.__prepare_run_state(run_state)
+        self.__thread = StoppableThread(
+            target=self.start,
+            name="Syslog monitor thread for %s:%d"
+            % (self.__server.syslog_transport_protocol, self.__server.syslog_port),
+        )
         self.__thread.start()
 
-    def stop( self, wait_on_join=True, join_timeout=5 ):
+    def stop(self, wait_on_join=True, join_timeout=5):
         if self.__thread is not None:
-            self.__thread.stop( wait_on_join=wait_on_join, join_timeout=join_timeout )
+            self.__thread.stop(wait_on_join=wait_on_join, join_timeout=join_timeout)
 
 
-class SyslogMonitor( ScalyrMonitor ):
+class SyslogMonitor(ScalyrMonitor):
     """
 # Syslog Monitor
 
@@ -1055,153 +1318,168 @@ specifies TCP.
 Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
 running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
     """
-    def _initialize( self ):
-        #the main server
+
+    def _initialize(self):
+        # the main server
         self.__server = None
 
-        #any extra servers if we are listening for multiple protocols
+        # any extra servers if we are listening for multiple protocols
         self.__extra_servers = []
 
-        #build list of protocols and ports from the protocol option
-        self.__server_list = self.__build_server_list( self._config.get( 'protocols' ) )
+        # build list of protocols and ports from the protocol option
+        self.__server_list = self.__build_server_list(self._config.get("protocols"))
 
-        #our disk logger and handler
+        # our disk logger and handler
         self.__disk_logger = None
         self.__log_handler = None
 
-        #whether or not to accept only connections created on this localhost.
-        self.__accept_remote_connections = self._config.get( 'accept_remote_connections' )
+        # whether or not to accept only connections created on this localhost.
+        self.__accept_remote_connections = self._config.get("accept_remote_connections")
 
         self.__server_host = None
-        self.__log_path = ''
+        self.__log_path = ""
         if self._global_config:
             self.__log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
-                if 'serverHost' in self._global_config.server_attributes:
-                    self.__server_host = self._global_config.server_attributes['serverHost']
+                if "serverHost" in self._global_config.server_attributes:
+                    self.__server_host = self._global_config.server_attributes[
+                        "serverHost"
+                    ]
 
         self.__log_watcher = None
         self.__module = None
 
-        #configure the logger and path
-        self.__message_log = self._config.get( 'message_log' )
+        # configure the logger and path
+        self.__message_log = self._config.get("message_log")
 
         self.log_config = {
-            'parser': self._config.get( 'parser' ),
-            'path': self.__message_log,
+            "parser": self._config.get("parser"),
+            "path": self.__message_log,
         }
 
-        self.__flush_delay = self._config.get('log_flush_delay')
+        self.__flush_delay = self._config.get("log_flush_delay")
         try:
-            attributes = JsonObject( { "monitor": "agentSyslog" } )
-            self.log_config['attributes'] = attributes
+            attributes = JsonObject({"monitor": "agentSyslog"})
+            self.log_config["attributes"] = attributes
         except Exception, e:
-            global_log.error( "Error setting monitor attribute in SyslogMonitor" )
+            global_log.error("Error setting monitor attribute in SyslogMonitor")
 
-        default_rotation_count, default_max_bytes = self._get_log_rotation_configuration()
+        (
+            default_rotation_count,
+            default_max_bytes,
+        ) = self._get_log_rotation_configuration()
 
-        self.__max_log_size = self._config.get( 'max_log_size' )
+        self.__max_log_size = self._config.get("max_log_size")
         if self.__max_log_size is None:
             self.__max_log_size = default_max_bytes
 
-        self.__max_log_rotations = self._config.get( 'max_log_rotations' )
+        self.__max_log_rotations = self._config.get("max_log_rotations")
         if self.__max_log_rotations is None:
             self.__max_log_rotations = default_rotation_count
 
         self._docker_options = None
 
-    def __build_server_list( self, protocol_string ):
+    def __build_server_list(self, protocol_string):
         """Builds a list containing (protocol, port) tuples, based on a comma separated list
         of protocols and optional ports e.g. protocol[:port], protocol[:port]
         """
 
-        #split out each protocol[:port]
-        protocol_list = [p.strip().lower() for p in protocol_string.split(',')]
+        # split out each protocol[:port]
+        protocol_list = [p.strip().lower() for p in protocol_string.split(",")]
 
-        if len( protocol_list ) == 0:
-            raise Exception('Invalid config state for Syslog Monitor. '
-                            'No protocols specified')
+        if len(protocol_list) == 0:
+            raise Exception(
+                "Invalid config state for Syslog Monitor. " "No protocols specified"
+            )
 
-        default_ports = { 'tcp': 601,
-                          'udp': 514,
-                        }
+        default_ports = {
+            "tcp": 601,
+            "udp": 514,
+        }
 
         server_list = []
 
-        #regular expression matching protocol:port
-        port_re = re.compile( '^(tcp|udp):(\d+)$' )
+        # regular expression matching protocol:port
+        port_re = re.compile("^(tcp|udp):(\d+)$")
         for p in protocol_list:
 
-            #protocol defaults to the full p for when match fails
+            # protocol defaults to the full p for when match fails
             protocol = p
             port = 0
 
-            m = port_re.match( p )
+            m = port_re.match(p)
             if m:
                 protocol = m.group(1)
-                port = int( m.group(2) )
+                port = int(m.group(2))
 
             if protocol in default_ports:
-                #get the default port for this protocol if none was specified
+                # get the default port for this protocol if none was specified
                 if port == 0:
                     port = default_ports[protocol]
             else:
-                raise Exception( 'Unknown value \'%s\' specified for SyslogServer \'protocol\'.' % protocol )
+                raise Exception(
+                    "Unknown value '%s' specified for SyslogServer 'protocol'."
+                    % protocol
+                )
 
-            #only allow ports between 1 and 65535
+            # only allow ports between 1 and 65535
             if port < 1 or port > 65535:
-                raise Exception( 'Port values must be in the range 1-65535.  Current value: %d.' % port )
+                raise Exception(
+                    "Port values must be in the range 1-65535.  Current value: %d."
+                    % port
+                )
 
-            server_list.append( (protocol, port) )
+            server_list.append((protocol, port))
 
-        #return a list with duplicates removed
-        return list( set( server_list ) )
+        # return a list with duplicates removed
+        return list(set(server_list))
 
-
-    def open_metric_log( self ):
+    def open_metric_log(self):
         """Override open_metric_log to prevent a metric log from being created for the Syslog Monitor
         and instead create our own logger which will log raw messages out to disk.
         """
-        name = __name__ + '-' + self.__message_log + '.syslog'
-        self.__disk_logger = logging.getLogger( name )
+        name = __name__ + "-" + self.__message_log + ".syslog"
+        self.__disk_logger = logging.getLogger(name)
 
-        #assume successful for when the logger handler has already been created
+        # assume successful for when the logger handler has already been created
         success = True
 
-        #only configure once -- assumes all configuration happens on the same thread
-        if len( self.__disk_logger.handlers ) == 0:
-            #logger handler hasn't been created yet, so assume unsuccssful
+        # only configure once -- assumes all configuration happens on the same thread
+        if len(self.__disk_logger.handlers) == 0:
+            # logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
-                self.__log_handler = AutoFlushingRotatingFileHandler( filename = self.log_config['path'],
-                                                                      maxBytes = self.__max_log_size,
-                                                                      backupCount = self.__max_log_rotations,
-                                                                      flushDelay = self.__flush_delay)
+                self.__log_handler = AutoFlushingRotatingFileHandler(
+                    filename=self.log_config["path"],
+                    maxBytes=self.__max_log_size,
+                    backupCount=self.__max_log_rotations,
+                    flushDelay=self.__flush_delay,
+                )
 
                 formatter = logging.Formatter()
-                self.__log_handler.setFormatter( formatter )
-                self.__disk_logger.addHandler( self.__log_handler )
-                self.__disk_logger.setLevel( logging.INFO )
+                self.__log_handler.setFormatter(formatter)
+                self.__disk_logger.addHandler(self.__log_handler)
+                self.__disk_logger.setLevel(logging.INFO)
                 self.__disk_logger.propagate = False
                 success = True
             except Exception, e:
-                global_log.error( "Unable to open SyslogMonitor log file: %s" % str( e ) )
+                global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
 
         return success
 
-    def close_metric_log( self ):
+    def close_metric_log(self):
         if self.__log_handler:
-            self.__disk_logger.removeHandler( self.__log_handler )
+            self.__disk_logger.removeHandler(self.__log_handler)
             self.__log_handler.close()
 
-    def set_log_watcher( self, log_watcher ):
+    def set_log_watcher(self, log_watcher):
         self.__log_watcher = log_watcher
 
-    def __get_log_watcher( self ):
+    def __get_log_watcher(self):
         return (self.__log_watcher, self)
 
-    def config_from_monitors( self, manager ):
+    def config_from_monitors(self, manager):
         """
         Called directly before running the `run` method.
         This method passes in the module manager object to a monitor before
@@ -1214,61 +1492,81 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         # if we are using docker, then see if the docker monitor is also running
         # and if so, read the config options from there
         monitor = None
-        if self._config.get( 'mode' ) == 'docker':
-            monitor = manager.find_monitor( 'scalyr_agent.builtin_monitors.docker_monitor' )
+        if self._config.get("mode") == "docker":
+            monitor = manager.find_monitor(
+                "scalyr_agent.builtin_monitors.docker_monitor"
+            )
 
         # if the docker monitor doesn't exist don't do anything
         if monitor is None:
             return
 
         self._docker_options = DockerOptions()
-        global_log.info( "About to configure options from monitor: %s", monitor.module_name )
-        self._docker_options.configure_from_monitor( monitor )
+        global_log.info(
+            "About to configure options from monitor: %s", monitor.module_name
+        )
+        self._docker_options.configure_from_monitor(monitor)
 
-
-    def run( self ):
+    def run(self):
         def line_reporter(num_lines):
             self.increment_counter(reported_lines=num_lines)
 
         rotate_options = self._get_log_rotation_configuration()
         try:
             if self.__disk_logger is None:
-                raise Exception( "No disk logger available for Syslog Monitor" )
+                raise Exception("No disk logger available for Syslog Monitor")
 
-            #create the main server from the first item in the server list
+            # create the main server from the first item in the server list
             protocol = self.__server_list[0]
-            self.__server = SyslogServer( protocol[0], protocol[1], self.__disk_logger, self._config,
-                                          line_reporter, accept_remote=self.__accept_remote_connections,
-                                          server_host=self.__server_host, log_path=self.__log_path,
-                                          get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options,
-                                          docker_options=self._docker_options)
+            self.__server = SyslogServer(
+                protocol[0],
+                protocol[1],
+                self.__disk_logger,
+                self._config,
+                line_reporter,
+                accept_remote=self.__accept_remote_connections,
+                server_host=self.__server_host,
+                log_path=self.__log_path,
+                get_log_watcher=self.__get_log_watcher,
+                rotate_options=rotate_options,
+                docker_options=self._docker_options,
+            )
 
-            #iterate over the remaining items creating servers for each protocol
+            # iterate over the remaining items creating servers for each protocol
             for p in self.__server_list[1:]:
-                server = SyslogServer( p[0], p[1], self.__disk_logger, self._config,
-                                       line_reporter, accept_remote=self.__accept_remote_connections,
-                                       server_host=self.__server_host, log_path=self.__log_path,
-                                       get_log_watcher=self.__get_log_watcher, rotate_options=rotate_options,
-                                       docker_options=self._docker_options)
-                self.__extra_servers.append( server )
+                server = SyslogServer(
+                    p[0],
+                    p[1],
+                    self.__disk_logger,
+                    self._config,
+                    line_reporter,
+                    accept_remote=self.__accept_remote_connections,
+                    server_host=self.__server_host,
+                    log_path=self.__log_path,
+                    get_log_watcher=self.__get_log_watcher,
+                    rotate_options=rotate_options,
+                    docker_options=self._docker_options,
+                )
+                self.__extra_servers.append(server)
 
-            #start any extra servers in their own threads
+            # start any extra servers in their own threads
             for server in self.__extra_servers:
-                server.start_threaded( self._run_state )
+                server.start_threaded(self._run_state)
 
-            #start the main server
-            self.__server.start( self._run_state )
+            # start the main server
+            self.__server.start(self._run_state)
 
         except Exception, e:
-            global_log.exception('Monitor died due to exception:', error_code='failedMonitor')
+            global_log.exception(
+                "Monitor died due to exception:", error_code="failedMonitor"
+            )
             raise
 
     def stop(self, wait_on_join=True, join_timeout=5):
 
-        #stop the main server
-        ScalyrMonitor.stop( self, wait_on_join=wait_on_join, join_timeout=join_timeout )
+        # stop the main server
+        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
 
-        #stop any extra servers
+        # stop any extra servers
         for server in self.__extra_servers:
-            server.stop( wait_on_join, join_timeout )
-
+            server.stop(wait_on_join, join_timeout)

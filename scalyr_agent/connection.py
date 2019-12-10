@@ -15,7 +15,7 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@scalyr.com'
+__author__ = "imron@scalyr.com"
 
 import httplib
 import os
@@ -34,6 +34,7 @@ log = scalyr_logging.getLogger(__name__)
 # noinspection PyBroadException
 try:
     import ssl
+
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
@@ -43,6 +44,7 @@ except Exception:
 __has_pure_python_tls__ = False
 try:
     from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+
     __has_pure_python_tls__ = True
 except Exception:
     pass
@@ -52,9 +54,19 @@ class ConnectionFactory:
     """ Factory class for creating connection objects using either Httplib or Requests
     to handle the connection.
     """
+
     @staticmethod
-    def connection(server, request_deadline, ca_file, intermediate_certs_file,
-                   headers, use_requests, use_tlslite, quiet=False, proxies=None):
+    def connection(
+        server,
+        request_deadline,
+        ca_file,
+        intermediate_certs_file,
+        headers,
+        use_requests,
+        use_tlslite,
+        quiet=False,
+        proxies=None,
+    ):
         """ Create a new connection, with either Requests or Httplib, depending on the
         use_requests parameter.  If Requests is not available, fallback to to Httplib
 
@@ -86,45 +98,73 @@ class ConnectionFactory:
 
         if use_tlslite:
             if use_requests:
-                log.warn( "Both `use_requests_lib` and `use_tlslite` are set to True.  `use_tlslite` is ignored if `use_requests_lib` is True" )
+                log.warn(
+                    "Both `use_requests_lib` and `use_tlslite` are set to True.  `use_tlslite` is ignored if `use_requests_lib` is True"
+                )
 
             if sys.version_info[:3] >= (2, 7, 9):
-                log.warn( "`use_tlslite` is only valid when running on Python 2.7.8 or below" )
+                log.warn(
+                    "`use_tlslite` is only valid when running on Python 2.7.8 or below"
+                )
                 use_tlslite = False
-
 
         result = None
         if use_requests:
             try:
                 from scalyr_agent.requests_connection import RequestsConnection
-                result = RequestsConnection( server, request_deadline, ca_file, headers, proxies)
+
+                result = RequestsConnection(
+                    server, request_deadline, ca_file, headers, proxies
+                )
             except Exception, e:
-                log.warn( "Unable to load requests module '%s'.  Falling back to Httplib for connection handling" % str( e ) )
-                result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite)
+                log.warn(
+                    "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
+                    % str(e)
+                )
+                result = ScalyrHttpConnection(
+                    server,
+                    request_deadline,
+                    ca_file,
+                    intermediate_certs_file,
+                    headers,
+                    use_tlslite,
+                )
                 use_requests = False
         else:
-            result = ScalyrHttpConnection(server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite)
+            result = ScalyrHttpConnection(
+                server,
+                request_deadline,
+                ca_file,
+                intermediate_certs_file,
+                headers,
+                use_tlslite,
+            )
 
         if not quiet:
             if use_requests:
-                log.info( "Using Requests for HTTP(S) connections" )
+                log.info("Using Requests for HTTP(S) connections")
             else:
                 if result.is_pure_python_tls:
-                    log.info("Using ScalyrHttpConnection/tlslite for HTTP(S) connections")
+                    log.info(
+                        "Using ScalyrHttpConnection/tlslite for HTTP(S) connections"
+                    )
                 else:
-                    log.info("Using ScalyrHttpConnection/Httplib for HTTP(S) connections")
+                    log.info(
+                        "Using ScalyrHttpConnection/Httplib for HTTP(S) connections"
+                    )
 
         return result
 
-class Connection( object ):
+
+class Connection(object):
     """ Connection class
     An abstraction for dealing with different connection types Httplib or Requests
     """
 
-    def __init__( self, server, request_deadline, ca_file, headers ):
+    def __init__(self, server, request_deadline, ca_file, headers):
 
         # Verify the server address looks right.
-        parsed_server = re.match('^(http://|https://|)([^:]*)(:\d+|)$', server.lower())
+        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -133,10 +173,10 @@ class Connection( object ):
         self._host = parsed_server.group(2)
         # Whether or not the connection uses SSL.  For production use, this should always be true.  We only
         # use non-SSL when testing against development versions of the Scalyr server.
-        self._use_ssl = parsed_server.group(1) == 'https://'
+        self._use_ssl = parsed_server.group(1) == "https://"
 
         # Determine the port, defaulting to the right one based on protocol if not given.
-        if parsed_server.group(3) != '':
+        if parsed_server.group(3) != "":
             self._port = int(parsed_server.group(3)[1:])
         elif self._use_ssl:
             self._port = 443
@@ -148,56 +188,64 @@ class Connection( object ):
         self._ca_file = ca_file
         self._request_deadline = request_deadline
         self.__connection = None
-            
-    def __check_ssl( self ):
+
+    def __check_ssl(self):
         """ Helper function to check if ssl is available and enabled """
         if self._use_ssl:
             if not __has_ssl__ and not __has_pure_python_tls__:
-                log.warn('No ssl library available so cannot verify server certificate when communicating with Scalyr. '
-                         'This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. '
-                         'To solve this, install the Python ssl library. '
-                         'For more details, see https://www.scalyr.com/help/scalyr-agent#ssl',
-                         limit_once_per_x_secs=86400, limit_key='nosslwarning', error_code='client/nossl')
+                log.warn(
+                    "No ssl library available so cannot verify server certificate when communicating with Scalyr. "
+                    "This means traffic is encrypted but can be intercepted through a man-in-the-middle attack. "
+                    "To solve this, install the Python ssl library. "
+                    "For more details, see https://www.scalyr.com/help/scalyr-agent#ssl",
+                    limit_once_per_x_secs=86400,
+                    limit_key="nosslwarning",
+                    error_code="client/nossl",
+                )
             elif self._ca_file is None:
-                log.warn('Server certificate validation has been disabled while communicating with Scalyr. '
-                         'This means traffic is encrypted but can be intercepted through a man-in-the-middle attach. '
-                         'Please update your configuration file to re-enable server certificate validation.',
-                         limit_once_per_x_secs=86400, limit_key='nocertwarning', error_code='client/sslverifyoff')
+                log.warn(
+                    "Server certificate validation has been disabled while communicating with Scalyr. "
+                    "This means traffic is encrypted but can be intercepted through a man-in-the-middle attach. "
+                    "Please update your configuration file to re-enable server certificate validation.",
+                    limit_once_per_x_secs=86400,
+                    limit_key="nocertwarning",
+                    error_code="client/sslverifyoff",
+                )
 
-    def post( self, request_path, body ):
+    def post(self, request_path, body):
         """Post requests"""
         self.__check_ssl()
-        self._post( request_path, body )
+        self._post(request_path, body)
 
-    def get( self, request_path ):
+    def get(self, request_path):
         """Get requests"""
         self.__check_ssl()
-        self._get( request_path )
+        self._get(request_path)
 
-    def _post( self, request_path, body ):
+    def _post(self, request_path, body):
         """Subclasses override to handle specifics of post requests """
         pass
-    
-    def _get( self, request_path ):
+
+    def _get(self, request_path):
         """Subclasses override to handle specifics of get requests """
         pass
 
-    def response( self ):
+    def response(self):
         """Subclasses override to return the text contents of a response from a server
-        
+
         @return: The text contents of a requests
         @rtype: str
         """
         pass
-        
-    def status_code( self ):
+
+    def status_code(self):
         """Subclasses override to return the status code of a request
-        
+
         @return: The status code of a request
         """
         pass
 
-    def close( self ):
+    def close(self):
         """Subclasses override to close a connection"""
         pass
 
@@ -212,21 +260,33 @@ class CertValidationError(Exception):
 
 
 class ScalyrHttpConnection(Connection):
-    def __init__(self, server, request_deadline, ca_file, intermediate_certs_file, headers, use_tlslite):
-        super(ScalyrHttpConnection, self).__init__(server, request_deadline, ca_file, headers)
+    def __init__(
+        self,
+        server,
+        request_deadline,
+        ca_file,
+        intermediate_certs_file,
+        headers,
+        use_tlslite,
+    ):
+        super(ScalyrHttpConnection, self).__init__(
+            server, request_deadline, ca_file, headers
+        )
         self.__http_response = None
         self._intermediate_certs_file = intermediate_certs_file
 
         try:
             self._init_connection(pure_python_tls=use_tlslite)
         except Exception, e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
-            log.info('Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation')
+            log.info(
+                "Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation"
+            )
             self._init_connection(pure_python_tls=True)
 
         if self.is_pure_python_tls:
-            log.info('HttpConnection uses pure-python TLS')
+            log.info("HttpConnection uses pure-python TLS")
         else:
-            log.info('HttpConnection uses native os ssl')
+            log.info("HttpConnection uses native os ssl")
 
     def _validate_chain_openssl(self):
         """Validate server certificate chain using openssl system callout"""
@@ -234,22 +294,34 @@ class ScalyrHttpConnection(Connection):
         end_entity_pem = ssl.get_server_certificate((self._host, self._port))
         try:
             _, end_entity_pem_tempfile_path = mkstemp()
-            fh = open(end_entity_pem_tempfile_path, 'w')
+            fh = open(end_entity_pem_tempfile_path, "w")
             fh.write(end_entity_pem)
             fh.close()
 
             # invoke openssl
             # root_certs = '/usr/share/scalyr-agent-2/certs/ca_certs.crt'
             # intermediate_certs = '/usr/share/scalyr-agent-2/certs/intermediate_certs.pem'
-            cmd = ['openssl', 'verify', '-CAfile', self._ca_file, '-untrusted', self._intermediate_certs_file,
-                   end_entity_pem_tempfile_path]
-            log.debug('Validating server certificate chain via: %s' % cmd)
-            proc = subprocess.Popen(args=' '.join(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            cmd = [
+                "openssl",
+                "verify",
+                "-CAfile",
+                self._ca_file,
+                "-untrusted",
+                self._intermediate_certs_file,
+                end_entity_pem_tempfile_path,
+            ]
+            log.debug("Validating server certificate chain via: %s" % cmd)
+            proc = subprocess.Popen(
+                args=" ".join(cmd),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True,
+            )
             out, err = proc.communicate()
             returncode = proc.returncode
             if returncode != 0:
                 raise CertValidationError(err.strip())
-            log.info('Scalyr server cert chain successfully validated via openssl')
+            log.info("Scalyr server cert chain successfully validated via openssl")
         finally:
             # delete temp file
             os.remove(end_entity_pem_tempfile_path)
@@ -265,6 +337,7 @@ class ScalyrHttpConnection(Connection):
             from certvalidator import CertificateValidator
             from certvalidator import ValidationContext
             from asn1crypto import x509, pem
+
             # validate server certificate chain
             session = tlslite_connection.sock.session
             assert type(session.serverCertChain.x509List) == list
@@ -276,7 +349,7 @@ class ScalyrHttpConnection(Connection):
             def cert_files_exist(path, file_names):
                 file_names = [os.path.join(path, f) for f in file_names]
                 for f in file_names:
-                    if not os.path.isfile( f ):
+                    if not os.path.isfile(f):
                         return False
                 return True
 
@@ -284,19 +357,19 @@ class ScalyrHttpConnection(Connection):
                 file_names = [os.path.join(cert_dir, f) for f in file_names]
                 result = []
                 for fname in file_names:
-                    arr = open(fname, 'rb').read()
+                    arr = open(fname, "rb").read()
                     cert_bytes = pem.unarmor(arr)[2]
                     result.append(cert_bytes)
                 return result
 
             intermediate_cert_names = [
-                'comodo_ca_intermediate.pem',
-                'sectigo_ca_intermediate.pem'
+                "comodo_ca_intermediate.pem",
+                "sectigo_ca_intermediate.pem",
             ]
 
             extra_trust_names = [
-                'scalyr_agent_ca_root.pem',
-                'addtrust_external_ca_root.pem'
+                "scalyr_agent_ca_root.pem",
+                "addtrust_external_ca_root.pem",
             ]
 
             # Determine the directory containing the certs.
@@ -308,13 +381,13 @@ class ScalyrHttpConnection(Connection):
             cert_dir = os.path.dirname(self._ca_file)
             if not cert_files_exist(cert_dir, all_cert_names):
                 path = os.path.dirname(os.path.abspath(__file__))
-                path = os.path.abspath( path + '../../certs')
+                path = os.path.abspath(path + "../../certs")
                 if cert_files_exist(path, all_cert_names):
                     cert_dir = path
 
             trust_roots = None
-            intermediate_certs = get_cert_bytes( cert_dir, intermediate_cert_names )
-            extra_trust_roots = get_cert_bytes( cert_dir, extra_trust_names )
+            intermediate_certs = get_cert_bytes(cert_dir, intermediate_cert_names)
+            extra_trust_roots = get_cert_bytes(cert_dir, extra_trust_names)
 
             if trust_roots:
                 context = ValidationContext(
@@ -329,13 +402,16 @@ class ScalyrHttpConnection(Connection):
                     other_certs=intermediate_certs,
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
-            validator = CertificateValidator(end_entity_cert, validation_context=context)
+            validator = CertificateValidator(
+                end_entity_cert, validation_context=context
+            )
             validator.validate_tls(unicode(self._host))
-            log.info('Scalyr server cert chain successfully validated via certvalidator library')
+            log.info(
+                "Scalyr server cert chain successfully validated via certvalidator library"
+            )
         except Exception, ce:
-            log.exception('Error validating server certificate chain: %s' % ce)
+            log.exception("Error validating server certificate chain: %s" % ce)
             raise
-
 
     def _init_connection(self, pure_python_tls=False):
         try:
@@ -346,16 +422,23 @@ class ScalyrHttpConnection(Connection):
                         ca_file = self._ca_file
                     else:
                         ca_file = None
-                    self.__connection = HTTPSConnectionWithTimeoutAndVerification(self._host, self._port,
-                                                                                  self._request_deadline,
-                                                                                  ca_file, __has_ssl__)
+                    self.__connection = HTTPSConnectionWithTimeoutAndVerification(
+                        self._host,
+                        self._port,
+                        self._request_deadline,
+                        ca_file,
+                        __has_ssl__,
+                    )
                     self.__connection.connect()
                 else:
                     # Pure python implementation of TLS does not require ssl library
                     settings = HandshakeSettings()
                     settings.minVersion = (3, 3)  # TLS 1.2
                     self.__connection = HTTPTLSConnection(
-                        self._host, self._port, timeout=self._request_deadline, settings=settings
+                        self._host,
+                        self._port,
+                        timeout=self._request_deadline,
+                        settings=settings,
                     )
                     self.__connection.connect()
                     # Non-null _ca_file signifies server cert validation is requireds
@@ -363,69 +446,99 @@ class ScalyrHttpConnection(Connection):
                         try:
                             self._validate_chain_certvalidator(self.__connection)
                         except Exception, e:
-                            log.exception('Failure in _validate_chain_certvalidator()')
+                            log.exception("Failure in _validate_chain_certvalidator()")
                             self._validate_chain_openssl()
             else:
                 # unencrypted connection
-                self.__connection = HTTPConnectionWithTimeout(self._host, self._port, self._request_deadline)
+                self.__connection = HTTPConnectionWithTimeout(
+                    self._host, self._port, self._request_deadline
+                )
                 self.__connection.connect()
         except Exception, error:
-            if hasattr(error, 'errno'):
+            if hasattr(error, "errno"):
                 errno = error.errno
             else:
                 errno = None
             if isinstance(error, CertValidationError):
-                log.error('Failed to connect to "%s" because of server certificate validation error: "%s"',
-                          self._full_address, error.message, error_code='client/connectionFailed')
+                log.error(
+                    'Failed to connect to "%s" because of server certificate validation error: "%s"',
+                    self._full_address,
+                    error.message,
+                    error_code="client/connectionFailed",
+                )
             elif __has_ssl__ and isinstance(error, ssl.SSLError):
-                log.error('Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
-                          'for the root Certificate Authority could not be parsed, or we attempted to connect to '
-                          'a server whose certificate could not be trusted (if so, maybe Scalyr\'s SSL cert has '
-                          'changed and you should update your agent to get the new certificate).  The returned '
-                          'errno was %d and the full exception was \'%s\'.  Closing connection, will re-attempt',
-                          self._full_address, errno, str(error), error_code='client/connectionFailed')
+                log.error(
+                    'Failed to connect to "%s" due to some SSL error.  Possibly the configured certificate '
+                    "for the root Certificate Authority could not be parsed, or we attempted to connect to "
+                    "a server whose certificate could not be trusted (if so, maybe Scalyr's SSL cert has "
+                    "changed and you should update your agent to get the new certificate).  The returned "
+                    "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
+                    self._full_address,
+                    errno,
+                    str(error),
+                    error_code="client/connectionFailed",
+                )
             elif errno == 61:  # Connection refused
-                log.error('Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
-                          self._full_address, error_code='client/connectionFailed')
+                log.error(
+                    'Failed to connect to "%s" because connection was refused.  Server may be unavailable.',
+                    self._full_address,
+                    error_code="client/connectionFailed",
+                )
             elif errno == 8:  # Unknown name
-                log.error('Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
-                          self._full_address, error_code='client/connectionFailed')
+                log.error(
+                    'Failed to connect to "%s" because could not resolve address.  Server host may be bad.',
+                    self._full_address,
+                    error_code="client/connectionFailed",
+                )
             elif errno is not None:
-                log.error('Failed to connect to "%s" due to errno=%d.  Exception was "%s".  Closing connection, '
-                          'will re-attempt', self._full_address, errno, str(error),
-                          error_code='client/connectionFailed')
+                log.error(
+                    'Failed to connect to "%s" due to errno=%d.  Exception was "%s".  Closing connection, '
+                    "will re-attempt",
+                    self._full_address,
+                    errno,
+                    str(error),
+                    error_code="client/connectionFailed",
+                )
             else:
-                log.error('Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
-                          'will re-attempt', self._full_address, str(error),
-                          error_code='client/connectionFailed')
-            raise Exception( "client/connectionFailed" )
+                log.error(
+                    'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
+                    "will re-attempt",
+                    self._full_address,
+                    str(error),
+                    error_code="client/connectionFailed",
+                )
+            raise Exception("client/connectionFailed")
 
-    def _post( self, request_path, body ):
+    def _post(self, request_path, body):
         self.__http_response = None
-        self.__connection.request( 'POST', request_path, body=body, headers=self._standard_headers )
+        self.__connection.request(
+            "POST", request_path, body=body, headers=self._standard_headers
+        )
 
-    def _get( self, request_path ):
+    def _get(self, request_path):
         self.__http_response = None
-        self.__connection.request( 'GET', request_path, headers=self._standard_headers )
+        self.__connection.request("GET", request_path, headers=self._standard_headers)
 
-    def response( self ):
+    def response(self):
         if not self.__http_response:
             self.__http_response = self.__connection.getresponse()
-        
+
         return self.__http_response.read()
-        
-    def status_code( self ):
+
+    def status_code(self):
         if not self.__http_response:
             self.__http_response = self.__connection.getresponse()
-        
+
         return self.__http_response.status
 
-    def close( self ):
+    def close(self):
         self.__connection.close()
 
     @property
     def is_pure_python_tls(self):
-        return __has_pure_python_tls__ and isinstance(self.__connection, HTTPTLSConnection)
+        return __has_pure_python_tls__ and isinstance(
+            self.__connection, HTTPTLSConnection
+        )
 
 
 class HTTPConnectionWithTimeout(httplib.HTTPConnection):
@@ -434,6 +547,7 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
     Older versions of Python (2.4, 2.5) do not allow for setting a timeout directly on httplib.HTTPConnection
     objects.  This is meant to solve that problem generally.
     """
+
     def __init__(self, host, port, timeout):
         self.__timeout = timeout
         httplib.HTTPConnection.__init__(self, host, port)
@@ -442,11 +556,13 @@ class HTTPConnectionWithTimeout(httplib.HTTPConnection):
         # This method is essentially copied from 2.7's httplib.HTTPConnection.connect.
         # If socket.create_connection then we use it (as it does in newer Pythons), otherwise, rely on our
         # own way of doing it.
-        if hasattr(socket, 'create_connection'):
+        if hasattr(socket, "create_connection"):
             self.sock = socket.create_connection((self.host, self.port), self.__timeout)
         else:
-            self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
-        if hasattr(self, '_tunnel_host') and self._tunnel_host:
+            self.sock = create_connection_helper(
+                self.host, self.port, timeout=self.__timeout
+            )
+        if hasattr(self, "_tunnel_host") and self._tunnel_host:
             self._tunnel()
 
 
@@ -459,6 +575,7 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
     Python library, then it is possible to perform server certificate validation even on Python 2.4, 2.5.  This
     class implements the necessary support.
     """
+
     def __init__(self, host, port, timeout, ca_file, has_ssl):
         """
         Creates an instance.
@@ -475,7 +592,9 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
             has_ssl:  True if the ssl Python library is available.
         """
         if not has_ssl and ca_file is not None:
-            raise Exception('If has_ssl is false, you are not allowed to specify a ca_file because it has no affect.')
+            raise Exception(
+                "If has_ssl is false, you are not allowed to specify a ca_file because it has no affect."
+            )
         self.__timeout = timeout
         self.__ca_file = ca_file
         self.__has_ssl = has_ssl
@@ -501,17 +620,21 @@ class HTTPSConnectionWithTimeoutAndVerification(httplib.HTTPSConnection):
                 socket.setdefaulttimeout(old_timeout)
 
         # Create the underlying socket.  Prefer Python's newer socket.create_connection method if it is available.
-        if hasattr(socket, 'create_connection'):
+        if hasattr(socket, "create_connection"):
             self.sock = socket.create_connection((self.host, self.port), self.__timeout)
         else:
-            self.sock = create_connection_helper(self.host, self.port, timeout=self.__timeout)
+            self.sock = create_connection_helper(
+                self.host, self.port, timeout=self.__timeout
+            )
 
-        if hasattr(self, '_tunnel_host') and self._tunnel_host:
+        if hasattr(self, "_tunnel_host") and self._tunnel_host:
             self._tunnel()
 
         # Now ask the ssl library to wrap the socket and verify the server certificate if we have a ca_file.
         if self.__ca_file is not None:
-            self.sock = ssl.wrap_socket(self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED)
+            self.sock = ssl.wrap_socket(
+                self.sock, ca_certs=self.__ca_file, cert_reqs=ssl.CERT_REQUIRED
+            )
         else:
             self.sock = ssl.wrap_socket(self.sock, cert_reqs=ssl.CERT_NONE)
 
@@ -549,4 +672,3 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
         raise err
     else:
         raise socket.error("getaddrinfo returns an empty list")
-

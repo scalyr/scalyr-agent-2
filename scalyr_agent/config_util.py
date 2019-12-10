@@ -15,19 +15,23 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
-__author__ = 'echee@scalyr.com'
+__author__ = "echee@scalyr.com"
 
 
 import os
 import re
 
 from scalyr_agent import json_lib
-from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings
+from scalyr_agent.json_lib.objects import (
+    JsonArray,
+    JsonObject,
+    ArrayOfStrings,
+    SpaceAndCommaSeparatedArrayOfStrings,
+)
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
 
 
-
-def parse_array_of_strings(strlist, separators=[',']):
+def parse_array_of_strings(strlist, separators=[","]):
     """Convert comma-separated string list into an ArrayOfStrings
 
     Accepts the following string representations.
@@ -49,7 +53,7 @@ def parse_array_of_strings(strlist, separators=[',']):
     strlist = strlist.strip()
 
     # Remove surrounding square brackets
-    if strlist[0] == '[' and strlist[-1] == ']':
+    if strlist[0] == "[" and strlist[-1] == "]":
         strlist = strlist[1:-1]
     if not strlist:
         return ArrayOfStrings()
@@ -82,14 +86,20 @@ def parse_array_of_strings(strlist, separators=[',']):
 NUMERIC_TYPES = set([int, long, float])
 STRING_TYPES = set([str, unicode])
 PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
-SUPPORTED_TYPES = PRIMITIVE_TYPES | set([JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings])
+SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
+    [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+)
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
     int: set([str, unicode, long, float]),
     long: set([str, unicode, float]),
     float: STRING_TYPES,
-    list: set([str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]),
-    JsonArray: set([str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]),
+    list: set(
+        [str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+    ),
+    JsonArray: set(
+        [str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+    ),
     JsonObject: STRING_TYPES,
     str: SUPPORTED_TYPES,
     unicode: SUPPORTED_TYPES,
@@ -106,9 +116,9 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     """
     convert_from = type(value)
 
-    kind = 'environment variable'
+    kind = "environment variable"
     if not is_environment_variable:
-        kind = 'config param'
+        kind = "config param"
 
     conversion_allowed = False
     if convert_from in ALLOWED_CONVERSIONS:
@@ -116,9 +126,12 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
             conversion_allowed = True
 
     if not conversion_allowed:
-        raise BadConfiguration('Prohibited conversion of %s "%s" from %s to %s' %
-                               (kind, field_name, convert_from, convert_to),
-                               field_name, 'illegalConversion')
+        raise BadConfiguration(
+            'Prohibited conversion of %s "%s" from %s to %s'
+            % (kind, field_name, convert_from, convert_to),
+            field_name,
+            "illegalConversion",
+        )
 
     # If no type change, simply return unconverted value
     if convert_from == convert_to:
@@ -135,15 +148,23 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
             raise BadConfiguration(
                 'Could not convert value %s for field "%s" from %s to %s'
                 % (value, field_name, convert_from, convert_to),
-                field_name, 'notJsonArray')
+                field_name,
+                "notJsonArray",
+            )
 
-    if convert_from in (list, JsonArray) and convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
+    if convert_from in (list, JsonArray) and convert_to in (
+        ArrayOfStrings,
+        SpaceAndCommaSeparatedArrayOfStrings,
+    ):
         list_of_strings = []
         for item in value:
             if type(item) not in STRING_TYPES:
                 raise BadConfiguration(
-                    'Non-string element found in value %s for field "%s"' % (value, field_name),
-                    field_name, 'notArrayOfStrings')
+                    'Non-string element found in value %s for field "%s"'
+                    % (value, field_name),
+                    field_name,
+                    "notArrayOfStrings",
+                )
             list_of_strings.append(item)
         return convert_to(list_of_strings)
 
@@ -152,15 +173,18 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     if convert_from in STRING_TYPES:
 
         if convert_to == bool:
-            return str(value).lower() == 'true'
+            return str(value).lower() == "true"
 
         elif convert_to in (JsonArray, JsonObject):
             try:
                 return json_lib.parse(value)
             except JsonParseException:
                 raise BadConfiguration(
-                    'Could not parse value %s for field "%s" as %s' % (value, field_name, convert_to),
-                    field_name, 'notJsonObject')
+                    'Could not parse value %s for field "%s" as %s'
+                    % (value, field_name, convert_to),
+                    field_name,
+                    "notJsonObject",
+                )
 
         elif convert_to in (ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings):
             try:
@@ -168,27 +192,45 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
                 return parse_array_of_strings(value, convert_to.separators)
             except TypeError:
                 raise BadConfiguration(
-                    'Could not parse value %s for field "%s" as %s' % (value, field_name, convert_to),
-                    field_name, 'notArrayOfStrings')
+                    'Could not parse value %s for field "%s" as %s'
+                    % (value, field_name, convert_to),
+                    field_name,
+                    "notArrayOfStrings",
+                )
 
         elif convert_to in NUMERIC_TYPES:
             try:
                 return convert_to(value)
             except ValueError:
-                raise BadConfiguration('Could not parse value %s for field "%s" as numeric type %s' % (
-                                              value, field_name, convert_to), field_name, 'notNumber')
+                raise BadConfiguration(
+                    'Could not parse value %s for field "%s" as numeric type %s'
+                    % (value, field_name, convert_to),
+                    field_name,
+                    "notNumber",
+                )
 
     if convert_from not in NUMERIC_TYPES:
-        raise BadConfiguration('Type conversion for field "%s" from %s to %s not implemented.' %
-                                      (field_name, convert_from, convert_to), field_name, 'notNumber')
+        raise BadConfiguration(
+            'Type conversion for field "%s" from %s to %s not implemented.'
+            % (field_name, convert_from, convert_to),
+            field_name,
+            "notNumber",
+        )
 
     if convert_to == bool:
-        raise BadConfiguration('A numeric value %s was given for boolean field "%s"' % (
-                                      value, field_name), field_name, 'notBoolean')
+        raise BadConfiguration(
+            'A numeric value %s was given for boolean field "%s"' % (value, field_name),
+            field_name,
+            "notBoolean",
+        )
 
     if convert_to not in NUMERIC_TYPES:
-        raise BadConfiguration('Type conversion for field "%s" from %s to %s not implemented.' %
-                                      (field_name, convert_from, convert_to), field_name, 'unsupportedConversion')
+        raise BadConfiguration(
+            'Type conversion for field "%s" from %s to %s not implemented.'
+            % (field_name, convert_from, convert_to),
+            field_name,
+            "unsupportedConversion",
+        )
 
     # At this point, we are trying to convert a number to another number type.  We only allow int to long
     # and long, int to float.
@@ -197,12 +239,22 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     if convert_to == long and convert_from == int:
         return long(value)
 
-    raise BadConfiguration('A numeric value of %s was given for field "%s" but a %s is required.' % (
-                                  value, field_name, convert_to), field_name, 'wrongType')
+    raise BadConfiguration(
+        'A numeric value of %s was given for field "%s" but a %s is required.'
+        % (value, field_name, convert_to),
+        field_name,
+        "wrongType",
+    )
 
 
-def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
-                        logger=None, param_val=None, monitor_name=None):
+def get_config_from_env(
+    param_name,
+    custom_env_name=None,
+    convert_to=None,
+    logger=None,
+    param_val=None,
+    monitor_name=None,
+):
     """Returns the environment variable value for a config param.  Warn on conflicts between config and env values.
 
     If a custom environment variable name is defined, use it instead of prepending 'SCALYR_'.
@@ -219,7 +271,7 @@ def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
     """
     env_name = custom_env_name
     if not env_name:
-        env_name = 'SCALYR_%s' % param_name
+        env_name = "SCALYR_%s" % param_name
 
     env_name = env_name.upper()
     strval = os.getenv(env_name)
@@ -231,28 +283,37 @@ def get_config_from_env(param_name, custom_env_name=None, convert_to=None,
     if strval is None or convert_to is None:
         return strval
 
-    converted_val = convert_config_param(param_name, strval, convert_to, is_environment_variable=True)
+    converted_val = convert_config_param(
+        param_name, strval, convert_to, is_environment_variable=True
+    )
 
     # Report conflicting values
     if logger:
         if param_val is not None and param_val != converted_val:
             logger.warn(
                 "Conflicting values detected between %s config file parameter `%s` and the environment variable `%s`. "
-                "Ignoring environment variable." % (monitor_name or 'global', param_name, env_name),
+                "Ignoring environment variable."
+                % (monitor_name or "global", param_name, env_name),
                 limit_once_per_x_secs=300,
-                limit_key='config_conflict_%s_%s_%s' % (monitor_name or 'global', param_name, env_name))
+                limit_key="config_conflict_%s_%s_%s"
+                % (monitor_name or "global", param_name, env_name),
+            )
 
         # Extra logging for critical params
         if param_val is None:
-            if param_name == 'api_key':
-                logger.debug("Using the api key from environment variable `%s`" % env_name,
-                             limit_once_per_x_secs=300, limit_key='api_key_from_env')
+            if param_name == "api_key":
+                logger.debug(
+                    "Using the api key from environment variable `%s`" % env_name,
+                    limit_once_per_x_secs=300,
+                    limit_key="api_key_from_env",
+                )
 
     return converted_val
 
 
 class BadConfiguration(Exception):
     """Raised when bad values are supplied in the configuration."""
+
     def __init__(self, message, field, error_code):
         """
         @param message:  The main error message
@@ -263,6 +324,9 @@ class BadConfiguration(Exception):
         self.field = field
         self.error_code = error_code
         if field is not None:
-            Exception.__init__(self, '%s [[badField="%s" errorCode="%s"]]' % (message, field, error_code))
+            Exception.__init__(
+                self,
+                '%s [[badField="%s" errorCode="%s"]]' % (message, field, error_code),
+            )
         else:
             Exception.__init__(self, '%s [[errorCode="%s"]]' % (message, error_code))
