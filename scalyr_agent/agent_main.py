@@ -1534,7 +1534,7 @@ class WorkerThread(object):
             self.__scalyr_client.close()
 
 
-if __name__ == "__main__":
+def main():
     my_controller = PlatformController.new_platform()
     parser = OptionParser(
         usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
@@ -1622,3 +1622,9 @@ if __name__ == "__main__":
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
     sys.exit(main_rc)
+
+
+if __name__ == "__main__":
+    # it is important to do all things in "main" function and leave this place clear.
+    # This allows us to patch this part, for example, to enable coverage.
+    main()

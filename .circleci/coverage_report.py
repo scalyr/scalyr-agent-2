@@ -20,6 +20,7 @@
 # To execute this script, you must have installed "coverage" package.(pip install coverage).
 # Before execution put files '.coverage' and '.coveragerc' in the root directory of the project.
 # Current working directory must be in the root directory too.
+# After execution paths from coverage file will be changed to local paths.
 #
 # Usage: python coverage_report.py
 
@@ -27,9 +28,30 @@
 import os
 import shutil
 import ConfigParser
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--show",
+    action="store_true",
+    default=False,
+    help="Open index page of html coverage report.",
+)
+
+args = parser.parse_args()
+
 
 # "rename .coverage file for  "combine" command"
-os.rename(".coverage", ".coverage.1")
+if os.path.exists("coverage.txt"):
+    # can be useful after downloading from circleci.
+    os.rename("coverage.txt", ".coverage.1")
+elif os.path.exists(".coverage"):
+    os.rename(".coverage", ".coverage.1")
+elif os.path.exists(".coverage.1"):
+    pass
+else:
+    raise OSError("Coverage file not found.")
 
 # Add current local project path in .coveragrc config file.
 # This is important because html report needs source code to generate results
@@ -41,7 +63,9 @@ with open(".coveragerc", "r") as f:
 
 # add current path to 'paths' section.
 paths = parser.get("paths", "source").split("\n")
-paths = ["\n%s" % os.getcwd()] + paths
+cwd = os.getcwd()
+if cwd not in paths:
+    paths = ["\n%s" % os.getcwd()] + paths
 parser.set("paths", "source", "\n".join(paths))
 
 with open(".coveragerc", "w") as f:
@@ -52,3 +76,7 @@ os.system("coverage combine")
 shutil.rmtree("htmlcov", ignore_errors=True)
 
 os.system("coverage html")
+
+if args.show:
+    import webbrowser
+    webbrowser.open("htmlcov/index.html")

@@ -131,7 +131,6 @@ ${contname_uploader} ${max_wait} \
 uploader_hostname=$(kubectl get pods | fgrep ${contname_uploader} | awk {'print $1'})
 echo "Uploader pod == ${uploader_hostname}"
 
-
 # Launch synchronous Verifier image (writes to stdout and also queries Scalyr)
 # Like the Uploader, the Verifier also waits for agent to be alive before uploading data
 echo ""
@@ -151,7 +150,6 @@ ${contname_verifier} ${max_wait} \
 
 echo "Stopping agent"
 k8s_docker_id=$(docker ps | grep k8s_scalyr-agent_scalyr-agent-2 | awk {'print$1'})
-docker container stop ${k8s_docker_id}
-
+docker stop ${k8s_docker_id}
 echo "Agent stopped copying .coverage results."
 docker cp ${k8s_docker_id}:/.coverage .
