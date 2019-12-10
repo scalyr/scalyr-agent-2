@@ -29,26 +29,26 @@ import shutil
 import ConfigParser
 
 # "rename .coverage file for  "combine" command"
-os.rename('.coverage', '.coverage.1')
+os.rename(".coverage", ".coverage.1")
 
 # Add current local project path in .coveragrc config file.
 # This is important because html report needs source code to generate results
 # Paths in .coverage and in local project can be different,
 # so we need to specify local project path, so coverage tool can access to source code to generate html.
 parser = ConfigParser.ConfigParser()
-with open('.coveragerc', 'r') as f:
+with open(".coveragerc", "r") as f:
     parser.readfp(f)
 
 # add current path to 'paths' section.
-paths = parser.get('paths', 'source').split('\n')
+paths = parser.get("paths", "source").split("\n")
 paths = ["\n%s" % os.getcwd()] + paths
-parser.set('paths', 'source', '\n'.join(paths))
+parser.set("paths", "source", "\n".join(paths))
 
-with open('.coveragerc', 'w') as f:
+with open(".coveragerc", "w") as f:
     parser.write(f)
 
-os.system('coverage combine')
+os.system("coverage combine")
 
-shutil.rmtree('htmlcov', ignore_errors=True)
+shutil.rmtree("htmlcov", ignore_errors=True)
 
-os.system('coverage html')
+os.system("coverage html")

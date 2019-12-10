@@ -85,7 +85,7 @@ echo "Building agent image"
 echo "=================================================="
 # Build local image (add .ci.k8s to version)
 perl -pi.bak -e 's/\s*(\S+)/$1\.ci\.k8s/' VERSION
-python build_package.py k8s_builder --dockerfiles-path docker/coverage
+python build_package.py k8s_builder --coverage
 TARBALL=$(ls scalyr-k8s-agent-*)
 
 TEMP_DIRECTORY=~/temp_directory

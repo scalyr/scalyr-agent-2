@@ -12,6 +12,7 @@
 # script relies on these lines.
 REPOSITORIES=""      # OVERRIDE_REPOSITORIES
 TAGS=""              # OVERRIDE_TAGS
+COVERAGE_RUN_SCRIPT_NAME=""     # OVERRIDE_COVERAGE_RUN_SCRIPT_NAME
 
 function print_usage() {
 cat <<EOF
@@ -85,6 +86,9 @@ while (( $# > 0)); do
       cp $TMPDIR/Dockerfile ./ || die "Failed to copy the Dockerfile to current directory";
       cp $TMPDIR/*.tar.gz ./ ||
         die "Failed to copy the source tarball to the current directory";
+      echo ${COVERAGE_RUN_SCRIPT_NAME}
+      cp $TMPDIR/${COVERAGE_RUN_SCRIPT_NAME} ./ ||
+        die "Failed to copy the run coverage script";
       exit 0;;
 
     --repositories)

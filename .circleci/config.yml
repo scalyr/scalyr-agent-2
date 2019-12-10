@@ -233,7 +233,15 @@ jobs:
           paths:
             - "venv"
       - run:
-          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
+          command: |
+            mkdir -p coverage-smoke-docker-syslog
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
+            mv .coverage coverage-smoke-docker-syslog/.coverage.smoke-docker-syslog
+
+      - persist_to_workspace:
+          root: coverage-smoke-docker-syslog
+          paths:
+            .coverage.smoke-docker-syslog
 
   smoke-k8s:
     machine:

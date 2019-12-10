@@ -79,7 +79,7 @@ fakeversion=`cat VERSION`
 fakeversion="${fakeversion}.ci"
 echo $fakeversion > ./VERSION
 echo "Building docker image"
-python build_package.py docker_${syslog_or_json}_builder --dockerfiles-path docker/coverage
+python build_package.py docker_${syslog_or_json}_builder --coverage
 
 # Extract and build agent docker image
 ./scalyr-docker-agent-${syslog_or_json}-${fakeversion} --extract-packages

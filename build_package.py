@@ -61,7 +61,7 @@ PACKAGE_TYPES = [
 ]
 
 
-def build_package(package_type, variant, no_versioned_file_name, dockerfiles_path):
+def build_package(package_type, variant, no_versioned_file_name, coverage_enabled):
     """Builds the scalyr-agent-2 package specified by the arguments.
 
     The package is left in the current working directory.  The file name of the
@@ -73,7 +73,7 @@ def build_package(package_type, variant, no_versioned_file_name, dockerfiles_pat
         as 'rpm').
     @param no_versioned_file_name:  If True, will not embed a version number in the resulting artifact's file name.
         This only has an affect if building one of the tarball formats.
-    @param dockerfiles_path: Path to Dockerfiles. Only works with Docker builds.
+    @param coverage_enabled: If True, enables coverage analysis. Patches Dockerfile to run agent with coverage.
 
     @return: The file name of the produced package.
     """
@@ -98,31 +98,45 @@ def build_package(package_type, variant, no_versioned_file_name, dockerfiles_pat
             # This is the deprecated approach (but is still published under scalyr/scalyr-docker-agent for
             # backward compatibility.)  We also publish this under scalyr/scalyr-docker-agent-syslog to help
             # with the eventual migration.
-            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-docker-agent.tar.gz',
-                                                         os.path.join(dockerfiles_path, 'Dockerfile.syslog'),
-                                                         'docker/docker-syslog-config',
-                                                         'scalyr-docker-agent-syslog',
-                                                         ['scalyr/scalyr-agent-docker-syslog',
-                                                          'scalyr/scalyr-agent-docker'])
-        elif package_type == 'docker_json_builder':
+            artifact_file_name = build_container_builder(
+                variant,
+                version,
+                no_versioned_file_name,
+                "scalyr-docker-agent.tar.gz",
+                "docker/Dockerfile.syslog",
+                "docker/docker-syslog-config",
+                "scalyr-docker-agent-syslog",
+                ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"],
+                coverage_enabled=coverage_enabled
+            )
+        elif package_type == "docker_json_builder":
             # An image for running on Docker configured to fetch logs via the file system (the container log
             # directory is mounted to the agent container.)  This is the preferred way of running on Docker.
             # This image is published to scalyr/scalyr-agent-docker-json.
-            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-docker-agent.tar.gz',
-                                                         os.path.join(dockerfiles_path, 'Dockerfile'),
-                                                         'docker/docker-json-config',
-                                                         'scalyr-docker-agent-json',
-                                                         ['scalyr/scalyr-agent-docker-json'])
-        elif package_type == 'k8s_builder':
+            artifact_file_name = build_container_builder(
+                variant,
+                version,
+                no_versioned_file_name,
+                "scalyr-docker-agent.tar.gz",
+                "docker/Dockerfile",
+                "docker/docker-json-config",
+                "scalyr-docker-agent-json",
+                ["scalyr/scalyr-agent-docker-json"],
+                coverage_enabled=coverage_enabled
+            )
+        elif package_type == "k8s_builder":
             # An image for running the agent on Kubernetes.
-            artifact_file_name = build_container_builder(variant, version, no_versioned_file_name,
-                                                         'scalyr-k8s-agent.tar.gz',
-                                                         os.path.join(dockerfiles_path, 'Dockerfile.k8s'),
-                                                         'docker/k8s-config',
-                                                         'scalyr-k8s-agent',
-                                                         ['scalyr/scalyr-k8s-agent'])
+            artifact_file_name = build_container_builder(
+                variant,
+                version,
+                no_versioned_file_name,
+                "scalyr-k8s-agent.tar.gz",
+                "docker/Dockerfile.k8s",
+                "docker/k8s-config",
+                "scalyr-k8s-agent",
+                ["scalyr/scalyr-k8s-agent"],
+                coverage_enabled=coverage_enabled
+            )
         else:
             assert package_type in ("deb", "rpm")
             artifact_file_name = build_rpm_or_deb_package(
@@ -489,6 +503,66 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     )
 
 
+def _add_coverage_to_dockerfile(dockerfile_path, run_coverage_script_name):
+    """
+    Patches Dockerfile to run script that runs agent with coverage enabled. Script is created dynamically
+    with name specified in "run_coverage_script_name".
+    :param dockerfile_path:
+    :param run_coverage_script_name:
+    :return:
+    """
+    with open(dockerfile_path, "r") as file:
+        data = file.read().decode('utf-8')
+
+    cmd_pattern = re.compile(r"CMD\s\[.*\]")
+
+    try:
+        cmd_line = cmd_pattern.search(data).group(0)
+    except:
+        print >> sys.stderr, "CMD entrypoint not found."
+        raise
+
+    # get all parameters of CMD.
+    cmd_params = re.findall(r"(?:\")([^\"]+)(?:\")", cmd_line.replace('CMD ', ''))
+
+    try:
+        symlink_path = cmd_params[0]
+    except IndexError:
+        print >> sys.stderr, "Dockefile CMD has any arguments"
+        raise
+
+    other_params = " ".join(cmd_params[1:])
+
+    # new CMD line that runs coverage script.
+    cmd_replace = 'ADD run_coverage.sh /\nCMD ["/bin/sh", "run_coverage.sh"]'
+
+    new_dockerfile_source = cmd_pattern.sub(cmd_replace, data)
+
+    # add coverage library to pip install
+    new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage", new_dockerfile_source)
+
+    with open(dockerfile_path, 'w') as file:
+        file.write(new_dockerfile_source)
+
+    # run coverage script source.
+    run_coverage_script_code = u"""
+#!/bin/bash
+AGENT_MAIN_PATH="$(readlink -f "{symlink_path}")"
+
+coverage run ${{AGENT_MAIN_PATH}} {other_params}
+
+echo path
+"""
+
+    run_coverage_script_code = run_coverage_script_code.format(
+        symlink_path=symlink_path,
+        other_params=other_params
+    )
+
+    with open(run_coverage_script_name, 'w') as file:
+        file.write(run_coverage_script_code)
+
+
 def build_container_builder(
     variant,
     version,
@@ -498,6 +572,7 @@ def build_container_builder(
     base_configs,
     image_name,
     image_repos,
+    coverage_enabled=False,
 ):
     """Builds an executable script in the current working directory that will build the container image for the various
     Docker and Kubernetes targets.  This script embeds all assets it needs in it so it can be a standalone artifact.
@@ -519,6 +594,7 @@ def build_container_builder(
     @param image_name:  The name for the image that is being built.  Will be used for the artifact's name.
     @param image_repos:  A list of repositories that should be added as tags to the image once it is built.
         Each repository will have two tags added -- one for the specific agent version and one for `latest`.
+    @param coverage_enabled: Path Dockerfile to run agent with enabled coverage.
 
     @return: The file name of the built artifact.
     """
@@ -553,6 +629,14 @@ def build_container_builder(
         base_script,
     )
 
+    if coverage_enabled:
+        run_coverage_script_name = "run_smoketests_with_coverage.sh"
+        base_script = re.sub(
+            r"\n.*OVERRIDE_COVERAGE_RUN_SCRIPT_NAME.*\n",
+            '\nCOVERAGE_RUN_SCRIPT_NAME="%s"\n' % run_coverage_script_name,
+            base_script,
+        )
+
     if no_versioned_file_name:
         output_name = image_name
     else:
@@ -562,6 +646,10 @@ def build_container_builder(
     # rethink this.
     tar_out = StringIO()
     tar = tarfile.open("assets.tar.gz", "w|gz", tar_out)
+    if coverage_enabled:
+        _add_coverage_to_dockerfile("Dockerfile", run_coverage_script_name)
+        # add coverage script to archive.
+        tar.add(run_coverage_script_name)
     tar.add("Dockerfile")
     tar.add(source_tarball)
     tar.close()
@@ -1661,10 +1749,14 @@ if __name__ == "__main__":
         "itself.  The file should be one built by a previous run of this script.",
     )
 
-    parser.add_option('', '--dockerfiles-path',dest='dockerfiles_path', default='docker',
-                      help='The path to the directory with Dockerfiles for docker builds. '
-                           'This can be used to specify alternative Dockerfile. For example, with enabled coverage.'
-                           'Only works with docker and k8s builds.')
+    parser.add_option(
+        "",
+        "--coverage",
+        dest="coverage",
+        action="store_true",
+        default=False,
+        help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+    )
 
     (options, args) = parser.parse_args()
     # If we are just suppose to create the build_info, then do it and exit.  We do not bother to check to see
@@ -1692,6 +1784,11 @@ if __name__ == "__main__":
     if options.build_info is not None:
         set_build_info(options.build_info)
 
-    artifact = build_package(args[0], options.variant, options.no_versioned_file_name, options.dockerfiles_path)
+    artifact = build_package(
+        args[0],
+        options.variant,
+        options.no_versioned_file_name,
+        options.coverage,
+    )
     print "Built %s" % artifact
     sys.exit(0)
