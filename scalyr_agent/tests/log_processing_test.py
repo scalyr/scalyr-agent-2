@@ -2437,8 +2437,6 @@ class TestLogMatcher(ScalyrTestCase):
 
         processor = processors[0]
 
-        s = processors[0].generate_status()
-
         processor.scan_for_new_bytes()
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = processor.perform_processing(
