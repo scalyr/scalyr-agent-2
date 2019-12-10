@@ -4,10 +4,10 @@
 # Prerequisites:
 #
 # 1) Install kops
-# 2) Create and version an s3 bucket.  Create the agentscale.yaml cluster definition file 
+# 2) Create and version an s3 bucket.  Create the agentscale.yaml cluster definition file
 #    Run `create_agentscale_yaml.sh` to do this.  The cluster definition will be saved to `fivezones.yaml`.
 # 3) Save `fivezones.yaml` as `agentscale.yaml`.  Customize `agentscale.yaml`, e.g turning off Gossip protocol.
-#    (Diff `fivezones.yaml` and `agentscale.yaml` to view the customizations I used to 
+#    (Diff `fivezones.yaml` and `agentscale.yaml` to view the customizations I used to
 #    successfully bring up a 1000-node cluster.)
 #
 # Finally, note that all scripts and sample files have the following placeholders:
@@ -23,7 +23,7 @@
 ###################################################################################################################
 
 ###################################################################################################################
-# Necessary environment variables for connecting to AWS 
+# Necessary environment variables for connecting to AWS
 # Note: you must be granted read/write access to the AWS cluster and have requested appropriate resource
 # limits (e.g. if you need 1000 t3.small worker nodes, submit a request from the AWS console.)
 ###################################################################################################################

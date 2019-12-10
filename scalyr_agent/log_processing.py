@@ -23,12 +23,20 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 import sys
 
-__author__ = 'czerwin@scalyr.com'
+__author__ = "czerwin@scalyr.com"
 
 import datetime
 import errno
 import fnmatch
-import glob
+import sys
+
+# Glob2 requires a Python version >= 2.6. This check falls back to the built-in glob module when running under
+# old Python versions. This can be removed when we no longer support Python earlier than 2.6.
+# When support for Python earlier than 3.5 is deprecated, the built-in glob with a recursive option can be used.
+if sys.version_info >= (2, 6):
+    import glob2 as glob
+else:
+    import glob as glob
 import os
 import random
 import re
@@ -57,7 +65,7 @@ from os.path import isfile, join
 
 # The maximum allowed size for a line when reading from a log file.
 # We do not strictly enforce this -- some lines returned by LogFileIterator may be
-#longer than this due to some edge cases.
+# longer than this due to some edge cases.
 MAX_LINE_SIZE = 5 * 1024
 
 # The number of seconds we are willing to wait when encountering a log line at the end of a log file that does not
@@ -79,43 +87,45 @@ COPY_STALENESS_THRESHOLD = 15 * 60
 
 log = scalyr_logging.getLogger(__name__)
 
-def _parse_cri_log( line ):
+
+def _parse_cri_log(line):
     """
     Parse a log line that uses the K8S Container Runtime Interface (CRI) format
     https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md
     """
     # find the end of the timestamp segment
-    index = line.find( ' ' )
+    index = line.find(" ")
     if index < 0:
         return None, None, None, None
 
-    #parse the timestamp
-    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch( line[:index] )
+    # parse the timestamp
+    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(line[:index])
     if timestamp is None:
         return None, None, None, None
 
     # skip over the ' ' delimiter and parse the stream type
-    line = line[index+1:]
-    index = line.find( ' ' )
+    line = line[index + 1 :]
+    index = line.find(" ")
     if index < 0:
         return None, None, None, None
 
     stream = line[:index]
-    if stream != 'stdout' and stream != 'stderr':
+    if stream != "stdout" and stream != "stderr":
         return None, None, None, None
 
     # skip over the ' ' delimiter and parse the tags
-    line = line[index+1:]
-    index = line.find( ' ' )
+    line = line[index + 1 :]
+    index = line.find(" ")
     if index < 0:
         return None, None, None, None
 
     tags = line[:index]
 
     # skip over the ' ' delimiter and get the log line
-    line = line[index+1:]
+    line = line[index + 1 :]
 
     return timestamp, stream, tags, line
+
 
 class LogLine(object):
     """A class representing a line from a log file.
@@ -124,6 +134,7 @@ class LogLine(object):
     the log line in nanoseconds since the epoch (defaults to None, in which case the
     current time.time() will be used), and 'attrs' which are optional attributes for the line.
     """
+
     def __init__(self, line):
         # line is a string
         self.line = line
@@ -221,28 +232,33 @@ class LogFileIterator(object):
         self.at_end = False
 
         self.__max_line_length = config.max_line_size  # Defaults to 5 * 1024
-        self.__line_completion_wait_time = config.line_completion_wait_time  # Defaults to 5 * 60
+        self.__line_completion_wait_time = (
+            config.line_completion_wait_time
+        )  # Defaults to 5 * 60
         self.__log_deletion_delay = config.log_deletion_delay  # Defaults to 10 * 60
         self.__page_size = config.read_page_size  # Defaults to 64 * 1024
 
-        self.__parse_format = log_config.get( 'parse_format' )
+        self.__parse_format = log_config.get("parse_format")
         parse_as_json = None
         if type(log_config) is dict:
-            parse_as_json = log_config.get('parse_lines_as_json', None)
+            parse_as_json = log_config.get("parse_lines_as_json", None)
         else:
-            parse_as_json = log_config.get('parse_lines_as_json', None, none_if_missing=True)
+            parse_as_json = log_config.get(
+                "parse_lines_as_json", None, none_if_missing=True
+            )
         if parse_as_json is not None:
             if parse_as_json:
-                self.__parse_format = 'json'
+                self.__parse_format = "json"
             else:
-                self.__parse_format = 'raw'
+                self.__parse_format = "raw"
 
-        self.__json_log_key = log_config.get('json_message_field', 'log' )
-        self.__json_timestamp_key = log_config.get('json_timestamp_field', 'time')
+        self.__json_log_key = log_config.get("json_message_field", "log")
+        self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
 
         # create the line matcher objects for matching single and multiple lines
-        self.__line_matcher = LineMatcher.create_line_matchers(log_config, config.max_line_size,
-                                                               config.line_completion_wait_time)
+        self.__line_matcher = LineMatcher.create_line_matchers(
+            log_config, config.max_line_size, config.line_completion_wait_time
+        )
 
         # Stat just used in testing to verify pages are being read correctly.
         self.page_reads = 0
@@ -258,7 +274,7 @@ class LogFileIterator(object):
         # of this and self.__position
         self.__sequence_number_at_mark = 0
 
-        self.__max_sequence_number = config.max_sequence_number # defaults to 1TB
+        self.__max_sequence_number = config.max_sequence_number  # defaults to 1TB
 
         # The file system facade that we direct all I/O calls through
         # so that we can insert testing methods in the future if needed.
@@ -272,37 +288,49 @@ class LogFileIterator(object):
         if checkpoint is not None:
             need_to_close = True
             try:
-                if 'sequence_id' in checkpoint:
+                if "sequence_id" in checkpoint:
                     # only set the sequence id if the checkpoint also has a sequence number.
                     # If it's missing the sequence number then something has become corrupted
                     # so we shouldn't use it
-                    if 'sequence_number' in checkpoint:
-                        self.__sequence_number_at_mark = checkpoint['sequence_number']
-                        self.__sequence_id = checkpoint['sequence_id']
+                    if "sequence_number" in checkpoint:
+                        self.__sequence_number_at_mark = checkpoint["sequence_number"]
+                        self.__sequence_id = checkpoint["sequence_id"]
 
-                if 'position' in checkpoint:
-                    self.__position = checkpoint['position']
-                    for state in checkpoint['pending_files']:
-                        if not state['is_log_file'] or self.__file_system.trust_inodes:
-                            (file_object, file_size, inode) = self.__open_file_by_inode(os.path.dirname(self.__path),
-                                                                                        state['inode'])
+                if "position" in checkpoint:
+                    self.__position = checkpoint["position"]
+                    for state in checkpoint["pending_files"]:
+                        if not state["is_log_file"] or self.__file_system.trust_inodes:
+                            (file_object, file_size, inode) = self.__open_file_by_inode(
+                                os.path.dirname(self.__path), state["inode"]
+                            )
                         else:
-                            (file_object, file_size, inode) = self.__open_file_by_path(self.__path)
+                            (file_object, file_size, inode) = self.__open_file_by_path(
+                                self.__path
+                            )
 
                         if file_object is not None:
-                            self.__pending_files.append(LogFileIterator.FileState(state, file_object))
+                            self.__pending_files.append(
+                                LogFileIterator.FileState(state, file_object)
+                            )
                     self.__refresh_pending_files(time.time())
                     need_to_close = False
                 else:
                     # Must be a psuedo checkpoint created by the static create_checkpoint method.  This is asking us
                     # to start iterating over the log file at a specific position.
                     self.__position = 0
-                    initial_position = checkpoint['initial_position']
-                    (file_object, file_size, inode) = self.__open_file_by_path(self.__path)
+                    initial_position = checkpoint["initial_position"]
+                    (file_object, file_size, inode) = self.__open_file_by_path(
+                        self.__path
+                    )
                     if file_object is not None and file_size >= initial_position:
-                        self.__pending_files.append(LogFileIterator.FileState(
-                            LogFileIterator.FileState.create_json(0, initial_position, file_size, inode, True),
-                            file_object))
+                        self.__pending_files.append(
+                            LogFileIterator.FileState(
+                                LogFileIterator.FileState.create_json(
+                                    0, initial_position, file_size, inode, True
+                                ),
+                                file_object,
+                            )
+                        )
                     elif file_object is not None:
                         file_object.close()
                 need_to_close = False
@@ -337,13 +365,13 @@ class LogFileIterator(object):
         if page_size is not None:
             self.__page_size = page_size
 
-    def __get_unique_id( self ):
+    def __get_unique_id(self):
         """Returns a uuid as a string
         We want uuids as strings mostly as a convenience for json_lib
         """
-        return str( uuid.uuid4() )
+        return str(uuid.uuid4())
 
-    def get_sequence( self ):
+    def get_sequence(self):
         """Gets the current sequence id and sequence number of the iterator
         The sequence id is a globally unique number that groups a set of sequence numbers
 
@@ -352,7 +380,7 @@ class LogFileIterator(object):
         """
         return self.__sequence_id, self.__sequence_number_at_mark + self.__position
 
-    def __increase_sequence_number( self, amount ):
+    def __increase_sequence_number(self, amount):
         """Increases the sequence number and resets both the sequence number and the id
         if the sequence number exceeds the maximum value"""
         self.__sequence_number_at_mark += amount
@@ -390,8 +418,10 @@ class LogFileIterator(object):
         # read.
         mark_position = position.get_offset_into_buffer()
         for pending_file in self.__pending_files:
-            if not pending_file.valid or (mark_position >= pending_file.position_end
-                                          and not pending_file.is_log_file):
+            if not pending_file.valid or (
+                mark_position >= pending_file.position_end
+                and not pending_file.is_log_file
+            ):
                 self.__close_file(pending_file)
             else:
                 new_pending_files.append(pending_file)
@@ -411,8 +441,9 @@ class LogFileIterator(object):
         self.__position -= position_delta
 
         self.__pending_files = new_pending_files
-        self.__mark_generation = LogFileIterator.MarkGeneration(previous_generation=self.__mark_generation,
-                                                                position_advanced=position_delta)
+        self.__mark_generation = LogFileIterator.MarkGeneration(
+            previous_generation=self.__mark_generation, position_advanced=position_delta
+        )
 
     def tell(self, dest=None):
         """Returns a position.
@@ -444,7 +475,9 @@ class LogFileIterator(object):
         """
         mark_offset = position.get_offset_into_buffer()
         if mark_offset < 0:
-            raise Exception('Attempt to seek to a position that occurs before further set mark.')
+            raise Exception(
+                "Attempt to seek to a position that occurs before further set mark."
+            )
 
         buffer_index = self.__determine_buffer_index(mark_offset)
         if buffer_index is not None:
@@ -466,7 +499,9 @@ class LogFileIterator(object):
         @rtype: int
         """
         if first.mark_generation is not second.mark_generation:
-            raise Exception('Attempt to compare positions from two different mark generations')
+            raise Exception(
+                "Attempt to compare positions from two different mark generations"
+            )
 
         return second.mark_offset - first.mark_offset
 
@@ -517,18 +552,20 @@ class LogFileIterator(object):
         # if there are no bytes available in the buffer or on the file
         # shortcircuit return an empty string
         if available_buffer_bytes == 0 and not more_file_bytes_available:
-            return LogLine( line='' )
+            return LogLine(line="")
 
         # Keep our underlying buffer of bytes filled up.
-        if self.__buffer is None or (available_buffer_bytes < self.__max_line_length and
-                                     more_file_bytes_available):
+        if self.__buffer is None or (
+            available_buffer_bytes < self.__max_line_length
+            and more_file_bytes_available
+        ):
             self.__fill_buffer(current_time)
 
         # The following code and the sanity check below were to check for an old bug that was fixed a long time ago.
         # original_buffer_index = self.__buffer.tell()
         # expected_buffer_index = self.__determine_buffer_index(self.__position)
         # Just a sanity check.
-        #if len(self.__buffer_contents_index) > 0 and self.__position != self.__buffer_contents_index[-1].position_end:
+        # if len(self.__buffer_contents_index) > 0 and self.__position != self.__buffer_contents_index[-1].position_end:
         #    if expected_buffer_index != original_buffer_index:
         #        assert expected_buffer_index == original_buffer_index, (
         #            'Mismatch between expected index and actual %ld %ld',
@@ -544,7 +581,7 @@ class LogFileIterator(object):
         self.__position = self.__determine_mark_position(self.__buffer.tell())
 
         # Just a sanity check.
-        #if len(self.__buffer_contents_index) > 0:
+        # if len(self.__buffer_contents_index) > 0:
         #    expected_size = self.__buffer_contents_index[-1].buffer_index_end
         #    actual_size = self.__file_system.get_file_size(self.__buffer)
         #    if expected_size != actual_size:
@@ -553,22 +590,24 @@ class LogFileIterator(object):
 
         # check to see if we need to parse the line as cri.
         # Note: we don't handle multi-line lines.
-        if self.__parse_format == 'cri':
-            timestamp, stream, tags, message = _parse_cri_log( result.line )
+        if self.__parse_format == "cri":
+            timestamp, stream, tags, message = _parse_cri_log(result.line)
             if message is None:
-                log.warn("Didn't find a valid log line in CRI format for log %s.  Logging full line." %
-                        (self.__path), limit_once_per_x_secs=300, limit_key=('invalid-cri-format-%s' % self.__path))
+                log.warn(
+                    "Didn't find a valid log line in CRI format for log %s.  Logging full line."
+                    % (self.__path),
+                    limit_once_per_x_secs=300,
+                    limit_key=("invalid-cri-format-%s" % self.__path),
+                )
             else:
                 result.line = message
                 result.timestamp = timestamp
-                result.attrs = { 'raw_timestamp': timestamp,
-                                 'stream': stream
-                               }
+                result.attrs = {"raw_timestamp": timestamp, "stream": stream}
 
         # or see if we need to parse it as json
-        elif self.__parse_format == 'json':
+        elif self.__parse_format == "json":
             try:
-                json = scalyr_util.json_decode( result.line )
+                json = scalyr_util.json_decode(result.line)
 
                 line = None
                 attrs = {}
@@ -580,17 +619,23 @@ class LogFileIterator(object):
                         line = value
                     elif key == self.__json_timestamp_key:
                         # TODO: need to add support for multiple timestamp formats
-                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(value)
-                        if 'raw_timestamp' not in attrs:
-                            attrs['raw_timestamp'] = value
+                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
+                            value
+                        )
+                        if "raw_timestamp" not in attrs:
+                            attrs["raw_timestamp"] = value
                     else:
                         attrs[key] = value
 
                 # if we didn't find a valid line key/value pair
                 # throw a warning and treat it as a normal line
                 if line is None:
-                    log.warn("Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration" %
-                        (self.__json_log_key, self.__path), limit_once_per_x_secs=300, limit_key=('json-message-field-missing-%s' % self.__path))
+                    log.warn(
+                        "Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration"
+                        % (self.__json_log_key, self.__path),
+                        limit_once_per_x_secs=300,
+                        limit_key=("json-message-field-missing-%s" % self.__path),
+                    )
                 else:
                     # we found a key match for the message field, so use that for the log line
                     # and store any other fields in the attr dict
@@ -601,8 +646,11 @@ class LogFileIterator(object):
 
             except Exception, e:
                 # something went wrong. Return the full line and log a message
-                log.warn("Error parsing line as json for log '%s' - %s" % (self.__path, e),
-                         limit_once_per_x_secs=300, limit_key=('bad-json-%s' % self.__path))
+                log.warn(
+                    "Error parsing line as json for log '%s' - %s" % (self.__path, e),
+                    limit_once_per_x_secs=300,
+                    limit_key=("bad-json-%s" % self.__path),
+                )
 
         return result
 
@@ -659,7 +707,7 @@ class LogFileIterator(object):
         # not allow for file deletes while someone has a file handle open, but you have to use the native win32 api
         # to be able to open files that work in such a way.. and it still does not allow for the parent dirs to be
         # deleted.)
-        close_file = (sys.platform == 'win32')
+        close_file = sys.platform == "win32"
 
         # also close any files that haven't been modified for a certain amount of time.
         # This can help prevent errors from having too many open files if we are scanning
@@ -755,7 +803,7 @@ class LogFileIterator(object):
 
         # We should never reach here since the fill_buffer method should construct a buffer_contents_index that
         # spans all the buffer positions.
-        assert False, 'Buffer index of %d not found' % buffer_index
+        assert False, "Buffer index of %d not found" % buffer_index
 
     def __available_buffer_bytes(self):
         """Returns the number of bytes available to be read in the buffer.
@@ -776,7 +824,10 @@ class LogFileIterator(object):
             if self.__buffer is None or len(self.__buffer_contents_index) == 0:
                 return self.__pending_files[-1].position_end > self.__position
             else:
-                return self.__pending_files[-1].position_end > self.__buffer_contents_index[-1].position_end
+                return (
+                    self.__pending_files[-1].position_end
+                    > self.__buffer_contents_index[-1].position_end
+                )
         else:
             return False
 
@@ -801,11 +852,19 @@ class LogFileIterator(object):
             largest_position = self.__pending_files[-1].position_end
         else:
             largest_position = 0
-        (file_handle, file_size, inode) = self.__open_file_by_path(self.__path, starting_inode=inode)
+        (file_handle, file_size, inode) = self.__open_file_by_path(
+            self.__path, starting_inode=inode
+        )
 
         if file_handle is not None:
-            self.__pending_files.append(LogFileIterator.FileState(
-                LogFileIterator.FileState.create_json(largest_position, 0, file_size, inode, True), file_handle))
+            self.__pending_files.append(
+                LogFileIterator.FileState(
+                    LogFileIterator.FileState.create_json(
+                        largest_position, 0, file_size, inode, True
+                    ),
+                    file_handle,
+                )
+            )
 
     def __refresh_pending_files(self, current_time):
         """Check to see if __pending_files needs to be adjusted due to log rotation or the
@@ -836,8 +895,11 @@ class LogFileIterator(object):
 
             # See if it is rotated by checking out the file handle we last opened to this file path.
             if current_log_file is not None:
-                if (current_log_file.last_known_size > latest_size or
-                        self.__file_system.trust_inodes and current_log_file.inode != latest_inode):
+                if (
+                    current_log_file.last_known_size > latest_size
+                    or self.__file_system.trust_inodes
+                    and current_log_file.inode != latest_inode
+                ):
                     # Ok, the log file has rotated.  We need to add in a new entry to represent this.
                     # But, we also take this opportunity to see if the current entry we had for the log file has
                     # grown in length since the last time we checked it, which is possible.  This is the last time
@@ -846,14 +908,20 @@ class LogFileIterator(object):
                     if current_log_file.file_handle is not None:
                         current_log_file.last_known_size = max(
                             current_log_file.last_known_size,
-                            self.__file_system.get_file_size(current_log_file.file_handle))
+                            self.__file_system.get_file_size(
+                                current_log_file.file_handle
+                            ),
+                        )
                     elif not self.__file_system.trust_inodes:
                         # If we do not have the file handle open (probably because we are on a win32 system) and
                         # we do not trust inodes, then there is no way to get back to the original contents, so we
                         # just mark this file portion as now invalid.
                         current_log_file.valid = False
                     current_log_file.is_log_file = False
-                    current_log_file.position_end = current_log_file.position_start + current_log_file.last_known_size
+                    current_log_file.position_end = (
+                        current_log_file.position_start
+                        + current_log_file.last_known_size
+                    )
                     # Note, we do not yet detect if current_log_file is actually pointing to the same inode as the
                     # log_path.  This could be true if the log file was copied to another location and then truncated
                     # in place (a commom mode of operation used by logrotate).  If this is the case, then the
@@ -867,7 +935,9 @@ class LogFileIterator(object):
                 else:
                     # It has not been rotated.  So we just update the size of the current entry.
                     current_log_file.last_known_size = latest_size
-                    current_log_file.position_end = current_log_file.position_start + latest_size
+                    current_log_file.position_end = (
+                        current_log_file.position_start + latest_size
+                    )
             else:
                 # There is no entry representing the file at log_path, but it does exist, so we need to add it in.
                 self.__add_entry_for_log_path(latest_inode)
@@ -881,13 +951,21 @@ class LogFileIterator(object):
                 if current_log_file is not None:
                     current_log_file.is_log_file = False
                     if current_log_file.file_handle is not None:
-                        current_log_file.last_known_size = max(current_log_file.last_known_size,
-                                                               self.__file_system.get_file_size(
-                                                                   current_log_file.file_handle))
-                    current_log_file.position_end = current_log_file.position_start + current_log_file.last_known_size
+                        current_log_file.last_known_size = max(
+                            current_log_file.last_known_size,
+                            self.__file_system.get_file_size(
+                                current_log_file.file_handle
+                            ),
+                        )
+                    current_log_file.position_end = (
+                        current_log_file.position_start
+                        + current_log_file.last_known_size
+                    )
                 if self.__log_deletion_time is None:
                     self.__log_deletion_time = current_time
-                self.at_end = current_time - self.__log_deletion_time > self.__log_deletion_delay
+                self.at_end = (
+                    current_time - self.__log_deletion_time > self.__log_deletion_delay
+                )
 
             else:
                 raise
@@ -917,13 +995,17 @@ class LogFileIterator(object):
                 # The easiest way to think about this is that we are shifting the buffer positions of all existing
                 # entries by buffer_index.  If that results in a positive end position, then it's still a useful
                 # entry.
-                entry.buffer_index_start = max(entry.buffer_index_start - buffer_index, 0)
+                entry.buffer_index_start = max(
+                    entry.buffer_index_start - buffer_index, 0
+                )
                 entry.buffer_index_end -= buffer_index
 
                 if entry.buffer_index_end > 0:
                     new_buffer_content_index.append(entry)
                     expected_bytes += entry.buffer_index_end - entry.buffer_index_start
-                    entry.position_start = entry.position_end - (entry.buffer_index_end - entry.buffer_index_start)
+                    entry.position_start = entry.position_end - (
+                        entry.buffer_index_end - entry.buffer_index_start
+                    )
                     read_position = entry.position_end
 
             # Now read the bytes.  We should get the number of bytes we just found in all of the entries.
@@ -931,8 +1013,9 @@ class LogFileIterator(object):
             new_buffer.write(tmp)
             if expected_bytes != new_buffer.tell():
                 assert expected_bytes == new_buffer.tell(), (
-                    'Failed to get the right number of left over bytes %d %d "%s"' % (
-                    expected_bytes, new_buffer.tell(), tmp))
+                    'Failed to get the right number of left over bytes %d %d "%s"'
+                    % (expected_bytes, new_buffer.tell(), tmp)
+                )
 
         leftover_bytes = new_buffer.tell()
 
@@ -945,17 +1028,23 @@ class LogFileIterator(object):
             if read_position < pending_file.position_end:
                 should_have_bytes = True
                 read_position = max(pending_file.position_start, read_position)
-                bytes_left_in_file = pending_file.last_known_size - (read_position - pending_file.position_start)
+                bytes_left_in_file = pending_file.last_known_size - (
+                    read_position - pending_file.position_start
+                )
                 content = self.__read_file_chunk(
-                    pending_file, read_position,
-                    min(self.__page_size - new_buffer.tell(), bytes_left_in_file))
+                    pending_file,
+                    read_position,
+                    min(self.__page_size - new_buffer.tell(), bytes_left_in_file),
+                )
                 if content is not None:
                     buffer_start = new_buffer.tell()
                     new_buffer.write(content)
                     buffer_end = new_buffer.tell()
-                    new_buffer_content_index.append(LogFileIterator.BufferEntry(read_position,
-                                                                                buffer_start,
-                                                                                buffer_end - buffer_start))
+                    new_buffer_content_index.append(
+                        LogFileIterator.BufferEntry(
+                            read_position, buffer_start, buffer_end - buffer_start
+                        )
+                    )
                 read_position = pending_file.position_end
                 if new_buffer.tell() >= self.__page_size:
                     break
@@ -981,17 +1070,26 @@ class LogFileIterator(object):
             # have had bytes available for reading.  This must mean  all of our file content after the current position
             # is gone.  so, just adjust the position to point to the end as we know it.
             self.__position = self.__pending_files[-1].position_end
-            log.warn('File content appears to have disappeared.  This may not be an indicator of a real error. '
-                     'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-disappeared-%s' % self.__path))
+            log.warn(
+                "File content appears to have disappeared.  This may not be an indicator of a real error. "
+                "File=%s",
+                self.__path,
+                limit_once_per_x_secs=60,
+                limit_key=("some-disappeared-%s" % self.__path),
+            )
 
         # Just a sanity check.
         if len(self.__buffer_contents_index) > 0:
             expected_size = self.__buffer_contents_index[-1].buffer_index_end
             actual_size = buffer_size
             if expected_size != actual_size:
-                assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld %ld %ld',
-                                                      expected_size, actual_size, leftover_bytes,
-                                                      actual_size - leftover_bytes)
+                assert expected_size == actual_size, (
+                    "Mismatch between expected and actual size %ld %ld %ld %ld",
+                    expected_size,
+                    actual_size,
+                    leftover_bytes,
+                    actual_size - leftover_bytes,
+                )
 
     def __read_file_chunk(self, file_state, read_position_relative_to_mark, num_bytes):
         """Reads a portion of the file in file_state and returns it.
@@ -1014,7 +1112,9 @@ class LogFileIterator(object):
         # The file_handle could have been closed if we are on a win32 system and prepare_for_inactivity was closed.
         # If so, we need to re-open it for reading.
         if file_state.file_handle is None:
-            (file_state.file_handle, x, y) = self.__open_file_by_path(self.__path, starting_inode=file_state.inode)
+            (file_state.file_handle, x, y) = self.__open_file_by_path(
+                self.__path, starting_inode=file_state.inode
+            )
 
         if file_state.file_handle is None:
             file_state.valid = False
@@ -1030,15 +1130,23 @@ class LogFileIterator(object):
         if len(chunk) != num_bytes:
             # We did not read the right number of bytes for some reason.  This shouldn't really happen, but
             # we just pretend like we didn't read anything to prevent corrupting logs.
-            log.warn('Did not read expected number of bytes. Expected=%ld vs Read=%ld in file %s', num_bytes,
-                     len(chunk), self.__path, limit_once_per_x_secs=60,
-                     limit_key=('byte_mismatch-%s' % self.__path))
+            log.warn(
+                "Did not read expected number of bytes. Expected=%ld vs Read=%ld in file %s",
+                num_bytes,
+                len(chunk),
+                self.__path,
+                limit_once_per_x_secs=60,
+                limit_key=("byte_mismatch-%s" % self.__path),
+            )
             file_state.valid = False
             return None
 
         # Check to see if the file has been truncated.. if so, then we probably are not reading what we think
         # we are reading.
-        if self.__file_system.get_file_size(file_state.file_handle) < file_state.last_known_size:
+        if (
+            self.__file_system.get_file_size(file_state.file_handle)
+            < file_state.last_known_size
+        ):
             file_state.valid = False
             return None
 
@@ -1075,7 +1183,10 @@ class LogFileIterator(object):
                     pending_file = self.__file_system.open(file_path)
                     second_stat = self.__file_system.stat(file_path)
 
-                    if not self.__file_system.trust_inodes or starting_inode == second_stat.st_ino:
+                    if (
+                        not self.__file_system.trust_inodes
+                        or starting_inode == second_stat.st_ino
+                    ):
                         new_file = pending_file
                         pending_file = None
                         return new_file, second_stat.st_size, second_stat.st_ino
@@ -1086,18 +1197,32 @@ class LogFileIterator(object):
                     starting_inode = None
             except IOError, error:
                 if error.errno == 13:
-                    log.warn('Permission denied while attempting to read file \'%s\'', file_path,
-                             limit_once_per_x_secs=60, limit_key=('invalid-perm' + file_path))
+                    log.warn(
+                        "Permission denied while attempting to read file '%s'",
+                        file_path,
+                        limit_once_per_x_secs=60,
+                        limit_key=("invalid-perm" + file_path),
+                    )
                 else:
-                    log.warn('Error seen while attempting to read file \'%s\' with errno=%d', file_path, error.errno,
-                             limit_once_per_x_secs=60, limit_key=('unknown-io' + file_path))
+                    log.warn(
+                        "Error seen while attempting to read file '%s' with errno=%d",
+                        file_path,
+                        error.errno,
+                        limit_once_per_x_secs=60,
+                        limit_key=("unknown-io" + file_path),
+                    )
                 return None, None, None
             except OSError, e:
                 if e.errno == errno.ENOENT:
-                    log.warn('File unexpectantly missing when trying open it')
+                    log.warn("File unexpectantly missing when trying open it")
                 else:
-                    log.warn('OSError seen while attempting to read file \'%s\' with errno=%d', file_path, e.errno,
-                             limit_once_per_x_secs=60, limit_key=('unknown-os' + file_path))
+                    log.warn(
+                        "OSError seen while attempting to read file '%s' with errno=%d",
+                        file_path,
+                        e.errno,
+                        limit_once_per_x_secs=60,
+                        limit_key=("unknown-os" + file_path),
+                    )
                 return None, None, None
         finally:
             if pending_file is not None:
@@ -1138,7 +1263,9 @@ class LogFileIterator(object):
                 if found_path is None:
                     return None, None, None
 
-                (pending_file, file_size, opened_inode) = self.__open_file_by_path(found_path, target_inode)
+                (pending_file, file_size, opened_inode) = self.__open_file_by_path(
+                    found_path, target_inode
+                )
                 if opened_inode == target_inode:
                     opened_file = pending_file
                     pending_file = None
@@ -1165,11 +1292,11 @@ class LogFileIterator(object):
         pending_files = []
         for pending_file in self.__pending_files:
             pending_files.append(pending_file.to_json())
-        result = {'position': 0, 'pending_files': pending_files}
+        result = {"position": 0, "pending_files": pending_files}
 
         if self.__sequence_id:
-            result['sequence_id'] = self.__sequence_id
-            result['sequence_number'] = self.__sequence_number_at_mark
+            result["sequence_id"] = self.__sequence_id
+            result["sequence_number"] = self.__sequence_number_at_mark
 
         return result
 
@@ -1184,7 +1311,7 @@ class LogFileIterator(object):
         """
         # We implement this by creating a psuedo checkpoint that we then detect and handle properly
         # in the constructor.
-        return {'initial_position': initial_position}
+        return {"initial_position": initial_position}
 
     def get_open_files_count(self):
         """Returns the number of pending file objects that need to be read to return log content.
@@ -1199,6 +1326,7 @@ class LogFileIterator(object):
 
     class BufferEntry(object):
         """Simple object used to represent a portion of the cache buffer holding a portion of a file."""
+
         def __init__(self, position_start, buffer_index_start, num_bytes):
             # The mark position start and end for these bytes.
             self.position_start = position_start
@@ -1209,6 +1337,7 @@ class LogFileIterator(object):
 
     class FileState(object):
         """Represents a file in the list of pending files for the LogFileIterator."""
+
         def __init__(self, state_json, file_handle):
             """
             @param state_json: The state for this file, including what mark positions its bytes are in the overall
@@ -1221,14 +1350,14 @@ class LogFileIterator(object):
             # True if this file is still a valid portion of the overall iterator.
             self.valid = True
             # The mark position of the bytes in this file.
-            self.position_start = state_json['position_start']
-            self.position_end = state_json['position_end']
+            self.position_start = state_json["position_start"]
+            self.position_end = state_json["position_end"]
             self.file_handle = file_handle
-            if 'inode' in state_json:
-                self.inode = state_json['inode']
-            self.last_known_size = state_json['last_known_size']
+            if "inode" in state_json:
+                self.inode = state_json["inode"]
+            self.last_known_size = state_json["last_known_size"]
             # Is this file currently at the file path of the log file (or is it a file a rotated log).
-            self.is_log_file = state_json['is_log_file']
+            self.is_log_file = state_json["is_log_file"]
 
         def to_json(self):
             """Creates and returns the state serialized to Json.
@@ -1236,12 +1365,14 @@ class LogFileIterator(object):
             @return: The JsonObject containing the serialized state.
             @rtype: json_lib.JsonObject
             """
-            result = json_lib.JsonObject(position_start=self.position_start,
-                                         position_end=self.position_end,
-                                         last_known_size=self.last_known_size,
-                                         is_log_file=self.is_log_file)
+            result = json_lib.JsonObject(
+                position_start=self.position_start,
+                position_end=self.position_end,
+                last_known_size=self.last_known_size,
+                is_log_file=self.is_log_file,
+            )
             if self.inode is not None:
-                result['inode'] = self.inode
+                result["inode"] = self.inode
             return result
 
         @staticmethod
@@ -1263,16 +1394,19 @@ class LogFileIterator(object):
             @return:  The serialized state.
             @rtype: json_lib.JsonObject
             """
-            result = json_lib.JsonObject(position_start=position_start - initial_offset,
-                                         position_end=position_start + file_size - initial_offset,
-                                         last_known_size=file_size,
-                                         is_log_file=is_log_file)
+            result = json_lib.JsonObject(
+                position_start=position_start - initial_offset,
+                position_end=position_start + file_size - initial_offset,
+                last_known_size=file_size,
+                is_log_file=is_log_file,
+            )
             if inode is not None:
-                result['inode'] = inode
+                result["inode"] = inode
             return result
 
     class Position(object):
         """Represents a position in the iterator."""
+
         def __init__(self, mark_generation, position):
             # The offset from the mark generation.
             self.mark_offset = position
@@ -1295,6 +1429,7 @@ class LogFileIterator(object):
         so that we can always calculate the offset, even for positions made with an old generation.
 
         """
+
         def __init__(self, previous_generation=None, position_advanced=0):
             """Creates a new mark generation.  There are two forms of this initializer.  The first ever created
             MarkGeneration object for an instance of the LogFileIterator will not have any of the arguments
@@ -1342,8 +1477,16 @@ class LogFileProcessor(object):
     to be sent to the server after applying any sampling and redaction rules.
     """
 
-    def __init__(self, file_path, config, log_config, close_when_staleness_exceeds=None, log_attributes=None,
-                 file_system=None, checkpoint=None):
+    def __init__(
+        self,
+        file_path,
+        config,
+        log_config,
+        close_when_staleness_exceeds=None,
+        log_attributes=None,
+        file_system=None,
+        checkpoint=None,
+    ):
         """Initializes an instance.
 
         @param file_path: The path of the log file to process.
@@ -1372,7 +1515,7 @@ class LogFileProcessor(object):
             log_attributes = {}
         else:
             if not isinstance(log_attributes, dict):
-                raise Exception('log_attributes must be of type dict.')
+                raise Exception("log_attributes must be of type dict.")
 
         self.__path = file_path
         # To mimic the behavior of the old agent which would use the ``thread_id`` feature of the Scalyr API to
@@ -1381,15 +1524,23 @@ class LogFileProcessor(object):
         # which will mean all the vents from a single logical log file will not be put together (when an agent restart
         # happens).  However, this is how the old agent worked and the UI relies on it, so we just keep the old system
         # going for now.
-        self.__thread_name = 'Lines for file %s' % file_path
-        self.__thread_id = LogFileProcessor.generate_unique_thread_id()
+        self.__thread_name = "Lines for file %s" % file_path
+        self.__thread_id = LogFileProcessor.generate_unique_id()
 
-        self.__log_file_iterator = LogFileIterator(file_path, config, log_config, file_system=file_system,
-                                                   checkpoint=checkpoint)
+        self.__log_file_iterator = LogFileIterator(
+            file_path,
+            config,
+            log_config,
+            file_system=file_system,
+            checkpoint=checkpoint,
+        )
 
         self.__minimum_scan_interval = None
-        if 'minimum_scan_interval' in log_config and log_config['minimum_scan_interval'] is not None:
-            self.__minimum_scan_interval = log_config['minimum_scan_interval']
+        if (
+            "minimum_scan_interval" in log_config
+            and log_config["minimum_scan_interval"] is not None
+        ):
+            self.__minimum_scan_interval = log_config["minimum_scan_interval"]
         else:
             self.__minimum_scan_interval = config.minimum_scan_interval
 
@@ -1406,7 +1557,11 @@ class LogFileProcessor(object):
         self.__close_when_staleness_exceeds = close_when_staleness_exceeds
 
         # The base event that will be used to insert all events from this log.
-        self.__base_event = Event(thread_id=self.__thread_id, attrs=log_attributes)
+        self.__base_event = Event(
+            thread_id=self.__thread_id,
+            attrs=log_attributes,
+            disable_logfile_addevents_format=config.disable_logfile_addevents_format,
+        )
         # The redacter to perform on all log lines from this log file.
         self.__redacter = LogLineRedacter(file_path)
         # The sampler to apply to all log lines from this log file.
@@ -1416,11 +1571,17 @@ class LogFileProcessor(object):
         self.__lock = threading.Lock()
         # The following fields are tracked for generating status information.
         self.__total_bytes_copied = 0L
-        self.__total_bytes_skipped = 0L   # Bytes that had to be skipped due to falling too far behind in the log.
-        self.__total_bytes_failed = 0L    # Bytes that could not be sent up to server.
+        self.__total_bytes_skipped = (
+            0L  # Bytes that had to be skipped due to falling too far behind in the log.
+        )
+        self.__total_bytes_failed = 0L  # Bytes that could not be sent up to server.
         self.__total_bytes_dropped_by_sampling = 0L
-        self.__total_bytes_pending = 0L  # The number of bytes that haven't been processed from the log file yet.
-        self.__total_bytes_being_processed = 0L  # The number of bytes that are currently being processed.
+        self.__total_bytes_pending = (
+            0L  # The number of bytes that haven't been processed from the log file yet.
+        )
+        self.__total_bytes_being_processed = (
+            0L  # The number of bytes that are currently being processed.
+        )
 
         self.__total_lines_copied = 0L
         self.__total_lines_dropped_by_sampling = 0L
@@ -1433,14 +1594,20 @@ class LogFileProcessor(object):
         # The last time the log file was checked for new content.
         self.__last_scan_time = None
 
-        self.__copy_staleness_threshold = config.copy_staleness_threshold  # Defaults to 15 * 60
+        self.__copy_staleness_threshold = (
+            config.copy_staleness_threshold
+        )  # Defaults to 15 * 60
 
-        self.__max_existing_log_offset_size = config.max_existing_log_offset_size  # Defaults to 100 * 1024 * 1024
+        self.__max_existing_log_offset_size = (
+            config.max_existing_log_offset_size
+        )  # Defaults to 100 * 1024 * 1024
 
         # if we don't have a checkpoint or if the checkpoint doesn't contain pending files
         # then we assume this is a new file and we only go back at most max_log_offset_size bytes
-        if checkpoint is None or 'pending_files' not in checkpoint:
-            self.__max_log_offset_size = config.max_log_offset_size  # Defaults to 5 * 1024 * 1024
+        if checkpoint is None or "pending_files" not in checkpoint:
+            self.__max_log_offset_size = (
+                config.max_log_offset_size
+            )  # Defaults to 5 * 1024 * 1024
         else:
             # otherwise this is an existing file so we can go back at most
             # max_existing_log_offset_size bytes
@@ -1450,7 +1617,7 @@ class LogFileProcessor(object):
 
         self.__disable_processing_new_bytes = config.disable_processing_new_bytes
 
-    def close_at_eof( self ):
+    def close_at_eof(self):
         """
         Tell the log processor to close itself once it catches up to the end of the file.
 
@@ -1463,14 +1630,13 @@ class LogFileProcessor(object):
         finally:
             self.__lock.release()
 
-    def add_missing_attributes( self, attributes ):
+    def add_missing_attributes(self, attributes):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
         already have those attributes set
         """
-        self.__base_event.add_missing_attributes( attributes )
+        self.__base_event.add_missing_attributes(attributes)
 
-
-    def set_max_log_offset_size( self, max_log_offset_size ):
+    def set_max_log_offset_size(self, max_log_offset_size):
         """Sets the max_log_offset_size.
 
         Used for testing
@@ -1490,13 +1656,19 @@ class LogFileProcessor(object):
             result.last_scan_time = self.__last_scan_time
 
             result.total_bytes_copied = self.__total_bytes_copied
-            result.total_bytes_pending = self.__total_bytes_pending + self.__total_bytes_being_processed
+            result.total_bytes_pending = (
+                self.__total_bytes_pending + self.__total_bytes_being_processed
+            )
 
             result.total_bytes_skipped = self.__total_bytes_skipped
             result.total_bytes_failed = self.__total_bytes_failed
-            result.total_bytes_dropped_by_sampling = self.__total_bytes_dropped_by_sampling
+            result.total_bytes_dropped_by_sampling = (
+                self.__total_bytes_dropped_by_sampling
+            )
             result.total_lines_copied = self.__total_lines_copied
-            result.total_lines_dropped_by_sampling = self.__total_lines_dropped_by_sampling
+            result.total_lines_dropped_by_sampling = (
+                self.__total_lines_dropped_by_sampling
+            )
             result.total_redactions = self.__total_redactions
             result.total_bytes_skipped = self.__total_bytes_skipped
 
@@ -1515,10 +1687,10 @@ class LogFileProcessor(object):
         return result
 
     @property
-    def is_active( self ):
+    def is_active(self):
         return self.__is_active
 
-    def set_inactive( self ):
+    def set_inactive(self):
         self.__is_active = False
 
     @property
@@ -1571,7 +1743,7 @@ class LogFileProcessor(object):
         # see if we need to scan for new bytes yet
         scan = True
         if last_scan_time is not None and self.__minimum_scan_interval is not None:
-            scan = (current_time - last_scan_time > self.__minimum_scan_interval)
+            scan = current_time - last_scan_time > self.__minimum_scan_interval
 
         # by default, we don't close at eof, unless we are scanning for new bytes
         close_at_eof = False
@@ -1592,16 +1764,23 @@ class LogFileProcessor(object):
             self.__last_scan_time = current_time
             self.__lock.release()
 
-        if not self.__path.endswith( 'agent.callgrind' ):
+        if not self.__path.endswith("agent.callgrind"):
             # Check to see if we haven't had a success in enough time.  If so, then we just skip ahead.
             if current_time - self.__last_success > self.__copy_staleness_threshold:
-                self.skip_to_end('Too long since last success.  Last success was \'%s\'' % scalyr_util.format_time(
-                    self.__last_success), 'skipForStaleness', current_time=current_time)
+                self.skip_to_end(
+                    "Too long since last success.  Last success was '%s'"
+                    % scalyr_util.format_time(self.__last_success),
+                    "skipForStaleness",
+                    current_time=current_time,
+                )
             # Also make sure we are at least within 5MB of the tail of the log.  If not, then we skip ahead.
             elif self.__log_file_iterator.available > self.__max_log_offset_size:
                 self.skip_to_end(
-                    'Too far behind end of log.  Num of bytes to end is %ld' % self.__log_file_iterator.available,
-                    'skipForTooFarBehind', current_time=current_time)
+                    "Too far behind end of log.  Num of bytes to end is %ld"
+                    % self.__log_file_iterator.available,
+                    "skipForTooFarBehind",
+                    current_time=current_time,
+                )
 
         # Keep track of both the position in the iterator and where we are about to add new events to the request,
         # in case we have to roll it back.
@@ -1638,16 +1817,22 @@ class LogFileProcessor(object):
             while True:
                 # debug leak
                 if self.__disable_processing_new_bytes:
-                    log.log(scalyr_logging.DEBUG_LEVEL_0, 'Processing new bytes disabled for %s' % self.__path,
-                                   limit_once_per_x_secs=60, limit_key=('disable-processing-%s' % self.__path))
+                    log.log(
+                        scalyr_logging.DEBUG_LEVEL_0,
+                        "Processing new bytes disabled for %s" % self.__path,
+                        limit_once_per_x_secs=60,
+                        limit_key=("disable-processing-%s" % self.__path),
+                    )
                     break
 
                 position = self.__log_file_iterator.tell(dest=position)
 
-                #time_spent_reading -= fast_get_time()
-                line_object = self.__log_file_iterator.readline(current_time=current_time)
+                # time_spent_reading -= fast_get_time()
+                line_object = self.__log_file_iterator.readline(
+                    current_time=current_time
+                )
                 line_len = line_object.raw_line_len
-                #time_spent_reading += fast_get_time()
+                # time_spent_reading += fast_get_time()
 
                 # This means we hit the end of the file, or at least there is not a new line yet available.
                 if line_len == 0:
@@ -1668,7 +1853,9 @@ class LogFileProcessor(object):
                         bytes_dropped_by_sampling += line_len
                         continue
 
-                    (line_object.line, redacted) = self.__redacter.process_line(line_object.line)
+                    (line_object.line, redacted) = self.__redacter.process_line(
+                        line_object.line
+                    )
                     line_len = len(line_object.line)
                 else:
                     sample_result = 1.0
@@ -1677,12 +1864,20 @@ class LogFileProcessor(object):
                 if line_len > 0:
                     # Try to add the line to the request, but it will let us know if it exceeds the limit it can
                     # send.
-                    sequence_id, sequence_number = self.__log_file_iterator.get_sequence()
+                    (
+                        sequence_id,
+                        sequence_number,
+                    ) = self.__log_file_iterator.get_sequence()
 
-                    #time_spent_serializing += fast_get_time()
+                    # time_spent_serializing += fast_get_time()
                     event = self.__create_events_object(line_object, sample_result)
-                    if not add_events_request.add_event(event, timestamp=line_object.timestamp, sequence_id=sequence_id, sequence_number=sequence_number):
-                        #time_spent_serializing -= fast_get_time()
+                    if not add_events_request.add_event(
+                        event,
+                        timestamp=line_object.timestamp,
+                        sequence_id=sequence_id,
+                        sequence_number=sequence_number,
+                    ):
+                        # time_spent_serializing -= fast_get_time()
                         self.__log_file_iterator.seek(position)
                         buffer_filled = True
 
@@ -1690,11 +1885,15 @@ class LogFileProcessor(object):
                         bytes_read = previous_bytes_read
                         break
 
-                    #time_spent_serializing -= fast_get_time()
+                    # time_spent_serializing -= fast_get_time()
 
-                    # Try to add the thread id if we have not done so far.  This should only be added once per file.
+                    # Try to add the thread id and log metadata if we have not done so far.  This should only be added once per file.
                     if not added_thread_id:
-                        if not add_events_request.add_thread(self.__thread_id, self.__thread_name):
+                        if not add_events_request.add_log_and_thread(
+                            self.__thread_id,
+                            self.__thread_name,
+                            self.__base_event.attrs,
+                        ):
                             # If we got here, it means we did not have enough room to add both the thread id
                             # and the event into the events request.  So, we have to remove the event we just
                             # added to the add_events_request by setting the position to the original.
@@ -1718,11 +1917,13 @@ class LogFileProcessor(object):
             final_position = self.__log_file_iterator.tell()
 
             # start_process_time = fast_get_time() - start_process_time
-            #add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
+            # add_events_request.increment_timing_data(serialization_time=time_spent_serializing,
             #                                         reading_time=time_spent_reading,
             #                                         process_time=start_process_time,
             #                                         lines=lines_read, bytes=bytes_read, files=1)
-            add_events_request.increment_timing_data(lines=lines_read, bytes=bytes_read, files=1)
+            add_events_request.increment_timing_data(
+                lines=lines_read, bytes=bytes_read, files=1
+            )
 
             # To do proper account when an RPC has failed and we retry it, we track how many bytes are
             # actively being processed.  We will update this once the completion callback has been invoked.
@@ -1733,7 +1934,7 @@ class LogFileProcessor(object):
 
             # We have finished a processing loop.  We probably won't be calling the iterator for a while, so let it
             # do some clean up work until the next time we need it.
-            self.__log_file_iterator.prepare_for_inactivity( current_time )
+            self.__log_file_iterator.prepare_for_inactivity(current_time)
 
             # If we get here on what was a new file, then the file is now an existing file, so set the maximum log
             # offset size to use the size for existing files
@@ -1751,7 +1952,7 @@ class LogFileProcessor(object):
                 @rtype: bool
                 """
                 try:
-                    #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
+                    # log.log(scalyr_logging.DEBUG_LEVEL_3, 'Result for advancing %s was %s', self.__path, str(result))
                     self.__lock.acquire()
                     # Zero out the bytes we were tracking as they were in flight.
                     self.__total_bytes_being_processed = 0
@@ -1759,13 +1960,21 @@ class LogFileProcessor(object):
                     # If it was a success, then we update the counters and advance the iterator.
                     if result == LogFileProcessor.SUCCESS:
                         self.__total_bytes_copied += bytes_copied
-                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions( original_position, final_position)
-                        self.__total_bytes_skipped += bytes_between_positions - bytes_read
+                        bytes_between_positions = self.__log_file_iterator.bytes_between_positions(
+                            original_position, final_position
+                        )
+                        self.__total_bytes_skipped += (
+                            bytes_between_positions - bytes_read
+                        )
 
-                        self.__total_bytes_dropped_by_sampling += bytes_dropped_by_sampling
+                        self.__total_bytes_dropped_by_sampling += (
+                            bytes_dropped_by_sampling
+                        )
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         self.__total_lines_copied += lines_copied
-                        self.__total_lines_dropped_by_sampling += lines_dropped_by_sampling
+                        self.__total_lines_dropped_by_sampling += (
+                            lines_dropped_by_sampling
+                        )
                         self.__total_redactions += total_redactions
                         self.__last_success = current_time
 
@@ -1773,15 +1982,24 @@ class LogFileProcessor(object):
                         # to before this point now.
                         # Only mark files that have logged new bytes to prevent stat'ing unused files
                         if bytes_between_positions > 0:
-                            self.__log_file_iterator.mark(final_position, current_time=current_time)
+                            self.__log_file_iterator.mark(
+                                final_position, current_time=current_time
+                            )
 
                         # close the processor if we are at the end of the log file iterator
                         # or if the log is stale
-                        close = self.__log_file_iterator.at_end or self.__should_close_because_stale(current_time)
+                        close = (
+                            self.__log_file_iterator.at_end
+                            or self.__should_close_because_stale(current_time)
+                        )
 
                         # also close if we should close at eof and no bytes were read for this processor
                         # and the log file iterator has no bytes pending
-                        if close_at_eof and bytes_between_positions == 0 and self.__total_bytes_pending == 0:
+                        if (
+                            close_at_eof
+                            and bytes_between_positions == 0
+                            and self.__total_bytes_pending == 0
+                        ):
                             close = True
 
                         if close:
@@ -1791,29 +2009,41 @@ class LogFileProcessor(object):
                         return self.__is_closed
 
                     elif result == LogFileProcessor.FAIL_AND_DROP:
-                        self.__log_file_iterator.mark(final_position, current_time=current_time)
+                        self.__log_file_iterator.mark(
+                            final_position, current_time=current_time
+                        )
                         self.__total_bytes_pending = self.__log_file_iterator.available
                         self.__total_bytes_failed += bytes_read
-                        log.info('Request failed. Dropping %d bytes of logs as per server request.' % bytes_read)
+                        log.info(
+                            "Request failed. Dropping %d bytes of logs as per server request."
+                            % bytes_read
+                        )
                         return False
                     elif result == LogFileProcessor.FAIL_AND_RETRY:
                         self.__log_file_iterator.seek(original_position)
                         self.__total_bytes_pending = self.__log_file_iterator.available
-                        log.info('Request failed. Retrying')
+                        log.info("Request failed. Retrying")
                         return False
                     else:
-                        raise Exception('Invalid result %s' % str(result))
+                        raise Exception("Invalid result %s" % str(result))
                 finally:
                     self.__lock.release()
 
-            #log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
-                    #self.__path, bytes_copied, str(buffer_filled))
+            # log.log(scalyr_logging.DEBUG_LEVEL_3, 'Scanned %s and found %ld bytes for copying.  Buffer filled=%s.',
+            # self.__path, bytes_copied, str(buffer_filled))
 
             return completion_callback, buffer_filled
         except Exception:
-            log.exception('Failed to copy lines from \'%s\'.  Will re-attempt lines.', self.__path,
-                          error_code='logCopierFailed')
-            log.log(scalyr_logging.DEBUG_LEVEL_3, 'Failed while scanning \'%s\' for new bytes.', self.__path)
+            log.exception(
+                "Failed to copy lines from '%s'.  Will re-attempt lines.",
+                self.__path,
+                error_code="logCopierFailed",
+            )
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_3,
+                "Failed while scanning '%s' for new bytes.",
+                self.__path,
+            )
 
             # Roll back the positions if something happened.
             self.__log_file_iterator.seek(original_position)
@@ -1835,7 +2065,9 @@ class LogFileProcessor(object):
         if self.__close_when_staleness_exceeds is None:
             return False
 
-        return (current_time - self.__log_file_iterator.last_modification_time) > self.__close_when_staleness_exceeds
+        return (
+            current_time - self.__log_file_iterator.last_modification_time
+        ) > self.__close_when_staleness_exceeds
 
     def skip_to_end(self, message, error_code, current_time=None):
         """Advances the iterator to the end of the log file due to some error.
@@ -1850,14 +2082,21 @@ class LogFileProcessor(object):
         """
         if current_time is None:
             current_time = time.time()
-        skipped_bytes = self.__log_file_iterator.advance_to_end(current_time=current_time)
+        skipped_bytes = self.__log_file_iterator.advance_to_end(
+            current_time=current_time
+        )
 
         self.__lock.acquire()
         self.__total_bytes_skipped += skipped_bytes
         self.__lock.release()
 
-        log.warn('Skipped copying %ld bytes in \'%s\' due to: %s', skipped_bytes, self.__path, message,
-                 error_code=error_code)
+        log.warn(
+            "Skipped copying %ld bytes in '%s' due to: %s",
+            skipped_bytes,
+            self.__path,
+            message,
+            error_code=error_code,
+        )
 
     def add_sampler(self, match_expression, sampling_rate):
         """Adds a new sampling rule that will be applied after all previously added sampling rules.
@@ -1869,7 +2108,7 @@ class LogFileProcessor(object):
         self.__num_redaction_and_sampling_rules += 1
         self.__sampler.add_rule(match_expression, sampling_rate)
 
-    def add_redacter(self, match_expression, replacement, hash_salt=''):
+    def add_redacter(self, match_expression, replacement, hash_salt=""):
         """Adds a new redaction rule that will be applied after all previously added redaction rules.
 
         @param match_expression: The regular expression that must match the portion of the log line that will be
@@ -1881,9 +2120,7 @@ class LogFileProcessor(object):
         @type hash_salt: str
         """
         self.__num_redaction_and_sampling_rules += 1
-        self.__redacter.add_redaction_rule(
-            match_expression, replacement, hash_salt
-        )
+        self.__redacter.add_redaction_rule(match_expression, replacement, hash_salt)
 
     def __create_events_object(self, line_object, sampling_rate):
         """Returns the events object that can be sent to the server for this log to insert the specified message.
@@ -1900,7 +2137,7 @@ class LogFileProcessor(object):
         """
         result = Event(base=self.__base_event)
         if line_object.attrs:
-            result.add_missing_attributes( line_object.attrs )
+            result.add_missing_attributes(line_object.attrs)
         result.set_message(line_object.line)
         if sampling_rate != 1.0:
             result.set_sampling_rate(sampling_rate)
@@ -1926,7 +2163,7 @@ class LogFileProcessor(object):
         self.__lock.release()
 
     @property
-    def total_bytes_pending( self ):
+    def total_bytes_pending(self):
         result = 0
         self.__lock.acquire()
         result = self.__total_bytes_pending
@@ -1957,23 +2194,23 @@ class LogFileProcessor(object):
         """
         return LogFileIterator.create_checkpoint(initial_position)
 
-    # Variables used to implement the static method ``generate_unique_thread_id``.
-    __thread_id_lock = threading.Lock()
-    __thread_id_counter = 0
+    # Variables used to implement the static method ``generate_unique_id``.
+    __unique_id_lock = threading.Lock()
+    __unique_id_counter = 0
 
     @staticmethod
-    def generate_unique_thread_id():
-        """Generates and returns a unique thread id that has not been issued before by this agent.
+    def generate_unique_id():
+        """Generates and returns a unique id that has not been issued before by this agent.
 
-        This is used to assign a unique thread id to all events coming from a single LogFileProcessor instance.
+        This is used to assign a unique thread and log id to all events coming from a single LogFileProcessor instance.
         @rtype: str
         """
-        LogFileProcessor.__thread_id_lock.acquire()
-        LogFileProcessor.__thread_id_counter += 1
-        new_id = LogFileProcessor.__thread_id_counter
-        LogFileProcessor.__thread_id_lock.release()
+        LogFileProcessor.__unique_id_lock.acquire()
+        LogFileProcessor.__unique_id_counter += 1
+        new_id = LogFileProcessor.__unique_id_counter
+        LogFileProcessor.__unique_id_lock.release()
 
-        return 'log_%d' % new_id
+        return "log_%d" % new_id
 
 
 class LogLineSampler(object):
@@ -2120,12 +2357,14 @@ class LogLineRedacter(object):
         modified_it = False
 
         for redaction_rule in self.__redaction_rules:
-            (input_line, redaction) = self.__apply_redaction_rule(input_line, redaction_rule)
+            (input_line, redaction) = self.__apply_redaction_rule(
+                input_line, redaction_rule
+            )
             modified_it = modified_it or redaction
 
         return input_line, modified_it
 
-    def add_redaction_rule(self, redaction_expression, replacement_text, hash_salt=''):
+    def add_redaction_rule(self, redaction_expression, replacement_text, hash_salt=""):
         """Appends a new redaction rule to this instance.
 
         @param redaction_expression: The regular expression that must match some portion of the line.
@@ -2137,9 +2376,7 @@ class LogLineRedacter(object):
         """
 
         self.__redaction_rules.append(
-            RedactionRule(
-                redaction_expression, replacement_text, hash_salt=hash_salt
-            )
+            RedactionRule(redaction_expression, replacement_text, hash_salt=hash_salt)
         )
 
     def __apply_redaction_rule(self, line, redaction_rule):
@@ -2173,22 +2410,29 @@ class LogLineRedacter(object):
                 for _group_index, _group in enumerate(_groups):
                     # for each group in a match, replace the `replacement_ex` with either its `group` content, or
                     # the hash of the `group` depending on the hash indicator \\1 vs \\H1 etc.
-                    group_hash_indicator = "\\%s%d" % (LogLineRedacter.HASH_GROUP_INDICATOR, _group_index + 1)
+                    group_hash_indicator = "\\%s%d" % (
+                        LogLineRedacter.HASH_GROUP_INDICATOR,
+                        _group_index + 1,
+                    )
                     replacement_matches += 1
                     if group_hash_indicator in replacement_ex:
                         # the group needs to be hashed
-                        replaced_group = replaced_group.encode('utf8')
+                        replaced_group = replaced_group.encode("utf8")
                         replaced_group = replaced_group.replace(
                             group_hash_indicator,
-                            scalyr_util.md5_hexdigest(_group + redaction_rule.hash_salt),
-                            1
+                            scalyr_util.md5_hexdigest(
+                                _group + redaction_rule.hash_salt
+                            ),
+                            1,
                         )
                     else:
                         # the group does not need to be hashed
-                        replaced_group = replaced_group.replace("\\%d" % (_group_index + 1), _group, 1)
+                        replaced_group = replaced_group.replace(
+                            "\\%d" % (_group_index + 1), _group, 1
+                        )
                 # once we have formed the replacement expression, we just need to replace the matched
                 # portion of the `line` with the `replaced_group` that we just built
-                replaced_string += line[last_match_index: _match.start()]
+                replaced_string += line[last_match_index : _match.start()]
                 replaced_string += replaced_group
                 # forward the last match index to the end of the match group
                 last_match_index = _match.end()
@@ -2202,11 +2446,13 @@ class LogLineRedacter(object):
                 (result, matches) = __replace_groups_with_hashed_content(
                     redaction_rule.redaction_expression,
                     redaction_rule.replacement_text,
-                    line
+                    line,
                 )
             else:
                 (result, matches) = re.subn(
-                    redaction_rule.redaction_expression, redaction_rule.replacement_text, line
+                    redaction_rule.redaction_expression,
+                    redaction_rule.replacement_text,
+                    line,
                 )
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
@@ -2217,20 +2463,20 @@ class LogLineRedacter(object):
                 (result, matches) = __replace_groups_with_hashed_content(
                     redaction_rule.redaction_expression,
                     redaction_rule.replacement_text,
-                    line.decode('utf-8', 'replace')
+                    line.decode("utf-8", "replace"),
                 )
             else:
                 (result, matches) = re.subn(
                     redaction_rule.redaction_expression,
                     redaction_rule.replacement_text,
-                    line.decode('utf-8', 'replace')
+                    line.decode("utf-8", "replace"),
                 )
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
             if type(result) == unicode:
-                result = result.encode('utf-8')
+                result = result.encode("utf-8")
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
@@ -2240,7 +2486,7 @@ class LogLineRedacter(object):
 class RedactionRule(object):
     """Encapsulates all data for one redaction rule."""
 
-    def __init__(self, redaction_expression, replacement_text, hash_salt=''):
+    def __init__(self, redaction_expression, replacement_text, hash_salt=""):
         self.redaction_expression = re.compile(redaction_expression)
         self.replacement_text = replacement_text
         self.hash_salt = hash_salt
@@ -2249,7 +2495,9 @@ class RedactionRule(object):
 
     @property
     def hash_redacted_data(self):
-        return ("\\%s" % (LogLineRedacter.HASH_GROUP_INDICATOR)) in self.replacement_text
+        return (
+            "\\%s" % (LogLineRedacter.HASH_GROUP_INDICATOR)
+        ) in self.replacement_text
 
 
 class LogMatcher(object):
@@ -2260,6 +2508,7 @@ class LogMatcher(object):
     that log file.  Finally, it also includes attributes that should be included with each log line from that
     log when sent to the server.
     """
+
     def __init__(self, overall_config, log_entry_config, file_system=None):
         """Initializes an instance.
         @param overall_config:  The configuration object containing parameters that govern how the logs will be
@@ -2285,16 +2534,18 @@ class LogMatcher(object):
         # The lock that protects the __processor, __is_finishing and __last_check vars.
         self.__lock = threading.Lock()
 
-        self.update_log_entry_config( log_entry_config )
+        self.update_log_entry_config(log_entry_config)
 
         self.__is_finishing = False
         # Determine if the log path to match on is a glob or not by looking for normal wildcard characters.
         # This probably leads to false positives, but that's ok.
-        self.__is_glob = '*' in self.log_path or '?' in self.log_path or '[' in self.log_path
+        self.__is_glob = (
+            "*" in self.log_path or "?" in self.log_path or "[" in self.log_path
+        )
         # The time in seconds past epoch when we last checked for new files that match the glob.
         self.__last_check = None
 
-    def update_log_entry_config( self, log_entry_config ):
+    def update_log_entry_config(self, log_entry_config):
         """
         Updates the log config for the log matcher and any of its processors.
         In order to update the processors, the processors are simply closed and
@@ -2307,17 +2558,26 @@ class LogMatcher(object):
         """
 
         self.__log_entry_config = log_entry_config
-        self.log_path = self.__log_entry_config['path']
+        self.log_path = self.__log_entry_config["path"]
 
         # Determine if we should be ignoring stale files (meaning we don't track them at all).
         # If we should not be ignoring them, then self.__stale_threshold_secs will be set to a number.
-        if 'ignore_stale_files' in self.__log_entry_config and self.__log_entry_config['ignore_stale_files']:
-            if 'staleness_threshold_secs' in self.__log_entry_config:
-                self.__stale_threshold_secs = self.__log_entry_config['staleness_threshold_secs']
+        if (
+            "ignore_stale_files" in self.__log_entry_config
+            and self.__log_entry_config["ignore_stale_files"]
+        ):
+            if "staleness_threshold_secs" in self.__log_entry_config:
+                self.__stale_threshold_secs = self.__log_entry_config[
+                    "staleness_threshold_secs"
+                ]
             else:
                 self.__stale_threshold_secs = 300
-            log.log(scalyr_logging.DEBUG_LEVEL_3, 'Using a staleness threshold of %f for %s',
-                    self.__stale_threshold_secs, self.log_path)
+            log.log(
+                scalyr_logging.DEBUG_LEVEL_3,
+                "Using a staleness threshold of %f for %s",
+                self.__stale_threshold_secs,
+                self.log_path,
+            )
         else:
             self.__stale_threshold_secs = None
 
@@ -2327,7 +2587,7 @@ class LogMatcher(object):
             # get checkpoints and close all processors
             for p in self.__processors:
                 result[p.log_path] = p.get_checkpoint()
-                p.close();
+                p.close()
 
             self.__processors = []
         finally:
@@ -2346,7 +2606,7 @@ class LogMatcher(object):
         """
         return self.__log_entry_config
 
-    def finish( self, immediately=False ):
+    def finish(self, immediately=False):
         """
         Tells the log matcher to finish processing any processors.
 
@@ -2375,7 +2635,7 @@ class LogMatcher(object):
         finally:
             self.__lock.release()
 
-    def is_finished( self ):
+    def is_finished(self):
         """
         Returns true if the log matcher is finished and all of its processors are closed, and the matcher has
         been processed at least once
@@ -2424,7 +2684,9 @@ class LogMatcher(object):
         finally:
             self.__lock.release()
 
-    def find_matches(self, existing_processors, previous_state, copy_at_index_zero=False):
+    def find_matches(
+        self, existing_processors, previous_state, copy_at_index_zero=False
+    ):
         """Determine if there are any files that match the log file for this matcher that are not
         already handled by other processors, and if so, return a processor for it.
 
@@ -2445,7 +2707,9 @@ class LogMatcher(object):
         @rtype: list of LogFileProcessor
         """
         if not self.__is_glob and self.log_path in existing_processors:
-            existing_processors[self.log_path].add_missing_attributes( self.__log_entry_config['attributes'] )
+            existing_processors[self.log_path].add_missing_attributes(
+                self.__log_entry_config["attributes"]
+            )
             return []
 
         self.__lock.acquire()
@@ -2468,20 +2732,22 @@ class LogMatcher(object):
         reached_return = False
 
         copy_from_start = False
-        if 'copy_from_start' in self.__log_entry_config:
-            copy_from_start = self.__log_entry_config['copy_from_start']
+        if "copy_from_start" in self.__log_entry_config:
+            copy_from_start = self.__log_entry_config["copy_from_start"]
 
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
-            for matched_file in glob.glob(self.__log_entry_config['path']):
-
+            # glob.glob is sorted here because otherwise it returns non-deterministic results
+            for matched_file in sorted(glob.glob(self.__log_entry_config["path"])):
                 skip = False
                 # check to see if this file matches any of the exclude globs
-                for exclude_glob in self.__log_entry_config['exclude']:
-                    if fnmatch.fnmatch( matched_file, exclude_glob ):
+                for exclude_glob in self.__log_entry_config["exclude"]:
+                    if fnmatch.fnmatch(matched_file, exclude_glob):
                         skip = True
                         break
-
+                # Check if this is a directory
+                if os.path.isdir(matched_file):
+                    skip = True
                 # if so, skip it.
                 if skip:
                     continue
@@ -2489,7 +2755,9 @@ class LogMatcher(object):
                 already_exists = matched_file in existing_processors
                 # Only process it if we have permission to read it and it is not already being processed.
                 # Also check if we should skip over it entirely because it is too stale.
-                if not already_exists and self.__can_read_file_and_not_stale(matched_file, self.__last_check):
+                if not already_exists and self.__can_read_file_and_not_stale(
+                    matched_file, self.__last_check
+                ):
                     checkpoint_state = None
                     # Get the last checkpoint state if it exists.
                     if matched_file in previous_state:
@@ -2500,33 +2768,49 @@ class LogMatcher(object):
                         # then create a checkpoint to represent that.
                         checkpoint_state = LogFileProcessor.create_checkpoint(0)
 
-                    renamed_log = self.__rename_log_file( matched_file, self.__log_entry_config )
+                    renamed_log = self.__rename_log_file(
+                        matched_file, self.__log_entry_config
+                    )
 
                     # Be sure to add in an entry for the logfile name to include in the log attributes.  We only do this
                     # if the field or legacy field is not present.  Maybe we should override this regardless because the
                     # user could get it wrong.. but for now, we just let them screw it up if they want to.
-                    log_attributes = dict(self.__log_entry_config['attributes'])
-                    if 'logfile' not in log_attributes and 'filename' not in log_attributes:
-                        log_attributes['logfile'] = renamed_log
+                    log_attributes = dict(self.__log_entry_config["attributes"])
+                    if (
+                        "logfile" not in log_attributes
+                        and "filename" not in log_attributes
+                    ):
+                        log_attributes["logfile"] = renamed_log
 
-                    if 'original_file' not in log_attributes and renamed_log != matched_file:
+                    if (
+                        "original_file" not in log_attributes
+                        and renamed_log != matched_file
+                    ):
                         # Note, this next line is for a hack in the kubernetes_monitor to not include the original
                         # log file name.  TODO: Clean this up.
-                        if not 'rename_no_original' in self.__log_entry_config:
-                            log_attributes['original_file'] = matched_file
+                        if not "rename_no_original" in self.__log_entry_config:
+                            log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.
-                    new_processor = LogFileProcessor(matched_file, self.__overall_config, self.__log_entry_config,
-                                                     log_attributes=log_attributes, checkpoint=checkpoint_state,
-                                                     close_when_staleness_exceeds=self.__stale_threshold_secs)
-                    for rule in self.__log_entry_config['redaction_rules']:
+                    new_processor = LogFileProcessor(
+                        matched_file,
+                        self.__overall_config,
+                        self.__log_entry_config,
+                        log_attributes=log_attributes,
+                        checkpoint=checkpoint_state,
+                        close_when_staleness_exceeds=self.__stale_threshold_secs,
+                    )
+                    for rule in self.__log_entry_config["redaction_rules"]:
                         new_processor.add_redacter(
-                            rule['match_expression'],
-                            rule['replacement'],
-                            str(rule.get('hash_salt', default_value=''))
+                            rule["match_expression"],
+                            rule["replacement"],
+                            str(rule.get("hash_salt", default_value="")),
                         )
-                    for rule in self.__log_entry_config['sampling_rules']:
-                        new_processor.add_sampler(rule['match_expression'], rule.get_float('sampling_rate', 1.0))
+                    for rule in self.__log_entry_config["sampling_rules"]:
+                        new_processor.add_sampler(
+                            rule["match_expression"],
+                            rule.get_float("sampling_rate", 1.0),
+                        )
                     result.append(new_processor)
 
             self.__lock.acquire()
@@ -2551,14 +2835,14 @@ class LogMatcher(object):
                 for new_processor in result:
                     new_processor.close()
 
-    def __split_path( self, path ):
+    def __split_path(self, path):
         paths = []
         while True:
             prev = path
-            path, current = os.path.split( path )
+            path, current = os.path.split(path)
 
             if prev == path:
-                break;
+                break
             elif current != "":
                 paths.append(current)
             else:
@@ -2570,38 +2854,48 @@ class LogMatcher(object):
         paths.reverse()
         return paths
 
-    def __rename_log_file( self, matched_file, log_config ):
+    def __rename_log_file(self, matched_file, log_config):
         """Renames a log file based on the log_config's 'rename_logfile' field (if present)
         """
         result = matched_file
-        if 'rename_logfile' in log_config:
-            rename = log_config['rename_logfile']
+        if "rename_logfile" in log_config:
+            rename = log_config["rename_logfile"]
 
-            if isinstance( rename, basestring ):
-                pattern = string.Template( rename )
+            if isinstance(rename, basestring):
+                pattern = string.Template(rename)
                 try:
                     values = {}
-                    sections = self.__split_path( matched_file )
+                    sections = self.__split_path(matched_file)
                     for index, section in enumerate(sections):
-                        values["PATH%d" % (index+1)] = section
+                        values["PATH%d" % (index + 1)] = section
 
-                    basename = os.path.basename( matched_file )
-                    values['BASENAME'] = basename
-                    values['BASENAME_NO_EXT'] = os.path.splitext( basename )[0]
-                    result = pattern.substitute( values )
+                    basename = os.path.basename(matched_file)
+                    values["BASENAME"] = basename
+                    values["BASENAME_NO_EXT"] = os.path.splitext(basename)[0]
+                    result = pattern.substitute(values)
                 except Exception, e:
-                    log.warn( "Invalid substition pattern in 'rename_logfile'. %s" % str( e ) )
-            elif isinstance( rename, json_lib.JsonObject ):
-                if 'match' in rename and 'replacement' in rename:
+                    log.warn(
+                        "Invalid substition pattern in 'rename_logfile'. %s" % str(e)
+                    )
+            elif isinstance(rename, json_lib.JsonObject):
+                if "match" in rename and "replacement" in rename:
                     try:
-                        pattern = re.compile( rename['match'] )
-                        result = re.sub( pattern, rename['replacement'], matched_file )
+                        pattern = re.compile(rename["match"])
+                        result = re.sub(pattern, rename["replacement"], matched_file)
                         if result == matched_file:
-                            log.warn( "Regex '%s' used to rename logfile '%s', but logfile name was not changed." % ( rename['match'], matched_file ),
-                                   limit_once_per_x_secs=600, limit_key=('rename-regex-same-%s' % matched_file))
+                            log.warn(
+                                "Regex '%s' used to rename logfile '%s', but logfile name was not changed."
+                                % (rename["match"], matched_file),
+                                limit_once_per_x_secs=600,
+                                limit_key=("rename-regex-same-%s" % matched_file),
+                            )
                     except Exception, e:
-                        log.warn( "Error matching regular expression '%s' and replacing with '%s'.  %s" % (rename['match'], rename['replacement'], str(e ) ),
-                                   limit_once_per_x_secs=600, limit_key=('rename-regex-error-%s' % matched_file))
+                        log.warn(
+                            "Error matching regular expression '%s' and replacing with '%s'.  %s"
+                            % (rename["match"], rename["replacement"], str(e)),
+                            limit_once_per_x_secs=600,
+                            limit_key=("rename-regex-error-%s" % matched_file),
+                        )
 
         return result
 
@@ -2615,8 +2909,15 @@ class LogMatcher(object):
         """
         if self.__stale_threshold_secs is not None:
             mod_time = self.__file_system.get_last_mod_time(file_path)
-            if mod_time is not None and (current_time - mod_time) > self.__stale_threshold_secs:
-                log.log(scalyr_logging.DEBUG_LEVEL_3, 'Ignoring "%s" because its last mod is too old', file_path)
+            if (
+                mod_time is not None
+                and (current_time - mod_time) > self.__stale_threshold_secs
+            ):
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_3,
+                    'Ignoring "%s" because its last mod is too old',
+                    file_path,
+                )
                 return False
 
         return self.__file_system.can_read(file_path)
@@ -2647,7 +2948,7 @@ class FileSystem(object):
     """
 
     def __init__(self):
-        self.trust_inodes = sys.platform != 'win32'
+        self.trust_inodes = sys.platform != "win32"
 
     def open(self, file_path):
         """Returns a file object to read the file at file_path.
@@ -2656,7 +2957,7 @@ class FileSystem(object):
 
         @return: The file object
         """
-        return open(file_path, 'rb')
+        return open(file_path, "rb")
 
     def readlines(self, file_object, max_bytes=None):
         """Reads lines from the file_object, up to max_bytes bytes.
@@ -2786,7 +3087,7 @@ class FileSystem(object):
         @rtype: bool
         """
         try:
-            fp = open(file_path, 'r')
+            fp = open(file_path, "r")
             fp.close()
         except IOError, error:
             if error.errno == 13:
