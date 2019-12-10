@@ -6,6 +6,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+venv/
 env/
 bin/
 build/
@@ -58,4 +59,3 @@ coverage.xml
 xunit.xml
 # Sphinx documentation
 docs/_build/
-

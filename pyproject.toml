@@ -1,0 +1,18 @@
+[tool.black]
+#line-length = 88
+#target_version = ['py37']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+    | \.git          # root of the project
+    | \.mypy_cache
+    | \.venv
+    | \.env
+    | venv
+    | __pycache__
+    | third_party
+    | third_party_tls
+  )/
+)
+'''

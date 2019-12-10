@@ -74,7 +74,7 @@ kubectl create secret generic scalyr-api-key --from-literal=scalyr-api-key=${SCA
 # Create configmap
 kubectl create configmap scalyr-config \
 --from-literal=SCALYR_K8S_CLUSTER_NAME=ci-agent-k8s-${CIRCLE_BUILD_NUM} \
---from-literal=SCALYR_SERVER=qatesting.scalyr.com
+--from-literal=SCALYR_SERVER=https://app-qatesting.scalyr.com
 
 # The following line should be commented out for CircleCI, but it necessary for local debugging
 # eval $(minikube docker-env)

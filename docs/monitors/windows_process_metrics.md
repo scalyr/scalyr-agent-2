@@ -9,7 +9,7 @@ This agent monitor plugin records CPU consumption, memory usage, and other metri
 on a Windows system.  You can use this plugin to record resource usage for a web server, database, or other application.
 
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
-simply add it to the ``monitors`` section of the Scalyr Agent configuration file 
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file
 (``C:\Program Files (x86)\Scalyr\config\agent.json`).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
@@ -33,7 +33,7 @@ your configuration.
 
 ## Viewing Data
 
-After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then 
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
 click the {{menuRef:Dashboards}} menu and select {{menuRef:Windows Process Metrics}}. (The dashboard will not be
 listed until the agent begins sending data.)
 
@@ -128,4 +128,3 @@ The tables below list all metrics recorded by the monitor.  They are broken up i
                                                    time.
 |||# ``winproc.disk.bytes`` ||| ``type=read``  ||| The number of bytes read from disk by the process.
 |||# ``winproc.disk.bytes`` ||| ``type=write`` ||| The number of bytes written to disk by the process.
-

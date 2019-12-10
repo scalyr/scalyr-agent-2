@@ -17,7 +17,7 @@ aws s3api create-bucket \
 
 # Version the bucket
 aws s3api put-bucket-versioning --bucket ${BUCKET}  --versioning-configuration Status=Enabled
-    
+
 kops create cluster \
     --ssh-public-key ~/.ssh/agentscale_id_rsa.pub \
     --master-count 5 \
@@ -31,4 +31,3 @@ kops create cluster \
     --bastion \
     --name ${KOPS_CLUSTER_NAME} \
     --dry-run -oyaml > fivezones.yaml
-
