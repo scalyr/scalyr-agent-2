@@ -15,7 +15,7 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
-__author__ = 'imron@scalyr.com'
+__author__ = "imron@scalyr.com"
 
 import time
 import unittest
@@ -24,57 +24,59 @@ from struct import pack
 from scalyr_agent.builtin_monitors.redis_monitor import RedisMonitor
 from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
 
-class DummyLogger( object ):
-    def __init__( self ):
-        self.command = ''
-        self.warning = ''
 
-    def emit_value( self, key, value, extra_fields ):
-        self.command = extra_fields['command']
+class DummyLogger(object):
+    def __init__(self):
+        self.command = ""
+        self.warning = ""
 
-    def warn( self, message, limit_once_per_x_secs=0, limit_key="" ):
+    def emit_value(self, key, value, extra_fields):
+        self.command = extra_fields["command"]
+
+    def warn(self, message, limit_once_per_x_secs=0, limit_key=""):
         self.warning = message
 
-class RedisHostTestCase( unittest.TestCase ):
 
-    def setUp( self ):
-        config = {
-            'module': 'scalyr_agent.builtin_monitors.syslog_monitor'
-            }
+class RedisHostTestCase(unittest.TestCase):
+    def setUp(self):
+        config = {"module": "scalyr_agent.builtin_monitors.syslog_monitor"}
         self.logger = DummyLogger()
-        self.host = RedisHost( 'localhost', 6379, '', 1000 )
+        self.host = RedisHost("localhost", 6379, "", 1000)
 
-        self.entry = { 'command' : '',
-                  'start_time' : time.time(),
-                  'duration' : 100,
-                  'id' : 1
-                }
+        self.entry = {
+            "command": "",
+            "start_time": time.time(),
+            "duration": 100,
+            "id": 1,
+        }
 
-    def test_invalild_utf8_message( self ):
-        expected = u'abc\ufffddef'
+    def test_invalild_utf8_message(self):
+        expected = u"abc\ufffddef"
 
-        self.entry['command'] = pack( '3sB13s', 'abc', 0xce, 'def' ).rstrip( '\0' )
+        self.entry["command"] = pack("3sB13s", "abc", 0xCE, "def").rstrip("\0")
 
         self.host.utf8_warning_interval = 1
-        self.host.log_entry( self.logger, self.entry )
-        self.assertEquals( expected, self.logger.command )
-        self.assertTrue( self.logger.warning.startswith( "Redis command contains invalid utf8" ) )
+        self.host.log_entry(self.logger, self.entry)
+        self.assertEquals(expected, self.logger.command)
+        self.assertTrue(
+            self.logger.warning.startswith("Redis command contains invalid utf8")
+        )
 
+    def test_truncated_utf8_message(self):
+        expected = "abc... (4 more bytes)"
 
-    def test_truncated_utf8_message( self ):
-        expected = 'abc... (4 more bytes)'
+        self.entry["command"] = pack(
+            "3sB18s", "abc", 0xCE, "... (4 more bytes)"
+        ).rstrip("\0")
 
-        self.entry['command'] = pack( '3sB18s', 'abc', 0xce, '... (4 more bytes)' ).rstrip( '\0' )
+        self.host.log_entry(self.logger, self.entry)
+        self.assertEquals(expected, self.logger.command)
 
-        self.host.log_entry( self.logger, self.entry )
-        self.assertEquals( expected, self.logger.command )
+    def test_non_truncated_utf8_message(self):
 
-    def test_non_truncated_utf8_message( self ):
+        expected = "abc... (4 more bytes)"
+        self.entry["command"] = "abc... (4 more bytes)"
 
-        expected = 'abc... (4 more bytes)'
-        self.entry['command'] = 'abc... (4 more bytes)'
+        self.host.log_entry(self.logger, self.entry)
 
-        self.host.log_entry( self.logger, self.entry )
-
-        self.assertEquals( expected, self.logger.command )
-
+        self.assertEquals(expected, self.logger.command)

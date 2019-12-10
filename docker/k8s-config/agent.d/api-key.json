@@ -2,4 +2,3 @@
   import_vars: [ "SCALYR_API_KEY" ],
   api_key: "$SCALYR_API_KEY"
 }
-
