@@ -83,9 +83,6 @@ class Configuration(object):
         # the monitors.
         self.__log_configs = []
 
-        # The extended log configuration objects
-        self.__extended_log_configs = []
-
         # The monitor configuration objects from the configuration file.  This does not include monitors that
         # are created by default by the platform.
         self.__monitor_configs = []
@@ -139,7 +136,6 @@ class Configuration(object):
             allowed_multiple_keys = (
                 "import_vars",
                 "logs",
-                "extended_logs",
                 "monitors",
                 "server_attributes",
             )
@@ -171,7 +167,6 @@ class Configuration(object):
                         self.__config.put(key, value)
 
                 self.__add_elements_from_array("logs", content, self.__config)
-                self.__add_elements_from_array("extended_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
@@ -225,10 +220,6 @@ class Configuration(object):
             self.__log_configs = list(self.__config.get_json_array("logs"))
             if agent_log is not None:
                 self.__log_configs.append(agent_log)
-
-            self.__extended_log_configs = list(
-                self.__config.get_json_array("extended_logs")
-            )
 
             # add in the profile log if we have enabled profiling
             if self.enable_profiling:
@@ -2061,10 +2052,18 @@ class Configuration(object):
         config_object.update({param_name: env_val})
         return env_val
 
-    def get_extended_logs(self, key):
-        """Returns a list of all extended log configs that have a matching key
+    def get_log_config(self, matcher, default_config):
+        """Returns a JsonObject with the log configuration matched by the `matcher` function if found, otherwise
+        returns `default_config`.
+
+        @param matcher: A function that takes a log config JsonObject as a parameter, and returns True if the config
+        should be returned, False otherwise
+        @param default_config: A JsonObject that is returned if we can't match on any log configs
         """
-        return [l for l in self.__extended_log_configs if key in l]
+        for log_config in self.__log_configs:
+            if matcher(log_config):
+                return log_config
+        return default_config
 
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.
@@ -2079,20 +2078,12 @@ class Configuration(object):
         """
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, "logs", description)
-        self.__verify_or_set_optional_array(config, "extended_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
 
         i = 0
         for log_entry in config.get_json_array("logs"):
             self.__verify_log_entry_and_set_defaults(
                 log_entry, config_file_path=file_path, entry_index=i
-            )
-            i += 1
-
-        i = 0
-        for log_entry in config.get_json_array("extended_logs"):
-            self.__verify_log_entry_with_key_and_set_defaults(
-                log_entry, key=None, config_file_path=file_path, entry_index=i
             )
             i += 1
 
@@ -2120,12 +2111,12 @@ class Configuration(object):
             was given.
         """
         # Make sure the log_enty has a path and the path is absolute.
-        path = log_entry.get_string("path")
-        if not os.path.isabs(path):
+        path = log_entry.get_string("path", none_if_missing=True)
+        if path and not os.path.isabs(path):
             log_entry.put("path", os.path.join(self.agent_log_path, path))
         self.__verify_log_entry_with_key_and_set_defaults(
             log_entry,
-            "path",
+            None,
             description=description,
             config_file_path=config_file_path,
             entry_index=entry_index,

@@ -177,14 +177,6 @@ class TestConfigurationBase(ScalyrTestCase):
         return self.make_path(None, path)
 
 
-def _get_extended_log_configs(config):
-    return config.get_extended_logs("path")
-
-
-def _get_log_configs(config):
-    return config.log_configs
-
-
 class TestConfiguration(TestConfigurationBase):
     def test_basic_case(self):
         self._write_file_with_separator_conversion(
@@ -343,11 +335,8 @@ class TestConfiguration(TestConfigurationBase):
             http_proxy: "http://foo.com",
             https_proxy: "https://bar.com",
 
-            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
-            extended_logs: [
-              { foo: "bar", ignore_stale_files: true}
-              { shiny: "capn", ignore_stale_files: true}
-            ]
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true},
+                    { journald_unit: ".*", parser: "journald_catchall" } ]
           }
         """
         )
@@ -414,15 +403,15 @@ class TestConfiguration(TestConfigurationBase):
             {"http": "http://foo.com", "https": "https://bar.com"},
         )
 
-        extended_logs = config.get_extended_logs("foo")
-        self.assertEquals(1, len(extended_logs))
-        self.assertEquals("bar", extended_logs[0].get_string("foo"))
-        self.assertTrue(extended_logs[0].get_bool("ignore_stale_files"))
+        def config_matcher(config):
+            if "journald_unit" in config:
+                return True
+            return False
 
-        extended_logs = config.get_extended_logs("shiny")
-        self.assertEquals(1, len(extended_logs))
-        self.assertEquals("capn", extended_logs[0].get_string("shiny"))
-        self.assertTrue(extended_logs[0].get_bool("ignore_stale_files"))
+        self.assertEqual(
+            config.get_log_config(config_matcher, JsonObject({})).get_string("parser"),
+            "journald_catchall",
+        )
 
     def test_missing_api_key(self):
         self._write_file_with_separator_conversion(
@@ -565,275 +554,236 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEqual(config.network_proxies, {"https": "https://bar.com"})
 
     def test_sampling_rules(self):
-        def run_test(key, get_log_configs, expected_configs):
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { match_expression: "INFO", sampling_rate: 0},
-                                    { match_expression: ".*error.*=foo", sampling_rate: 0.2 } ],
-                }]
-              }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            config.parse()
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { match_expression: "INFO", sampling_rate: 0},
+                                { match_expression: ".*error.*=foo", sampling_rate: 0.2 } ],
+            }]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
 
-            log_configs = get_log_configs(config)
-
-            self.assertEquals(len(log_configs), expected_configs)
-            sampling_rules = log_configs[0].get_json_array("sampling_rules")
-            self.assertEquals(len(sampling_rules), 2)
-            self.assertEquals(
-                sampling_rules.get_json_object(0).get_string("match_expression"), "INFO"
-            )
-            self.assertEquals(
-                sampling_rules.get_json_object(0).get_float("sampling_rate"), 0
-            )
-            self.assertEquals(
-                sampling_rules.get_json_object(1).get_string("match_expression"),
-                ".*error.*=foo",
-            )
-            self.assertEquals(
-                sampling_rules.get_json_object(1).get_float("sampling_rate"), 0.2
-            )
-
-        run_test("logs", _get_log_configs, 2)
-        run_test("extended_logs", _get_extended_log_configs, 1)
+        self.assertEquals(len(config.log_configs), 2)
+        sampling_rules = config.log_configs[0].get_json_array("sampling_rules")
+        self.assertEquals(len(sampling_rules), 2)
+        self.assertEquals(
+            sampling_rules.get_json_object(0).get_string("match_expression"), "INFO"
+        )
+        self.assertEquals(
+            sampling_rules.get_json_object(0).get_float("sampling_rate"), 0
+        )
+        self.assertEquals(
+            sampling_rules.get_json_object(1).get_string("match_expression"),
+            ".*error.*=foo",
+        )
+        self.assertEquals(
+            sampling_rules.get_json_object(1).get_float("sampling_rate"), 0.2
+        )
 
     def test_bad_sampling_rules(self):
-        def run_test(key):
-            # Missing match_expression.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { sampling_rate: 0} ]
-              }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Missing match_expression.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { sampling_rate: 0} ]
+          }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Bad regular expression.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { match_expression: "[a", sampling_rate: 0} ]
-              }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Bad regular expression.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { match_expression: "[a", sampling_rate: 0} ]
+          }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Missing sampling.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { match_expression: "INFO"} ]
-              }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Missing sampling.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { match_expression: "INFO"} ]
+          }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Not number for percentage.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { match_expression: "INFO", sampling_rate: true} ]
-              }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Not number for percentage.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { match_expression: "INFO", sampling_rate: true} ]
+          }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Bad percentage.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  sampling_rules: [ { match_expression: "INFO", sampling_rate: 2.0} ]
-              }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
-
-        run_test("logs")
-        run_test("extended_logs")
+        # Bad percentage.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              sampling_rules: [ { match_expression: "INFO", sampling_rate: 2.0} ]
+          }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
     def test_redaction_rules(self):
-        def run_test(key, get_log_configs, expected_configs):
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  redaction_rules: [ { match_expression: "password=", replacement: "password=foo"},
-                                     { match_expression: "password=.*", replacement: "password=foo"},
-                                     { match_expression: "password=" },
-                  ],
-                }]
-              }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            config.parse()
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              redaction_rules: [ { match_expression: "password=", replacement: "password=foo"},
+                                 { match_expression: "password=.*", replacement: "password=foo"},
+                                 { match_expression: "password=" },
+              ],
+            }]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
 
-            log_configs = get_log_configs(config)
-            self.assertEquals(len(log_configs), expected_configs)
-            redaction_rules = log_configs[0].get_json_array("redaction_rules")
-            self.assertEquals(len(redaction_rules), 3)
-            self.assertEquals(
-                redaction_rules.get_json_object(0).get_string("match_expression"),
-                "password=",
-            )
-            self.assertEquals(
-                redaction_rules.get_json_object(0).get_string("replacement"),
-                "password=foo",
-            )
-            self.assertEquals(
-                redaction_rules.get_json_object(1).get_string("match_expression"),
-                "password=.*",
-            )
-            self.assertEquals(
-                redaction_rules.get_json_object(1).get_string("replacement"),
-                "password=foo",
-            )
-            self.assertEquals(
-                redaction_rules.get_json_object(2).get_string("match_expression"),
-                "password=",
-            )
-            self.assertEquals(
-                redaction_rules.get_json_object(2).get_string("replacement"), ""
-            )
-
-        run_test("logs", _get_log_configs, 2)
-        run_test("extended_logs", _get_extended_log_configs, 1)
+        self.assertEquals(len(config.log_configs), 2)
+        redaction_rules = config.log_configs[0].get_json_array("redaction_rules")
+        self.assertEquals(len(redaction_rules), 3)
+        self.assertEquals(
+            redaction_rules.get_json_object(0).get_string("match_expression"),
+            "password=",
+        )
+        self.assertEquals(
+            redaction_rules.get_json_object(0).get_string("replacement"), "password=foo"
+        )
+        self.assertEquals(
+            redaction_rules.get_json_object(1).get_string("match_expression"),
+            "password=.*",
+        )
+        self.assertEquals(
+            redaction_rules.get_json_object(1).get_string("replacement"), "password=foo"
+        )
+        self.assertEquals(
+            redaction_rules.get_json_object(2).get_string("match_expression"),
+            "password=",
+        )
+        self.assertEquals(
+            redaction_rules.get_json_object(2).get_string("replacement"), ""
+        )
 
     def test_bad_redaction_rules(self):
-        def run_test(key):
-            # Missing match expression.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  redaction_rules: [ { replacement: "password=foo"} ],
-                }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Missing match expression.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              redaction_rules: [ { replacement: "password=foo"} ],
+            }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Match expression is not a regexp.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  redaction_rules: [ { match_expression: "[a" } ],
-                }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
+        # Match expression is not a regexp.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              redaction_rules: [ { match_expression: "[a" } ],
+            }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
-            # Replacement is not a string.
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [ {
-                  path:"/var/log/tomcat6/access.log",
-                  redaction_rules: [ { match_expression: "a", replacement: [ true ] } ],
-                }] }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            self.assertRaises(BadConfiguration, config.parse)
-
-        run_test("logs")
-        run_test("extended_logs")
+        # Replacement is not a string.
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [ {
+              path:"/var/log/tomcat6/access.log",
+              redaction_rules: [ { match_expression: "a", replacement: [ true ] } ],
+            }] }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        self.assertRaises(BadConfiguration, config.parse)
 
     def test_configuration_directory(self):
-        def run_test(key, get_log_configs, expected_configs):
-            self._write_file_with_separator_conversion(
-                """ { api_key: "hi there"
-                %s: [ { path:"/var/log/tomcat6/access.log" }],
-                server_attributes: {  serverHost:"foo.com" }
-              }
-            """
-                % key
-            )
+        self._write_file_with_separator_conversion(
+            """ { api_key: "hi there"
+            logs: [ { path:"/var/log/tomcat6/access.log" }],
+            server_attributes: {  serverHost:"foo.com" }
+          }
+        """
+        )
 
-            self._write_config_fragment_file_with_separator_conversion(
-                "nginx.json",
-                """ {
-               %s: [ { path: "/var/log/nginx/access.log" } ],
-               server_attributes: { webServer:"true"}
-              }
-            """
-                % key,
-            )
+        self._write_config_fragment_file_with_separator_conversion(
+            "nginx.json",
+            """ {
+           logs: [ { path: "/var/log/nginx/access.log" } ],
+           server_attributes: { webServer:"true"}
+          }
+        """,
+        )
 
-            self._write_config_fragment_file_with_separator_conversion(
-                "apache.json",
-                """ {
-               %s: [ { path: "/var/log/apache/access.log" } ]
-              }
-            """
-                % key,
-            )
+        self._write_config_fragment_file_with_separator_conversion(
+            "apache.json",
+            """ {
+           logs: [ { path: "/var/log/apache/access.log" } ]
+          }
+        """,
+        )
 
-            config = self._create_test_configuration_instance()
-            config.parse()
+        config = self._create_test_configuration_instance()
+        config.parse()
 
-            self.assertEquals(len(config.additional_file_paths), 2)
-            additional_paths = list(config.additional_file_paths)
-            additional_paths.sort()
-            self.assertTrue(additional_paths[0].endswith("apache.json"))
-            self.assertTrue(additional_paths[1].endswith("nginx.json"))
+        self.assertEquals(len(config.additional_file_paths), 2)
+        additional_paths = list(config.additional_file_paths)
+        additional_paths.sort()
+        self.assertTrue(additional_paths[0].endswith("apache.json"))
+        self.assertTrue(additional_paths[1].endswith("nginx.json"))
 
-            log_configs = get_log_configs(config)
-            self.assertEquals(len(log_configs), expected_configs)
-            self.assertPathEquals(
-                log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
-            )
-            self.assertPathEquals(
-                log_configs[1].get_string("path"), "/var/log/apache/access.log"
-            )
-            self.assertPathEquals(
-                log_configs[2].get_string("path"), "/var/log/nginx/access.log"
-            )
-            self.assertEquals(
-                log_configs[0].get_json_array("sampling_rules"), JsonArray()
-            )
+        self.assertEquals(len(config.log_configs), 4)
+        self.assertPathEquals(
+            config.log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
+        )
+        self.assertPathEquals(
+            config.log_configs[1].get_string("path"), "/var/log/apache/access.log"
+        )
+        self.assertPathEquals(
+            config.log_configs[2].get_string("path"), "/var/log/nginx/access.log"
+        )
+        self.assertEquals(
+            config.log_configs[0].get_json_array("sampling_rules"), JsonArray()
+        )
 
-            self.assertEquals(config.server_attributes["webServer"], "true")
-            self.assertEquals(config.server_attributes["serverHost"], "foo.com")
-
-        run_test("logs", _get_log_configs, 4)
-        run_test("extended_logs", _get_extended_log_configs, 3)
+        self.assertEquals(config.server_attributes["webServer"], "true")
+        self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
     def test_api_key_and_scalyr_server_defined_in_config_directory(self):
         self._write_file_with_separator_conversion(
@@ -922,25 +872,19 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(len(config.log_configs), 2)
 
     def test_parser_specification(self):
-        def run_test(key, get_log_configs):
-            self._write_file_with_separator_conversion(
-                """ {
-                implicit_agent_log_collection: false,
-                api_key: "hi there",
-                %s: [ { path: "/tmp/foo.txt",
-                          parser: "foo-parser"} ]
-              }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            config.parse()
-            log_configs = get_log_configs(config)
-            self.assertEquals(len(log_configs), 1)
-            self.assertEquals(log_configs[0]["attributes"]["parser"], "foo-parser")
-
-        run_test("logs", _get_log_configs)
-        run_test("extended_logs", _get_extended_log_configs)
+        self._write_file_with_separator_conversion(
+            """ {
+            implicit_agent_log_collection: false,
+            api_key: "hi there",
+            logs: [ { path: "/tmp/foo.txt",
+                      parser: "foo-parser"} ]
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        self.assertEquals(len(config.log_configs), 1)
+        self.assertEquals(config.log_configs[0]["attributes"]["parser"], "foo-parser")
 
     def test_monitors(self):
         self._write_file_with_separator_conversion(
@@ -1021,36 +965,6 @@ class TestConfiguration(TestConfigurationBase):
             """ {
             api_key: "hi there",
             logs: [ { path:"/var/log/nginx/access.log"} ]
-          }
-        """
-        )
-
-        config_b = self._create_test_configuration_instance()
-        config_b.parse()
-
-        self.assertFalse(config_a.equivalent(config_b))
-
-    def test_equivalent_extended_logs_configuration(self):
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            extended_logs: [ { foo:"bar"} ]
-          }
-        """
-        )
-        config_a = self._create_test_configuration_instance()
-        config_a.parse()
-
-        config_b = self._create_test_configuration_instance()
-        config_b.parse()
-
-        self.assertTrue(config_a.equivalent(config_b))
-
-        # Now write a new file that is slightly different.
-        self._write_file_with_separator_conversion(
-            """ {
-            api_key: "hi there",
-            extended_logs: [ { foo:"barry"} ]
           }
         """
         )
@@ -1457,29 +1371,23 @@ class TestConfiguration(TestConfigurationBase):
         patch_and_start_test()
 
     def test_log_excludes_from_config(self):
-        def run_test(key, get_log_configs):
-            self._write_file_with_separator_conversion(
-                """ {
-                api_key: "hi there",
-                %s: [
-                    {
-                        path: "/var/log/tomcat6/access.log",
-                        exclude: ["*.[0-9]*", "*.bak"]
-                    }
-                ],
-              }
-            """
-                % key
-            )
-            config = self._create_test_configuration_instance()
-            config.parse()
-            log_configs = get_log_configs(config)
-            excludes = log_configs[0]["exclude"]
-            self.assertEquals(type(excludes), JsonArray)
-            self.assertEquals(list(excludes), ["*.[0-9]*", "*.bak"])
-
-        run_test("logs", _get_log_configs)
-        run_test("extended_logs", _get_extended_log_configs)
+        self._write_file_with_separator_conversion(
+            """ {
+            api_key: "hi there",
+            logs: [
+                {
+                    path: "/var/log/tomcat6/access.log",
+                    exclude: ["*.[0-9]*", "*.bak"]
+                }
+            ],
+          }
+        """
+        )
+        config = self._create_test_configuration_instance()
+        config.parse()
+        excludes = config.log_configs[0]["exclude"]
+        self.assertEquals(type(excludes), JsonArray)
+        self.assertEquals(list(excludes), ["*.[0-9]*", "*.bak"])
 
     def test_global_options_in_fragments(self):
         self._write_config_fragment_file_with_separator_conversion(

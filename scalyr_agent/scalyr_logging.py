@@ -831,10 +831,23 @@ class MetricLogFormatter(BaseFormatter):
     """
 
     def __init__(self):
-        # TODO: It seems on Python 2.4 the filename and line number do not work correctly.  I think we need to
-        # define a custom findCaller method to actually fix the problem.
         BaseFormatter.__init__(
             self, "%(asctime)s [%(monitor_name)s] %(message)s", "metric-formatter"
+        )
+
+
+class JournaldLogFormatter(BaseFormatter):
+    """Formatter used for the logs produced by the journald monitor.
+
+    In general, it formats each line as:
+        time (with milliseconds)
+        component (`journald_monitor()` so we don't have to have ugly hashes in the log line for extended config.)
+        message (the logged message)
+    """
+
+    def __init__(self):
+        BaseFormatter.__init__(
+            self, "%(asctime)s [journald_monitor()] %(message)s", "metric-formatter"
         )
 
 

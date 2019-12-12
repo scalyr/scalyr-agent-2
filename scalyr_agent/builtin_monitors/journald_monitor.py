@@ -14,11 +14,10 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-__author__ = "imron@scalyr.com"
+_author_ = "imron@scalyr.com"
 
 import datetime
 import os
-import random
 import re
 import select
 from scalyr_agent import ScalyrMonitor, define_config_option
@@ -26,9 +25,16 @@ from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.builtin_monitors.docker_monitor import get_parser_from_config
 import threading
 import traceback
+import logging
+from string import Template
+from cStringIO import StringIO
 
+from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
+    AutoFlushingRotatingFile,
+)
 
 try:
     from systemd import journal
@@ -227,6 +233,20 @@ class JournaldMonitor(ScalyrMonitor):
     "Read logs from journalctl and emit to scalyr"
 
     def _initialize(self):
+        self._metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
+        self._extra_loggers = {}
+        self._cached_regexes = {}
+        self._file_template = Template("journald_${ID}")
+        default_rotation_count, default_max_bytes = (2, 20 * 1024 * 1024)
+
+        self._max_log_rotations = self._config.get("max_log_rotations")
+        if self._max_log_rotations is None:
+            self._max_log_rotations = default_rotation_count
+
+        self._max_log_size = self._config.get("max_log_size")
+        if self._max_log_size is None:
+            self._max_log_size = default_max_bytes
+
         self._journal_path = self._config.get("journal_path")
         if len(self._journal_path) == 0:
             self._journal_path = None
@@ -258,6 +278,13 @@ class JournaldMonitor(ScalyrMonitor):
         self.set_sample_interval(self._config.get("journal_poll_interval"))
         self.log_config["parser"] = "journald"
 
+        def config_matcher(config):
+            return "journald_unit" in config and config["journald_unit"] == ".*"
+
+        matched_config = self._global_config.get_log_config(config_matcher, None)
+        if matched_config:
+            self.log_config = self._create_log_config(self.log_config, matched_config)
+
         self._extra_fields = self._config.get("journal_fields")
         self._last_cursor = None
 
@@ -288,6 +315,12 @@ class JournaldMonitor(ScalyrMonitor):
         self._checkpoint = load_checkpoints(self._checkpoint_file)
         self._reset_journal()
         ScalyrMonitor.run(self)
+
+    def set_log_watcher(self, log_watcher):
+        self._log_watcher = log_watcher
+
+    def _get_log_watcher(self):
+        return (self._log_watcher, self)
 
     def _reset_journal(self):
         """
@@ -415,14 +448,165 @@ class JournaldMonitor(ScalyrMonitor):
             try:
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
-                self._logger.emit_value("details", msg, extra_fields=extra)
-                self._last_cursor = entry.get("__CURSOR", None)
+                self._handle_log_line(msg, extra)
+                self._last_cursor = entry.get("_CURSOR", None)
             except Exception, e:
                 global_log.warn(
                     "Error getting journal entries: %s" % str(e),
                     limit_once_per_x_secs=60,
                     limit_key="journald-entry-error",
                 )
+
+    def _handle_log_line(self, data, extra_fields):
+        def config_matcher(config):
+            if "journald_unit" in config and not config["journald_unit"] == ".*":
+                if config["journald_unit"] not in self._cached_regexes:
+                    self._cached_regexes[config["journald_unit"]] = re.compile(
+                        config["journald_unit"]
+                    )
+                return self._cached_regexes[config["journald_unit"]].match(
+                    extra_fields["unit"]
+                )
+            return False
+
+        if "unit" in extra_fields:
+            matched_config = self._global_config.get_log_config(config_matcher, None)
+            if matched_config:
+                # Create a log file if we don't have one for this configuration yet
+                if matched_config["journald_unit"] not in self._extra_loggers:
+                    self._extra_loggers[matched_config["journald_unit"]] = {}
+                    log_config = self._create_log_config(
+                        self.log_config, matched_config, matched_config["journald_unit"]
+                    )
+                    logger = self._create_logger(log_config)
+                    self._extra_loggers[matched_config["journald_unit"]][
+                        "logger"
+                    ] = logger
+                    self._extra_loggers[matched_config["journald_unit"]][
+                        "log_config"
+                    ] = log_config
+                self._emit_value(
+                    self._extra_loggers[matched_config["journald_unit"]]["logger"],
+                    "details",
+                    data,
+                    extra_fields=extra_fields,
+                )
+                return
+        self._logger.emit_value("details", data, extra_fields=extra_fields)
+
+    def _emit_value(
+        self, logger, metric_name, metric_value, extra_fields=None,
+    ):
+        string_buffer = StringIO()
+        metric_name = self._force_valid_metric_or_field_name(
+            logger, metric_name, is_metric=True
+        )
+
+        string_buffer.write(
+            "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
+        )
+
+        if extra_fields is not None:
+            for field_name in extra_fields:
+                field_value = extra_fields[field_name]
+                field_name = self._force_valid_metric_or_field_name(
+                    logger, field_name, is_metric=False
+                )
+                string_buffer.write(
+                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
+                )
+
+        logger.info(
+            string_buffer.getvalue(),
+            metric_log_for_monitor=self,
+            monitor_id_override=None,
+        )
+        string_buffer.close()
+
+    def _force_valid_metric_or_field_name(self, logger, name, is_metric=True):
+        """Forces the given metric or field name to be valid.
+
+        A valid metric/field name must being with a letter or underscore and only contain alphanumeric characters including
+        periods, underscores, and dashes.
+
+        If it is not valid, it will replace invalid characters with underscores.  If it does not being with a letter
+        or underscore a sa_ is added as a prefix.
+
+        If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
+
+        @param name: The metric name
+        @type name: str
+        @param is_metric: Whether or not the name is a metric or field name
+        @type is_metric: bool
+        @return: The metric / field name to use, which may be the original string.
+        @rtype: str
+        """
+        if self._metric_or_field_name_rule.match(name) is not None:
+            return name
+
+        if is_metric:
+            logger.warn(
+                'Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
+                "alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been "
+                "fixed by replacing invalid characters with underscores.  Other metric names may be invalid "
+                "(only reporting first occurrence)." % name,
+                limit_once_per_x_secs=86400,
+                limit_key="badmetricname",
+                error_code="client/badMetricName",
+            )
+        else:
+            logger.warn(
+                'Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
+                "alphanumeric characters as well as periods, underscores, and dashes.  The field name has been "
+                "fixed by replacing invalid characters with underscores.  Other field names may be invalid "
+                "(only reporting first occurrence)." % name,
+                limit_once_per_x_secs=86400,
+                limit_key="badfieldname",
+                error_code="client/badFieldName",
+            )
+
+        if not re.match("^[_a-zA-Z]", name):
+            name = "sa_" + name
+        return re.sub("[^\w\-\.]", "_", name)
+
+    def _create_log_config(self, base_config, matched_config, match_regex=None):
+        log_config = base_config.copy()
+        attrs = log_config.get("attributes", JsonObject({}))
+        log_config.update(matched_config)
+        # Set the parser the log_config['parser'] level
+        # otherwise it will be overwritten by a default value due to the way
+        # log_config verification works
+        log_config["parser"] = get_parser_from_config(matched_config, attrs, "journald")
+
+        attrs.update(matched_config.get("attributes", JsonObject({})))
+        log_config["attributes"] = attrs
+        if match_regex:
+            match_hash = hash(match_regex)
+            full_path = os.path.join(
+                self._global_config.agent_log_path,
+                self._file_template.safe_substitute({"ID": match_hash}),
+            )
+            log_config["path"] = full_path
+
+        return log_config
+
+    def _create_logger(self, log_config):
+        logger = logging.getLogger(
+            "journald_" + str(hash(log_config["journald_unit"])) + "()"
+        )
+        _log_handler = logging.handlers.RotatingFileHandler(
+            filename=log_config["path"],
+            maxBytes=self._max_log_size,
+            backupCount=self._max_log_rotations,
+        )
+        _log_handler.setFormatter(scalyr_logging.JournaldLogFormatter())
+
+        logger.addHandler(_log_handler)
+        logger.propagate = False
+        watcher, module = self._get_log_watcher()
+        watcher.add_log_config(self.module_name, log_config)
+
+        return logger
 
     def gather_sample(self):
 
@@ -435,3 +619,8 @@ class JournaldMonitor(ScalyrMonitor):
             self._checkpoint.update_checkpoint(
                 self._checkpoint_name, str(self._last_cursor)
             )
+
+    def stop(self, wait_on_join=True, join_timeout=5):
+        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
+
+        self._extra_loggers = {}
