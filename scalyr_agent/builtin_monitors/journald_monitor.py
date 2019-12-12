@@ -283,7 +283,9 @@ class JournaldMonitor(ScalyrMonitor):
 
         matched_config = self._global_config.get_log_config(config_matcher, None)
         if matched_config:
-            self.log_config = self._create_log_config(self.log_config, matched_config)
+            self.log_config.update(
+                self._create_log_config(self.log_config, matched_config)
+            )
 
         self._extra_fields = self._config.get("journal_fields")
         self._last_cursor = None
