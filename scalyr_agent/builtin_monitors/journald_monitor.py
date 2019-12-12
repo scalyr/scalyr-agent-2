@@ -14,7 +14,7 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-_author_ = "imron@scalyr.com"
+__author__ = "imron@scalyr.com"
 
 import datetime
 import os
@@ -449,7 +449,7 @@ class JournaldMonitor(ScalyrMonitor):
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
                 self._handle_log_line(msg, extra)
-                self._last_cursor = entry.get("_CURSOR", None)
+                self._last_cursor = entry.get("__CURSOR", None)
             except Exception, e:
                 global_log.warn(
                     "Error getting journal entries: %s" % str(e),
