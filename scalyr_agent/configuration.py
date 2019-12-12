@@ -82,7 +82,6 @@ class Configuration(object):
         # The log configuration objects from the configuration file.  This does not include logs required by
         # the monitors.
         self.__log_configs = []
-
         # The monitor configuration objects from the configuration file.  This does not include monitors that
         # are created by default by the platform.
         self.__monitor_configs = []
