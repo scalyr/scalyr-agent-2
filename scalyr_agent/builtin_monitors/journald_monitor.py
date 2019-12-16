@@ -317,18 +317,17 @@ class JournaldMonitor(ScalyrMonitor):
                 "_SOURCE_REALTIME_TIMESTAMP": "timestamp",
             }
 
-        self.log_manager = None
+        self.log_manager = LogManager(
+            self.default_config,
+            self.module_name,
+            self._global_config,
+            Template("journald_${ID}.log"),
+            self._max_log_size,
+            self._max_log_rotations,
+        )
 
     def run(self):
-        if not self.log_manager:
-            self.log_manager = LogManager(
-                self.default_config,
-                self.module_name,
-                self._global_config,
-                self._max_log_size,
-                self._max_log_rotations,
-            )
-            self.log_manager.set_log_watcher(self._log_watcher)
+        self.log_manager.set_log_watcher(self._log_watcher)
         self._checkpoint = load_checkpoints(self._checkpoint_file)
         self._reset_journal()
         ScalyrMonitor.run(self)
@@ -595,30 +594,74 @@ class LogManager:
         default_config,
         module_name,
         global_config,
+        file_name_template,
         max_log_size=20 * 1024 * 1024,
         max_log_rotations=2,
     ):
-        self._file_template = Template("journald_${ID}.log")
+        self._file_template = file_name_template
         self.loggers = {}
         self.default_config = default_config
         self._max_log_size = max_log_size
         self._max_log_rotations = max_log_rotations
         self.module_name = module_name
         self.global_config = global_config
-        self.cached_regexes = {}
         self.log_watcher = None
-
-        self.matching_configs = self.global_config.get_all_log_configs(
-            ["journald_unit"]
-        )
+        self.all_configs = self.global_config.get_all_log_configs([])
         self.loggers_created = False
 
+        self.initialize()
+
+    def initialize(self):
+        """Called at the end of __init__, intended for overriding by subclasses
+        If configuration can be invalid, it should be checked here
+        """
+        for config in self.all_configs:
+            match = self.match_config_to_logger(config)
+            if match:
+                regex = re.compile(match)
+                if match not in self.loggers:
+                    self.loggers[match] = {}
+                self.loggers[match]["regex"] = regex
+
+    def match_line_to_logger(self, data, extra_fields=None):
+        """Get the unique identifier of the logger we should output this data to, intended for overriding by subclasses
+
+        @param data: Data to be send to the logger, used for matching
+        @param extra_fields: Any extra data used for matching
+        @return: A string uniquely identifying the matched logger
+        """
+        if extra_fields and "unit" in extra_fields:
+            for match in self.loggers.keys():
+                if match != ".*" and self.loggers[match]["regex"].match(
+                    extra_fields["unit"]
+                ):
+                    return match
+        return None
+
+    def match_config_to_logger(self, config):
+        """Get the unique identifier of the logger that should have this config, intended for overriding by subclasses
+
+        @param config: The configuration for a logger
+        @return: A string uniquely identifying the matched logger
+        """
+        if "journald_unit" in config:
+            return config["journald_unit"]
+        return None
+
     def set_log_watcher(self, log_watcher):
+        """Set the log_watcher so we can use it to register new log files
+        If loggers have not yet been created they will be when this is called
+
+        @param log_watcher:
+        @return:
+        """
         self.log_watcher = log_watcher
         if not self.loggers_created:
-            for config in self.matching_configs:
-                if config["journald_unit"] != ".*":
-                    self.create_logger(config["journald_unit"], config)
+            for config in self.all_configs:
+                match = self.match_config_to_logger(config)
+                if match:
+                    self.create_logger(match, config)
+            self.loggers_created = True
 
     def emit(self, data, extra_fields=None):
         """Emits the passed in `data` to the appropriate log file, creating it in the process if need be.
@@ -627,28 +670,11 @@ class LogManager:
         @param extra_fields: Key value pairs that can be used for matching the data to the correct log file
         @return: True if the data was matched to a logger and writen out, False otherwise
         """
-        match, log_config = self.match_to_logger(data, extra_fields)
+        match = self.match_line_to_logger(data, extra_fields)
         if not match:
             return False
-        if match not in self.loggers:
-            self.create_logger(match, log_config)
         self.loggers[match]["logger"].info(data)
         return True
-
-    def match_to_logger(self, data, extra_fields=None):
-        """Get the unique identifier of the logger we should output this data to
-
-        @param data: Data to be send to the logger, used for matching
-        @param extra_fields: Any extra data used for matching
-        @return: A string uniquely identifying the matched logger and the config for it
-        """
-        if extra_fields and "unit" in extra_fields:
-            for match in self.loggers.keys():
-                if match != ".*" and self.loggers[match]["regex"].match(
-                    extra_fields["unit"]
-                ):
-                    return match, self.loggers[match]["config"]
-        return None, None
 
     def create_logger(self, match, matched_config):
         """Create a logger uniquely identified by `match` for sending data to
@@ -662,7 +688,9 @@ class LogManager:
 
         match_hash = str(hash(match))
 
-        logger = logging.getLogger("journald_" + match_hash + "()")
+        logger = logging.getLogger(
+            self._file_template.safe_substitute({"ID": match_hash})
+        )
         log_config = _create_log_config(
             self.default_config,
             matched_config,
@@ -682,13 +710,11 @@ class LogManager:
 
         self.log_watcher.add_log_config(self.module_name, log_config)
 
-        regex = re.compile(match)
-
-        self.loggers[match] = {}
+        if match not in self.loggers:
+            self.loggers[match] = {}
         self.loggers[match]["logger"] = logger
         self.loggers[match]["handler"] = _log_handler
         self.loggers[match]["config"] = log_config
-        self.loggers[match]["regex"] = regex
 
     def close(self):
         """Close all log handlers currently managed by this LogManager
