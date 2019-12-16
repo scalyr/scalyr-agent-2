@@ -2064,6 +2064,19 @@ class Configuration(object):
                 return log_config
         return default_config
 
+    def get_all_log_configs(self, matching_keys):
+        """Returns a list of JsonObjects with the log configurations that contain all the keys in `matching_keys`
+
+        @param matching_keys: List of strings containing the keys that need to be in a config for it to be included
+        in the return list
+        """
+        configs = []
+        matching_set = set(matching_keys)
+        for log_config in self.__log_configs:
+            if matching_set.issubset(log_config.keys()):
+                configs.append(log_config)
+        return configs
+
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.
 
