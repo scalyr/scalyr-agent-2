@@ -335,8 +335,8 @@ class TestConfiguration(TestConfigurationBase):
             http_proxy: "http://foo.com",
             https_proxy: "https://bar.com",
 
-            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true},
-                    { journald_unit: ".*", parser: "journald_catchall" } ]
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
+            journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ]
           }
         """
         )
@@ -403,14 +403,8 @@ class TestConfiguration(TestConfigurationBase):
             {"http": "http://foo.com", "https": "https://bar.com"},
         )
 
-        def config_matcher(config):
-            if "journald_unit" in config:
-                return True
-            return False
-
         self.assertEqual(
-            config.get_log_config(config_matcher, JsonObject({})).get_string("parser"),
-            "journald_catchall",
+            config.journald_log_configs[0].get_string("parser"), "journald_catchall"
         )
 
     def test_missing_api_key(self):

@@ -82,6 +82,8 @@ class Configuration(object):
         # The log configuration objects from the configuration file.  This does not include logs required by
         # the monitors.
         self.__log_configs = []
+        # Optional configuration for journald monitor logging
+        self.__journald_log_configs = []
         # The monitor configuration objects from the configuration file.  This does not include monitors that
         # are created by default by the platform.
         self.__monitor_configs = []
@@ -135,6 +137,7 @@ class Configuration(object):
             allowed_multiple_keys = (
                 "import_vars",
                 "logs",
+                "journald_logs",
                 "monitors",
                 "server_attributes",
             )
@@ -166,6 +169,7 @@ class Configuration(object):
                         self.__config.put(key, value)
 
                 self.__add_elements_from_array("logs", content, self.__config)
+                self.__add_elements_from_array("journald_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
@@ -219,6 +223,10 @@ class Configuration(object):
             self.__log_configs = list(self.__config.get_json_array("logs"))
             if agent_log is not None:
                 self.__log_configs.append(agent_log)
+
+            self.__journald_log_configs = list(
+                self.__config.get_json_array("journald_logs")
+            )
 
             # add in the profile log if we have enabled profiling
             if self.enable_profiling:
@@ -602,6 +610,13 @@ class Configuration(object):
 
         @rtype list<JsonObject>"""
         return self.__log_configs
+
+    @property
+    def journald_log_configs(self):
+        """Returns the list of configuration entries for all the journald loggers specified in the configuration file.
+
+        @rtype list<JsonObject>"""
+        return self.__journald_log_configs
 
     @property
     def monitor_configs(self):
@@ -2051,32 +2066,6 @@ class Configuration(object):
         config_object.update({param_name: env_val})
         return env_val
 
-    def get_log_config(self, matcher, default_config):
-        """Returns a JsonObject with the log configuration matched by the `matcher` function if found, otherwise
-        returns `default_config`.
-
-        @param matcher: A function that takes a log config JsonObject as a parameter, and returns True if the config
-        should be returned, False otherwise
-        @param default_config: A JsonObject that is returned if we can't match on any log configs
-        """
-        for log_config in self.__log_configs:
-            if matcher(log_config):
-                return log_config
-        return default_config
-
-    def get_all_log_configs(self, matching_keys):
-        """Returns a list of JsonObjects with the log configurations that contain all the keys in `matching_keys`
-
-        @param matching_keys: List of strings containing the keys that need to be in a config for it to be included
-        in the return list
-        """
-        configs = []
-        matching_set = set(matching_keys)
-        for log_config in self.__log_configs:
-            if matching_set.issubset(log_config.keys()):
-                configs.append(log_config)
-        return configs
-
     def __verify_logs_and_monitors_configs_and_apply_defaults(self, config, file_path):
         """Verifies the contents of the 'logs' and 'monitors' fields and updates missing fields with defaults.
 
@@ -2090,12 +2079,23 @@ class Configuration(object):
         """
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, "logs", description)
+        self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
 
         i = 0
         for log_entry in config.get_json_array("logs"):
             self.__verify_log_entry_and_set_defaults(
                 log_entry, config_file_path=file_path, entry_index=i
+            )
+            i += 1
+
+        i = 0
+        for log_entry in config.get_json_array("journald_logs"):
+            self.__verify_log_entry_with_key_and_set_defaults(
+                log_entry,
+                key="journald_unit",
+                config_file_path=file_path,
+                entry_index=i,
             )
             i += 1
 
@@ -2128,7 +2128,7 @@ class Configuration(object):
             log_entry.put("path", os.path.join(self.agent_log_path, path))
         self.__verify_log_entry_with_key_and_set_defaults(
             log_entry,
-            None,
+            "path",
             description=description,
             config_file_path=config_file_path,
             entry_index=entry_index,

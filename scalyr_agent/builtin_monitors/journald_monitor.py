@@ -276,20 +276,21 @@ class JournaldMonitor(ScalyrMonitor):
         self.set_sample_interval(self._config.get("journal_poll_interval"))
         self.log_config["parser"] = "journald"
         self.default_config = self.log_config.copy()
+        self.default_config[
+            "rename_logfile"
+        ] = "/var/log/scalyr-agent-2/journald_monitor.log"
 
-        def config_matcher(config):
-            return "journald_unit" in config and config["journald_unit"] == ".*"
-
-        matched_config = self._global_config.get_log_config(config_matcher, None)
-        if matched_config:
-            self.log_config.update(
-                _create_log_config(
-                    self.log_config,
-                    matched_config,
-                    self._global_config,
-                    self._file_template,
+        for config in self._global_config.journald_log_configs:
+            if config["journald_unit"] == ".*":
+                self.log_config.update(
+                    _create_log_config(
+                        self.log_config,
+                        config,
+                        self._global_config,
+                        self._file_template,
+                    )
                 )
-            )
+                break
 
         self._extra_fields = self._config.get("journal_fields")
         self._last_cursor = None
@@ -606,7 +607,7 @@ class LogManager:
         self.module_name = module_name
         self.global_config = global_config
         self.log_watcher = None
-        self.all_configs = self.global_config.get_all_log_configs([])
+        self.all_configs = []
         self.loggers_created = False
 
         self.initialize()
@@ -615,6 +616,7 @@ class LogManager:
         """Called at the end of __init__, intended for overriding by subclasses
         If configuration can be invalid, it should be checked here
         """
+        self.all_configs = self.global_config.journald_log_configs
         for config in self.all_configs:
             match = self.match_config_to_logger(config)
             if match:
@@ -644,7 +646,7 @@ class LogManager:
         @param config: The configuration for a logger
         @return: A string uniquely identifying the matched logger
         """
-        if "journald_unit" in config:
+        if "journald_unit" in config and config["journald_unit"] != ".*":
             return config["journald_unit"]
         return None
 
