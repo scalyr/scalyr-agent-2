@@ -2393,10 +2393,6 @@ class LogLineRedacter(object):
 
             _matches = re.finditer(re_ex, line)
 
-            if not _matches:
-                # if no matches, return the `line` as such
-                return line, None
-
             replacement_matches = 0
 
             # last_match_index captures the index of the last match position
