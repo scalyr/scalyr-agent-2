@@ -120,6 +120,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         status = test_manager.generate_status()
         self.assertEquals(status.total_alive_monitors, 0)
         self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
+        test_manager.stop_manager(wait_on_join=True)
 
     def test_with_disabled_monitors(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
