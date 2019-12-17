@@ -153,6 +153,9 @@ def json_decode(text):
     return _json_decode(text)
 
 
+_NUMERIC_TYPES = six.integer_types + (float,)
+
+
 def value_to_bool(value):
     """
     Duplicates "JsonObject.__num_to_bool" functionality.
@@ -161,7 +164,7 @@ def value_to_bool(value):
     value_type = type(value)
     if value_type is bool:
         return value
-    elif value_type in (int, long, float):
+    elif value_type in _NUMERIC_TYPES:
         value = float(value)
         # return True if the value is one, False if it is zero
         if abs(value) < 1e-10:
@@ -418,7 +421,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     except ValueError as e:
         return None
 
-    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000
+    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
     nanos = 0
 
     # now add the fractional part
@@ -436,7 +439,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = long(long(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10 ** to_nanos)
 
     return nano_seconds + nanos
 

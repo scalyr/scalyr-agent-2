@@ -1064,7 +1064,7 @@ class AddEventsRequest(object):
         global __last_time_stamp__
 
         if timestamp is None:
-            timestamp = long(time.time() * 1000000000)
+            timestamp = int(time.time() * 1000000000)
 
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
             timestamp = __last_time_stamp__ + 1
@@ -1589,7 +1589,7 @@ class Event(object):
         """
         # We have to cut off the quotes we surrounded the field with when we serialized it.
         if self.__timestamp is not None:
-            return long(self.__timestamp[1:-1])
+            return int(self.__timestamp[1:-1])
         else:
             return None
 
@@ -1649,7 +1649,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number is not None:
-            return long(self.__sequence_number)
+            return int(self.__sequence_number)
         else:
             return None
 
@@ -1676,7 +1676,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number_delta is not None:
-            return long(self.__sequence_number_delta)
+            return int(self.__sequence_number_delta)
         else:
             return None
 

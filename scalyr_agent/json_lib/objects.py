@@ -203,9 +203,7 @@ class JsonObject(object):
         value_type = type(value)
         if value_type is bool:
             return value
-        elif value_type is int:
-            return self.__num_to_bool(field, float(value))
-        elif value_type is long:
+        elif value_type in six.integer_types:
             return self.__num_to_bool(field, float(value))
         elif value_type is float:
             return self.__num_to_bool(field, value)
@@ -266,8 +264,7 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type is int
-            or value_type is long
+            value_type in six.integer_types
             or value_type is float
             or value_type is str
             or value_type is six.text_type
@@ -284,6 +281,7 @@ class JsonObject(object):
         else:
             return self.__conversion_error(field, value, "integer")
 
+    # 2->TODO: Should we keep this?
     def get_long(self, field, default_value=None, none_if_missing=False):
         """Returns the specified field as a long with some conversion.
 
@@ -318,8 +316,7 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type is int
-            or value_type is long
+            value_type in six.integer_types
             or value_type is float
             or value_type is str
             or value_type is six.text_type
@@ -330,7 +327,7 @@ class JsonObject(object):
                 # float.
                 if value_type is str or value_type is six.text_type:
                     value = float(value)
-                return long(value)
+                return int(value)
             except ValueError:
                 return self.__conversion_error(field, value, "long")
         else:
@@ -367,8 +364,7 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type is int
-            or value_type is long
+            value_type in six.integer_types
             or value_type is float
             or value_type is str
             or value_type is six.text_type
@@ -408,8 +404,7 @@ class JsonObject(object):
         value_type = type(value)
 
         if (
-            value_type is int
-            or value_type is long
+            value_type in six.integer_types
             or value_type is float
             or value_type is str
             or value_type is six.text_type

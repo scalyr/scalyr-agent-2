@@ -585,7 +585,7 @@ class JsonParser(object):
             and number_string.find("E") < 0
         ):
             try:
-                return sign * long(number_string)
+                return sign * int(number_string)
             except ValueError:
                 self.__error("Could not parse number as long '%s'" % number_string)
         else:

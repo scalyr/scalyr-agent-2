@@ -714,7 +714,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         # Set up tags for this file.
         tags = self._config.get("tags", default=JsonObject())
 
-        if not type(tags) is dict and not type(tags) is JsonObject:
+        if type(tags) is not dict and type(tags) is not JsonObject:
             raise BadMonitorConfiguration(
                 "The configuration field 'tags' is not a dict or JsonObject", "tags"
             )

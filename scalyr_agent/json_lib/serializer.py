@@ -102,7 +102,7 @@ def serialize(
             serialize(element, output, use_fast_encoding=use_fast_encoding)
             first = False
         output.write("]")
-    elif value_type is int or value_type is long:
+    elif value_type in six.integer_types:
         output.write(str(value))
     elif value_type is bool:
         if value:

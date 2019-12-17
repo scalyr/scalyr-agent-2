@@ -121,11 +121,11 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEquals(self.get(1, convert_to=six.text_type), u"1")
 
     def test_long_conversion(self):
-        self.assertEquals(self.get(2, convert_to=long), 2)
-        self.assertEquals(self.get("3", convert_to=long), 3)
-        self.assertEquals(self.get(1, convert_to=long), 1)
-        self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=long)
-        self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=long)
+        self.assertEquals(self.get(2, convert_to=int), 2)
+        self.assertEquals(self.get("3", convert_to=int), 3)
+        self.assertEquals(self.get(1, convert_to=int), 1)
+        self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=int)
+        self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=int)
 
     def test_float_conversion(self):
         self.assertEquals(self.get(2, convert_to=float), 2.0)
