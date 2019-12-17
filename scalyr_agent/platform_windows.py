@@ -14,7 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Scott Sullivan <guy.hoozdis@gmail.com>
-from __future__ import absolute_import
 from __future__ import print_function
 import atexit
 import errno
@@ -79,7 +78,7 @@ except ImportError:
         "the following command:  pip install psutil"
     )
 
-from .__scalyr__ import get_install_root, scalyr_init
+from __scalyr__ import get_install_root, scalyr_init
 
 scalyr_init()
 

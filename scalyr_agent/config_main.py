@@ -43,7 +43,7 @@ if "win32" != sys.platform:
     from pwd import getpwnam
 
 
-from .__scalyr__ import (
+from __scalyr__ import (
     scalyr_init,
     get_install_root,
     TARBALL_INSTALL,

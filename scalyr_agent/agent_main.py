@@ -31,7 +31,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
@@ -41,7 +40,7 @@ import os
 import sys
 import time
 
-from .__scalyr__ import SCALYR_VERSION, scalyr_init
+from __scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()

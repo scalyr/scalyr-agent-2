@@ -74,7 +74,6 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertRaises(BadMonitorConfiguration, self.get, 2.0, convert_to=int)
         self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=int)
         self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=int)
-        self.assertRaises(BadMonitorConfiguration, self.get, 4, convert_to=int)
 
     def test_str_conversion(self):
         self.assertEquals(self.get(1, convert_to=str), "1")

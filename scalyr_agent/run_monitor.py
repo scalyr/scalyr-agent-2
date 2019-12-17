@@ -38,7 +38,6 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
-from __future__ import absolute_import
 from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
@@ -48,7 +47,7 @@ import time
 
 from optparse import OptionParser
 
-from .__scalyr__ import scalyr_init
+from __scalyr__ import scalyr_init
 
 scalyr_init()
 
