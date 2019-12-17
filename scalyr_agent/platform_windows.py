@@ -18,7 +18,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 import atexit
 import errno
-from six.moves import input
 
 __author__ = "guy.hoozdis@gmail.com"
 
@@ -83,6 +82,11 @@ except ImportError:
 from .__scalyr__ import get_install_root, scalyr_init
 
 scalyr_init()
+
+# 2->TODO check for suitability.
+# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+from six.moves import input
+# [end of 2->TOD0]t
 
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.util import RedirectorServer, RedirectorClient, RedirectorError

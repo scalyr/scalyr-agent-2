@@ -22,7 +22,6 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-from six.moves import input
 __author__ = "czerwin@scalyr.com"
 
 import cStringIO
@@ -43,7 +42,6 @@ from optparse import OptionParser
 if "win32" != sys.platform:
     from pwd import getpwnam
 
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
 
 from .__scalyr__ import (
     scalyr_init,
@@ -54,6 +52,14 @@ from .__scalyr__ import (
 )
 
 scalyr_init()
+
+# 2->TODO check for suitability.
+# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+from six.moves import input
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+
+# [end of 2->TOD0]
+
 
 from scalyr_agent.scalyr_logging import set_log_destination
 

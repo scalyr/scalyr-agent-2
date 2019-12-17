@@ -25,7 +25,6 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
-from six.moves import range
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -48,6 +47,11 @@ from time import gmtime, strftime
 from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_init
 
 scalyr_init()
+
+# 2->TODO check for suitability.
+# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+from six.moves import range
+# [end of 2->TOD0]
 
 # The root of the Scalyr repository should just be the parent of this file.
 __source_root__ = get_install_root()

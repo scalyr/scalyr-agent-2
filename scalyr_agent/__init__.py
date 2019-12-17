@@ -37,6 +37,13 @@ The packages exported are:
 from __future__ import absolute_import
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
+# 2->TODO: "Modernize" tool added "six" library almost everywhere.
+#  So we need to add third_party libraries in PYTHONPATH before "six" will be imported in any further file.
+from .__scalyr__ import scalyr_init
+
+scalyr_init()
+# [end of 2->TODO]
+
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 from scalyr_agent.scalyr_monitor import MonitorConfig
