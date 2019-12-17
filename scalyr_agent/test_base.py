@@ -16,6 +16,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
 import sys
@@ -34,10 +36,10 @@ def _noop_skip(reason):
         if not isinstance(test_func_or_obj, type):
 
             def skip_wrapper(*args, **kwargs):
-                print (
+                print((
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
-                )
+                ))
 
             return skip_wrapper
         else:
@@ -94,10 +96,10 @@ def _thread_watcher():
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
-    print "Detected hung test run.  Active threads are:"
+    print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
-        print "Active thread %s daemon=%s" % (t.getName(), str(t.isDaemon()))
-    print "Done"
+        print("Active thread %s daemon=%s" % (t.getName(), str(t.isDaemon())))
+    print("Done")
 
 
 def _start_thread_watcher_if_necessary():

@@ -24,6 +24,10 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
+import six
+from six.moves import range
 __author__ = "czerwin@scalyr.com"
 
 import sys
@@ -50,18 +54,18 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     @type additional_module_paths: str
     """
     info = load_monitor_class(monitor_module, additional_module_paths)[1]
-    print "Description:"
-    print info.description
+    print("Description:")
+    print(info.description)
 
-    print "Options:"
+    print("Options:")
     print_options(info.config_options, column_size)
-    print ""
+    print("")
 
-    print "Log reference:"
+    print("Log reference:")
     print_log_fields(info.log_fields, column_size)
-    print ""
+    print("")
 
-    print "Metrics:"
+    print("Metrics:")
     # Have to break the metrics up into their categories if they have them.
     all_metrics = info.metrics
 
@@ -78,12 +82,12 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     metrics_with_no_categories = filter_metric_by_category(all_metrics, None)
     if len(metrics_with_no_categories) > 0:
         print_metrics(metrics_with_no_categories, column_size)
-    print ""
+    print("")
 
     for category in categories:
-        print "%s metrics" % category
+        print("%s metrics" % category)
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
-        print ""
+        print("")
 
 
 def print_options(option_list, column_size):
@@ -197,7 +201,7 @@ def print_metrics(metric_list, column_size):
         if metric.extra_fields is not None and len(metric.extra_fields) > 0:
             # Create an entry for each extra field.  We create a string representation that is
             # field_name=value if value is not an empty string, otherwise just field_name.
-            for key, value in metric.extra_fields.iteritems():
+            for key, value in six.iteritems(metric.extra_fields):
                 if value == "":
                     str_rep = "``%s``" % key
                 else:
@@ -350,15 +354,15 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
-        print >> sys.stderr, "You must specify the module for the monitor whose documentation you wish to print."
+        print("You must specify the module for the monitor whose documentation you wish to print.", file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     if not options.no_warning:
-        print >> sys.stderr, (
+        print((
             "Warning, this tool is still experimental.  The format of the output may change in the"
             "future.  Use with caution."
-        )
+        ), file=sys.stderr)
 
     print_monitor_documentation(args[0], int(options.column_size), options.module_paths)
     sys.exit(0)

@@ -16,9 +16,13 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import division
 
+from __future__ import absolute_import
+from __future__ import print_function
 import sys
 import struct
-import thread
+import six.moves._thread
+import six
+from six.moves import range
 
 
 __author__ = "czerwin@scalyr.com"
@@ -164,7 +168,7 @@ def value_to_bool(value):
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is str or value_type is unicode:
+    elif value_type is str or value_type is six.text_type:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
@@ -195,9 +199,9 @@ def read_file_as_json(file_path):
             f = open(file_path, "r")
             data = f.read()
             return parse(data)
-        except IOError, e:
+        except IOError as e:
             raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
-        except JsonParseException, e:
+        except JsonParseException as e:
             raise JsonReadFileException(
                 file_path,
                 "JSON parsing error occurred: %s (line %i, byte position %i)"
@@ -270,7 +274,7 @@ def md5_hexdigest(data):
     @rtype: str
     """
 
-    if not (data and isinstance(data, basestring)):
+    if not (data and isinstance(data, six.string_types)):
         raise Exception("invalid data to be hashed: %s", repr(data))
 
     if not new_md5:
@@ -360,7 +364,7 @@ def rfc3339_to_datetime(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError as e:
         return None
 
     dt = datetime.datetime(*(tm[0:6]))
@@ -411,10 +415,10 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError as e:
         return None
 
-    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000L
+    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000
     nanos = 0
 
     # now add the fractional part
@@ -470,7 +474,7 @@ def get_pid_tid():
     """
     # noinspection PyBroadException
     try:
-        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(thread.get_ident()))
+        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(six.moves._thread.get_ident()))
     except:
         return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
@@ -480,7 +484,7 @@ def is_list_of_strings(vals):
     try:
         # check if everything is a string
         for val in vals:
-            if not isinstance(val, basestring):
+            if not isinstance(val, six.string_types):
                 return False
     except:
         # vals is not enumerable
@@ -927,7 +931,7 @@ class StoppableThread(threading.Thread):
                 self.__target(self._run_state)
             else:
                 self.run_and_propagate()
-        except Exception, e:
+        except Exception as e:
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
                 "Received exception from run method in StoppableThread %s" % str(e)
@@ -976,9 +980,9 @@ class StoppableThread(threading.Thread):
         """
         threading.Thread.join(self, timeout)
         if not self.isAlive() and self.__exception_info is not None:
-            raise self.__exception_info[0], self.__exception_info[
+            six.reraise(self.__exception_info[0], self.__exception_info[
                 1
-            ], self.__exception_info[2]
+            ], self.__exception_info[2])
 
 
 class RateLimiter(object):
@@ -1129,10 +1133,10 @@ class ScriptEscalator(object):
             return self.__controller.run_as_user(
                 self.__desired_user, script_file_path, script_binary, script_args
             )
-        except CannotExecuteAsUser, e:
+        except CannotExecuteAsUser as e:
             if not handle_error:
                 raise e
-            print >>sys.stderr, (
+            print((
                 "Failing, cannot %s as the correct user.  The command must be executed using the "
                 "same account that owns the configuration file.  The configuration file is owned by "
                 "%s whereas the current user is %s.  Changing user failed due to the following "
@@ -1144,7 +1148,7 @@ class ScriptEscalator(object):
                     e.error_message,
                     self.__desired_user,
                 )
-            )
+            ), file=sys.stderr)
             return 1
 
 
@@ -1239,7 +1243,7 @@ class RedirectorServer(object):
         """
         # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
         # serialize it that way.
-        encoded_content = unicode(content).encode("utf-8")
+        encoded_content = six.text_type(content).encode("utf-8")
         # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
         # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
         # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is

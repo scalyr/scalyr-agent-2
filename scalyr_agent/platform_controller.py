@@ -15,12 +15,13 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 
 import sys
 
-from __scalyr__ import INSTALL_TYPE
+from .__scalyr__ import INSTALL_TYPE
 
 
 class PlatformController:

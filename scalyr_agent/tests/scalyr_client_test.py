@@ -15,6 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 from cStringIO import StringIO
@@ -47,10 +48,10 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 0)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         self.assertEquals(
@@ -66,10 +67,10 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         self.assertEquals(request.get_payload(), request.get_payload())
@@ -82,11 +83,11 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertEquals(request.total_events, 0)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(request.add_log_and_thread("t1", "n1", {"l1": "L1"}))
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
         self.assertTrue(request.add_log_and_thread("t2", "n2", {"l2": "L2"}))
 
@@ -104,10 +105,10 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertFalse(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         self.assertEquals(
@@ -135,15 +136,15 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         position = request.position()
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         request.set_position(position)
         self.assertTrue(
-            request.add_event(Event().set_message("eventThree"), timestamp=3L)
+            request.add_event(Event().set_message("eventThree"), timestamp=3)
         )
 
         self.assertEquals(
@@ -159,16 +160,16 @@ class AddEventsRequestTest(ScalyrTestCase):
         position = request.position()
         request.add_log_and_thread("log1", "Hi there", {})
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         request.set_position(position)
         self.assertTrue(request.add_log_and_thread("log2", "Log two", {}))
         self.assertTrue(
-            request.add_event(Event().set_message("eventThree"), timestamp=3L)
+            request.add_event(Event().set_message("eventThree"), timestamp=3)
         )
 
         self.assertEquals(
@@ -184,10 +185,10 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(100)
 
         self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1L)
+            request.add_event(Event().set_message("eventOne"), timestamp=1)
         )
         self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2L)
+            request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
 
         self.assertEquals(
@@ -209,7 +210,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         self.assertTrue(
             request.add_event(
-                Event().set_message("eventOne"), timestamp=1L, sequence_id=1234
+                Event().set_message("eventOne"), timestamp=1, sequence_id=1234
             )
         )
         self.assertEquals(request.total_events, 1)
@@ -227,7 +228,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         self.assertTrue(
             request.add_event(
-                Event().set_message("eventOne"), timestamp=1L, sequence_number=1234
+                Event().set_message("eventOne"), timestamp=1, sequence_number=1234
             )
         )
         self.assertEquals(request.total_events, 1)
@@ -248,7 +249,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=expected_id,
                 sequence_number=expected_number,
             )
@@ -272,7 +273,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=expected_id,
                 sequence_number=expected_number,
             )
@@ -280,7 +281,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=expected_id,
                 sequence_number=expected_number + expected_delta,
             )
@@ -305,7 +306,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -313,7 +314,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=first_id,
                 sequence_number=first_number + 1,
             )
@@ -321,7 +322,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventThree"),
-                timestamp=3L,
+                timestamp=3,
                 sequence_id=second_id,
                 sequence_number=second_number,
             )
@@ -347,7 +348,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -357,7 +358,7 @@ class AddEventsRequestTest(ScalyrTestCase):
                 Event(
                     attrs={"name": "eventTwo", "long": "some really long text"}
                 ).set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=second_id,
                 sequence_number=second_number,
             )
@@ -365,7 +366,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventThree"),
-                timestamp=3L,
+                timestamp=3,
                 sequence_id=first_id,
                 sequence_number=first_number + expected_delta,
             )
@@ -391,7 +392,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventOne"),
-                timestamp=1L,
+                timestamp=1,
                 sequence_id=first_id,
                 sequence_number=first_number,
             )
@@ -400,7 +401,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventTwo"),
-                timestamp=2L,
+                timestamp=2,
                 sequence_id=first_id,
                 sequence_number=first_number + expected_delta,
             )
@@ -409,7 +410,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         self.assertTrue(
             request.add_event(
                 Event().set_message("eventThree"),
-                timestamp=3L,
+                timestamp=3,
                 sequence_id=first_id,
                 sequence_number=second_number,
             )
@@ -439,7 +440,7 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
@@ -465,7 +466,7 @@ class EventTest(ScalyrTestCase):
         x = Event(thread_id="foo", attrs={"parser": "bar"})
         x.set_message("my_message")
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
@@ -559,7 +560,7 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
@@ -576,7 +577,7 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
@@ -594,7 +595,7 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
@@ -612,7 +613,7 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_id(1)
         x.set_sequence_number(2)
         x.set_sequence_number_delta(3)
-        x.set_timestamp(42L)
+        x.set_timestamp(42)
 
         x.add_missing_attributes({"trigger_update": "yes"})
 

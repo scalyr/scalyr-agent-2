@@ -15,6 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+import six
+from six.moves import range
 __author__ = "czerwin@scalyr.com"
 
 import re
@@ -69,7 +72,7 @@ def serialize(
     value_type = type(value)
     if value is None:
         output.write("null")
-    elif value_type is str or value_type is unicode:
+    elif value_type is str or value_type is six.text_type:
         if not use_length_prefix_string:
             output.write('"')
             output.write(
@@ -81,7 +84,7 @@ def serialize(
     elif value_type is dict or value_type is JsonObject:
         output.write("{")
         first = True
-        for key in sorted(value.iterkeys()):
+        for key in sorted(six.iterkeys(value)):
             if not first:
                 output.write(",")
             output.write('"')
@@ -159,7 +162,7 @@ def __to_escaped_string(string_value, use_fast_encoding=False, use_optimization=
 
     @return: The escaped string.
     """
-    if type(string_value) is unicode:
+    if type(string_value) is six.text_type:
         type_index = 1
     elif not use_fast_encoding:
         if not isinstance(string_value, str) or HAS_UTF8.search(string_value):
@@ -233,7 +236,7 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     @type output_buffer: StringIO
     """
     output_buffer.write("`s")
-    if type(value) is unicode:
+    if type(value) is six.text_type:
         to_serialize = value.encode("utf-8")
     else:
         to_serialize = value

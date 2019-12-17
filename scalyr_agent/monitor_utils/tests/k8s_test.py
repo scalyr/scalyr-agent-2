@@ -14,7 +14,10 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
 import threading
+import six
+from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -577,7 +580,7 @@ def create_object_from_dict(d):
     equal to the names of the keys and values equal to the values
     """
     result = type("", (), {})()
-    for key, value in d.iteritems():
+    for key, value in six.iteritems(d):
         setattr(result, key, value)
     return result
 

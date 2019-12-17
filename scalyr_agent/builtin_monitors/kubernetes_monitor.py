@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
 __author__ = "imron@scalyr.com"
 
 import datetime
@@ -1038,7 +1040,7 @@ class ControlledCacheWarmer(StoppableThread):
         """
         self.__lock.acquire()
         try:
-            for value in self.__active_pods.itervalues():
+            for value in six.itervalues(self.__active_pods):
                 value.is_recently_marked = False
         finally:
             self.__lock.release()
@@ -1079,7 +1081,7 @@ class ControlledCacheWarmer(StoppableThread):
         already_warmed = None
         self.__lock.acquire()
         try:
-            for key, value in self.__active_pods.iteritems():
+            for key, value in six.iteritems(self.__active_pods):
                 if value.is_recently_marked:
                     new_active_pods[key] = value
             self.__active_pods = new_active_pods
@@ -1176,7 +1178,7 @@ class ControlledCacheWarmer(StoppableThread):
 
             warm_attempts_info = ""
             stats = self.__gather_report_stats()
-            for category, (current_amount, previous_amount) in stats.iteritems():
+            for category, (current_amount, previous_amount) in six.iteritems(stats):
                 warm_attempts_info += "%s=%d(delta=%d) " % (
                     category,
                     current_amount,
@@ -1202,7 +1204,7 @@ class ControlledCacheWarmer(StoppableThread):
         :rtype: int
         """
         result = 0
-        for value in self.__active_pods.itervalues():
+        for value in six.itervalues(self.__active_pods):
             if value.blacklisted_until is not None:
                 result += 1
         return result
@@ -1223,7 +1225,7 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: [str]
         """
         already_warmed = []
-        for key, entry in self.__active_pods.iteritems():
+        for key, entry in six.iteritems(self.__active_pods):
             was_warm = entry.is_warm
             # Check the actual cache.
             entry.is_warm = self.is_warm(entry.pod_namespace, entry.pod_name)
@@ -1246,7 +1248,7 @@ class ControlledCacheWarmer(StoppableThread):
         @param current_time:  The current time in seconds past epoch.
         @type current_time: Number
         """
-        for value in self.__active_pods.itervalues():
+        for value in six.itervalues(self.__active_pods):
             if (
                 value.blacklisted_until is not None
                 and value.blacklisted_until < current_time
@@ -1273,7 +1275,7 @@ class ControlledCacheWarmer(StoppableThread):
         original_to_warm_count = len(self.__containers_to_warm)
         self.__containers_to_warm = []
 
-        for key, value in self.__active_pods.iteritems():
+        for key, value in six.iteritems(self.__active_pods):
             if not value.is_warm and value.blacklisted_until is None:
                 self.__containers_to_warm.append(key)
                 if value.start_time is None:
@@ -1344,7 +1346,7 @@ class ControlledCacheWarmer(StoppableThread):
         result = []
         self.__lock.acquire()
         try:
-            for container_id, entry in self.__active_pods.iteritems():
+            for container_id, entry in six.iteritems(self.__active_pods):
                 if entry.blacklisted_until is not None:
                     result.append(container_id)
             result.sort()
@@ -1500,19 +1502,19 @@ class ControlledCacheWarmer(StoppableThread):
                             pod_namespace, pod_name, allow_expired=False
                         )
                         self.__record_warming_result(container_id, success=True)
-                    except K8sApiPermanentError, e:
+                    except K8sApiPermanentError as e:
                         self.__record_warming_result(
                             container_id,
                             permanent_error=e,
                             traceback_report=traceback.format_exc(),
                         )
-                    except K8sApiTemporaryError, e:
+                    except K8sApiTemporaryError as e:
                         self.__record_warming_result(
                             container_id,
                             temporary_error=e,
                             traceback_report=traceback.format_exc(),
                         )
-                    except Exception, e:
+                    except Exception as e:
                         self.__record_warming_result(
                             container_id,
                             unknown_error=e,
@@ -1697,7 +1699,7 @@ def _get_containers(
                                     k8s_info = {}
                                     missing_field = False
 
-                                    for key, label in k8s_labels.iteritems():
+                                    for key, label in six.iteritems(k8s_labels):
                                         value = labels.get(label)
                                         if value:
                                             k8s_info[key] = value
@@ -1822,7 +1824,7 @@ def _get_containers(
                                                     % (short_cid, str(pod.annotations)),
                                                 )
 
-                            except Exception, e:
+                            except Exception as e:
                                 logger.error(
                                     "Error inspecting container '%s' - %s, %s"
                                     % (cid, e, traceback.format_exc()),
@@ -1844,7 +1846,7 @@ def _get_containers(
             if controlled_warmer is not None:
                 controlled_warmer.end_marking()
 
-    except Exception, e:  # container querying failed
+    except Exception as e:  # container querying failed
         logger.exception(
             "Error querying running containers: %s, filters=%s, only_running_containers=%s"
             % (str(e), filters, only_running_containers),
@@ -1923,7 +1925,7 @@ class ContainerEnumerator(object):
         # This is done in the parent ContainerEnumerator class so it doesn't have to be duplicated in the
         # DockerEnumerator and CRIEnumerator
         filtered_containers = {}
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_info = info.get("k8s_info", {})
             pod_name = k8s_info.get("pod_name", None)
             pod_namespace = k8s_info.get("pod_namespace", None)
@@ -2140,7 +2142,7 @@ class CRIEnumerator(ContainerEnumerator):
                     "log_path": log_path,
                     "k8s_info": k8s_info,
                 }
-        except Exception, e:
+        except Exception as e:
             global_log.error(
                 "Error querying containers %s - %s" % (str(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
@@ -2284,7 +2286,7 @@ class CRIEnumerator(ContainerEnumerator):
 
                     result.append((pod_name, pod_namespace, cname, cid))
 
-        except ConnectionError, e:
+        except ConnectionError as e:
             global_log.error(
                 "Error connecting to kubelet API endpoint - %s. The Scalyr Agent will now monitor containers from the filesystem"
                 % str(e),
@@ -2292,7 +2294,7 @@ class CRIEnumerator(ContainerEnumerator):
                 limit_key="kubelet-api-connect",
             )
             self._query_filesystem = True
-        except Exception, e:
+        except Exception as e:
             global_log.exception(
                 "Error querying kubelet API for running pods and containers",
                 limit_once_per_x_secs=300,
@@ -2583,13 +2585,13 @@ class ContainerChecker(object):
             )
             self.__thread.start()
 
-        except K8sInitException, e:
+        except K8sInitException as e:
             global_log.warn(
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
                 % (str(e))
             )
             raise
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Failed to start container checker - %s\n%s"
                 % (str(e), traceback.format_exc())
@@ -2624,7 +2626,7 @@ class ContainerChecker(object):
         result = {}
         try:
             result = self.k8s_cache.pods_shallow_copy()
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Failed to get k8s data: %s\n%s" % (str(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
@@ -2691,7 +2693,7 @@ class ContainerChecker(object):
                 changed = {}
                 digests = {}
 
-                for cid, info in running_containers.iteritems():
+                for cid, info in six.iteritems(running_containers):
                     pod = None
                     if "k8s_info" in info:
                         pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
@@ -2730,7 +2732,7 @@ class ContainerChecker(object):
 
                 # get the containers that have stopped
                 stopping = {}
-                for cid, info in self.containers.iteritems():
+                for cid, info in six.iteritems(self.containers):
                     if cid not in running_containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -2767,7 +2769,7 @@ class ContainerChecker(object):
                             self.__log_watcher.update_log_config(
                                 self.__module.module_name, new_config
                             )
-            except Exception, e:
+            except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
                     % (str(e), traceback.format_exc())
@@ -2854,7 +2856,7 @@ class ContainerChecker(object):
                 if dt:
                     result = dt
             fp.close()
-        except Exception, e:
+        except Exception as e:
             global_log.info("%s", str(e))
 
         return scalyr_util.seconds_since_epoch(result)
@@ -2876,7 +2878,7 @@ class ContainerChecker(object):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception, e:
+        except Exception as e:
             self._logger.error("Error setting monitor attribute in KubernetesMonitor")
             raise
 
@@ -2944,7 +2946,7 @@ class ContainerChecker(object):
                 elif self.__use_v2_attributes or self.__use_v1_and_v2_attributes:
                     container_attributes["k8s_node"] = pod.node_name
 
-                for label, value in pod.labels.iteritems():
+                for label, value in six.iteritems(pod.labels):
                     container_attributes[label] = value
 
                 if "parser" in pod.labels:
@@ -2968,7 +2970,7 @@ class ContainerChecker(object):
                 container_specific_annotations = False
 
                 # get any common annotations for all containers
-                for annotation, value in all_annotations.iteritems():
+                for annotation, value in six.iteritems(all_annotations):
                     if annotation in pod.container_names:
                         container_specific_annotations = True
                     else:
@@ -3080,7 +3082,7 @@ class ContainerChecker(object):
 
         # set config items, ignoring invalid options and taking care to
         # handle attributes
-        for key, value in annotations.iteritems():
+        for key, value in six.iteritems(annotations):
             if key in skip_keys:
                 continue
 
@@ -3127,7 +3129,7 @@ class ContainerChecker(object):
 
         prefix = self.__log_prefix + "-"
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             log_config = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
             )
@@ -3532,7 +3534,7 @@ class KubernetesMonitor(ScalyrMonitor):
         if metrics is None:
             return
 
-        for key, value in metrics_to_emit.iteritems():
+        for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
                 # Note, we do a bit of a hack to pretend the monitor's name include the container/pod's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
@@ -3628,12 +3630,12 @@ class KubernetesMonitor(ScalyrMonitor):
             @param metrics: a dict of metrics keys/values to emit
             @param k8s_extra: extra k8s specific key/value pairs to associate with each metric value emitted
         """
-        for key, value in metrics.iteritems():
+        for key, value in six.iteritems(metrics):
             if value is None:
                 continue
 
             if key == "networks":
-                for interface, network_metrics in value.iteritems():
+                for interface, network_metrics in six.iteritems(value):
                     self.__log_network_interface_metrics(
                         container, network_metrics, interface, k8s_extra=k8s_extra
                     )
@@ -3706,10 +3708,10 @@ class KubernetesMonitor(ScalyrMonitor):
 
         cluster_info = self.__get_cluster_info(cluster_name)
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             self.__metric_fetcher.prefetch_metrics(info["name"])
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_extra = {}
             if self.__include_controller_info:
                 k8s_extra = self.__get_k8s_controller_info(info)
@@ -3735,7 +3737,7 @@ class KubernetesMonitor(ScalyrMonitor):
         node_extra = {"node_name": name}
         node_extra.update(extra)
 
-        for key, metrics in node.iteritems():
+        for key, metrics in six.iteritems(node):
             if key == "network":
                 self.__log_metrics(
                     name, self.__k8s_node_network_metrics, metrics, node_extra
@@ -3754,7 +3756,7 @@ class KubernetesMonitor(ScalyrMonitor):
 
         extra.update(k8s_extra)
 
-        for key, metrics in pod_metrics.iteritems():
+        for key, metrics in six.iteritems(pod_metrics):
             if key == "network":
                 self.__log_metrics(
                     pod_info.uid, self.__k8s_pod_network_metrics, metrics, extra
@@ -3774,7 +3776,7 @@ class KubernetesMonitor(ScalyrMonitor):
 
         # get set of pods we are interested in querying
         pod_info = {}
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             k8s_info = info.get("k8s_info", {})
             pod = k8s_info.get("pod_info", None)
             if pod is None:
@@ -3806,14 +3808,14 @@ class KubernetesMonitor(ScalyrMonitor):
                     controller_info.update(cluster_info)
                 self.__gather_k8s_metrics_for_pod(pod, info, controller_info)
 
-        except ConnectionError, e:
+        except ConnectionError as e:
             self._logger.warning(
                 "Error connecting to kubelet API: %s.  No Kubernetes stats will be available"
                 % str(e),
                 limit_once_per_x_secs=3600,
                 limit_key="kubelet-api-connection-stats",
             )
-        except KubeletApiException, e:
+        except KubeletApiException as e:
             self._logger.warning(
                 "Error querying kubelet API: %s" % str(e),
                 limit_once_per_x_secs=300,
@@ -3887,7 +3889,7 @@ class KubernetesMonitor(ScalyrMonitor):
                     self.__gather_k8s_metrics_from_kubelet(
                         containers, self.__kubelet_api, cluster_name
                     )
-        except Exception, e:
+        except Exception as e:
             self._logger.exception("Unexpected error logging metrics: %s" % (str(e)))
 
         if self.__gather_k8s_pod_info:
@@ -3898,7 +3900,7 @@ class KubernetesMonitor(ScalyrMonitor):
                 k8s_include_by_default=self.__include_all,
                 k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
             )
-            for cid, info in containers.iteritems():
+            for cid, info in six.iteritems(containers):
                 try:
                     extra = info.get("k8s_info", {})
                     extra["status"] = info.get("status", "unknown")
@@ -3914,7 +3916,7 @@ class KubernetesMonitor(ScalyrMonitor):
                         extra,
                         monitor_id_override="namespace:%s" % namespace,
                     )
-                except Exception, e:
+                except Exception as e:
                     self._logger.error(
                         "Error logging container information for %s: %s"
                         % (_get_short_cid(cid), str(e))
@@ -3922,8 +3924,8 @@ class KubernetesMonitor(ScalyrMonitor):
 
             if self.__container_checker:
                 namespaces = self.__container_checker.get_k8s_data()
-                for namespace, pods in namespaces.iteritems():
-                    for pod_name, pod in pods.iteritems():
+                for namespace, pods in six.iteritems(namespaces):
+                    for pod_name, pod in six.iteritems(pods):
                         try:
                             extra = {
                                 "pod_uid": pod.uid,
@@ -3943,7 +3945,7 @@ class KubernetesMonitor(ScalyrMonitor):
                                 extra,
                                 monitor_id_override="namespace:%s" % pod.namespace,
                             )
-                        except Exception, e:
+                        except Exception as e:
                             self._logger.error(
                                 "Error logging pod information for %s: %s"
                                 % (pod.name, str(e))
@@ -4038,7 +4040,7 @@ class KubernetesMonitor(ScalyrMonitor):
                 self.__kubelet_api = KubeletApi(
                     k8s, host_ip=self._config.get("k8s_kubelet_host_ip")
                 )
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "Error creating KubeletApi object. Kubernetes metrics will not be logged: %s"
                 % str(e)

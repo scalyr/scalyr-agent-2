@@ -14,11 +14,13 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
 import datetime
 import os
 import scalyr_agent.util as scalyr_util
 import threading
 import time
+import six
 
 try:
     import win32api
@@ -180,7 +182,7 @@ class OldApi(Api):
         self.__sources = source_list
 
     def load_checkpoints(self, checkpoints, config):
-        for source, record_number in checkpoints.iteritems():
+        for source, record_number in six.iteritems(checkpoints):
             self._checkpoints[source] = record_number
 
     def read_event_log(self):
@@ -239,7 +241,7 @@ class OldApi(Api):
                         # if it is one we are interested in
                         if event.EventType in event_types:
                             event_list.append(event)
-        except Exception, error:
+        except Exception as error:
             self._logger.error(
                 "Error reading from event log: %s",
                 str(error),
@@ -388,7 +390,7 @@ class NewApi(Api):
                         Context=self,
                         Session=self._session,
                     )
-                except Exception, e:
+                except Exception as e:
                     handle = None
                     error_message = win32api.FormatMessage(0)
 
@@ -417,7 +419,7 @@ class NewApi(Api):
         if "bookmarks" not in checkpoints:
             checkpoints["bookmarks"] = {}
 
-        for channel, bookmarkXml in checkpoints["bookmarks"].iteritems():
+        for channel, bookmarkXml in six.iteritems(checkpoints["bookmarks"]):
             self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
 
         # subscribe to the events
@@ -432,7 +434,7 @@ class NewApi(Api):
 
         self.__bookmark_lock.acquire()
         try:
-            for channel, bookmark in self.__bookmarks.iteritems():
+            for channel, bookmark in six.iteritems(self.__bookmarks):
                 self._checkpoints["bookmarks"][channel] = win32evtlog.EvtRender(
                     bookmark, win32evtlog.EvtRenderBookmark
                 )
@@ -565,7 +567,7 @@ class NewApi(Api):
     def log_event_safe(self, event):
         try:
             self.log_event(event)
-        except Exception, e:
+        except Exception as e:
             try:
                 self._logger.info("%s", str(e))
             except:

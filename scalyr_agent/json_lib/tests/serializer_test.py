@@ -15,6 +15,7 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import unittest
@@ -27,7 +28,7 @@ class SerializeTests(ScalyrTestCase):
     def test_numbers(self):
         self.assertEquals(self.write(1), "1")
         self.assertEquals(self.write(1.2), "1.2")
-        self.assertEquals(self.write(133L), "133")
+        self.assertEquals(self.write(133), "133")
 
     def test_bool(self):
         self.assertEquals(self.write(True), "true")

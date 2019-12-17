@@ -15,6 +15,8 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
+from __future__ import absolute_import
+from six.moves import range
 __author__ = "saurabh@scalyr.com"
 
 from scalyr_agent.compat import custom_defaultdict as defaultdict

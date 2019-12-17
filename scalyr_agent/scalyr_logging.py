@@ -23,7 +23,9 @@
 #     should only be emitted at most once per X seconds).
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
 import inspect
+import six
 
 __author__ = "czerwin@scalyr.com"
 
@@ -335,13 +337,13 @@ class AgentLogger(logging.Logger):
             )
 
         string_buffer = StringIO()
-        if not type(metric_name) in (str, unicode):
+        if not type(metric_name) in (str, six.text_type):
             raise UnsupportedValueType(metric_name=metric_name)
         metric_name = self.__force_valid_metric_or_field_name(
             metric_name, is_metric=True
         )
 
-        if not type(metric_value) in (str, unicode, bool, int, long, float):
+        if not type(metric_value) in (str, six.text_type, bool, int, long, float):
             raise UnsupportedValueType(
                 metric_name=metric_name, metric_value=metric_value
             )
@@ -350,11 +352,11 @@ class AgentLogger(logging.Logger):
 
         if extra_fields is not None:
             for field_name in extra_fields:
-                if not type(field_name) in (str, unicode):
+                if not type(field_name) in (str, six.text_type):
                     raise UnsupportedValueType(field_name=field_name)
 
                 field_value = extra_fields[field_name]
-                if not type(field_value) in (str, unicode, bool, int, long, float):
+                if not type(field_value) in (str, six.text_type, bool, int, long, float):
                     raise UnsupportedValueType(
                         field_name=field_name, field_value=field_value
                     )
@@ -678,7 +680,7 @@ class AgentLogger(logging.Logger):
                 if not value:
                     value_str = "false"
                 string_entries.append("%s=%s" % (key, value_str))
-            elif value_type is str or value_type is unicode:
+            elif value_type is str or value_type is six.text_type:
                 string_entries.append("%s=%s" % (key, str(value).replace('"', '\\"')))
             else:
                 raise UnsupportedValueType(key, value)

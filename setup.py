@@ -38,6 +38,7 @@
 # from here, the files would not be set up correctly.  We need to improve this, but
 # it is low on the list of priorities right now.
 
+from __future__ import absolute_import
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
 from codecs import open  # To use a consistent encoding
 from os import path

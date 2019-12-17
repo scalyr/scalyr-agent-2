@@ -16,13 +16,16 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+import six
+from six.moves import range
 __author__ = "czerwin@scalyr.com"
 
 import os
 import re
 import socket
 import time
-import urlparse
+import six.moves.urllib.parse
 
 import scalyr_agent.util as scalyr_util
 
@@ -37,7 +40,7 @@ from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
-from __scalyr__ import get_install_root
+from .__scalyr__ import get_install_root
 
 
 class Configuration(object):
@@ -106,7 +109,7 @@ class Configuration(object):
                 self.__config = scalyr_util.read_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException, e:
+            except JsonReadFileException as e:
                 raise BadConfiguration(str(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
@@ -161,7 +164,7 @@ class Configuration(object):
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                for (key, value) in content.iteritems():
+                for (key, value) in six.iteritems(content):
                     if key not in allowed_multiple_keys:
                         self.__config.put(key, value)
 
@@ -187,7 +190,7 @@ class Configuration(object):
                 server = self.__config["scalyr_server"].strip()
                 https_server = server
 
-                parts = urlparse.urlparse(server)
+                parts = six.moves.urllib.parse.urlparse(server)
 
                 # use index-based addressing for 2.4 compatibility
                 scheme = parts[0]
@@ -235,7 +238,7 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-        except BadConfiguration, e:
+        except BadConfiguration as e:
             self.__last_error = e
             raise e
 
@@ -2656,7 +2659,7 @@ class Configuration(object):
 
             index = 0
             for x in array_of_strings:
-                if not isinstance(x, basestring):
+                if not isinstance(x, six.string_types):
                     raise BadConfiguration(
                         "The element at index=%i is not a string or unicode object as required in the array "
                         'field "%s".  Error is in %s'
@@ -2790,7 +2793,7 @@ class Configuration(object):
             result = None
             value_type = type(value)
 
-            if (value_type is str or value_type is unicode) and "$" in value:
+            if (value_type is str or value_type is six.text_type) and "$" in value:
                 result = perform_str_substitution(value)
             elif isinstance(value, JsonObject):
                 perform_object_substitution(value)
@@ -2806,12 +2809,12 @@ class Configuration(object):
             """
             # We collect the new values and apply them later to avoid messing up the iteration.
             new_values = {}
-            for (key, value) in object_value.iteritems():
+            for (key, value) in six.iteritems(object_value):
                 replace_value = perform_generic_substitution(value)
                 if replace_value is not None:
                     new_values[key] = replace_value
 
-            for (key, value) in new_values.iteritems():
+            for (key, value) in six.iteritems(new_values):
                 object_value[key] = value
 
         def perform_str_substitution(str_value):
@@ -2823,7 +2826,7 @@ class Configuration(object):
             @rtype: str or unicode
             """
             result = str_value
-            for (var_name, value) in substitutions.iteritems():
+            for (var_name, value) in six.iteritems(substitutions):
                 result = result.replace("$%s" % var_name, value)
             return result
 

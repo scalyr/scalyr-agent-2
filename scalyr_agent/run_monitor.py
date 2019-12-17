@@ -38,6 +38,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
 import signal
@@ -46,7 +48,7 @@ import time
 
 from optparse import OptionParser
 
-from __scalyr__ import scalyr_init
+from .__scalyr__ import scalyr_init
 
 scalyr_init()
 
@@ -89,10 +91,10 @@ def run_standalone_monitor(
     try:
         parsed_config = json_lib.parse(monitor_config)
         log.log(scalyr_logging.DEBUG_LEVEL_1, "Parsed configuration successfully")
-    except json_lib.JsonParseException, e:
-        print >>sys.stderr, "Failed to parse the monitor configuration as valid JSON: %s", str(
+    except json_lib.JsonParseException as e:
+        print("Failed to parse the monitor configuration as valid JSON: %s", str(
             e
-        )
+        ), file=sys.stderr)
         return 1
 
     parsed_config["module"] = monitor_module
@@ -101,7 +103,7 @@ def run_standalone_monitor(
 
     # noinspection PyUnusedLocal
     def handle_shutdown_signal(signum, frame):
-        print >>sys.stdout, "Signal received, stopping monitor..."
+        print("Signal received, stopping monitor...", file=sys.stdout)
         monitor.stop()
 
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -128,8 +130,8 @@ def run_standalone_monitor(
 
         while monitor.isAlive():
             time.sleep(0.1)
-    except BadMonitorConfiguration, e:
-        print >>sys.stderr, "Invalid monitor configuration: %s" % str(e)
+    except BadMonitorConfiguration as e:
+        print("Invalid monitor configuration: %s" % str(e), file=sys.stderr)
 
     return 0
 
@@ -182,7 +184,7 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
     if len(args) != 1:
-        print >>sys.stderr, "You must provide the module that contains the Scalyr Monitor plugin you wish to run."
+        print("You must provide the module that contains the Scalyr Monitor plugin you wish to run.", file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
 
@@ -191,10 +193,10 @@ if __name__ == "__main__":
         if my_debug_level < 0 or my_debug_level > 5:
             raise ValueError("Out of range")
     except ValueError:
-        print >>sys.stderr, (
+        print((
             "Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 "
             % str(options.debug_level)
-        )
+        ), file=sys.stderr)
         sys.exit(1)
 
     debug_levels = [

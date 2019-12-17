@@ -32,6 +32,7 @@ The methods exported are:
   serialize                   -- Serializes a JSON value to a string.
 """
 
+from __future__ import absolute_import
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException

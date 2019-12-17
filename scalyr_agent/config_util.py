@@ -15,6 +15,7 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
+from __future__ import absolute_import
 __author__ = "echee@scalyr.com"
 
 
@@ -29,6 +30,7 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
+import six
 
 
 def parse_array_of_strings(strlist, separators=[","]):
@@ -84,25 +86,25 @@ def parse_array_of_strings(strlist, separators=[","]):
 
 
 NUMERIC_TYPES = set([int, long, float])
-STRING_TYPES = set([str, unicode])
-PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
+STRING_TYPES = set([str, six.text_type])
+PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, six.text_type, bool])
 SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
     [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
 )
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
-    int: set([str, unicode, long, float]),
-    long: set([str, unicode, float]),
+    int: set([str, six.text_type, long, float]),
+    long: set([str, six.text_type, float]),
     float: STRING_TYPES,
     list: set(
-        [str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [str, six.text_type, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonArray: set(
-        [str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [str, six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonObject: STRING_TYPES,
     str: SUPPORTED_TYPES,
-    unicode: SUPPORTED_TYPES,
+    six.text_type: SUPPORTED_TYPES,
 }
 
 
@@ -234,7 +236,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     # At this point, we are trying to convert a number to another number type.  We only allow int to long
     # and long, int to float.
-    if convert_to == float and convert_from in (long, int):
+    if convert_to == float and convert_from in six.integer_types:
         return float(value)
     if convert_to == long and convert_from == int:
         return long(value)

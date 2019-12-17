@@ -3,10 +3,11 @@
 # Note, this can be run in standalone mode by:
 # python -m scalyr_agent.run_monitor
 # scalyr_agent.builtin_monitors.apache_monitor
-import httplib
-import urllib2
+from __future__ import absolute_import
+import six.moves.http_client
+import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
 import socket
-import urlparse
+import six.moves.urllib.parse
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -115,7 +116,7 @@ define_metric(
 # Note - the use of a global is ugly, but this form is more compatible than with another
 # method mentioned which would not require the global.  (The cleaner version was added
 # in Python 2.7.)
-class BindableHTTPConnection(httplib.HTTPConnection):
+class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
     def connect(self):
         """Connect to the host and port specified in __init__."""
         self.sock = socket.socket()
@@ -134,7 +135,7 @@ def BindableHTTPConnectionFactory(source_ip):
     return _get
 
 
-class BindableHTTPHandler(urllib2.HTTPHandler):
+class BindableHTTPHandler(six.moves.urllib.request.HTTPHandler):
     def http_open(self, req):
         return self.do_open(BindableHTTPConnectionFactory(httpSourceAddress), req)
 
@@ -261,8 +262,8 @@ options, see Configuration Reference.
         data = None
         # verify that the URL is valid
         try:
-            url = urlparse.urlparse(self.__url)
-        except Exception, e:
+            url = six.moves.urllib.parse.urlparse(self.__url)
+        except Exception as e:
             self._logger.error(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % self.__url
@@ -270,12 +271,12 @@ options, see Configuration Reference.
             return data
         # attempt to request server status
         try:
-            opener = urllib2.build_opener(BindableHTTPHandler)
+            opener = six.moves.urllib.request.build_opener(BindableHTTPHandler)
             handle = opener.open(self.__url)
             data = handle.read()
             if data is not None:
                 data = self._parse_data(data)
-        except urllib2.HTTPError, err:
+        except six.moves.urllib.error.HTTPError as err:
             message = (
                 "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ",
                 err.code,
@@ -291,7 +292,7 @@ options, see Configuration Reference.
                 )
             self._logger.error(message)
             data = None
-        except urllib2.URLError, err:
+        except six.moves.urllib.error.URLError as err:
             message = (
                 "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
                 err,
@@ -303,7 +304,7 @@ options, see Configuration Reference.
                 )
             self._logger.error(message)
             data = None
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "An error occurred attempting to request the server status: %s" % e
             )

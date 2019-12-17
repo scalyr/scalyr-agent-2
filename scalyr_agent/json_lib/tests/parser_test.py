@@ -15,6 +15,8 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from six.moves import range
 __author__ = "czerwin@scalyr.com"
 
 import unittest
@@ -140,7 +142,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x, -10.5)
 
         x = JsonParser.parse("12345678901234567890")
-        self.assertEquals(x, 12345678901234567890L)
+        self.assertEquals(x, 12345678901234567890)
 
         self.assertRaises(JsonParseException, JsonParser.parse, "1..e")
 

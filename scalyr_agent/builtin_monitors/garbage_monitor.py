@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
 __author__ = "imron@scalyr.com"
 
 import gc
@@ -147,7 +149,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
             object_dump_types = []
 
         for t in object_dump_types:
-            if not isinstance(t, basestring):
+            if not isinstance(t, six.string_types):
                 raise BadMonitorConfiguration(
                     "object_dump_types contains a non-string value: %s" % str(t)
                 )
@@ -215,7 +217,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
 
         # get the top objects, sorted by descending object count
         sorted_objects = sorted(
-            type_count.items(), key=lambda (k, v): len(v), reverse=True
+            list(type_count.items()), key=lambda k_v: len(k_v[1]), reverse=True
         )[:max_type_dump]
 
         # print the overview
@@ -268,7 +270,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
                     dump_kind="live",
                 )
 
-        except Exception, e:
+        except Exception as e:
             global_log.info("error gathering sample %s", traceback.format_exc())
 
     def stop(self, wait_on_join=True, join_timeout=5):

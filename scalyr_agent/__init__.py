@@ -34,6 +34,7 @@ The packages exported are:
   monitor_utils  -- A collection of abstractions that can be used to implement monitors.
 """
 
+from __future__ import absolute_import
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor
@@ -53,8 +54,8 @@ from scalyr_agent.scalyr_logging import DEBUG_LEVEL_0, DEBUG_LEVEL_1, DEBUG_LEVE
 from scalyr_agent.scalyr_logging import DEBUG_LEVEL_3, DEBUG_LEVEL_4, DEBUG_LEVEL_5
 from scalyr_agent.scalyr_logging import AutoFlushingRotatingFileHandler
 
-import json_lib
-import monitor_utils
+from . import json_lib
+from . import monitor_utils
 
 __all__ = [
     "ScalyrMonitor",

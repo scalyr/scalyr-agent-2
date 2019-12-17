@@ -20,10 +20,12 @@
 # https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
 import inspect
 import os
 import sys
 import time
+import six
 
 __author__ = "czerwin@scalyr.com"
 
@@ -614,7 +616,7 @@ class MonitorInformation(object):
         @return: A list of the options
         @rtype: list of ConfigOption
         """
-        return sorted(self.__options.itervalues(), key=self.__get_insert_sort_position)
+        return sorted(six.itervalues(self.__options), key=self.__get_insert_sort_position)
 
     @property
     def metrics(self):
@@ -623,7 +625,7 @@ class MonitorInformation(object):
         @return: A list of metric descriptions
         @rtype: list of MetricDescription
         """
-        return sorted(self.__metrics.itervalues(), key=self.__get_insert_sort_position)
+        return sorted(six.itervalues(self.__metrics), key=self.__get_insert_sort_position)
 
     @property
     def log_fields(self):
@@ -633,7 +635,7 @@ class MonitorInformation(object):
         @rtype: list of LogFieldDescription
         """
         return sorted(
-            self.__log_fields.itervalues(), key=self.__get_insert_sort_position
+            six.itervalues(self.__log_fields), key=self.__get_insert_sort_position
         )
 
     def __get_insert_sort_position(self, item):
@@ -930,35 +932,35 @@ class MonitorConfig(object):
                 )
 
             return result
-        except BadConfiguration, e:
+        except BadConfiguration as e:
             raise BadMonitorConfiguration(message=e.message, field=e.field)
 
     def __iter__(self):
-        return self.__map.iterkeys()
+        return six.iterkeys(self.__map)
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
-        return self.__map.iteritems()
+        return six.iteritems(self.__map)
 
     def itervalues(self):
         """Returns an iterator over the values for this object."""
-        return self.__map.itervalues()
+        return six.itervalues(self.__map)
 
     def iterkeys(self):
         """Returns an iterator over the keys for this object."""
-        return self.__map.iterkeys()
+        return six.iterkeys(self.__map)
 
     def items(self):
         """Returns a list of items (key/value tuple) for this object."""
-        return self.__map.items()
+        return list(self.__map.items())
 
     def values(self):
         """Returns a list of values for this object."""
-        return self.__map.values()
+        return list(self.__map.values())
 
     def keys(self):
         """Returns a list keys for this object."""
-        return self.__map.keys()
+        return list(self.__map.keys())
 
     def __getitem__(self, field):
         if not field in self:

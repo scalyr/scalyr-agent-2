@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
 __author__ = "imron@scalyr.com"
 
 import re
@@ -136,7 +138,7 @@ def process_annotations(
 
     # first split out any scalyr log-config annotations
     items = {}
-    for annotation_key, annotation_value in annotations.iteritems():
+    for annotation_key, annotation_value in six.iteritems(annotations):
         m = annotation_prefix_re.match(annotation_key)
         if m:
             key = m.group(2)
@@ -210,7 +212,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
 
     # sort dict by the value of the first sub key (up to the first '.')
     # this ensures that all items of the same key are processed together
-    sorted_items = sorted(items.iteritems(), key=sort_annotation)
+    sorted_items = sorted(six.iteritems(items), key=sort_annotation)
 
     current_object = None
     previous_key = None
@@ -290,7 +292,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
     # if the result should be an array, return values as a JsonArray, sorted by numeric order of keys
     if is_array:
         result = JsonArray(
-            *[r[1] for r in sorted(result.iteritems(), key=sort_numeric)]
+            *[r[1] for r in sorted(six.iteritems(result), key=sort_numeric)]
         )
     else:
         # return values as a JsonObject

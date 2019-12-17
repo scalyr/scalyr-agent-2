@@ -14,6 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
 __author__ = "imron@scalyr.com"
 
 import datetime
@@ -331,7 +333,7 @@ class JournaldMonitor(ScalyrMonitor):
                                 "Checkpoint is older than %d seconds, skipping to end"
                                 % self._staleness_threshold_secs,
                             )
-                except Exception, e:
+                except Exception as e:
                     global_log.warn(
                         "Error loading checkpoint: %s. Skipping to end." % str(e)
                     )
@@ -347,7 +349,7 @@ class JournaldMonitor(ScalyrMonitor):
             self._poll = select.poll()
             mask = self._journal.get_events()
             self._poll.register(self._journal, mask)
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Failed to reset journal %s\n%s" % (str(e), traceback.format_exc())
             )
@@ -359,7 +361,7 @@ class JournaldMonitor(ScalyrMonitor):
         """
         result = {}
 
-        for key, value in self._extra_fields.iteritems():
+        for key, value in six.iteritems(self._extra_fields):
             if key in entry:
                 result[value] = str(entry[key])
 
@@ -385,7 +387,7 @@ class JournaldMonitor(ScalyrMonitor):
         process = journal.NOP
         try:
             process = self._journal.process()
-        except Exception, e:
+        except Exception as e:
             # early return if there was an error
             global_log.warn(
                 "Error processing journal entries: %s" % str(e),
@@ -417,7 +419,7 @@ class JournaldMonitor(ScalyrMonitor):
                 extra = self._get_extra_fields(entry)
                 self._logger.emit_value("details", msg, extra_fields=extra)
                 self._last_cursor = entry.get("__CURSOR", None)
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "Error getting journal entries: %s" % str(e),
                     limit_once_per_x_secs=60,

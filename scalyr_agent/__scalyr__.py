@@ -15,6 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+import six
 __author__ = "czerwin@scalyr.com"
 
 import inspect
@@ -99,7 +101,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(six.text_type(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 
