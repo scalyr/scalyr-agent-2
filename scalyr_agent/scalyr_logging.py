@@ -39,8 +39,6 @@ import scalyr_agent.util as util
 from cStringIO import StringIO
 from scalyr_agent.util import RateLimiter
 
-import scalyr_agent.json_lib as json_lib
-
 # The debugging levels supported on the debugger logger.  The higher the debug level, the
 # more verbose the output.
 DEBUG_LEVEL_0 = logging.INFO

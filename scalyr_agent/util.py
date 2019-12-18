@@ -29,6 +29,7 @@ import calendar
 import datetime
 import os
 import random
+import sys
 import threading
 import time
 from collections import deque
@@ -124,8 +125,10 @@ try:
 except ImportError:
     try:
         _set_json_lib("json")
-    except:
-        pass
+    except ImportError:
+        # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        sys.exit(1)
 
 
 def get_json_lib():
@@ -147,6 +150,63 @@ def json_decode(text):
     If the Scalyr custom json_lib decoder is used, a JsonObject is returned
     """
     return _json_decode(text)
+
+
+def json_scalyr_request_encode(value, output=None, use_length_prefix_string=False):
+    """Encode the specified value into json using the Scalyr-specific JSON encoding optimizations.
+
+    Note, this should only be used for requests being sent to Scalyr.  This JSON encoding is not compatible
+    with standard JSON decoders.  Also, we are trying to deprecate this code path, so should only really be used
+    if needed.
+
+    :param value: The value to encode.
+    :param output: If not None, the buffer to apend the result to.
+    :param use_length_prefix_string: If True, will use the Scalyr optimization to encode strings using length prefix.
+        This strategy means the strings do not have to be escaped or UTF encoded.
+
+    :type value: str
+    :type output: None|StringIO
+    :type use_length_prefix_string: bool
+    :return: The encoding if output was not specified.
+    :rtype: str
+    """
+    return json_lib.serialize(
+        value,
+        output=output,
+        use_fast_encoding=True,
+        use_length_prefix_string=use_length_prefix_string,
+    )
+
+
+def json_scalyr_encode_length_prefixed_string(value, output=None):
+    """Encodes the string as a length prefixed string using the Scalyr-specific JSON optimiztion.
+
+    :param value: The string.  This should be a byte string, already UTF-8-encoded.
+    :param output: If not None, a buffer to append the result to.
+
+    :type value: bytes
+    :type output: None|StringIO
+
+    :return: The encoding if output was not specified.
+    :rtype: str
+    """
+    json_lib.serialize_as_length_prefixed_string(value, output)
+
+
+def json_scalyr_config_decode(text):
+    """Decodes the specified string as a Scalyr JSON-encoded configuration file.
+
+    Note, this uses a JSON parser that allows for comments and other user-friendly conventions not supported by
+    standard JSON.  This should only be used to parse JSON where comments, etc might be included, which really
+    means agent configuration files.  This JSON parser is not performant so should not be used for standard
+    JSON parsing (use `json_decode` for that.)
+
+    :param text: The string to parse.
+    :type text: unicode|str
+    :return: The parsed JSON
+    :rtype: JsonObject
+    """
+    return json_lib.parse(text)
 
 
 def value_to_bool(value):
@@ -219,7 +279,7 @@ def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     fp = None
     try:
         fp = open(tmp_path, "w")
-        fp.write(json_lib.serialize(info))
+        fp.write(json_encode(info))
         fp.close()
         fp = None
         if sys.platform == "win32" and os.path.isfile(file_path):

@@ -25,6 +25,8 @@ import tempfile
 import unittest
 import sys
 
+import scalyr_agent.util as scalyr_util
+
 from scalyr_agent.scalyr_client import EventSequencer
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.log_processing import (
@@ -36,7 +38,6 @@ from scalyr_agent.log_processing import (
 )
 from scalyr_agent.log_processing import FileSystem
 from scalyr_agent.log_processing import _parse_cri_log as parse_cri_log
-from scalyr_agent import json_lib
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.json_lib import JsonArray
 from scalyr_agent.util import md5_hexdigest
@@ -969,16 +970,15 @@ class TestLogLineRedactor(ScalyrTestCase):
         )
 
     def test_multiple_redactions_in_line_with_hash_with_unicode(self):
-        redactor = LogLineRedacter('/var/fake_log')
-        redactor.add_redaction_rule(u'(password)', u'\\H1')
+        redactor = LogLineRedacter("/var/fake_log")
+        redactor.add_redaction_rule(u"(password)", u"\\H1")
 
         self._run_case(
             redactor,
-            unichr(8230).encode('utf-8') + "auth=password foo=password",
-            unichr(8230).encode('utf-8') + "auth=%s foo=%s" % (
-                md5_hexdigest("password"), md5_hexdigest("password")
-            ),
-            True
+            unichr(8230).encode("utf-8") + "auth=password foo=password",
+            unichr(8230).encode("utf-8")
+            + "auth=%s foo=%s" % (md5_hexdigest("password"), md5_hexdigest("password")),
+            True,
         )
 
     def test_single_regular_expression_redaction_with_hash(self):
@@ -1612,11 +1612,11 @@ class TestLogFileProcessor(ScalyrTestCase):
     def test_random_coin_flip_sampling_rules(self):
 
         log_processor = self.log_processor
-        self.log_processor.add_sampler('ERROR', 1)
-        self.log_processor.add_sampler('INFO', 0.5)
+        self.log_processor.add_sampler("ERROR", 1)
+        self.log_processor.add_sampler("INFO", 0.5)
 
         # 10 ERROR and 10 INFO lines.
-        log_content = '\n'.join(['ERROR_%i\nINFO_%i' % (i, i) for i in range(10)])
+        log_content = "\n".join(["ERROR_%i\nINFO_%i" % (i, i) for i in range(10)])
 
         self.append_file(self.__path, log_content)
 
@@ -1624,7 +1624,8 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = log_processor.perform_processing(
-            events, current_time=self.__fake_time)
+            events, current_time=self.__fake_time
+        )
 
         self.assertFalse(completion_callback(LogFileProcessor.SUCCESS))
 
@@ -2426,10 +2427,12 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEquals(0, len(processors))
 
     def test_with_reduction_rules_in_config(self):
-        reduction_rule = JsonObject(**{'match_expression': 'My',
-                                       'replacement': 'Your',
-                                       })
-        config = self._create_log_config(self.__path_one, redaction_rules=[reduction_rule])
+        reduction_rule = JsonObject(
+            **{"match_expression": "My", "replacement": "Your",}
+        )
+        config = self._create_log_config(
+            self.__path_one, redaction_rules=[reduction_rule]
+        )
         self.append_file(self.__path_one, "My line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
@@ -2440,17 +2443,20 @@ class TestLogMatcher(ScalyrTestCase):
         processor.scan_for_new_bytes()
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = processor.perform_processing(
-            events, current_time=self.__fake_time)
+            events, current_time=self.__fake_time
+        )
 
         completion_callback(LogFileProcessor.SUCCESS)
 
-        self.assertEquals('Your line\n', events.get_message(0))
+        self.assertEquals("Your line\n", events.get_message(0))
 
     def test_with_sampling_rules_in_config(self):
-        sampling_rule = JsonObject(**{ 'match_expression': 'Second_line',
-                                        'sampling_rate': 0
-                           })
-        config = self._create_log_config(self.__path_one, sampling_rules=[sampling_rule])
+        sampling_rule = JsonObject(
+            **{"match_expression": "Second_line", "sampling_rate": 0}
+        )
+        config = self._create_log_config(
+            self.__path_one, sampling_rules=[sampling_rule]
+        )
         self.append_file(self.__path_one, "First line\n", "Second_line\n")
         matcher = LogMatcher(self.__config, config)
         matcher.finish()
@@ -2461,7 +2467,8 @@ class TestLogMatcher(ScalyrTestCase):
         processor.scan_for_new_bytes()
         events = TestLogFileProcessor.TestAddEventsRequest()
         (completion_callback, buffer_full) = processor.perform_processing(
-            events, current_time=self.__fake_time)
+            events, current_time=self.__fake_time
+        )
 
         completion_callback(LogFileProcessor.SUCCESS)
 
@@ -2469,7 +2476,7 @@ class TestLogMatcher(ScalyrTestCase):
 
         self.assertEquals(1, status.total_lines_dropped_by_sampling)
 
-        self.assertEquals('First line\n', events.get_message(0))
+        self.assertEquals("First line\n", events.get_message(0))
 
     def test_generate_status(self):
         config = self._create_log_config(self.__path_one)
@@ -2483,7 +2490,6 @@ class TestLogMatcher(ScalyrTestCase):
 
         self.assertEquals(self.__path_one, status.log_path)
         self.assertEquals(1, len(status.log_processors_status))
-
 
     def _close_processors(self, processors):
         for x in processors:
@@ -2503,8 +2509,13 @@ class TestLogMatcher(ScalyrTestCase):
         file_handle.close()
 
     def _create_log_config(
-            self, path, ignore_stale_files=False, staleness_threshold_secs=None, exclude=None,
-            redaction_rules=None, sampling_rules=None
+        self,
+        path,
+        ignore_stale_files=False,
+        staleness_threshold_secs=None,
+        exclude=None,
+        redaction_rules=None,
+        sampling_rules=None,
     ):
         redaction_rules = redaction_rules or []
         exclude = exclude or []
@@ -2514,7 +2525,9 @@ class TestLogMatcher(ScalyrTestCase):
             attributes=dict(),
             lineGroupers=[],
             redaction_rules=redaction_rules,
-            sampling_rules=sampling_rules, exclude=exclude or [], ignore_stale_files=ignore_stale_files,
+            sampling_rules=sampling_rules,
+            exclude=exclude or [],
+            ignore_stale_files=ignore_stale_files,
             staleness_threshold_secs=staleness_threshold_secs,
         )
 
@@ -2530,8 +2543,11 @@ def _create_configuration(extra=None):
     config_fragments_dir = os.path.join(config_dir, "configs.d")
     os.makedirs(config_fragments_dir)
 
+    payload = {"api_key": "fake"}
+    payload.update(extra)
+
     fp = open(config_file, "w")
-    fp.write(json_lib.serialize(JsonObject(extra, api_key="fake")))
+    fp.write(scalyr_util.json_encode(payload))
     fp.close()
 
     default_paths = DefaultPaths(
