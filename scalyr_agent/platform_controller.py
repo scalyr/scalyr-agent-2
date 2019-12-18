@@ -21,7 +21,7 @@ __author__ = "czerwin@scalyr.com"
 
 import sys
 
-from .__scalyr__ import INSTALL_TYPE
+from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
 
 class PlatformController:

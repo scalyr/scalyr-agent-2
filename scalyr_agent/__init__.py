@@ -39,7 +39,7 @@ __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 # 2->TODO: "Modernize" tool added "six" library almost everywhere.
 #  So we need to add third_party libraries in PYTHONPATH before "six" will be imported in any further file.
-from .__scalyr__ import scalyr_init
+from scalyr_agent.__scalyr__ import scalyr_init
 
 scalyr_init()
 # [end of 2->TODO]

@@ -40,7 +40,7 @@ from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
-from .__scalyr__ import get_install_root
+from scalyr_agent.__scalyr__ import get_install_root
 
 
 class Configuration(object):

@@ -37,7 +37,7 @@
 #                          gather_sample method.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
+from __future__ import absolute_import
 from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
@@ -47,7 +47,16 @@ import time
 
 from optparse import OptionParser
 
-from __scalyr__ import scalyr_init
+# 2->TODO check for suitability.
+# This file can be executed as script and imported as module.
+if __name__ == "__main__":
+    # run as script, can not import __scalyr__.py as part of the package.
+    from __scalyr__ import scalyr_init
+else:
+    # run as package module.
+    # Python3 does not allow to import __scalyr__.py file within the same package just by its name. (PEP 328)
+    from scalyr_agent.__scalyr__ import scalyr_init
+# [end of 2->TOD0]
 
 scalyr_init()
 
