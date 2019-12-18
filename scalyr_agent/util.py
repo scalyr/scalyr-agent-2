@@ -36,7 +36,7 @@ from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
-from scalyr_agent.json_lib import parse, JsonParseException
+from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 
@@ -234,14 +234,16 @@ def value_to_bool(value):
     )
 
 
-def read_file_as_json(file_path):
+def _read_file_as_json(file_path, json_parser):
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
-    @type file_path: str
+    @param json_parser:  The method to invoke to parse the JSON.
 
-    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
-        values such as int or str if that is all the file contains.
+    @type file_path: str
+    @type json_parser: func
+
+    @return: The JSON value contained in the file.  The return type is dependent on `json_parser`.
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
@@ -254,7 +256,7 @@ def read_file_as_json(file_path):
                 raise JsonReadFileException(file_path, "The file is not readable.")
             f = open(file_path, "r")
             data = f.read()
-            return parse(data)
+            return json_parser(data)
         except IOError, e:
             raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
         except JsonParseException, e:
@@ -266,6 +268,49 @@ def read_file_as_json(file_path):
     finally:
         if f is not None:
             f.close()
+
+
+def read_config_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns the results as `JsonObject`s where
+    possible.
+
+    WARNING: This should only be used for agent configuration files where the file may contain the
+    Scalyr-specific JSON extensions such as allowing comments.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+    return _read_file_as_json(file_path, json_lib.parse)
+
+
+def read_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
+    `dict`s, `list`s and primitive types.
+
+    WARNING: This should not be used to parse agent configuration files.  This only parses standard JSON and
+    does not handle Scalyr-specific extensions.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a dict, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+
+    def parse_standard_json(text):
+        try:
+            return json_decode(text)
+        except ValueError as e:
+            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+
+    return _read_file_as_json(file_path, parse_standard_json)
 
 
 def atomic_write_dict_as_json_file(file_path, tmp_path, info):

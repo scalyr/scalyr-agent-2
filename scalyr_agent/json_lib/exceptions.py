@@ -42,10 +42,13 @@ class JsonMissingFieldException(Exception):
 class JsonParseException(Exception):
     """Raised when a parsing problem occurs."""
 
-    def __init__(self, message, position, line_number):
+    def __init__(self, message, position=-1, line_number=-1):
         self.position = position
         self.line_number = line_number
         self.raw_message = message
-        position_message = " (line %i, byte position %i)" % (line_number, position)
+        if position >= 0 and line_number >= 0:
+            position_message = " (line %i, byte position %i)" % (line_number, position)
+        else:
+            position_message = ""
 
         Exception.__init__(self, message + position_message)

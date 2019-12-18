@@ -1344,7 +1344,7 @@ class LogFileIterator(object):
                 LogFileIterator.
             @param file_handle: The open file handle.
 
-            @type state_json: json_lib.JsonObject
+            @type state_json: dict
             @type file_handle: FileIO
             """
             # True if this file is still a valid portion of the overall iterator.
@@ -2700,7 +2700,7 @@ class LogMatcher(object):
             point.
 
         @type existing_processors: dict of str to LogFileProcessor
-        @type previous_state: dict of str to json_lib.JsonObject
+        @type previous_state: dict of str to dict
         @type copy_at_index_zero: bool
 
         @return: A list of the processors to handle the newly matched files.

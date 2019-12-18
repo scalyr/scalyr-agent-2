@@ -1058,7 +1058,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
         from where we left off copying each file.
         """
-        # Create the format that is expected.  An overall JsonObject with the time when the file was written,
+        # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
         checkpoints = {}
         state = {
