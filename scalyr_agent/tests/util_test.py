@@ -108,9 +108,15 @@ class TestUtil(ScalyrTestCase):
         self.__path = os.path.join(self.__tempdir, "testing.json")
 
     def test_read_file_as_json(self):
-        self.__create_file(self.__path, '{ a: "hi"}')
+        self.__create_file(self.__path, '{ "a": "hi"}')
 
-        json_object = scalyr_util.read_file_as_json(self.__path)
+        value = scalyr_util.read_file_as_json(self.__path)
+        self.assertEquals(value, {"a": "hi"})
+
+    def test_read_config_file_as_json(self):
+        self.__create_file(self.__path, '{ a: "hi"} // Test')
+
+        json_object = scalyr_util.read_config_file_as_json(self.__path)
         self.assertEquals(json_object, JsonObject(a="hi"))
 
     def test_read_file_as_json_no_file(self):
@@ -128,7 +134,7 @@ class TestUtil(ScalyrTestCase):
         scalyr_util.atomic_write_dict_as_json_file(self.__path, self.__path + "~", info)
 
         json_object = scalyr_util.read_file_as_json(self.__path)
-        self.assertEquals(json_object, JsonObject(a="hi"))
+        self.assertEquals(json_object, info)
 
     def __create_file(self, path, contents):
         fp = open(path, "w")
