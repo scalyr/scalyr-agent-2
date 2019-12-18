@@ -2544,7 +2544,8 @@ def _create_configuration(extra=None):
     os.makedirs(config_fragments_dir)
 
     payload = {"api_key": "fake"}
-    payload.update(extra)
+    if extra is not None:
+        payload.update(extra)
 
     fp = open(config_file, "w")
     fp.write(scalyr_util.json_encode(payload))
