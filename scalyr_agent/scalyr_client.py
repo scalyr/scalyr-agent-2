@@ -46,7 +46,6 @@ except Exception:
     ssl = None
 
 
-import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
@@ -456,7 +455,7 @@ class ScalyrClientSession(object):
             # Try to parse the response
             # noinspection PyBroadException
             try:
-                response_as_json = json_lib.parse(response)
+                response_as_json = scalyr_util.json_decode(response)
             except Exception:
                 # TODO: Do not just catch Exception.  Do narrower scope.  Also, log error here.
                 log.error(
@@ -819,7 +818,7 @@ class AddEventsRequest(object):
         # 2->TODO: this buffer goes to event serialization later, where binary buffer is required, so this buffer has to be binary too.
         string_buffer = BytesIO()
         # 2->TODO: since string_buffer is BytesIO, json_lib.serialize has to produce binary result too
-        json_lib.serialize(base_body, output=string_buffer, use_fast_encoding=True)
+        scalyr_util.json_scalyr_request_encode(base_body, output=string_buffer)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)
@@ -1717,7 +1716,9 @@ class Event(object):
         output_buffer.write(self.__serialization_base)
         # Use a special serialization format for message so that we don't have to send CPU time escaping it.  This
         # is just a length prefixed format understood by Scalyr servers.
-        json_lib.serialize_as_length_prefixed_string(self.__message, output_buffer)
+        scalyr_util.json_scalyr_encode_length_prefixed_string(
+            self.__message, output_buffer
+        )
 
         # We fast path the very common case of just a timestamp and sequence delta fields.
         if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:

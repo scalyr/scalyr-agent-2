@@ -19,9 +19,6 @@ from __future__ import absolute_import
 __author__ = "imron@scalyr.com"
 
 from scalyr_agent.monitor_utils.annotation_config import process_annotations
-from scalyr_agent import json_lib
-from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.json_lib import JsonArray
 
 from scalyr_agent.test_base import ScalyrTestCase
 
