@@ -421,13 +421,13 @@ class ScalyrAgent(object):
         self.__verify_can_write_to_logs_and_data(self.__config)
 
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
-        # scalyr_logging.set_log_destination(
-        #    use_disk=True,
-        #    max_bytes=self.__config.log_rotation_max_bytes,
-        #    backup_count=self.__config.log_rotation_backup_count,
-        #    logs_directory=self.__config.agent_log_path,
-        #    agent_log_file_path="agent.log",
-        # )
+        scalyr_logging.set_log_destination(
+            use_disk=True,
+            max_bytes=self.__config.log_rotation_max_bytes,
+            backup_count=self.__config.log_rotation_backup_count,
+            logs_directory=self.__config.agent_log_path,
+            agent_log_file_path="agent.log",
+        )
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
         if not no_check_remote:
