@@ -143,6 +143,34 @@ class JsonObject(object):
         result.__map = self.__map.copy()
         return result
 
+    def to_dict(self):
+        """Creates a copy of this object as represented using `dict` and `list` objects instead
+        of `JsonObject` and `JsonArray`.  This will be a deep copy.
+
+        Note: This function may not be performant (it is recursive) so you may wish to not use it
+        on critical code paths.
+
+        :return: The dict version of this JSON object.
+        :rtype: dict
+        """
+
+        def _convert_to_builtin_type(value):
+            value_type = type(value)
+            if value_type == JsonObject or value_type == dict:
+                result = dict()
+                for key, value in value.iteritems():
+                    result[key] = _convert_to_builtin_type(value)
+                return result
+            elif value_type == JsonArray or value_type == list:
+                result = []
+                for x in value:
+                    result.append(_convert_to_builtin_type(x))
+                return result
+            else:
+                return value
+
+        return _convert_to_builtin_type(self)
+
     def get(self, field, default_value=None, none_if_missing=False):
         """Returns the specified field without any conversion.
 

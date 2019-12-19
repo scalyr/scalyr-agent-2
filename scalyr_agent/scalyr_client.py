@@ -597,6 +597,9 @@ class ScalyrClientSession(object):
         if session_info is not None:
             body["sessionInfo"] = session_info
 
+        # session_info used to be a JsonObject but now must be dict.
+        assert type(session_info) == dict
+
         return AddEventsRequest(
             body,
             max_size=max_size,
@@ -807,7 +810,7 @@ class AddEventsRequest(object):
         # add in the 'events: [ ... ]' ourselves.  This way we can watch the size of the buffer as
         # we build up events.
         string_buffer = StringIO()
-        scalyr_util.json_scalyr_request_encode(base_body, output=string_buffer)
+        scalyr_util.json_encode(base_body, output=string_buffer)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)

@@ -1249,9 +1249,9 @@ class TestableCopyingManager(CopyingManager):
     def _create_add_events_request(self, session_info=None, max_size=None):
         # Need to override this to return an AddEventsRequest even though we don't have a real scalyr client instance.
         if session_info is None:
-            body = JsonObject(server_attributes=session_info, token="fake")
+            body = dict(server_attributes=session_info, token="fake")
         else:
-            body = JsonObject(token="fake")
+            body = dict(token="fake")
 
         return AddEventsRequest(body, max_size=max_size)
 

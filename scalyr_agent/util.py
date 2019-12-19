@@ -64,32 +64,29 @@ except ImportError:
     uuid = None
 
 
-def _fallback_json_encode(obj, sort_keys=False):
-    # json_lib.serialize() always ignores sort_keys param (always sorts regardless)
-    return json_lib.serialize(obj)
-
-
-def _fallback_json_decode(text):
-    return json_lib.parse(text)
-
-
 def get_json_implementation(lib_name):
 
-    if lib_name == "json_lib":
-        return lib_name, _fallback_json_encode, _fallback_json_decode
-
-    elif lib_name == "ujson":
+    if lib_name == "ujson":
         import ujson
 
-        def ujson_dumps_custom(*args, **kwargs):
+        def ujson_dumps_custom(obj, fp):
+            """Serialize the objection.
+            :param obj: The object to serialize
+            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
+            :type obj: dict
+            :return: If fp is not None, then the str representing the serialization.
+            :rtype: str
+            """
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
-            if isinstance(args[0], (json_lib.JsonObject, json_lib.JsonArray)):
+            if isinstance(obj, (json_lib.JsonObject, json_lib.JsonArray)):
                 raise TypeError(
-                    "ujson does not correctly encode objects of type: %s"
-                    % type(args[0])
+                    "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
-            return ujson.dumps(*args, **kwargs)
+            if fp is not None:
+                return ujson.dump(obj, fp, sort_keys=True)
+            else:
+                return ujson.dumps(obj, sort_keys=True)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
@@ -99,11 +96,20 @@ def get_json_implementation(lib_name):
 
         import json
 
-        def json_dumps_custom(*args, **kwargs):
-            """Eliminate spaces by default. Python 2.4 does not support partials."""
-            if "separators" not in kwargs:
-                kwargs["separators"] = (",", ":")
-            return json.dumps(*args, **kwargs)
+        def json_dumps_custom(obj, fp):
+            """Serialize the objection.
+            :param obj: The object to serialize
+            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
+            :type obj: dict
+            :return: If fp is not None, then the str representing the serialization.
+            :rtype: str
+            """
+
+            if fp is not None:
+                # Eliminate spaces by default. Python 2.4 does not support partials.
+                return json.dump(obj, fp, sort_keys=True, separators=(",", ":"))
+            else:
+                return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
         return lib_name, json_dumps_custom, json.loads
 
@@ -119,7 +125,6 @@ def _set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-_set_json_lib("json_lib")
 try:
     _set_json_lib("ujson")
 except ImportError:
@@ -135,47 +140,21 @@ def get_json_lib():
     return _json_lib
 
 
-def json_encode(obj):
-    """Encodes an object into a JSON string.  The underlying implementation either handles JsonObject/JsonArray
-    or else complains loudly (raises Exception) if they do not correctly support encoding.
+def json_encode(obj, output=None):
+    """Encodes an object into a JSON string.
+
+    @param obj: The object to serialize
+    @param output: If not None, a file-like object to which the serialization should be written.
+
+    @type obj: dict|list
     """
-    return _json_encode(obj, sort_keys=True)
+    return _json_encode(obj, output)
 
 
 def json_decode(text):
-    """Decodes text containing json and returns either a dict or a scalyr_agent.json_lib.objects.JsonObject
-    depending on which underlying decoder is used.
-
-    If json or ujson are used, a dict is returned.
-    If the Scalyr custom json_lib decoder is used, a JsonObject is returned
+    """Decodes text containing json and returns either a dict
     """
     return _json_decode(text)
-
-
-def json_scalyr_request_encode(value, output=None, use_length_prefix_string=False):
-    """Encode the specified value into json using the Scalyr-specific JSON encoding optimizations.
-
-    Note, this should only be used for requests being sent to Scalyr.  This JSON encoding is not compatible
-    with standard JSON decoders.  Also, we are trying to deprecate this code path, so should only really be used
-    if needed.
-
-    :param value: The value to encode.
-    :param output: If not None, the buffer to apend the result to.
-    :param use_length_prefix_string: If True, will use the Scalyr optimization to encode strings using length prefix.
-        This strategy means the strings do not have to be escaped or UTF encoded.
-
-    :type value: str
-    :type output: None|StringIO
-    :type use_length_prefix_string: bool
-    :return: The encoding if output was not specified.
-    :rtype: str
-    """
-    return json_lib.serialize(
-        value,
-        output=output,
-        use_fast_encoding=True,
-        use_length_prefix_string=use_length_prefix_string,
-    )
 
 
 def json_scalyr_encode_length_prefixed_string(value, output=None):
