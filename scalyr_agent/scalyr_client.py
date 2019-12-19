@@ -145,9 +145,9 @@ class ScalyrClientSession(object):
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self.__standard_headers = {
-            "Connection": "Keep-Alive",
-            "Accept": "application/json",
-            "User-Agent": self.__get_user_agent(agent_version),
+            b"Connection": b"Keep-Alive",
+            b"Accept": b"application/json",
+            b"User-Agent": self.__get_user_agent(agent_version).encode("utf-8"),
         }
 
         # Configure compression type
@@ -168,7 +168,7 @@ class ScalyrClientSession(object):
                 )
 
         if encoding:
-            self.__standard_headers["Content-Encoding"] = encoding
+            self.__standard_headers[b"Content-Encoding"] = encoding.encode("utf-8")
 
         # Configure compression level
         if self.__compress:
@@ -219,9 +219,9 @@ class ScalyrClientSession(object):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of str
         """
-        self.__standard_headers["User-Agent"] = self.__get_user_agent(
+        self.__standard_headers[b"User-Agent"] = self.__get_user_agent(
             self.__agent_version, fragments
-        )
+        ).encode("utf-8")
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -563,7 +563,7 @@ class ScalyrClientSession(object):
             return add_events_request.get_payload()
 
         return self.__send_request(
-            "/addEvents", body_func=generate_body, block_on_response=block_on_response
+            b"/addEvents", body_func=generate_body, block_on_response=block_on_response
         )
 
     def close(self, current_time=None):
