@@ -407,7 +407,6 @@ class ScalyrAgent(object):
         write to the logs directory, (3) we can send a request to the the configured scalyr server
         and (4) the api key is correct.
         """
-        print >> sys.stderr, "Checkpoint 1"
         # Make sure the user has set an API key... a common step that can be forgotten.
         # If they haven't set it, it will have REPLACE_THIS as the value since that's what is in the template.
         if self.__config.api_key == "REPLACE_THIS" or self.__config.api_key == "":
@@ -419,9 +418,8 @@ class ScalyrAgent(object):
                 % self.__config.file_path
             )
 
-        print >> sys.stderr, "Checkpoint 2"
         self.__verify_can_write_to_logs_and_data(self.__config)
-        print >> sys.stderr, "Checkpoint 3"
+
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
         # scalyr_logging.set_log_destination(
         #    use_disk=True,
@@ -433,12 +431,9 @@ class ScalyrAgent(object):
 
         # Send a test message to the server to make sure everything works.  If not, print a decent error message.
         if not no_check_remote:
-            print >> sys.stderr, "Checkpoint 4"
             client = self.__create_client(quiet=True)
-            print >> sys.stderr, "Checkpoint 5"
             try:
                 ping_result = client.ping()
-                print >> sys.stderr, "Checkpoint 6"
                 if ping_result != "success":
                     if "badClientClockSkew" in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
@@ -475,9 +470,7 @@ class ScalyrAgent(object):
                             "background. You can disable this check with --no-check-remote-server."
                         )
             finally:
-                print >> sys.stderr, "Checkpoint 7"
                 client.close()
-        print >> sys.stderr, "Checkpoint 8"
 
     def __start(self, quiet, no_fork, no_check_remote):
         """Executes the start command.
