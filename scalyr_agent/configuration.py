@@ -106,7 +106,7 @@ class Configuration(object):
         try:
             try:
                 # First read the file.  This makes sure it exists and can be parsed.
-                self.__config = scalyr_util.read_file_as_json(self.__file_path)
+                self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException as e:
@@ -145,7 +145,7 @@ class Configuration(object):
             # Now, look for any additional configuration in the config fragment directory.
             for fp in self.__list_files(self.config_directory):
                 self.__additional_paths.append(fp)
-                content = scalyr_util.read_file_as_json(fp)
+                content = scalyr_util.read_config_file_as_json(fp)
                 for k in content.keys():
                     if k not in allowed_multiple_keys:
                         if k in already_seen:

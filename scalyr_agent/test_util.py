@@ -15,8 +15,9 @@
 #
 #
 # author: Edward Chee <echee@scalyr.com>
-
 from __future__ import absolute_import
+import re
+import struct
 __author__ = "echee@scalyr.com"
 
 
@@ -29,7 +30,6 @@ import threading
 
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent import json_lib
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.json_lib import JsonArray, JsonObject
@@ -57,7 +57,7 @@ class ScalyrTestUtils(object):
             toplevel_config.update(extra_toplevel_config)
 
         fp = open(config_file, "w")
-        fp.write(json_lib.serialize(JsonObject(**toplevel_config)))
+        fp.write(scalyr_util.json_encode(toplevel_config))
         fp.close()
 
         default_paths = DefaultPaths(
@@ -90,10 +90,10 @@ class ScalyrTestUtils(object):
         @param null_logger: If True, set all monitors to log to Nullhandler
         @param fake_clock: If non-null, the manager and all it's monitors' _run_state's will use the provided fake_clock
         """
-        monitors_json_array = JsonArray()
+        monitors_json_array = []
         if config_monitors:
             for entry in config_monitors:
-                monitors_json_array.add(JsonObject(content=entry))
+                monitors_json_array.append(entry)
 
         extras = {"monitors": monitors_json_array}
         if extra_toplevel_config:
@@ -148,3 +148,51 @@ class FakePlatform(object):
 
     def get_default_monitors(self, _):
         return self.__monitors
+
+
+def parse_scalyr_request(payload):
+    """Parses a payload encoded with the Scalyr-specific JSON optimizations. The only place these optimizations
+    are used are creating `AddEvent` requests.
+
+    NOTE:  This method is very fragile and just does enough conversion to support the tests.  It could lead to
+    erroneous results if patterns like "`s" and colons are used in strings content.  It is also not optimized
+    for performance.
+
+    :param payload: The request payload
+    :type payload: bytes
+    :return: The parsed request body
+    :rtype: dict
+    """
+    # Our general strategy is to rewrite the payload to be standard JSON and then use the
+    # standard JSON libraries to parse it.  There are two main optimizations we need to undo
+    # here: length-prefixed strings and not using quotes around key names in JSON objects.
+
+    # First, look for the length-prefixed strings.  These are marked by "`sXXXX" where XXXX is a four
+    # byte integer holding the number of bytes in the string.  This precedes the string.  So we find
+    # all of those and replace them with quotes.  We also have to escape the string.
+    # NOTE: It is very important all of our regex work against byte strings because our input is in bytes.
+    length_prefix_re = re.compile(b"`s(....)", re.DOTALL)
+
+    # Accumulate the rewrite of `payload` here.  We will eventually parse this as standard JSON.
+    rewritten_payload = b""
+    # The index of `payload` up to which we have processed (copied into `rewritten_payload`).
+    last_processed_index = -1
+
+    for x in length_prefix_re.finditer(payload):
+        # First add in the bytes between the last processed and the start of this match.
+        rewritten_payload += payload[last_processed_index + 1 : x.start(0)]
+        # Read the 4 bytes that describe the length, which is stored in regex group 1.
+        length = struct.unpack(">i", x.group(1))[0]
+        # Grab the string content as raw bytes.
+        raw_string = payload[x.end(1) : x.end(1) + length]
+        rewritten_payload += scalyr_util.json_encode(raw_string.decode("utf-8"))
+        last_processed_index = x.end(1) + length - 1
+    rewritten_payload += payload[last_processed_index + 1 : len(payload)]
+
+    # Now convert all places where we do not have quotes around key names to have quotes.
+    # This is pretty fragile.. we look for anything like
+    #      foo:
+    #  and convert it to
+    #      "foo":
+    rewritten_payload = re.sub(b"([\\w\\-]+):", b'"\\1":', rewritten_payload)
+    return scalyr_util.json_decode(rewritten_payload.decode("utf-8"))

@@ -22,7 +22,8 @@ __author__ = "echee@scalyr.com"
 import os
 import re
 
-from scalyr_agent import json_lib
+import scalyr_agent.util as scalyr_util
+
 from scalyr_agent.json_lib.objects import (
     JsonArray,
     JsonObject,
@@ -187,7 +188,8 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
         elif convert_to in (JsonArray, JsonObject):
             try:
-                return json_lib.parse(value)
+                # Needs to be json_lib.parse since it is parsing configuration.
+                return scalyr_util.json_scalyr_config_decode(value)
             except JsonParseException:
                 raise BadConfiguration(
                     'Could not parse value %s for field "%s" as %s'

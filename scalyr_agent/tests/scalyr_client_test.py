@@ -30,9 +30,11 @@ from scalyr_agent.scalyr_client import (
     Event,
     ScalyrClientSession,
 )
-from scalyr_agent import json_lib
+
 from scalyr_agent.test_base import ScalyrTestCase
-import unittest
+
+
+import scalyr_agent.test_util as test_util
 
 
 class AddEventsRequestTest(ScalyrTestCase):
@@ -215,7 +217,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 1)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
 
         self.assertFalse("si" in event)
@@ -233,7 +235,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 1)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
 
         self.assertFalse("si" in event)
@@ -256,7 +258,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 1)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][0]
 
         self.assertEquals(expected_id, event["si"])
@@ -288,7 +290,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 2)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
         self.assertFalse("si" in event)
@@ -329,7 +331,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 3)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][2]
 
         self.assertEquals(second_id, event["si"])
@@ -373,7 +375,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 2)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
         self.assertFalse("si" in event)
@@ -417,7 +419,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         )
         self.assertEquals(request.total_events, 2)
 
-        json = json_lib.parse(request.get_payload())
+        json = test_util.parse_scalyr_request(request.get_payload())
         event = json["events"][1]
 
         self.assertEquals(second_number, event["sn"])
@@ -449,17 +451,18 @@ class EventTest(ScalyrTestCase):
             '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
+
         self.assertEquals(
-            json_lib.JsonObject(
-                log="foo",
-                thread="foo",
-                ts="42",
-                si="1",
-                sn=2,
-                sd=3,
-                attrs=json_lib.JsonObject(message="my_message", sample_rate=0.5),
-            ),
-            json_lib.parse(output_buffer.getvalue()),
+            {
+                "log": u"foo",
+                "thread": u"foo",
+                "ts": u"42",
+                "si": u"1",
+                "sn": 2,
+                "sd": 3,
+                "attrs": {"message": "my_message", "sample_rate": 0.5},
+            },
+            test_util.parse_scalyr_request(output_buffer.getvalue()),
         )
 
     def test_fast_path_fields(self):

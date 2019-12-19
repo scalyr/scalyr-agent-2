@@ -61,14 +61,14 @@ else:
 scalyr_init()
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-import scalyr_agent.json_lib as json_lib
-from scalyr_agent.log_watcher import LogWatcher
+import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController, DefaultPaths
+from scalyr_agent.json_lib import JsonParseException
 
 log = scalyr_logging.getLogger("scalyr_agent.run_monitor")
 
@@ -97,9 +97,10 @@ def run_standalone_monitor(
     log.log(scalyr_logging.DEBUG_LEVEL_1, "Attempting to run module %s", monitor_module)
 
     try:
-        parsed_config = json_lib.parse(monitor_config)
+        # Needs to be json_lib.parse because it is parsing configuration
+        parsed_config = scalyr_util.json_scalyr_config_decode(monitor_config)
         log.log(scalyr_logging.DEBUG_LEVEL_1, "Parsed configuration successfully")
-    except json_lib.JsonParseException as e:
+    except JsonParseException as e:
         print("Failed to parse the monitor configuration as valid JSON: %s", str(
             e
         ), file=sys.stderr)

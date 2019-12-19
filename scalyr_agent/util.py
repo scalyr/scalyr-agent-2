@@ -33,13 +33,14 @@ import calendar
 import datetime
 import os
 import random
+import sys
 import threading
 import time
 from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
-from scalyr_agent.json_lib import parse, JsonParseException
+from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 
@@ -128,8 +129,10 @@ try:
 except ImportError:
     try:
         _set_json_lib("json")
-    except:
-        pass
+    except ImportError:
+        # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        sys.exit(1)
 
 
 def get_json_lib():
@@ -151,6 +154,63 @@ def json_decode(text):
     If the Scalyr custom json_lib decoder is used, a JsonObject is returned
     """
     return _json_decode(text)
+
+
+def json_scalyr_request_encode(value, output=None, use_length_prefix_string=False):
+    """Encode the specified value into json using the Scalyr-specific JSON encoding optimizations.
+
+    Note, this should only be used for requests being sent to Scalyr.  This JSON encoding is not compatible
+    with standard JSON decoders.  Also, we are trying to deprecate this code path, so should only really be used
+    if needed.
+
+    :param value: The value to encode.
+    :param output: If not None, the buffer to apend the result to.
+    :param use_length_prefix_string: If True, will use the Scalyr optimization to encode strings using length prefix.
+        This strategy means the strings do not have to be escaped or UTF encoded.
+
+    :type value: str
+    :type output: None|StringIO
+    :type use_length_prefix_string: bool
+    :return: The encoding if output was not specified.
+    :rtype: str
+    """
+    return json_lib.serialize(
+        value,
+        output=output,
+        use_fast_encoding=True,
+        use_length_prefix_string=use_length_prefix_string,
+    )
+
+
+def json_scalyr_encode_length_prefixed_string(value, output=None):
+    """Encodes the string as a length prefixed string using the Scalyr-specific JSON optimiztion.
+
+    :param value: The string.  This should be a byte string, already UTF-8-encoded.
+    :param output: If not None, a buffer to append the result to.
+
+    :type value: bytes
+    :type output: None|StringIO
+
+    :return: The encoding if output was not specified.
+    :rtype: str
+    """
+    json_lib.serialize_as_length_prefixed_string(value, output)
+
+
+def json_scalyr_config_decode(text):
+    """Decodes the specified string as a Scalyr JSON-encoded configuration file.
+
+    Note, this uses a JSON parser that allows for comments and other user-friendly conventions not supported by
+    standard JSON.  This should only be used to parse JSON where comments, etc might be included, which really
+    means agent configuration files.  This JSON parser is not performant so should not be used for standard
+    JSON parsing (use `json_decode` for that.)
+
+    :param text: The string to parse.
+    :type text: unicode|str
+    :return: The parsed JSON
+    :rtype: JsonObject
+    """
+    return json_lib.parse(text)
 
 
 _NUMERIC_TYPES = six.integer_types + (float,)
@@ -181,14 +241,16 @@ def value_to_bool(value):
     )
 
 
-def read_file_as_json(file_path):
+def _read_file_as_json(file_path, json_parser):
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
-    @type file_path: str
+    @param json_parser:  The method to invoke to parse the JSON.
 
-    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
-        values such as int or str if that is all the file contains.
+    @type file_path: str
+    @type json_parser: func
+
+    @return: The JSON value contained in the file.  The return type is dependent on `json_parser`.
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
@@ -201,7 +263,7 @@ def read_file_as_json(file_path):
                 raise JsonReadFileException(file_path, "The file is not readable.")
             f = open(file_path, "r")
             data = f.read()
-            return parse(data)
+            return json_parser(data)
         except IOError as e:
             raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
         except JsonParseException as e:
@@ -215,6 +277,49 @@ def read_file_as_json(file_path):
             f.close()
 
 
+def read_config_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns the results as `JsonObject`s where
+    possible.
+
+    WARNING: This should only be used for agent configuration files where the file may contain the
+    Scalyr-specific JSON extensions such as allowing comments.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+    return _read_file_as_json(file_path, json_lib.parse)
+
+
+def read_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
+    `dict`s, `list`s and primitive types.
+
+    WARNING: This should not be used to parse agent configuration files.  This only parses standard JSON and
+    does not handle Scalyr-specific extensions.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a dict, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+
+    def parse_standard_json(text):
+        try:
+            return json_decode(text)
+        except ValueError as e:
+            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+
+    return _read_file_as_json(file_path, parse_standard_json)
+
+
 def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     """Write a dict to a JSON encoded file
     The file is first completely written to tmp_path, and then renamed to file_path
@@ -226,7 +331,7 @@ def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     fp = None
     try:
         fp = open(tmp_path, "w")
-        fp.write(json_lib.serialize(info))
+        fp.write(json_encode(info))
         fp.close()
         fp = None
         if sys.platform == "win32" and os.path.isfile(file_path):
