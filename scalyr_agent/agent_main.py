@@ -30,6 +30,7 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import traceback
 
 __author__ = "czerwin@scalyr.com"
 
@@ -518,6 +519,8 @@ class ScalyrAgent(object):
         except Exception, e:
             print >> sys.stderr
             print >> sys.stderr, "%s" % str(e)
+            print >> sys.stderr, "%s" % str(type(e).__name__)
+            traceback.print_exc(file=sys.stderr)
             print >> sys.stderr, "Terminating agent, please fix the error and restart the agent."
             log.error("%s" % str(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
