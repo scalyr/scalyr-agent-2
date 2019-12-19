@@ -60,7 +60,7 @@ from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import PlatformController
 
-import scalyr_agent.json_lib as json_lib
+import scalyr_agent.util as scalyr_util
 
 
 def set_api_key(config, config_file_path, new_api_key):
@@ -190,7 +190,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
             if os.path.isfile(tmp_host_path):
                 os.unlink(tmp_host_path)
 
-            config_content = json_lib.serialize(config_json)
+            config_content = scalyr_util.json_encode(config_json)
 
             tmp_file = open(tmp_host_path, "w")
             print >> tmp_file, "// Sets the %s." % field_description
@@ -589,7 +589,7 @@ def upgrade_windows_install(
 
         # TODO:  We shouldn't have to reparse response on JSON, but for now that, that's what the client library
         # does.
-        data_payload = json_lib.parse(response)["data"]
+        data_payload = scalyr_util.json_decode(response)["data"]
 
         if not data_payload["update_required"]:
             print "The latest version is already installed."

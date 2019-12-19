@@ -45,7 +45,6 @@ import threading
 import time
 import timeit
 
-import scalyr_agent.json_lib as json_lib
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 
@@ -54,6 +53,7 @@ import scalyr_agent.third_party.uuid_tp.uuid as uuid
 from scalyr_agent.agent_status import LogMatcherStatus
 from scalyr_agent.agent_status import LogProcessorStatus
 
+from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.line_matcher import LineMatcher
 
 from scalyr_agent.scalyr_client import Event
@@ -1344,7 +1344,7 @@ class LogFileIterator(object):
                 LogFileIterator.
             @param file_handle: The open file handle.
 
-            @type state_json: json_lib.JsonObject
+            @type state_json: dict
             @type file_handle: FileIO
             """
             # True if this file is still a valid portion of the overall iterator.
@@ -1362,22 +1362,22 @@ class LogFileIterator(object):
         def to_json(self):
             """Creates and returns the state serialized to Json.
 
-            @return: The JsonObject containing the serialized state.
-            @rtype: json_lib.JsonObject
+            @return: The dict containing the serialized state.
+            @rtype: dict
             """
-            result = json_lib.JsonObject(
-                position_start=self.position_start,
-                position_end=self.position_end,
-                last_known_size=self.last_known_size,
-                is_log_file=self.is_log_file,
-            )
+            result = {
+                "position_start": self.position_start,
+                "position_end": self.position_end,
+                "last_known_size": self.last_known_size,
+                "is_log_file": self.is_log_file,
+            }
             if self.inode is not None:
                 result["inode"] = self.inode
             return result
 
         @staticmethod
         def create_json(position_start, initial_offset, file_size, inode, is_log_file):
-            """Creates a JsonObject that represents the specified state.
+            """Creates a dict that represents the specified state.
 
             @param position_start: The start position relative to mark for this file.
             @param initial_offset: The initial offset in the file from where bytes should be read.
@@ -1392,14 +1392,14 @@ class LogFileIterator(object):
             @type is_log_file: bool
 
             @return:  The serialized state.
-            @rtype: json_lib.JsonObject
+            @rtype: dict
             """
-            result = json_lib.JsonObject(
-                position_start=position_start - initial_offset,
-                position_end=position_start + file_size - initial_offset,
-                last_known_size=file_size,
-                is_log_file=is_log_file,
-            )
+            result = {
+                "position_start": position_start - initial_offset,
+                "position_end": position_start + file_size - initial_offset,
+                "last_known_size": file_size,
+                "is_log_file": is_log_file,
+            }
             if inode is not None:
                 result["inode"] = inode
             return result
@@ -2700,7 +2700,7 @@ class LogMatcher(object):
             point.
 
         @type existing_processors: dict of str to LogFileProcessor
-        @type previous_state: dict of str to json_lib.JsonObject
+        @type previous_state: dict of str to dict
         @type copy_at_index_zero: bool
 
         @return: A list of the processors to handle the newly matched files.
@@ -2877,7 +2877,7 @@ class LogMatcher(object):
                     log.warn(
                         "Invalid substition pattern in 'rename_logfile'. %s" % str(e)
                     )
-            elif isinstance(rename, json_lib.JsonObject):
+            elif isinstance(rename, JsonObject):
                 if "match" in rename and "replacement" in rename:
                     try:
                         pattern = re.compile(rename["match"])

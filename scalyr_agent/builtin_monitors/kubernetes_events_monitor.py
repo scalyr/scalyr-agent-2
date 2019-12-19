@@ -13,7 +13,6 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
-import scalyr_agent.json_lib.objects
 
 __author__ = "imron@scalyr.com"
 
@@ -43,7 +42,6 @@ from scalyr_agent import (
     AutoFlushingRotatingFileHandler,
 )
 from scalyr_agent.scalyr_logging import BaseFormatter
-import scalyr_agent.json_lib as json_lib
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
@@ -602,7 +600,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             Checks to see if the resource identified in `response` is expired or not.
             @param response: a response from querying the k8s api for a resource
         """
-        obj = response.get("object", JsonObject())
+        obj = response.get("object", dict())
 
         # check to see if the resource version we are using has expired
         return (
@@ -618,14 +616,14 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             Otherwise returns (None, None, None)
             @param obj: an object returned from querying th k8s api
         """
-        involved = obj.get("involvedObject", JsonObject())
-        kind = involved.get("kind", None, none_if_missing=True)
+        involved = obj.get("involvedObject", dict())
+        kind = involved.get("kind", None)
         namespace = None
         name = None
 
         if kind:
-            name = involved.get("name", None, none_if_missing=True)
-            namespace = involved.get("namespace", None, none_if_missing=True)
+            name = involved.get("name", None)
+            namespace = involved.get("namespace", None)
 
         return (kind, namespace, name)
 
@@ -726,7 +724,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                     json = {}
                     for line in lines:
                         try:
-                            json = json_lib.parse(line)
+                            json = scalyr_util.json_decode(line)
                         except Exception, e:
                             global_log.warning(
                                 "Error parsing event json: %s, %s, %s"
@@ -743,18 +741,18 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 )
                                 continue
 
-                            obj = json.get("object", JsonObject())
+                            obj = json.get("object", dict())
                             event_type = json.get("type", "UNKNOWN")
 
                             # resource version hasn't expired, so update it to the most recently seen version
                             last_event = last_resource
 
-                            metadata = obj.get("metadata", JsonObject())
+                            metadata = obj.get("metadata", dict())
 
                             # skip any events with resourceVersions higher than ones we've already seen
-                            resource_version = metadata.get_int(
-                                "resourceVersion", None, none_if_missing=True
-                            )
+                            resource_version = metadata.get("resourceVersion", None)
+                            if resource_version is not None:
+                                resource_version = int(resource_version)
                             if resource_version and resource_version <= last_resource:
                                 global_log.log(
                                     scalyr_logging.DEBUG_LEVEL_2,
@@ -832,8 +830,8 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                             self.__disk_logger.info(
                                 "event=%s extra=%s"
                                 % (
-                                    str(json_lib.serialize(obj)),
-                                    str(json_lib.serialize(extra_fields)),
+                                    str(scalyr_util.json_encode(obj)),
+                                    str(scalyr_util.json_encode(extra_fields)),
                                 )
                             )
 

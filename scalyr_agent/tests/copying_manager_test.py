@@ -43,8 +43,8 @@ from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import skip, ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
-from scalyr_agent import json_lib
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.test_util as test_util
 
 ONE_MB = 1024 * 1024
 
@@ -621,7 +621,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         test_manager.remove_log_path("test_monitor", "blahblah.log")
 
     def test_get_server_attribute(self):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
         )
@@ -636,7 +636,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(attribs["KEY_b"], monitor_b.attribute_value)
 
     def test_get_server_attribute_no_override(self):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
         )
@@ -663,9 +663,9 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         for entry in configuration_logs_entry:
-            logs_json_array.add(JsonObject(content=entry))
+            logs_json_array.append(entry)
 
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
@@ -684,13 +684,13 @@ def _shift_time_in_checkpoint_file(path, delta):
     Modify time in checkpoints by "delta" stored in file located in "path"
     """
     fp = open(path, "r")
-    data = json_lib.parse(fp.read())
+    data = scalyr_util.json_decode(fp.read())
     fp.close()
 
     data["time"] += delta
 
     fp = open(path, "w")
-    fp.write(json_lib.serialize(data))
+    fp.write(scalyr_util.json_encode(data))
     fp.close()
 
 
@@ -1097,16 +1097,16 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(["5", "6", "7", "8", "9"], lines)
 
     def __extract_lines(self, request):
-        parsed_request = json_lib.parse(request.get_payload())
+        parsed_request = test_util.parse_scalyr_request(request.get_payload())
 
         lines = []
 
         if "events" in parsed_request:
-            for event in parsed_request.get_json_array("events"):
+            for event in parsed_request["events"]:
                 if "attrs" in event:
-                    attrs = event.get_json_object("attrs")
+                    attrs = event["attrs"]
                     if "message" in attrs:
-                        lines.append(attrs.get_string("message").strip())
+                        lines.append(attrs["message"].strip())
 
         return lines
 
@@ -1147,9 +1147,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         if not os.path.exists(config_fragments_dir):
             os.makedirs(config_fragments_dir)
 
-        logs_json_array = JsonArray()
-        logs_json_array.add(JsonObject(path=self.__test_log_file))
-
         pipeline_threshold = 1.1
         if use_pipelining:
             pipeline_threshold = 0.0
@@ -1157,12 +1154,12 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         if not os.path.exists(config_file):
             fp = open(config_file, "w")
             fp.write(
-                json_lib.serialize(
-                    JsonObject(
-                        api_key="fake",
-                        logs=logs_json_array,
-                        pipeline_threshold=pipeline_threshold,
-                    )
+                scalyr_util.json_encode(
+                    {
+                        "api_key": "fake",
+                        "logs": [{"path": self.__test_log_file}],
+                        "pipeline_threshold": pipeline_threshold,
+                    }
                 )
             )
             fp.close()

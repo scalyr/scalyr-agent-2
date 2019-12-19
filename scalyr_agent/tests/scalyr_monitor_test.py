@@ -18,8 +18,6 @@
 __author__ = "czerwin@scalyr.com"
 
 
-from scalyr_agent.json_lib import serialize
-from scalyr_agent.json_lib import parse as json_lib_parse
 from scalyr_agent.json_lib.objects import JsonArray, JsonObject, ArrayOfStrings
 from scalyr_agent.scalyr_monitor import (
     MonitorConfig,
@@ -27,6 +25,8 @@ from scalyr_agent.scalyr_monitor import (
     define_config_option,
 )
 from scalyr_agent.test_base import ScalyrTestCase
+
+import scalyr_agent.util as scalyr_util
 
 
 class MonitorConfigTest(ScalyrTestCase):
@@ -94,7 +94,7 @@ class MonitorConfigTest(ScalyrTestCase):
 
         # str -> JsonArray
         self.assertEquals(
-            self.get(serialize(test_array), convert_to=JsonArray),
+            self.get(scalyr_util.json_encode(test_array), convert_to=JsonArray),
             JsonArray(*test_array),
         )
         self.assertRaises(
@@ -108,8 +108,8 @@ class MonitorConfigTest(ScalyrTestCase):
         # str -> JsonObject
         test_obj = {"a": 1, "b": "two", "c": [1, 2, 3]}
         self.assertEquals(
-            self.get(serialize(test_obj), convert_to=JsonObject),
-            json_lib_parse(serialize(test_obj)),
+            self.get(scalyr_util.json_encode(test_obj), convert_to=JsonObject),
+            scalyr_util.json_scalyr_config_decode(scalyr_util.json_encode(test_obj)),
         )
 
     def test_unicode_conversion(self):
