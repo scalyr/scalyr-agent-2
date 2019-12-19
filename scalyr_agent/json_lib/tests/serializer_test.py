@@ -14,108 +14,30 @@
 # ------------------------------------------------------------------------
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
-
 from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
-import unittest
-from scalyr_agent.json_lib import serialize
+from cStringIO import StringIO
 
-from scalyr_agent.test_base import ScalyrTestCase, skip
+from scalyr_agent.json_lib import serialize_as_length_prefixed_string
+
+from scalyr_agent.test_base import ScalyrTestCase
 
 
 class SerializeTests(ScalyrTestCase):
-    def test_numbers(self):
-        self.assertEquals(self.write(1), "1")
-        self.assertEquals(self.write(1.2), "1.2")
-        self.assertEquals(self.write(133), "133")
-
-    def test_bool(self):
-        self.assertEquals(self.write(True), "true")
-        self.assertEquals(self.write(False), "false")
-
-    def test_4byte_utf8_fast(self):
-        actual = "\xF0\xAA\x9A\xA5"
-        expected_fast = '"\xf0\xaa\\u009a\xa5"'
-        self.assertEquals(serialize(actual, use_fast_encoding=True), expected_fast)
-
-        actual = "\xF0\x9F\x98\xA2"
-        expected_fast = '"\xf0\\u009f\\u0098\xa2"'
-        self.assertEquals(serialize(actual, use_fast_encoding=True), expected_fast)
-
-    def test_string_fast(self):
-        self.__run_string_test_case("Hi there", '"Hi there"')
-        self.__run_string_test_case("Hi there\n", '"Hi there\\n"')
-        self.__run_string_test_case("Hi there\b", '"Hi there\\b"')
-        self.__run_string_test_case("Hi there\f", '"Hi there\\f"')
-        self.__run_string_test_case("Hi there\r", '"Hi there\\r"')
-        self.__run_string_test_case("Hi there\t", '"Hi there\\t"')
-        self.__run_string_test_case('Hi there"', '"Hi there\\""')
-        self.__run_string_test_case("Hi there\\", '"Hi there\\\\"')
-
-        self.__run_string_test_case("Escaped\5", '"Escaped\\u0005"')
-        self.__run_string_test_case("Escaped\17", '"Escaped\\u000f"')
-        self.__run_string_test_case("Escaped\177", '"Escaped\\u007f"')
-        self.__run_string_test_case("Escaped\177", '"Escaped\\u007f"')
-        self.__run_string_test_case(u"\u2192", '"\\u2192"')
-
-        self.assertEquals(
-            serialize("Escaped\xE2\x82\xAC", use_fast_encoding=True),
-            '"Escaped\xe2\\u0082\xac"',
-        )
-
-    def test_string_slow(self):
-        self.__run_string_test_case("Hi there", '"Hi there"')
-        self.__run_string_test_case("Hi there\n", '"Hi there\\n"')
-        self.__run_string_test_case("Hi there\b", '"Hi there\\b"')
-        self.__run_string_test_case("Hi there\f", '"Hi there\\f"')
-        self.__run_string_test_case("Hi there\r", '"Hi there\\r"')
-        self.__run_string_test_case("Hi there\t", '"Hi there\\t"')
-        self.__run_string_test_case('Hi there"', '"Hi there\\""')
-        self.__run_string_test_case("Hi there\\", '"Hi there\\\\"')
-
-        self.__run_string_test_case("Escaped\5", '"Escaped\\u0005"')
-        self.__run_string_test_case("Escaped\17", '"Escaped\\u000f"')
-        self.__run_string_test_case("Escaped\177", '"Escaped\\u007f"')
-        self.__run_string_test_case("Escaped\177", '"Escaped\\u007f"')
-        self.__run_string_test_case(u"\u2192", '"\\u2192"')
-
-        self.assertEquals(
-            serialize("Escaped\xE2\x82\xAC", use_fast_encoding=False),
-            '"Escaped\\u20ac"',
-        )
-
-    def test_dict(self):
-        self.assertEquals(self.write({"hi": 5}), '{"hi":5}')
-        self.assertEquals(self.write({"bye": 5, "hi": True}), '{"bye":5,"hi":true}')
-        self.assertEquals(
-            self.write({"bye": 5, "hi": {"foo": 5}}), '{"bye":5,"hi":{"foo":5}}'
-        )
-        self.assertEquals(self.write({}), "{}")
-
-    def test_array(self):
-        self.assertEquals(self.write([1, 2, 5]), "[1,2,5]")
-        self.assertEquals(self.write([]), "[]")
-
     def test_length_prefixed_strings(self):
         self.assertEquals(
-            "`s\x00\x00\x00\x0cHowdy folks!",
-            serialize("Howdy folks!", use_length_prefix_string=True),
+            b"`s\x00\x00\x00\x0cHowdy folks!", self.serialize_string("Howdy folks!"),
         )
 
     def test_length_prefixed_strings_with_unicode(self):
         self.assertEquals(
-            "`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!",
-            serialize(u"Howdy \u84b8 folks!", use_length_prefix_string=True),
+            b"`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!",
+            self.serialize_string(u"Howdy \u84b8 folks!"),
         )
 
-    def write(self, value, sort_keys=False):
-        return serialize(value, use_fast_encoding=True, sort_keys=sort_keys)
-
-    def __run_string_test_case(self, input_string, expected_result):
-        self.assertEquals(
-            serialize(input_string, use_fast_encoding=True), expected_result
-        )
-        self.assertEquals(
-            serialize(input_string, use_fast_encoding=False), expected_result
-        )
+    @staticmethod
+    def serialize_string(input):
+        result = StringIO()
+        serialize_as_length_prefixed_string(input, result)
+        return result.getvalue()
