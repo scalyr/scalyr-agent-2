@@ -836,21 +836,6 @@ class MetricLogFormatter(BaseFormatter):
         )
 
 
-class JournaldLogFormatter(BaseFormatter):
-    """Formatter used for the logs produced by the journald monitor.
-
-    In general, it formats each line as:
-        time (with milliseconds)
-        component (`journald_monitor()` so we don't have to have ugly hashes in the log line for extended config.)
-        message (the logged message)
-    """
-
-    def __init__(self):
-        BaseFormatter.__init__(
-            self, "%(asctime)s [journald_monitor()] %(message)s", "metric-formatter"
-        )
-
-
 class AgentLogFilter(object):
     """A filter that includes any record emitted by an AgentLogger instance unless it was a metric record.
 
