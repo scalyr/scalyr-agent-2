@@ -60,7 +60,7 @@ from scalyr_agent.line_matcher import LineMatcher
 
 from scalyr_agent.scalyr_client import Event
 
-from cStringIO import StringIO
+from io import BytesIO
 from os import listdir
 from os.path import isfile, join
 
@@ -201,7 +201,7 @@ class LogFileIterator(object):
         # So, much of this abstraction is just about mapping which portions of the files map to which mark positions,
         # and corresponding, which portions of the buffered lines match with which mark positions.
         #
-        # Oh yes, we actually use a StringIO buffer to temporarily buffer the bytes from the files.  We read them in
+        # Oh yes, we actually use a BytesIO buffer to temporarily buffer the bytes from the files.  We read them in
         # in chunks of 64K and then just pull the strings out of them.  A single buffer holds the contents from
         # different files if needed.
 
@@ -214,7 +214,7 @@ class LogFileIterator(object):
 
         # The current position we are reading from, relative to the position that was last passed into mark.
         self.__position = 0
-        # The StringIO buffer holding the bytes to be read.
+        # The BytesIO buffer holding the bytes to be read.
         self.__buffer = None
         # This is a list of LogFileIterator.BufferEntry which maps which portions of the buffer map to which mark
         # positions.
@@ -981,7 +981,7 @@ class LogFileIterator(object):
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float or None
         """
-        new_buffer = StringIO()
+        new_buffer = BytesIO()
         new_buffer_content_index = []
 
         # What position we need to read from the files.
@@ -1849,16 +1849,24 @@ class LogFileProcessor(object):
                 lines_read += 1
 
                 if self.__num_redaction_and_sampling_rules > 0:
-                    sample_result = self.__sampler.process_line(line_object.line)
+                    # decode bytes string from UTF-8
+                    decoded_line = line_object.line.decode("utf-8", "replace")
+                    sample_result = self.__sampler.process_line(decoded_line)
+
                     if sample_result is None:
                         lines_dropped_by_sampling += 1
                         bytes_dropped_by_sampling += line_len
                         continue
 
-                    (line_object.line, redacted) = self.__redacter.process_line(
-                        line_object.line
+                    (decoded_line, redacted) = self.__redacter.process_line(
+                        decoded_line
                     )
-                    line_len = len(line_object.line)
+
+                    line_len = len(decoded_line)
+
+                    # encode line back.
+                    line_object.line = decoded_line.encode("utf-8")
+
                 else:
                     sample_result = 1.0
                     redacted = False
@@ -2236,6 +2244,8 @@ class LogLineSampler(object):
         self.total_passes = 0
 
     def process_line(self, input_line):
+        if type(input_line) == str:
+            raise AssertionError
         """Performs all configured sampling operations on the input line and returns whether or not it should
         be kept.  If it should be kept, then a float is returned indicating the sampling rate of the rule that
         allowed it to be included.  Otherwise, None.
@@ -2343,6 +2353,8 @@ class LogLineRedacter(object):
         self.total_redactions = 0
 
     def process_line(self, input_line):
+        if type(input_line) == str:
+            raise AssertionError
         """Performs all configured redaction rules on the input line and returns the results.
 
         See the class description for the algorithm that determines how the rules are applied.
@@ -2456,6 +2468,7 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line,
                 )
+        # 2->TODO: This can not happen when it is guarantied that the input is unicode.
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
@@ -2474,11 +2487,17 @@ class LogLineRedacter(object):
                     line.decode("utf-8", "replace"),
                 )
 
+        # [end of 2-> TOD0]
+
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
-            if type(result) == six.text_type:
-                result = result.encode("utf-8")
+
+            # 2->TODO: as redaction and sampling now ony expect unicode, this can be removed.
+            # if type(result) == six.text_type:
+            #     result = result.encode("utf-8")
+            # [end of 2->TOD0]
+
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches

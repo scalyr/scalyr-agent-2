@@ -37,8 +37,12 @@ ESCAPES = {
     ord("\r"): ("\\r", u"\\r"),
     ord("\t"): ("\\t", u"\\t"),
 }
+# 2->TODO: Which type of the result serialize function should return?
+#  In the majority of cases, json_lib will be used only to serialize data before send it to Scalyr.
+#  The binary data is required to send it to Scalyr, so "serialize" can return bytes string all the time.
+#  Moreover, we don't have to worry about current encoding if "use_length_prefix_string" is used.
 
-
+# IF there is a place where unicode is required, it will be easier just to convert it there.
 def serialize(
     value,
     output=None,

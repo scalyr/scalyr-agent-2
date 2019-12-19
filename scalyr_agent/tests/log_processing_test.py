@@ -15,6 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import time
 import six
 from six import unichr
@@ -880,7 +882,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         redacter.add_redaction_rule(u"(.*)", u"bb\\1bb")
 
         # build the utf8 string
-        utf8_string = unichr(8230).encode("utf-8")
+        utf8_string = unichr(8230)
         expected = "bb" + utf8_string + "bb"
 
         # go go go
@@ -978,8 +980,8 @@ class TestLogLineRedactor(ScalyrTestCase):
 
         self._run_case(
             redactor,
-            unichr(8230).encode('utf-8') + "auth=password foo=password",
-            unichr(8230).encode('utf-8') + "auth=%s foo=%s" % (
+            unichr(8230) + "auth=password foo=password",
+            unichr(8230) + "auth=%s foo=%s" % (
                 md5_hexdigest("password"), md5_hexdigest("password")
             ),
             True
@@ -1771,7 +1773,7 @@ class TestLogFileProcessor(ScalyrTestCase):
 
         # create a utf8 string that will cause conflict when matched/replaced against a unicode string
         utf8_string = (u"aa" + unichr(8230) + u"aa").encode("utf-8")
-        self.append_file(self.__path, utf8_string + "\n")
+        self.append_file(self.__path, utf8_string + b"\n")
 
         # read the log
         events = TestLogFileProcessor.TestAddEventsRequest()
@@ -2081,7 +2083,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         file_handle.close()
 
     def append_file(self, path, *lines):
-        contents = "".join(lines)
+        contents = b"".join(lines)
         file_handle = open(path, "ab")
         file_handle.write(contents)
         file_handle.close()
