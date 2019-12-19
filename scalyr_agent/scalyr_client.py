@@ -595,10 +595,10 @@ class ScalyrClientSession(object):
         }
 
         if session_info is not None:
-            body["sessionInfo"] = session_info
+            # session_info used to be a JsonObject but now must be dict.
+            assert type(session_info) == dict
 
-        # session_info used to be a JsonObject but now must be dict.
-        assert type(session_info) == dict
+            body["sessionInfo"] = session_info
 
         return AddEventsRequest(
             body,
