@@ -226,10 +226,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Keep track of monitors
         self.__monitors = monitors
 
-        # collect monitor-specific extra server-attributes
-        self.__expanded_server_attributes = copy.deepcopy(
-            self.__config.server_attributes
-        )
+        # collect monitor-specific extra server-attributes.  seed with a copy of the attributes and converted to a dict.
+        self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
+
         for monitor in monitors:
             monitor_attribs = monitor.get_extra_server_attributes()
             if not monitor_attribs:

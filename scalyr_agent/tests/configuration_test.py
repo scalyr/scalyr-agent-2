@@ -84,11 +84,9 @@ class TestConfigurationBase(ScalyrTestCase):
 
     def _write_file_with_separator_conversion(self, contents):
         contents = scalyr_util.json_encode(
-            self._convert_json_to_dict(
-                self.__convert_separators(
-                    scalyr_util.json_scalyr_config_decode(contents)
-                )
-            )
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
         )
 
         fp = open(self._config_file, "w")
@@ -99,40 +97,15 @@ class TestConfigurationBase(ScalyrTestCase):
         self, file_path, contents
     ):
         contents = scalyr_util.json_encode(
-            self._convert_json_to_dict(
-                self.__convert_separators(
-                    scalyr_util.json_scalyr_config_decode(contents)
-                )
-            )
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
         )
 
         full_path = os.path.join(self._config_fragments_dir, file_path)
         fp = open(full_path, "w")
         fp.write(contents)
         fp.close()
-
-    # TODO: This method may be generally useful in other parts of the code.  If we find we need it, maybe
-    # we should move it to test_util.  It is recursive code, so may not be performant.
-    def _convert_json_to_dict(self, value):
-        """Converts a `JsonObject` or `JsonArray` value to its dict/list equivalent, replacing
-        all uses of `JsonObject` with a `dict` and `JsonArray` with a `list`, recursively.
-
-        :param value: The value to convert
-        :type value: JsonArray|JsonObject|str|number|bool
-        :return: The converted value
-        :rtype: dict|list|str|number|bool
-        """
-        if type(value) is JsonObject:
-            result = dict()
-            for k, v in value.iteritems():
-                result[k] = self._convert_json_to_dict(v)
-            return result
-        elif type(value) is JsonArray:
-            result = []
-            for v in value:
-                result.append(self._convert_json_to_dict(v))
-            return result
-        return value
 
     class LogObject(object):
         def __init__(self, config):

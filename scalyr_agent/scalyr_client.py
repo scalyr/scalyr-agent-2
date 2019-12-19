@@ -604,6 +604,8 @@ class ScalyrClientSession(object):
         }
 
         if session_info is not None:
+            # session_info used to be a JsonObject but now must be dict.
+            assert type(session_info) == dict
             body["sessionInfo"] = session_info
 
         return AddEventsRequest(
@@ -818,7 +820,7 @@ class AddEventsRequest(object):
         # 2->TODO: this buffer goes to event serialization later, where binary buffer is required, so this buffer has to be binary too.
         string_buffer = BytesIO()
         # 2->TODO: since string_buffer is BytesIO, json_lib.serialize has to produce binary result too
-        scalyr_util.json_scalyr_request_encode(base_body, output=string_buffer)
+        scalyr_util.json_encode(base_body, output=string_buffer)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)

@@ -217,6 +217,22 @@ class JsonObjectTests(ScalyrTestCase):
         self.assertTrue("foo" in keys)
         self.assertTrue("bar" in keys)
 
+    def test_to_dict(self):
+        x = JsonObject(foo="a", bar=10)
+        self.assertEquals(dict(foo="a", bar=10), x.to_dict())
+
+        x = JsonObject(foo=JsonObject(bee=1), bar=10)
+        self.assertEquals(dict(foo=dict(bee=1), bar=10), x.to_dict())
+
+        x = JsonObject(foo=dict(bee=1, boo=JsonObject(hi=True)), bar=10)
+        self.assertEquals(dict(foo=dict(bee=1, boo=dict(hi=True)), bar=10), x.to_dict())
+
+        x = JsonObject(foo=JsonArray(1, 2, 3), bar=10)
+        self.assertEquals(dict(foo=[1, 2, 3], bar=10), x.to_dict())
+
+        x = JsonObject(foo=[1, 2, JsonObject(foo=5)], bar=10)
+        self.assertEquals(dict(foo=[1, 2, dict(foo=5)], bar=10), x.to_dict())
+
 
 class JsonArrayTests(ScalyrTestCase):
     def test_constructor(self):

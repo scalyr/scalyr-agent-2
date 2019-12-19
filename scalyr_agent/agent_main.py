@@ -30,11 +30,11 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
 from __future__ import print_function
 from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
+import traceback
 import errno
 import gc
 import os
@@ -512,7 +512,7 @@ class ScalyrAgent(object):
             self.__perform_config_checks(no_check_remote)
         except Exception as e:
             print(file=sys.stderr)
-            print("%s" % str(e), file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             print("Terminating agent, please fix the error and restart the agent.", file=sys.stderr)
             log.error("%s" % str(e))
             log.error("Terminating agent, please fix the error and restart the agent.")

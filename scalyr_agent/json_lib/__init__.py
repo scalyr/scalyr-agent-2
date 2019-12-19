@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------
-r"""A lightweight JSON library used by the Scalyr agent to serialize data
-for storage to disk and for sending over HTTP.
+r"""A lightweight JSON library used by the Scalyr agent to read JSON configuration
+files and to serialize some parts of the server requests.
 
 This library is used instead of python's default json library because
 it supports some custom Scalyr extensions (chiefly it allows for comments
-in the JSON) and the json library is not included in all versions of Python
-supported by the Scalyr agent.
+in the JSON).
 
 The classes exported by this package are:
   JsonObject                  -- A JSON object containing keys and fields.  Has similar methods as a dict.
@@ -29,7 +28,6 @@ The classes exported by this package are:
 
 The methods exported are:
   parse                       -- Parses a string as JSON and returns the value.
-  serialize                   -- Serializes a JSON value to a string.
 """
 
 from __future__ import absolute_import
@@ -47,13 +45,11 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.json_lib.parser import parse
-from scalyr_agent.json_lib.serializer import serialize
 from scalyr_agent.json_lib.serializer import serialize_as_length_prefixed_string
 
 
 __all__ = [
     "parse",
-    "serialize",
     "JsonObject",
     "JsonArray",
     "JsonConversionException",
