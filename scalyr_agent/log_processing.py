@@ -55,7 +55,7 @@ from cStringIO import StringIO
 from os import listdir
 from os.path import isfile, join
 
-if sys.version_info[0] < (3, 5):
+if sys.version_info < (3, 5):
     # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
     import glob2
 else:
