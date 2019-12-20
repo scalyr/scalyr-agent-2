@@ -226,6 +226,11 @@ class AgentLogger(logging.Logger):
     verbose debug logging.
     """
 
+    # The regular expression that must match for metric and field names.  Essentially, it has to begin with
+    # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this,
+    # be sure to fix the __force_valid_metric_or_field_name method below.
+    __metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
+
     def __init__(self, name):
         """Initializes the logger instance with the specified name.
 
@@ -276,11 +281,6 @@ class AgentLogger(logging.Logger):
         # which monitor it is reporting for and the associated log handler.
         self.__monitor = None
         self.__metric_handler = None
-
-        # The regular expression that must match for metric and field names.  Essentially, it has to begin with
-        # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this, be
-        # sure to fix the __force_valid_metric_or_field_name method below.
-        self.__metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
@@ -338,7 +338,7 @@ class AgentLogger(logging.Logger):
         if not type(metric_name) in (str, unicode):
             raise UnsupportedValueType(metric_name=metric_name)
         metric_name = self.__force_valid_metric_or_field_name(
-            metric_name, is_metric=True
+            metric_name, is_metric=True, logger=self
         )
 
         if not type(metric_value) in (str, unicode, bool, int, long, float):
@@ -360,7 +360,7 @@ class AgentLogger(logging.Logger):
                     )
 
                 field_name = self.__force_valid_metric_or_field_name(
-                    field_name, is_metric=False
+                    field_name, is_metric=False, logger=self
                 )
 
                 string_buffer.write(
@@ -581,7 +581,8 @@ class AgentLogger(logging.Logger):
             del AgentLogger.__opened_monitors__[self.__monitor]
             self.__monitor = None
 
-    def __force_valid_metric_or_field_name(self, name, is_metric=True):
+    @staticmethod
+    def __force_valid_metric_or_field_name(name, is_metric=True, logger=None):
         """Forces the given metric or field name to be valid.
 
         A valid metric/field name must being with a letter or underscore and only contain alphanumeric characters including
@@ -599,11 +600,11 @@ class AgentLogger(logging.Logger):
         @return: The metric / field name to use, which may be the original string.
         @rtype: str
         """
-        if self.__metric_or_field_name_rule.match(name) is not None:
+        if AgentLogger.__metric_or_field_name_rule.match(name) is not None:
             return name
 
-        if is_metric:
-            self.warn(
+        if is_metric and logger is not None:
+            logger.warn(
                 'Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
                 "alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been "
                 "fixed by replacing invalid characters with underscores.  Other metric names may be invalid "
@@ -612,8 +613,8 @@ class AgentLogger(logging.Logger):
                 limit_key="badmetricname",
                 error_code="client/badMetricName",
             )
-        else:
-            self.warn(
+        elif logger is not None:
+            logger.warn(
                 'Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
                 "alphanumeric characters as well as periods, underscores, and dashes.  The field name has been "
                 "fixed by replacing invalid characters with underscores.  Other field names may be invalid "

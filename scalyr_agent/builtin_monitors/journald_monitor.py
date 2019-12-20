@@ -25,16 +25,13 @@ from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
-from scalyr_agent.builtin_monitors.docker_monitor import get_parser_from_config
+from scalyr_agent.builtin_monitors.journald_utils import (
+    LogConfigManager,
+    JournaldLogFormatter,
+)
 import threading
 import traceback
-import logging
-from string import Template
 from cStringIO import StringIO
-
-from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
-    AutoFlushingRotatingFile,
-)
 
 try:
     from systemd import journal
@@ -244,28 +241,11 @@ class Checkpoint(object):
             self._lock.release()
 
 
-class JournaldLogFormatter(scalyr_logging.BaseFormatter):
-    """Formatter used for the logs produced by the journald monitor.
-
-    In general, it formats each line as:
-        time (with milliseconds)
-        component (`journald_monitor()` so we don't have to have ugly hashes in the log line for extended config.)
-        message (the logged message)
-    """
-
-    def __init__(self):
-        scalyr_logging.BaseFormatter.__init__(
-            self, "%(asctime)s [journald_monitor()] %(message)s", "metric-formatter"
-        )
-
-
 class JournaldMonitor(ScalyrMonitor):
 
     "Read logs from journalctl and emit to scalyr"
 
     def _initialize(self):
-        self._metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
-        self._file_template = Template("journald_${ID}")
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
@@ -300,6 +280,17 @@ class JournaldMonitor(ScalyrMonitor):
         self.log_config["parser"] = "journald"
 
         self._extra_fields = self._config.get("journal_fields")
+        if self._extra_fields is not None:
+            for field_name in self._extra_fields:
+                fixed_field_name = scalyr_logging.AgentLogger.__force_valid_metric_or_field_name(
+                    field_name, is_metric=False
+                )
+                if field_name != fixed_field_name:
+                    self._extra_fields[fixed_field_name] = self._extra_fields[
+                        field_name
+                    ]
+                    del self._extra_fields[fixed_field_name]
+
         self._last_cursor = None
 
         matches = self._config.get("journal_matches")
@@ -331,7 +322,6 @@ class JournaldMonitor(ScalyrMonitor):
             JournaldLogFormatter(),
             self._max_log_size,
             self._max_log_rotations,
-            self._logger,
         )
         self.log_config = self.log_manager.get_config(".*")
 
@@ -473,7 +463,7 @@ class JournaldMonitor(ScalyrMonitor):
             try:
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
-                logger = self.log_manager.get_logger(extra["unit"])
+                logger = self.log_manager.get_logger(extra.get("unit", ""))
                 logger.info(self.format_msg("details", msg, extra))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception, e:
@@ -495,9 +485,6 @@ class JournaldMonitor(ScalyrMonitor):
         if extra_fields is not None:
             for field_name in extra_fields:
                 field_value = extra_fields[field_name]
-                field_name = self._force_valid_metric_or_field_name(
-                    field_name, is_metric=False
-                )
                 string_buffer.write(
                     " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
                 )
@@ -505,52 +492,6 @@ class JournaldMonitor(ScalyrMonitor):
         msg = string_buffer.getvalue()
         string_buffer.close()
         return msg
-
-    def _force_valid_metric_or_field_name(self, name, is_metric=True):
-        """Forces the given metric or field name to be valid.
-
-        A valid metric/field name must being with a letter or underscore and only contain alphanumeric characters including
-        periods, underscores, and dashes.
-
-        If it is not valid, it will replace invalid characters with underscores.  If it does not being with a letter
-        or underscore a sa_ is added as a prefix.
-
-        If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
-
-        @param name: The metric name
-        @type name: str
-        @param is_metric: Whether or not the name is a metric or field name
-        @type is_metric: bool
-        @return: The metric / field name to use, which may be the original string.
-        @rtype: str
-        """
-        if self._metric_or_field_name_rule.match(name) is not None:
-            return name
-
-        if is_metric:
-            self._logger.warn(
-                'Invalid metric name "%s" seen.  Metric names must begin with a letter and only contain '
-                "alphanumeric characters as well as periods, underscores, and dashes.  The metric name has been "
-                "fixed by replacing invalid characters with underscores.  Other metric names may be invalid "
-                "(only reporting first occurrence)." % name,
-                limit_once_per_x_secs=86400,
-                limit_key="badmetricname",
-                error_code="client/badMetricName",
-            )
-        else:
-            self._logger.warn(
-                'Invalid field name "%s" seen.  Field names must begin with a letter and only contain '
-                "alphanumeric characters as well as periods, underscores, and dashes.  The field name has been "
-                "fixed by replacing invalid characters with underscores.  Other field names may be invalid "
-                "(only reporting first occurrence)." % name,
-                limit_once_per_x_secs=86400,
-                limit_key="badfieldname",
-                error_code="client/badFieldName",
-            )
-
-        if not re.match("^[_a-zA-Z]", name):
-            name = "sa_" + name
-        return re.sub("[^\w\-\.]", "_", name)
 
     def gather_sample(self):
 
@@ -568,124 +509,3 @@ class JournaldMonitor(ScalyrMonitor):
         ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
         self.log_manager.close()
         self._logger.info("Stop was called on the journald monitor")
-
-
-class LogConfigManager:
-    def __init__(
-        self,
-        global_config,
-        formatter,
-        max_log_size=20 * 1024 * 1024,
-        max_log_rotations=2,
-        test_logger=None,
-    ):
-        self._loggers = {}
-        self._max_log_size = max_log_size
-        self._max_log_rotations = max_log_rotations
-        self._global_config = global_config
-        self._formatter = formatter
-        self.log_watcher = None
-        self.test_logger = test_logger
-
-        self.__log_config_creators = self.initialize()
-
-    def initialize(self):
-        """ TODO: document
-        """
-        config_matchers = []
-        catchall_defined = False
-        for config in self._global_config.journald_log_configs:
-            config_matcher = self.create_config_matcher(config)
-            config_matchers.append(config_matcher)
-            if config["journald_unit"] == ".*":
-                catchall_defined = True
-        if not catchall_defined:
-            config_matchers.append(self.create_config_matcher({}))
-
-        return config_matchers
-
-    def create_config_matcher(self, conf):
-        """ TODO: document
-        """
-        config = conf.copy()
-        if "journald_unit" not in config:
-            config["journald_unit"] = ".*"
-        file_template = Template("journald_${ID}.log")
-        regex = re.compile(config["journald_unit"])
-        match_hash = str(hash(config["journald_unit"]))
-        if config["journald_unit"] == ".*":
-            match_hash = "monitor"
-
-        def config_matcher(unit):
-            if regex.match(unit) is not None:
-                full_path = os.path.join(
-                    self._global_config.agent_log_path,
-                    file_template.safe_substitute({"ID": match_hash}),
-                )
-                matched_config = JsonObject({"parser": "journald", "path": full_path})
-                matched_config.update(config)
-                return matched_config
-            return None
-
-        return config_matcher
-
-    def get_config(self, unit):
-        """TODO: document
-        """
-        for matcher in self.__log_config_creators:
-            config = matcher(unit)
-            if config is not None:
-                return config
-        return None
-
-    def get_logger(self, unit):
-        """TODO: document
-        """
-        config = self.get_config(unit)
-        if config is not None and "path" in config:
-            if config["path"] not in self._loggers:
-                self.create_logger(config)
-            return self._loggers[config["path"]]["logger"]
-        return None
-
-    def set_log_watcher(self, log_watcher):
-        """Set the log_watcher so we can use it to register new log files
-
-        @param log_watcher:
-        @return:
-        """
-        self.log_watcher = log_watcher
-
-    def create_logger(self, log_config):
-        """TODO: document
-        """
-        if not self.log_watcher:
-            return  # TODO: throw something
-
-        logger = logging.getLogger(log_config["path"])
-        log_handler = logging.handlers.RotatingFileHandler(
-            filename=log_config["path"],
-            maxBytes=self._max_log_size,
-            backupCount=self._max_log_rotations,
-        )
-        log_handler.setFormatter(self._formatter)
-        logger.addHandler(log_handler)
-        logger.propagate = False
-
-        self.log_watcher.add_log_config(log_config["path"], log_config)
-
-        if log_config["path"] not in self._loggers:
-            self._loggers[log_config["path"]] = {}
-        self._loggers[log_config["path"]]["logger"] = logger
-        self._loggers[log_config["path"]]["handler"] = log_handler
-        self._loggers[log_config["path"]]["config"] = log_config
-
-    def close(self):
-        """Close all log handlers currently managed by this LogManager?
-
-        @return:
-        """
-        for logger in self._loggers.values():
-            logger["logger"].removeHandler(logger["handler"])
-            logger["handler"].close()
-        self._loggers = {}
