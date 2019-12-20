@@ -30,13 +30,6 @@ import errno
 import fnmatch
 import sys
 
-# Glob2 requires a Python version >= 2.6. This check falls back to the built-in glob module when running under
-# old Python versions. This can be removed when we no longer support Python earlier than 2.6.
-# When support for Python earlier than 3.5 is deprecated, the built-in glob with a recursive option can be used.
-if sys.version_info >= (2, 6):
-    import glob2 as glob
-else:
-    import glob as glob
 import os
 import random
 import re
@@ -62,6 +55,12 @@ from cStringIO import StringIO
 from os import listdir
 from os.path import isfile, join
 
+if sys.version_info[0] < (3, 5):
+    # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
+    import glob2
+else:
+    # Python 3.5 and higher supports `**`
+    import glob
 
 # The maximum allowed size for a line when reading from a log file.
 # We do not strictly enforce this -- some lines returned by LogFileIterator may be
@@ -125,6 +124,20 @@ def _parse_cri_log(line):
     line = line[index + 1 :]
 
     return timestamp, stream, tags, line
+
+
+def _match_glob(pathname):
+    """Performs a glob match for the given pathname glob pattern, returning the list of matching
+    files.
+
+    :param pathname: The glob pattern
+    :return: The list of matching paths
+    """
+    if sys.version_info >= (3, 5):
+        result = glob.glob(pathname, recursive=True)
+    else:
+        result = glob2.glob(pathname)
+    return result
 
 
 class LogLine(object):
@@ -2737,8 +2750,8 @@ class LogMatcher(object):
 
         # See if the file path matches.. even if it is not a glob, this will return the single file represented by it.
         try:
-            # glob.glob is sorted here because otherwise it returns non-deterministic results
-            for matched_file in sorted(glob.glob(self.__log_entry_config["path"])):
+            # match_glob is sorted here because otherwise it returns non-deterministic results
+            for matched_file in sorted(_match_glob(self.__log_entry_config["path"])):
                 skip = False
                 # check to see if this file matches any of the exclude globs
                 for exclude_glob in self.__log_entry_config["exclude"]:
