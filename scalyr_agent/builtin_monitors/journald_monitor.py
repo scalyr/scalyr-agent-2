@@ -117,6 +117,14 @@ define_config_option(
     default=10 * 60,
 )
 
+define_config_option(
+    __monitor__,
+    "parser",
+    "Allow to override the parser used for journald entries",
+    convert_to=str,
+    default="journald",
+)
+
 # this lock must be held to access the
 # _global_checkpoints dict
 _global_lock = threading.Lock()
@@ -256,7 +264,7 @@ class JournaldMonitor(ScalyrMonitor):
         self._poll = None
         # override the sample_interval
         self.set_sample_interval(self._config.get("journal_poll_interval"))
-        self.log_config["parser"] = "journald"
+        self.log_config["parser"] = self._config.get("parser")
 
         self._extra_fields = self._config.get("journal_fields")
         self._last_cursor = None
