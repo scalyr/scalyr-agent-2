@@ -16,6 +16,7 @@
 # author: Imron Alston <imron@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import time

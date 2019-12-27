@@ -18,6 +18,7 @@
 from __future__ import absolute_import
 import re
 import struct
+
 __author__ = "echee@scalyr.com"
 
 

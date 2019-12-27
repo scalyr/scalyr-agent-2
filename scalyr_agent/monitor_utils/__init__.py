@@ -29,6 +29,7 @@ The classes exported by this package are:
 """
 
 from __future__ import absolute_import
+
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 from scalyr_agent.monitor_utils.server_processors import ServerProcessor

@@ -358,8 +358,8 @@ class PostgreSQLDb(object):
                 "select * from %s where datname = '%s';" % (table, self._database)
             )
             data = self._cursor.fetchone()
-        except pg8000.OperationalError as xxx_todo_changeme:
-            (errcode, msg) = xxx_todo_changeme.args
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()
@@ -387,8 +387,8 @@ class PostgreSQLDb(object):
         try:
             self._cursor.execute("select pg_database_size('%s');" % self._database)
             size = self._cursor.fetchone()[0]
-        except pg8000.OperationalError as xxx_todo_changeme1:
-            (errcode, msg) = xxx_todo_changeme1.args
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()

@@ -524,7 +524,9 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             # alive
             if self._check_labels:
                 query = "?labelSelector=%s" % (
-                    six.moves.urllib.parse.quote("agent.config.scalyr.com/events_leader_candidate=true")
+                    six.moves.urllib.parse.quote(
+                        "agent.config.scalyr.com/events_leader_candidate=true"
+                    )
                 )
                 new_leader = self._check_nodes_for_leader(k8s, query)
 

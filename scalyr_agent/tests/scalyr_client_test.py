@@ -16,6 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 from cStringIO import StringIO
@@ -49,12 +50,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(request.total_events, 0)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         self.assertEquals(
             request.get_payload(),
@@ -68,12 +65,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         self.assertEquals(request.get_payload(), request.get_payload())
         request.close()
@@ -84,13 +77,9 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(request.total_events, 0)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
         self.assertTrue(request.add_log_and_thread("t1", "n1", {"l1": "L1"}))
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
         self.assertTrue(request.add_log_and_thread("t2", "n2", {"l2": "L2"}))
 
         self.assertEquals(
@@ -106,9 +95,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body, max_size=112)
         request.set_client_time(1)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
         self.assertFalse(
             request.add_event(Event().set_message("eventTwo"), timestamp=2)
         )
@@ -137,12 +124,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
         position = request.position()
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         request.set_position(position)
         self.assertTrue(
@@ -161,12 +144,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.set_client_time(1)
         position = request.position()
         request.add_log_and_thread("log1", "Hi there", {})
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         request.set_position(position)
         self.assertTrue(request.add_log_and_thread("log2", "Log two", {}))
@@ -186,12 +165,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
 
-        self.assertTrue(
-            request.add_event(Event().set_message("eventOne"), timestamp=1)
-        )
-        self.assertTrue(
-            request.add_event(Event().set_message("eventTwo"), timestamp=2)
-        )
+        self.assertTrue(request.add_event(Event().set_message("eventOne"), timestamp=1))
+        self.assertTrue(request.add_event(Event().set_message("eventTwo"), timestamp=2))
 
         self.assertEquals(
             request.get_payload(),

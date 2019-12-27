@@ -416,10 +416,10 @@ instance."""
         try:
             testurl = six.moves.urllib.parse.urlparse(url)
         except Exception as e:
-            print((
+            print(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % url
-            ))
+            )
             return data
         # attempt to request server status
         try:

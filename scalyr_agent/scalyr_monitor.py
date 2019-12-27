@@ -616,7 +616,9 @@ class MonitorInformation(object):
         @return: A list of the options
         @rtype: list of ConfigOption
         """
-        return sorted(six.itervalues(self.__options), key=self.__get_insert_sort_position)
+        return sorted(
+            six.itervalues(self.__options), key=self.__get_insert_sort_position
+        )
 
     @property
     def metrics(self):
@@ -625,7 +627,9 @@ class MonitorInformation(object):
         @return: A list of metric descriptions
         @rtype: list of MetricDescription
         """
-        return sorted(six.itervalues(self.__metrics), key=self.__get_insert_sort_position)
+        return sorted(
+            six.itervalues(self.__metrics), key=self.__get_insert_sort_position
+        )
 
     @property
     def log_fields(self):

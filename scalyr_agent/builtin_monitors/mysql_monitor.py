@@ -416,8 +416,8 @@ class MysqlDB(object):
 
         try:
             self._cursor.execute(sql)
-        except pymysql.OperationalError as xxx_todo_changeme:
-            (errcode, msg) = xxx_todo_changeme.args
+        except pymysql.OperationalError as error:
+            (errcode, msg) = error.args
             if errcode != 2006:  # "MySQL server has gone away"
                 self._logger.exception(
                     "Exception trying to execute query: %d '%s'" % (errcode, msg)
@@ -870,8 +870,8 @@ class MysqlDB(object):
         """Returns whether or not the given path is a socket file."""
         try:
             s = os.stat(path)
-        except OSError as xxx_todo_changeme1:
-            (no, e) = xxx_todo_changeme1.args
+        except OSError as error:
+            (no, e) = error.args
             if no == errno.ENOENT:
                 return False
             self._logger.error("warning: couldn't stat(%r): %s" % (path, e))

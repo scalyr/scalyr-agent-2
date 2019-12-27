@@ -41,6 +41,7 @@ scalyr_init()
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 import six
 from six.moves import range
+
 # [end of 2->TOD0]
 
 from scalyr_agent.monitors_manager import load_monitor_class
@@ -359,15 +360,19 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
-        print("You must specify the module for the monitor whose documentation you wish to print.", file=sys.stderr)
+        print(
+            "You must specify the module for the monitor whose documentation you wish to print.",
+            file=sys.stderr,
+        )
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     if not options.no_warning:
-        print((
+        print(
             "Warning, this tool is still experimental.  The format of the output may change in the"
-            "future.  Use with caution."
-        ), file=sys.stderr)
+            "future.  Use with caution.",
+            file=sys.stderr,
+        )
 
     print_monitor_documentation(args[0], int(options.column_size), options.module_paths)
     sys.exit(0)

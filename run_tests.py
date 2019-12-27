@@ -20,6 +20,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 from scalyr_agent.__scalyr__ import scalyr_init

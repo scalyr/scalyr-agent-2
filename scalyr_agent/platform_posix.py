@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -38,7 +39,12 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 import scalyr_agent.util as scalyr_util
 
-from scalyr_agent.__scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.__scalyr__ import (
+    get_install_root,
+    TARBALL_INSTALL,
+    DEV_INSTALL,
+    PACKAGE_INSTALL,
+)
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -145,7 +151,11 @@ class PosixPlatformController(PlatformController):
             self.__pidfile = os.path.join(
                 self.default_paths.agent_log_path, "agent.pid"
             )
-            print("Assuming pid file is '%s'.  Use --pid-file to override." % self.__pidfile, file=sys.stderr)
+            print(
+                "Assuming pid file is '%s'.  Use --pid-file to override."
+                % self.__pidfile,
+                file=sys.stderr,
+            )
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)
             print("Using pid file '%s'." % self.__pidfile, file=sys.stderr)
@@ -508,7 +518,7 @@ class PosixPlatformController(PlatformController):
             "--no-change-user",
         ] + script_arguments
 
-        print(("Running as %s" % user_name), file=sys.stderr)
+        print("Running as %s" % user_name, file=sys.stderr)
         return os.execvp("sudo", arguments)
 
     def is_agent(self):

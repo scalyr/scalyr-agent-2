@@ -561,7 +561,10 @@ def get_pid_tid():
     """
     # noinspection PyBroadException
     try:
-        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(six.moves._thread.get_ident()))
+        return "(pid=%s) (tid=%s)" % (
+            str(os.getpid()),
+            str(six.moves._thread.get_ident()),
+        )
     except:
         return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
 
@@ -1067,9 +1070,11 @@ class StoppableThread(threading.Thread):
         """
         threading.Thread.join(self, timeout)
         if not self.isAlive() and self.__exception_info is not None:
-            six.reraise(self.__exception_info[0], self.__exception_info[
-                1
-            ], self.__exception_info[2])
+            six.reraise(
+                self.__exception_info[0],
+                self.__exception_info[1],
+                self.__exception_info[2],
+            )
 
 
 class RateLimiter(object):
@@ -1223,7 +1228,7 @@ class ScriptEscalator(object):
         except CannotExecuteAsUser as e:
             if not handle_error:
                 raise e
-            print((
+            print(
                 "Failing, cannot %s as the correct user.  The command must be executed using the "
                 "same account that owns the configuration file.  The configuration file is owned by "
                 "%s whereas the current user is %s.  Changing user failed due to the following "
@@ -1234,8 +1239,9 @@ class ScriptEscalator(object):
                     self.__running_user,
                     e.error_message,
                     self.__desired_user,
-                )
-            ), file=sys.stderr)
+                ),
+                file=sys.stderr,
+            )
             return 1
 
 

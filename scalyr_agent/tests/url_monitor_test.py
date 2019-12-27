@@ -16,6 +16,7 @@
 # author: Saurabh Jain <saurabh@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "saurabh@scalyr.com"
 
 import unittest

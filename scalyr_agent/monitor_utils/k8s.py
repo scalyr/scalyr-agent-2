@@ -1912,7 +1912,10 @@ class KubernetesApi(object):
                 )
 
         if filter:
-            query = "%s?fieldSelector=%s" % (query, six.moves.urllib.parse.quote(filter))
+            query = "%s?fieldSelector=%s" % (
+                query,
+                six.moves.urllib.parse.quote(filter),
+            )
 
         return self.query_api_with_retries(
             query,

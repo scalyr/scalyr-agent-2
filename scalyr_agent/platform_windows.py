@@ -95,6 +95,7 @@ scalyr_init()
 # 2->TODO check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import input
+
 # [end of 2->TOD0]t
 
 from scalyr_agent.json_lib import JsonObject
@@ -133,7 +134,9 @@ def _set_config_path_registry_entry(value):
     registry_key = six.moves.winreg.OpenKey(
         six.moves.winreg.HKEY_LOCAL_MACHINE, _REG_PATH, 0, six.moves.winreg.KEY_WRITE
     )
-    six.moves.winreg.SetValueEx(registry_key, _CONFIG_KEY, 0, six.moves.winreg.REG_SZ, value)
+    six.moves.winreg.SetValueEx(
+        registry_key, _CONFIG_KEY, 0, six.moves.winreg.REG_SZ, value
+    )
     six.moves.winreg.CloseKey(registry_key)
     return True
 
@@ -434,8 +437,12 @@ class WindowsPlatformController(PlatformController):
             )
 
         if not self.__no_escalation_warning:
-            print("The process requires Administrator permissions to complete this action.")
-            print("Attempting to escalate privileges, which will require user confirmation or the Administrator ")
+            print(
+                "The process requires Administrator permissions to complete this action."
+            )
+            print(
+                "Attempting to escalate privileges, which will require user confirmation or the Administrator "
+            )
             print("password through a dialog box that is about to be shown.")
             input("Hit Enter to continue and view the dialog box.")
 

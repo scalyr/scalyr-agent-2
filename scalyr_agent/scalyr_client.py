@@ -19,6 +19,7 @@ from __future__ import absolute_import
 import six
 from six.moves import map
 from six.moves import range
+
 __author__ = "czerwin@scalyr.com"
 
 import six.moves.http_client
