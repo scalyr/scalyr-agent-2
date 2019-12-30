@@ -36,6 +36,8 @@ import random
 import sys
 import threading
 import time
+import uuid
+
 from collections import deque
 
 import scalyr_agent.json_lib as json_lib
@@ -60,12 +62,6 @@ except ImportError:
     import md5
 
     new_md5 = False
-
-
-try:
-    import scalyr_agent.third_party.uuid_tp.uuid as uuid
-except ImportError:
-    uuid = None
 
 
 def get_json_implementation(lib_name):
@@ -333,24 +329,7 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    if uuid is not None and hasattr(uuid, "uuid1"):
-        # Here the uuid should be based on the mac of the machine.
-        base_value = uuid.uuid1().bytes
-        method = "a"
-    else:
-        # Otherwise, get as good of a 16 byte random number as we can and prefix it with
-        # the current time.
-        try:
-            base_value = os.urandom(16)
-            method = "b"
-        except NotImplementedError:
-            base_value = ""
-            for i in range(16):
-                base_value += random.randrange(256)
-            method = "c"
-        base_value = str(time.time()) + base_value
-    result = base64.urlsafe_b64encode(sha1(base_value).digest()) + method
-    return result
+    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
 
 
 def md5_hexdigest(data):
