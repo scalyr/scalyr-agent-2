@@ -35,6 +35,7 @@ The packages exported are:
 """
 
 from __future__ import absolute_import
+
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 # 2->TODO: "Modernize" tool added "six" library almost everywhere.

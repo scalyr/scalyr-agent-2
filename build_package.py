@@ -25,6 +25,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -51,6 +52,7 @@ scalyr_init()
 # 2->TODO check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import range
+
 # [end of 2->TOD0]
 
 # The root of the Scalyr repository should just be the parent of this file.
@@ -176,8 +178,13 @@ def build_win32_installer_package(variant, version):
     @return: The file name of the built package.
     """
     if os.getenv("WIX") is None:
-        print("Error, the WIX toolset does not appear to be installed.", file=sys.stderr)
-        print("Please install it to build the Windows Scalyr Agent installer.", file=sys.stderr)
+        print(
+            "Error, the WIX toolset does not appear to be installed.", file=sys.stderr
+        )
+        print(
+            "Please install it to build the Windows Scalyr Agent installer.",
+            file=sys.stderr,
+        )
         print("See http://wixtoolset.org.", file=sys.stderr)
         sys.exit(1)
 
@@ -186,10 +193,19 @@ def build_win32_installer_package(variant, version):
     except ImportError:
         # noinspection PyUnusedLocal
         psutil = None
-        print("Error, the psutil Python module is not installed.  This is required to build the", file=sys.stderr)
-        print("Windows version of the Scalyr Agent.  Please download and install it.", file=sys.stderr)
+        print(
+            "Error, the psutil Python module is not installed.  This is required to build the",
+            file=sys.stderr,
+        )
+        print(
+            "Windows version of the Scalyr Agent.  Please download and install it.",
+            file=sys.stderr,
+        )
         print("See http://pythonhosted.org/psutil/", file=sys.stderr)
-        print('On many systems, executing "pip install psutil" will install the package.', file=sys.stderr)
+        print(
+            'On many systems, executing "pip install psutil" will install the package.',
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     make_directory("source_root")
@@ -1147,15 +1163,17 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
 
         if return_code != 0 and not fail_quietly:
             if command_name is not None:
-                print("Executing %s failed and returned a non-zero result of %d" % (
-                    command_name,
-                    return_code,
-                ), file=sys.stderr)
+                print(
+                    "Executing %s failed and returned a non-zero result of %d"
+                    % (command_name, return_code,),
+                    file=sys.stderr,
+                )
             else:
-                print((
+                print(
                     "Executing the following command failed and returned a non-zero result of %d"
-                    % return_code
-                ), file=sys.stderr)
+                    % return_code,
+                    file=sys.stderr,
+                )
                 print('  Command: "%s"' % command_str, file=sys.stderr)
 
             print("The output was:", file=sys.stderr)
@@ -1319,12 +1337,16 @@ def create_change_logs():
 
             # RPM expects the leading line for a relesae to start with an asterisk, then have
             # the name of the person doing the release, their e-mail and then the version.
-            print("* %s %s <%s> %s" % (
-                date_str,
-                release["packager"],
-                release["packager_email"],
-                release["version"],
-            ), file=fp)
+            print(
+                "* %s %s <%s> %s"
+                % (
+                    date_str,
+                    release["packager"],
+                    release["packager_email"],
+                    release["version"],
+                ),
+                file=fp,
+            )
             print(file=fp)
             print("Release: %s (%s)" % (release["version"], release["name"]), file=fp)
             print(file=fp)
@@ -1344,15 +1366,17 @@ def create_change_logs():
             date_str = time.strftime(
                 "%a, %d %b %Y %H:%M:%S %z", time.localtime(release["time"])
             )
-            print("scalyr-agent-2 (%s) stable; urgency=low" % release["version"], file=fp)
+            print(
+                "scalyr-agent-2 (%s) stable; urgency=low" % release["version"], file=fp
+            )
             # Include release notes with an indented first level (using asterisk, then a dash for the next level,
             # finally a plus sign.
             print_release_notes(fp, release["notes"], [" * ", "   - ", "     + "])
-            print("-- %s <%s>  %s" % (
-                release["packager"],
-                release["packager_email"],
-                date_str,
-            ), file=fp)
+            print(
+                "-- %s <%s>  %s"
+                % (release["packager"], release["packager_email"], date_str,),
+                file=fp,
+            )
     finally:
         fp.close()
 
@@ -1597,9 +1621,10 @@ def get_build_info():
         print("From branch: %s" % branch.strip(), file=build_info_buffer)
 
         # Add a timestamp.
-        print("Build time: %s" % strftime(
-            "%Y-%m-%d %H:%M:%S UTC", gmtime()
-        ), file=build_info_buffer)
+        print(
+            "Build time: %s" % strftime("%Y-%m-%d %H:%M:%S UTC", gmtime()),
+            file=build_info_buffer,
+        )
 
         __build_info__ = build_info_buffer.getvalue()
         return __build_info__
@@ -1687,9 +1712,11 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if len(args) < 1:
-        print("You must specify the package you wish to build, one of the following: %s." % ", ".join(
-            PACKAGE_TYPES
-        ), file=sys.stderr)
+        print(
+            "You must specify the package you wish to build, one of the following: %s."
+            % ", ".join(PACKAGE_TYPES),
+            file=sys.stderr,
+        )
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:

@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import
 import six
+
 __author__ = "czerwin@scalyr.com"
 
 import os

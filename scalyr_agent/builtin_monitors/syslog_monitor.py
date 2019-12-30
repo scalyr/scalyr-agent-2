@@ -17,6 +17,7 @@
 from __future__ import absolute_import
 import six
 from six.moves import range
+
 __author__ = "imron@scalyr.com"
 
 import errno
@@ -591,7 +592,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
         )
 
 
-class SyslogUDPServer(six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.UDPServer):
+class SyslogUDPServer(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.UDPServer
+):
     """Class that creates a UDP SocketServer on a specified port
     """
 
@@ -615,7 +618,9 @@ class SyslogUDPServer(six.moves.socketserver.ThreadingMixIn, six.moves.socketser
         pass
 
 
-class SyslogTCPServer(six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer):
+class SyslogTCPServer(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+):
     """Class that creates a TCP SocketServer on a specified port
     """
 

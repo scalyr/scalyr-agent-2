@@ -19,6 +19,7 @@
 
 
 from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor

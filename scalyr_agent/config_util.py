@@ -16,6 +16,7 @@
 # author:  Edward Chee <echee@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
 
@@ -96,7 +97,13 @@ ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
     float: STRING_TYPES,
     list: set(
-        [str, six.text_type, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [
+            str,
+            six.text_type,
+            JsonArray,
+            ArrayOfStrings,
+            SpaceAndCommaSeparatedArrayOfStrings,
+        ]
     ),
     JsonArray: set(
         [str, six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]

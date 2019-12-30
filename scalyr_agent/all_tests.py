@@ -19,6 +19,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest
@@ -83,28 +84,28 @@ def run_all_tests():
                 suites.append(test_loader.loadTestsFromName(test_case))
             except Exception as ex:
                 if sys.version_info[:2] < (2, 5) and test_case in PYTHON24_WHITELIST:
-                    print((
+                    print(
                         "Warning. Skipping unloadable module '%s'.\n"
                         "This module was whitelisted as non-critical for Python 2.4 testing.\n"
                         "Module-load exception message: '%s'\n" % (test_case, ex)
-                    ))
+                    )
                 elif (
                     sys.version_info[:2] < (2, 7)
                     and test_case in PRE_PYTHON27_WHITELIST
                 ):
-                    print((
+                    print(
                         "Warning. Skipping unloadable module '%s'.\n"
                         "This module was whitelisted as non-critical for pre-2.7 testing.\n"
                         "Module-load exception message: '%s'\n" % (test_case, ex)
-                    ))
+                    )
                 else:
                     raise
         except Exception as e:
             error = True
-            print((
+            print(
                 "Error loading test_case '%s'.  %s, %s"
                 % (test_case, str(e), traceback.format_exc())
-            ))
+            )
 
     test_suite = unittest.TestSuite(suites)
     if sys.version_info[:2] < (2, 7):

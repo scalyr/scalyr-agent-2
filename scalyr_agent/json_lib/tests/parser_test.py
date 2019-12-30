@@ -17,6 +17,7 @@
 
 from __future__ import absolute_import
 from six.moves import range
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest

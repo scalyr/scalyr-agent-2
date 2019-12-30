@@ -20,6 +20,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import cStringIO
@@ -34,7 +35,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 global_log = scalyr_logging.getLogger(__name__)
 
 
-class ServerProcessor(six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer):
+class ServerProcessor(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+):
     """Base class for simple servers that only need to accept incoming connections, perform some actions on
     individual commands, and return no output.
 
@@ -86,7 +89,9 @@ class ServerProcessor(six.moves.socketserver.ThreadingMixIn, six.moves.socketser
         if run_state is not None:
             self.run_state.register_on_stop_callback(self.shutdown)
 
-        six.moves.socketserver.TCPServer.__init__(self, server_address, ConnectionHandler)
+        six.moves.socketserver.TCPServer.__init__(
+            self, server_address, ConnectionHandler
+        )
 
     def run(self):
         """Begins accepting new connections and processing the incoming requests.

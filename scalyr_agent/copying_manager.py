@@ -19,6 +19,7 @@
 from __future__ import absolute_import
 import six
 from six.moves import range
+
 __author__ = "czerwin@scalyr.com"
 
 import copy
@@ -1039,7 +1040,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
             if active_checkpoints["time"] > full_checkpoints["time"]:
                 full_checkpoints["time"] = active_checkpoints["time"]
-                for path, checkpoint in six.iteritems(active_checkpoints["checkpoints"]):
+                for path, checkpoint in six.iteritems(
+                    active_checkpoints["checkpoints"]
+                ):
                     full_checkpoints[path] = checkpoint
 
             return full_checkpoints

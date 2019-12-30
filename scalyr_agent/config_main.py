@@ -22,6 +22,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import cStringIO
@@ -102,14 +103,23 @@ def set_api_key(config, config_file_path, new_api_key):
                 # we are replacing the correct thing.
                 found += s.count(current_key)
                 if found > 1:
-                    print("The existing API key was found in more than one place.  Config file has been", file=sys.stderr)
-                    print("modified already.  Cannot safely update modified config file so failing.", file=sys.stderr)
+                    print(
+                        "The existing API key was found in more than one place.  Config file has been",
+                        file=sys.stderr,
+                    )
+                    print(
+                        "modified already.  Cannot safely update modified config file so failing.",
+                        file=sys.stderr,
+                    )
                     sys.exit(1)
                 s = s.replace(current_key, new_api_key)
-                print(s, end=' ', file=tmp_file)
+                print(s, end=" ", file=tmp_file)
 
             if found != 1:
-                print("The existing API key could not be found in file, failing", file=sys.stderr)
+                print(
+                    "The existing API key could not be found in file, failing",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
             # For Win32, we must make sure the files are closed before rename.
@@ -127,13 +137,23 @@ def set_api_key(config, config_file_path, new_api_key):
             os.rename(tmp_file_path, config_file_path)
         except IOError as error:
             if error.errno == 13:
-                print("You do not have permission to write to the file and directory required ", file=sys.stderr)
-                print("to update the API key.  Ensure you can write to the file at path", file=sys.stderr)
-                print("'%s' and create files in its parent directory." % config_file_path, file=sys.stderr)
+                print(
+                    "You do not have permission to write to the file and directory required ",
+                    file=sys.stderr,
+                )
+                print(
+                    "to update the API key.  Ensure you can write to the file at path",
+                    file=sys.stderr,
+                )
+                print(
+                    "'%s' and create files in its parent directory." % config_file_path,
+                    file=sys.stderr,
+                )
             else:
-                print("Error attempting to update the key: %s" % str(
-                    error
-                ), file=sys.stderr)
+                print(
+                    "Error attempting to update the key: %s" % str(error),
+                    file=sys.stderr,
+                )
                 print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
         except Exception as err:
@@ -212,21 +232,33 @@ def write_config_fragment(config, file_name, field_description, config_json):
             os.rename(tmp_host_path, host_path)
         except IOError as error:
             if error.errno == 13:
-                print("You do not have permission to write to the file and directory required ", file=sys.stderr)
-                print("to set the %s.  Ensure you can write to the file at path" % field_description, file=sys.stderr)
-                print("'%s' and create files in its parent directory." % host_path, file=sys.stderr)
+                print(
+                    "You do not have permission to write to the file and directory required ",
+                    file=sys.stderr,
+                )
+                print(
+                    "to set the %s.  Ensure you can write to the file at path"
+                    % field_description,
+                    file=sys.stderr,
+                )
+                print(
+                    "'%s' and create files in its parent directory." % host_path,
+                    file=sys.stderr,
+                )
             else:
-                print("Error attempting to update the %s: %s" % (
-                    field_description,
-                    str(error),
-                ), file=sys.stderr)
+                print(
+                    "Error attempting to update the %s: %s"
+                    % (field_description, str(error),),
+                    file=sys.stderr,
+                )
                 print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
         except Exception as err:
-            print("Error attempting to update the %s: %s" % (
-                field_description,
-                str(err),
-            ), file=sys.stderr)
+            print(
+                "Error attempting to update the %s: %s"
+                % (field_description, str(err),),
+                file=sys.stderr,
+            )
             print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
     finally:
@@ -244,10 +276,11 @@ def update_user_id(file_path, new_uid):
         group_id = os.stat(file_path).st_gid
         os.chown(file_path, new_uid, group_id)
     except Exception as err:
-        print('Error attempting to update permission on file "%s": %s' % (
-            file_path,
-            str(err),
-        ), file=sys.stderr)
+        print(
+            'Error attempting to update permission on file "%s": %s'
+            % (file_path, str(err),),
+            file=sys.stderr,
+        )
         print(traceback.format_exc(), file=sys.stderr)
         sys.exit(1)
 
@@ -267,10 +300,11 @@ def update_user_id_recursively(path, new_uid):
             elif os.path.isdir(full_path):
                 update_user_id_recursively(full_path, new_uid)
     except Exception as err:
-        print('Error attempting to update permissions on files in dir "%s": %s' % (
-            path,
-            str(err),
-        ), file=sys.stderr)
+        print(
+            'Error attempting to update permissions on files in dir "%s": %s'
+            % (path, str(err),),
+            file=sys.stderr,
+        )
         print(traceback.format_exc(), file=sys.stderr)
         sys.exit(1)
 
@@ -285,7 +319,9 @@ def set_executing_user(config, config_file_path, new_executing_user):
     try:
         uid = getpwnam(new_executing_user).pw_uid
     except KeyError:
-        print('User "%s" does not exist.  Failing.' % new_executing_user, file=sys.stderr)
+        print(
+            'User "%s" does not exist.  Failing.' % new_executing_user, file=sys.stderr
+        )
         sys.exit(1)
 
     # The agent looks to the owner of the configuration file to determine what user to run as.  So, change that
@@ -455,7 +491,9 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                     == 0
                 ):
                     print("Agent has successfully restarted.")
-                    print("  You may execute the following command for status details:  scalyr-agent-2 status -v")
+                    print(
+                        "  You may execute the following command for status details:  scalyr-agent-2 status -v"
+                    )
                     was_restarted = True
                 else:
                     raise UpgradeFailure(
@@ -463,13 +501,18 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                         "scalyr-agent-2 start"
                     )
             else:
-                print("Execute the following command to start the agent:  scalyr-agent-2 start")
+                print(
+                    "Execute the following command to start the agent:  scalyr-agent-2 start"
+                )
 
             return 0
 
         except UpgradeFailure as error:
             print(file=sys.stderr)
-            print("The upgrade failed due to the following reason: %s" % error.message, file=sys.stderr)
+            print(
+                "The upgrade failed due to the following reason: %s" % error.message,
+                file=sys.stderr,
+            )
             return 1
 
     finally:
@@ -479,7 +522,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
         # Warn if we should have restarted the agent but did not.
         if was_running and not was_restarted:
             print("")
-            print (
+            print(
                 "WARNING, due to failure, the agent may no longer be running.  Restart it with: scalyr-agent-2 "
                 "start"
             )
@@ -488,7 +531,9 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
         if preserve_dir is not None:
             print("")
             print("The previous agent installation was left in '%s'" % preserve_dir)
-            print("You should be sure to delete this directory once you no longer need it.")
+            print(
+                "You should be sure to delete this directory once you no longer need it."
+            )
 
 
 # noinspection PyUnusedLocal
@@ -604,10 +649,10 @@ def upgrade_windows_install(
             print("The latest version is already installed.")
             return 0
 
-        print("Attempting to upgrade agent from version %s to version %s." % (
-            SCALYR_VERSION,
-            data_payload["current_version"],
-        ))
+        print(
+            "Attempting to upgrade agent from version %s to version %s."
+            % (SCALYR_VERSION, data_payload["current_version"],)
+        )
         url_path = data_payload["urls"]["win32"]
 
         file_portion = url_path[url_path.rfind("/") + 1 :]
@@ -622,12 +667,12 @@ def upgrade_windows_install(
                     raise UpgradeFailure("Failed to download installation package")
 
                 if use_ui:
-                    print (
+                    print(
                         "Executing upgrade.  Please follow the instructions in the subsequent dialog boxes to "
                         "complete the upgrade process."
                     )
                 else:
-                    print ("Executing upgrade.  It will finish in the background.")
+                    print("Executing upgrade.  It will finish in the background.")
 
                 # Because this file, config_main.py, is part of the currently installed Scalyr Agent package, we have
                 # to finish our use of it before the upgrade can proceed.  So, we just fork off the msiexec process
@@ -660,15 +705,26 @@ def upgrade_windows_install(
             # before the msiexec process runs, but maybe we can do something like have a small shell script
             # that runs the upgrader and then deletes the file.  Something to consider post-alpha release.
             if preserve_msi:
-                print("Downloaded installer file has been left at %s" % download_location)
+                print(
+                    "Downloaded installer file has been left at %s" % download_location
+                )
 
     except UpgradeFailure as error:
         print(file=sys.stderr)
-        print("The upgrade failed due to the following reason: %s" % error.message, file=sys.stderr)
+        print(
+            "The upgrade failed due to the following reason: %s" % error.message,
+            file=sys.stderr,
+        )
         if url_path is not None:
-            print("You may try downloading and running the installer file yourself.", file=sys.stderr)
+            print(
+                "You may try downloading and running the installer file yourself.",
+                file=sys.stderr,
+            )
             print("The installer can be downloaded from %s" % url_path, file=sys.stderr)
-        print("Please e-mail contact@scalyr.com for help resolving this issue.", file=sys.stderr)
+        print(
+            "Please e-mail contact@scalyr.com for help resolving this issue.",
+            file=sys.stderr,
+        )
         return 1
 
 
@@ -708,15 +764,17 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
 
         if return_code != 0:
             if command_name is not None:
-                print("Executing %s failed and returned a non-zero result of %d" % (
-                    command_name,
-                    return_code,
-                ), file=sys.stderr)
+                print(
+                    "Executing %s failed and returned a non-zero result of %d"
+                    % (command_name, return_code,),
+                    file=sys.stderr,
+                )
             else:
-                print((
+                print(
                     "Executing the following command failed and returned a non-zero result of %d"
-                    % return_code
-                ), file=sys.stderr)
+                    % return_code,
+                    file=sys.stderr,
+                )
                 print('  Command: "%s"' % command_str, file=sys.stderr)
 
             print("The output was:", file=sys.stderr)
@@ -1266,25 +1324,32 @@ if __name__ == "__main__":
 
         if os.path.exists(config_path):
             if not options.init_config_ignore_exists:
-                print((
+                print(
                     "Cannot initialize configuration file at %s because file already exists."
-                    % config_path
-                ), file=sys.stderr)
+                    % config_path,
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             else:
-                print("Configuration file already exists at %s, so doing nothing." % config_path, file=sys.stderr)
+                print(
+                    "Configuration file already exists at %s, so doing nothing."
+                    % config_path,
+                    file=sys.stderr,
+                )
         else:
             if not os.path.isdir(template_dir):
-                print((
+                print(
                     "Cannot initialize configuration file because template directory does not exist "
-                    "at %s" % template_dir
-                ), file=sys.stderr)
+                    "at %s" % template_dir,
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             if not os.path.isfile(template):
-                print((
+                print(
                     "Cannot initialize configuration file because template file does not exist at"
-                    "%s" % template
-                ), file=sys.stderr)
+                    "%s" % template,
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
             # Copy the file.
@@ -1293,7 +1358,10 @@ if __name__ == "__main__":
             print("Successfully initialized the configuration file.")
 
     if options.executing_user and controller.get_current_user() != "root":
-        print("You must be root to update the user account that is used to run the agent.", file=sys.stderr)
+        print(
+            "You must be root to update the user account that is used to run the agent.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     try:
@@ -1302,7 +1370,10 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error reading configuration file: %s" % str(e), file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
-        print("Terminating, please fix the configuration file and restart agent.", file=sys.stderr)
+        print(
+            "Terminating, please fix the configuration file and restart agent.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     controller.consume_config(config_file, options.config_filename)

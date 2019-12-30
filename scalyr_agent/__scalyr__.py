@@ -16,9 +16,11 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
-# 2->TODO "Modernize" tool added "six" library as a dependency in this file.
+# [start of 2->TODO]
+# "Modernize" tool added "six" library as a dependency in this file.
 # But in case of absence of six in site-packages we can not import "six" before scalyr_init.
 # The first option is to provide 2->3 compatibility without "six". This is easy for now,
 # because there is only one incompatible piece of code here.
@@ -30,7 +32,7 @@ except NameError:
     # Python3
     text_type = str
 # The second option is to assure that "six" library installed in current python environment.
-# [end of 2->TODO]
+# [end of 2->TOD0]
 
 
 import inspect
@@ -156,9 +158,14 @@ def get_install_root():
 def __add_scalyr_package_to_path():
     """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
     """
-    # prepend the third party directory first so it appears after the package root and
-    # third_party_tls directories
+    # prepend the third party directory first so it appears after the package root, third_party_pythonX
+    # and third_party_tls directories
     sys.path.insert(0, os.path.join(get_package_root(), "third_party"))
+
+    if sys.version_info[0] == 2:
+        sys.path.insert(0, os.path.join(get_package_root(), "third_party_python2"))
+    else:
+        sys.path.insert(0, os.path.join(get_package_root(), "third_party_python3"))
 
     # if we are not on windows, prepend the third party tls directory first so it appears after the package root
     if not __is_py2exe__:

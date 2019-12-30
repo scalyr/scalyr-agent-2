@@ -17,6 +17,7 @@
 
 
 from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import scalyr_agent.scalyr_logging as scalyr_logging

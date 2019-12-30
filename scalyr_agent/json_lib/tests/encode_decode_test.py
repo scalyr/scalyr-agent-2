@@ -16,6 +16,7 @@
 # author:  Edward Chee <echee@scalyr.com>
 
 from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
 

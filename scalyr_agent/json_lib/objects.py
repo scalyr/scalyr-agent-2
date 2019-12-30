@@ -26,6 +26,7 @@
 from __future__ import absolute_import
 import six
 from six.moves import range
+
 __author__ = "czerwin@scalyr.com"
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException
@@ -161,7 +162,7 @@ class JsonObject(object):
             value_type = type(value)
             if value_type == JsonObject or value_type == dict:
                 result = dict()
-                for key, value in value.iteritems():
+                for key, value in six.iteritems(value):
                     result[key] = _convert_to_builtin_type(value)
                 return result
             elif value_type == JsonArray or value_type == list:

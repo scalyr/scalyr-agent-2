@@ -18,6 +18,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import sys
@@ -36,10 +37,10 @@ def _noop_skip(reason):
         if not isinstance(test_func_or_obj, type):
 
             def skip_wrapper(*args, **kwargs):
-                print((
+                print(
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
-                ))
+                )
 
             return skip_wrapper
         else:

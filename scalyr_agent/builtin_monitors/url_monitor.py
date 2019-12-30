@@ -199,7 +199,10 @@ class UrlMonitor(ScalyrMonitor):
         # Query the URL
         try:
             opener = six.moves.urllib.request.build_opener(
-                NoRedirection, six.moves.urllib.request.HTTPCookieProcessor(six.moves.http_cookiejar.CookieJar())
+                NoRedirection,
+                six.moves.urllib.request.HTTPCookieProcessor(
+                    six.moves.http_cookiejar.CookieJar()
+                ),
             )
             request = self.build_request()
             response = opener.open(request, timeout=self.timeout)
