@@ -49,7 +49,8 @@ from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_ini
 
 scalyr_init()
 
-# 2->TODO check for suitability.
+# [start of 2->TODO]
+# Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import range
 

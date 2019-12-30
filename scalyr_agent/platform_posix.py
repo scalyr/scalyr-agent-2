@@ -154,7 +154,7 @@ class PosixPlatformController(PlatformController):
             print(
                 "Assuming pid file is '%s'.  Use --pid-file to override."
                 % self.__pidfile,
-                file=sys.stderr,
+                file=sys.stderr
             )
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)

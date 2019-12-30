@@ -34,11 +34,21 @@ The packages exported are:
   monitor_utils  -- A collection of abstractions that can be used to implement monitors.
 """
 
+# [start of 2-TODO]
+# all source code files should have unicode literals by using "from __future__ import unicode_literals"
+# By using unicode literals, we will have to explicitly specify literals and variables with binary data,
+# By the way we have to use io.StringIO and io BytesIO
+# instead of sStringIO.StringIO by the same reason(python3 does not have such things)
+# As we are not able to use something different in python3,
+# I think we should use the same things in python2, to achieve maximal identity of the behaviour.
+# [end of 2->TODO]
+
 from __future__ import absolute_import
 
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
-# 2->TODO: "Modernize" tool added "six" library almost everywhere.
+# [start of 2->TODO]
+#  "Modernize" tool added "six" library almost everywhere.
 #  So we need to add third_party libraries in PYTHONPATH before "six" will be imported in any further file.
 from scalyr_agent.__scalyr__ import scalyr_init
 

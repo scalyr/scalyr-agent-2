@@ -79,7 +79,8 @@ except ImportError:
         "the following command:  pip install psutil"
     )
 
-# 2->TODO check for suitability.
+# [start of 2->TODO]
+# Check for suitability.
 # This file can be executed as script and imported as module.
 if __name__ == "__main__":
     # run as script, can not import __scalyr__.py as part of the package.
@@ -92,7 +93,8 @@ else:
 
 scalyr_init()
 
-# 2->TODO check for suitability.
+# [start of 2->TODO]
+# Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import input
 

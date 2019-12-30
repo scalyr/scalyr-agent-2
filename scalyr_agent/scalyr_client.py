@@ -15,6 +15,12 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+# [start of 2->TODO]
+# Should we keep intermediate data(such as Event.__set_attributes, or AddEventsRequest.set_client_time)
+# as binary from the beginning, or it should keep in as unicode and convert it to bytes when we gather all data together?
+# Here i tried to keep them as binary.
+# [end of 2->TOD0]
+
 from __future__ import absolute_import
 import six
 from six.moves import map
@@ -813,6 +819,7 @@ class AddEventsRequest(object):
         # to JSON without the 'events' field, but then delete the last '}' so that we can manually
         # add in the 'events: [ ... ]' ourselves.  This way we can watch the size of the buffer as
         # we build up events.
+        # 2->TODO use BytesIO, make all data that is going to be written here - binary
         string_buffer = StringIO()
         scalyr_util.json_encode(base_body, output=string_buffer)
 
@@ -945,6 +952,7 @@ class AddEventsRequest(object):
         # Check if we exceeded the size, if so chop off what we just added.
         # Also reset previously seen sequence numbers and ids
         if self.current_size > self.__max_size:
+            # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
             self.__buffer.truncate(start_pos)
             self.__event_sequencer.restore_from_memento(memento)
             return False
@@ -985,6 +993,7 @@ class AddEventsRequest(object):
 
             # Create a buffer for the copying.  We write in the entire JSON and then just back up the length of
             # the old postfix and then add in the new one.
+            # 2->TODO: use BytesIO
             rebuild_buffer = StringIO()
             rebuild_buffer.write(self.__body)
             self.__body = None
@@ -1094,6 +1103,7 @@ class AddEventsRequest(object):
         @param position: The position token representing the previous state.
         """
         self.__events_added = position.events_added
+        # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
         self.__buffer.truncate(position.buffer_size)
         self.__post_fix_buffer.set_position(position.postfix_buffer_position)
 
@@ -1194,6 +1204,7 @@ def _calculate_per_log_extra_bytes():
 
 
 class PostFixBuffer(object):
+    # 2->TODO this is binary buffer. Make it work only with binary data.
     """Buffer for the items that must be written after the events JSON array, which typically means
     the client timestamp and the threads JSON array.
 
@@ -1298,6 +1309,7 @@ class PostFixBuffer(object):
     def add_log_and_thread_entry(
         self, thread_id, thread_name, log_attrs, fail_if_buffer_exceeds=None
     ):
+        # 2->TODO: Make it work with binary.
         """Adds in a new thread entry that will be included in the post fix.
 
 
@@ -1494,6 +1506,7 @@ class Event(object):
         self.__thread_id = thread_id
         self.__attrs = attributes
         # A new event.  We have to create the serialization base using provided information/
+        # 2->TODO: use BytesIO, make all written data - binary.
         tmp_buffer = StringIO()
         # Open base for the event object.
         tmp_buffer.write("{")
@@ -1698,6 +1711,7 @@ class Event(object):
         """Serialize the event into ``output_buffer``.
 
         @param output_buffer: The buffer to serialize to.
+        # 2->TODO: output_buffer needs to be BytesIO
         @type output_buffer: StringIO
         """
         output_buffer.write(self.__serialization_base)
@@ -1743,6 +1757,10 @@ class Event(object):
         @type field_value: str or None
         @type output_buffer: StringIO
         """
+        # [start of 2->TODO]
+        # BytesIO type needed. filed_name and field_value should be passed as binary.
+        # In other case, we should convert them here.
+        # [end of 2->TODO]
         if field_value is not None:
             output_buffer.write(field_name)
             output_buffer.write(field_value)
@@ -1757,6 +1775,7 @@ def _rewind_past_close_curly(output_buffer):
     @param output_buffer:  The buffer to rewind.
     @type output_buffer: StringO
     """
+    #2->TODO make binary literals.
     # Now go back and find the last '}' and delete it so that we can open up the JSON again.
     location = output_buffer.tell()
     while location > 0:

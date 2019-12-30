@@ -1219,7 +1219,7 @@ class ScriptEscalator(object):
                     e.error_message,
                     self.__desired_user,
                 ),
-                file=sys.stderr,
+                file=sys.stderr
             )
             return 1
 

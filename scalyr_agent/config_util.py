@@ -88,7 +88,9 @@ def parse_array_of_strings(strlist, separators=[","]):
 
 
 NUMERIC_TYPES = set(six.integer_types + (float,))
+# 2->TODO remove str, only six.text_type should remain in string_type
 STRING_TYPES = set([str, six.text_type])
+# 2->TODO remove str
 PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, six.text_type, bool])
 SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
     [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
@@ -98,6 +100,7 @@ ALLOWED_CONVERSIONS = {
     float: STRING_TYPES,
     list: set(
         [
+            # 2->TODO remove str
             str,
             six.text_type,
             JsonArray,
@@ -106,22 +109,28 @@ ALLOWED_CONVERSIONS = {
         ]
     ),
     JsonArray: set(
+        # 2->TODO remove str
         [str, six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonObject: STRING_TYPES,
+    # 2->TODO remove str
     str: SUPPORTED_TYPES,
     six.text_type: SUPPORTED_TYPES,
 }
 
-# 2->TODO The review of this solution is needed.
+# [start of 2->TODO]
+# The review of this solution is needed.
 # In python 2.6, 2.7 long can be converted to int without error,
 # so we can keep only int as allowed conversion for both int and long input values.
 ALLOWED_CONVERSIONS.update(
     (
+        # 2->TODO remove str
         (int_type, set([str, six.text_type, int, float]))
         for int_type in six.integer_types
     )
 )
+
+# [end of 2->TOD0]
 
 
 def convert_config_param(field_name, value, convert_to, is_environment_variable=False):

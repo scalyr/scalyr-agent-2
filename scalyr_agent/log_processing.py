@@ -21,6 +21,7 @@
 #         logs.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+# 2-TODO add unicode_literals
 from __future__ import absolute_import
 import sys
 import six
@@ -52,6 +53,7 @@ from scalyr_agent.line_matcher import LineMatcher
 
 from scalyr_agent.scalyr_client import Event
 
+# 2->TODO use io library
 from cStringIO import StringIO
 from os import listdir
 from os.path import isfile, join
@@ -383,6 +385,7 @@ class LogFileIterator(object):
         """Returns a uuid as a string
         We want uuids as strings mostly as a convenience for json_lib
         """
+        # 2->TODO str to six.text_type
         return str(uuid.uuid4())
 
     def get_sequence(self):
@@ -993,6 +996,7 @@ class LogFileIterator(object):
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float or None
         """
+        # 2->TODO change to BytesIO
         new_buffer = StringIO()
         new_buffer_content_index = []
 
@@ -1861,6 +1865,7 @@ class LogFileProcessor(object):
                 lines_read += 1
 
                 if self.__num_redaction_and_sampling_rules > 0:
+                    # 2->TODO: decode bytes string from UTF-8 for redaction and sampling
                     sample_result = self.__sampler.process_line(line_object.line)
                     if sample_result is None:
                         lines_dropped_by_sampling += 1
@@ -1871,6 +1876,7 @@ class LogFileProcessor(object):
                         line_object.line
                     )
                     line_len = len(line_object.line)
+                    # 2->TODO: encode line back
                 else:
                     sample_result = 1.0
                     redacted = False
@@ -2039,7 +2045,11 @@ class LogFileProcessor(object):
                         log.info("Request failed. Retrying")
                         return False
                     else:
+                        # [start of  2->TODO] as in other similar places, it can be OK to leave literals here as str.
+                        #  But as we use "unicode_literals",
+                        #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                         raise Exception("Invalid result %s" % str(result))
+                        # [end of 2->TODO]
                 finally:
                     self.__lock.release()
 
@@ -2468,6 +2478,7 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line,
                 )
+        # [start of 2->TODO]:I think this can not happen when it is guarantied that the input is unicode.
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
@@ -2485,12 +2496,16 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line.decode("utf-8", "replace"),
                 )
+        # [end of 2-> TOD0]
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
+            # [start of 2->TODO]:
+            #  As redaction and sampling now only expect unicode, this can be removed.
             if type(result) == six.text_type:
                 result = result.encode("utf-8")
+            # [end of 2->TOD0]
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
@@ -2818,6 +2833,7 @@ class LogMatcher(object):
                         new_processor.add_redacter(
                             rule["match_expression"],
                             rule["replacement"],
+                            # 2->TODO str to six.text_type
                             str(rule.get("hash_salt", default_value="")),
                         )
                     for rule in self.__log_entry_config["sampling_rules"]:
@@ -2889,6 +2905,7 @@ class LogMatcher(object):
                     result = pattern.substitute(values)
                 except Exception as e:
                     log.warn(
+                        # 2->TODO same as 2046 line.
                         "Invalid substition pattern in 'rename_logfile'. %s" % str(e)
                     )
             elif isinstance(rename, JsonObject):
@@ -2906,6 +2923,7 @@ class LogMatcher(object):
                     except Exception as e:
                         log.warn(
                             "Error matching regular expression '%s' and replacing with '%s'.  %s"
+                            # 2->TODO same as 2046 line.
                             % (rename["match"], rename["replacement"], str(e)),
                             limit_once_per_x_secs=600,
                             limit_key=("rename-regex-error-%s" % matched_file),

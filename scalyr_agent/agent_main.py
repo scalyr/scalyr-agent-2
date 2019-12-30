@@ -249,7 +249,7 @@ class ScalyrAgent(object):
                 self.__config = None
                 print(
                     "Could not parse configuration file at '%s'" % config_file_path,
-                    file=sys.stderr,
+                    file=sys.stderr
                 )
 
         self.__controller.consume_config(self.__config, config_file_path)
@@ -285,7 +285,7 @@ class ScalyrAgent(object):
                     agent_data_path = self.__default_paths.agent_data_path
                     print(
                         "Assuming agent data path is '%s'" % agent_data_path,
-                        file=sys.stderr,
+                        file=sys.stderr
                     )
                 return self.__detailed_status(agent_data_path)
             elif command == "restart":
@@ -455,7 +455,7 @@ class ScalyrAgent(object):
                             "Sending request to the server failed due to bad clock skew.  The system "
                             "clock on this host is too far off from actual time. The agent will keep "
                             "trying to connect in the background.",
-                            file=sys.stderr,
+                            file=sys.stderr
                         )
                     elif "invalidApiKey" in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
@@ -478,7 +478,7 @@ class ScalyrAgent(object):
                             "wrong, there could be a network connectivity issue, or the provided "
                             "token could be incorrect. The agent will keep trying to connect in the "
                             "background. You can disable this check with --no-check-remote-server.",
-                            file=sys.stderr,
+                            file=sys.stderr
                         )
             finally:
                 client.close()
@@ -524,7 +524,7 @@ class ScalyrAgent(object):
             traceback.print_exc(file=sys.stderr)
             print(
                 "Terminating agent, please fix the error and restart the agent.",
-                file=sys.stderr,
+                file=sys.stderr
             )
             log.error("%s" % str(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
@@ -533,7 +533,7 @@ class ScalyrAgent(object):
         if sys.version_info[:2] < (2, 6):
             print(
                 "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019",
-                file=sys.stderr,
+                file=sys.stderr
             )
             log.error(
                 "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019"
@@ -598,7 +598,7 @@ class ScalyrAgent(object):
             print(
                 'Cannot get status due to bad config.  The data path "%s" is not a directory'
                 % data_directory,
-                file=sys.stderr,
+                file=sys.stderr
             )
             return 1
 
@@ -610,7 +610,7 @@ class ScalyrAgent(object):
             print(
                 "Cannot get status due to insufficient permissions.  The current user does not "
                 'have write access to "%s" as required.' % status_file,
-                file=sys.stderr,
+                file=sys.stderr
             )
             return 1
 
@@ -632,7 +632,7 @@ class ScalyrAgent(object):
                 print(
                     "To view agent status, you must be running as the same user as the agent. "
                     "Try running this command as root or Administrator.",
-                    file=sys.stderr,
+                    file=sys.stderr
                 )
                 return 2
 
@@ -654,7 +654,7 @@ class ScalyrAgent(object):
                 print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
                     "possibly stuck.  See %s for more details." % agent_log,
-                    file=sys.stderr,
+                    file=sys.stderr
                 )
                 return 1
 
@@ -664,7 +664,7 @@ class ScalyrAgent(object):
             print(
                 "Cannot get status due to insufficient permissions.  The current user does not "
                 'have read access to "%s" as required.' % status_file,
-                file=sys.stderr,
+                file=sys.stderr
             )
             return 1
 
@@ -697,7 +697,7 @@ class ScalyrAgent(object):
         except AgentNotRunning as e:
             print(
                 "Failed to stop the agent because it does not appear to be running.",
-                file=sys.stderr,
+                file=sys.stderr
             )
             print("%s" % str(e), file=sys.stderr)
             return 0  # For the sake of restart, we need to return non-error code here.
@@ -744,7 +744,7 @@ class ScalyrAgent(object):
             if self.__stop(quiet) != 0:
                 print(
                     "Failed to stop the running agent.  Cannot restart until it is killed.",
-                    file=sys.stderr,
+                    file=sys.stderr
                 )
                 return 1
 
@@ -785,7 +785,7 @@ class ScalyrAgent(object):
             if self.__stop(quiet) != 0:
                 print(
                     "Failed to stop the running agent.  Cannot restart until it is killed",
-                    file=sys.stderr,
+                    file=sys.stderr
                 )
                 return 1
 
@@ -1624,14 +1624,14 @@ if __name__ == "__main__":
     if len(args) < 1:
         print(
             'You must specify a command, such as "start", "stop", or "status".',
-            file=sys.stderr,
+            file=sys.stderr
         )
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
         print(
             'Too many commands specified.  Only specify one of "start", "stop", "status".',
-            file=sys.stderr,
+            file=sys.stderr
         )
         parser.print_help(sys.stderr)
         sys.exit(1)
