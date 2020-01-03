@@ -82,6 +82,8 @@ class Configuration(object):
         # The log configuration objects from the configuration file.  This does not include logs required by
         # the monitors.
         self.__log_configs = []
+        # Optional configuration for journald monitor logging
+        self.__journald_log_configs = []
         # The monitor configuration objects from the configuration file.  This does not include monitors that
         # are created by default by the platform.
         self.__monitor_configs = []
@@ -135,6 +137,7 @@ class Configuration(object):
             allowed_multiple_keys = (
                 "import_vars",
                 "logs",
+                "journald_logs",
                 "monitors",
                 "server_attributes",
             )
@@ -166,6 +169,7 @@ class Configuration(object):
                         self.__config.put(key, value)
 
                 self.__add_elements_from_array("logs", content, self.__config)
+                self.__add_elements_from_array("journald_logs", content, self.__config)
                 self.__add_elements_from_array("monitors", content, self.__config)
                 self.__merge_server_attributes(fp, content, self.__config)
 
@@ -219,6 +223,10 @@ class Configuration(object):
             self.__log_configs = list(self.__config.get_json_array("logs"))
             if agent_log is not None:
                 self.__log_configs.append(agent_log)
+
+            self.__journald_log_configs = list(
+                self.__config.get_json_array("journald_logs")
+            )
 
             # add in the profile log if we have enabled profiling
             if self.enable_profiling:
@@ -602,6 +610,13 @@ class Configuration(object):
 
         @rtype list<JsonObject>"""
         return self.__log_configs
+
+    @property
+    def journald_log_configs(self):
+        """Returns the list of configuration entries for all the journald loggers specified in the configuration file.
+
+        @rtype list<JsonObject>"""
+        return self.__journald_log_configs
 
     @property
     def monitor_configs(self):
@@ -2064,12 +2079,23 @@ class Configuration(object):
         """
         description = 'in configuration file "%s"' % file_path
         self.__verify_or_set_optional_array(config, "logs", description)
+        self.__verify_or_set_optional_array(config, "journald_logs", description)
         self.__verify_or_set_optional_array(config, "monitors", description)
 
         i = 0
         for log_entry in config.get_json_array("logs"):
             self.__verify_log_entry_and_set_defaults(
                 log_entry, config_file_path=file_path, entry_index=i
+            )
+            i += 1
+
+        i = 0
+        for log_entry in config.get_json_array("journald_logs"):
+            self.__verify_log_entry_with_key_and_set_defaults(
+                log_entry,
+                key="journald_unit",
+                config_file_path=file_path,
+                entry_index=i,
             )
             i += 1
 
@@ -2083,7 +2109,8 @@ class Configuration(object):
     def __verify_log_entry_and_set_defaults(
         self, log_entry, description=None, config_file_path=None, entry_index=None
     ):
-        """Verifies that the configuration for the specified log meets all the required criteria and sets any defaults.
+        """Verifies that the configuration for the specified log has a key called 'path' and meets all
+        the required criteria and sets any defaults.
 
         Raises an exception if it does not.
 
@@ -2095,23 +2122,56 @@ class Configuration(object):
         @param entry_index: The index of the entry in the 'logs' json array. Used to generate the description if none
             was given.
         """
-        # Verify it has a path entry that is a string.
+        # Make sure the log_enty has a path and the path is absolute.
+        path = log_entry.get_string("path", none_if_missing=True)
+        if path and not os.path.isabs(path):
+            log_entry.put("path", os.path.join(self.agent_log_path, path))
+        self.__verify_log_entry_with_key_and_set_defaults(
+            log_entry,
+            "path",
+            description=description,
+            config_file_path=config_file_path,
+            entry_index=entry_index,
+        )
+
+    def __verify_log_entry_with_key_and_set_defaults(
+        self,
+        log_entry,
+        key=None,
+        description=None,
+        config_file_path=None,
+        entry_index=None,
+    ):
+        """Verifies that the configuration for the specified log meets all the required criteria and sets any defaults.
+
+        Raises an exception if it does not.
+
+        @param log_entry: The JsonObject holding the configuration for a log.
+        @param key: A key that must exist in the log entry.  The key is used to identify logs e.g. by path, container name etc
+            If `None` then no checking is done
+        @param description: A human-readable description of where the log entry came from to use in error messages. If
+            none is given, then both file_path and entry_index must be set.
+        @param config_file_path: The path for the file from where the configuration was read. Used to generate the
+            description if none was given.
+        @param entry_index: The index of the entry in the 'logs' json array. Used to generate the description if none
+            was given.
+        """
         no_description_given = description is None
         if no_description_given:
             description = (
                 'the entry with index=%i in the "logs" array in configuration file "%s"'
                 % (entry_index, config_file_path)
             )
-        self.__verify_required_string(log_entry, "path", description)
-        # Make sure the path is absolute.
-        path = log_entry.get_string("path")
-        if not os.path.isabs(path):
-            log_entry.put("path", os.path.join(self.agent_log_path, path))
+        log = None
+        if key is not None:
+            # Verify it has a `key` entry that is a string.
+            self.__verify_required_string(log_entry, key, description)
+            log = log_entry.get_string(key)
 
-        if no_description_given:
+        if log is not None and no_description_given:
             description = (
                 'the entry for "%s" in the "logs" array in configuration file "%s"'
-                % (path, config_file_path)
+                % (log, config_file_path)
             )
 
         self.__verify_or_set_optional_array_of_strings(
