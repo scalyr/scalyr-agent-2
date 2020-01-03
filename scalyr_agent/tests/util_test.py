@@ -108,9 +108,15 @@ class TestUtil(ScalyrTestCase):
         self.__path = os.path.join(self.__tempdir, "testing.json")
 
     def test_read_file_as_json(self):
-        self.__create_file(self.__path, '{ a: "hi"}')
+        self.__create_file(self.__path, '{ "a": "hi"}')
 
-        json_object = scalyr_util.read_file_as_json(self.__path)
+        value = scalyr_util.read_file_as_json(self.__path)
+        self.assertEquals(value, {"a": "hi"})
+
+    def test_read_config_file_as_json(self):
+        self.__create_file(self.__path, '{ a: "hi"} // Test')
+
+        json_object = scalyr_util.read_config_file_as_json(self.__path)
         self.assertEquals(json_object, JsonObject(a="hi"))
 
     def test_read_file_as_json_no_file(self):
@@ -128,7 +134,7 @@ class TestUtil(ScalyrTestCase):
         scalyr_util.atomic_write_dict_as_json_file(self.__path, self.__path + "~", info)
 
         json_object = scalyr_util.read_file_as_json(self.__path)
-        self.assertEquals(json_object, JsonObject(a="hi"))
+        self.assertEquals(json_object, info)
 
     def __create_file(self, path, contents):
         fp = open(path, "w")
@@ -153,6 +159,15 @@ class TestUtil(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_datetime(s)
 
         self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56Z"
+        actual = scalyr_util.rfc3339_to_datetime(s)
+
+        self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56), actual)
+
+        s = "2015-08-06T14:40:56.123456"
+        actual = scalyr_util.rfc3339_to_datetime(s)
+        self.assertEquals(datetime.datetime(2015, 8, 6, 14, 40, 56), actual)
 
     def test_rfc3339_to_datetime_truncated_nano(self):
         s = "2015-08-06T14:40:56.123456789Z"
@@ -186,8 +201,28 @@ class TestUtil(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
+        s = "2015-08-06T14:40:56.123456"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56)
+            )
+            * 1000
+        )
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
     def test_rfc3339_to_nanoseconds_since_epoch_no_fractions(self):
         s = "2015-08-06T14:40:56"
+        expected = (
+            scalyr_util.microseconds_since_epoch(
+                datetime.datetime(2015, 8, 6, 14, 40, 56)
+            )
+            * 1000
+        )
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        self.assertEquals(expected, actual)
+
+        s = "2015-08-06T14:40:56Z"
         expected = (
             scalyr_util.microseconds_since_epoch(
                 datetime.datetime(2015, 8, 6, 14, 40, 56)
@@ -243,6 +278,11 @@ class TestUtil(ScalyrTestCase):
         actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
         self.assertEquals(expected, actual)
 
+    def test_rfc3339_to_nanoseconds_since_epoch_bad_format_has_timezone(self):
+        s = "2015-08-06T14:40:56.123456789+04:00"
+        actual = scalyr_util.rfc3339_to_nanoseconds_since_epoch(s)
+        self.assertIs(None, actual)
+
     def test_uuid(self):
         first = scalyr_util.create_unique_id()
         second = scalyr_util.create_unique_id()
@@ -271,6 +311,16 @@ class TestUtil(ScalyrTestCase):
 
     def test_is_list_of_strings_none(self):
         self.assertFalse(scalyr_util.is_list_of_strings(None))
+
+    def test_value_to_bool(self):
+        self.assertTrue(scalyr_util.value_to_bool(True))
+        self.assertTrue(scalyr_util.value_to_bool(1))
+        self.assertFalse(scalyr_util.value_to_bool(0))
+        self.assertRaises(ValueError, scalyr_util.value_to_bool, 100)
+        self.assertTrue(scalyr_util.value_to_bool("something"))
+        self.assertFalse(scalyr_util.value_to_bool("f"))
+        self.assertFalse(scalyr_util.value_to_bool("False"))
+        self.assertFalse(scalyr_util.value_to_bool(""))
 
 
 class TestRateLimiter(ScalyrTestCase):

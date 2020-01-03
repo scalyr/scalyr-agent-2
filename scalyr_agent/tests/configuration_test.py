@@ -14,7 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import scalyr_agent.json_lib.objects
 
 __author__ = "czerwin@scalyr.com"
 
@@ -29,7 +28,6 @@ from scalyr_agent.config_util import (
     get_config_from_env,
 )
 from scalyr_agent.json_lib import JsonObject, JsonArray
-from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
 from scalyr_agent.json_lib.objects import (
     ArrayOfStrings,
     SpaceAndCommaSeparatedArrayOfStrings,
@@ -42,6 +40,7 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
     JournaldLogFormatter,
 )
+import scalyr_agent.util as scalyr_util
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -85,7 +84,11 @@ class TestConfigurationBase(ScalyrTestCase):
         return contents
 
     def _write_file_with_separator_conversion(self, contents):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+        contents = scalyr_util.json_encode(
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
+        )
 
         fp = open(self._config_file, "w")
         fp.write(contents)
@@ -94,7 +97,11 @@ class TestConfigurationBase(ScalyrTestCase):
     def _write_config_fragment_file_with_separator_conversion(
         self, file_path, contents
     ):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+        contents = scalyr_util.json_encode(
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
+        )
 
         full_path = os.path.join(self._config_fragments_dir, file_path)
         fp = open(full_path, "w")
@@ -1194,7 +1201,7 @@ class TestConfiguration(TestConfigurationBase):
             "use_unsafe_debugging": False,
         }
         self._write_file_with_separator_conversion(
-            serialize_json(JsonObject(config_file_dict))
+            scalyr_util.json_encode(config_file_dict)
         )
 
         config = self._create_test_configuration_instance()

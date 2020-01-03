@@ -497,9 +497,9 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
 
 class TestExtraServerAttributes(ScalyrTestCase):
     def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         for entry in configuration_logs_entry:
-            logs_json_array.add(JsonObject(content=entry))
+            logs_json_array.append(entry)
 
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
@@ -515,7 +515,7 @@ class TestExtraServerAttributes(ScalyrTestCase):
     def test_no_extra_server_attributes(self):
         copying_manager = self._create_test_instance([], [])
         attribs = copying_manager._CopyingManager__expanded_server_attributes
-        self.assertIsNone(attribs.get("_k8s_ver", none_if_missing=True))
+        self.assertIsNone(attribs.get("_k8s_ver", None))
 
     def test_extra_server_attributes(self):
         def fake_init(self):

@@ -37,7 +37,32 @@ class MonitorsManagerTest(ScalyrTestCase):
         self.assertEquals(len(test_manager.monitors), 1)
         self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor()")
 
-    def test_multiple_modules(self):
+    def test_multiple_modules_and_platform_monitors(self):
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+            config_monitors=[
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+            ],
+            platform_monitors=[
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+            ],
+        )
+
+        self.assertEquals(len(test_manager.monitors), 3)
+        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor(1)")
+        self.assertEquals(test_manager.monitors[1].monitor_name, "test_monitor(2)")
+        self.assertEquals(test_manager.monitors[2].monitor_name, "test_monitor(3)")
+
+    def test_stopping_monitor(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
             [
                 {
@@ -52,9 +77,91 @@ class MonitorsManagerTest(ScalyrTestCase):
             [],
         )
 
-        self.assertEquals(len(test_manager.monitors), 2)
-        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor(1)")
-        self.assertEquals(test_manager.monitors[1].monitor_name, "test_monitor(2)")
+        def augment_user_agent(fragments):
+            pass
+
+        test_manager.set_user_agent_augment_callback(augment_user_agent)
+        test_manager.start_manager()
+        self.assertEquals(test_manager.generate_status().total_alive_monitors, 2)
+
+        test_manager.stop_manager(wait_on_join=True)
+        self.assertEquals(test_manager.generate_status().total_alive_monitors, 0)
+
+    def test_generate_status(self):
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+            [
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+            ],
+            [],
+        )
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
+
+        def augment_user_agent(fragments):
+            pass
+
+        test_manager.set_user_agent_augment_callback(augment_user_agent)
+        test_manager.start_manager()
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 2)
+        self.assertTrue(all([ms.is_alive for ms in status.monitors_status]))
+
+        test_manager.stop_manager(wait_on_join=True)
+
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 0)
+        self.assertFalse(any([ms.is_alive for ms in status.monitors_status]))
+
+    def test_with_disabled_monitors(self):
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+            [
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+            ],
+            [],
+            extra_toplevel_config={"disable_leak_monitors_creation": True,},
+        )
+
+        self.assertEquals(len(test_manager.monitors), 0)
+
+    def test_with_disabled_monitor_threads(self):
+        test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
+            [
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+                {
+                    "module": "scalyr_agent.builtin_monitors.test_monitor",
+                    "gauss_mean": 0,
+                },
+            ],
+            [],
+            extra_toplevel_config={"disable_leak_monitor_threads": True},
+        )
+
+        def augment_user_agent(fragments):
+            pass
+
+        test_manager.set_user_agent_augment_callback(augment_user_agent)
+        test_manager.start_manager()
+        status = test_manager.generate_status()
+        self.assertEquals(status.total_alive_monitors, 0)
 
     def test_module_with_id(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(

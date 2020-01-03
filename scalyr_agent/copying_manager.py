@@ -223,10 +223,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Keep track of monitors
         self.__monitors = monitors
 
-        # collect monitor-specific extra server-attributes
-        self.__expanded_server_attributes = copy.deepcopy(
-            self.__config.server_attributes
-        )
+        # collect monitor-specific extra server-attributes.  seed with a copy of the attributes and converted to a dict.
+        self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
+
         for monitor in monitors:
             monitor_attribs = monitor.get_extra_server_attributes()
             if not monitor_attribs:
@@ -1059,7 +1058,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
         from where we left off copying each file.
         """
-        # Create the format that is expected.  An overall JsonObject with the time when the file was written,
+        # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
         checkpoints = {}
         state = {

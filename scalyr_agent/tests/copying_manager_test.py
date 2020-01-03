@@ -43,10 +43,32 @@ from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import skip, ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
-from scalyr_agent import json_lib
 import scalyr_agent.util as scalyr_util
+import scalyr_agent.test_util as test_util
 
 ONE_MB = 1024 * 1024
+
+
+def _create_test_copying_manager(configuration, monitors, auto_start=True):
+    """
+    :param configuration:
+    :param monitors:
+    :param auto_start:
+        If True, do a proper initialization where the copying manager has scanned the current log file and is ready
+    for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
+        If False, manual start of copying manager is needed. This is useful if we need to pause copying manager
+    before sleeping state, or specify "logs_initial_positions".
+    :return:
+    """
+    manager = TestableCopyingManager(configuration, monitors)
+    # To do a proper initialization where the copying manager has scanned the current log file and is ready
+    # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
+    # But in some cases we have to stop it earlier, so we can specify "stop_at" parameter.
+    if auto_start:
+        manager.start_manager()
+        manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
+
+    return manager
 
 
 class DynamicLogPathTest(ScalyrTestCase):
@@ -94,7 +116,7 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         configuration = Configuration(self._config_file, default_paths, None)
         configuration.parse()
-        self._manager = TestableCopyingManager(configuration, [])
+        self._manager = _create_test_copying_manager(configuration, [])
         self._controller = self._manager.controller
 
     def test_add_path(self):
@@ -230,6 +252,35 @@ class DynamicLogPathTest(ScalyrTestCase):
         matchers = self._manager.log_matchers
         self.assertEquals(0, len(matchers))
 
+    def test_schedule_pending_log_path_for_removal(self):
+        config = {}
+        self.create_copying_manager(config)
+        self.fake_scan()
+
+        path = os.path.join(self._log_dir, "newlog.log")
+        self.append_log_lines(path, "line1")
+
+        log_config = {"path": path}
+
+        # Add new log and remove it right after addition.
+        # Expected that it will remain until all bytes have been read.
+        self._manager.add_log_config("unittest", log_config)
+        self._manager.schedule_log_path_for_removal("unittest", path)
+
+        # The first scan only adds file matcher and file processor, the read, will be on next iteration.
+        # Also it sets matcher as pending removal, but keeps it until file has been read.
+        self.fake_scan()
+        # File processor performs read on previously added file processor.
+        # It should reach OEF, but it won't be removed yet, because it has new bytes.
+        self.fake_scan()
+        # Processor performs another read, but there aren't new bytes.
+        # File processor and file matcher can be removed.
+        self.fake_scan()
+
+        matchers = self._manager.log_matchers
+
+        self.assertEquals(0, len(matchers))
+
     def test_schedule_log_path_for_removal_different_monitor(self):
         config = {}
         self.create_copying_manager(config)
@@ -261,13 +312,24 @@ class DynamicLogPathTest(ScalyrTestCase):
 
         log_config = {"path": path}
 
+        path2 = os.path.join(self._log_dir, "newlog2.log")
+        self.append_log_lines(path2, "line1\n")
+
+        log_config2 = {"path": path2}
+
         self._manager.add_log_config("unittest", log_config)
+        self._manager.add_log_config("unittest", log_config2)
         self.fake_scan()
         matchers = self._manager.log_matchers
-        self.assertEquals(1, len(matchers))
+        self.assertEquals(2, len(matchers))
         self.assertEquals(path, matchers[0].log_path)
+        self.assertEquals(path2, matchers[1].log_path)
 
         self._manager.remove_log_path("unittest", path)
+        matchers = self._manager.log_matchers
+        self.assertEquals(1, len(matchers))
+
+        self._manager.remove_log_path("unittest", path2)
         matchers = self._manager.log_matchers
         self.assertEquals(0, len(matchers))
 
@@ -559,7 +621,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         test_manager.remove_log_path("test_monitor", "blahblah.log")
 
     def test_get_server_attribute(self):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
         )
@@ -574,7 +636,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         self.assertEquals(attribs["KEY_b"], monitor_b.attribute_value)
 
     def test_get_server_attribute_no_override(self):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
         )
@@ -601,9 +663,9 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def _create_test_instance(self, configuration_logs_entry, monitors_log_configs):
-        logs_json_array = JsonArray()
+        logs_json_array = []
         for entry in configuration_logs_entry:
-            logs_json_array.add(JsonObject(content=entry))
+            logs_json_array.append(entry)
 
         config = ScalyrTestUtils.create_configuration(
             extra_toplevel_config={"logs": logs_json_array}
@@ -617,10 +679,26 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         return CopyingManager(config, self.__monitor_fake_instances)
 
 
+def _shift_time_in_checkpoint_file(path, delta):
+    """
+    Modify time in checkpoints by "delta" stored in file located in "path"
+    """
+    fp = open(path, "r")
+    data = scalyr_util.json_decode(fp.read())
+    fp.close()
+
+    data["time"] += delta
+
+    fp = open(path, "w")
+    fp.write(scalyr_util.json_encode(data))
+    fp.close()
+
+
 class CopyingManagerEnd2EndTest(ScalyrTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
         self._controller = None
+        self._config = None
 
     def tearDown(self):
         if self._controller is not None:
@@ -817,67 +895,284 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         responder_callback("success")
 
+    def test_start_from_full_checkpoint(self):
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
+        # stop thread on manager to write checkouts to file.
+        controller.stop()
+
+        # write some new lines to log.
+        self.__append_log_lines("Third line", "Fourth line")
+
+        # Create new copying manager, but passing previous directory with same log and checkouts.
+        # Also starting it manually, to not miss the first "SENDING" state.
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+
+        self._manager.start_manager()
+
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        # thread should continue from saved checkpoint
+        self.assertEquals(2, len(lines))
+        self.assertEquals("Third line", lines[0])
+        self.assertEquals("Fourth line", lines[1])
+
+        # stopping one more time, but now emulating that checkpoint files are stale.
+        controller.stop()
+
+        # This likes should be skipped by  copying manager.
+        self.__append_log_lines("Fifth line", "Sixth line")
+
+        # shift time on checkpoint files to make it seem like the checkpoint was written in the past.
+        for name in ["checkpoints.json", "active-checkpoints.json"]:
+            _shift_time_in_checkpoint_file(
+                os.path.join(self._config.agent_data_path, name),
+                # set negative value to shift checkpoint time to the past.
+                -(self._config.max_allowed_checkpoint_age + 1),
+            )
+
+        # create and manager.
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+
+        # We are expecting that copying manager has considered checkpoint file as stale,
+        # and has skipped "fifth" and "sixth" lines.
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+        self.assertEquals(0, len(lines))
+
+    def test_start_from_active_checkpoint(self):
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
+        controller.stop()
+
+        # "active_checkpoints" file is used if it is newer than "full_checkpoints",
+        # so we read "full_checkpoints" ...
+        checkpoints = scalyr_util.read_file_as_json(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
+        )
+
+        # ... and make bigger time value for "active_checkpoints".
+        _shift_time_in_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json"),
+            checkpoints["time"] + 1,
+        )
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+
+        self._manager.start_manager()
+
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+        self.assertEquals(2, len(lines))
+        self.assertEquals("Third line", lines[0])
+        self.assertEquals("Fourth line", lines[1])
+
+    def test_start_without_active_checkpoint(self):
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+        controller.stop()
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        os.remove(os.path.join(self._config.agent_data_path, "active-checkpoints.json"))
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+        self.assertEquals(2, len(lines))
+        self.assertEquals("Third line", lines[0])
+        self.assertEquals("Fourth line", lines[1])
+
+    def test_stale_request(self):
+        controller = self.__create_test_instance()
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+
+        lines = self.__extract_lines(request)
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
+        from scalyr_agent import copying_manager
+
+        # backup original 'time' module
+        orig_time = copying_manager.time
+
+        class _time_mock(object):
+            # This dummy 'time()' should be called on new copying thread iteration
+            # to emulate huge gap between last request.
+            def time(_self):
+                result = (
+                    orig_time.time()
+                    + self._manager._CopyingManager__config.max_retry_time
+                )
+                # restore original 'time' module
+                copying_manager.time = orig_time
+                return result
+
+        # replace time module with dummy time object.
+        copying_manager.time = _time_mock()
+
+        try:
+
+            # Set response to force copying manager to retry request.
+            responder_callback("error")
+
+            # Because of mocked time,repeated request will be rejected as too old.
+            (request, responder_callback) = controller.wait_for_rpc()
+
+            lines = self.__extract_lines(request)
+            self.assertEquals(0, len(lines))
+        finally:
+            copying_manager.time = orig_time
+
+    def test_generate_status(self):
+        controller = self.__create_test_instance()
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+
+        status = self._manager.generate_status()
+
+        self.assertEquals(2, len(status.log_matchers))
+
+    def test_logs_initial_positions(self):
+        controller = self.__create_test_instance(auto_start=False,)
+
+        self.__append_log_lines(*"0123456789")
+
+        # Start copying manager from 10 bytes offset.
+        self._manager.start_manager(
+            logs_initial_positions={self.__test_log_file: 5 * 2}
+        )
+
+        request, cb = controller.wait_for_rpc()
+
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(["5", "6", "7", "8", "9"], lines)
+
     def __extract_lines(self, request):
-        parsed_request = json_lib.parse(request.get_payload())
+        parsed_request = test_util.parse_scalyr_request(request.get_payload())
 
         lines = []
 
         if "events" in parsed_request:
-            for event in parsed_request.get_json_array("events"):
+            for event in parsed_request["events"]:
                 if "attrs" in event:
-                    attrs = event.get_json_object("attrs")
+                    attrs = event["attrs"]
                     if "message" in attrs:
-                        lines.append(attrs.get_string("message").strip())
+                        lines.append(attrs["message"].strip())
 
         return lines
 
     def __was_pipelined(self, request):
         return "pipelined=1.0" in request.get_timing_data()
 
-    def __create_test_instance(self, use_pipelining=False):
-        tmp_dir = tempfile.mkdtemp()
-        config_dir = os.path.join(tmp_dir, "config")
-        data_dir = os.path.join(tmp_dir, "data")
-        log_dir = os.path.join(tmp_dir, "log")
+    def __create_test_instance(
+        self, use_pipelining=False, root_dir=None, auto_start=True,
+    ):
+        """
+        :param use_pipelining:
+        :param root_dir: path to root directory, if None, new tempfile will be created.
+        :param auto_start: If True, manager starts right after creation, defaults to True
+        This is useful if we need to stop copying manager earlier than after first full iteration.
+        :return:
+        """
+        if root_dir is None:
+            root_dir = tempfile.mkdtemp()
+        config_dir = os.path.join(root_dir, "config")
+        data_dir = os.path.join(root_dir, "data")
+        log_dir = os.path.join(root_dir, "log")
 
-        os.mkdir(data_dir)
-        os.mkdir(config_dir)
-        os.mkdir(log_dir)
+        if not os.path.exists(data_dir):
+            os.mkdir(data_dir)
+        if not os.path.exists(config_dir):
+            os.mkdir(config_dir)
+        if not os.path.exists(log_dir):
+            os.mkdir(log_dir)
 
-        self.__test_log_file = os.path.join(tmp_dir, "test.log")
-        fp = open(self.__test_log_file, "w")
-        fp.close()
+        self.__test_log_file = os.path.join(root_dir, "test.log")
+
+        if not os.path.exists(self.__test_log_file):
+            fp = open(self.__test_log_file, "w")
+            fp.close()
 
         config_file = os.path.join(config_dir, "agentConfig.json")
         config_fragments_dir = os.path.join(config_dir, "configs.d")
-        os.makedirs(config_fragments_dir)
-
-        logs_json_array = JsonArray()
-        logs_json_array.add(JsonObject(path=self.__test_log_file))
+        if not os.path.exists(config_fragments_dir):
+            os.makedirs(config_fragments_dir)
 
         pipeline_threshold = 1.1
         if use_pipelining:
             pipeline_threshold = 0.0
 
-        fp = open(config_file, "w")
-        fp.write(
-            json_lib.serialize(
-                JsonObject(
-                    api_key="fake",
-                    logs=logs_json_array,
-                    pipeline_threshold=pipeline_threshold,
+        if not os.path.exists(config_file):
+            fp = open(config_file, "w")
+            fp.write(
+                scalyr_util.json_encode(
+                    {
+                        "api_key": "fake",
+                        "logs": [{"path": self.__test_log_file}],
+                        "pipeline_threshold": pipeline_threshold,
+                    }
                 )
             )
-        )
-        fp.close()
+            fp.close()
 
         default_paths = DefaultPaths(log_dir, config_file, data_dir)
 
         config = Configuration(config_file, default_paths, None)
         config.parse()
 
-        # noinspection PyTypeChecker
-        self._controller = TestableCopyingManager(config, []).controller
+        self._config = config
+
+        self._manager = _create_test_copying_manager(config, [], auto_start=auto_start)
+        self._controller = self._manager.controller
         return self._controller
 
     def __append_log_lines(self, *args):
@@ -936,7 +1231,7 @@ class TestableCopyingManager(CopyingManager):
         # Protected by __test_state_cv.  The status message to return for the next call to ``_send_events``.
         self.__pending_response = None
 
-        self.__controller = TestableCopyingManager.TestController(self)
+        self.__controller = TestableCopyingManager.TestController(self,)
 
     @property
     def controller(self):
@@ -954,9 +1249,9 @@ class TestableCopyingManager(CopyingManager):
     def _create_add_events_request(self, session_info=None, max_size=None):
         # Need to override this to return an AddEventsRequest even though we don't have a real scalyr client instance.
         if session_info is None:
-            body = JsonObject(server_attributes=session_info, token="fake")
+            body = dict(server_attributes=session_info, token="fake")
         else:
-            body = JsonObject(token="fake")
+            body = dict(token="fake")
 
         return AddEventsRequest(body, max_size=max_size)
 
@@ -1142,6 +1437,16 @@ class TestableCopyingManager(CopyingManager):
             self, wait_on_join=wait_on_join, join_timeout=join_timeout
         )
 
+    def start_manager(self, scalyr_client=None, logs_initial_positions=None):
+        """
+        Overrides base class method, to initialize "scalyr_client" by default.
+        """
+        if scalyr_client is None:
+            scalyr_client = dict(fake_client=True)
+        super(TestableCopyingManager, self).start_manager(
+            scalyr_client, logs_initial_positions=logs_initial_positions
+        )
+
     class TestController(object):
         """Used to control the TestableCopyingManager.
 
@@ -1150,10 +1455,6 @@ class TestableCopyingManager(CopyingManager):
 
         def __init__(self, copying_manager):
             self.__copying_manager = copying_manager
-            copying_manager.start_manager(dict(fake_client=True))
-            # To do a proper initialization where the copying manager has scanned the current log file and is ready
-            # for the next loop, we let it go all the way through the loop once and wait in the sleeping state.
-            copying_manager.run_and_stop_at(TestableCopyingManager.SLEEPING)
 
         def perform_scan(self):
             """Tells the CopyingManager thread to go through the process loop until far enough where it has performed

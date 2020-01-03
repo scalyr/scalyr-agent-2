@@ -29,13 +29,16 @@ import calendar
 import datetime
 import os
 import random
+import sys
 import threading
 import time
+import uuid
+
 from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
-from scalyr_agent.json_lib import parse, JsonParseException
+from scalyr_agent.json_lib import JsonParseException
 from scalyr_agent.platform_controller import CannotExecuteAsUser
 
 
@@ -57,38 +60,29 @@ except ImportError:
     new_md5 = False
 
 
-try:
-    import scalyr_agent.third_party.uuid_tp.uuid as uuid
-except ImportError:
-    uuid = None
-
-
-def _fallback_json_encode(obj, sort_keys=False):
-    # json_lib.serialize() always ignores sort_keys param (always sorts regardless)
-    return json_lib.serialize(obj)
-
-
-def _fallback_json_decode(text):
-    return json_lib.parse(text)
-
-
 def get_json_implementation(lib_name):
 
-    if lib_name == "json_lib":
-        return lib_name, _fallback_json_encode, _fallback_json_decode
-
-    elif lib_name == "ujson":
+    if lib_name == "ujson":
         import ujson
 
-        def ujson_dumps_custom(*args, **kwargs):
+        def ujson_dumps_custom(obj, fp):
+            """Serialize the objection.
+            :param obj: The object to serialize
+            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
+            :type obj: dict
+            :return: If fp is not None, then the str representing the serialization.
+            :rtype: str
+            """
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
-            if isinstance(args[0], (json_lib.JsonObject, json_lib.JsonArray)):
+            if isinstance(obj, (json_lib.JsonObject, json_lib.JsonArray)):
                 raise TypeError(
-                    "ujson does not correctly encode objects of type: %s"
-                    % type(args[0])
+                    "ujson does not correctly encode objects of type: %s" % type(obj)
                 )
-            return ujson.dumps(*args, **kwargs)
+            if fp is not None:
+                return ujson.dump(obj, fp, sort_keys=True)
+            else:
+                return ujson.dumps(obj, sort_keys=True)
 
         return lib_name, ujson_dumps_custom, ujson.loads
 
@@ -98,11 +92,20 @@ def get_json_implementation(lib_name):
 
         import json
 
-        def json_dumps_custom(*args, **kwargs):
-            """Eliminate spaces by default. Python 2.4 does not support partials."""
-            if "separators" not in kwargs:
-                kwargs["separators"] = (",", ":")
-            return json.dumps(*args, **kwargs)
+        def json_dumps_custom(obj, fp):
+            """Serialize the objection.
+            :param obj: The object to serialize
+            :param fp: If not None, then a file-like object to which the serialized JSON will be written.
+            :type obj: dict
+            :return: If fp is not None, then the str representing the serialization.
+            :rtype: str
+            """
+
+            if fp is not None:
+                # Eliminate spaces by default. Python 2.4 does not support partials.
+                return json.dump(obj, fp, sort_keys=True, separators=(",", ":"))
+            else:
+                return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
         return lib_name, json_dumps_custom, json.loads
 
@@ -118,47 +121,84 @@ def _set_json_lib(lib_name):
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
-_set_json_lib("json_lib")
 try:
     _set_json_lib("ujson")
 except ImportError:
     try:
         _set_json_lib("json")
-    except:
-        pass
+    except ImportError:
+        # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
+        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        sys.exit(1)
 
 
 def get_json_lib():
     return _json_lib
 
 
-def json_encode(obj):
-    """Encodes an object into a JSON string.  The underlying implementation either handles JsonObject/JsonArray
-    or else complains loudly (raises Exception) if they do not correctly support encoding.
+def json_encode(obj, output=None):
+    """Encodes an object into a JSON string.
+
+    @param obj: The object to serialize
+    @param output: If not None, a file-like object to which the serialization should be written.
+
+    @type obj: dict|list
     """
-    return _json_encode(obj, sort_keys=True)
+    return _json_encode(obj, output)
 
 
 def json_decode(text):
-    """Decodes text containing json and returns either a dict or a scalyr_agent.json_lib.objects.JsonObject
-    depending on which underlying decoder is used.
-
-    If json or ujson are used, a dict is returned.
-    If the Scalyr custom json_lib decoder is used, a JsonObject is returned
+    """Decodes text containing json and returns either a dict
     """
     return _json_decode(text)
 
 
+def json_scalyr_encode_length_prefixed_string(value, output=None):
+    """Encodes the string as a length prefixed string using the Scalyr-specific JSON optimiztion.
+
+    :param value: The string.  This should be a byte string, already UTF-8-encoded.
+    :param output: If not None, a buffer to append the result to.
+
+    :type value: bytes
+    :type output: None|StringIO
+
+    :return: The encoding if output was not specified.
+    :rtype: str
+    """
+    json_lib.serialize_as_length_prefixed_string(value, output)
+
+
+def json_scalyr_config_decode(text):
+    """Decodes the specified string as a Scalyr JSON-encoded configuration file.
+
+    Note, this uses a JSON parser that allows for comments and other user-friendly conventions not supported by
+    standard JSON.  This should only be used to parse JSON where comments, etc might be included, which really
+    means agent configuration files.  This JSON parser is not performant so should not be used for standard
+    JSON parsing (use `json_decode` for that.)
+
+    :param text: The string to parse.
+    :type text: unicode|str
+    :return: The parsed JSON
+    :rtype: JsonObject
+    """
+    return json_lib.parse(text)
+
+
 def value_to_bool(value):
+    """
+    Duplicates "JsonObject.__num_to_bool" functionality.
+    :rtype: bool
+    """
     value_type = type(value)
     if value_type is bool:
         return value
-    elif value_type is int:
-        return self.__num_to_bool(field, float(value))
-    elif value_type is long:
-        return self.__num_to_bool(field, float(value))
-    elif value_type is float:
-        return self.__num_to_bool(field, value)
+    elif value_type in (int, long, float):
+        value = float(value)
+        # return True if the value is one, False if it is zero
+        if abs(value) < 1e-10:
+            return False
+        if abs(1 - value) < 1e-10:
+            return True
     elif value_type is str or value_type is unicode:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
@@ -169,14 +209,16 @@ def value_to_bool(value):
     )
 
 
-def read_file_as_json(file_path):
+def _read_file_as_json(file_path, json_parser):
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
-    @type file_path: str
+    @param json_parser:  The method to invoke to parse the JSON.
 
-    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
-        values such as int or str if that is all the file contains.
+    @type file_path: str
+    @type json_parser: func
+
+    @return: The JSON value contained in the file.  The return type is dependent on `json_parser`.
 
     @raise JsonReadFileException:  If there is an error reading the file.
     """
@@ -189,7 +231,7 @@ def read_file_as_json(file_path):
                 raise JsonReadFileException(file_path, "The file is not readable.")
             f = open(file_path, "r")
             data = f.read()
-            return parse(data)
+            return json_parser(data)
         except IOError, e:
             raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
         except JsonParseException, e:
@@ -203,6 +245,49 @@ def read_file_as_json(file_path):
             f.close()
 
 
+def read_config_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns the results as `JsonObject`s where
+    possible.
+
+    WARNING: This should only be used for agent configuration files where the file may contain the
+    Scalyr-specific JSON extensions such as allowing comments.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a JsonObject, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+    return _read_file_as_json(file_path, json_lib.parse)
+
+
+def read_file_as_json(file_path):
+    """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
+    `dict`s, `list`s and primitive types.
+
+    WARNING: This should not be used to parse agent configuration files.  This only parses standard JSON and
+    does not handle Scalyr-specific extensions.
+
+    @param file_path: the path to the file to read
+    @type file_path: str
+
+    @return: The JSON value contained in the file.  This is typically a dict, but could be primitive
+        values such as int or str if that is all the file contains.
+
+    @raise JsonReadFileException:  If there is an error reading the file.
+    """
+
+    def parse_standard_json(text):
+        try:
+            return json_decode(text)
+        except ValueError as e:
+            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+
+    return _read_file_as_json(file_path, parse_standard_json)
+
+
 def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     """Write a dict to a JSON encoded file
     The file is first completely written to tmp_path, and then renamed to file_path
@@ -214,7 +299,7 @@ def atomic_write_dict_as_json_file(file_path, tmp_path, info):
     fp = None
     try:
         fp = open(tmp_path, "w")
-        fp.write(json_lib.serialize(info))
+        fp.write(json_encode(info))
         fp.close()
         fp = None
         if sys.platform == "win32" and os.path.isfile(file_path):
@@ -237,24 +322,7 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    if uuid is not None and hasattr(uuid, "uuid1"):
-        # Here the uuid should be based on the mac of the machine.
-        base_value = uuid.uuid1().bytes
-        method = "a"
-    else:
-        # Otherwise, get as good of a 16 byte random number as we can and prefix it with
-        # the current time.
-        try:
-            base_value = os.urandom(16)
-            method = "b"
-        except NotImplementedError:
-            base_value = ""
-            for i in range(16):
-                base_value += random.randrange(256)
-            method = "c"
-        base_value = str(time.time()) + base_value
-    result = base64.urlsafe_b64encode(sha1(base_value).digest()) + method
-    return result
+    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
 
 
 def md5_hexdigest(data):
