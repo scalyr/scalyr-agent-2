@@ -694,6 +694,30 @@ def _shift_time_in_checkpoint_file(path, delta):
     fp.close()
 
 
+def _add_non_utf8_to_checkpoint_file(path):
+    """
+    Add a unicode character to the checkpoint data stored in file located in "path"
+    """
+    fp = open(path, "r")
+    data = scalyr_util.json_decode(fp.read())
+    fp.close()
+
+    data["test"] = "\x96"
+
+    fp = open(path, "w")
+    fp.write(scalyr_util.json_encode(data))
+    fp.close()
+
+
+def _write_bad_checkpoint_file(path):
+    """
+    Write invalid JSON in file located in "path"
+    """
+    fp = open(path, "w")
+    fp.write(scalyr_util.json_encode("}data{,:,,{}"))
+    fp.close()
+
+
 class CopyingManagerEnd2EndTest(ScalyrTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
@@ -1021,6 +1045,66 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("Third line", lines[0])
         self.assertEquals("Fourth line", lines[1])
+
+    def test_start_with_bad_checkpoint(self):
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+        controller.stop()
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        _write_bad_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
+        )
+        _write_bad_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
+        )
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+        self.assertEquals(0, len(lines))
+
+    def test_start_with_non_utf8_checkpoint(self):
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+        controller.stop()
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        _add_non_utf8_to_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
+        )
+        _add_non_utf8_to_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
+        )
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+        self.assertEquals(0, len(lines))
 
     def test_stale_request(self):
         controller = self.__create_test_instance()

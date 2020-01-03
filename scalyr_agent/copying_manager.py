@@ -1020,7 +1020,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # noinspection PyBroadException
         try:
-            full_checkpoints = scalyr_util.read_file_as_json(full_checkpoint_file_path)
+            full_checkpoints = scalyr_util.read_file_as_json(
+                full_checkpoint_file_path, strict_utf8=True
+            )
             active_checkpoint_file_path = os.path.join(
                 self.__config.agent_data_path, "active-checkpoints.json"
             )
@@ -1031,7 +1033,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # if the active checkpoint file is newer, overwrite any checkpoint values with the
             # updated full checkpoint
             active_checkpoints = scalyr_util.read_file_as_json(
-                active_checkpoint_file_path
+                active_checkpoint_file_path, strict_utf8=True
             )
 
             if active_checkpoints["time"] > full_checkpoints["time"]:
