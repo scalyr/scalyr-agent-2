@@ -28,6 +28,18 @@ class JournaldLogFormatter(scalyr_logging.BaseFormatter):
 
 
 class LogConfigManager:
+    """A manager for the logs needed by the journald monitor.
+
+    TODO: The intent is to use this as a base for similar managers in other monitors, so we need to generalize it more
+    and move it to general utils eventually
+
+    Keeps track of loggers for all the journald log configurations defined in `journald_logs`. Creates loggers when
+    calling `get_logger`, only creating the one that matches the passed in message and extra fields, and only if it has
+    not already been created.
+    Expects `set_log_watcher` to be called with a valid log watcher before attempting to call `get_logger`.
+    Expects that `close()` will be called when it is no longer needed, usually when the monitor is shutting down.
+    """
+
     def __init__(
         self,
         global_config,
@@ -57,7 +69,7 @@ class LogConfigManager:
         return config_matchers
 
     def create_config_matcher(self, conf):
-        """ Create a function that will return a logger configuration when passed in data that matches that config.
+        """ Create a function that will return a log configuration when passed in data that matches that config.
         Intended to be overwritten by users of LogConfigManager to match their own use case.
         If passed an empty dictionary in `conf` this should create a catchall matcher with default configuration.
 
@@ -88,7 +100,7 @@ class LogConfigManager:
         return config_matcher
 
     def get_config(self, unit):
-        """ Get a logger configuration that matches the passed in data based on the configured config matchers.
+        """ Get a log configuration that matches the passed in data based on the configured config matchers.
 
         @param unit: Arbitrary data that the configured config matchers will attempt to match against
         @return: Logger configuration if a config matcher matched on `unit`, None otherwise

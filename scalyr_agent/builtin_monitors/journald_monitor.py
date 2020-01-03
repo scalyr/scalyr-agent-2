@@ -316,6 +316,8 @@ class JournaldMonitor(ScalyrMonitor):
                 "_SOURCE_REALTIME_TIMESTAMP": "timestamp",
             }
 
+        # Closing the default logger since we aren't going to use it, instead allowing LogConfigManager to provide us
+        # with loggers
         self._logger.closeMetricLog()
         self.log_manager = LogConfigManager(
             self._global_config,
@@ -333,9 +335,6 @@ class JournaldMonitor(ScalyrMonitor):
 
     def set_log_watcher(self, log_watcher):
         self._log_watcher = log_watcher
-
-    def _get_log_watcher(self):
-        return self._log_watcher, self
 
     def _reset_journal(self):
         """
