@@ -1047,6 +1047,7 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals("Fourth line", lines[1])
 
     def test_start_with_bad_checkpoint(self):
+        # Check totally mangled checkpoint file in the form of invalid JSON, should be treated as not having one at all
         controller = self.__create_test_instance()
         previous_root_dir = os.path.dirname(self.__test_log_file)
 
@@ -1074,9 +1075,13 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self._manager.start_manager()
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
+
+        # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
+        # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
         self.assertEquals(0, len(lines))
 
     def test_start_with_non_utf8_checkpoint(self):
+        # Check checkpoint file with invalid UTF-8 in it, should be treated the same as not having one at all
         controller = self.__create_test_instance()
         previous_root_dir = os.path.dirname(self.__test_log_file)
 
@@ -1104,6 +1109,9 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self._manager.start_manager()
         (request, responder_callback) = controller.wait_for_rpc()
         lines = self.__extract_lines(request)
+
+        # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
+        # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
         self.assertEquals(0, len(lines))
 
     def test_stale_request(self):

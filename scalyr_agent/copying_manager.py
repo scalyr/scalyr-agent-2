@@ -1046,7 +1046,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         except Exception:
             # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
             log.exception(
-                "Could not read checkpoint file due to error.",
+                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
                 error_code="failedCheckpointRead",
             )
             return None
