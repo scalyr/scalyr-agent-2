@@ -164,7 +164,7 @@ def load_checkpoints(filename):
     # read from the file on disk
     checkpoints = JsonObject({})
     try:
-        checkpoints = scalyr_util.read_file_as_json(filename)
+        checkpoints = scalyr_util.read_file_as_json(filename, strict_utf8=True)
     except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,

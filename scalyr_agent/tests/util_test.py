@@ -129,6 +129,13 @@ class TestUtil(ScalyrTestCase):
             JsonReadFileException, scalyr_util.read_file_as_json, self.__path
         )
 
+    def test_read_file_as_json_with_strict_utf8_json(self):
+        self.__create_file(self.__path, '{ a: "\x96"}')
+
+        self.assertRaises(
+            JsonReadFileException, scalyr_util.read_file_as_json, self.__path, True
+        )
+
     def test_atomic_write_dict_as_json_file(self):
         info = {"a": "hi"}
         scalyr_util.atomic_write_dict_as_json_file(self.__path, self.__path + "~", info)
