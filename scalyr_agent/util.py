@@ -251,7 +251,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
                 "JSON parsing error occurred: %s (line %i, byte position %i)"
                 % (e.raw_message, e.line_number, e.position),
             )
-        except UnicodeDecodeError, e:
+        except UnicodeDecodeError as e:
             raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
     finally:
         if f is not None:
@@ -1227,7 +1227,7 @@ class ScriptEscalator(object):
                     e.error_message,
                     self.__desired_user,
                 ),
-                file=sys.stderr
+                file=sys.stderr,
             )
             return 1
 

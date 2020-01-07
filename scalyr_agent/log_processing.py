@@ -2045,11 +2045,12 @@ class LogFileProcessor(object):
                         log.info("Request failed. Retrying")
                         return False
                     else:
-                        # [start of  2->TODO] as in other similar places, it can be OK to leave literals here as str.
+                        # [start of 2->TODO]
+                        #  As in other similar places, it can be OK to leave literals here as str.
                         #  But as we use "unicode_literals",
                         #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                         raise Exception("Invalid result %s" % str(result))
-                        # [end of 2->TODO]
+                        # [end of 2->TOD0]
                 finally:
                     self.__lock.release()
 
@@ -2478,7 +2479,9 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line,
                 )
-        # [start of 2->TODO]:I think this can not happen when it is guarantied that the input is unicode.
+                unicode
+        # [start of 2->TODO]
+        #  I think this can not happen when it is guarantied that the input is unicode.
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
@@ -2496,12 +2499,12 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line.decode("utf-8", "replace"),
                 )
-        # [end of 2-> TOD0]
+        # [end of 2->TOD0]
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
-            # [start of 2->TODO]:
+            # [start of 2->TODO]
             #  As redaction and sampling now only expect unicode, this can be removed.
             if type(result) == six.text_type:
                 result = result.encode("utf-8")
@@ -2905,8 +2908,13 @@ class LogMatcher(object):
                     result = pattern.substitute(values)
                 except Exception as e:
                     log.warn(
-                        # 2->TODO same as 2046 line.
-                        "Invalid substition pattern in 'rename_logfile'. %s" % str(e)
+                        # [start of 2->TODO]
+                        #  As in other similar places, it can be OK to leave literals here as str.
+                        #  But as we use "unicode_literals",
+                        #  we need to use six.text_type insted of str to be able to do formatting with unicode.
+                        "Invalid substition pattern in 'rename_logfile'. %s"
+                        % str(e)
+                        # [end of 2->TOD0]
                     )
             elif isinstance(rename, JsonObject):
                 if "match" in rename and "replacement" in rename:
@@ -2923,8 +2931,12 @@ class LogMatcher(object):
                     except Exception as e:
                         log.warn(
                             "Error matching regular expression '%s' and replacing with '%s'.  %s"
-                            # 2->TODO same as 2046 line.
+                            # [start of 2->TODO]
+                            #  As in other similar places, it can be OK to leave literals here as str.
+                            #  But as we use "unicode_literals",
+                            #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                             % (rename["match"], rename["replacement"], str(e)),
+                            # [end of 2->TOD0]
                             limit_once_per_x_secs=600,
                             limit_key=("rename-regex-error-%s" % matched_file),
                         )

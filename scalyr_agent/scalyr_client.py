@@ -1760,7 +1760,7 @@ class Event(object):
         # [start of 2->TODO]
         # BytesIO type needed. filed_name and field_value should be passed as binary.
         # In other case, we should convert them here.
-        # [end of 2->TODO]
+        # [end of 2->TOD0]
         if field_value is not None:
             output_buffer.write(field_name)
             output_buffer.write(field_value)
@@ -1775,7 +1775,7 @@ def _rewind_past_close_curly(output_buffer):
     @param output_buffer:  The buffer to rewind.
     @type output_buffer: StringO
     """
-    #2->TODO make binary literals.
+    # 2->TODO make binary literals.
     # Now go back and find the last '}' and delete it so that we can open up the JSON again.
     location = output_buffer.tell()
     while location > 0:

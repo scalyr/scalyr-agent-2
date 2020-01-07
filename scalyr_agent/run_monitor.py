@@ -106,7 +106,7 @@ def run_standalone_monitor(
         print(
             "Failed to parse the monitor configuration as valid JSON: %s",
             str(e),
-            file=sys.stderr
+            file=sys.stderr,
         )
         return 1
 
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     if len(args) != 1:
         print(
             "You must provide the module that contains the Scalyr Monitor plugin you wish to run.",
-            file=sys.stderr
+            file=sys.stderr,
         )
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         print(
             "Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 "
             % str(options.debug_level),
-            file=sys.stderr
+            file=sys.stderr,
         )
         sys.exit(1)
 

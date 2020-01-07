@@ -154,7 +154,7 @@ class PosixPlatformController(PlatformController):
             print(
                 "Assuming pid file is '%s'.  Use --pid-file to override."
                 % self.__pidfile,
-                file=sys.stderr
+                file=sys.stderr,
             )
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)
@@ -363,6 +363,9 @@ class PosixPlatformController(PlatformController):
             os.dup2(si.fileno(), sys.stdin.fileno())
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
+            si.close()
+            so.close()
+            se.close()
 
             # Write out our process id to the pidfile.
             if not self.__write_pidfile(debug_logger=debug_logger, logger=logger):
