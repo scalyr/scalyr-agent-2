@@ -716,7 +716,9 @@ and System sources:
 
         checkpoints = None
         try:
-            checkpoints = scalyr_util.read_file_as_json(self.__checkpoint_file)
+            checkpoints = scalyr_util.read_file_as_json(
+                self.__checkpoint_file, strict_utf8=True
+            )
         except:
             self._logger.info(
                 "No checkpoint file '%s' exists.\nAll logs will be read starting from their current end.",

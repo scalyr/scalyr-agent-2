@@ -275,6 +275,10 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
 
+        # Stop the warmer thread since we don't need it for the test, and to avoid a race condition that sometimes
+        # results in finding too many "already_warm" results
+        warmer.stop()
+
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
         warmer.end_marking()

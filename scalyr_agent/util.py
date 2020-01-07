@@ -18,6 +18,7 @@ from __future__ import division
 
 from __future__ import absolute_import
 from __future__ import print_function
+import codecs
 import sys
 import struct
 import six.moves._thread
@@ -216,7 +217,7 @@ def value_to_bool(value):
     )
 
 
-def _read_file_as_json(file_path, json_parser):
+def _read_file_as_json(file_path, json_parser, strict_utf8=False):
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
@@ -236,7 +237,10 @@ def _read_file_as_json(file_path, json_parser):
                 raise JsonReadFileException(file_path, "The file does not exist.")
             if not os.access(file_path, os.R_OK):
                 raise JsonReadFileException(file_path, "The file is not readable.")
-            f = open(file_path, "r")
+            if strict_utf8:
+                f = codecs.open(file_path, "r", encoding="utf-8")
+            else:
+                f = open(file_path, "r")
             data = f.read()
             return json_parser(data)
         except IOError as e:
@@ -247,6 +251,8 @@ def _read_file_as_json(file_path, json_parser):
                 "JSON parsing error occurred: %s (line %i, byte position %i)"
                 % (e.raw_message, e.line_number, e.position),
             )
+        except UnicodeDecodeError, e:
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
     finally:
         if f is not None:
             f.close()
@@ -270,7 +276,7 @@ def read_config_file_as_json(file_path):
     return _read_file_as_json(file_path, json_lib.parse)
 
 
-def read_file_as_json(file_path):
+def read_file_as_json(file_path, strict_utf8=False):
     """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
     `dict`s, `list`s and primitive types.
 
@@ -279,6 +285,8 @@ def read_file_as_json(file_path):
 
     @param file_path: the path to the file to read
     @type file_path: str
+    @param strict_utf8: If true invalid UTF-8 read from the file will raise an exception
+    @type strict_utf8: bool
 
     @return: The JSON value contained in the file.  This is typically a dict, but could be primitive
         values such as int or str if that is all the file contains.
@@ -292,7 +300,7 @@ def read_file_as_json(file_path):
         except ValueError as e:
             raise JsonParseException("JSON parsing failed due to: %s" % str(e))
 
-    return _read_file_as_json(file_path, parse_standard_json)
+    return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
 
 
 def atomic_write_dict_as_json_file(file_path, tmp_path, info):
