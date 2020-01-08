@@ -453,17 +453,15 @@ def expand_template(input_lines, dist_files):
     return result
 
 
-def build_common_docker_and_package_files(create_initd_link, base_configs=None, coverage_enabled=False):
+def build_common_docker_and_package_files(create_initd_link, base_configs=None):
     """Builds the common `root` system used by Debian, RPM, and container source tarballs in the current working
     directory.
 
     @param create_initd_link: Whether or not to create the link from initd to the scalyr agent binary.
     @param base_configs:  The directory (relative to the top of the source tree) that contains the configuration
         files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
-    @param coverage_enabled: Path Dockerfile to run agent with enabled coverage.
     @type create_initd_link: bool
     @type base_configs: str
-    @type coverage_enabled: bool
     """
     original_dir = os.getcwd()
 
@@ -477,7 +475,7 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None, 
     # Place all of the import source in /usr/share/scalyr-agent-2.
     os.chdir("root/usr/share")
 
-    build_base_files(base_configs=base_configs, coverage_enabled=coverage_enabled)
+    build_base_files(base_configs=base_configs)
 
     os.chdir("scalyr-agent-2")
     # The build_base_files leaves the config directory in config, but we have to move it to its etc
@@ -540,7 +538,7 @@ def build_container_builder(
 
     @return: The file name of the built artifact.
     """
-    build_container_tarball(source_tarball, base_configs=base_configs, coverage_enabled=coverage_enabled)
+    build_container_tarball(source_tarball, base_configs=base_configs)
 
     agent_source_root = __source_root__
     # Make a copy of the right Dockerfile to embed in the script.
@@ -586,6 +584,12 @@ def build_container_builder(
         with open("Dockerfile", "r") as file:
             data = file.read()
         new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage", data)
+        new_dockerfile_source = re.sub(
+            r"CMD .*\n",
+            'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
+            '"--no-fork", "--no-change-user", "start"]',
+            new_dockerfile_source
+        )
 
         with open("Dockerfile", 'w') as file:
             file.write(new_dockerfile_source)
@@ -607,20 +611,18 @@ def build_container_builder(
     return output_name
 
 
-def build_container_tarball(tarball_name, base_configs=None, coverage_enabled=False):
+def build_container_tarball(tarball_name, base_configs=None):
     """Builds the scalyr-agent-2 tarball for either Docker or Kubernetes in the current working directory.
 
     @param tarball_name:  The name for the output tarball (including the `.tar.gz` extension)
     @param base_configs: The directory (relative to the top of the source tree) that contains the configuration
         files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
-    @param coverage_enabled: Path Dockerfile to run agent with enabled coverage.
     @type tarball_name: str
     @type base_configs: str
-    @type coverage_enabled: bool
 
     @return: The file name of the built tarball.
     """
-    build_common_docker_and_package_files(False, base_configs=base_configs, coverage_enabled=coverage_enabled)
+    build_common_docker_and_package_files(False, base_configs=base_configs)
 
     # Need to create some docker specific files
     make_directory("root/var/log/scalyr-agent-2/containers")
@@ -784,7 +786,7 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     return output_name
 
 
-def build_base_files(base_configs="config", coverage_enabled=False):
+def build_base_files(base_configs="config"):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
     This creates scalyr-agent-2 in the current working directory and then populates it with the basic structure
@@ -805,7 +807,6 @@ def build_base_files(base_configs="config", coverage_enabled=False):
 
     @param base_configs:  The directory (relative to the top of the source tree) that contains the configuration
         files to copy (such as the agent.json and agent.d directory).  If None, then will use `config`.
-    @param coverage_enabled: Path Dockerfile to run agent with enabled coverage.
     """
     original_dir = os.getcwd()
     # This will return the parent directory of this file.  We will use that to determine the path
@@ -826,34 +827,6 @@ def build_base_files(base_configs="config", coverage_enabled=False):
     os.chdir("py")
 
     shutil.copytree(make_path(agent_source_root, "scalyr_agent"), "scalyr_agent")
-
-    # patching "agent_main.py" entrypoint to enable coverage.
-    if coverage_enabled:
-        with open("scalyr_agent/agent_main.py", 'r') as file:
-            agent_main_source = file.read()
-
-
-        main_replacement = \
-"""
-    import coverage
-    cov = coverage.Coverage()
-    cov.start()
-    try:
-        main()
-    finally:
-        cov.stop()
-        cov.save()
-"""
-
-        agent_main_source = re.sub(
-            r"(?!if\s?__name__\s?==\s?[\"']__main__[\"']:\n)\s{4}main\(\)$"
-            , main_replacement,
-            agent_main_source
-        )
-
-        with open("scalyr_agent/agent_main.py", 'w') as file:
-            file.write(agent_main_source)
-
     shutil.copytree(make_path(agent_source_root, "monitors"), "monitors")
     os.chdir("monitors")
     recursively_delete_files_by_name("README.md")
