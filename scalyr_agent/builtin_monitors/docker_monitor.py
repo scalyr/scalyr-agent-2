@@ -1133,7 +1133,9 @@ class ContainerChecker(StoppableThread):
 
     def __load_checkpoints(self):
         try:
-            checkpoints = scalyr_util.read_file_as_json(self.__checkpoint_file)
+            checkpoints = scalyr_util.read_file_as_json(
+                self.__checkpoint_file, strict_utf8=True
+            )
         except:
             self._logger.info(
                 "No checkpoint file '%s' exists.\n\tAll logs will be read starting from their current end.",

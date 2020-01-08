@@ -1,6 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.55 "Hermes" - Nov 21, 2019
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Nov 21, 2019 14:30 -0800
+--->
+
+Bugs
+* Fixed bug causing SSL connection failures on certain Windows configurations.
+
 ## 2.0.54 "Galactica" - Nov 7, 2019
 
 <!---

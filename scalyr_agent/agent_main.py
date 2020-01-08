@@ -30,6 +30,7 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+import traceback
 
 __author__ = "czerwin@scalyr.com"
 
@@ -510,7 +511,7 @@ class ScalyrAgent(object):
             self.__perform_config_checks(no_check_remote)
         except Exception, e:
             print >> sys.stderr
-            print >> sys.stderr, "%s" % str(e)
+            traceback.print_exc(file=sys.stderr)
             print >> sys.stderr, "Terminating agent, please fix the error and restart the agent."
             log.error("%s" % str(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
@@ -1534,7 +1535,7 @@ class WorkerThread(object):
             self.__scalyr_client.close()
 
 
-def main():
+if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
     parser = OptionParser(
         usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
@@ -1622,9 +1623,3 @@ def main():
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
     sys.exit(main_rc)
-
-
-if __name__ == "__main__":
-    # it is important to do all things in "main" function and leave this place clear.
-    # This allows us to patch this part, for example, to enable coverage.
-    main()

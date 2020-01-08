@@ -14,7 +14,6 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import scalyr_agent.json_lib.objects
 
 __author__ = "czerwin@scalyr.com"
 
@@ -29,7 +28,6 @@ from scalyr_agent.config_util import (
     get_config_from_env,
 )
 from scalyr_agent.json_lib import JsonObject, JsonArray
-from scalyr_agent.json_lib import parse as parse_json, serialize as serialize_json
 from scalyr_agent.json_lib.objects import (
     ArrayOfStrings,
     SpaceAndCommaSeparatedArrayOfStrings,
@@ -37,6 +35,12 @@ from scalyr_agent.json_lib.objects import (
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+from scalyr_agent.builtin_monitors.journald_utils import (
+    LogConfigManager,
+    JournaldLogFormatter,
+)
+import scalyr_agent.util as scalyr_util
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -80,7 +84,11 @@ class TestConfigurationBase(ScalyrTestCase):
         return contents
 
     def _write_file_with_separator_conversion(self, contents):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+        contents = scalyr_util.json_encode(
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
+        )
 
         fp = open(self._config_file, "w")
         fp.write(contents)
@@ -89,7 +97,11 @@ class TestConfigurationBase(ScalyrTestCase):
     def _write_config_fragment_file_with_separator_conversion(
         self, file_path, contents
     ):
-        contents = serialize_json(self.__convert_separators(parse_json(contents)))
+        contents = scalyr_util.json_encode(
+            self.__convert_separators(
+                scalyr_util.json_scalyr_config_decode(contents)
+            ).to_dict()
+        )
 
         full_path = os.path.join(self._config_fragments_dir, file_path)
         fp = open(full_path, "w")
@@ -335,7 +347,8 @@ class TestConfiguration(TestConfigurationBase):
             http_proxy: "http://foo.com",
             https_proxy: "https://bar.com",
 
-            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ]
+            logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
+            journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ]
           }
         """
         )
@@ -400,6 +413,10 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEqual(
             config.network_proxies,
             {"http": "http://foo.com", "https": "https://bar.com"},
+        )
+
+        self.assertEqual(
+            config.journald_log_configs[0].get_string("parser"), "journald_catchall"
         )
 
     def test_missing_api_key(self):
@@ -1184,7 +1201,7 @@ class TestConfiguration(TestConfigurationBase):
             "use_unsafe_debugging": False,
         }
         self._write_file_with_separator_conversion(
-            serialize_json(JsonObject(config_file_dict))
+            scalyr_util.json_encode(config_file_dict)
         )
 
         config = self._create_test_configuration_instance()
@@ -1607,3 +1624,249 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
         del os.environ["SCALYR_K8S_API_URL"]
         self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=str))
+
+
+class FakeLogWatcher:
+    def add_log_config(self, a, b):
+        pass
+
+
+class TestJournaldLogConfigManager(TestConfigurationBase):
+    def setUp(self):
+        super(TestJournaldLogConfigManager, self).setUp()
+        self._temp_dir = tempfile.mkdtemp()
+        self._log_dir = os.path.join(self._temp_dir, "log")
+        os.makedirs(self._log_dir)
+
+    def get_configuration(self):
+        default_paths = DefaultPaths(
+            self.convert_path(self._log_dir),
+            self.convert_path("/etc/scalyr-agent-2/agent.json"),
+            self.convert_path("/var/lib/scalyr-agent-2"),
+        )
+        return Configuration(self._config_file, default_paths, None)
+
+    def test_default_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("journald", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("journald", matched_config["parser"])
+
+    def test_catchall_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ { journald_unit: ".*", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_specific_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ { journald_unit: "test", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("journald", matched_config["parser"])
+
+    def test_multiple_configs(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_unit: "test", parser: "TestParser" },
+                    { journald_unit: "confirm", parser: "ConfirmParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("journald", matched_config["parser"])
+        matched_config = lcm.get_config("confirm")
+        self.assertEqual("ConfirmParser", matched_config["parser"])
+
+    def test_regex_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    { journald_unit: "test.*test", parser: "TestParser" }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("testtest")
+        self.assertEqual("TestParser", matched_config["parser"])
+        matched_config = lcm.get_config("other_test")
+        self.assertEqual("journald", matched_config["parser"])
+        matched_config = lcm.get_config("test_somethingarbitrary:test")
+        self.assertEqual("TestParser", matched_config["parser"])
+
+    def test_big_config(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                    {
+                        journald_unit: "test",
+                        parser: "TestParser",
+                        redaction_rules: [ { match_expression: "a", replacement: "yes" } ],
+                        sampling_rules: [ { match_expression: "INFO", sampling_rate: 0.1} ],
+                        attributes: {
+                            webServer: "true"
+                        }
+                    }
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, None)
+        matched_config = lcm.get_config("test")
+        self.assertEqual("TestParser", matched_config["parser"])
+        self.assertEqual(
+            str([{u"match_expression": u"a", u"replacement": u"yes"}]),
+            str(matched_config["redaction_rules"]),
+        )
+        self.assertEqual(
+            str([{u"match_expression": u"INFO", u"sampling_rate": 0.1}]),
+            str(matched_config["sampling_rules"]),
+        )
+        self.assertEqual("true", matched_config["attributes"]["webServer"])
+
+    def test_default_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [
+                ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, JournaldLogFormatter())
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("test")
+        logger.info("Find this string")
+
+        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+    def test_modified_default_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ { journald_unit: ".*", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, JournaldLogFormatter())
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("test")
+        logger.info("Find this string")
+
+        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+    def test_specific_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ { journald_unit: "TEST", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, JournaldLogFormatter())
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("TEST")
+        logger.info("Find this string")
+        logger2 = lcm.get_logger("Other")
+        logger2.info("Other thing")
+
+        expected_path = os.path.join(
+            self._log_dir, "journald_" + str(hash("TEST")) + ".log",
+        )
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Other thing" in f.read())
+
+    def test_regex_logger(self):
+        self._write_file_with_separator_conversion(
+            """ {
+                api_key: "hi",
+                journald_logs: [ { journald_unit: "test.*test", parser: "TestParser" } ]
+            }
+            """
+        )
+        config = self.get_configuration()
+        config.parse()
+
+        lcm = LogConfigManager(config, JournaldLogFormatter())
+        lcm.set_log_watcher(FakeLogWatcher())
+        logger = lcm.get_logger("testestestestestest")
+        logger.info("Find this string")
+        logger2 = lcm.get_logger("Other")
+        logger2.info("Other thing")
+
+        expected_path = os.path.join(
+            self._log_dir, "journald_" + str(hash("test.*test")) + ".log",
+        )
+        with open(expected_path) as f:
+            self.assertTrue("Find this string" in f.read())
+
+        expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
+        with open(expected_path) as f:
+            self.assertTrue("Other thing" in f.read())

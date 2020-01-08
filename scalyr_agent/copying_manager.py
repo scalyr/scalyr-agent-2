@@ -223,10 +223,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         # Keep track of monitors
         self.__monitors = monitors
 
-        # collect monitor-specific extra server-attributes
-        self.__expanded_server_attributes = copy.deepcopy(
-            self.__config.server_attributes
-        )
+        # collect monitor-specific extra server-attributes.  seed with a copy of the attributes and converted to a dict.
+        self.__expanded_server_attributes = self.__config.server_attributes.to_dict()
+
         for monitor in monitors:
             monitor_attribs = monitor.get_extra_server_attributes()
             if not monitor_attribs:
@@ -557,8 +556,9 @@ class CopyingManager(StoppableThread, LogWatcher):
         # but they are all just writing to the same monitor file.
         all_paths = {}
         for entry in configuration.log_configs:
-            configs.append(entry.copy())
-            all_paths[entry["path"]] = 1
+            if "path" in entry:
+                configs.append(entry.copy())
+                all_paths[entry["path"]] = 1
 
         for monitor in monitors:
             log_config = configuration.parse_log_config(
@@ -1021,7 +1021,9 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         # noinspection PyBroadException
         try:
-            full_checkpoints = scalyr_util.read_file_as_json(full_checkpoint_file_path)
+            full_checkpoints = scalyr_util.read_file_as_json(
+                full_checkpoint_file_path, strict_utf8=True
+            )
             active_checkpoint_file_path = os.path.join(
                 self.__config.agent_data_path, "active-checkpoints.json"
             )
@@ -1032,7 +1034,7 @@ class CopyingManager(StoppableThread, LogWatcher):
             # if the active checkpoint file is newer, overwrite any checkpoint values with the
             # updated full checkpoint
             active_checkpoints = scalyr_util.read_file_as_json(
-                active_checkpoint_file_path
+                active_checkpoint_file_path, strict_utf8=True
             )
 
             if active_checkpoints["time"] > full_checkpoints["time"]:
@@ -1045,7 +1047,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         except Exception:
             # TODO:  Fix read_file_as_json so that it will not return an exception.. or will return a specific one.
             log.exception(
-                "Could not read checkpoint file due to error.",
+                "Could not read checkpoint file due to error. Ignoring checkpoint file.",
                 error_code="failedCheckpointRead",
             )
             return None
@@ -1058,7 +1060,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         This must be done periodically to ensure that if the agent process stops and starts up again, we pick up
         from where we left off copying each file.
         """
-        # Create the format that is expected.  An overall JsonObject with the time when the file was written,
+        # Create the format that is expected.  An overall dict with the time when the file was written,
         # and then an entry for each file path.
         checkpoints = {}
         state = {
@@ -1302,7 +1304,24 @@ class CopyingManager(StoppableThread, LogWatcher):
         for matcher in log_matchers:
             self.__dynamic_matchers[matcher.log_path] = matcher
 
-        checkpoints = {}
+        # Try to read the checkpoint state from disk.
+        checkpoints_state = self.__read_checkpoint_state()
+        if checkpoints_state is None:
+            log.info("The checkpoints were not read from the filesystem.")
+        elif (
+            time.time() - checkpoints_state["time"]
+        ) > self.__config.max_allowed_checkpoint_age:
+            log.warn(
+                'The current checkpoint is too stale (written at "%s").  Ignoring it.',
+                scalyr_util.format_time(checkpoints_state["time"]),
+                error_code="staleCheckpointFile",
+            )
+            checkpoints_state = None
+
+        if checkpoints_state is None:
+            checkpoints = {}
+        else:
+            checkpoints = checkpoints_state["checkpoints"]
 
         # reload the config of any matchers/processors that need reloading
         reloaded = []

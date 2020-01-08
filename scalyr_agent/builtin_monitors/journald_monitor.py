@@ -18,7 +18,6 @@ __author__ = "imron@scalyr.com"
 
 import datetime
 import os
-import random
 import re
 import select
 from scalyr_agent import ScalyrMonitor, define_config_option
@@ -26,9 +25,13 @@ from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.builtin_monitors.journald_utils import (
+    LogConfigManager,
+    JournaldLogFormatter,
+)
 import threading
 import traceback
-
+from cStringIO import StringIO
 
 try:
     from systemd import journal
@@ -117,6 +120,22 @@ define_config_option(
     default=10 * 60,
 )
 
+define_config_option(
+    __monitor__,
+    "max_log_rotations",
+    "How many rotated logs to keep before deleting them, when writing journal entries to a log for sending to Scalyr.",
+    convert_to=int,
+    default=2,
+)
+
+define_config_option(
+    __monitor__,
+    "max_log_size",
+    "Max size of a log file before we rotate it out, when writing journal entries to a log for sending to Scalyr.",
+    convert_to=int,
+    default=20 * 1024 * 1024,
+)
+
 # this lock must be held to access the
 # _global_checkpoints dict
 _global_lock = threading.Lock()
@@ -145,7 +164,7 @@ def load_checkpoints(filename):
     # read from the file on disk
     checkpoints = JsonObject({})
     try:
-        checkpoints = scalyr_util.read_file_as_json(filename)
+        checkpoints = scalyr_util.read_file_as_json(filename, strict_utf8=True)
     except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
@@ -227,6 +246,8 @@ class JournaldMonitor(ScalyrMonitor):
     "Read logs from journalctl and emit to scalyr"
 
     def _initialize(self):
+        self._max_log_rotations = self._config.get("max_log_rotations")
+        self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
         if len(self._journal_path) == 0:
             self._journal_path = None
@@ -259,6 +280,17 @@ class JournaldMonitor(ScalyrMonitor):
         self.log_config["parser"] = "journald"
 
         self._extra_fields = self._config.get("journal_fields")
+        if self._extra_fields is not None:
+            for field_name in self._extra_fields:
+                fixed_field_name = scalyr_logging.AgentLogger.__force_valid_metric_or_field_name(
+                    field_name, is_metric=False
+                )
+                if field_name != fixed_field_name:
+                    self._extra_fields[fixed_field_name] = self._extra_fields[
+                        field_name
+                    ]
+                    del self._extra_fields[fixed_field_name]
+
         self._last_cursor = None
 
         matches = self._config.get("journal_matches")
@@ -284,10 +316,25 @@ class JournaldMonitor(ScalyrMonitor):
                 "_SOURCE_REALTIME_TIMESTAMP": "timestamp",
             }
 
+        # Closing the default logger since we aren't going to use it, instead allowing LogConfigManager to provide us
+        # with loggers
+        self._logger.closeMetricLog()
+        self.log_manager = LogConfigManager(
+            self._global_config,
+            JournaldLogFormatter(),
+            self._max_log_size,
+            self._max_log_rotations,
+        )
+        self.log_config = self.log_manager.get_config(".*")
+
     def run(self):
+        self.log_manager.set_log_watcher(self._log_watcher)
         self._checkpoint = load_checkpoints(self._checkpoint_file)
         self._reset_journal()
         ScalyrMonitor.run(self)
+
+    def set_log_watcher(self, log_watcher):
+        self._log_watcher = log_watcher
 
     def _reset_journal(self):
         """
@@ -415,7 +462,8 @@ class JournaldMonitor(ScalyrMonitor):
             try:
                 msg = entry.get("MESSAGE", "")
                 extra = self._get_extra_fields(entry)
-                self._logger.emit_value("details", msg, extra_fields=extra)
+                logger = self.log_manager.get_logger(extra.get("unit", ""))
+                logger.info(self.format_msg("details", msg, extra))
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception, e:
                 global_log.warn(
@@ -423,6 +471,26 @@ class JournaldMonitor(ScalyrMonitor):
                     limit_once_per_x_secs=60,
                     limit_key="journald-entry-error",
                 )
+
+    def format_msg(
+        self, metric_name, metric_value, extra_fields=None,
+    ):
+        string_buffer = StringIO()
+
+        string_buffer.write(
+            "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))
+        )
+
+        if extra_fields is not None:
+            for field_name in extra_fields:
+                field_value = extra_fields[field_name]
+                string_buffer.write(
+                    " %s=%s" % (field_name, scalyr_util.json_encode(field_value))
+                )
+
+        msg = string_buffer.getvalue()
+        string_buffer.close()
+        return msg
 
     def gather_sample(self):
 
@@ -435,3 +503,8 @@ class JournaldMonitor(ScalyrMonitor):
             self._checkpoint.update_checkpoint(
                 self._checkpoint_name, str(self._last_cursor)
             )
+
+    def stop(self, wait_on_join=True, join_timeout=5):
+        ScalyrMonitor.stop(self, wait_on_join=wait_on_join, join_timeout=join_timeout)
+        self.log_manager.close()
+        self._logger.info("Stop was called on the journald monitor")
