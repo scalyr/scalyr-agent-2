@@ -2479,7 +2479,6 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line,
                 )
-                unicode
         # [start of 2->TODO]
         #  I think this can not happen when it is guarantied that the input is unicode.
         except UnicodeDecodeError:
