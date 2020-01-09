@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
@@ -21,7 +22,7 @@ __author__ = "czerwin@scalyr.com"
 import struct
 import six
 
-from cStringIO import StringIO
+from io import BytesIO
 
 
 def serialize_as_length_prefixed_string(value, output_buffer):
@@ -33,9 +34,9 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     @param output_buffer: The buffer to serialize the string to.
 
     @type value: str or unicode
-    @type output_buffer: StringIO
+    @type output_buffer: BytesIO
     """
-    output_buffer.write("`s")
+    output_buffer.write(b"`s")
     if type(value) is six.text_type:
         to_serialize = value.encode("utf-8")
     else:

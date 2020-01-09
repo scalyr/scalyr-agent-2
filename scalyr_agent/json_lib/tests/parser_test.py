@@ -15,6 +15,7 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from six.moves import range
 
@@ -36,17 +37,17 @@ class ByteScannerTests(ScalyrTestCase):
     def test_read_ubyte(self):
         x = ByteScanner("Hi \n")
 
-        self.assertEquals(x.read_ubyte(), "H")
-        self.assertEquals(x.read_ubyte(), "i")
-        self.assertEquals(x.read_ubyte(), " ")
-        self.assertEquals(x.read_ubyte(), "\n")
+        self.assertEquals(x.read_ubyte(), b"H")
+        self.assertEquals(x.read_ubyte(), b"i")
+        self.assertEquals(x.read_ubyte(), b" ")
+        self.assertEquals(x.read_ubyte(), b"\n")
         self.assertRaises(IndexError, x.read_ubyte)
 
     def test_read_ubytes(self):
         x = ByteScanner("Hi there\n")
 
-        self.assertEquals(x.read_ubytes(2), "Hi")
-        self.assertEquals(x.read_ubytes(4), " the")
+        self.assertEquals(x.read_ubytes(2), b"Hi")
+        self.assertEquals(x.read_ubytes(4), b" the")
         self.assertRaises(IndexError, x.read_ubytes, 10)
 
     def test_properties(self):
@@ -82,8 +83,8 @@ class ByteScannerTests(ScalyrTestCase):
         x.read_ubyte()
         x.read_ubyte()
 
-        self.assertEquals(x.peek_next_ubyte(), " ")
-        self.assertEquals(x.peek_next_ubyte(1), "\n")
+        self.assertEquals(x.peek_next_ubyte(), b" ")
+        self.assertEquals(x.peek_next_ubyte(1), b"\n")
         self.assertEquals(x.peek_next_ubyte(2, none_if_bad_index=True), None)
         self.assertRaises(IndexError, x.peek_next_ubyte, 2)
 
@@ -93,8 +94,8 @@ class ByteScannerTests(ScalyrTestCase):
         x.read_ubyte()
         x.read_ubyte()
 
-        self.assertEquals(x.peek_next_ubyte(-1), "i")
-        self.assertEquals(x.peek_next_ubyte(-2), "H")
+        self.assertEquals(x.peek_next_ubyte(-1), b"i")
+        self.assertEquals(x.peek_next_ubyte(-2), b"H")
         self.assertEquals(x.peek_next_ubyte(-3, none_if_bad_index=True), None)
         self.assertRaises(IndexError, x.peek_next_ubyte, (-3))
 
@@ -169,7 +170,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there" + Hi')
 
     def test_parsing_length_prefixed_strings(self):
-        x = JsonParser.parse("`s\x00\x00\x00\x0cHowdy folks!")
+        x = JsonParser.parse(b"`s\x00\x00\x00\x0cHowdy folks!")
         self.assertEquals("Howdy folks!", x)
 
     def test_triple_quoted_strings(self):
