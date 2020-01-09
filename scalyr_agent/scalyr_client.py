@@ -21,6 +21,7 @@
 # Here i tried to keep them as binary.
 # [end of 2->TOD0]
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import six
 from six.moves import map
@@ -52,7 +53,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
 
-from cStringIO import StringIO
+from io import BytesIO
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -147,9 +148,9 @@ class ScalyrClientSession(object):
 
         # We create a few headers ahead of time so that we don't have to recreate them each time we need them.
         self.__standard_headers = {
-            "Connection": "Keep-Alive",
-            "Accept": "application/json",
-            "User-Agent": self.__get_user_agent(agent_version),
+            b"Connection": b"Keep-Alive",
+            b"Accept": b"application/json",
+            b"User-Agent": self.__get_user_agent(agent_version).encode("utf-8"),
         }
 
         # Configure compression type
@@ -170,7 +171,7 @@ class ScalyrClientSession(object):
                 )
 
         if encoding:
-            self.__standard_headers["Content-Encoding"] = encoding
+            self.__standard_headers[b"Content-Encoding"] = encoding.encode("utf-8")
 
         # Configure compression level
         if self.__compress:
@@ -221,9 +222,9 @@ class ScalyrClientSession(object):
         @param fragments String fragments to append (in order) to the standard user agent data
         @type fragments: List of str
         """
-        self.__standard_headers["User-Agent"] = self.__get_user_agent(
+        self.__standard_headers[b"User-Agent"] = self.__get_user_agent(
             self.__agent_version, fragments
-        )
+        ).encode("utf-8")
 
     def ping(self):
         """Ping the Scalyr server by sending a test message to add zero events.
@@ -565,7 +566,7 @@ class ScalyrClientSession(object):
             return add_events_request.get_payload()
 
         return self.__send_request(
-            "/addEvents", body_func=generate_body, block_on_response=block_on_response
+            b"/addEvents", body_func=generate_body, block_on_response=block_on_response
         )
 
     def close(self, current_time=None):
@@ -820,25 +821,25 @@ class AddEventsRequest(object):
         # add in the 'events: [ ... ]' ourselves.  This way we can watch the size of the buffer as
         # we build up events.
         # 2->TODO use BytesIO, make all data that is going to be written here - binary
-        string_buffer = StringIO()
+        string_buffer = BytesIO()
         scalyr_util.json_encode(base_body, output=string_buffer)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)
 
         # Append the start of our events field.
-        string_buffer.write(", events: [")
+        string_buffer.write(b", events: [")
 
         # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
         # the request.  That includes both the threads JSON array and the client timestamp.
         if disable_logfile_addevents_format:
             self.__post_fix_buffer = PostFixBuffer(
-                "], threads: THREADS, client_time: TIMESTAMP }",
+                b"], threads: THREADS, client_time: TIMESTAMP }",
                 disable_logfile_addevents_format,
             )
         else:
             self.__post_fix_buffer = PostFixBuffer(
-                "], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }",
+                b"], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }",
                 disable_logfile_addevents_format,
             )
 
@@ -937,7 +938,7 @@ class AddEventsRequest(object):
         start_pos = self.__buffer.tell()
         # If we already added an event before us, then make sure we add in a comma to separate us from the last event.
         if self.__events_added > 0:
-            self.__buffer.write(",")
+            self.__buffer.write(b",")
 
         timestamp = self.__get_valid_timestamp(timestamp=timestamp)
 
@@ -954,6 +955,8 @@ class AddEventsRequest(object):
         if self.current_size > self.__max_size:
             # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
             self.__buffer.truncate(start_pos)
+            # 2->TODO: new data streams from "io" don't return to the specified position, need to change position manually.
+            self.__buffer.seek(start_pos)
             self.__event_sequencer.restore_from_memento(memento)
             return False
 
@@ -994,7 +997,7 @@ class AddEventsRequest(object):
             # Create a buffer for the copying.  We write in the entire JSON and then just back up the length of
             # the old postfix and then add in the new one.
             # 2->TODO: use BytesIO
-            rebuild_buffer = StringIO()
+            rebuild_buffer = BytesIO()
             rebuild_buffer.write(self.__body)
             self.__body = None
             rebuild_buffer.seek(-1 * original_postfix_length, 2)  # os.SEEK_END
@@ -1012,7 +1015,7 @@ class AddEventsRequest(object):
         the client clock.
         """
         if self.__body is None:
-            self.__buffer.write(self.__post_fix_buffer.content())
+            self.__buffer.write(self.__post_fix_buffer.content().encode("utf-8"))
             self.__body = self.__buffer.getvalue()
             self.__buffer.close()
             self.__buffer = None
@@ -1047,17 +1050,17 @@ class AddEventsRequest(object):
         @return: A string of the key/value pairs for all timing data.
         @rtype: str
         """
-        output_buffer = StringIO()
+        output_buffer = BytesIO()
         first_time = True
 
         for key, value in six.iteritems(self.__timing_data):
             if not first_time:
-                output_buffer.write(" ")
+                output_buffer.write(b" ")
             else:
                 first_time = False
             output_buffer.write(key)
-            output_buffer.write("=")
-            output_buffer.write(str(value))
+            output_buffer.write(b"=")
+            output_buffer.write(six.text_type(value).encode("utf-8"))
 
         return output_buffer.getvalue()
 
@@ -1105,6 +1108,7 @@ class AddEventsRequest(object):
         self.__events_added = position.events_added
         # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
         self.__buffer.truncate(position.buffer_size)
+        self.__buffer.seek(position.buffer_size)
         self.__post_fix_buffer.set_position(position.postfix_buffer_position)
 
         # reset previously seen sequence id and numbers
@@ -1223,10 +1227,10 @@ class PostFixBuffer(object):
         @type format_string: str
         """
         # Make sure the keywords are used in the format string.
-        assert "THREADS" in format_string
-        assert "TIMESTAMP" in format_string
+        assert b"THREADS" in format_string
+        assert b"TIMESTAMP" in format_string
         if not disable_logfile_addevents_format:
-            assert "LOGS" in format_string
+            assert b"LOGS" in format_string
 
         self.__disable_logfile_addevents_format = disable_logfile_addevents_format
 
@@ -1265,11 +1269,12 @@ class PostFixBuffer(object):
         @return: The post fix to include at the end of the AddEventsRequest.
         @rtype: str
         """
+
         result = self.__format
         if not self.__disable_logfile_addevents_format:
-            result = result.replace("LOGS", scalyr_util.json_encode(self.__logs))
-        result = result.replace("TIMESTAMP", str(self.__client_timestamp))
-        result = result.replace("THREADS", scalyr_util.json_encode(self.__threads))
+            result = result.replace(b"LOGS", scalyr_util.json_encode(self.__logs).encode("utf-8"))
+        result = result.replace(b"TIMESTAMP", six.text_type(self.__client_timestamp).encode("utf-8"))
+        result = result.replace(b"THREADS", scalyr_util.json_encode(self.__threads).encode("utf-8"))
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
         # assert here to make sure it's always equal (it should be) but we don't want errors to cause issues for
@@ -1507,27 +1512,31 @@ class Event(object):
         self.__attrs = attributes
         # A new event.  We have to create the serialization base using provided information/
         # 2->TODO: use BytesIO, make all written data - binary.
-        tmp_buffer = StringIO()
+        tmp_buffer = BytesIO()
         # Open base for the event object.
-        tmp_buffer.write("{")
+        tmp_buffer.write(b"{")
         if thread_id is not None:
-            tmp_buffer.write("thread:")
-            tmp_buffer.write(scalyr_util.json_encode(thread_id))
-            tmp_buffer.write(", ")
+            tmp_buffer.write(b"thread:")
+            # 2->TODO: in python3 ujson will return result with unicode type,
+            tmp_buffer.write(scalyr_util.json_encode(thread_id).encode("utf-8"))
+            tmp_buffer.write(b", ")
             if not self.__disable_logfile_addevents_format:
-                tmp_buffer.write("log:")
+                tmp_buffer.write(b"log:")
                 tmp_buffer.write(scalyr_util.json_encode(thread_id))
-                tmp_buffer.write(", ")
+                tmp_buffer.write(b", ")
         if self.__disable_logfile_addevents_format and attributes is not None:
-            tmp_buffer.write("attrs:")
-            tmp_buffer.write(scalyr_util.json_encode(attributes))
+            tmp_buffer.write(b"attrs:")
+            # 2->TODO should we worry about type of keys and values in "attributes"?
+            #  ujson should handle unicode correctly with default option "ensure_ascii=True"
+            # [end of 2->TOD0]
+            tmp_buffer.write(scalyr_util.json_encode(attributes).encode("utf-8"))
             _rewind_past_close_curly(tmp_buffer)
-            tmp_buffer.write(",")
+            tmp_buffer.write(b",")
         else:
-            tmp_buffer.write("attrs:{")
+            tmp_buffer.write(b"attrs:{")
 
         # Add the message field into the json object.
-        tmp_buffer.write("message:")
+        tmp_buffer.write(b"message:")
 
         self.__serialization_base = tmp_buffer.getvalue()
 
@@ -1567,7 +1576,7 @@ class Event(object):
         """
         if self.__message is None and message is not None:
             self.__num_optimal_fields += 1
-        if message is six.text_type:
+        if type(message) is six.text_type:
             self.__message = message.encode("utf-8")
         else:
             self.__message = message
@@ -1592,7 +1601,7 @@ class Event(object):
         # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
         if self.__timestamp is None and timestamp is not None:
             self.__num_optimal_fields += 1
-        self.__timestamp = '"%s"' % str(timestamp)
+        self.__timestamp = b'"%s"' % six.text_type(timestamp).encode("utf-8")
         return self
 
     @property
@@ -1624,7 +1633,7 @@ class Event(object):
         @rtype: Event
         """
         # This is serialized as a string to get around overflow issues, so put in a string now.
-        self.__sequence_id = '"%s"' % str(sequence_id)
+        self.__sequence_id = b'"%s"' % str(sequence_id)
         self.__has_non_optimal_fields = True
         return self
 
@@ -1712,7 +1721,7 @@ class Event(object):
 
         @param output_buffer: The buffer to serialize to.
         # 2->TODO: output_buffer needs to be BytesIO
-        @type output_buffer: StringIO
+        @type output_buffer: BytesIO
         """
         output_buffer.write(self.__serialization_base)
         # Use a special serialization format for message so that we don't have to send CPU time escaping it.  This
@@ -1723,28 +1732,28 @@ class Event(object):
 
         # We fast path the very common case of just a timestamp and sequence delta fields.
         if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:
-            output_buffer.write("}")
-            output_buffer.write(",sd:")
+            output_buffer.write(b"}")
+            output_buffer.write(b",sd:")
             output_buffer.write(self.__sequence_number_delta)
-            output_buffer.write(",ts:")
+            output_buffer.write(b",ts:")
             output_buffer.write(self.__timestamp)
         else:
             self.__write_field_if_not_none(
-                ",sample_rate:", self.__sampling_rate, output_buffer
+                b",sample_rate:", self.__sampling_rate, output_buffer
             )
             # close off attrs object.
-            output_buffer.write("}")
+            output_buffer.write(b"}")
 
-            self.__write_field_if_not_none(",ts:", self.__timestamp, output_buffer)
-            self.__write_field_if_not_none(",si:", self.__sequence_id, output_buffer)
+            self.__write_field_if_not_none(b",ts:", self.__timestamp, output_buffer)
+            self.__write_field_if_not_none(b",si:", self.__sequence_id, output_buffer)
             self.__write_field_if_not_none(
-                ",sn:", self.__sequence_number, output_buffer
+                b",sn:", self.__sequence_number, output_buffer
             )
             self.__write_field_if_not_none(
-                ",sd:", self.__sequence_number_delta, output_buffer
+                b",sd:", self.__sequence_number_delta, output_buffer
             )
         # close off the event object.
-        output_buffer.write("}")
+        output_buffer.write(b"}")
 
     def __write_field_if_not_none(self, field_name, field_value, output_buffer):
         """If the specified field value is not None, then emit the field name and the value to the output buffer.
@@ -1755,7 +1764,7 @@ class Event(object):
 
         @type field_name: str
         @type field_value: str or None
-        @type output_buffer: StringIO
+        @type output_buffer: BytesIO
         """
         # [start of 2->TODO]
         # BytesIO type needed. filed_name and field_value should be passed as binary.

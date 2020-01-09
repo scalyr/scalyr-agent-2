@@ -20,7 +20,6 @@ __author__ = "czerwin@scalyr.com"
 
 import struct
 import six
-from six.moves import range
 
 from cStringIO import StringIO
 
