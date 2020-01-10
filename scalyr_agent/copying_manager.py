@@ -690,7 +690,7 @@ class CopyingManager(StoppableThread, LogWatcher):
                 # Just initialize the last time we had a success to now.  Make the logic below easier.
                 last_success = current_time
 
-                last_full_checkpoint_write = current_time
+                last_full_checkpoint_write = 0.0
 
                 pipeline_byte_threshold = self.__config.pipeline_threshold * float(
                     self.__config.max_allowed_request_size

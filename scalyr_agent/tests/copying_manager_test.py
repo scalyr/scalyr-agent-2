@@ -1045,8 +1045,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
                     orig_time.time()
                     + self._manager._CopyingManager__config.max_retry_time
                 )
-                # restore original 'time' module
-                copying_manager.time = orig_time
                 return result
 
         # replace time module with dummy time object.
