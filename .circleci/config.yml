@@ -26,7 +26,14 @@ jobs:
       - run:
           command: |
             source venv/bin/activate
-            python run_tests.py
+            coverage run run_tests.py
+            mkdir -p coverage-unittest-27
+            mv .coverage coverage-unittest-27/.coverage.unittest-27
+
+      - persist_to_workspace:
+          root: coverage-unittest-27
+          paths:
+            .coverage.unittest-27
 
       - store_artifacts:
           path: xunit.xml
@@ -115,7 +122,16 @@ jobs:
           paths:
             - "venv"
       - run:
-          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
+          command: |
+            mkdir -p coverage-smoke-docker-json
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 json 300
+            mv .coverage coverage-smoke-docker-json/.coverage.smoke-docker-json
+
+      - persist_to_workspace:
+          root: coverage-smoke-docker-json
+          paths:
+            .coverage.smoke-docker-json
+
 
   smoke-docker-syslog:
     docker:
@@ -136,7 +152,15 @@ jobs:
           paths:
             - "venv"
       - run:
-          command: source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
+          command: |
+            mkdir -p coverage-smoke-docker-syslog
+            source ./.circleci/smoketest_docker.sh scalyr/scalyr-agent-ci-unittest:4 syslog 300
+            mv .coverage coverage-smoke-docker-syslog/.coverage.smoke-docker-syslog
+
+      - persist_to_workspace:
+          root: coverage-smoke-docker-syslog
+          paths:
+            .coverage.smoke-docker-syslog
 
   smoke-k8s:
     machine:
@@ -185,7 +209,15 @@ jobs:
       - run:
           name: build k8s agent and run smoketest
           command: |
+            mkdir -p coverage-smoke-k8s
             source ./.circleci/smoketest_k8s.sh scalyr/scalyr-agent-ci-unittest:4 300 no_delete_existing_k8s_objs
+            mv .coverage coverage-smoke-k8s/.coverage.smoke-k8s
+
+      - persist_to_workspace:
+          root: coverage-smoke-k8s
+          paths:
+            .coverage.smoke-k8s
+
 
   smoke-k8s-helm:
     machine:
@@ -254,6 +286,46 @@ jobs:
             # dump services
             kubectl get svc  --all-namespaces | grep -vE '(kube-sys|docker)'
 
+  coverage:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install coverage
+            mkdir -p cov
+            cp .circleci/.coveragerc_ci cov/.coveragerc
+
+      - attach_workspace:
+          at: cov
+
+      - run:
+          working_directory: cov
+          command: |
+            source ../venv/bin/activate
+            coverage combine
+
+      - store_artifacts:
+          path: cov
+
+      - run:
+          name: report
+          working_directory: cov
+          command: |
+            source ../venv/bin/activate
+            coverage report
+
+
+
+
 workflows:
   version: 2
   unittest:
@@ -267,4 +339,9 @@ workflows:
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
-
+      - coverage:
+          requires:
+            - unittest-27
+            - smoke-docker-json
+            - smoke-docker-syslog
+            - smoke-k8s
