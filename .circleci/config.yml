@@ -342,6 +342,4 @@ workflows:
       - coverage:
           requires:
             - unittest-27
-            - smoke-docker-json
             - smoke-docker-syslog
-            - smoke-k8s
