@@ -217,7 +217,7 @@ class Checkpoint(object):
         result = None
         self._lock.acquire()
         try:
-            result = self._checkpoints.get(name, None, none_if_missing=True)
+            result = self._checkpoints.get(name, None)
         finally:
             self._lock.release()
 
