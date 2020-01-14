@@ -461,6 +461,7 @@ class SyslogRequestParser(object):
 
     def process(self, data, handle_frame):
         """Processes data returned from a previous call to read
+        :type data: six.binary_type
         """
         if not data:
             global_log.warning(
@@ -485,15 +486,16 @@ class SyslogRequestParser(object):
         while self._offset < size:
 
             # get the first byte to determine if framed or not
-            c = self._remaining[self._offset]
-            framed = c >= "0" and c <= "9"
+            # 2->TODO use slicing to get bytes in both python versions.
+            c = self._remaining[self._offset:self._offset+1]
+            framed = b"0" <= c <= b"9"
 
             skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
 
             # if framed, read the frame size
             if framed:
                 frame_end = -1
-                pos = self._remaining.find(" ", self._offset)
+                pos = self._remaining.find(b" ", self._offset)
                 if pos != -1:
                     frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
@@ -502,7 +504,7 @@ class SyslogRequestParser(object):
                         frame_end = self._offset + frame_size
             else:
                 # not framed, find the first newline
-                frame_end = self._remaining.find("\n", self._offset)
+                frame_end = self._remaining.find(b"\n", self._offset)
                 skip = 1
 
             # if we couldn't find the end of a frame, then it's time
@@ -521,7 +523,7 @@ class SyslogRequestParser(object):
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
-                    self._remaining = " "
+                    self._remaining = b" "
                     self._offset = 0
 
                 break
@@ -1091,7 +1093,7 @@ class SyslogHandler(object):
         else:
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        self.__line_reporter(data.count("\n") + 1)
+        self.__line_reporter(data.count(b"\n") + 1)
 
 
 class RequestVerifier(object):

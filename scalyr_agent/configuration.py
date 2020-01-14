@@ -16,9 +16,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -26,7 +25,10 @@ import os
 import re
 import socket
 import time
+
+import six
 import six.moves.urllib.parse
+from six.moves import range
 
 import scalyr_agent.util as scalyr_util
 
@@ -2703,7 +2705,8 @@ class Configuration(object):
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         """
-        separators.sort()
+        # 2->TODO Python3 can not sort None values
+        separators.sort(key=lambda s: s if s is not None else "")
         # For legacy reasons, must support space-separated array of strings
         cls = ArrayOfStrings
         if separators == [None, ","]:

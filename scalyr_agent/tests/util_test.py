@@ -15,10 +15,15 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
+
 
 __author__ = "czerwin@scalyr.com"
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
 
 import datetime
 import os
@@ -26,6 +31,7 @@ import tempfile
 import struct
 import threading
 from mock import patch, MagicMock
+import six
 
 import scalyr_agent.util as scalyr_util
 
@@ -52,7 +58,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 class TestUtilCompression(ScalyrTestCase):
     def setUp(self):
         super(TestUtilCompression, self).setUp()
-        self._data = "The rain in spain. " * 1000
+        self._data = b"The rain in spain. " * 1000
 
     def test_zlib(self):
         """Successful zlib compression"""
@@ -133,7 +139,9 @@ class TestUtil(ScalyrTestCase):
         )
 
     def test_read_file_as_json_with_strict_utf8_json(self):
-        self.__create_file(self.__path, '{ a: "\x96"}')
+        # 2->TODO python3 json libs do not allow serialization with invalid UTF-8.
+        with open(self.__path, "wb") as f:
+            f.write(b'{ a: "\x96"}')
 
         self.assertRaises(
             JsonReadFileException, scalyr_util.read_file_as_json, self.__path, True
@@ -629,7 +637,7 @@ class TestRedirectorClient(ScalyrTestCase):
             self._fake_clock.advance_time(set_to=59.0)
             self._client.join()
 
-    def test_receiving_str(self):
+    def test_receiving_bytes(self):
         # Simulate accepting the connection.
         self._accept_client_connection()
         self._send_to_client(0, "Testing")
@@ -684,7 +692,10 @@ class TestRedirectorClient(ScalyrTestCase):
         self._client_channel.simulate_server_connect()
 
     def _send_to_client(self, stream_id, content):
-        encoded_content = six.text_type(content).encode("utf-8")
+        if type(content) is six.text_type:
+            encoded_content = six.text_type(content).encode("utf-8")
+        else:
+            encoded_content = content
         code = len(encoded_content) * 2 + stream_id
         self._client_channel.simulate_server_write(
             struct.pack("i", code) + encoded_content
@@ -757,7 +768,7 @@ class FakeClientChannel(object):
     def __init__(self, fake_clock):
         self._lock = threading.Lock()
         self._allow_connection = False
-        self._pending_content = ""
+        self._pending_content = b""
         self._fake_clock = fake_clock
 
     def connect(self):
@@ -795,7 +806,7 @@ class FakeClientChannel(object):
 
     def simulate_server_write(self, content):
         self._lock.acquire()
-        self._pending_content = "%s%s" % (self._pending_content, content)
+        self._pending_content = b"%s%s" % (self._pending_content, content)
         self._lock.release()
         self._simulate_busy_loop_advance()
 

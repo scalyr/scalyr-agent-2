@@ -201,7 +201,8 @@ class BlockingRateLimiter(object):
         self._name = name
 
         # A queue of tokens
-        self._ripe_time = None
+        # 2->TODO python3 does not allow None in sort. There is sort in 'self._initialize_token_queue()'
+        self._ripe_time = 0.0
         self._token_queue = deque()
         # Condition variable to synchronize access to token queue
         self._token_queue_cv = threading.Condition()

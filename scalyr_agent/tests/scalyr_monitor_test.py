@@ -15,8 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
 
 __author__ = "czerwin@scalyr.com"
 
@@ -30,6 +30,8 @@ from scalyr_agent.scalyr_monitor import (
 from scalyr_agent.test_base import ScalyrTestCase
 
 import scalyr_agent.util as scalyr_util
+
+import six
 
 
 class MonitorConfigTest(ScalyrTestCase):

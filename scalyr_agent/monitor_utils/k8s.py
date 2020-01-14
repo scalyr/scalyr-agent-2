@@ -1839,7 +1839,7 @@ class KubernetesApi(object):
                             "\\n\\n".join(logged_response),
                             limit_once_per_x_secs=self.log_api_ratelimit_interval,
                             limit_key="query-api-log-resp-%s"
-                            % util.md5_hexdigest(path),
+                            % util.md5_hexdigest(path.encode("utf-8")),
                         )
 
     def query_object(self, kind, namespace, name, query_options=None):

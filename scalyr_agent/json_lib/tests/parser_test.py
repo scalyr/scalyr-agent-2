@@ -159,7 +159,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x, "Hi there\n")
 
         x = JsonParser.parse('"Hi there\\ua000"')
-        self.assertEquals(x, u"Hi there\ua000")
+        self.assertEquals(x, "Hi there\ua000")
 
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there')
 

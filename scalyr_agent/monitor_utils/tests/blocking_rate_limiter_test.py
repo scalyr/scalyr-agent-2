@@ -16,16 +16,18 @@
 # author: Edward Chee <echee@scalyr.com>
 
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "echee@scalyr.com"
 
 
 import threading
-from mock import patch
+
 from scalyr_agent.util import FakeClock, StoppableThread
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
+
+from mock import patch
+from six.moves import range
 
 
 def always_true():

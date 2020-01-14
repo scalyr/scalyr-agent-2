@@ -15,14 +15,19 @@
 #
 # A ScalyrMonitor which retrieves a specified URL and records the response status and body.
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six.moves.http_client
+
 import re
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
-import six.moves.http_cookiejar
+
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib.objects import JsonArray
+
+
+import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+import six.moves.http_cookiejar
+import six.moves.http_client
 
 __monitor__ = __name__
 

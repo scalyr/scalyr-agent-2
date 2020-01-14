@@ -132,7 +132,7 @@ class LineMatcher(object):
             ):
                 # We aren't going to return it so reset buffer back to the original spot.
                 file_like.seek(original_offset)
-                return ""
+                return b""
         else:
             self.__partial_line_time = None
 
@@ -151,7 +151,11 @@ class LineMatcher(object):
             max_length = self.max_line_length
 
         line = file_like.readline(max_length)
-        partial = len(line) > 0 and line[-1] != "\n" and line[-1] != "\r"
+        if len(line) == 0:
+            return line, False
+        # 2->TODO use slicing to get bytes string on both versions.
+        last_char = line[-1:]
+        partial = last_char != b"\n" and last_char != b"\r"
         return line, partial
 
 
@@ -219,8 +223,9 @@ class LineGrouper(LineMatcher):
         line_completion_wait_time=5 * 60,
     ):
         LineMatcher.__init__(self, max_line_length, line_completion_wait_time)
-        self._start_pattern = re.compile(start_pattern)
-        self._continuation_pattern = re.compile(continuation_pattern)
+        # 2->TODO encode patterns, need to discuss this.
+        self._start_pattern = re.compile(start_pattern.encode("utf-8"))
+        self._continuation_pattern = re.compile(continuation_pattern.encode("utf-8"))
 
     def _readline(self, file_like, max_length=0):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
@@ -305,7 +310,7 @@ class LineGrouper(LineMatcher):
                     # otherwise reset the file position and return an empty line
                     else:
                         file_like.seek(start_offset)
-                        line = ""
+                        line = b""
 
             # first line started a multiline and now we are waiting for the next line of
             # input, so return a partial line
@@ -316,7 +321,7 @@ class LineGrouper(LineMatcher):
         # the line didn't start a multiline, so reset the file position and return an empty line
         else:
             file_like.seek(start_offset)
-            line, partial = "", False
+            line, partial = b"", False
 
         return line, partial
 

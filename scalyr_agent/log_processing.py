@@ -21,7 +21,7 @@
 #         logs.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-# 2-TODO add unicode_literals
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import sys
 import six
@@ -41,6 +41,7 @@ import threading
 import time
 import timeit
 import uuid
+from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -145,15 +146,24 @@ def _match_glob(pathname):
 
 class LogLine(object):
     """A class representing a line from a log file.
-    This object will always have a single field 'line' which contains the log line.
+    This object has a property 'line' which contains the log line as binary string,
+    and a property 'decoded_line' as unicode version of the 'line(it acts like cache, calculates once, and can be reused)'.
     It can also contain two other attributes 'timestamp' which is the timestamp of the
     the log line in nanoseconds since the epoch (defaults to None, in which case the
     current time.time() will be used), and 'attrs' which are optional attributes for the line.
     """
 
     def __init__(self, line):
-        # line is a string
-        self.line = line
+        """
+        :param line: Binary string or unicode string.
+        More information can be found in the setter for LogLine.line property.
+        :type line: six.binary_type | six.text_type
+        """
+        # line is a bytes string
+        self._line = None  # type: six.binary_type
+
+        # same line but as decoded string.
+        self._decoded_line = None
 
         # timestamp is a long, counting nanoseconds since Epoch
         # or None to use current time
@@ -162,8 +172,46 @@ class LogLine(object):
         # attrs is a dict of optional attributes to attach to the log message
         self.attrs = None
 
-        # length of raw line (in contrast
-        self.raw_line_len = len(self.line)
+        # init line
+        self.line = line
+
+        # length of raw line
+        self.raw_line_len = len(self._line)
+
+    @property
+    def line(self):
+        """
+        :rtype: six.binary_type
+        """
+        return self._line
+
+    @line.setter
+    def line(self, value):
+        """
+        :param value: Normally should be binary string, but also can be unicode,
+        if so, it allows to avoid second decoding in case if we need to get 'decoded_line' later.
+        :type value: six.binary_type | six.text_type
+        """
+        # Set new value for self._line. Invalidate self._decoded_line if it was cached.
+        if type(value) is six.binary_type:
+            self._line = value
+            self._decoded_line = None
+
+        # Save it as decoded_line and get binary line from it.
+        else:
+            self._line = value.encode("utf-8")
+            self._decoded_line = value
+
+    @property
+    def decoded_line(self):
+        """
+        Returns decoded version of the line and caches it for further use.
+        :return:
+        :rtype: six.text_type
+        """
+        if self._decoded_line is None:
+            self._decoded_line = self.line.decode("utf-8", "replace")
+        return self._decoded_line
 
 
 class LogFileIterator(object):
@@ -385,15 +433,14 @@ class LogFileIterator(object):
         """Returns a uuid as a string
         We want uuids as strings mostly as a convenience for json_lib
         """
-        # 2->TODO str to six.text_type
-        return str(uuid.uuid4())
+        return six.text_type(uuid.uuid4())
 
     def get_sequence(self):
         """Gets the current sequence id and sequence number of the iterator
         The sequence id is a globally unique number that groups a set of sequence numbers
 
         @return: A tuple containing a (sequence_id, sequence_number)
-        @rtype: (uuid.UUID, int)
+        @rtype: (six.text_type, int)
         """
         return self.__sequence_id, self.__sequence_number_at_mark + self.__position
 
@@ -569,7 +616,7 @@ class LogFileIterator(object):
         # if there are no bytes available in the buffer or on the file
         # shortcircuit return an empty string
         if available_buffer_bytes == 0 and not more_file_bytes_available:
-            return LogLine(line="")
+            return LogLine(line=b"")
 
         # Keep our underlying buffer of bytes filled up.
         if self.__buffer is None or (
@@ -608,9 +655,9 @@ class LogFileIterator(object):
         # check to see if we need to parse the line as cri.
         # Note: we don't handle multi-line lines.
         if self.__parse_format == "cri":
-            timestamp, stream, tags, message = _parse_cri_log(result.line)
+            timestamp, stream, tags, message = _parse_cri_log(result.decoded_line)
             if message is None:
-                log.warn(
+                log.warning(
                     "Didn't find a valid log line in CRI format for log %s.  Logging full line."
                     % (self.__path),
                     limit_once_per_x_secs=300,
@@ -624,7 +671,7 @@ class LogFileIterator(object):
         # or see if we need to parse it as json
         elif self.__parse_format == "json":
             try:
-                json = scalyr_util.json_decode(result.line)
+                json = scalyr_util.json_decode(result.decoded_line)
 
                 line = None
                 attrs = {}
@@ -647,7 +694,7 @@ class LogFileIterator(object):
                 # if we didn't find a valid line key/value pair
                 # throw a warning and treat it as a normal line
                 if line is None:
-                    log.warn(
+                    log.warning(
                         "Key '%s' doesn't exist in json object for log %s.  Logging full line. Please check the log's 'json_message_field' configuration"
                         % (self.__json_log_key, self.__path),
                         limit_once_per_x_secs=300,
@@ -663,7 +710,7 @@ class LogFileIterator(object):
 
             except Exception as e:
                 # something went wrong. Return the full line and log a message
-                log.warn(
+                log.warning(
                     "Error parsing line as json for log '%s' - %s" % (self.__path, e),
                     limit_once_per_x_secs=300,
                     limit_key=("bad-json-%s" % self.__path),
@@ -1081,14 +1128,14 @@ class LogFileIterator(object):
             self.__position = self.__buffer_contents_index[0].position_start
             # TODO:  This warning was firing in normal cases.  Have to re-examine under what conditions this triggers.
             # It might be that if the file is empty, or if it consume all bytes, then we trigger this.
-            # log.warn('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
+            # log.warning('Had to skip over invalidated portions of the file.  May not be an indicator of a real error. '
             #         'File=%s', self.__path, limit_once_per_x_secs=60, limit_key=('some-invalidated-%s' % self.__path))
         elif should_have_bytes:
             # We only get here if we were not able to read anything into the buffer but there were files that should
             # have had bytes available for reading.  This must mean  all of our file content after the current position
             # is gone.  so, just adjust the position to point to the end as we know it.
             self.__position = self.__pending_files[-1].position_end
-            log.warn(
+            log.warning(
                 "File content appears to have disappeared.  This may not be an indicator of a real error. "
                 "File=%s",
                 self.__path,
@@ -1148,7 +1195,7 @@ class LogFileIterator(object):
         if len(chunk) != num_bytes:
             # We did not read the right number of bytes for some reason.  This shouldn't really happen, but
             # we just pretend like we didn't read anything to prevent corrupting logs.
-            log.warn(
+            log.warning(
                 "Did not read expected number of bytes. Expected=%ld vs Read=%ld in file %s",
                 num_bytes,
                 len(chunk),
@@ -1215,14 +1262,14 @@ class LogFileIterator(object):
                     starting_inode = None
             except IOError as error:
                 if error.errno == 13:
-                    log.warn(
+                    log.warning(
                         "Permission denied while attempting to read file '%s'",
                         file_path,
                         limit_once_per_x_secs=60,
                         limit_key=("invalid-perm" + file_path),
                     )
                 else:
-                    log.warn(
+                    log.warning(
                         "Error seen while attempting to read file '%s' with errno=%d",
                         file_path,
                         error.errno,
@@ -1232,9 +1279,9 @@ class LogFileIterator(object):
                 return None, None, None
             except OSError as e:
                 if e.errno == errno.ENOENT:
-                    log.warn("File unexpectantly missing when trying open it")
+                    log.warning("File unexpectantly missing when trying open it")
                 else:
-                    log.warn(
+                    log.warning(
                         "OSError seen while attempting to read file '%s' with errno=%d",
                         file_path,
                         e.errno,
@@ -1865,23 +1912,22 @@ class LogFileProcessor(object):
                 lines_read += 1
 
                 if self.__num_redaction_and_sampling_rules > 0:
-                    # 2->TODO: decode bytes string from UTF-8
-                    decoded_line = line_object.line.decode("utf-8", "replace")
-                    sample_result = self.__sampler.process_line(decoded_line)
+                    # 2->TODO: Here we use new field - 'LogLine.decoded_line'.
+                    # By the way maybe it will be better just to encode patterns and do apply regex on binary data?
+                    sample_result = self.__sampler.process_line(
+                        line_object.decoded_line
+                    )
 
                     if sample_result is None:
                         lines_dropped_by_sampling += 1
                         bytes_dropped_by_sampling += line_len
                         continue
 
-                    (decoded_line, redacted) = self.__redacter.process_line(
-                        decoded_line
+                    (line_object.line, redacted) = self.__redacter.process_line(
+                        line_object.decoded_line
                     )
 
-                    line_len = len(decoded_line)
-
-                    # 2->TODO: encode line back.
-                    line_object.line = decoded_line.encode("utf-8")
+                    line_len = len(line_object.line)
 
                 else:
                     sample_result = 1.0
@@ -1948,7 +1994,8 @@ class LogFileProcessor(object):
             #                                         process_time=start_process_time,
             #                                         lines=lines_read, bytes=bytes_read, files=1)
             add_events_request.increment_timing_data(
-                lines=lines_read, bytes=bytes_read, files=1
+                #2->TODO in python2 **kwargs dict has keys with str type.
+                **{"lines": lines_read, "bytes": bytes_read, "files": 1}
             )
 
             # To do proper account when an RPC has failed and we retry it, we track how many bytes are
@@ -2121,7 +2168,7 @@ class LogFileProcessor(object):
         self.__total_bytes_skipped += skipped_bytes
         self.__lock.release()
 
-        log.warn(
+        log.warning(
             "Skipped copying %ld bytes in '%s' due to: %s",
             skipped_bytes,
             self.__path,
@@ -2265,8 +2312,6 @@ class LogLineSampler(object):
         self.total_passes = 0
 
     def process_line(self, input_line):
-        if type(input_line) == str:
-            raise AssertionError
         """Performs all configured sampling operations on the input line and returns whether or not it should
         be kept.  If it should be kept, then a float is returned indicating the sampling rate of the rule that
         allowed it to be included.  Otherwise, None.
@@ -2374,8 +2419,6 @@ class LogLineRedacter(object):
         self.total_redactions = 0
 
     def process_line(self, input_line):
-        if type(input_line) == str:
-            raise AssertionError
         """Performs all configured redaction rules on the input line and returns the results.
 
         See the class description for the algorithm that determines how the rules are applied.
@@ -2423,6 +2466,7 @@ class LogLineRedacter(object):
         @return: A sequence of two elements, the line with the redaction applied (if any) and True or False
             indicating if a redaction was applied.
         """
+        # 2->TODO Maybe we should keep line as binary string, and just convert all used patterns to binary&
 
         def __replace_groups_with_hashed_content(re_ex, replacement_ex, line):
 
@@ -2452,11 +2496,11 @@ class LogLineRedacter(object):
                     replacement_matches += 1
                     if group_hash_indicator in replacement_ex:
                         # the group needs to be hashed
-                        replaced_group = replaced_group.encode("utf8")
+                        replaced_group = replaced_group
                         replaced_group = replaced_group.replace(
                             group_hash_indicator,
                             scalyr_util.md5_hexdigest(
-                                _group + redaction_rule.hash_salt
+                                (_group + redaction_rule.hash_salt).encode("utf-8")
                             ),
                             1,
                         )
@@ -2916,7 +2960,7 @@ class LogMatcher(object):
                     values["BASENAME_NO_EXT"] = os.path.splitext(basename)[0]
                     result = pattern.substitute(values)
                 except Exception as e:
-                    log.warn(
+                    log.warning(
                         # [start of 2->TODO]
                         #  As in other similar places, it can be OK to leave literals here as str.
                         #  But as we use "unicode_literals",
@@ -2931,14 +2975,14 @@ class LogMatcher(object):
                         pattern = re.compile(rename["match"])
                         result = re.sub(pattern, rename["replacement"], matched_file)
                         if result == matched_file:
-                            log.warn(
+                            log.warning(
                                 "Regex '%s' used to rename logfile '%s', but logfile name was not changed."
                                 % (rename["match"], matched_file),
                                 limit_once_per_x_secs=600,
                                 limit_key=("rename-regex-same-%s" % matched_file),
                             )
                     except Exception as e:
-                        log.warn(
+                        log.warning(
                             "Error matching regular expression '%s' and replacing with '%s'.  %s"
                             # [start of 2->TODO]
                             #  As in other similar places, it can be OK to leave literals here as str.

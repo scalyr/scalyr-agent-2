@@ -14,9 +14,8 @@
 # ------------------------------------------------------------------------
 #
 # author: Imron Alston <imron@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "imron@scalyr.com"
 
@@ -29,6 +28,7 @@ from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
 )
 
+from six.moves import range
 
 class AutoFlushingRotatingFileTestCase(unittest.TestCase):
     def setUp(self):

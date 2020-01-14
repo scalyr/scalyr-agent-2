@@ -57,11 +57,11 @@ class ByteScanner(object):
         # Go through and make sure the bytes are all less than 255.  I
         # am not sure if the b'' is really need to force a binary string,
         # especially since python 2.X, all strings are binary by default.
-        # 2->TODO Unicode can be passed, but it should contain only ascii
+        # 2->TODO Unicode can be passed.
 
         for i in range(len(string_input)):
             # 2->TODO slicing produces byte string for both versions.
-            self.__buffer.append(six.int2byte(ord(string_input[i:i+1]) & 255))
+            self.__buffer.append(six.int2byte(ord(string_input[i: i + 1]) & 255))
 
     @property
     def at_end(self):
@@ -460,7 +460,9 @@ class JsonParser(object):
             c = self.__scanner.peek_next_ubyte(offset=length, none_if_bad_index=True)
             if c is None:
                 break
-            elif c == b"_" or b"a" <= c <= b"z" or b"A" <= c <= b"Z" or b"0" <= c <= b"9":
+            elif (
+                c == b"_" or b"a" <= c <= b"z" or b"A" <= c <= b"Z" or b"0" <= c <= b"9"
+            ):
                 length += 1
             else:
                 break
@@ -652,7 +654,7 @@ class JsonParser(object):
 
         for i in range(0, len(chars)):
             # 2->TODO slicing produces byte string in both versions.
-            expected = chars[i:i+1]
+            expected = chars[i: i + 1]
             if self.__scanner.at_end:
                 actual = -1
             else:

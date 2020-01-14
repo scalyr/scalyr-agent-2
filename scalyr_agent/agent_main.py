@@ -30,6 +30,7 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
@@ -855,7 +856,7 @@ class ScalyrAgent(object):
                     logs_initial_positions = {self.__log_file_path: agent_log_position}
                 else:
                     logs_initial_positions = None
-
+                log.info(sys.version)
                 log.info(
                     "Starting scalyr agent... (version=%s) %s"
                     % (SCALYR_VERSION, scalyr_util.get_pid_tid())

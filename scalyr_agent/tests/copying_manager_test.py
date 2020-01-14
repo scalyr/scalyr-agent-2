@@ -14,9 +14,10 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import threading
-from six.moves import range
+
 
 __author__ = "czerwin@scalyr.com"
 
@@ -47,6 +48,12 @@ from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
+
+import six
 
 ONE_MB = 1024 * 1024
 
@@ -703,11 +710,19 @@ def _add_non_utf8_to_checkpoint_file(path):
     fp = open(path, "r")
     data = scalyr_util.json_decode(fp.read())
     fp.close()
+    # 2-> TODO json libraries do not allow serialize bytes string with invalid UTF-8(ujson)or even bytes in general(json).
+    # so to test this case we must write non-utf8 byte directrly, without serializing.
 
-    data["test"] = "\x96"
+    # this string will be replaced with invalid utf8 byte after encoding.
+    data["test"] = "__replace_me__"
 
-    fp = open(path, "w")
-    fp.write(scalyr_util.json_encode(data))
+    json_string = scalyr_util.json_encode(data).encode("utf-8")
+
+    # replace prepared substring to invalid byte.
+    json_string = json_string.replace(b"__replace_me__", b"\x96")
+
+    fp = open(path, "wb")
+    fp.write(json_string)
     fp.close()
 
 

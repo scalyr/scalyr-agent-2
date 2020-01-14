@@ -31,6 +31,8 @@ import resource
 import signal
 import tempfile
 
+import six
+
 from scalyr_agent.platform_controller import (
     PlatformController,
     DefaultPaths,
@@ -1180,12 +1182,13 @@ class StatusReporter(object):
 
         @param message: The text string to send.  For safety's sake, this probably should only include low ascii
             characters.
-        @type message: str
+        @type message: six.text_type
         """
         # We write out the number of bytes in the message followed by the message.  The number of bytes might be
         # different from the message length in the case of higher ascii, but we'll punt on that for now.
-        self.__fp.write("%d\n" % len(message))
-        self.__fp.write("%s" % message)
+        # 2->TODO message needs to be encoded in Python3
+        self.__fp.write(b"%d\n" % len(message))
+        self.__fp.write(b"%s" % six.ensure_binary(message))
         self.__fp.flush()
 
     def read_status(self, timeout=None, timeout_status=None):
@@ -1211,7 +1214,7 @@ class StatusReporter(object):
                 return timeout_status
             self.__fp.seek(0)
             num_bytes = self.__fp.readline()
-            if num_bytes != "":
+            if num_bytes != b"":
                 message = self.__fp.read()
                 if len(message) == int(num_bytes):
                     return message

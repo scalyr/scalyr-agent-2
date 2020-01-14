@@ -679,7 +679,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             last_check = time.time() - self._leader_check_interval
 
             last_reported_leader = None
-            while not self._is_stopped():
+            while not self._is_thread_stopped():
                 current_time = time.time()
 
                 # if we are the leader, we could be going through this loop before the leader_check_interval

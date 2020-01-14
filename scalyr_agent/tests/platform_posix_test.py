@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
 import tempfile
@@ -40,22 +41,22 @@ class TestStatusReporter(ScalyrTestCase):
 
     def test_basic_status(self):
         self.sender.report_status("My status")
-        self.assertEquals(self.receiver.read_status(timeout=5.0), "My status")
+        self.assertEquals(self.receiver.read_status(timeout=5.0), b"My status")
 
     def test_status_with_newlines(self):
         self.sender.report_status("My status\nAnother one\n")
         self.assertEquals(
-            self.receiver.read_status(timeout=5.0), "My status\nAnother one\n"
+            self.receiver.read_status(timeout=5.0), b"My status\nAnother one\n"
         )
 
     def test_timeout_exceeded(self):
         self.assertEquals(
-            self.receiver.read_status(timeout=0.0, timeout_status="timeout"), "timeout"
+            self.receiver.read_status(timeout=0.0, timeout_status=b"timeout"), b"timeout"
         )
 
     def test_no_timeout(self):
         self.sender.report_status("My status")
-        self.assertEquals(self.receiver.read_status(), "My status")
+        self.assertEquals(self.receiver.read_status(), b"My status")
 
 
 class TestPidfileManager(ScalyrTestCase):

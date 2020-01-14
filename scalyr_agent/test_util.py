@@ -16,12 +16,11 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 from __future__ import absolute_import
-import re
-import struct
 
 __author__ = "echee@scalyr.com"
 
-
+import re
+import struct
 import atexit
 import logging
 import os
@@ -37,6 +36,7 @@ from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_logging import AgentLogger
 
+import six
 
 class ScalyrTestUtils(object):
     @staticmethod
@@ -185,10 +185,12 @@ def parse_scalyr_request(payload):
         # Read the 4 bytes that describe the length, which is stored in regex group 1.
         length = struct.unpack(">i", x.group(1))[0]
         # Grab the string content as raw bytes.
-        raw_string = payload[x.end(1) : x.end(1) + length]
-        rewritten_payload += scalyr_util.json_encode(raw_string.decode("utf-8"))
+        raw_string = payload[x.end(1): x.end(1) + length]
+        rewritten_payload += six.ensure_binary(
+            scalyr_util.json_encode(raw_string.decode("utf-8"))
+        )
         last_processed_index = x.end(1) + length - 1
-    rewritten_payload += payload[last_processed_index + 1 : len(payload)]
+    rewritten_payload += payload[last_processed_index + 1: len(payload)]
 
     # Now convert all places where we do not have quotes around key names to have quotes.
     # This is pretty fragile.. we look for anything like

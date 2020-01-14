@@ -191,7 +191,7 @@ class TestAnnotationConfig(ScalyrTestCase):
 
     def test_mixed_list_and_dict_key(self):
         annotations = {
-            "log.config.scalyr.com/test.2.match_expression": "third",
+            "log.config.scalyr.com/1.2.match_expression": "third",
             "log.config.scalyr.com/test.2.sampling_rate": 3,
             "log.config.scalyr.com/test.bad.match_expression": "first",
             "log.config.scalyr.com/test.bad.sampling_rate": 1,

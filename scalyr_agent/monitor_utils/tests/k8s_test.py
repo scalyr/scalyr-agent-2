@@ -14,10 +14,9 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import threading
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -37,9 +36,11 @@ import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 import time
-import mock
 
+import mock
 from mock import Mock, patch, call
+import six
+from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):
@@ -188,7 +189,7 @@ class TestKubernetesApi(ScalyrTestCase):
             scalyr_logging.DEBUG_LEVEL_1,
             expected_log_msg,
             limit_once_per_x_secs=300,
-            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path),
+            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path.encode("utf-8")),
         )
         return debug_log_call
 
@@ -198,7 +199,7 @@ class TestKubernetesApi(ScalyrTestCase):
             scalyr_logging.DEBUG_LEVEL_1,
             expected_log_msg,
             limit_once_per_x_secs=300,
-            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path),
+            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path.encode("utf-8")),
         )
 
     def _assert_not_logged(self, mock_logger, expected_log_msg):
@@ -224,7 +225,7 @@ class TestKubernetesApi(ScalyrTestCase):
         else:
             resp = requests.Response()
             resp.status_code = response_code_or_exception
-            resp._content = "{}"
+            resp._content = b"{}"
             mock_get.return_value = resp
 
         stack_trace_lines = ["stack_trace_line_1\n", "stack_trace_line_2\n"]
@@ -234,7 +235,7 @@ class TestKubernetesApi(ScalyrTestCase):
         # Return the log message that should have been logged if all criteria are met
         return (
             mock_logger,
-            self._get_expected_log_mesg(self._path, stack_trace_lines, resp._content),
+            self._get_expected_log_mesg(self._path, stack_trace_lines, resp._content.decode("utf-8")),
         )
 
     def test_query_api_log_format(self):
@@ -269,7 +270,7 @@ class TestKubernetesApi(ScalyrTestCase):
             scalyr_logging.DEBUG_LEVEL_1,
             expected_log_msg,
             limit_once_per_x_secs=77,
-            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path),
+            limit_key="query-api-log-resp-%s" % md5_hexdigest(self._path.encode("utf-8")),
         )
 
     def test_query_api_200s_not_logged(self):
@@ -579,7 +580,13 @@ def create_object_from_dict(d):
     Takes a dict of key-value pairs and converts it to an object with attributes
     equal to the names of the keys and values equal to the values
     """
-    result = type("", (), {})()
+    # 2->TODO 'type' function accepts only str, not unicode, python3 has the opposite situation.
+    #  Did not find any solution in six library...
+    if six.PY2:
+        class_name = b""
+    else:
+        class_name = ""
+    result = type(class_name, (), {})()
     for key, value in six.iteritems(d):
         setattr(result, key, value)
     return result

@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import division
 
 from __future__ import absolute_import
@@ -147,7 +148,7 @@ def json_encode(obj, output=None):
     @param obj: The object to serialize
     @param output: If not None, a file-like object to which the serialization should be written.
 
-    @type obj: dict|list
+    @type obj: dict|list|six.text_type
     """
     return _json_encode(obj, output)
 
@@ -344,11 +345,11 @@ def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
-    @type data: str
+    @type data: six.binary_type
     @rtype: str
     """
 
-    if not (data and isinstance(data, six.string_types)):
+    if not (data and isinstance(data, six.binary_type)):
         raise Exception("invalid data to be hashed: %s", repr(data))
 
     if not new_md5:
@@ -1656,7 +1657,7 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = "a" * 100
+COMPRESSION_TEST_STR = b"a" * 100
 
 
 def get_compress_module(compression_type):

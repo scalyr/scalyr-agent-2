@@ -1,6 +1,6 @@
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
-from mock import patch, Mock
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
@@ -9,6 +9,9 @@ from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfiguration
+
+from mock import patch, Mock
+import six
 
 
 class TestConfigurationDocker(TestConfiguration):
@@ -92,13 +95,13 @@ class TestConfigurationDocker(TestConfiguration):
                 if custom_name == STANDARD_PREFIX
                 else custom_name.upper()
             )
-            envar_value = str(value[1])
+            param_value = value[1]
             if value[2] == ArrayOfStrings:
                 # Array of strings should be entered into environment in the user-preferred format
                 # which is without square brackets and quotes around each element
-                envar_value = envar_value[1:-1]  # strip square brackets
-                envar_value = envar_value.replace("'", "")
+                envar_value = "[{}]".format(", ".join(param_value))
             else:
+                envar_value = six.text_type(param_value)
                 envar_value = (
                     envar_value.lower()
                 )  # lower() needed for proper bool encoding

@@ -35,7 +35,7 @@ class SerializeTests(ScalyrTestCase):
     def test_length_prefixed_strings_with_unicode(self):
         self.assertEquals(
             b"`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!",
-            self.serialize_string(u"Howdy \u84b8 folks!"),
+            self.serialize_string("Howdy \u84b8 folks!"),
         )
 
     @staticmethod

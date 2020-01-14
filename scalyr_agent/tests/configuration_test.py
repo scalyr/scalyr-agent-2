@@ -14,15 +14,13 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-from mock import patch, Mock
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -44,6 +42,10 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     JournaldLogFormatter,
 )
 import scalyr_agent.util as scalyr_util
+
+import six
+from six.moves import range
+from mock import patch, Mock
 
 
 class TestConfigurationBase(ScalyrTestCase):
