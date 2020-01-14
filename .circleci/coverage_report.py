@@ -79,4 +79,5 @@ os.system("coverage html")
 
 if args.show:
     import webbrowser
+
     webbrowser.open("htmlcov/index.html")

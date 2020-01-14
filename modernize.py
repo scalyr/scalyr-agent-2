@@ -36,6 +36,7 @@ import glob2
 from libmodernize.main import refactor
 from libmodernize.fixes import six_fix_names
 
+MAX_TODO_LINES = 1000
 
 FIXERS = {
     "lib2to3.fixes.fix_apply",
@@ -156,7 +157,7 @@ def parse_todo_areas(source):
                 # end of the area found
                 if TODO_END_PATTERN.match(line):
                     todo_area_string = "".join(todo_area_lines)
-                    if len(todo_area_string) > 1000:
+                    if len(todo_area_string) > MAX_TODO_LINES:
                         raise TODOParseError(
                             "TODO area is bigger than 500 characters. Line: {}".format(
                                 line_index

@@ -117,7 +117,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "docker/docker-syslog-config",
                 "scalyr-docker-agent-syslog",
                 ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"],
-                coverage_enabled=coverage_enabled
+                coverage_enabled=coverage_enabled,
             )
         elif package_type == "docker_json_builder":
             # An image for running on Docker configured to fetch logs via the file system (the container log
@@ -132,7 +132,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "docker/docker-json-config",
                 "scalyr-docker-agent-json",
                 ["scalyr/scalyr-agent-docker-json"],
-                coverage_enabled=coverage_enabled
+                coverage_enabled=coverage_enabled,
             )
         elif package_type == "k8s_builder":
             # An image for running the agent on Kubernetes.
@@ -145,7 +145,7 @@ def build_package(package_type, variant, no_versioned_file_name, coverage_enable
                 "docker/k8s-config",
                 "scalyr-k8s-agent",
                 ["scalyr/scalyr-k8s-agent"],
-                coverage_enabled=coverage_enabled
+                coverage_enabled=coverage_enabled,
             )
         else:
             assert package_type in ("deb", "rpm")
@@ -612,10 +612,10 @@ def build_container_builder(
             r"CMD .*\n",
             'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
             '"--no-fork", "--no-change-user", "start"]',
-            new_dockerfile_source
+            new_dockerfile_source,
         )
 
-        with open("Dockerfile", 'w') as file:
+        with open("Dockerfile", "w") as file:
             file.write(new_dockerfile_source)
 
     tar.add("Dockerfile")
@@ -1763,10 +1763,7 @@ if __name__ == "__main__":
         set_build_info(options.build_info)
 
     artifact = build_package(
-        args[0],
-        options.variant,
-        options.no_versioned_file_name,
-        options.coverage,
+        args[0], options.variant, options.no_versioned_file_name, options.coverage,
     )
     print("Built %s" % artifact)
     sys.exit(0)
