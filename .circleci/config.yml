@@ -4,6 +4,35 @@
 #
 version: 2
 jobs:
+  unittest-36:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie-browsers
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install -r dev-requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "venv"
+      - run:
+          command: |
+            source venv/bin/activate
+            python run_tests.py
+
+      - store_artifacts:
+          path: xunit.xml
+
+      - store_artifacts:
+          path: cover/
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -258,6 +287,7 @@ workflows:
   version: 2
   unittest:
     jobs:
+      - unittest-36
       - unittest-27
       - unittest-26
       - smoke-standalone-27
