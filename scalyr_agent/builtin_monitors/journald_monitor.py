@@ -21,7 +21,6 @@ import os
 import re
 import select
 from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
@@ -162,7 +161,7 @@ def load_checkpoints(filename):
         return result
 
     # read from the file on disk
-    checkpoints = JsonObject({})
+    checkpoints = {}
     try:
         checkpoints = scalyr_util.read_file_as_json(filename, strict_utf8=True)
     except:
@@ -171,7 +170,7 @@ def load_checkpoints(filename):
             "No checkpoint file '%s' exists.\n\tAll journald logs for '%s' will be read starting from their current end.",
             filename,
         )
-        checkpoints = JsonObject({})
+        checkpoints = {}
 
     _global_lock.acquire()
     try:
