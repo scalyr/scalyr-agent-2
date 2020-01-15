@@ -24,7 +24,12 @@
 #
 # Optional env vars:
 #   TLS_REVERSE_PROXY:  (e.g. https://localhost:8080). If set, scalyr agent will use this proxy url
+#
+# Expects following positional args:
+#   $1 : coverage_enabled (true or false)
 ##################################################################
+
+coverage_enabled=$1
 
 alias ll='ls -la'
 PS1='\h:\w\$ '
@@ -113,12 +118,17 @@ sudo mv /tmp/scalyr_server.json /etc/scalyr-agent-2/agent.d/scalyr_server.json
 
 # Start the agent.  Must use -E to inherit environment for proper python settings
 
-echo "Installing coverage"
-sudo -E python -m pip install coverage==4.5.4
 
-echo "Starting agent ..."
-# coverage tool needs a real file, not symlink.
-sudo -E python -m coverage run /usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py start
+if [[ $coverage_enabled == "true" ]]; then
+  echo "Installing coverage"
+  sudo -E python -m pip install coverage==4.5.4
+  echo "Starting agent ..."
+  # coverage tool needs a real file, not symlink.
+  # sudo -E python -m coverage run /usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py start
+else
+  echo "Starting agent ..."
+  sudo -E scalyr-agent-2 start
+fi
 
 if [[ ! -f /var/log/scalyr-agent-2/agent.pid ]]; then
     exit 1
