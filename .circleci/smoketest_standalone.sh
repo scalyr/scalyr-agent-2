@@ -124,7 +124,7 @@ if [[ $coverage_enabled == "true" ]]; then
   sudo -E python -m pip install coverage==4.5.4
   echo "Starting agent ..."
   # coverage tool needs a real file, not symlink.
-  sudo -E python -m coverage run /usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py start
+  #sudo -E python -m coverage run /usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py start
 else
   echo "Starting agent ..."
   sudo -E scalyr-agent-2 start
