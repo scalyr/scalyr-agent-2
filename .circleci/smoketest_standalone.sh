@@ -112,8 +112,13 @@ fi
 sudo mv /tmp/scalyr_server.json /etc/scalyr-agent-2/agent.d/scalyr_server.json
 
 # Start the agent.  Must use -E to inherit environment for proper python settings
+
+echo "Installing coverage"
+sudo -E python -m pip install coverage==4.5.4
+
 echo "Starting agent ..."
-sudo -E scalyr-agent-2 start
+# coverage tool needs a real file, not symlink.
+sudo -E python -m coverage run /usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py start
 
 if [[ ! -f /var/log/scalyr-agent-2/agent.pid ]]; then
     exit 1
@@ -153,3 +158,6 @@ ci-agent-standalone-${CIRCLE_BUILD_NUM} $MAX_WAIT \
 --scalyr_server $SCALYR_SERVER --read_api_key $READ_API_KEY \
 --python_version $PYTHON_VERSION --monitored_logfile $LOGFILE \
 --debug true"
+
+# copy .coverage to root to make it easyer to find it outside of docker container.
+sudo cp .coverage /.coverage

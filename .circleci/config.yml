@@ -59,10 +59,19 @@ jobs:
           docker_layer_caching: true
       - run:
           command: |
+            mkdir -p coverage-standalone-27 && \
             docker container create --name dummy -v shared_vol:/app alpine && \
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker run -it --name smoke -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker ps -a && \
+            docker cp smoke:/.coverage coverage-standalone-27/.coverage.standalone-27 && \
             docker rm dummy;
+
+      - persist_to_workspace:
+          root: coverage-standalone-27
+          paths:
+            .coverage.standalone-27
+
   smoke-standalone-26:
     docker:
       - image: circleci/python:2.7-jessie-browsers
@@ -343,3 +352,4 @@ workflows:
           requires:
             - unittest-27
             - smoke-docker-syslog
+            - smoke-standalone-27
