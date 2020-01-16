@@ -332,6 +332,68 @@ class TestUtil(ScalyrTestCase):
         self.assertFalse(scalyr_util.value_to_bool("False"))
         self.assertFalse(scalyr_util.value_to_bool(""))
 
+    def test_get_parser_from_config_default(self):
+        config = {
+            "something": "something",
+            "other something": ["thing1", "thing2"],
+        }
+        attributes = {"nothing": 0}
+
+        self.assertEqual(
+            scalyr_util.get_parser_from_config(config, attributes, "default_parser"),
+            "default_parser",
+        )
+
+    def test_get_parser_from_config_hierarchy1(self):
+        config = {
+            "something": "something",
+            "other something": ["thing1", "thing2"],
+            "parser": "config_parser",
+            "attributes": {"parser": "config_attributes_parser",},
+        }
+        attributes = {
+            "nothing": 0,
+            "parser": "attributes_parser",
+        }
+
+        self.assertEqual(
+            scalyr_util.get_parser_from_config(config, attributes, "default_parser"),
+            "config_attributes_parser",
+        )
+
+    def test_get_parser_from_config_hierarchy2(self):
+        config = {
+            "something": "something",
+            "other something": ["thing1", "thing2"],
+            "parser": "config_parser",
+            "attributes": {},
+        }
+        attributes = {
+            "nothing": 0,
+            "parser": "attributes_parser",
+        }
+
+        self.assertEqual(
+            scalyr_util.get_parser_from_config(config, attributes, "default_parser"),
+            "config_parser",
+        )
+
+    def test_get_parser_from_config_hierarchy3(self):
+        config = {
+            "something": "something",
+            "other something": ["thing1", "thing2"],
+            "attributes": {},
+        }
+        attributes = {
+            "nothing": 0,
+            "parser": "attributes_parser",
+        }
+
+        self.assertEqual(
+            scalyr_util.get_parser_from_config(config, attributes, "default_parser"),
+            "attributes_parser",
+        )
+
 
 class TestRateLimiter(ScalyrTestCase):
     def setUp(self):
