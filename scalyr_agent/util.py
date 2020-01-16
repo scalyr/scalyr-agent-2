@@ -561,6 +561,35 @@ def is_list_of_strings(vals):
     return True
 
 
+def get_parser_from_config(base_config, attributes, default_parser):
+    """
+    Checks the various places that the parser option could be set and returns
+    the value with the highest precedence, or `default_parser` if no parser was found
+    @param base_config: a set of log config options for a logfile
+    @param attributes: a set of attributes to apply to a logfile
+    @param default_parser: the default parser if no parser setting is found in base_config or attributes
+    """
+    # check all the places `parser` might be set
+    # highest precedence is base_config['attributes']['parser'] - this is if
+    # `com.scalyr.config.log.attributes.parser is set as a label
+    if "attributes" in base_config and "parser" in base_config["attributes"]:
+        return base_config["attributes"]["parser"]
+
+    # next precedence is base_config['parser'] - this is if
+    # `com.scalyr.config.log.parser` is set as a label
+    if "parser" in base_config:
+        return base_config["parser"]
+
+    # lowest precedence is attributes['parser'] - this is if
+    # `parser` is a label and labels are being uploaded as attributes
+    # and the `parser` label passes the attribute filters
+    if "parser" in attributes:
+        return attributes["parser"]
+
+    # if we are here, then we found nothing so return the default
+    return default_parser
+
+
 class JsonReadFileException(Exception):
     """Raised when a failure occurs when reading a file as a JSON object."""
 
