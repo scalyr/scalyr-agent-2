@@ -27,7 +27,9 @@ is_py3 = (_ver[0] == 3)
 
 try:
     import simplejson as json
-except ImportError:
+except (ImportError, SyntaxError):
+    # simplejson does not support Python 3.2, it throws a SyntaxError
+    # because of u'...' Unicode literals.
     import json
 
 # ---------
@@ -43,8 +45,7 @@ if is_py2:
     import cookielib
     from Cookie import Morsel
     from StringIO import StringIO
-
-    from packages.urllib3.packages.ordered_dict import OrderedDict
+    from .packages.urllib3.packages.ordered_dict import OrderedDict
 
     builtin_str = str
     bytes = str
