@@ -24,7 +24,7 @@ import re
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib.objects import JsonArray
 
-
+import six
 import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
 import six.moves.http_cookiejar
 import six.moves.http_client
@@ -36,7 +36,7 @@ define_config_option(
     "module",
     "Always ``scalyr_agent.builtin_monitors.url_monitor``",
     required_option=True,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -269,7 +269,7 @@ class UrlMonitor(ScalyrMonitor):
         @type error_type: str
         """
         # Convert the exception to a string, truncated to 20 chars.
-        e_to_str = str(e)
+        e_to_str = six.text_type(e)
         if len(e_to_str) > 20:
             e_to_str = e_to_str[0:20]
         self._logger.emit_value(

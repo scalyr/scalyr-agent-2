@@ -14,12 +14,14 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import datetime
+
 import os
 import scalyr_agent.util as scalyr_util
 import threading
 import time
+
 import six
 
 try:
@@ -48,7 +50,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.windows_event_log_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -58,7 +60,7 @@ define_config_option(
     "Optional (defaults to ``Application, Security, System``). A comma separated list of event sources.\n"
     "You can use this to specify which event sources you are interested in listening to."
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
-    convert_to=str,
+    convert_to=six.text_type,
     default=DEFAULT_SOURCES,
 )
 
@@ -69,7 +71,7 @@ define_config_option(
     "Valid values are: All, Error, Warning, Information, AuditSuccess and AuditFailure"
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
     default=DEFAULT_EVENTS,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -103,7 +105,7 @@ define_config_option(
     "server_name",
     "Optional (defaults to ``localhost``). The remote server where the event log is to be opened\n",
     default="localhost",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -111,7 +113,7 @@ define_config_option(
     "remote_user",
     "Optional (defaults to ``None``). The username to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -119,7 +121,7 @@ define_config_option(
     "remote_password",
     "Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -127,7 +129,7 @@ define_config_option(
     "remote_domain",
     "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 
@@ -244,7 +246,7 @@ class OldApi(Api):
         except Exception as error:
             self._logger.error(
                 "Error reading from event log: %s",
-                str(error),
+                six.text_type(error),
                 limit_once_per_x_secs=self._error_repeat_interval,
                 limit_key="EventLogError",
             )
@@ -569,7 +571,7 @@ class NewApi(Api):
             self.log_event(event)
         except Exception as e:
             try:
-                self._logger.info("%s", str(e))
+                self._logger.info("%s", six.text_type(e))
             except:
                 self._logger.info("Error printing exception information")
 
@@ -583,13 +585,13 @@ class NewApi(Api):
             provider = vals["ProviderName"]
 
         if "ProviderGuid" in vals:
-            vals["ProviderGuid"] = str(vals["ProviderGuid"])
+            vals["ProviderGuid"] = six.text_type(vals["ProviderGuid"])
 
         if "ActivityId" in vals:
-            vals["ActivityId"] = str(vals["ActivityId"])
+            vals["ActivityId"] = six.text_type(vals["ActivityId"])
 
         if "RelatedActivityId" in vals:
-            vals["RelatedActivityId"] = str(vals["RelatedActivityId"])
+            vals["RelatedActivityId"] = six.text_type(vals["RelatedActivityId"])
 
         if "TimeCreated" in vals:
             time_format = "%Y-%m-%d %H:%M:%SZ"
@@ -601,10 +603,10 @@ class NewApi(Api):
             if isinstance(vals["Keywords"], list):
                 vals["Keywords"] = ",".join(vals["Keywords"])
             else:
-                vals["Keywords"] = str(vals["Keywords"])
+                vals["Keywords"] = six.text_type(vals["Keywords"])
 
         if "UserId" in vals:
-            user_id = str(vals["UserId"])
+            user_id = six.text_type(vals["UserId"])
             if user_id.startswith("PySID:"):
                 user_id = user_id[6:]
             vals["UserId"] = user_id

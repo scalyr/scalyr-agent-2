@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Scott Sullivan <guy.hoozdis@gmail.com>
+from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 import atexit
@@ -201,7 +202,7 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.start()
             win32event.WaitForSingleObject(self._stop_event, win32event.INFINITE)
         except Exception as e:
-            self.error("Error, causing Windows Service to exit early %s" % str(e))
+            self.error("Error, causing Windows Service to exit early %s" % six.text_type(e))
             self.SvcStop()
 
     def start(self):

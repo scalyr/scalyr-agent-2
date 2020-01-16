@@ -1,7 +1,13 @@
 # Copyright 2016 Scalyr Inc.
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import re
+
+import six
+from pysnmp import hlapi
+from pysnmp.smi.error import MibNotFoundError
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 from scalyr_agent.json_lib import JsonObject
@@ -15,10 +21,7 @@ from pysnmp.hlapi import (
     UdpTransportTarget,
     UsmUserData,
 )
-from pysnmp import hlapi
 
-from pysnmp.smi.error import MibNotFoundError
-import six
 
 __monitor__ = __name__
 
@@ -26,7 +29,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.snmp_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -43,7 +46,7 @@ define_config_option(
     "mib_path",
     "Optional (defaults to None).  An absolute path to a location on disk that contains ASN1 MIB files",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -304,7 +307,7 @@ class SNMPMonitor(ScalyrMonitor):
                 # the oid groups need to be in the previous list of oids
                 if oid not in groups:
                     raise Exception(
-                        "Configuration Error, '%s' is not a valid oid group" % str(oid)
+                        "Configuration Error, '%s' is not a valid oid group" % six.text_type(oid)
                     )
                 oids += groups[oid]
 
@@ -475,14 +478,14 @@ class SNMPMonitor(ScalyrMonitor):
             except MibNotFoundError as e:
                 self._logger.error(
                     "Unable to locate MIBs: '%s'.  Please check that mib_path has been correctly configured in your agent.json file and that the path contains valid MIBs for all the variables and/or devices you are trying to query."
-                    % str(e),
+                    % six.text_type(e),
                     limit_once_per_x_secs=self.__error_repeat_interval,
                     limit_key="invalid mibs",
                 )
             except Exception as e:
                 self._logger.error(
                     "An unexpected error occurred: %s.  If you are querying MIBs, please make sure that mib_path has been set and that the path contains valid MIBs for all the variables and/or devices you are trying to query."
-                    % str(e),
+                    % six.text_type(e),
                     limit_once_per_x_secs=self.__error_repeat_interval,
                     limit_key="invalid mibs",
                 )

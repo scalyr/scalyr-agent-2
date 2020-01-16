@@ -1,9 +1,16 @@
+
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import hashlib
 import os
 import random
 import re
 from string import Template
+
+import six
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+from six.moves import range
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
@@ -17,9 +24,6 @@ import time
 from time import strftime, gmtime
 import traceback
 import scalyr_agent.scalyr_logging as scalyr_logging
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
-import six
-from six.moves import range
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -256,7 +260,7 @@ class PodInfo(object):
         flattened = []
         for k, v in six.iteritems(annotations):
             flattened.append(k)
-            flattened.append(str(v))
+            flattened.append(six.text_type(v))
 
         md5.update("".join(flattened))
 
@@ -742,7 +746,7 @@ class PodProcessor(_K8sProcessor):
         except BadAnnotationConfig as e:
             global_log.warning(
                 "Bad Annotation config for %s/%s.  All annotations ignored. %s"
-                % (namespace, pod_name, str(e)),
+                % (namespace, pod_name, six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="bad-annotation-config-%s"
                 % metadata.get("uid", "invalid-uid"),
@@ -750,7 +754,7 @@ class PodProcessor(_K8sProcessor):
             annotations = JsonObject()
 
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % (str(annotations))
+            scalyr_logging.DEBUG_LEVEL_2, "Annotations: %s" % (six.text_type(annotations))
         )
 
         # create the PodInfo
@@ -998,7 +1002,7 @@ class _CacheConfigState(object):
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Got new config %s",
-                    str(self.cache_config),
+                    six.text_type(self.cache_config),
                 )
 
         finally:
@@ -1167,14 +1171,14 @@ class KubernetesCache(object):
                     self._lock.release()
             except K8sApiException as e:
                 global_log.warn(
-                    "Exception occurred when initializing k8s cache - %s" % (str(e)),
+                    "Exception occurred when initializing k8s cache - %s" % (six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_init_cache",
                 )
             except Exception as e:
                 global_log.warn(
                     "Exception occurred when initializing k8s cache - %s\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
 
         current_time = time.time()
@@ -1230,14 +1234,14 @@ class KubernetesCache(object):
 
             except K8sApiException as e:
                 global_log.warn(
-                    "Exception occurred when updating k8s cache - %s" % (str(e)),
+                    "Exception occurred when updating k8s cache - %s" % (six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_update_cache",
                 )
             except Exception as e:
                 global_log.warn(
                     "Exception occurred when updating k8s cache - %s\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
 
             # Fuzz how much time we spend until the next cycle.  This should spread out when the agents query the
@@ -1772,7 +1776,7 @@ class KubernetesApi(object):
             except Exception as e:
                 if return_temp_errors:
                     raise K8sApiTemporaryError(
-                        "Temporary error seen while accessing api: %s" % str(e)
+                        "Temporary error seen while accessing api: %s" % six.text_type(e)
                     )
                 else:
                     raise
@@ -1806,13 +1810,13 @@ class KubernetesApi(object):
                 if return_temp_errors:
                     raise K8sApiTemporaryError(
                         "Invalid response from Kubernetes API when querying '%s': %s"
-                        % (path, str(response)),
+                        % (path, six.text_type(response)),
                         status_code=response.status_code,
                     )
                 else:
                     raise K8sApiException(
                         "Invalid response from Kubernetes API when querying '%s': %s"
-                        % (path, str(response)),
+                        % (path, six.text_type(response)),
                         status_code=response.status_code,
                     )
 
@@ -1871,7 +1875,7 @@ class KubernetesApi(object):
             )
         except Exception as e:
             global_log.warn(
-                "k8s API - failed to build query string - %s" % (str(e)),
+                "k8s API - failed to build query string - %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="k8s_api_build_query-%s" % kind,
             )
@@ -1906,7 +1910,7 @@ class KubernetesApi(object):
             except Exception as e:
                 global_log.warn(
                     "k8s API - failed to build namespaced query list string - %s"
-                    % (str(e)),
+                    % (six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_build_list_query-%s" % kind,
                 )
@@ -1945,7 +1949,7 @@ class KubernetesApi(object):
         url = self._http_host + path
 
         if last_event:
-            resource = "resourceVersion=%s" % str(last_event)
+            resource = "resourceVersion=%s" % six.text_type(last_event)
             if "?" in url:
                 resource = "&%s" % resource
             else:
@@ -1969,7 +1973,7 @@ class KubernetesApi(object):
             )
             raise K8sApiException(
                 "Invalid response from Kubernetes API when querying %d - '%s': %s"
-                % (response.status_code, path, str(response)),
+                % (response.status_code, path, six.text_type(response)),
                 status_code=response.status_code,
             )
 
@@ -2029,7 +2033,7 @@ class KubeletApi(object):
             )
             raise KubeletApiException(
                 "Invalid response from Kubelet API when querying '%s': %s"
-                % (path, str(response))
+                % (path, six.text_type(response))
             )
 
         return util.json_decode(response.text)
@@ -2234,7 +2238,7 @@ class DockerMetricFetcher(object):
             except Exception as e:
                 global_log.error(
                     "Error readings stats for '%s': %s\n%s"
-                    % (container_id, str(e), traceback.format_exc()),
+                    % (container_id, six.text_type(e), traceback.format_exc()),
                     limit_once_per_x_secs=300,
                     limit_key="api-stats-%s" % container_id,
                 )

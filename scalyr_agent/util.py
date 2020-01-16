@@ -150,7 +150,7 @@ def json_encode(obj, output=None):
 
     @type obj: dict|list|six.text_type
     """
-    return _json_encode(obj, output)
+    return six.ensure_text(_json_encode(obj, output))
 
 
 def json_decode(text):
@@ -208,13 +208,13 @@ def value_to_bool(value):
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is str or value_type is six.text_type:
+    elif value_type is six.text_type:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
 
     raise ValueError(
-        "Cannot convert %s value to bool: %s" % (str(value_type), str(value))
+        "Cannot convert %s value to bool: %s" % (six.text_type(value_type), six.text_type(value))
     )
 
 
@@ -245,7 +245,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
             data = f.read()
             return json_parser(data)
         except IOError as e:
-            raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
+            raise JsonReadFileException(file_path, "Read error occurred: " + six.text_type(e))
         except JsonParseException as e:
             raise JsonReadFileException(
                 file_path,
@@ -253,7 +253,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
                 % (e.raw_message, e.line_number, e.position),
             )
         except UnicodeDecodeError as e:
-            raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + six.text_type(e))
     finally:
         if f is not None:
             f.close()
@@ -299,7 +299,7 @@ def read_file_as_json(file_path, strict_utf8=False):
         try:
             return json_decode(text)
         except ValueError as e:
-            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+            raise JsonParseException("JSON parsing failed due to: %s" % six.text_type(e))
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
 
@@ -550,11 +550,11 @@ def get_pid_tid():
     # noinspection PyBroadException
     try:
         return "(pid=%s) (tid=%s)" % (
-            str(os.getpid()),
-            str(six.moves._thread.get_ident()),
+            six.text_type(os.getpid()),
+            six.text_type(six.moves._thread.get_ident()),
         )
     except:
-        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
+        return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
 
 
 def is_list_of_strings(vals):
@@ -1012,7 +1012,7 @@ class StoppableThread(threading.Thread):
         except Exception as e:
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
-                "Received exception from run method in StoppableThread %s" % str(e)
+                "Received exception from run method in StoppableThread %s" % six.text_type(e)
             )
             return None
 

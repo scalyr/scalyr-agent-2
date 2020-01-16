@@ -3,11 +3,14 @@
 # Note, this can be run in standalone mode by:
 # python -m scalyr_agent.run_monitor
 # scalyr_agent.builtin_monitors.apache_monitor
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
+import socket
+
+import six.moves.urllib.parse
 import six.moves.http_client
 import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
-import socket
-import six.moves.urllib.parse
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -24,7 +27,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.apache_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
@@ -34,7 +37,7 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple Apache instances on a single server; you can monitor each "
     "instance with a separate apache_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,

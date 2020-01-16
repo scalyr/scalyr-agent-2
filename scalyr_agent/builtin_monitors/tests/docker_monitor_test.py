@@ -15,7 +15,7 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
@@ -24,17 +24,17 @@ __author__ = "echee@scalyr.com"
 import os
 import threading
 
-import mock
-from mock import patch
-from mock import Mock
 
 import scalyr_agent.util as scalyr_util
-
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
 from scalyr_agent.builtin_monitors.docker_monitor import _get_containers
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClock, FakeClockCounter
+
+import mock
+from mock import patch
+from mock import Mock
 
 
 class DockerMonitorTest(ScalyrTestCase):

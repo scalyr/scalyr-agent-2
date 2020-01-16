@@ -79,11 +79,11 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=int)
 
     def test_str_conversion(self):
-        self.assertEquals(self.get(1, convert_to=str), "1")
-        self.assertEquals(self.get("ah", convert_to=str), "ah")
-        self.assertEquals(self.get(False, convert_to=str), "False")
-        self.assertEquals(self.get(1.3, convert_to=str), "1.3")
-        self.assertEquals(self.get(1, convert_to=str), "1")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
+        self.assertEquals(self.get("ah", convert_to=six.text_type), "ah")
+        self.assertEquals(self.get(False, convert_to=six.text_type), "False")
+        self.assertEquals(self.get(1.3, convert_to=six.text_type), "1.3")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
 
         test_array = ["a", "b", "c"]
 
@@ -105,7 +105,7 @@ class MonitorConfigTest(ScalyrTestCase):
             BadMonitorConfiguration,
             # single quotes are invalid JSON
             lambda: self.assertEquals(
-                self.get(str(test_array), convert_to=JsonArray), JsonArray(*test_array)
+                self.get(six.text_type(test_array), convert_to=JsonArray), JsonArray(*test_array)
             ),
         )
 

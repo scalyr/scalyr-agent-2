@@ -15,6 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -322,7 +323,7 @@ class PosixPlatformController(PlatformController):
         except SystemExit as e:
             raise e
         except Exception as e:
-            reporter.report_status("forked #1 failed due to generic error: %s" % str(e))
+            reporter.report_status("forked #1 failed due to generic error: %s" % six.text_type(e))
             sys.exit(1)
 
         debug_logger("Second fork")
@@ -350,7 +351,7 @@ class PosixPlatformController(PlatformController):
         except SystemExit as e:
             raise e
         except Exception as e:
-            reporter.report_status("forked #2 failed due to generic error: %s" % str(e))
+            reporter.report_status("forked #2 failed due to generic error: %s" % six.text_type(e))
             sys.exit(1)
 
         debug_logger("Finished forking")
@@ -379,7 +380,7 @@ class PosixPlatformController(PlatformController):
             return True
         except Exception as e:
             reporter.report_status(
-                "Finalizing fork failed due to generic error: %s" % str(e)
+                "Finalizing fork failed due to generic error: %s" % six.text_type(e)
             )
             sys.exit(1)
 
@@ -612,7 +613,7 @@ class PosixPlatformController(PlatformController):
             if not self.__write_pidfile():
                 raise AgentAlreadyRunning(
                     "The pidfile %s exists and indicates it is running pid=%s"
-                    % (self.__pidfile, str(self.__read_pidfile()))
+                    % (self.__pidfile, six.text_type(self.__read_pidfile()))
                 )
 
         # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
@@ -670,13 +671,13 @@ class PosixPlatformController(PlatformController):
                 PosixPlatformController.__sleep(0.1)
 
         except OSError as err:
-            err = str(err)
+            err = six.text_type(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
                 print("Unable to terminate agent.")
-                print(str(err))
+                print(six.text_type(err))
                 return 1
 
         if not quiet:
@@ -865,14 +866,14 @@ class PidfileManager(object):
                 try:
                     fcntl.flock(pf, fcntl.LOCK_UN)
                 except IOError as e:
-                    self._log_debug("Unexpected error seen releasing lock: %s" % str(e))
+                    self._log_debug("Unexpected error seen releasing lock: %s" % six.text_type(e))
             except IOError as e:
                 # Triggered if the LOCK_SH call fails, indicating another process holds the lock.
                 if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                     was_locked = True
                 else:
                     self._log_debug(
-                        "Unexpected error seen checking on lock status: %s" % str(e)
+                        "Unexpected error seen checking on lock status: %s" % six.text_type(e)
                     )
                     was_locked = False
             pf.close()
@@ -1130,7 +1131,7 @@ class PidfileManager(object):
             try:
                 fcntl.flock(self.__locked_fd, fcntl.LOCK_UN)
             except IOError as e:
-                self._log("Unexpected error seen releasing lock: %s" % str(e))
+                self._log("Unexpected error seen releasing lock: %s" % six.text_type(e))
 
             self.__locked_fd.close()
             self.__locked_fd = None

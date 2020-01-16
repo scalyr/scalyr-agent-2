@@ -14,9 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "imron@scalyr.com"
 
@@ -30,11 +29,14 @@ import re
 from socket import error as socket_error
 import socket
 import struct
-import six.moves.socketserver
 import threading
 import time
 import traceback
 from string import Template
+
+import six
+from six.moves import range
+import six.moves.socketserver
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -65,7 +67,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.syslog_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
@@ -75,7 +77,7 @@ define_config_option(
     "messages. You can include one or more entries, separated by commas. Each entry must be of the "
     "form ``tcp:NNN`` or ``udp:NNN``. Port numbers are optional, defaulting to 601 for TCP and 514 "
     "for UDP",
-    convert_to=str,
+    convert_to=six.text_type,
     default="tcp",
 )
 
@@ -94,7 +96,7 @@ define_config_option(
     "Optional (defaults to ``agent_syslog.log``). Specifies the file name under which syslog messages "
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
-    convert_to=str,
+    convert_to=six.text_type,
     default="agent_syslog.log",
 )
 
@@ -102,7 +104,7 @@ define_config_option(
     __monitor__,
     "parser",
     "Optional (defaults to ``agentSyslog``). Defines the parser name associated with the log file",
-    convert_to=str,
+    convert_to=six.text_type,
     default="agentSyslog",
 )
 
@@ -158,7 +160,7 @@ define_config_option(
     "check for container ids in the tags of the incoming lines and create log files based on their "
     "container names.",
     default="syslog",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -167,7 +169,7 @@ define_config_option(
     "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
     "only has the container id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
-    convert_to=str,
+    convert_to=six.text_type,
     default="^.*([a-z0-9]{12})\[\d+\]: ?",
 )
 
@@ -177,7 +179,7 @@ define_config_option(
     "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
     "included both the container name and id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
-    convert_to=str,
+    convert_to=six.text_type,
     default="^.*([^/]+)/([^[]+)\[\d+\]: ?",
 )
 
@@ -208,7 +210,7 @@ define_config_option(
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using "
     "the -v parameter, e.g.\n"
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
 )
 
@@ -218,7 +220,7 @@ define_config_option(
     "Optional (defaults to 'auto'). The version of the Docker API to use when communicating to "
     "docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker "
     "monitor to this same value.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="auto",
 )
 
@@ -230,7 +232,7 @@ define_config_option(
     "$CID will be substituted with the name and id of the container that is emitting the logs.  If "
     "the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log "
     "directory.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="containers/${CNAME}.log",
 )
 
@@ -309,7 +311,7 @@ def _get_default_gateway():
     except IOError as e:
         global_log.error(
             "Error while getting the default gateway: %s",
-            str(e),
+            six.text_type(e),
             limit_once_per_x_secs=300,
             limit_key="_get_default_gateway_error",
         )
@@ -450,7 +452,7 @@ class SyslogRequestParser(object):
             else:
                 global_log.warning(
                     "Network error while reading from syslog: %s",
-                    str(e),
+                    six.text_type(e),
                     limit_once_per_x_secs=300,
                     limit_key="syslog-network-error",
                 )
@@ -584,7 +586,7 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         except Exception as e:
             global_log.warning(
-                "Error handling request: %s\n\t%s", str(e), traceback.format_exc()
+                "Error handling request: %s\n\t%s", six.text_type(e), traceback.format_exc()
             )
 
         global_log.log(
@@ -606,7 +608,7 @@ class SyslogUDPServer(
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "UDP Server: binding socket to %s" % str(address),
+            "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
         self.allow_reuse_address = True
@@ -632,7 +634,7 @@ class SyslogTCPServer(
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "TCP Server: binding socket to %s" % str(address),
+            "TCP Server: binding socket to %s" % six.text_type(address),
         )
 
         self.allow_reuse_address = True
@@ -709,7 +711,7 @@ class LogDeleter(object):
                     except OSError as e:
                         global_log.warn(
                             "Unable to read modification time for file '%s', %s"
-                            % (rotated_file, str(e)),
+                            % (rotated_file, six.text_type(e)),
                             limit_once_per_x_secs=300,
                             limit_key="mtime-%s" % rotated_file,
                         )
@@ -717,7 +719,7 @@ class LogDeleter(object):
             except OSError as e:
                 global_log.warn(
                     "Unable to read modification time for file '%s', %s"
-                    % (matching_file, str(e)),
+                    % (matching_file, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="mtime-%s" % matching_file,
                 )
@@ -746,7 +748,7 @@ class LogDeleter(object):
                 )
             except OSError as e:
                 global_log.warn(
-                    "Error deleting old log file '%s', %s" % (filename, str(e)),
+                    "Error deleting old log file '%s', %s" % (filename, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="delete-%s" % filename,
                 )
@@ -908,7 +910,7 @@ class SyslogHandler(object):
             )
 
         except Exception as e:
-            global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
+            global_log.error("Unable to open SyslogMonitor log file: %s" % six.text_type(e))
             result = None
 
         return result
@@ -985,7 +987,7 @@ class SyslogHandler(object):
         result = None
         if regex_value is not None:
             result = regex_value.pattern
-        return str(result)
+        return six.text_type(result)
 
     def __handle_docker_logs(self, data):
 
@@ -1115,7 +1117,7 @@ class RequestVerifier(object):
         if not result:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_4,
-                "Rejecting request from %s" % str(client_address),
+                "Rejecting request from %s" % six.text_type(client_address),
             )
 
         return result
@@ -1155,7 +1157,7 @@ class SyslogServer(object):
                 accept_ips = [gateway_ip]
 
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str(accept_ips)
+            scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % six.text_type(accept_ips)
         )
 
         docker_logging = config.get("mode") == "docker"
@@ -1474,7 +1476,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 self.__disk_logger.propagate = False
                 success = True
             except Exception as e:
-                global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
+                global_log.error("Unable to open SyslogMonitor log file: %s" % six.text_type(e))
 
         return success
 

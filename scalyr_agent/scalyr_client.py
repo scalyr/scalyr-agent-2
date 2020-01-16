@@ -356,7 +356,7 @@ class ScalyrClientSession(object):
                         "will re-attempt",
                         self.__full_address,
                         error.errno,
-                        str(error),
+                        six.text_type(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -425,7 +425,7 @@ class ScalyrClientSession(object):
                         "connection, will re-attempt",
                         self.__full_address,
                         error.errno,
-                        str(error),
+                        six.text_type(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -688,7 +688,7 @@ class ScalyrClientSession(object):
         ]
         if fragments:
             parts.extend(fragments)
-        return ";".join(map(str, parts))
+        return ";".join(map(six.text_type, parts))
 
     def perform_agent_version_check(self, track="stable"):
         """Query the Scalyr API to determine if a newer version is available
@@ -1307,7 +1307,8 @@ class PostFixBuffer(object):
         @rtype: bool
         """
         new_timestamp = int(timestamp)
-        size_difference = len(str(new_timestamp)) - len(str(self.__client_timestamp))
+        # 2->TODO timestamp should contain only ascii characters, so bytes count and characters count should be the same.
+        size_difference = len(six.text_type(new_timestamp)) - len(six.text_type(self.__client_timestamp))
 
         if (
             fail_if_buffer_exceeds is not None

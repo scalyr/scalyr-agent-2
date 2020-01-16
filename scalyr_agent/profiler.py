@@ -178,7 +178,7 @@ class Profiler(object):
         except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Failed to update profiler: %s, %s" % (str(e), traceback.format_exc()),
+                "Failed to update profiler: %s, %s" % (six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="profiler-update",
             )

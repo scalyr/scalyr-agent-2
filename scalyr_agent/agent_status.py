@@ -35,6 +35,8 @@ import os
 
 import scalyr_agent.util as scalyr_util
 
+import six
+
 
 class AgentStatus(object):
     """The main status container object, holding references to all other status elements.
@@ -341,7 +343,7 @@ def report_status(output, status, current_time):
 
     if status.config_status.last_error is not None:
         print(
-            "Parsing error:         %s" % str(status.config_status.last_error),
+            "Parsing error:         %s" % six.text_type(status.config_status.last_error),
             file=output,
         )
 

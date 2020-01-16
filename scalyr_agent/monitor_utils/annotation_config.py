@@ -16,9 +16,10 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
 
 __author__ = "imron@scalyr.com"
+
+import six
 
 import re
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -236,7 +237,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
             if is_object == is_array:
                 raise BadAnnotationConfig(
                     "Annotation cannot be both a dict and a list for '%s'.  Current key: %s, previous key: %s"
-                    % (key, str(root_key), str(previous_key))
+                    % (key, six.text_type(root_key), six.text_type(previous_key))
                 )
 
             # create an empty object if None exists
@@ -266,7 +267,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
             if is_object == is_array:
                 raise BadAnnotationConfig(
                     "Annotation cannot be both a dict and a list.  Current key: %s, previous key: %s"
-                    % (key, str(previous_key))
+                    % (key, six.text_type(previous_key))
                 )
 
             # if there was a previous key

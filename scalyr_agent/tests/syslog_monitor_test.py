@@ -36,6 +36,8 @@ from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.util import StoppableThread
 
+import six
+
 
 class SyslogFrameParserTestCase(unittest.TestCase):
     def test_framed_messages(self):
@@ -134,7 +136,7 @@ class SyslogMonitorTestCase(unittest.TestCase):
         try:
             func()
         except Exception as e:
-            self.fail("Unexpected Exception: %s" % str(e))
+            self.fail("Unexpected Exception: %s" % six.text_type(e))
         except:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
 

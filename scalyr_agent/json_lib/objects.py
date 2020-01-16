@@ -23,14 +23,20 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
+
+import six
+from six.moves import range
+
+
 from scalyr_agent.json_lib.exceptions import JsonConversionException
 from scalyr_agent.json_lib.exceptions import JsonMissingFieldException
+
+# 2->TODO remove 'str' where is the type check
 
 
 class JsonObject(object):
@@ -236,7 +242,7 @@ class JsonObject(object):
             return self.__num_to_bool(field, float(value))
         elif value_type is float:
             return self.__num_to_bool(field, value)
-        elif value_type is str or value_type is six.text_type:
+        elif value_type is six.text_type:
             return not value == "" and not value == "f" and not value == "false"
         else:
             return self.__conversion_error(field, value, "boolean")
@@ -295,14 +301,13 @@ class JsonObject(object):
         if (
             value_type in six.integer_types
             or value_type is float
-            or value_type is str
             or value_type is six.text_type
         ):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then int.. that way we will just truncate the
                 # float.
-                if value_type is str or value_type is six.text_type:
+                if value_type is six.text_type:
                     value = float(value)
                 return int(value)
             except ValueError:
@@ -347,14 +352,13 @@ class JsonObject(object):
         if (
             value_type in six.integer_types
             or value_type is float
-            or value_type is str
             or value_type is six.text_type
         ):
             try:
                 # If it is a string type, then try to convert to a float
                 # first, and then long.. that way we will just truncate the
                 # float.
-                if value_type is str or value_type is six.text_type:
+                if value_type is six.text_type:
                     value = float(value)
                 return int(value)
             except ValueError:
@@ -395,7 +399,6 @@ class JsonObject(object):
         if (
             value_type in six.integer_types
             or value_type is float
-            or value_type is str
             or value_type is six.text_type
         ):
             try:
@@ -435,10 +438,9 @@ class JsonObject(object):
         if (
             value_type in six.integer_types
             or value_type is float
-            or value_type is str
             or value_type is six.text_type
         ):
-            return str(value)
+            return six.text_type(value)
         else:
             return self.__conversion_error(field, value, "str")
 
@@ -528,7 +530,7 @@ class JsonObject(object):
         @raise JsonConversionException: The conversion error."""
         raise JsonConversionException(
             "Failed converting %s of type %s for field %s to desired type %s"
-            % (str(value), type(value), field_name, desired_type)
+            % (six.text_type(value), type(value), field_name, desired_type)
         )
 
     def __compute_missing_value(self, field_name, default_value, none_if_missing):
@@ -681,8 +683,8 @@ class ArrayOfStrings(JsonArray):
         self._items = []
         if values:
             for val in values:
-                if type(val) not in (str, six.text_type):
-                    raise TypeError("A non-string element was found: %s" % str(val))
+                if type(val) is not six.text_type:
+                    raise TypeError("A non-string element was found: %s" % six.text_type(val))
                 self._items.append(val)
 
 

@@ -15,8 +15,8 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "echee@scalyr.com"
 
@@ -24,6 +24,8 @@ import random
 import threading
 import time
 from collections import deque
+
+from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 

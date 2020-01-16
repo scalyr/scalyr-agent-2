@@ -51,9 +51,9 @@ class TestConfigurationDocker(TestConfiguration):
         # config_param_name: (custom_env_name, test_value)
         docker_testmap = {
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
-            "docker_api_version": (STANDARD_PREFIX, TEST_STRING, str),
-            "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, str),
-            "log_mode": ("SCALYR_DOCKER_LOG_MODE", TEST_STRING, str),
+            "docker_api_version": (STANDARD_PREFIX, TEST_STRING, six.text_type),
+            "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, six.text_type),
+            "log_mode": ("SCALYR_DOCKER_LOG_MODE", TEST_STRING, six.text_type),
             "docker_raw_logs": (
                 STANDARD_PREFIX,
                 False,
@@ -83,7 +83,7 @@ class TestConfigurationDocker(TestConfiguration):
                 ArrayOfStrings,
             ),
             "labels_as_attributes": (STANDARD_PREFIX, True, bool),
-            "label_prefix": (STANDARD_PREFIX, TEST_STRING, str),
+            "label_prefix": (STANDARD_PREFIX, TEST_STRING, six.text_type),
             "use_labels_for_log_config": (STANDARD_PREFIX, False, bool),
         }
 

@@ -1130,7 +1130,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "Getting batch of events to send. (pipelining=%s)" % str(for_pipelining),
+            "Getting batch of events to send. (pipelining=%s)" % six.text_type(for_pipelining),
         )
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
@@ -1227,7 +1227,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "Information for batch of events. (pipelining=%s): %s"
-            % (str(for_pipelining), add_events_request.get_timing_data()),
+            % (six.text_type(for_pipelining), add_events_request.get_timing_data()),
         )
         return AddEventsTask(add_events_request, handle_completed_callback)
 

@@ -124,7 +124,7 @@ class ConnectionFactory:
             except Exception as e:
                 log.warn(
                     "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
-                    % str(e)
+                    % six.text_type(e)
                 )
                 result = ScalyrHttpConnection(
                     server,
@@ -485,7 +485,7 @@ class ScalyrHttpConnection(Connection):
                     "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             elif errno == 61:  # Connection refused
@@ -506,7 +506,7 @@ class ScalyrHttpConnection(Connection):
                     "will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             else:
@@ -514,7 +514,7 @@ class ScalyrHttpConnection(Connection):
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             raise Exception("client/connectionFailed")

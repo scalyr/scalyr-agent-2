@@ -14,8 +14,8 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
 
 __author__ = "imron@scalyr.com"
 
@@ -23,18 +23,11 @@ import datetime
 import os
 import re
 import select
-from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.json_lib import JsonObject
-import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
-import scalyr_agent.util as scalyr_util
-from scalyr_agent.builtin_monitors.journald_utils import (
-    LogConfigManager,
-    JournaldLogFormatter,
-)
 import threading
 import traceback
 from cStringIO import StringIO
+
+import six
 
 try:
     from systemd import journal
@@ -51,6 +44,16 @@ except ImportError:
         "See here for more info: https://github.com/systemd/python-systemd/\n"
     )
 
+from scalyr_agent import ScalyrMonitor, define_config_option
+from scalyr_agent.json_lib import JsonObject
+import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
+import scalyr_agent.util as scalyr_util
+from scalyr_agent.builtin_monitors.journald_utils import (
+    LogConfigManager,
+    JournaldLogFormatter,
+)
+
 global_log = scalyr_logging.getLogger(__name__)
 __monitor__ = __name__
 
@@ -58,7 +61,7 @@ define_config_option(
     __monitor__,
     "journal_path",
     "Optional (defaults to /var/log/journal). Location on the filesystem of the journald logs.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/log/journal",
 )
 
@@ -111,7 +114,7 @@ define_config_option(
     "Optional id used to differentiate between multiple journald monitors. "
     "This is useful for configurations that define multiple journald monitors and that want to save unique checkpoints for each "
     "monitor.  If specified, the id is also sent to the server along with other attributes under the `monitor_id` field",
-    convert_to=str,
+    convert_to=six.text_type,
     default="",
 )
 
@@ -383,7 +386,7 @@ class JournaldMonitor(ScalyrMonitor):
                             )
                 except Exception as e:
                     global_log.warn(
-                        "Error loading checkpoint: %s. Skipping to end." % str(e)
+                        "Error loading checkpoint: %s. Skipping to end." % six.text_type(e)
                     )
 
             if skip_to_end:
@@ -399,7 +402,7 @@ class JournaldMonitor(ScalyrMonitor):
             self._poll.register(self._journal, mask)
         except Exception as e:
             global_log.warn(
-                "Failed to reset journal %s\n%s" % (str(e), traceback.format_exc())
+                "Failed to reset journal %s\n%s" % (six.text_type(e), traceback.format_exc())
             )
 
     def _get_extra_fields(self, entry):
@@ -411,7 +414,7 @@ class JournaldMonitor(ScalyrMonitor):
 
         for key, value in six.iteritems(self._extra_fields):
             if key in entry:
-                result[value] = str(entry[key])
+                result[value] = six.text_type(entry[key])
 
         if self._id and "monitor_id" not in result:
             result["monitor_id"] = self._id
@@ -438,7 +441,7 @@ class JournaldMonitor(ScalyrMonitor):
         except Exception as e:
             # early return if there was an error
             global_log.warn(
-                "Error processing journal entries: %s" % str(e),
+                "Error processing journal entries: %s" % six.text_type(e),
                 limit_once_per_x_secs=60,
                 limit_key="journald-process-error",
             )
@@ -470,7 +473,7 @@ class JournaldMonitor(ScalyrMonitor):
                 self._last_cursor = entry.get("__CURSOR", None)
             except Exception as e:
                 global_log.warn(
-                    "Error getting journal entries: %s" % str(e),
+                    "Error getting journal entries: %s" % six.text_type(e),
                     limit_once_per_x_secs=60,
                     limit_key="journald-entry-error",
                 )
@@ -504,7 +507,7 @@ class JournaldMonitor(ScalyrMonitor):
 
         if self._last_cursor is not None:
             self._checkpoint.update_checkpoint(
-                self._checkpoint_name, str(self._last_cursor)
+                self._checkpoint_name, six.text_type(self._last_cursor)
             )
 
     def stop(self, wait_on_join=True, join_timeout=5):

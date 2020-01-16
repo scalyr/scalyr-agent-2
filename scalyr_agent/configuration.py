@@ -115,7 +115,7 @@ class Configuration(object):
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
             except JsonReadFileException as e:
-                raise BadConfiguration(str(e), None, "fileParseError")
+                raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
@@ -2029,7 +2029,7 @@ class Configuration(object):
             config_val = config_object.get_bool(param_name, none_if_missing=True)
         elif param_type == float:
             config_val = config_object.get_float(param_name, none_if_missing=True)
-        elif param_type == str:
+        elif param_type == six.text_type:
             config_val = config_object.get_string(param_name, none_if_missing=True)
         elif param_type == JsonObject:
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
@@ -2384,14 +2384,14 @@ class Configuration(object):
         if count == 0:
             raise BadConfiguration(
                 'A required field is missing.  Object must contain one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
         elif count > 1:
             raise BadConfiguration(
                 'A required field has too many options.  Object must contain only one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
@@ -2423,7 +2423,7 @@ class Configuration(object):
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, str, env_aware, env_name
+                config_object, field, six.text_type, env_aware, env_name
             )
 
             if value is None:
@@ -2664,7 +2664,7 @@ class Configuration(object):
                     raise BadConfiguration(
                         "The element at index=%i is not a json object as required in the array "
                         'field "%s (%s, %s)".  Error is in %s'
-                        % (index, field, type(x), str(x), config_description),
+                        % (index, field, type(x), six.text_type(x), config_description),
                         field,
                         "notJsonObject",
                     )
@@ -2857,7 +2857,7 @@ class Configuration(object):
             result = None
             value_type = type(value)
 
-            if (value_type is str or value_type is six.text_type) and "$" in value:
+            if value_type is six.text_type and "$" in value:
                 result = perform_str_substitution(value)
             elif isinstance(value, JsonObject):
                 perform_object_substitution(value)
