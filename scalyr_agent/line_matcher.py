@@ -19,11 +19,14 @@
 # https://www.scalyr.com/help/parsing-logs#multiline
 #
 # author: Imron Alston <imron@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import re
 
 __author__ = "imron@scalyr.com"
+
+import re
+
+import six
 
 
 class LineMatcher(object):
@@ -95,11 +98,11 @@ class LineMatcher(object):
                 else:
                     raise Exception(
                         "Error, no continuation pattern found for line grouper: %s"
-                        % str(grouper)
+                        % six.text_type(grouper)
                     )
             else:
                 raise Exception(
-                    "Error, no start pattern found for line grouper: %s" % str(grouper)
+                    "Error, no start pattern found for line grouper: %s" % six.text_type(grouper)
                 )
         return result
 
@@ -223,9 +226,8 @@ class LineGrouper(LineMatcher):
         line_completion_wait_time=5 * 60,
     ):
         LineMatcher.__init__(self, max_line_length, line_completion_wait_time)
-        # 2->TODO encode patterns, need to discuss this.
-        self._start_pattern = re.compile(start_pattern.encode("utf-8"))
-        self._continuation_pattern = re.compile(continuation_pattern.encode("utf-8"))
+        self._start_pattern = re.compile(start_pattern)
+        self._continuation_pattern = re.compile(continuation_pattern)
 
     def _readline(self, file_like, max_length=0):
         """ Takes a file_like object (e.g. anything conforming to python's file interface
@@ -254,7 +256,8 @@ class LineGrouper(LineMatcher):
             return start_line, partial
 
         # check to see if this line starts a multiline
-        start = self._start_line(start_line)
+        start_line_decoded = start_line.decode("utf-8")
+        start = self._start_line(start_line_decoded)
         if start:
             max_length -= len(start_line)
             next_offset = file_like.tell()
@@ -267,7 +270,8 @@ class LineGrouper(LineMatcher):
             elif next_line:
 
                 # see if we are continuing the line
-                cont = self._continue_line(next_line)
+                next_line_decoded = next_line.decode("utf-8")
+                cont = self._continue_line(next_line_decoded)
                 if cont:
                     line = start_line
                     # build up a multiline string by looping over all lines for as long as
@@ -283,7 +287,8 @@ class LineGrouper(LineMatcher):
                                 self, file_like, max_length
                             )
                             # Only check if this line is a continuation if we got the full line.
-                            cont = not partial and self._continue_line(next_line)
+                            next_line_decoded = next_line.decode("utf-8")
+                            cont = not partial and self._continue_line(next_line_decoded)
                             line_max_reached = max_length - len(next_line) <= 0
 
                     if line_max_reached:
@@ -322,7 +327,6 @@ class LineGrouper(LineMatcher):
         else:
             file_like.seek(start_offset)
             line, partial = b"", False
-
         return line, partial
 
     def _match_single_line(self):

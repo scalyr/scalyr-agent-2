@@ -146,24 +146,15 @@ def _match_glob(pathname):
 
 class LogLine(object):
     """A class representing a line from a log file.
-    This object has a property 'line' which contains the log line as binary string,
-    and a property 'decoded_line' as unicode version of the 'line(it acts like cache, calculates once, and can be reused)'.
+    This object will always have a single field 'line' which contains the log line.
     It can also contain two other attributes 'timestamp' which is the timestamp of the
     the log line in nanoseconds since the epoch (defaults to None, in which case the
     current time.time() will be used), and 'attrs' which are optional attributes for the line.
     """
 
     def __init__(self, line):
-        """
-        :param line: Binary string or unicode string.
-        More information can be found in the setter for LogLine.line property.
-        :type line: six.binary_type | six.text_type
-        """
-        # line is a bytes string
-        self._line = None  # type: six.binary_type
-
-        # same line but as decoded string.
-        self._decoded_line = None
+        # line is a string
+        self.line = line
 
         # timestamp is a long, counting nanoseconds since Epoch
         # or None to use current time
@@ -172,46 +163,8 @@ class LogLine(object):
         # attrs is a dict of optional attributes to attach to the log message
         self.attrs = None
 
-        # init line
-        self.line = line
-
-        # length of raw line
-        self.raw_line_len = len(self._line)
-
-    @property
-    def line(self):
-        """
-        :rtype: six.binary_type
-        """
-        return self._line
-
-    @line.setter
-    def line(self, value):
-        """
-        :param value: Normally should be binary string, but also can be unicode,
-        if so, it allows to avoid second decoding in case if we need to get 'decoded_line' later.
-        :type value: six.binary_type | six.text_type
-        """
-        # Set new value for self._line. Invalidate self._decoded_line if it was cached.
-        if type(value) is six.binary_type:
-            self._line = value
-            self._decoded_line = None
-
-        # Save it as decoded_line and get binary line from it.
-        else:
-            self._line = value.encode("utf-8")
-            self._decoded_line = value
-
-    @property
-    def decoded_line(self):
-        """
-        Returns decoded version of the line and caches it for further use.
-        :return:
-        :rtype: six.text_type
-        """
-        if self._decoded_line is None:
-            self._decoded_line = self.line.decode("utf-8", "replace")
-        return self._decoded_line
+        # length of raw line (in contrast
+        self.raw_line_len = len(self.line)
 
 
 class LogFileIterator(object):
@@ -1912,10 +1865,11 @@ class LogFileProcessor(object):
                 lines_read += 1
 
                 if self.__num_redaction_and_sampling_rules > 0:
-                    # 2->TODO: Here we use new field - 'LogLine.decoded_line'.
+                    # 2->TODO: decode line before sampling and redaction.
+                    decoded_line = line_object.line.decode("utf-8")
                     # By the way maybe it will be better just to encode patterns and do apply regex on binary data?
                     sample_result = self.__sampler.process_line(
-                        line_object.decoded_line
+                        decoded_line
                     )
 
                     if sample_result is None:
@@ -1924,7 +1878,7 @@ class LogFileProcessor(object):
                         continue
 
                     (line_object.line, redacted) = self.__redacter.process_line(
-                        line_object.decoded_line
+                        decoded_line
                     )
 
                     line_len = len(line_object.line)
@@ -2102,7 +2056,7 @@ class LogFileProcessor(object):
                         #  As in other similar places, it can be OK to leave literals here as str.
                         #  But as we use "unicode_literals",
                         #  we need to use six.text_type insted of str to be able to do formatting with unicode.
-                        raise Exception("Invalid result %s" % str(result))
+                        raise Exception("Invalid result %s" % six.text_type(result))
                         # [end of 2->TOD0]
                 finally:
                     self.__lock.release()
@@ -2889,8 +2843,7 @@ class LogMatcher(object):
                         new_processor.add_redacter(
                             rule["match_expression"],
                             rule["replacement"],
-                            # 2->TODO str to six.text_type
-                            str(rule.get("hash_salt", default_value="")),
+                            six.text_type(rule.get("hash_salt", default_value="")),
                         )
                     for rule in self.__log_entry_config["sampling_rules"]:
                         new_processor.add_sampler(
@@ -2966,7 +2919,7 @@ class LogMatcher(object):
                         #  But as we use "unicode_literals",
                         #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                         "Invalid substition pattern in 'rename_logfile'. %s"
-                        % str(e)
+                        % six.text_type(e)
                         # [end of 2->TOD0]
                     )
             elif isinstance(rename, JsonObject):
@@ -2988,7 +2941,7 @@ class LogMatcher(object):
                             #  As in other similar places, it can be OK to leave literals here as str.
                             #  But as we use "unicode_literals",
                             #  we need to use six.text_type insted of str to be able to do formatting with unicode.
-                            % (rename["match"], rename["replacement"], str(e)),
+                            % (rename["match"], rename["replacement"], six.text_type(e)),
                             # [end of 2->TOD0]
                             limit_once_per_x_secs=600,
                             limit_key=("rename-regex-error-%s" % matched_file),

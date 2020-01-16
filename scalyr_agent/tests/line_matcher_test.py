@@ -21,11 +21,11 @@ from __future__ import absolute_import
 __author__ = "imron@scalyr.com"
 
 import time
+import io
 import unittest
 
 import pdb
 
-from io import BytesIO
 from scalyr_agent.line_matcher import LineMatcher
 from scalyr_agent.line_matcher import LineMatcherCollection
 from scalyr_agent.line_matcher import ContinueThrough
@@ -35,7 +35,7 @@ from scalyr_agent.line_matcher import HaltWith
 
 
 def make_string(string):
-    line = BytesIO()
+    line = io.BytesIO()
     line.write(string)
     line.seek(0)
     return line
