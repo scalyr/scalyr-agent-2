@@ -41,13 +41,22 @@ from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 from scalyr_agent.monitor_utils.auto_flushing_rotating_file import (
     AutoFlushingRotatingFile,
 )
-from scalyr_agent.util import StoppableThread
-from scalyr_agent.json_lib import JsonObject
-from scalyr_agent.builtin_monitors.docker_monitor import (
-    get_attributes_and_config_from_labels,
+from scalyr_agent.util import (
+    StoppableThread,
+    get_parser_from_config,
 )
-from scalyr_agent.builtin_monitors.docker_monitor import get_parser_from_config
-from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
+from scalyr_agent.json_lib import JsonObject
+from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
+
+docker_module_available = True
+
+try:
+    from scalyr_agent.builtin_monitors.docker_monitor import (
+        get_attributes_and_config_from_labels,
+    )
+    from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
+except ImportError:
+    docker_module_available = False
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -1320,6 +1329,12 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
     """
 
     def _initialize(self):
+        if self._config.get("mode") == "docker" and not docker_module_available:
+            raise BadMonitorConfiguration(
+                "The `docker` module was not found, syslog monitor docker mode is not available.",
+                "mode",
+            )
+
         # the main server
         self.__server = None
 
