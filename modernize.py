@@ -17,10 +17,10 @@
 #
 # Script used to check the code for python 2/3 compatibility using "python-modernize" tool
 # usage python modernize.py
-
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
+# optional arguments:
+#   -w --write:  if set, write suggested changes immediately.
+#   -j --processes <jobs count> run concurrently.
+# Note: This is only python3 script.
 
 import re
 import os
@@ -28,11 +28,12 @@ import io
 import difflib
 import collections
 import argparse
+import sys
+import time
 from concurrent.futures import ProcessPoolExecutor
 
-import six
-from six.moves import zip
-import glob2
+import glob
+
 from libmodernize.main import refactor
 from libmodernize.fixes import six_fix_names
 
@@ -100,7 +101,7 @@ def get_diff(new_source, original_source, file_path):
     :param original_source:
     :param file_path:
     :return: string with diff
-    :rtype six.text_type
+    :rtype str
     """
     diff = difflib.unified_diff(
         original_source.splitlines(),
@@ -125,7 +126,7 @@ def parse_todo_areas(source):
     """
     Parse and return list of code chunks between [start of 2->TOD0] ... [end of 2->TOD0] areas.
     :param source: string with python source code
-    :type source six.text_type
+    :type source str
     :return:
     :rtype list
     """
@@ -194,10 +195,10 @@ def modernize_source_string(original_source_string, disabled_fixers=None):
     Applies modernize on string and returns string with modified source code. Leaves [ start of 2->TOD0] untouched.
     :param original_source_string:
     :param disabled_fixers: fixers which are not going to be used in this file processing.
-    :type original_source_string: six.text_type
+    :type original_source_string: str
     :type disabled_fixers set
     :return:
-    :rtype six.text_type
+    :rtype str
     """
 
     # parse and save [2->TOD0] areas.
@@ -213,7 +214,7 @@ def modernize_source_string(original_source_string, disabled_fixers=None):
     # apply refactoring tool on source code.
     tree = tool.refactor_string(original_source_string, "<stdin>")
     # get string with modified source code.
-    modernized_source_string = six.text_type(tree)
+    modernized_source_string = str(tree)
 
     # parse [2->TOD0] areas which are now modernized too.
     new_todos = parse_todo_areas(modernized_source_string)
@@ -238,11 +239,11 @@ def process_file(file_path, write=False, executor=None, **modernize_params):
     :param write: Writes all found modification.
     :param executor: ProcessPoolExecutor object to run this function in separate process.
     :param modernize_params: all additional arguments to "modernize_source_string"
-    :type file_path six.text_type
+    :type file_path str
     :type write bool
     :type executor None|ProcessPoolExecutor
     :return: string with diff of original and modernized source code. If executor specified, future is returned.
-    :rtype six.text_type | concurrent.futures.Future
+    :rtype str | concurrent.futures.Future
     """
 
     if executor is not None:
@@ -318,7 +319,7 @@ print "Not to modernize"
         assert False, "Modernize should fail on second [start of 2->TOD0]."
     except TODOParseError as e:
         assert (
-            e.message
+            str(e)
             == "Another [start of 2->TOD0] inside of [start of 2->TOD0]. Line: 6"
         )
 
@@ -341,7 +342,7 @@ print "Not to modernize"
             False
         ), "Modernize should fail because of [end of 2->TOD0] before [start of 2->TOD0]."
     except TODOParseError as e:
-        assert e.message == "[end of 2->TOD0] without [start of 2->TOD0]. Line: 2"
+        assert str(e) == "[end of 2->TOD0] without [start of 2->TOD0]. Line: 2"
 
     orig_source = """
 from foo import bar
@@ -360,18 +361,21 @@ print "Not to modernize"
             False
         ), "Modernize should fail because of the absence of [end of 2->TOD0]."
     except TODOParseError as e:
-        assert e.message == "[start of 2->TOD0] without [end of 2->TOD0]. Line: 2"
+        assert str(e) == "[start of 2->TOD0] without [end of 2->TOD0]. Line: 2"
 
 
 # simple test before main activity.
 _run_tests()
 
 if __name__ == "__main__":
+    if sys.version_info[0] < 3:
+        print("This script runs only on python3")
+        exit(1)
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-w",
         "--write",
-        action="store_true",
+        action="store_false",
         default=False,
         help="Write modified files.",
     )
@@ -381,25 +385,31 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    root = os.path.dirname(__file__)
+    root = os.path.dirname(os.path.abspath(__file__))
     source_root = os.path.join(root, "scalyr_agent")
 
     # all python files
-    all_files = set(glob2.glob("{}/**/*.py".format(root), recursive=True))
+    all_files = set(glob.glob("{}/**/*.py".format(root), recursive=True))
+
+    venv_files = set(glob.glob("{}/venv/**/*".format(root), recursive=True))
 
     # do not modernize third_party libraries.
-    third_party_files = set(glob2.glob("{0}/third_party*/**/*.py".format(source_root)))
+    third_party_files = set(glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True))
 
     # files without third party libraries.
-    files_to_process = list(all_files - third_party_files)
+    files_to_process = all_files - third_party_files - venv_files
 
     # do not process script by itself.
-    files_to_process.remove(os.path.join(root, "modernize.py"))
+    try:
+        files_to_process.remove(os.path.join(root, "modernize.py"))
+    except KeyError:
+        pass
 
     # Create collection with additional modernize parameters for each file.
     files_modernize_params = collections.defaultdict(dict)
 
-    # __scalyr__.py can not have "six" as dependency, because third_party libraries are not imported yet.
+    # __scalyr__.py can not have "six" as dependency, because third_party libraries are not imported yet,
+    # so modernize should not add import of "six" in it.
     scalyr_py_path = os.path.join(source_root, "__scalyr__.py")
     files_modernize_params[scalyr_py_path] = {"disabled_fixers": six_fix_names}
 
@@ -409,7 +419,23 @@ if __name__ == "__main__":
         ProcessPoolExecutor(max_workers=args.processes) if is_concurrent else None
     )
 
-    diffs = list()
+    diffs = dict()
+    if not args.write:
+        print("Only compatibility check started. Files will not be changed.")
+
+    current_file_number = 1
+
+    def progress_message():
+        global current_file_number
+        print("Processing {} of {}.".format(
+            current_file_number,
+            total_files_count,
+            flush=True
+        ))
+        current_file_number += 1
+
+
+    total_files_count = len(files_to_process)
 
     for file_path in files_to_process:
         try:
@@ -419,24 +445,34 @@ if __name__ == "__main__":
                 executor=executor,
                 **files_modernize_params[file_path]
             )
+            if not is_concurrent:
+                progress_message()
 
-            # If there is a concurrent mode, diff is a future. Wait for result.
-            if is_concurrent:
-                diff = diff.result()
-
-            if diff:
-                diffs.append(diff)
+            diffs[file_path]=diff
 
         except TODOParseError as e:
             print("Can not modernize file: {}".format(file_path))
             raise
+    if is_concurrent:
+        for file_path, future in list(diffs.items()):
+            try:
+                diffs[file_path] = future.result()
+                progress_message()
+            except TODOParseError as e:
+                print("Can not modernize file: {}".format(file_path))
+                raise
+    print('\n\n=======================================\n')
+    sys.stdout.flush()
+    time.sleep(0.1)
+
+    diffs = [diff for diff in list(diffs.values()) if diff]
 
     if diffs:
         if args.write:
             print("Python-modernize found and modernized code in files:")
         else:
-            print("Python-modernize found code that can be modernized in files:")
-        print("\n".join(sorted(diffs)))
+            print("Python-modernize found code that can be modernized in files:", file=sys.stderr)
+        print("\n".join(sorted(diffs)), file=sys.stderr)
         exit(1)
     print("All files are up to date.")
     # Nothing to update. Exit without error.
