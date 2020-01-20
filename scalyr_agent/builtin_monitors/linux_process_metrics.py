@@ -24,6 +24,9 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from six.moves import range
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -207,7 +210,7 @@ class Metric(object):
 
     def __hash__(self):
         x = hash(self.name) + 13 * hash(self.type)
-        return x % sys.maxint
+        return x % sys.maxsize
 
     def __eq__(self, other):
         return other.name == self.name and other.type == self.type
@@ -321,7 +324,7 @@ class BaseReader:
         if self._file is None:
             try:
                 self._file = open(filename, "r")
-            except IOError, e:
+            except IOError as e:
                 # We take a simple approach.  If we don't find the file or
                 # don't have permissions for it, then just don't collect this
                 # stat from now on.  If the user changes the configuration file
@@ -349,7 +352,7 @@ class BaseReader:
 
                 return self.gather_sample(self._file, collector=collector)
 
-            except IOError, e:
+            except IOError as e:
                 # log the error if the errno isn't 'process not found'. Process not found likely means the
                 # process exited, so we ignore that because it's within the realm of expected behaviour
                 if e.errno != errno.ESRCH:
@@ -787,7 +790,7 @@ class FileDescriptorReader:
         num_fds = 0
         try:
             num_fds = len(os.listdir(self.__path))
-        except OSError, e:
+        except OSError as e:
             # ignore file not found errors, it just means the process
             # is dead so just continue but return
             # 0 open fds.  Rethrow all other exceptions
@@ -853,7 +856,7 @@ class ProcessTracker(object):
                 stats = gather.run_single_cycle(collector=collector)
                 if stats:
                     collector.update(stats)
-            except Exception, ex:
+            except Exception as ex:
                 self._logger.exception(
                     "Exception while collecting metrics for PID: %s of type: %s. Details: %s",
                     self.pid,
@@ -1110,7 +1113,7 @@ class ProcessMonitor(ScalyrMonitor):
         # NOTE: the removal of the contributions (if applicable) should already be done so
         # removing the entry from the history is safe.
 
-        all_pids = self.__metrics_history.keys()
+        all_pids = list(self.__metrics_history.keys())
         for _pid_to_remove in list(set(all_pids) - set(self.__pids)):
             # for all the absolute metrics, decrease the count that the dead processes accounted for
             del self.__metrics_history[_pid_to_remove]
@@ -1170,7 +1173,7 @@ class ProcessMonitor(ScalyrMonitor):
             # check that is useful to see if a process is still running.
             os.kill(pid, 0)
             return True
-        except OSError, e:
+        except OSError as e:
             # Errno #3 corresponds to the process not running.  We could get
             # other errors like this process does not have permission to send
             # a signal to self.pid.  But, if that error is returned to us, we

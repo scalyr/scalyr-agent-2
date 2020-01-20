@@ -17,6 +17,7 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+from __future__ import absolute_import
 import sys
 import re
 import os
@@ -32,6 +33,7 @@ from scalyr_agent import (
     define_metric,
     define_log_field,
 )
+from six.moves import zip
 
 # We must require 2.5 or greater right now because pg8000 requires it.
 if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 5):
@@ -281,11 +283,11 @@ class PostgreSQLDb(object):
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
-        except pg8000.Error, me:
+        except pg8000.Error as me:
             self._db = None
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
-        except Exception, ex:
+        except Exception as ex:
             self._logger.error("Exception trying to connect occured:  %s" % ex)
             raise Exception("Exception trying to connect:  %s" % ex)
 
@@ -329,7 +331,7 @@ class PostgreSQLDb(object):
                 version = self._version.split(".")
                 self._major = int(version[0])
                 self._medium = int(version[1])
-        except (ValueError, IndexError), e:
+        except (ValueError, IndexError) as e:
             self._major = self._medium = 0
             self._version = "unknown"
         except:
@@ -356,7 +358,8 @@ class PostgreSQLDb(object):
                 "select * from %s where datname = '%s';" % (table, self._database)
             )
             data = self._cursor.fetchone()
-        except pg8000.OperationalError, (errcode, msg):
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()
@@ -384,7 +387,8 @@ class PostgreSQLDb(object):
         try:
             self._cursor.execute("select pg_database_size('%s');" % self._database)
             size = self._cursor.fetchone()[0]
-        except pg8000.OperationalError, (errcode, msg):
+        except pg8000.OperationalError as error:
+            errcode = error.errcode
             if errcode != 2006:  # "PostgreSQL server has gone away"
                 raise Exception("Database error -- " + errcode)
             self.reconnect()
@@ -521,7 +525,7 @@ instance."""
 
         try:
             self._db.reconnect()
-        except Exception, e:
+        except Exception as e:
             self._logger.warning(
                 "Unable to gather stats for postgres database - %s" % str(e)
             )
@@ -540,7 +544,7 @@ instance."""
         if dbstats != None:
             for table in self._db._database_stats.keys():
                 for key in self._db._database_stats[table].keys():
-                    if key in dbstats.keys():
+                    if key in list(dbstats.keys()):
                         if key != "stats_reset":
                             extra = None
                             if len(self._db._database_stats[table][key]) == 3:

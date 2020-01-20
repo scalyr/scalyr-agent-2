@@ -32,6 +32,8 @@ limitations under the License.
 ------------------------------------------------------------------------
 """
 
+from __future__ import absolute_import
+
 __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
@@ -106,7 +108,7 @@ def _gather_metric(method, attribute=None, transform=None):
             if transform is not None:
                 value = transform(value)
             yield value, None
-        except RuntimeError, e:
+        except RuntimeError as e:
             # Special case the expected exception we see if we call disk_io_counters without the
             # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
             # on the exception message, but sometimes you have to do what you have to do.  At least we

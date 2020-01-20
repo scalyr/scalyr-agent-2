@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
 import os
 import tempfile
 import errno
@@ -230,7 +231,7 @@ class TestPidfileManager(ScalyrTestCase):
         while True:
             try:
                 os.kill(result, 0)
-            except OSError, e:
+            except OSError as e:
                 # ESRCH indicates the process is not running, in which case we ignore the pidfile.
                 if e.errno == errno.ESRCH:
                     return result

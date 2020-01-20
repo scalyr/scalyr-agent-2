@@ -14,6 +14,9 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
+import six
+from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -46,7 +49,7 @@ import scalyr_agent.util as scalyr_util
 class TestConfigurationBase(ScalyrTestCase):
     def setUp(self):
         super(TestConfigurationBase, self).setUp()
-        self.original_os_env = dict([(k, v) for k, v in os.environ.iteritems()])
+        self.original_os_env = dict([(k, v) for k, v in six.iteritems(os.environ)])
         self._config_dir = tempfile.mkdtemp()
         self._config_file = os.path.join(self._config_dir, "agent.json")
         self._config_fragments_dir = os.path.join(self._config_dir, "agent.d")
@@ -73,7 +76,7 @@ class TestConfigurationBase(ScalyrTestCase):
                 value = contents[key]
                 value_type = type(value)
                 if key.endswith("path") and (
-                    value_type is str or value_type is unicode
+                    value_type is str or value_type is six.text_type
                 ):
                     contents[key] = self.convert_path(contents[key])
                 elif value_type in (dict, JsonObject, list, JsonArray):

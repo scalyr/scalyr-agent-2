@@ -15,6 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -24,7 +26,12 @@ from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
 
-from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.__scalyr__ import (
+    get_install_root,
+    TARBALL_INSTALL,
+    DEV_INSTALL,
+    PACKAGE_INSTALL,
+)
 
 
 class LinuxPlatformController(PosixPlatformController):

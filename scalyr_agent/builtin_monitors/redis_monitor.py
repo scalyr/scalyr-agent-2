@@ -17,6 +17,8 @@
 #
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import binascii
@@ -209,7 +211,7 @@ class RedisHost(object):
         command = ""
         try:
             command = entry["command"].decode("utf8")
-        except UnicodeDecodeError, e:
+        except UnicodeDecodeError as e:
             if self.utf8_warning_interval:
                 logger.warn(
                     "Redis command contains invalid utf8: %s"
@@ -392,7 +394,7 @@ Additional configuration options are as follows:
             new_connection = not host.valid()
             try:
                 entries = host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
-            except ConnectionError, e:
+            except ConnectionError as e:
                 if new_connection:
                     self._logger.error(
                         "Unable to establish connection: %s" % (host.display_string),
@@ -403,5 +405,5 @@ Additional configuration options are as follows:
                     self._logger.error(
                         "Connection to redis lost: %s" % host.display_string
                     )
-            except TimeoutError, e:
+            except TimeoutError as e:
                 self._logger.warn("Connection timed out: %s" % host.display_string)

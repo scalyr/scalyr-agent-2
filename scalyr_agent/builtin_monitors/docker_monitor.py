@@ -14,6 +14,9 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
+
 __author__ = "imron@scalyr.com"
 
 import datetime
@@ -754,7 +757,7 @@ def _get_containers(
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
-                        except Exception, e:
+                        except Exception as e:
                             logger.error(
                                 "Error inspecting container '%s'" % cid,
                                 limit_once_per_x_secs=300,
@@ -766,7 +769,7 @@ def _get_containers(
             else:
                 result[cid] = {"name": cid, "log_path": None, "labels": None}
 
-    except Exception, e:  # container querying failed
+    except Exception as e:  # container querying failed
         logger.exception(
             "Error querying running containers: %s, filters=%s, only_running_containers=%s"
             % (str(e), filters, only_running_containers),
@@ -800,14 +803,14 @@ def get_attributes_and_config_from_labels(labels, docker_options):
 
             included = {}
             # apply include globs
-            for key, value in labels.iteritems():
+            for key, value in six.iteritems(labels):
                 for glob in docker_options.label_include_globs:
                     if fnmatch.fnmatch(key, glob):
                         included[key] = value
                         break
 
             # filter excluded labels
-            for key, value in included.iteritems():
+            for key, value in six.iteritems(included):
                 add_label = True
                 for glob in docker_options.label_exclude_globs:
                     if fnmatch.fnmatch(key, glob):
@@ -1023,7 +1026,7 @@ class ContainerChecker(StoppableThread):
                 # get the containers that have started since the last sample
                 starting = {}
 
-                for cid, info in running_containers.iteritems():
+                for cid, info in six.iteritems(running_containers):
                     if cid not in self.containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1033,7 +1036,7 @@ class ContainerChecker(StoppableThread):
 
                 # get the containers that have stopped
                 stopping = {}
-                for cid, info in self.containers.iteritems():
+                for cid, info in six.iteritems(self.containers):
                     if cid not in running_containers:
                         self._logger.log(
                             scalyr_logging.DEBUG_LEVEL_1,
@@ -1053,7 +1056,7 @@ class ContainerChecker(StoppableThread):
                 # start the new ones
                 self.__start_loggers(starting)
 
-            except Exception, e:
+            except Exception as e:
                 self._logger.warn(
                     "Exception occurred when checking containers %s\n%s"
                     % (str(e), traceback.format_exc())
@@ -1144,7 +1147,7 @@ class ContainerChecker(StoppableThread):
             checkpoints = {}
 
         if checkpoints:
-            for name, last_request in checkpoints.iteritems():
+            for name, last_request in six.iteritems(checkpoints):
                 self.__checkpoints[name] = last_request
 
     def __stop_loggers(self, stopping):
@@ -1209,7 +1212,7 @@ class ContainerChecker(StoppableThread):
                     log["log_config"] = self.__log_watcher.add_log_config(
                         self.__module.module_name, log["log_config"]
                     )
-                except Exception, e:
+                except Exception as e:
                     global_log.info(
                         "Error adding log '%s' to log watcher - %s"
                         % (log["log_config"]["path"], e)
@@ -1259,7 +1262,7 @@ class ContainerChecker(StoppableThread):
                 if dt:
                     result = dt
             fp.close()
-        except Exception, e:
+        except Exception as e:
             global_log.info("%s", str(e))
 
         return scalyr_util.seconds_since_epoch(result)
@@ -1314,13 +1317,13 @@ class ContainerChecker(StoppableThread):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception, e:
+        except Exception as e:
             self._logger.error("Error setting monitor attribute in DockerMonitor")
             raise
 
         prefix = self.__log_prefix + "-"
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             container_attributes = attributes.copy()
             container_attributes["containerName"] = info["name"]
             container_attributes["containerId"] = cid
@@ -1547,7 +1550,7 @@ class DockerLogger(object):
                                 % str(self.cid),
                             )
                             break
-                except ProtocolError, e:
+                except ProtocolError as e:
                     if run_state.is_running():
                         global_log.warning(
                             "Stream closed due to protocol error: %s" % str(e)
@@ -1573,7 +1576,7 @@ class DockerLogger(object):
 
             self.__last_request_lock.release()
 
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "Unhandled exception in DockerLogger.process_request for %s:\n\t%s"
                 % (self.name, str(e))
@@ -1669,7 +1672,7 @@ class ContainerIdResolver:
 
             # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
 
-        except Exception, e:
+        except Exception as e:
             self.__logger.error(
                 'Error seen while attempting resolving docker cid="%s"', container_id
             )
@@ -1753,7 +1756,7 @@ class ContainerIdResolver:
 
         # Note, the cid used as the key for the returned matches is the long container id, not the short one that
         # we were passed in as `container_id`.
-        match = matches[matches.keys()[0]]
+        match = matches[list(matches.keys())[0]]
         labels = match.get("labels", {})
         if labels is None:
             labels = {}
@@ -1918,7 +1921,7 @@ class DockerOptions(object):
             self.use_labels_for_log_config = monitor.use_labels_for_log_config
             self.label_prefix = monitor.label_prefix
             self.labels_as_attributes = monitor.labels_as_attributes
-        except Exception, e:
+        except Exception as e:
             global_log.warning(
                 "Error getting docker config from docker monitor - %s.  Using defaults"
                 % str(e)
@@ -2231,7 +2234,7 @@ class DockerMonitor(ScalyrMonitor):
         if metrics is None:
             return
 
-        for key, value in metrics_to_emit.iteritems():
+        for key, value in six.iteritems(metrics_to_emit):
             if value in metrics:
                 # Note, we do a bit of a hack to pretend the monitor's name include the container's name.  We take this
                 # approach because the Scalyr servers already have some special logic to collect monitor names and ids
@@ -2285,12 +2288,12 @@ class DockerMonitor(ScalyrMonitor):
             )
 
     def __log_json_metrics(self, container, metrics):
-        for key, value in metrics.iteritems():
+        for key, value in six.iteritems(metrics):
             if value is None:
                 continue
 
             if key == "networks":
-                for interface, network_metrics in value.iteritems():
+                for interface, network_metrics in six.iteritems(value):
                     self.__log_network_interface_metrics(
                         container, network_metrics, interface
                     )
@@ -2310,7 +2313,7 @@ class DockerMonitor(ScalyrMonitor):
             result = self.__client.stats(container=container, stream=False)
             if result is not None:
                 self.__log_json_metrics(container, result)
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "Error readings stats for '%s': %s\n%s"
                 % (container, str(e), traceback.format_exc()),
@@ -2320,7 +2323,7 @@ class DockerMonitor(ScalyrMonitor):
 
     def __gather_metrics_from_api(self, containers):
 
-        for cid, info in containers.iteritems():
+        for cid, info in six.iteritems(containers):
             self.__gather_metrics_from_api_for_container(info["name"])
 
     def get_user_agent_fragment(self):

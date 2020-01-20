@@ -323,6 +323,29 @@ jobs:
             source ../venv/bin/activate
             coverage report
 
+  modernize-check:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie-browsers
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-modernize-venv
+      - run:
+          command: |
+            virtualenv venv
+            source venv/bin/activate
+            pip install modernize
+      - save_cache:
+          key: deps1-{{ .Branch }}-modernize-venv
+          paths:
+            - "venv"
+      - run:
+          command: |
+            source venv/bin/activate
+            python modernize.py -j 2
+
+
 
 
 
@@ -330,6 +353,7 @@ workflows:
   version: 2
   unittest:
     jobs:
+      - modernize-check
       - unittest-27
       - unittest-26
       - smoke-standalone-27

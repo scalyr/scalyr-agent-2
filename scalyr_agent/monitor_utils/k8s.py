@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import hashlib
 import os
 import random
@@ -16,7 +17,9 @@ import time
 from time import strftime, gmtime
 import traceback
 import scalyr_agent.scalyr_logging as scalyr_logging
-import urllib
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+import six
+from six.moves import range
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -239,7 +242,7 @@ class PodInfo(object):
         # just the object id, we explicitly create a flattened string of
         # key/value pairs
         flattened = []
-        for k, v in labels.iteritems():
+        for k, v in six.iteritems(labels):
             flattened.append(k)
             flattened.append(v)
         md5.update("".join(flattened))
@@ -251,7 +254,7 @@ class PodInfo(object):
         # flatten the annotations dict in to a single string
         # see previous comment for why flattening is necessary
         flattened = []
-        for k, v in annotations.iteritems():
+        for k, v in six.iteritems(annotations):
             flattened.append(k)
             flattened.append(str(v))
 
@@ -313,7 +316,7 @@ class Controller(object):
         self.parent_name = parent_name
         self.parent_kind = parent_kind
         flat_labels = []
-        for key, value in labels.iteritems():
+        for key, value in six.iteritems(labels):
             flat_labels.append("%s=%s" % (key, value))
 
         self.flat_labels = ",".join(flat_labels)
@@ -380,7 +383,7 @@ class _K8sCache(object):
         result = {}
         self._lock.acquire()
         try:
-            for k, v in self._objects.iteritems():
+            for k, v in six.iteritems(self._objects):
                 result[k] = v
         finally:
             self._lock.release()
@@ -390,8 +393,8 @@ class _K8sCache(object):
     def __get_stale_objects(self, access_time):
         """Get all stale objects.  Caller should first obtain lock on self._objects"""
         stale = []
-        for namespace, objs in self._objects.iteritems():
-            for obj_name, obj in objs.iteritems():
+        for namespace, objs in six.iteritems(self._objects):
+            for obj_name, obj in six.iteritems(objs):
                 if hasattr(obj, "access_time"):
                     if obj.access_time is None or obj.access_time < access_time:
                         stale.append((namespace, obj_name))
@@ -736,7 +739,7 @@ class PodProcessor(_K8sProcessor):
 
         try:
             annotations = annotation_config.process_annotations(annotations)
-        except BadAnnotationConfig, e:
+        except BadAnnotationConfig as e:
             global_log.warning(
                 "Bad Annotation config for %s/%s.  All annotations ignored. %s"
                 % (namespace, pod_name, str(e)),
@@ -1162,13 +1165,13 @@ class KubernetesCache(object):
                     self._initialized = True
                 finally:
                     self._lock.release()
-            except K8sApiException, e:
+            except K8sApiException as e:
                 global_log.warn(
                     "Exception occurred when initializing k8s cache - %s" % (str(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_init_cache",
                 )
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "Exception occurred when initializing k8s cache - %s\n%s"
                     % (str(e), traceback.format_exc())
@@ -1225,13 +1228,13 @@ class KubernetesCache(object):
                     self._pods_cache.purge_unused(last_purge)
                     last_purge = current_time
 
-            except K8sApiException, e:
+            except K8sApiException as e:
                 global_log.warn(
                     "Exception occurred when updating k8s cache - %s" % (str(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_update_cache",
                 )
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "Exception occurred when updating k8s cache - %s\n%s"
                     % (str(e), traceback.format_exc())
@@ -1635,7 +1638,7 @@ class KubernetesApi(object):
                 # will return a 404.  Then if you query again a few seconds later everything works.
                 rate_limit_outcome = True
                 raise
-            except K8sApiTemporaryError, e:
+            except K8sApiTemporaryError as e:
                 rate_limit_outcome = False
                 if retries_left <= 0:
                     raise e
@@ -1669,13 +1672,13 @@ class KubernetesApi(object):
         try:
             kapi = os.path.join(self.agent_log_path, "kapi")
             if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
+                os.mkdir(kapi, 0o755)
             if rate_limited:
                 kapi = os.path.join(kapi, "limited")
             else:
                 kapi = os.path.join(kapi, "limited")
             if not os.path.exists(kapi):
-                os.mkdir(kapi, 0755)
+                os.mkdir(kapi, 0o755)
             fname = "%s_%.20f_%s_%s" % (
                 strftime("%Y%m%d-%H-%M-%S", gmtime()),
                 time.time(),
@@ -1766,7 +1769,7 @@ class KubernetesApi(object):
                     url, verify=self._verify_connection(), timeout=self.query_timeout
                 )
                 response.encoding = "utf-8"
-            except Exception, e:
+            except Exception as e:
                 if return_temp_errors:
                     raise K8sApiTemporaryError(
                         "Temporary error seen while accessing api: %s" % str(e)
@@ -1866,7 +1869,7 @@ class KubernetesApi(object):
             query = _OBJECT_ENDPOINTS[kind]["single"].substitute(
                 name=name, namespace=namespace
             )
-        except Exception, e:
+        except Exception as e:
             global_log.warn(
                 "k8s API - failed to build query string - %s" % (str(e)),
                 limit_once_per_x_secs=300,
@@ -1900,7 +1903,7 @@ class KubernetesApi(object):
         if namespace:
             try:
                 query = _OBJECT_ENDPOINTS[kind]["list"].substitute(namespace=namespace)
-            except Exception, e:
+            except Exception as e:
                 global_log.warn(
                     "k8s API - failed to build namespaced query list string - %s"
                     % (str(e)),
@@ -1909,7 +1912,10 @@ class KubernetesApi(object):
                 )
 
         if filter:
-            query = "%s?fieldSelector=%s" % (query, urllib.quote(filter))
+            query = "%s?fieldSelector=%s" % (
+                query,
+                six.moves.urllib.parse.quote(filter),
+            )
 
         return self.query_api_with_retries(
             query,
@@ -2225,7 +2231,7 @@ class DockerMetricFetcher(object):
                 result = self.__docker_client.stats(
                     container=container_id, stream=False
                 )
-            except Exception, e:
+            except Exception as e:
                 global_log.error(
                     "Error readings stats for '%s': %s\n%s"
                     % (container_id, str(e), traceback.format_exc()),

@@ -15,6 +15,9 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
+from __future__ import absolute_import
+from six.moves import range
+
 __author__ = "echee@scalyr.com"
 
 
@@ -224,7 +227,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
                 self._outcome_generator_lock.acquire()
                 try:
-                    outcome = reported_outcome_generator.next()
+                    outcome = next(reported_outcome_generator)
                     rate_limiter.release_token(token, outcome)
                 finally:
                     self._outcome_generator_lock.release()

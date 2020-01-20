@@ -15,6 +15,8 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 import time
@@ -130,7 +132,7 @@ class SyslogMonitorTestCase(unittest.TestCase):
     def assertNoException(self, func):
         try:
             func()
-        except Exception, e:
+        except Exception as e:
             self.fail("Unexpected Exception: %s" % str(e))
         except:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])

@@ -16,6 +16,7 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+from __future__ import absolute_import
 import sys
 import re
 import os
@@ -31,6 +32,7 @@ from scalyr_agent import (
 )
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+import six
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -375,11 +377,11 @@ class MysqlDB(object):
             self._db = conn
             self._cursor = self._db.cursor()
             self._gather_db_information()
-        except pymysql.Error, me:
+        except pymysql.Error as me:
             self._db = None
             self._cursor = None
             self._logger.error("Database connect failed: %s" % me)
-        except Exception, ex:
+        except Exception as ex:
             self._logger.error("Exception trying to connect occured:  %s" % ex)
             raise Exception("Exception trying to connect:  %s" % ex)
 
@@ -414,7 +416,8 @@ class MysqlDB(object):
 
         try:
             self._cursor.execute(sql)
-        except pymysql.OperationalError, (errcode, msg):
+        except pymysql.OperationalError as error:
+            (errcode, msg) = error.args
             if errcode != 2006:  # "MySQL server has gone away"
                 self._logger.exception(
                     "Exception trying to execute query: %d '%s'" % (errcode, msg)
@@ -434,7 +437,7 @@ class MysqlDB(object):
             version = self._version.split(".")
             self._major = int(version[0])
             self._medium = int(version[1])
-        except (ValueError, IndexError), e:
+        except (ValueError, IndexError) as e:
             self._major = self._medium = 0
             self._version = "unknown"
         except:
@@ -637,7 +640,7 @@ class MysqlDB(object):
         if master_host and master_host is not "None":
             result = []
             sbm = slave_status.get("seconds_behind_master")
-            if isinstance(sbm, (int, long)):
+            if isinstance(sbm, six.integer_types):
                 result.append({"field": "slave.seconds_behind_master", "value": sbm})
             result.append(
                 {
@@ -676,7 +679,7 @@ class MysqlDB(object):
         for row in process_status:
             id, user, host, db_, cmd, time, state = row[:7]
             states[cmd] = states.get(cmd, 0) + 1
-        for state, count in states.iteritems():
+        for state, count in six.iteritems(states):
             state = state.lower().replace(" ", "_")
             result.append({"field": "process.%s" % state, "value": count})
         if len(result) == 0:
@@ -867,7 +870,8 @@ class MysqlDB(object):
         """Returns whether or not the given path is a socket file."""
         try:
             s = os.stat(path)
-        except OSError, (no, e):
+        except OSError as error:
+            (no, e) = error.args
             if no == errno.ENOENT:
                 return False
             self._logger.error("warning: couldn't stat(%r): %s" % (path, e))
@@ -966,7 +970,7 @@ class MysqlMonitor(ScalyrMonitor):
             self._database_connect_type = "socket"
             if (
                 type(self._config["database_socket"]) is str
-                or type(self._config["database_socket"]) is unicode
+                or type(self._config["database_socket"]) is six.text_type
             ):
                 self._database_socket = self._config["database_socket"]
                 if len(self._database_socket) == 0:
@@ -983,7 +987,7 @@ class MysqlMonitor(ScalyrMonitor):
             self._database_connect_type = "host:port"
             if (
                 type(self._config["database_hostport"]) is str
-                or type(self._config["database_hostport"]) is unicode
+                or type(self._config["database_hostport"]) is six.text_type
             ):
                 hostport = self._config["database_hostport"]
                 if len(hostport) == 0:
@@ -1056,7 +1060,7 @@ class MysqlMonitor(ScalyrMonitor):
                     password=self._database_password,
                     logger=self._logger,
                 )
-        except Exception, e:
+        except Exception as e:
             self._db = None
             global_log.warning(
                 "Error establishing database connection: %s" % (str(e)),

@@ -15,7 +15,25 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
+
+# [start of 2->TODO]
+# "Modernize" tool added "six" library as a dependency in this file.
+# But in case of absence of six in site-packages we can not import "six" before scalyr_init.
+# The first option is to provide 2->3 compatibility without "six". This is easy for now,
+# because there is only one incompatible piece of code here.
+# and it can be fixed in code below...
+try:
+    # Python2
+    text_type = unicode
+except NameError:
+    # Python3
+    text_type = str
+# The second option is to assure that "six" library installed in current python environment.
+# [end of 2->TOD0]
+
 
 import inspect
 import os
@@ -98,7 +116,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(text_type(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 

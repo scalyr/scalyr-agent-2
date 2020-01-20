@@ -30,6 +30,8 @@ The methods exported are:
   parse                       -- Parses a string as JSON and returns the value.
 """
 
+from __future__ import absolute_import
+
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 
 from scalyr_agent.json_lib.exceptions import JsonConversionException

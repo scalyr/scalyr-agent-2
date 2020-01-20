@@ -63,6 +63,8 @@ limitations under the License.
 ------------------------------------------------------------------------
 """
 
+from __future__ import absolute_import
+
 __author__ = "Scott Sullivan <guy.hoozdis@gmail.com>"
 __version__ = "0.0.1"
 

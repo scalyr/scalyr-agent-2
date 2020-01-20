@@ -15,6 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -25,7 +27,7 @@ from scalyr_agent.agent_status import MonitorStatus
 from scalyr_agent.scalyr_monitor import load_monitor_class, ScalyrMonitor
 from scalyr_agent.util import StoppableThread
 
-from __scalyr__ import get_package_root
+from scalyr_agent.__scalyr__ import get_package_root
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 

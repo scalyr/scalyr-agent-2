@@ -14,6 +14,10 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+import six
+from six.moves import range
+
 __author__ = "imron@scalyr.com"
 
 import errno
@@ -26,7 +30,7 @@ import re
 from socket import error as socket_error
 import socket
 import struct
-import SocketServer
+import six.moves.socketserver
 import threading
 import time
 import traceback
@@ -313,7 +317,7 @@ def _get_default_gateway():
                 continue
 
             result = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
-    except IOError, e:
+    except IOError as e:
         global_log.error(
             "Error while getting the default gateway: %s",
             str(e),
@@ -422,7 +426,7 @@ class SyslogFrameParser(object):
         return result
 
 
-class SyslogUDPHandler(SocketServer.BaseRequestHandler):
+class SyslogUDPHandler(six.moves.socketserver.BaseRequestHandler):
     """Class that reads data from a UDP request and passes it to
     a protocol neutral handler
     """
@@ -451,7 +455,7 @@ class SyslogRequestParser(object):
         except socket.timeout:
             self._socket_error = True
             return None
-        except socket.error, e:
+        except socket.error as e:
             if e.errno == errno.EAGAIN:
                 return None
             else:
@@ -551,7 +555,7 @@ class SyslogRequestParser(object):
         self._offset = 0
 
 
-class SyslogTCPHandler(SocketServer.BaseRequestHandler):
+class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
     """Class that reads data from a TCP request and passes it to
     a protocol neutral handler
     """
@@ -587,7 +591,7 @@ class SyslogTCPHandler(SocketServer.BaseRequestHandler):
                 if check_running and not self.server.is_running():
                     break
 
-        except Exception, e:
+        except Exception as e:
             global_log.warning(
                 "Error handling request: %s\n\t%s", str(e), traceback.format_exc()
             )
@@ -599,7 +603,9 @@ class SyslogTCPHandler(SocketServer.BaseRequestHandler):
         )
 
 
-class SyslogUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
+class SyslogUDPServer(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.UDPServer
+):
     """Class that creates a UDP SocketServer on a specified port
     """
 
@@ -613,7 +619,7 @@ class SyslogUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         )
 
         self.allow_reuse_address = True
-        SocketServer.UDPServer.__init__(self, address, SyslogUDPHandler)
+        six.moves.socketserver.UDPServer.__init__(self, address, SyslogUDPHandler)
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -623,7 +629,9 @@ class SyslogUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         pass
 
 
-class SyslogTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class SyslogTCPServer(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+):
     """Class that creates a TCP SocketServer on a specified port
     """
 
@@ -639,7 +647,7 @@ class SyslogTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         self.allow_reuse_address = True
         self.__run_state = None
         self.tcp_buffer_size = tcp_buffer_size
-        SocketServer.TCPServer.__init__(self, address, SyslogTCPHandler)
+        six.moves.socketserver.TCPServer.__init__(self, address, SyslogTCPHandler)
 
     def verify_request(self, request, client_address):
         return self.__verifier.verify_request(client_address)
@@ -707,7 +715,7 @@ class LogDeleter(object):
                             if added:
                                 result.append(rotated_file)
 
-                    except OSError, e:
+                    except OSError as e:
                         global_log.warn(
                             "Unable to read modification time for file '%s', %s"
                             % (rotated_file, str(e)),
@@ -715,7 +723,7 @@ class LogDeleter(object):
                             limit_key="mtime-%s" % rotated_file,
                         )
 
-            except OSError, e:
+            except OSError as e:
                 global_log.warn(
                     "Unable to read modification time for file '%s', %s"
                     % (matching_file, str(e)),
@@ -745,7 +753,7 @@ class LogDeleter(object):
                 global_log.log(
                     scalyr_logging.DEBUG_LEVEL_1, "Deleted old log file '%s'" % filename
                 )
-            except OSError, e:
+            except OSError as e:
                 global_log.warn(
                     "Error deleting old log file '%s', %s" % (filename, str(e)),
                     limit_once_per_x_secs=300,
@@ -890,7 +898,7 @@ class SyslogHandler(object):
             if self.__server_host:
                 attributes["serverHost"] = self.__server_host
 
-        except Exception, e:
+        except Exception as e:
             global_log.error("Error setting docker logger attribute in SyslogMonitor")
             raise
 
@@ -908,7 +916,7 @@ class SyslogHandler(object):
                 flush_delay=self.__flush_delay,
             )
 
-        except Exception, e:
+        except Exception as e:
             global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
             result = None
 
@@ -1055,7 +1063,7 @@ class SyslogHandler(object):
                 # expired
                 expired = []
 
-                for key, info in self.__docker_loggers.iteritems():
+                for key, info in six.iteritems(self.__docker_loggers):
                     if current_time - info["last_seen"] > self.__docker_expire_log:
                         expired.append(key)
 
@@ -1070,7 +1078,7 @@ class SyslogHandler(object):
                             )
             self.__expire_count += 1
 
-            for key, info in self.__docker_loggers.iteritems():
+            for key, info in six.iteritems(self.__docker_loggers):
                 current_log_files.append(info["log_config"]["path"])
         finally:
             self.__logger_lock.release()
@@ -1181,7 +1189,7 @@ class SyslogServer(object):
                     port, bind_address=bind_address, verifier=verifier
                 )
 
-        except socket_error, e:
+        except socket_error as e:
             if e.errno == errno.EACCES and port < 1024:
                 raise Exception(
                     "Access denied when trying to create a %s server on a low port (%d). "
@@ -1380,7 +1388,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         try:
             attributes = JsonObject({"monitor": "agentSyslog"})
             self.log_config["attributes"] = attributes
-        except Exception, e:
+        except Exception as e:
             global_log.error("Error setting monitor attribute in SyslogMonitor")
 
         (
@@ -1481,7 +1489,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 self.__disk_logger.setLevel(logging.INFO)
                 self.__disk_logger.propagate = False
                 success = True
-            except Exception, e:
+            except Exception as e:
                 global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
 
         return success
@@ -1574,7 +1582,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             # start the main server
             self.__server.start(self._run_state)
 
-        except Exception, e:
+        except Exception as e:
             global_log.exception(
                 "Monitor died due to exception:", error_code="failedMonitor"
             )

@@ -15,6 +15,7 @@
 #
 #
 # author: Edward Chee <echee@scalyr.com>
+from __future__ import absolute_import
 import re
 import struct
 

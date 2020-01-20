@@ -19,12 +19,14 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import cStringIO
 import errno
 import socket
-import SocketServer
+import six.moves.socketserver
 import struct
 import time
 
@@ -33,7 +35,9 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 global_log = scalyr_logging.getLogger(__name__)
 
 
-class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+class ServerProcessor(
+    six.moves.socketserver.ThreadingMixIn, six.moves.socketserver.TCPServer
+):
     """Base class for simple servers that only need to accept incoming connections, perform some actions on
     individual commands, and return no output.
 
@@ -85,7 +89,9 @@ class ServerProcessor(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
         if run_state is not None:
             self.run_state.register_on_stop_callback(self.shutdown)
 
-        SocketServer.TCPServer.__init__(self, server_address, ConnectionHandler)
+        six.moves.socketserver.TCPServer.__init__(
+            self, server_address, ConnectionHandler
+        )
 
     def run(self):
         """Begins accepting new connections and processing the incoming requests.
@@ -354,7 +360,7 @@ class ConnectionProcessor(object):
         return self.__run_state.is_running() and not self.__request_stream.at_end()
 
 
-class ConnectionHandler(SocketServer.BaseRequestHandler):
+class ConnectionHandler(six.moves.socketserver.BaseRequestHandler):
     """The handler class that is used by ServerProcess to handle incoming connections.
     """
 
@@ -377,7 +383,7 @@ class ConnectionHandler(SocketServer.BaseRequestHandler):
                 self.server.max_connection_idle_time,
             )
             processor.run()
-        except Exception, e:
+        except Exception as e:
             self.server.report_connection_problem(e)
 
 
@@ -533,7 +539,7 @@ class RequestStream(object):
             except socket.timeout:
                 self.__socket_error = True
                 return None
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == errno.EAGAIN:
                     return None
                 else:

@@ -21,6 +21,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import sys
@@ -68,7 +70,7 @@ class SocketWrapper(object):
                 return self.__socket.recv(max_bytes)
             except socket.timeout:
                 continue
-            except socket.error, e:
+            except socket.error as e:
                 if e.errno == 35:
                     continue
                 raise e

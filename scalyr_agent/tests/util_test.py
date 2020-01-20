@@ -15,6 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+import six
+
 __author__ = "czerwin@scalyr.com"
 
 import datetime
@@ -743,7 +746,7 @@ class TestRedirectorClient(ScalyrTestCase):
         self._client_channel.simulate_server_connect()
 
     def _send_to_client(self, stream_id, content):
-        encoded_content = unicode(content).encode("utf-8")
+        encoded_content = six.text_type(content).encode("utf-8")
         code = len(encoded_content) * 2 + stream_id
         self._client_channel.simulate_server_write(
             struct.pack("i", code) + encoded_content

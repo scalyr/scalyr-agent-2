@@ -15,12 +15,15 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+import six
+
 __author__ = "czerwin@scalyr.com"
 
 import os
 import re
 import scalyr_agent.third_party.tcollector.tcollector as tcollector
-from Queue import Empty
+from six.moves.queue import Empty
 from scalyr_agent import (
     ScalyrMonitor,
     BadMonitorConfiguration,
@@ -712,7 +715,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         # Set up tags for this file.
         tags = self._config.get("tags", default=JsonObject())
 
-        if not type(tags) is dict and not type(tags) is JsonObject:
+        if type(tags) is not dict and type(tags) is not JsonObject:
             raise BadMonitorConfiguration(
                 "The configuration field 'tags' is not a dict or JsonObject", "tags"
             )
@@ -748,7 +751,7 @@ class SystemMetricsMonitor(ScalyrMonitor):
         self.options.network_interface_prefixes = self._config.get(
             "network_interface_prefixes", default="eth"
         )
-        if isinstance(self.options.network_interface_prefixes, basestring):
+        if isinstance(self.options.network_interface_prefixes, six.string_types):
             self.options.network_interface_prefixes = [
                 self.options.network_interface_prefixes
             ]

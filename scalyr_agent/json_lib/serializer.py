@@ -14,10 +14,13 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
 import struct
+import six
+from six.moves import range
 
 from cStringIO import StringIO
 
@@ -34,7 +37,7 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     @type output_buffer: StringIO
     """
     output_buffer.write("`s")
-    if type(value) is unicode:
+    if type(value) is six.text_type:
         to_serialize = value.encode("utf-8")
     else:
         to_serialize = value

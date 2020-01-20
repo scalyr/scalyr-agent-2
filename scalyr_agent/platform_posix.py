@@ -15,6 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -36,7 +39,12 @@ from scalyr_agent.platform_controller import (
 from scalyr_agent.platform_controller import CannotExecuteAsUser, AgentNotRunning
 import scalyr_agent.util as scalyr_util
 
-from __scalyr__ import get_install_root, TARBALL_INSTALL, DEV_INSTALL, PACKAGE_INSTALL
+from scalyr_agent.__scalyr__ import (
+    get_install_root,
+    TARBALL_INSTALL,
+    DEV_INSTALL,
+    PACKAGE_INSTALL,
+)
 
 # Based on code by Sander Marechal posted at
 # http://web.archive.org/web/20131017130434/http://www.jejik.com/articles/2007/02/a_simple_unix_linux_daemon_in_python/
@@ -143,10 +151,14 @@ class PosixPlatformController(PlatformController):
             self.__pidfile = os.path.join(
                 self.default_paths.agent_log_path, "agent.pid"
             )
-            print >> sys.stderr, "Assuming pid file is '%s'.  Use --pid-file to override." % self.__pidfile
+            print(
+                "Assuming pid file is '%s'.  Use --pid-file to override."
+                % self.__pidfile,
+                file=sys.stderr,
+            )
         else:
             self.__pidfile = os.path.abspath(self.__pidfile_from_options)
-            print >> sys.stderr, "Using pid file '%s'." % self.__pidfile
+            print("Using pid file '%s'." % self.__pidfile, file=sys.stderr)
 
     @property
     def default_paths(self):
@@ -302,12 +314,12 @@ class PosixPlatformController(PlatformController):
                         "%s\n" % status_line
                     )
                     sys.exit(1)
-        except OSError, e:
+        except OSError as e:
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
-        except SystemExit, e:
+        except SystemExit as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             reporter.report_status("forked #1 failed due to generic error: %s" % str(e))
             sys.exit(1)
 
@@ -322,20 +334,20 @@ class PosixPlatformController(PlatformController):
             # set umask to be consistent with common settings on linux systems.  This makes the standalone agent
             # created-file permissions consistent with that of docker/k8s agents (no write permissions for group and
             # others)
-            os.umask(0022)
+            os.umask(0o022)
 
             # do second fork
             pid = os.fork()
             if pid > 0:
                 # exit from second parent
                 sys.exit(0)
-        except OSError, e:
+        except OSError as e:
             reporter.report_status("fork #2 failed: %d (%s)" % (e.errno, e.strerror))
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
-        except SystemExit, e:
+        except SystemExit as e:
             raise e
-        except Exception, e:
+        except Exception as e:
             reporter.report_status("forked #2 failed due to generic error: %s" % str(e))
             sys.exit(1)
 
@@ -345,12 +357,15 @@ class PosixPlatformController(PlatformController):
             # redirect standard file descriptors
             sys.stdout.flush()
             sys.stderr.flush()
-            si = file(self.__stdin, "r")
-            so = file(self.__stdout, "a+")
-            se = file(self.__stderr, "a+", 0)
+            si = open(self.__stdin, "r")
+            so = open(self.__stdout, "a+")
+            se = open(self.__stderr, "a+", 0)
             os.dup2(si.fileno(), sys.stdin.fileno())
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
+            si.close()
+            so.close()
+            se.close()
 
             # Write out our process id to the pidfile.
             if not self.__write_pidfile(debug_logger=debug_logger, logger=logger):
@@ -360,7 +375,7 @@ class PosixPlatformController(PlatformController):
             reporter.report_status("success")
             logger("Process has been daemonized")
             return True
-        except Exception, e:
+        except Exception as e:
             reporter.report_status(
                 "Finalizing fork failed due to generic error: %s" % str(e)
             )
@@ -379,7 +394,7 @@ class PosixPlatformController(PlatformController):
             try:
                 # noinspection PyBroadException
                 try:
-                    pf = file("/proc/%d/stat" % pid, "r")
+                    pf = open("/proc/%d/stat" % pid, "r")
                     ppid = int(pf.read().split()[3])
                     if ppid == 0:
                         return None
@@ -506,7 +521,7 @@ class PosixPlatformController(PlatformController):
             "--no-change-user",
         ] + script_arguments
 
-        print >> sys.stderr, ("Running as %s" % user_name)
+        print("Running as %s" % user_name, file=sys.stderr)
         return os.execvp("sudo", arguments)
 
     def is_agent(self):
@@ -634,7 +649,7 @@ class PosixPlatformController(PlatformController):
             return 0  # not an error in a restart
 
         if not quiet:
-            print "Sending signal to terminate agent."
+            print("Sending signal to terminate agent.")
 
         # Try killing the daemon process
         try:
@@ -646,26 +661,26 @@ class PosixPlatformController(PlatformController):
                 term_attempts -= 1
 
             if not quiet:
-                print "Still waiting for agent to terminate, sending KILL signal."
+                print("Still waiting for agent to terminate, sending KILL signal.")
 
             while 1:
                 os.kill(pid, signal.SIGKILL)
                 PosixPlatformController.__sleep(0.1)
 
-        except OSError, err:
+        except OSError as err:
             err = str(err)
             if err.find("No such process") > 0:
                 if os.path.exists(self.__pidfile):
                     os.remove(self.__pidfile)
             else:
-                print "Unable to terminate agent."
-                print str(err)
+                print("Unable to terminate agent.")
+                print(str(err))
                 return 1
 
         if not quiet:
             # Warning, do not change this output.  The config_main.py file looks for this message when
             # upgrading a tarball install to make sure the agent was running.
-            print "Agent has stopped."
+            print("Agent has stopped.")
 
         return 0
 
@@ -685,7 +700,7 @@ class PosixPlatformController(PlatformController):
 
         try:
             os.kill(pid, signal.SIGINT)
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.ESRCH or e.errno == errno.EPERM:
                 return e.errno
             raise e
@@ -719,7 +734,7 @@ class PosixPlatformController(PlatformController):
         try:
             time.sleep(seconds)
         except Exception:
-            print "Ignoring exception while sleeping"
+            print("Ignoring exception while sleeping")
 
     def sleep(self, seconds):
         """Sleeps for at most the specified number of seconds while also handling signals.
@@ -826,7 +841,7 @@ class PidfileManager(object):
         try:
             # Read the pidfile
             try:
-                pf = file(self.__pidfile, "r")
+                pf = open(self.__pidfile, "r")
                 raw_contents = pf.read()
             except IOError:
                 self._log("Checked pidfile: does not exist")
@@ -847,9 +862,9 @@ class PidfileManager(object):
                 was_locked = False
                 try:
                     fcntl.flock(pf, fcntl.LOCK_UN)
-                except IOError, e:
+                except IOError as e:
                     self._log_debug("Unexpected error seen releasing lock: %s" % str(e))
-            except IOError, e:
+            except IOError as e:
                 # Triggered if the LOCK_SH call fails, indicating another process holds the lock.
                 if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                     was_locked = True
@@ -889,7 +904,7 @@ class PidfileManager(object):
         # We have a legacy agent pid file.  We see if the process is still alive on the pid in the pidfile.
         try:
             os.kill(pid, 0)
-        except OSError, e:
+        except OSError as e:
             # ESRCH indicates the process is not running, in which case we ignore the pidfile.
             if e.errno == errno.ESRCH:
                 self._log("Checked pidfile: missing+")
@@ -1001,7 +1016,7 @@ class PidfileManager(object):
                 try:
                     self._log_debug("Creating pidfile")
                     fd = os.open(self.__pidfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                except OSError, e:
+                except OSError as e:
                     if e.errno != errno.EEXIST:
                         raise e
 
@@ -1012,7 +1027,7 @@ class PidfileManager(object):
                     # an agent just finished... we pretend like we got a colision and couldn't become the agent.
                     fd = os.open(self.__pidfile, os.O_WRONLY)
                     self._log_debug("Opened pidfile for writing")
-                except OSError, e:
+                except OSError as e:
                     if e.errno == errno.ENOENT:
                         # Someone just deleted the pid file.. an agent is just finishing, so just say we couldn't
                         # acquire the lock.
@@ -1027,7 +1042,7 @@ class PidfileManager(object):
                     # Grab the lock on the file if possible.
                     fp = os.fdopen(fd, "w")
                     fcntl.flock(fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError, e:
+                except IOError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         # Someone else had the lock.
                         self._log("Acquire pidfile failed-")
@@ -1073,7 +1088,7 @@ class PidfileManager(object):
                 try:
                     fcntl.flock(self.__locked_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._log_debug("Refreshed pidfile lock")
-                except IOError, e:
+                except IOError as e:
                     if (e.errno == errno.EAGAIN) or (e.errno == errno.EACCES):
                         self._log("Write pidfile failed-")
                         return None
@@ -1112,7 +1127,7 @@ class PidfileManager(object):
             os.unlink(self.__pidfile)
             try:
                 fcntl.flock(self.__locked_fd, fcntl.LOCK_UN)
-            except IOError, e:
+            except IOError as e:
                 self._log("Unexpected error seen releasing lock: %s" % str(e))
 
             self.__locked_fd.close()
@@ -1233,7 +1248,7 @@ def _read_command_line(pid):
     """
     pf = None
     try:
-        pf = file("/proc/%d/cmdline" % pid, "r")
+        pf = open("/proc/%d/cmdline" % pid, "r")
         return pf.read().strip()
     finally:
         if pf is not None:

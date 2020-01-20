@@ -13,6 +13,7 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
+from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
@@ -31,7 +32,7 @@ import os
 import re
 import traceback
 import time
-import urllib
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
 
 import logging
 import logging.handlers
@@ -314,7 +315,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         try:
             attributes = JsonObject({"monitor": "json"})
             self.log_config["attributes"] = attributes
-        except Exception, e:
+        except Exception as e:
             global_log.error(
                 "Error setting monitor attribute in KubernetesEventMonitor"
             )
@@ -395,7 +396,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 self.__disk_logger.setLevel(logging.INFO)
                 self.__disk_logger.propagate = False
                 success = True
-            except Exception, e:
+            except Exception as e:
                 global_log.error(
                     "Unable to open KubernetesEventsMonitor log file: %s" % str(e)
                 )
@@ -425,7 +426,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 retry_error_context=node,
                 retry_error_limit_key="k8se_check_if_alive",
             )
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node
             )
@@ -523,7 +524,9 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             # alive
             if self._check_labels:
                 query = "?labelSelector=%s" % (
-                    urllib.quote("agent.config.scalyr.com/events_leader_candidate=true")
+                    six.moves.urllib.parse.quote(
+                        "agent.config.scalyr.com/events_leader_candidate=true"
+                    )
                 )
                 new_leader = self._check_nodes_for_leader(k8s, query)
 
@@ -564,7 +567,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             )
             self._current_leader = None
             return None
-        except K8sApiException, e:
+        except K8sApiException as e:
             global_log.error(
                 "get current leader: %s, %s" % (str(e), traceback.format_exc())
             )
@@ -587,7 +590,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 leader = self._get_current_leader(k8s)
 
             # check if this node is the current leader node
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
                 "Unexpected error checking for leader: %s" % (str(e)),
@@ -725,7 +728,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                     for line in lines:
                         try:
                             json = scalyr_util.json_decode(line)
-                        except Exception, e:
+                        except Exception as e:
                             global_log.warning(
                                 "Error parsing event json: %s, %s, %s"
                                 % (line, str(e), traceback.format_exc())
@@ -843,7 +846,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 )
                                 break
 
-                        except Exception, e:
+                        except Exception as e:
                             global_log.exception(
                                 "Failed to process single k8s event line due to following exception: %s, %s, %s"
                                 % (repr(e), str(e), traceback.format_exc()),
@@ -865,7 +868,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 except ConnectionError:
                     # ignore these, and just carry on querying in the next loop
                     pass
-                except Exception, e:
+                except Exception as e:
                     global_log.exception(
                         "Failed to stream k8s events due to the following exception: %s, %s, %s"
                         % (repr(e), str(e), traceback.format_exc())

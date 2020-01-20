@@ -15,6 +15,8 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
 
@@ -30,6 +32,7 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
+import six
 
 
 def parse_array_of_strings(strlist, separators=[","]):
@@ -84,27 +87,50 @@ def parse_array_of_strings(strlist, separators=[","]):
     return ArrayOfStrings(elems)
 
 
-NUMERIC_TYPES = set([int, long, float])
-STRING_TYPES = set([str, unicode])
-PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, unicode, bool])
+NUMERIC_TYPES = set(six.integer_types + (float,))
+# 2->TODO remove str, only six.text_type should remain in string_type
+STRING_TYPES = set([str, six.text_type])
+# 2->TODO remove str
+PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, six.text_type, bool])
 SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
     [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
 )
 ALLOWED_CONVERSIONS = {
     bool: STRING_TYPES,
-    int: set([str, unicode, long, float]),
-    long: set([str, unicode, float]),
     float: STRING_TYPES,
     list: set(
-        [str, unicode, JsonArray, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [
+            # 2->TODO remove str
+            str,
+            six.text_type,
+            JsonArray,
+            ArrayOfStrings,
+            SpaceAndCommaSeparatedArrayOfStrings,
+        ]
     ),
     JsonArray: set(
-        [str, unicode, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        # 2->TODO remove str
+        [str, six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonObject: STRING_TYPES,
+    # 2->TODO remove str
     str: SUPPORTED_TYPES,
-    unicode: SUPPORTED_TYPES,
+    six.text_type: SUPPORTED_TYPES,
 }
+
+# [start of 2->TODO]
+# The review of this solution is needed.
+# In python 2.6, 2.7 long can be converted to int without error,
+# so we can keep only int as allowed conversion for both int and long input values.
+ALLOWED_CONVERSIONS.update(
+    (
+        # 2->TODO remove str
+        (int_type, set([str, six.text_type, int, float]))
+        for int_type in six.integer_types
+    )
+)
+
+# [end of 2->TOD0]
 
 
 def convert_config_param(field_name, value, convert_to, is_environment_variable=False):
@@ -236,10 +262,10 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
     # At this point, we are trying to convert a number to another number type.  We only allow int to long
     # and long, int to float.
-    if convert_to == float and convert_from in (long, int):
+    if convert_to == float and convert_from in six.integer_types:
         return float(value)
-    if convert_to == long and convert_from == int:
-        return long(value)
+    if convert_to in six.integer_types:
+        return int(value)
 
     raise BadConfiguration(
         'A numeric value of %s was given for field "%s" but a %s is required.'

@@ -15,6 +15,7 @@
 #
 # A ScalyrMonitor which executes a specified shell command and records the output.
 
+from __future__ import absolute_import
 import re
 import sys
 

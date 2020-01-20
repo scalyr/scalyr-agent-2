@@ -21,7 +21,10 @@
 #         logs.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+# 2-TODO add unicode_literals
+from __future__ import absolute_import
 import sys
+import six
 
 __author__ = "czerwin@scalyr.com"
 
@@ -50,6 +53,7 @@ from scalyr_agent.line_matcher import LineMatcher
 
 from scalyr_agent.scalyr_client import Event
 
+# 2->TODO use io library
 from cStringIO import StringIO
 from os import listdir
 from os.path import isfile, join
@@ -223,7 +227,7 @@ class LogFileIterator(object):
         self.__mark_generation = LogFileIterator.MarkGeneration()
 
         # The current position we are reading from, relative to the position that was last passed into mark.
-        self.__position = 0L
+        self.__position = 0
         # The StringIO buffer holding the bytes to be read.
         self.__buffer = None
         # This is a list of LogFileIterator.BufferEntry which maps which portions of the buffer map to which mark
@@ -381,6 +385,7 @@ class LogFileIterator(object):
         """Returns a uuid as a string
         We want uuids as strings mostly as a convenience for json_lib
         """
+        # 2->TODO str to six.text_type
         return str(uuid.uuid4())
 
     def get_sequence(self):
@@ -626,7 +631,7 @@ class LogFileIterator(object):
                 timestamp = None
                 # go over all json key/values, adding non-message values to a attr dict
                 # and the message value to the line variable
-                for key, value in json.iteritems():
+                for key, value in six.iteritems(json):
                     if key == self.__json_log_key:
                         line = value
                     elif key == self.__json_timestamp_key:
@@ -656,7 +661,7 @@ class LogFileIterator(object):
                     if attrs:
                         result.attrs = attrs
 
-            except Exception, e:
+            except Exception as e:
                 # something went wrong. Return the full line and log a message
                 log.warn(
                     "Error parsing line as json for log '%s' - %s" % (self.__path, e),
@@ -953,7 +958,7 @@ class LogFileIterator(object):
             else:
                 # There is no entry representing the file at log_path, but it does exist, so we need to add it in.
                 self.__add_entry_for_log_path(latest_inode)
-        except OSError, e:
+        except OSError as e:
             # The file could have disappeared or the file permissions could have changed such that we can no longer
             # read it.  We have to handle these cases gracefully.  We treat both like it has disappeared from our point
             # of view.
@@ -991,6 +996,7 @@ class LogFileIterator(object):
         @param current_time: If not None, the value to use for the current_time.  Used for testing purposes.
         @type current_time: float or None
         """
+        # 2->TODO change to BytesIO
         new_buffer = StringIO()
         new_buffer_content_index = []
 
@@ -1207,7 +1213,7 @@ class LogFileIterator(object):
                     pending_file = None
                     attempts_left -= 1
                     starting_inode = None
-            except IOError, error:
+            except IOError as error:
                 if error.errno == 13:
                     log.warn(
                         "Permission denied while attempting to read file '%s'",
@@ -1224,7 +1230,7 @@ class LogFileIterator(object):
                         limit_key=("unknown-io" + file_path),
                     )
                 return None, None, None
-            except OSError, e:
+            except OSError as e:
                 if e.errno == errno.ENOENT:
                     log.warn("File unexpectantly missing when trying open it")
                 else:
@@ -1582,23 +1588,23 @@ class LogFileProcessor(object):
         # The lock that must be held when reading all status related fields, __close_at_eof,  and __is_closed.
         self.__lock = threading.Lock()
         # The following fields are tracked for generating status information.
-        self.__total_bytes_copied = 0L
+        self.__total_bytes_copied = 0
         self.__total_bytes_skipped = (
-            0L  # Bytes that had to be skipped due to falling too far behind in the log.
+            0  # Bytes that had to be skipped due to falling too far behind in the log.
         )
-        self.__total_bytes_failed = 0L  # Bytes that could not be sent up to server.
-        self.__total_bytes_dropped_by_sampling = 0L
+        self.__total_bytes_failed = 0  # Bytes that could not be sent up to server.
+        self.__total_bytes_dropped_by_sampling = 0
         self.__total_bytes_pending = (
-            0L  # The number of bytes that haven't been processed from the log file yet.
+            0  # The number of bytes that haven't been processed from the log file yet.
         )
         self.__total_bytes_being_processed = (
-            0L  # The number of bytes that are currently being processed.
+            0  # The number of bytes that are currently being processed.
         )
 
-        self.__total_lines_copied = 0L
-        self.__total_lines_dropped_by_sampling = 0L
+        self.__total_lines_copied = 0
+        self.__total_lines_dropped_by_sampling = 0
 
-        self.__total_redactions = 0L
+        self.__total_redactions = 0
 
         # the count of sampling and redaction rules. Used to detect when there are none.
         self.__num_redaction_and_sampling_rules = 0
@@ -1810,14 +1816,14 @@ class LogFileProcessor(object):
         # noinspection PyBroadException
         try:
             # Keep track of some states about the lines/events we process.
-            bytes_read = 0L
-            previous_bytes_read = 0L
-            lines_read = 0L
-            bytes_copied = 0L
-            lines_copied = 0L
-            total_redactions = 0L
-            lines_dropped_by_sampling = 0L
-            bytes_dropped_by_sampling = 0L
+            bytes_read = 0
+            previous_bytes_read = 0
+            lines_read = 0
+            bytes_copied = 0
+            lines_copied = 0
+            total_redactions = 0
+            lines_dropped_by_sampling = 0
+            bytes_dropped_by_sampling = 0
 
             time_spent_reading = 0.0
             time_spent_serializing = 0.0
@@ -1856,12 +1862,13 @@ class LogFileProcessor(object):
 
                 # We have a line, process it and see what comes out.
                 bytes_read += line_len
-                lines_read += 1L
+                lines_read += 1
 
                 if self.__num_redaction_and_sampling_rules > 0:
+                    # 2->TODO: decode bytes string from UTF-8 for redaction and sampling
                     sample_result = self.__sampler.process_line(line_object.line)
                     if sample_result is None:
-                        lines_dropped_by_sampling += 1L
+                        lines_dropped_by_sampling += 1
                         bytes_dropped_by_sampling += line_len
                         continue
 
@@ -1869,6 +1876,7 @@ class LogFileProcessor(object):
                         line_object.line
                     )
                     line_len = len(line_object.line)
+                    # 2->TODO: encode line back
                 else:
                     sample_result = 1.0
                     redacted = False
@@ -1919,7 +1927,7 @@ class LogFileProcessor(object):
                         added_thread_id = True
 
                 if redacted:
-                    total_redactions += 1L
+                    total_redactions += 1
                 bytes_copied += line_len
                 lines_copied += 1
 
@@ -2037,7 +2045,12 @@ class LogFileProcessor(object):
                         log.info("Request failed. Retrying")
                         return False
                     else:
+                        # [start of 2->TODO]
+                        #  As in other similar places, it can be OK to leave literals here as str.
+                        #  But as we use "unicode_literals",
+                        #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                         raise Exception("Invalid result %s" % str(result))
+                        # [end of 2->TOD0]
                 finally:
                     self.__lock.release()
 
@@ -2243,7 +2256,7 @@ class LogLineSampler(object):
         """
         self.__log_file_path = log_file_path
         self.__sampling_rules = []
-        self.total_passes = 0L
+        self.total_passes = 0
 
     def process_line(self, input_line):
         """Performs all configured sampling operations on the input line and returns whether or not it should
@@ -2259,17 +2272,17 @@ class LogLineSampler(object):
         """
 
         if len(self.__sampling_rules) == 0:
-            self.total_passes += 1L
+            self.total_passes += 1
             return 1.0
 
         sampling_rule = self.__find_first_match(input_line)
         if sampling_rule is None:
             return 1.0
         else:
-            sampling_rule.total_matches += 1L
+            sampling_rule.total_matches += 1
             if self.__flip_biased_coin(sampling_rule.sampling_rate):
-                sampling_rule.total_passes += 1L
-                self.total_passes += 1L
+                sampling_rule.total_passes += 1
+                self.total_passes += 1
                 return sampling_rule.sampling_rate
         return None
 
@@ -2466,6 +2479,8 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line,
                 )
+        # [start of 2->TODO]
+        #  I think this can not happen when it is guarantied that the input is unicode.
         except UnicodeDecodeError:
             # if our line contained non-ascii characters and our redaction_rules
             # are unicode, then the previous replace will fail.
@@ -2483,12 +2498,16 @@ class LogLineRedacter(object):
                     redaction_rule.replacement_text,
                     line.decode("utf-8", "replace"),
                 )
+        # [end of 2->TOD0]
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8
             # to avoid any conflicts
-            if type(result) == unicode:
+            # [start of 2->TODO]
+            #  As redaction and sampling now only expect unicode, this can be removed.
+            if type(result) == six.text_type:
                 result = result.encode("utf-8")
+            # [end of 2->TOD0]
             self.total_redactions += 1
             redaction_rule.total_lines += 1
             redaction_rule.total_redactions += matches
@@ -2816,6 +2835,7 @@ class LogMatcher(object):
                         new_processor.add_redacter(
                             rule["match_expression"],
                             rule["replacement"],
+                            # 2->TODO str to six.text_type
                             str(rule.get("hash_salt", default_value="")),
                         )
                     for rule in self.__log_entry_config["sampling_rules"]:
@@ -2873,7 +2893,7 @@ class LogMatcher(object):
         if "rename_logfile" in log_config:
             rename = log_config["rename_logfile"]
 
-            if isinstance(rename, basestring):
+            if isinstance(rename, six.string_types):
                 pattern = string.Template(rename)
                 try:
                     values = {}
@@ -2885,9 +2905,15 @@ class LogMatcher(object):
                     values["BASENAME"] = basename
                     values["BASENAME_NO_EXT"] = os.path.splitext(basename)[0]
                     result = pattern.substitute(values)
-                except Exception, e:
+                except Exception as e:
                     log.warn(
-                        "Invalid substition pattern in 'rename_logfile'. %s" % str(e)
+                        # [start of 2->TODO]
+                        #  As in other similar places, it can be OK to leave literals here as str.
+                        #  But as we use "unicode_literals",
+                        #  we need to use six.text_type insted of str to be able to do formatting with unicode.
+                        "Invalid substition pattern in 'rename_logfile'. %s"
+                        % str(e)
+                        # [end of 2->TOD0]
                     )
             elif isinstance(rename, JsonObject):
                 if "match" in rename and "replacement" in rename:
@@ -2901,10 +2927,15 @@ class LogMatcher(object):
                                 limit_once_per_x_secs=600,
                                 limit_key=("rename-regex-same-%s" % matched_file),
                             )
-                    except Exception, e:
+                    except Exception as e:
                         log.warn(
                             "Error matching regular expression '%s' and replacing with '%s'.  %s"
+                            # [start of 2->TODO]
+                            #  As in other similar places, it can be OK to leave literals here as str.
+                            #  But as we use "unicode_literals",
+                            #  we need to use six.text_type insted of str to be able to do formatting with unicode.
                             % (rename["match"], rename["replacement"], str(e)),
+                            # [end of 2->TOD0]
                             limit_once_per_x_secs=600,
                             limit_key=("rename-regex-error-%s" % matched_file),
                         )
@@ -3101,7 +3132,7 @@ class FileSystem(object):
         try:
             fp = open(file_path, "r")
             fp.close()
-        except IOError, error:
+        except IOError as error:
             if error.errno == 13:
                 return False
         return True
