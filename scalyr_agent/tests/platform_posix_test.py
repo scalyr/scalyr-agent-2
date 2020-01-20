@@ -20,6 +20,7 @@ import os
 import tempfile
 import errno
 import fcntl
+from io import open
 
 __author__ = "czerwin@scalyr.com"
 
@@ -41,22 +42,22 @@ class TestStatusReporter(ScalyrTestCase):
 
     def test_basic_status(self):
         self.sender.report_status("My status")
-        self.assertEquals(self.receiver.read_status(timeout=5.0), b"My status")
+        self.assertEquals(self.receiver.read_status(timeout=5.0), "My status")
 
     def test_status_with_newlines(self):
         self.sender.report_status("My status\nAnother one\n")
         self.assertEquals(
-            self.receiver.read_status(timeout=5.0), b"My status\nAnother one\n"
+            self.receiver.read_status(timeout=5.0), "My status\nAnother one\n"
         )
 
     def test_timeout_exceeded(self):
         self.assertEquals(
-            self.receiver.read_status(timeout=0.0, timeout_status=b"timeout"), b"timeout"
+            self.receiver.read_status(timeout=0.0, timeout_status="timeout"), "timeout"
         )
 
     def test_no_timeout(self):
         self.sender.report_status("My status")
-        self.assertEquals(self.receiver.read_status(), b"My status")
+        self.assertEquals(self.receiver.read_status(), "My status")
 
 
 class TestPidfileManager(ScalyrTestCase):

@@ -76,6 +76,8 @@ def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
     contained in files ending in '_test.py'.
     """
+    print("Current python version: %s" % sys.version)
+
     test_loader = unittest.defaultTestLoader
     suites = []
     error = False

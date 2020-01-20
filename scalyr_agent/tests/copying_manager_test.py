@@ -16,7 +16,9 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import threading
+from io import open
 
 
 __author__ = "czerwin@scalyr.com"

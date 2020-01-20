@@ -17,6 +17,8 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from io import open
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -51,7 +53,11 @@ from mock import patch, Mock
 class TestConfigurationBase(ScalyrTestCase):
     def setUp(self):
         super(TestConfigurationBase, self).setUp()
-        self.original_os_env = dict([(k, v) for k, v in six.iteritems(os.environ)])
+        self.original_os_env = dict([
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            (six.ensure_text(k), six.ensure_text(v))
+            for k, v in six.iteritems(os.environ)
+        ])
         self._config_dir = tempfile.mkdtemp()
         self._config_file = os.path.join(self._config_dir, "agent.json")
         self._config_fragments_dir = os.path.join(self._config_dir, "agent.d")
@@ -1042,7 +1048,6 @@ class TestConfiguration(TestConfigurationBase):
           }
         """
         )
-
         os.environ["TEST_VAR"] = "bye"
         config = self._create_test_configuration_instance()
         config.parse()

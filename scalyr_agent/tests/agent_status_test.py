@@ -39,6 +39,8 @@ from scalyr_agent.agent_status import (
 
 from scalyr_agent.test_base import ScalyrTestCase
 
+import six
+
 
 class TestOverallStats(ScalyrTestCase):
     def test_read_file_as_json(self):
@@ -106,7 +108,11 @@ class TestReportStatus(ScalyrTestCase):
 
     def setUp(self):
         super(TestReportStatus, self).setUp()
-        self.saved_env = dict(os.environ)
+        self.saved_env = dict(
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            (six.ensure_text(k), six.ensure_text(v))
+            for k, v in six.iteritems(os.environ)
+        )
         os.environ.clear()
         self.time = 1409958853
         self.status = AgentStatus()

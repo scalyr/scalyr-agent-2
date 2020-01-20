@@ -275,7 +275,7 @@ class JsonParser(object):
             elif c == b'"':
                 key = self.__parse_string()
             elif c == b"_" or b"a" <= c <= b"z" or b"A" <= c <= b"Z":
-                key = self.__parse_identifier().decode("utf-8")
+                key = self.__parse_identifier()
 
                 next_char = self.__scanner.peek_next_ubyte(none_if_bad_index=True)
 
@@ -293,6 +293,9 @@ class JsonParser(object):
                 return result_object
             else:
                 return self.__error("Expected string literal for object attribute name")
+
+            if key is not None:
+                key = six.ensure_text(key)
 
             self.__peek_next_non_whitespace()
             c = self.__scanner.read_ubyte()

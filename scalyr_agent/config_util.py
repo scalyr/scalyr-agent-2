@@ -300,7 +300,12 @@ def get_config_from_env(
 
     if strval is None:
         env_name = env_name.lower()
+
         strval = os.getenv(env_name)
+
+    # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+    if strval is not None:
+        strval = six.ensure_text(strval)
 
     if strval is None or convert_to is None:
         return strval

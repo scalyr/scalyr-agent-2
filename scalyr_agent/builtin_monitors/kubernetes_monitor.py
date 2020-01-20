@@ -17,7 +17,10 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+from io import open
+
 import six
+
 
 __author__ = "imron@scalyr.com"
 
@@ -2444,20 +2447,29 @@ class ContainerChecker(object):
 
     def get_cluster_name(self, k8s_cache):
         """ Gets the cluster name that the agent is running on """
-
         cluster_name = os.environ.get("SCALYR_K8S_CLUSTER_NAME")
         if cluster_name is not None:
+            # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+            cluster_name = six.ensure_text(cluster_name)
             return cluster_name
 
         return (k8s_cache and k8s_cache.get_cluster_name()) or None
 
     def _get_node_name(self):
         """ Gets the node name of the node running the agent from downward API """
-        return os.environ.get("SCALYR_K8S_NODE_NAME")
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        node_name = os.environ.get("SCALYR_K8S_NODE_NAME")
+        if node_name is not None:
+            node_name = six.ensure_text(node_name)
+        return node_name
 
     def _get_pod_name(self):
         """ Gets the pod name of the pod running the agent from downward API"""
-        return os.environ.get("SCALYR_K8S_POD_NAME")
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        pod_name = os.environ.get("SCALYR_K8S_POD_NAME")
+        if pod_name is not None:
+            pod_name = six.ensure_text(pod_name)
+        return pod_name
 
     def _get_container_runtime(self):
         """ Gets the container runtime currently in use """
@@ -3391,8 +3403,16 @@ class KubernetesMonitor(ScalyrMonitor):
         self.__verify_required_env_var("SCALYR_K8S_POD_NAMESPACE")
         self.__verify_required_env_var("SCALYR_K8S_NODE_NAME")
 
+        pod_namespace = os.getenv("SCALYR_K8S_POD_NAMESPACE")
+        pod_name = os.getenv("SCALYR_K8S_POD_NAME")
+        # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+        if pod_namespace is not None:
+            pod_namespace = six.ensure_text(pod_namespace)
+        if pod_name is not None:
+            pod_name = six.ensure_text(pod_name)
+
         self.__agent_pod = QualifiedName(
-            os.getenv("SCALYR_K8S_POD_NAMESPACE"), os.getenv("SCALYR_K8S_POD_NAME")
+            pod_namespace, pod_name
         )
 
         # create controlled cache warmers for logs and metrics

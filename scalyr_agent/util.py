@@ -16,14 +16,15 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import division
-
 from __future__ import absolute_import
 from __future__ import print_function
 import codecs
 import sys
 import struct
-import six.moves._thread
+from io import open
+
 import six
+import six.moves._thread
 from six.moves import range
 
 
@@ -150,6 +151,7 @@ def json_encode(obj, output=None):
 
     @type obj: dict|list|six.text_type
     """
+    # 2->TODO additional check in case if some of json libraries return 'str' in python2.
     return six.ensure_text(_json_encode(obj, output))
 
 
@@ -338,7 +340,9 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    # 2->TODO this function should return unicode.
+    base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    return base64_id.decode("utf-8")
 
 
 def md5_hexdigest(data):

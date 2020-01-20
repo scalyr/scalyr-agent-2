@@ -2835,8 +2835,10 @@ class Configuration(object):
                         var_name = entry
                         default_value = ""
 
-                    if var_name in os.environ and len(os.environ[var_name]) > 0:
-                        result[var_name] = os.environ[var_name]
+                    var_value = os.environ.get(var_name)
+                    # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+                    if var_value is not None and len(var_value) > 0:
+                        result[var_name] = six.ensure_text(var_value)
                     else:
                         result[var_name] = default_value
             return result

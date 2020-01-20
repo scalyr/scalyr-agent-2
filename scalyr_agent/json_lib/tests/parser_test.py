@@ -17,7 +17,6 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -26,6 +25,8 @@ import unittest
 from scalyr_agent.json_lib.parser import ByteScanner, JsonParser, JsonParseException
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+from six.moves import range
 
 
 class ByteScannerTests(ScalyrTestCase):

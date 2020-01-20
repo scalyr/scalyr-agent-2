@@ -50,9 +50,16 @@ __author__ = "Steven Czerwinski <czerwin@scalyr.com>"
 # [start of 2->TODO]
 #  "Modernize" tool added "six" library almost everywhere.
 #  So we need to add third_party libraries in PYTHONPATH before "six" will be imported in any further file.
+
 from scalyr_agent.__scalyr__ import scalyr_init
 
 scalyr_init()
+
+# 2-<TODO import this file before everything to be sure that all necessary monkey patches were done.
+# for example monkey patching of struct.pack in python2.6 (see in scalyr_agent.compat)
+import scalyr_agent.compat
+
+
 # [end of 2->TODO]
 
 from scalyr_agent.scalyr_monitor import ScalyrMonitor

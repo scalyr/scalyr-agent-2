@@ -34,6 +34,8 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+from io import open
+
 __author__ = "czerwin@scalyr.com"
 
 import traceback
@@ -860,17 +862,22 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
+                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
                 log.info(
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid())
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (
+                        SCALYR_VERSION, scalyr_util.get_pid_tid(),
+                        sys.version
+                    )
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid()),
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (
+                        SCALYR_VERSION, scalyr_util.get_pid_tid(),
+                        sys.version
+                    )
                 )
-                # 2->TODO added logging of python version. May be helpful during migration.
-                log.info("Python version: %s." % sys.version)
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 

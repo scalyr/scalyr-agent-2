@@ -902,7 +902,9 @@ class TestLogLineRedactor(ScalyrTestCase):
 
     def test_unicode_redactions(self):
         redacter = LogLineRedacter("/var/fake_log")
-        # redaction rules are created as unicode, to cause conflict with a utf-8 string
+        # 2->TODO there is a bugfix of 're.subn' in  python3.7 and higher.
+        # Empty matches for the pattern are replaced when adjacent to a previous non-empty match.
+        # on python3.6 and below it works incorrect and returns "bb...bb" but it should return "bb..bbbbbb" and it does so in python3.7+
         redacter.add_redaction_rule("(.*)", "bb\\1bb")
 
         # build the utf8 string
@@ -2603,7 +2605,7 @@ def _create_configuration(extra=None):
         payload.update(extra)
 
     fp = open(config_file, "w")
-    fp.write(six.ensure_text(scalyr_util.json_encode(payload)))
+    fp.write(scalyr_util.json_encode(payload))
     fp.close()
 
     default_paths = DefaultPaths(

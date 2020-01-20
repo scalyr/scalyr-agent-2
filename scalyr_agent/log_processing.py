@@ -608,7 +608,7 @@ class LogFileIterator(object):
         # check to see if we need to parse the line as cri.
         # Note: we don't handle multi-line lines.
         if self.__parse_format == "cri":
-            timestamp, stream, tags, message = _parse_cri_log(result.decoded_line)
+            timestamp, stream, tags, message = _parse_cri_log(result)
             if message is None:
                 log.warning(
                     "Didn't find a valid log line in CRI format for log %s.  Logging full line."
@@ -624,7 +624,7 @@ class LogFileIterator(object):
         # or see if we need to parse it as json
         elif self.__parse_format == "json":
             try:
-                json = scalyr_util.json_decode(result.decoded_line)
+                json = scalyr_util.json_decode(result)
 
                 line = None
                 attrs = {}
@@ -2420,7 +2420,6 @@ class LogLineRedacter(object):
         @return: A sequence of two elements, the line with the redaction applied (if any) and True or False
             indicating if a redaction was applied.
         """
-        # 2->TODO Maybe we should keep line as binary string, and just convert all used patterns to binary&
 
         def __replace_groups_with_hashed_content(re_ex, replacement_ex, line):
 
@@ -2507,8 +2506,6 @@ class LogLineRedacter(object):
                     line.decode("utf-8", "replace"),
                 )
         # [end of 2->TOD0]
-
-        # [end of 2-> TOD0]
 
         if matches > 0:
             # if our result is a unicode string, lets convert it back to utf-8

@@ -19,6 +19,8 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
+from io import open
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -362,7 +364,8 @@ class PosixPlatformController(PlatformController):
             sys.stderr.flush()
             si = open(self.__stdin, "r")
             so = open(self.__stdout, "a+")
-            se = open(self.__stderr, "a+", 0)
+            # 2->TODO io.open does not allow buffering disabling on text files.
+            se = open(self.__stderr, "a+")
             os.dup2(si.fileno(), sys.stdin.fileno())
             os.dup2(so.fileno(), sys.stdout.fileno())
             os.dup2(se.fileno(), sys.stderr.fileno())
@@ -1218,7 +1221,8 @@ class StatusReporter(object):
             if num_bytes != b"":
                 message = self.__fp.read()
                 if len(message) == int(num_bytes):
-                    return message
+                    # 2->TODO return unicode
+                    return message.decode("utf-8")
             time.sleep(0.20)
 
     @property
