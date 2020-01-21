@@ -17,7 +17,10 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import sys
 import re
 import os
@@ -26,6 +29,10 @@ import errno
 import string
 from datetime import datetime
 
+import pg8000
+import six
+from six.moves import zip
+
 from scalyr_agent import (
     ScalyrMonitor,
     UnsupportedSystem,
@@ -33,13 +40,10 @@ from scalyr_agent import (
     define_metric,
     define_log_field,
 )
-from six.moves import zip
 
 # We must require 2.5 or greater right now because pg8000 requires it.
 if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] < 5):
     raise UnsupportedSystem("postgresql_monitor", "Requires Python 2.5 or greater.")
-
-import pg8000
 
 __monitor__ = __name__
 
@@ -57,37 +61,37 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate postgresql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_host",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_port",
     "Name of port on the host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_name",
     "Name of database the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username which the agent uses to connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password for connecting to PostgreSQL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 # Metric definitions.
@@ -527,7 +531,7 @@ instance."""
             self._db.reconnect()
         except Exception as e:
             self._logger.warning(
-                "Unable to gather stats for postgres database - %s" % str(e)
+                "Unable to gather stats for postgres database - %s" % six.text_type(e)
             )
             return
 

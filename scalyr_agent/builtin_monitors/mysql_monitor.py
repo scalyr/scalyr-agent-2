@@ -16,12 +16,16 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.mysql_monitor
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import sys
 import re
 import os
 import stat
 import errno
+
+import six
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -32,7 +36,6 @@ from scalyr_agent import (
 )
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-import six
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -63,19 +66,19 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple MySQL instances on a single server; you can monitor each "
     "instance with a separate mysql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_username",
     "Username which the agent uses to connect to MySQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "database_password",
     "Password for connecting to MySQL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -83,7 +86,7 @@ define_config_option(
     "Location of the socket file for connecting to MySQL, e.g. "
     "``/var/run/mysqld_instance2/mysqld.sock``. If MySQL is running on the same server as the Scalyr "
     'Agent, you can usually set this to "default".',
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -91,7 +94,7 @@ define_config_option(
     "Hostname (or IP address) and port number of the MySQL server, e.g. ``dbserver:3306``, or simply "
     "``3306`` when connecting to the local machine. You should specify one of ``database_socket`` or "
     "``database_hostport``, but not both.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 # Metric definitions.
@@ -422,7 +425,12 @@ class MysqlDB(object):
                 self._logger.exception(
                     "Exception trying to execute query: %d '%s'" % (errcode, msg)
                 )
-                raise Exception("Database error -- " + str(errcode) + ": " + str(msg))
+                raise Exception(
+                    "Database error -- "
+                    + six.text_type(errcode)
+                    + ": "
+                    + six.text_type(msg)
+                )
             self._reconnect()
             return None
         return self._cursor.fetchall()
@@ -498,7 +506,7 @@ class MysqlDB(object):
             else:
                 value = int(value)
         except ValueError:
-            value = str(value)  # string values are possible
+            value = six.text_type(value)  # string values are possible
         return value
 
     def _parse_data(self, data, fields):
@@ -1063,7 +1071,7 @@ class MysqlMonitor(ScalyrMonitor):
         except Exception as e:
             self._db = None
             global_log.warning(
-                "Error establishing database connection: %s" % (str(e)),
+                "Error establishing database connection: %s" % (six.text_type(e)),
                 limit_once_per_x_secs=300,
                 limit_key="mysql_connect_to_db",
             )

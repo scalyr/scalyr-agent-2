@@ -14,14 +14,14 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
 import socket
 import struct
-import cStringIO
+import io
 
 from scalyr_agent.monitor_utils.server_processors import (
     RequestStream,
