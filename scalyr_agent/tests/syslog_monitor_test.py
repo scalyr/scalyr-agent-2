@@ -15,6 +15,7 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
@@ -26,7 +27,8 @@ import unittest
 import logging
 import uuid
 import os
-from cStringIO import StringIO
+from io import open
+from io import StringIO
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
@@ -34,6 +36,8 @@ from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.util import StoppableThread
+
+import six
 
 
 class SyslogFrameParserTestCase(unittest.TestCase):
@@ -133,7 +137,7 @@ class SyslogMonitorTestCase(unittest.TestCase):
         try:
             func()
         except Exception as e:
-            self.fail("Unexpected Exception: %s" % str(e))
+            self.fail("Unexpected Exception: %s" % six.text_type(e))
         except:
             self.fail("Unexpected Exception: %s" % sys.exc_info()[0])
 
@@ -326,7 +330,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         s = socket.socket()
         self.sockets.append(s)
 
-        expected = "TCP TestXX\n"
+        expected = b"TCP TestXX\n"
         self.connect(s, ("localhost", 8514))
         s.sendall(expected)
         time.sleep(1)
@@ -334,7 +338,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "rb")
         actual = f.read().strip()
 
         expected = expected.strip()
@@ -360,12 +364,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockets.append(s)
 
-        expected = "UDP Test %s" % (uuid.uuid4())
+        expected = ("UDP Test %s" % (uuid.uuid4())).encode("utf-8")
         s.sendto(expected, ("localhost", 5514))
         time.sleep(1)
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "rb")
         actual = f.read().strip()
         self.assertTrue(
             expected in actual,
@@ -398,16 +402,16 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.connect(tcp1, ("localhost", 8001))
         self.connect(tcp2, ("localhost", 8003))
 
-        expected_udp1 = "UDP Test"
+        expected_udp1 = b"UDP Test"
         udp.sendto(expected_udp1, ("localhost", 8000))
 
-        expected_udp2 = "UDP2 Test"
+        expected_udp2 = b"UDP2 Test"
         udp.sendto(expected_udp2, ("localhost", 8002))
 
-        expected_tcp1 = "TCP Test\n"
+        expected_tcp1 = b"TCP Test\n"
         tcp1.sendall(expected_tcp1)
 
-        expected_tcp2 = "TCP2 Test\n"
+        expected_tcp2 = b"TCP2 Test\n"
         tcp2.sendall(expected_tcp2)
 
         time.sleep(1)
@@ -415,7 +419,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log")
+        f = open("agent_syslog.log", "rb")
         actual = f.read().strip()
 
         expected_tcp1 = expected_tcp1.strip()

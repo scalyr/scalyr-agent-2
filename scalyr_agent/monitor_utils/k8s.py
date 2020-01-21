@@ -1535,11 +1535,18 @@ class KubernetesApi(object):
 
     def get_pod_name(self):
         """ Gets the pod name of the pod running the scalyr-agent """
-        return os.environ.get("SCALYR_K8S_POD_NAME") or os.environ.get("HOSTNAME")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        result = os.environ.get("SCALYR_K8S_POD_NAME") or os.environ.get("HOSTNAME")
+        if result is not None:
+            result = six.ensure_text(result)
+        return result
 
     def get_node_name(self, pod_name):
         """ Gets the node name of the node running the agent """
         node = os.environ.get("SCALYR_K8S_NODE_NAME")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        if node is not None:
+            node = six.ensure_text(node)
         if not node:
             pod = self.query_pod(self.namespace, pod_name)
             spec = pod.get("spec", {})
@@ -1572,9 +1579,10 @@ class KubernetesApi(object):
         Otherwise return None
         """
 
-        cluster = os.environ.get("SCALYR_K8S_CLUSTER_NAME")
+        cluster = os.environ.get("SCALYR_K8S_CLUSTER_NAME", "")
         if cluster:
-            return cluster
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            return six.ensure_text(cluster)
 
         pod_name = self.get_pod_name()
         pod = self.query_pod(self.namespace, pod_name)
@@ -1848,7 +1856,7 @@ class KubernetesApi(object):
                             "\\n\\n".join(logged_response),
                             limit_once_per_x_secs=self.log_api_ratelimit_interval,
                             limit_key="query-api-log-resp-%s"
-                            % util.md5_hexdigest(path),
+                            % util.md5_hexdigest(path.encode("utf-8")),
                         )
 
     def query_object(self, kind, namespace, name, query_options=None):

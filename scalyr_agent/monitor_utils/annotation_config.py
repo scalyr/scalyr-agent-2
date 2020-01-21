@@ -178,8 +178,8 @@ def _process_annotation_items(items, hyphens_as_underscores):
         m = SCALYR_ANNOTATION_ELEMENT_RE.match(key)
         if m:
             root_key = m.group(1)
-            if _is_int(root_key):
-                return int(root_key)
+            # 2->TODO Python3 does not support mixed types sorting.
+            #  One of the solutions is to keep all keys as strings, and sort them lexicographically.
             return root_key
 
         return key
