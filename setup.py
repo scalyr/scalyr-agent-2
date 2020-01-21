@@ -54,6 +54,8 @@ if path.isdir("source_root"):
 # we break win32 builds
 if path.isdir("source_root/scalyr_agent/third_party"):
     sys.path.append("source_root/scalyr_agent/third_party")
+if path.isdir("source_root/scalyr_agent/third_party_python2"):
+    sys.path.append("source_root/scalyr_agent/third_party_python2")
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION, get_install_root
 
