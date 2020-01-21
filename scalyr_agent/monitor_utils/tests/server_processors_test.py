@@ -38,33 +38,37 @@ from scalyr_agent.monitor_utils.server_processors import (
 from scalyr_agent.util import FakeRunState
 from scalyr_agent.test_base import ScalyrTestCase
 
+import six
+
 
 class TestInt32RequestParser(ScalyrTestCase):
     def setUp(self):
         super(TestInt32RequestParser, self).setUp()
-        self.__buffer = cStringIO.StringIO()
+        self.__buffer = io.BytesIO()
 
     def test_basic_case(self):
-        self.assertEquals(self.run_test_case("Hi there", 8), "Hi there")
-        self.assertEquals(self.run_test_case("Hi thereok", 8), "Hi there")
+        self.assertEquals(self.run_test_case(b"Hi there", 8), b"Hi there")
+        self.assertEquals(self.run_test_case(b"Hi thereok", 8), b"Hi there")
 
     def test_prefix_not_ready(self):
-        self.assertIsNone(self.run_test_case("Hi there", 8, truncate_size=2))
+        self.assertIsNone(self.run_test_case(b"Hi there", 8, truncate_size=2))
 
     def test_body_not_ready(self):
-        self.assertIsNone(self.run_test_case("Hi there", 8, truncate_size=8))
+        self.assertIsNone(self.run_test_case(b"Hi there", 8, truncate_size=8))
 
     def test_request_too_long(self):
         self.assertRaises(
-            RequestSizeExceeded, self.run_test_case, "Hi there fool again", 18
+            RequestSizeExceeded, self.run_test_case, b"Hi there fool again", 18
         )
 
     def run_test_case(self, input_string, length_to_send, truncate_size=None):
-        input_buffer = cStringIO.StringIO()
-        input_buffer.write(struct.pack("!I", length_to_send))
+        input_buffer = io.BytesIO()
+        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        input_buffer.write(struct.pack(six.ensure_str("!I"), length_to_send))
         input_buffer.write(input_string)
         if truncate_size is not None:
             input_buffer.truncate(truncate_size)
+            input_buffer.seek(truncate_size)
         num_bytes = input_buffer.tell()
         input_buffer.seek(0)
 
@@ -84,7 +88,7 @@ class FakeSocket(object):
         # True if the socket has been closed.
         self.__is_closed = False
         # Holds the fake data that is inserted by the test code and will be return to callers of recv.
-        self.__stream = cStringIO.StringIO()
+        self.__stream = io.BytesIO()
 
     def recv(self, max_bytes):
         """Reads data from the socket.
@@ -148,19 +152,19 @@ class TestRequestStream(ScalyrTestCase):
 
     def test_basic_case(self):
         # Basic case of just a single line.
-        self.__fake_socket.add_input("Hi there\n")
-        self.assertEquals(self.read_request(), "Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
+        self.assertEquals(self.read_request(), b"Hi there\n")
         self.assertEquals(self.total_times_slept(), 1)
         self.assertEquals(self.buffer_size(), 0)
 
         self.assertIsNone(self.read_request())
 
     def test_multiple_lines(self):
-        self.__fake_socket.add_input("Hi\nBye\nOk\n")
-        self.assertEquals(self.read_request(), "Hi\n")
+        self.__fake_socket.add_input(b"Hi\nBye\nOk\n")
+        self.assertEquals(self.read_request(), b"Hi\n")
         self.assertEquals(self.buffer_size(), 10)
-        self.assertEquals(self.read_request(), "Bye\n")
-        self.assertEquals(self.read_request(), "Ok\n")
+        self.assertEquals(self.read_request(), b"Bye\n")
+        self.assertEquals(self.read_request(), b"Ok\n")
         self.assertEquals(self.total_times_slept(), 1)
         self.assertEquals(self.buffer_size(), 0)
         self.assertFalse(self.at_end())
@@ -168,22 +172,22 @@ class TestRequestStream(ScalyrTestCase):
         self.assertIsNone(self.read_request())
 
     def test_broken_lines(self):
-        self.__fake_socket.add_input("Hi there")
+        self.__fake_socket.add_input(b"Hi there")
         self.assertIsNone(self.read_request())
-        self.__fake_socket.add_input("\n")
-        self.assertEquals(self.read_request(), "Hi there\n")
+        self.__fake_socket.add_input(b"\n")
+        self.assertEquals(self.read_request(), b"Hi there\n")
         self.assertEquals(self.total_times_slept(), 2)
         self.assertEquals(self.buffer_size(), 0)
         self.assertFalse(self.at_end())
 
     def test_request_too_long(self):
-        self.__fake_socket.add_input("0123456789")
+        self.__fake_socket.add_input(b"0123456789")
         self.assertRaises(RequestSizeExceeded, self.read_request)
         self.assertFalse(self.at_end())
 
     def test_full_compaction(self):
-        self.__fake_socket.add_input("012\n345678")
-        self.assertEquals(self.read_request(), "012\n")
+        self.__fake_socket.add_input(b"012\n345678")
+        self.assertEquals(self.read_request(), b"012\n")
         self.assertEquals(self.total_times_slept(), 1)
         self.assertEquals(self.buffer_size(), 10)
         self.assertFalse(self.at_end())
@@ -191,16 +195,16 @@ class TestRequestStream(ScalyrTestCase):
         self.assertIsNone(self.read_request())
         self.assertEquals(self.buffer_size(), 6)
 
-        self.__fake_socket.add_input("\n")
-        self.assertEquals(self.read_request(), "345678\n")
+        self.__fake_socket.add_input(b"\n")
+        self.assertEquals(self.read_request(), b"345678\n")
         self.assertEquals(self.total_times_slept(), 3)
         self.assertEquals(self.buffer_size(), 0)
 
     def test_close(self):
-        self.__fake_socket.add_input("Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
         self.__fake_socket.close()
 
-        self.assertEquals(self.read_request(), "Hi there\n")
+        self.assertEquals(self.read_request(), b"Hi there\n")
         self.assertEquals(self.total_times_slept(), 1)
         self.assertEquals(self.buffer_size(), 0)
         self.assertIsNone(self.read_request())
@@ -238,9 +242,9 @@ class TestLineRequestEOF(ScalyrTestCase):
         return self.__request_stream.read_request(run_state=self.__fake_run_state)
 
     def test_eof_as_eol(self):
-        self.__fake_socket.add_input("Hi there\nGoodbye")
-        self.assertEquals(self.read_request(), "Hi there\n")
-        self.assertEquals(self.read_request(), "Goodbye")
+        self.__fake_socket.add_input(b"Hi there\nGoodbye")
+        self.assertEquals(self.read_request(), b"Hi there\n")
+        self.assertEquals(self.read_request(), b"Goodbye")
 
 
 class TestConnectionHandler(ScalyrTestCase):
@@ -264,28 +268,28 @@ class TestConnectionHandler(ScalyrTestCase):
         self.__fake_time = 0.0
 
     def test_basic_case(self):
-        self.__fake_socket.add_input("Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "Hi there\n")
+        self.assertEquals(self.__last_request, b"Hi there\n")
 
     def test_multiple_requests(self):
-        self.__fake_socket.add_input("Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "Hi there\n")
+        self.assertEquals(self.__last_request, b"Hi there\n")
 
         self.advance_time(3.0)
-        self.__fake_socket.add_input("2nd there\n")
+        self.__fake_socket.add_input(b"2nd there\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "2nd there\n")
+        self.assertEquals(self.__last_request, b"2nd there\n")
 
         self.advance_time(3.0)
         self.assertTrue(self.run_single_cycle())
         self.assertIsNone(self.__last_request)
 
     def test_inactivity_error(self):
-        self.__fake_socket.add_input("Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "Hi there\n")
+        self.assertEquals(self.__last_request, b"Hi there\n")
 
         self.advance_time(3.0)
         self.assertTrue(self.run_single_cycle())
@@ -295,18 +299,18 @@ class TestConnectionHandler(ScalyrTestCase):
         self.assertRaises(ConnectionIdleTooLong, self.run_single_cycle)
 
     def test_run_state_done(self):
-        self.__fake_socket.add_input("Hi there\nOk\n")
+        self.__fake_socket.add_input(b"Hi there\nOk\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "Hi there\n")
+        self.assertEquals(self.__last_request, b"Hi there\n")
         self.__fake_run_state.stop()
 
         self.assertFalse(self.run_single_cycle())
         self.assertIsNone(self.__last_request)
 
     def test_connection_closed(self):
-        self.__fake_socket.add_input("Hi there\n")
+        self.__fake_socket.add_input(b"Hi there\n")
         self.assertTrue(self.run_single_cycle())
-        self.assertEquals(self.__last_request, "Hi there\n")
+        self.assertEquals(self.__last_request, b"Hi there\n")
         self.__fake_socket.close()
 
         self.assertFalse(self.run_single_cycle())

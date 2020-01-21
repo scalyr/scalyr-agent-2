@@ -885,8 +885,10 @@ class ProcessList(object):
         # regex intended to capture pid, ppid and the command eg:
         # 593     0 /bin/bash
         regex = r"\s*(\d+)\s+(\d+)\s+(.*)"
-        lines = sub_proc.stdout.readlines()
-        for line in lines:
+        # 2->TODO stdout is binary in Python3
+        sub_proc_output = sub_proc.stdout.read()
+        sub_proc_output = sub_proc_output.decode("utf-8")
+        for line in sub_proc_output.splitlines(True):
             match = re.search(regex, line)
             if match:
                 _pid, _ppid, _cmd = match.groups()

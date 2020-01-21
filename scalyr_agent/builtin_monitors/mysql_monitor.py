@@ -976,10 +976,7 @@ class MysqlMonitor(ScalyrMonitor):
             )
         elif "database_socket" in self._config:
             self._database_connect_type = "socket"
-            if (
-                type(self._config["database_socket"]) is str
-                or type(self._config["database_socket"]) is six.text_type
-            ):
+            if type(self._config["database_socket"]) is six.text_type:
                 self._database_socket = self._config["database_socket"]
                 if len(self._database_socket) == 0:
                     raise Exception(
@@ -993,10 +990,7 @@ class MysqlMonitor(ScalyrMonitor):
                 )
         elif "database_hostport" in self._config:
             self._database_connect_type = "host:port"
-            if (
-                type(self._config["database_hostport"]) is str
-                or type(self._config["database_hostport"]) is six.text_type
-            ):
+            if type(self._config["database_hostport"]) is six.text_type:
                 hostport = self._config["database_hostport"]
                 if len(hostport) == 0:
                     raise Exception(
@@ -1088,7 +1082,7 @@ class MysqlMonitor(ScalyrMonitor):
         # to try again
         if self._db is None:
             return
-
+        # 2->TODO unused?
         def get_value_as_str(value):
             if type(value) is int:
                 return "%d" % value
