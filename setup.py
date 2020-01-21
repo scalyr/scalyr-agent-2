@@ -232,7 +232,8 @@ setup(
             "scalyr_agent.builtin_monitors.syslog_monitor,"
             "scalyr_agent.builtin_monitors.test_monitor,"
             "scalyr_agent.builtin_monitors.url_monitor,"
-            "scalyr_agent.builtin_monitors.windows_event_log_monitor",
+            "scalyr_agent.builtin_monitors.windows_event_log_monitor,"
+            "scalyr_agent.third_party_python2.glob2",
             "dll_excludes": ["IPHLPAPI.DLL", "NSI.dll", "WINNSI.DLL", "WTSAPI32.dll"],
         }
     },
