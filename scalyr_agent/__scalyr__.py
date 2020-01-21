@@ -156,6 +156,9 @@ def get_install_root():
 
 def __add_scalyr_package_to_path():
     """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
+
+    If you add any new paths in this method, be sure to add them near the top of `setup.py` as well so as not
+    to break the Windows builds.
     """
     # prepend the third party directory first so it appears after the package root, third_party_pythonX
     # and third_party_tls directories
