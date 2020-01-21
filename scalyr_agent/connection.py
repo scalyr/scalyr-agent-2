@@ -15,19 +15,21 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
 
 __author__ = "imron@scalyr.com"
 
-import six.moves.http_client
 import os
 import re
 import socket
 import subprocess
 import sys
-
 from tempfile import mkstemp
+from io import open
+
+import six
+import six.moves.http_client
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -122,7 +124,7 @@ class ConnectionFactory:
             except Exception as e:
                 log.warn(
                     "Unable to load requests module '%s'.  Falling back to Httplib for connection handling"
-                    % str(e)
+                    % six.text_type(e)
                 )
                 result = ScalyrHttpConnection(
                     server,
@@ -186,7 +188,12 @@ class Connection(object):
         else:
             self._port = 80
 
-        self._standard_headers = headers
+        # 2->TODO In python2 httplib accepts request headers as binary string(str),
+        #  and in python3 http.client accepts headers as unicode.  In this case 'six.ensure_str' can be very useful.
+        self._standard_headers = dict()
+        for name, value in six.iteritems(headers):
+            self._standard_headers[six.ensure_str(name)] = six.ensure_str(value)
+
         self._full_address = server
         self._ca_file = ca_file
         self._request_deadline = request_deadline
@@ -347,7 +354,7 @@ class ScalyrHttpConnection(Connection):
 
             # get the end-entity cert
             file_bytes = session.serverCertChain.x509List[0].bytes
-            end_entity_cert = x509.Certificate.load(str(file_bytes))
+            end_entity_cert = x509.Certificate.load(six.binary_type(file_bytes))
 
             def cert_files_exist(path, file_names):
                 file_names = [os.path.join(path, f) for f in file_names]
@@ -478,7 +485,7 @@ class ScalyrHttpConnection(Connection):
                     "errno was %d and the full exception was '%s'.  Closing connection, will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             elif errno == 61:  # Connection refused
@@ -499,7 +506,7 @@ class ScalyrHttpConnection(Connection):
                     "will re-attempt",
                     self._full_address,
                     errno,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             else:
@@ -507,7 +514,7 @@ class ScalyrHttpConnection(Connection):
                     'Failed to connect to "%s" due to exception.  Exception was "%s".  Closing connection, '
                     "will re-attempt",
                     self._full_address,
-                    str(error),
+                    six.text_type(error),
                     error_code="client/connectionFailed",
                 )
             raise Exception("client/connectionFailed")
@@ -515,7 +522,10 @@ class ScalyrHttpConnection(Connection):
     def _post(self, request_path, body):
         self.__http_response = None
         self.__connection.request(
-            "POST", request_path, body=body, headers=self._standard_headers
+            six.ensure_str("POST"),
+            request_path,
+            body=body,
+            headers=self._standard_headers,
         )
 
     def _get(self, request_path):

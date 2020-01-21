@@ -25,6 +25,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -33,6 +34,8 @@ __author__ = "czerwin@scalyr.com"
 import os
 
 import scalyr_agent.util as scalyr_util
+
+import six
 
 
 class AgentStatus(object):
@@ -340,7 +343,8 @@ def report_status(output, status, current_time):
 
     if status.config_status.last_error is not None:
         print(
-            "Parsing error:         %s" % str(status.config_status.last_error),
+            "Parsing error:         %s"
+            % six.text_type(status.config_status.last_error),
             file=output,
         )
 

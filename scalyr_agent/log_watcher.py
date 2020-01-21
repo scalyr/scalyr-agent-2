@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Imron Alston <imron@scalyr.com>
+from __future__ import unicode_literals
 
 __author__ = "imron@scalyr.com"
 

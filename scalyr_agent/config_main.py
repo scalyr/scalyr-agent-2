@@ -20,6 +20,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -35,6 +36,7 @@ import sys
 import tarfile
 import tempfile
 import traceback
+from io import open
 
 from distutils import spawn
 from optparse import OptionParser
@@ -152,13 +154,16 @@ def set_api_key(config, config_file_path, new_api_key):
                 )
             else:
                 print(
-                    "Error attempting to update the key: %s" % str(error),
+                    "Error attempting to update the key: %s" % six.text_type(error),
                     file=sys.stderr,
                 )
                 print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
         except Exception as err:
-            print("Error attempting to update the key: %s" % str(err), file=sys.stderr)
+            print(
+                "Error attempting to update the key: %s" % six.text_type(err),
+                file=sys.stderr,
+            )
             print(traceback.format_exc(), file=sys.stderr)
             sys.exit(1)
     finally:
@@ -249,7 +254,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
             else:
                 print(
                     "Error attempting to update the %s: %s"
-                    % (field_description, str(error),),
+                    % (field_description, six.text_type(error),),
                     file=sys.stderr,
                 )
                 print(traceback.format_exc(), file=sys.stderr)
@@ -257,7 +262,7 @@ def write_config_fragment(config, file_name, field_description, config_json):
         except Exception as err:
             print(
                 "Error attempting to update the %s: %s"
-                % (field_description, str(err),),
+                % (field_description, six.text_type(err),),
                 file=sys.stderr,
             )
             print(traceback.format_exc(), file=sys.stderr)
@@ -279,7 +284,7 @@ def update_user_id(file_path, new_uid):
     except Exception as err:
         print(
             'Error attempting to update permission on file "%s": %s'
-            % (file_path, str(err),),
+            % (file_path, six.text_type(err),),
             file=sys.stderr,
         )
         print(traceback.format_exc(), file=sys.stderr)
@@ -303,7 +308,7 @@ def update_user_id_recursively(path, new_uid):
     except Exception as err:
         print(
             'Error attempting to update permissions on files in dir "%s": %s'
-            % (path, str(err),),
+            % (path, six.text_type(err),),
             file=sys.stderr,
         )
         print(traceback.format_exc(), file=sys.stderr)
@@ -698,7 +703,8 @@ def upgrade_windows_install(
                 return 0
             except IOError as error:
                 raise UpgradeFailure(
-                    "Could not download the installer, returned error %s" % str(error)
+                    "Could not download the installer, returned error %s"
+                    % six.text_type(error)
                 )
 
         finally:
@@ -1369,7 +1375,9 @@ if __name__ == "__main__":
         config_file = Configuration(options.config_filename, default_paths, None)
         config_file.parse()
     except Exception as e:
-        print("Error reading configuration file: %s" % str(e), file=sys.stderr)
+        print(
+            "Error reading configuration file: %s" % six.text_type(e), file=sys.stderr
+        )
         print(traceback.format_exc(), file=sys.stderr)
         print(
             "Terminating, please fix the configuration file and restart agent.",

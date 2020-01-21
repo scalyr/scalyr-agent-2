@@ -20,16 +20,18 @@
 # https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
+__author__ = "czerwin@scalyr.com"
+
 import inspect
 import os
 import sys
 import time
-import six
-
-__author__ = "czerwin@scalyr.com"
-
 from threading import Lock
+
+import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -250,7 +252,7 @@ class ScalyrMonitor(StoppableThread):
         """
         # noinspection PyBroadException
         try:
-            while not self._is_stopped():
+            while not self._is_thread_stopped():
                 # noinspection PyBroadException
                 adjustment = 0
                 try:
@@ -383,7 +385,8 @@ class ScalyrMonitor(StoppableThread):
             self._logger.closeMetricLog()
             self.__metric_log_open = False
 
-    def _is_stopped(self):
+    # 2->TODO '_is_stopped' name is reserved in python3
+    def _is_thread_stopped(self):
         """Returns whether or not the "stop" method has been invoked."""
         return not self._run_state.is_running()
 
@@ -436,7 +439,7 @@ def load_monitor_class(module_name, additional_python_paths):
             value = getattr(module, attr)
             if not inspect.isclass(value):
                 continue
-            if "ScalyrMonitor" in str(value.__bases__):
+            if "ScalyrMonitor" in six.text_type(value.__bases__):
                 MonitorInformation.set_monitor_info(
                     module_name, description=value.__doc__
                 )
@@ -700,7 +703,7 @@ class MonitorInformation(object):
                 # If there are extra fields, we use that as part of the key name to store the metric under to
                 # avoid collisions with the same metric but different extra fields registered.
                 info.__metrics[
-                    "%s%s" % (metric.metric_name, str(metric.extra_fields))
+                    "%s%s" % (metric.metric_name, six.text_type(metric.extra_fields))
                 ] = metric
             # Stash a position attribute to capture what the insert order was for the metrics.
             setattr(metric, "sort_pos", info.__counter)
@@ -924,14 +927,14 @@ class MonitorConfig(object):
             if max_value is not None and result > max_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; maximum is %s'
-                    % (str(result), field, str(max_value)),
+                    % (six.text_type(result), field, six.text_type(max_value)),
                     field,
                 )
 
             if min_value is not None and result < min_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; minimum is %s'
-                    % (str(result), field, str(min_value)),
+                    % (six.text_type(result), field, six.text_type(min_value)),
                     field,
                 )
 

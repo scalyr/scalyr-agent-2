@@ -14,6 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author: Scott Sullivan <guy.hoozdis@gmail.com>
+from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 import atexit
@@ -201,7 +202,9 @@ class ScalyrAgentService(win32serviceutil.ServiceFramework):
             self.start()
             win32event.WaitForSingleObject(self._stop_event, win32event.INFINITE)
         except Exception as e:
-            self.error("Error, causing Windows Service to exit early %s" % str(e))
+            self.error(
+                "Error, causing Windows Service to exit early %s" % six.text_type(e)
+            )
             self.SvcStop()
 
     def start(self):
@@ -248,7 +251,7 @@ class WindowsPlatformController(PlatformController):
         self.__config_file_path = None
 
         # The local domain Administrators name.
-        self.__local_administrators = u"%s\\Administrators" % win32api.GetComputerName()
+        self.__local_administrators = "%s\\Administrators" % win32api.GetComputerName()
 
         self.__no_change_user = False
 
@@ -349,7 +352,7 @@ class WindowsPlatformController(PlatformController):
         if name == "Administrators":
             return self.__local_administrators
         else:
-            return u"%s\\%s" % (domain, name)
+            return "%s\\%s" % (domain, name)
 
     def set_file_owner(self, file_path, owner):
         """Sets the owner of the specified file.
@@ -780,7 +783,8 @@ class PipeRedirectorServer(RedirectorServer):
             """Closes the channel to the client.
             """
             try:
-                win32file.WriteFile(self.__pipe_handle, struct.pack("I", 0))
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                win32file.WriteFile(self.__pipe_handle, struct.pack(six.ensure_str("I"), 0))
                 win32file.FlushFileBuffers(self.__pipe_handle)
             finally:
                 win32pipe.DisconnectNamedPipe(self.__pipe_handle)

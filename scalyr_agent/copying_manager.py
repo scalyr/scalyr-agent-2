@@ -15,10 +15,8 @@
 #
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -29,6 +27,9 @@ import os
 import threading
 import time
 import sys
+
+import six
+from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -1130,7 +1131,8 @@ class CopyingManager(StoppableThread, LogWatcher):
         """
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "Getting batch of events to send. (pipelining=%s)" % str(for_pipelining),
+            "Getting batch of events to send. (pipelining=%s)"
+            % six.text_type(for_pipelining),
         )
 
         # We have to iterate over all of the LogFileProcessors, getting bytes from them.  We also have to
@@ -1157,7 +1159,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         )
 
         if for_pipelining:
-            add_events_request.increment_timing_data(pipelined=1.0)
+            add_events_request.increment_timing_data(**{"pipelined": 1.0})
 
         while not buffer_filled and logs_processed < len(self.__log_processors):
             # Iterate, getting bytes from each LogFileProcessor until we are full.
@@ -1227,7 +1229,7 @@ class CopyingManager(StoppableThread, LogWatcher):
         log.log(
             scalyr_logging.DEBUG_LEVEL_1,
             "Information for batch of events. (pipelining=%s): %s"
-            % (str(for_pipelining), add_events_request.get_timing_data()),
+            % (six.text_type(for_pipelining), add_events_request.get_timing_data()),
         )
         return AddEventsTask(add_events_request, handle_completed_callback)
 

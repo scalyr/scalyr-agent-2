@@ -38,6 +38,7 @@ except NameError:
 import inspect
 import os
 import sys
+from io import open
 
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
 # type :
