@@ -319,8 +319,7 @@ print "Not to modernize"
         assert False, "Modernize should fail on second [start of 2->TOD0]."
     except TODOParseError as e:
         assert (
-            str(e)
-            == "Another [start of 2->TOD0] inside of [start of 2->TOD0]. Line: 6"
+            str(e) == "Another [start of 2->TOD0] inside of [start of 2->TOD0]. Line: 6"
         )
 
     orig_source = """
@@ -394,7 +393,9 @@ if __name__ == "__main__":
     venv_files = set(glob.glob("{}/venv/**/*".format(root), recursive=True))
 
     # do not modernize third_party libraries.
-    third_party_files = set(glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True))
+    third_party_files = set(
+        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
+    )
 
     # files without third party libraries.
     files_to_process = all_files - third_party_files - venv_files
@@ -427,13 +428,12 @@ if __name__ == "__main__":
 
     def progress_message():
         global current_file_number
-        print("Processing {} of {}.".format(
-            current_file_number,
-            total_files_count,
-            flush=True
-        ))
+        print(
+            "Processing {} of {}.".format(
+                current_file_number, total_files_count, flush=True
+            )
+        )
         current_file_number += 1
-
 
     total_files_count = len(files_to_process)
 
@@ -448,7 +448,7 @@ if __name__ == "__main__":
             if not is_concurrent:
                 progress_message()
 
-            diffs[file_path]=diff
+            diffs[file_path] = diff
 
         except TODOParseError as e:
             print("Can not modernize file: {}".format(file_path))
@@ -461,7 +461,7 @@ if __name__ == "__main__":
             except TODOParseError as e:
                 print("Can not modernize file: {}".format(file_path))
                 raise
-    print('\n\n=======================================\n')
+    print("\n\n=======================================\n")
     sys.stdout.flush()
     time.sleep(0.1)
 
@@ -471,7 +471,10 @@ if __name__ == "__main__":
         if args.write:
             print("Python-modernize found and modernized code in files:")
         else:
-            print("Python-modernize found code that can be modernized in files:", file=sys.stderr)
+            print(
+                "Python-modernize found code that can be modernized in files:",
+                file=sys.stderr,
+            )
         print("\n".join(sorted(diffs)), file=sys.stderr)
         exit(1)
     print("All files are up to date.")

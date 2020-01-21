@@ -20,6 +20,8 @@
 # by Mark Smith <msmith@stumbleupon.com>.
 #
 
+from __future__ import absolute_import
+from __future__ import print_function
 import atexit
 import errno
 import fcntl
@@ -33,11 +35,15 @@ import subprocess
 import sys
 import threading
 import time
+import io
+
 from logging.handlers import RotatingFileHandler
-from Queue import Queue
-from Queue import Empty
-from Queue import Full
+from six.moves.queue import Queue
+from six.moves.queue import Empty
+from six.moves.queue import Full
 from optparse import OptionParser
+import six
+from six.moves import range
 
 
 # global variables.
@@ -133,7 +139,8 @@ class Collector(object):
                           self.name, len(out))
                 for line in out.splitlines():
                     LOG.warning('%s: %s', self.name, line)
-        except IOError, (err, msg):
+        except IOError as xxx_todo_changeme:
+            (err, msg) = xxx_todo_changeme.args
             if err != errno.EAGAIN:
                 raise
         except:
@@ -143,11 +150,14 @@ class Collector(object):
         # out a bunch of data points at one time and we get some weird sized
         # chunk.  This read call is non-blocking.
         try:
-            self.buffer += self.proc.stdout.read()
+            stdout_data = self.proc.stdout.read()
+            if stdout_data:
+                self.buffer += stdout_data.decode("utf-8")
             if len(self.buffer):
                 LOG.debug('reading %s, buffer now %d bytes',
                           self.name, len(self.buffer))
-        except IOError, (err, msg):
+        except IOError as xxx_todo_changeme1:
+            (err, msg) = xxx_todo_changeme1.args
             if err != errno.EAGAIN:
                 raise
         except:
@@ -457,7 +467,7 @@ class SenderThread(threading.Thread):
                 self.send_data()
                 errors = 0  # We managed to do a successful iteration.
             except (ArithmeticError, EOFError, EnvironmentError, LookupError,
-                    ValueError), e:
+                    ValueError) as e:
                 errors += 1
                 if errors > MAX_UNCAUGHT_EXCEPTIONS:
                     shutdown()
@@ -485,7 +495,7 @@ class SenderThread(threading.Thread):
         LOG.debug('verifying our TSD connection is alive')
         try:
             self.tsd.sendall('version\n')
-        except socket.error, msg:
+        except socket.error as msg:
             self.tsd = None
             return False
 
@@ -496,7 +506,7 @@ class SenderThread(threading.Thread):
             # connection
             try:
                 buf = self.tsd.recv(bufsize)
-            except socket.error, msg:
+            except socket.error as msg:
                 self.tsd = None
                 return False
 
@@ -576,7 +586,7 @@ class SenderThread(threading.Thread):
                     self.tsd.connect(sockaddr)
                     # if we get here it connected
                     break
-                except socket.error, msg:
+                except socket.error as msg:
                     LOG.warning('Connection attempt failed to %s:%d: %s',
                                 self.host, self.port, msg)
                 self.tsd.close()
@@ -602,11 +612,11 @@ class SenderThread(threading.Thread):
         # try sending again next time.
         try:
             if self.dryrun:
-                print out
+                print(out)
             else:
                 self.tsd.sendall(out)
             self.sendq = []
-        except socket.error, msg:
+        except socket.error as msg:
             LOG.error('failed to send data: %s', msg)
             try:
                 self.tsd.close()
@@ -741,7 +751,7 @@ def main(argv):
     # prebuild the tag string from our tags dict
     tagstr = ''
     if tags:
-        tagstr = ' '.join('%s=%s' % (k, v) for k, v in tags.iteritems())
+        tagstr = ' '.join('%s=%s' % (k, v) for k, v in six.iteritems(tags))
         tagstr = ' ' + tagstr.strip()
 
     # gracefully handle death for normal termination paths and abnormal
@@ -911,7 +921,7 @@ def reload_changed_config_modules(modules, options, sender, tags):
     changed = False
 
     # Reload any module that has changed.
-    for path, (module, timestamp) in modules.iteritems():
+    for path, (module, timestamp) in six.iteritems(modules):
         if path not in current_paths:  # Module was removed.
             continue
         mtime = os.path.getmtime(path)
@@ -938,7 +948,7 @@ def reload_changed_config_modules(modules, options, sender, tags):
     # Scalyr edit:  Added and not sender is None
     if changed and not sender is None:
         sender.tagstr = ' '.join('%s=%s' % (k, v)
-                                 for k, v in tags.iteritems())
+                                 for k, v in six.iteritems(tags))
         sender.tagstr = ' ' + sender.tagstr.strip()
     return changed
 
@@ -955,7 +965,7 @@ def write_pid(pidfile):
 def all_collectors():
     """Generator to return all collectors."""
 
-    return COLLECTORS.itervalues()
+    return six.itervalues(COLLECTORS)
 
 
 # collectors that are not marked dead
@@ -1067,7 +1077,7 @@ def spawn_collector(col):
         # Scalyr edit:  Add in close_fds=True
         col.proc = subprocess.Popen(col.filename, stdout=subprocess.PIPE,
                                     stderr=subprocess.PIPE, close_fds=True)
-    except OSError, e:
+    except OSError as e:
         LOG.error('Failed to spawn collector %s: %s' % (col.filename, e))
         return
     # The following line needs to move below this line because it is used in
