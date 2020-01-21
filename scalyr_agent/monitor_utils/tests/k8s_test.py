@@ -14,10 +14,9 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import threading
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -37,9 +36,11 @@ import scalyr_agent.third_party.requests as requests
 from scalyr_agent.util import FakeClock, md5_hexdigest
 import scalyr_agent.scalyr_logging as scalyr_logging
 import time
-import mock
 
+import mock
 from mock import Mock, patch, call
+import six
+from six.moves import range
 
 
 class Test_K8sCache(ScalyrTestCase):

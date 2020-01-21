@@ -23,7 +23,7 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
+import io
 import errno
 import socket
 import six.moves.socketserver

@@ -17,14 +17,17 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.tomcat_monitor
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
-import six.moves.http_client
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+
 import socket
-import six.moves.urllib.parse
 import base64
 import re
+
+import six.moves.urllib.parse
+import six.moves.http_client
+import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -52,26 +55,26 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate tomcatql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_url",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
     __monitor__,
     "monitor_user",
     "The username required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_password",
     "The pasword associated with the monitor_user required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -690,7 +693,7 @@ instance."""
                 return "%d" % value
             elif type(value) is float:
                 return "%f" % value
-            elif type(value) is str:
+            elif type(value) is six.text_type:
                 return "%r" % value
             else:
                 return "%r" % value
