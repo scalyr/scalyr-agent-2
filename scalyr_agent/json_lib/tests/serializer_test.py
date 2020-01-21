@@ -14,11 +14,12 @@
 # ------------------------------------------------------------------------
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-from cStringIO import StringIO
+from io import BytesIO
 
 from scalyr_agent.json_lib import serialize_as_length_prefixed_string
 
@@ -34,11 +35,11 @@ class SerializeTests(ScalyrTestCase):
     def test_length_prefixed_strings_with_unicode(self):
         self.assertEquals(
             b"`s\x00\x00\x00\x10Howdy \xe8\x92\xb8 folks!",
-            self.serialize_string(u"Howdy \u84b8 folks!"),
+            self.serialize_string("Howdy \u84b8 folks!"),
         )
 
     @staticmethod
     def serialize_string(input):
-        result = StringIO()
+        result = BytesIO()
         serialize_as_length_prefixed_string(input, result)
         return result.getvalue()

@@ -14,7 +14,7 @@
 # ------------------------------------------------------------------------
 #
 # author:  Edward Chee <echee@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
@@ -45,13 +45,13 @@ class EncodeDecodeTest(ScalyrTestCase):
         )
 
     def test_dict(self):
-        self.__test_encode_decode('{"a":1,"b":2}', {u"a": 1, u"b": 2})
+        self.__test_encode_decode('{"a":1,"b":2}', {"a": 1, "b": 2})
 
     def test_dict2(self):
-        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {u"a": 1, u"b": {u"c": 2}})
+        self.__test_encode_decode('{"a":1,"b":{"c":2}}', {"a": 1, "b": {"c": 2}})
 
     def test_str(self):
-        self.__test_encode_decode(r'"a"', u"a")
+        self.__test_encode_decode(r'"a"', "a")
 
     def test_int(self):
         self.__test_encode_decode(r"1", 1)
@@ -79,7 +79,7 @@ class EncodeDecodeTest(ScalyrTestCase):
         self.__test_encode_decode(r"[1,2,3]", [1, 2, 3])
 
     def test_list2(self):
-        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, u"a"])
+        self.__test_encode_decode(r'[1,2,"a"]', [1, 2, "a"])
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):

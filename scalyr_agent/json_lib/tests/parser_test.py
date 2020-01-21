@@ -15,8 +15,8 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
@@ -25,6 +25,8 @@ import unittest
 from scalyr_agent.json_lib.parser import ByteScanner, JsonParser, JsonParseException
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+from six.moves import range
 
 
 class ByteScannerTests(ScalyrTestCase):
@@ -158,7 +160,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x, "Hi there\n")
 
         x = JsonParser.parse('"Hi there\\ua000"')
-        self.assertEquals(x, u"Hi there\ua000")
+        self.assertEquals(x, "Hi there\ua000")
 
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there')
 
@@ -167,10 +169,6 @@ class JsonParserTests(ScalyrTestCase):
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there \\')
 
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there" + Hi')
-
-    def test_parsing_length_prefixed_strings(self):
-        x = JsonParser.parse("`s\x00\x00\x00\x0cHowdy folks!")
-        self.assertEquals("Howdy folks!", x)
 
     def test_triple_quoted_strings(self):
         x = JsonParser.parse('"""Howdy\n"folks"!"""')
