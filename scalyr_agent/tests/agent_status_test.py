@@ -15,11 +15,12 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
+import io
 import os
 
 from scalyr_agent.agent_status import (
@@ -37,6 +38,8 @@ from scalyr_agent.agent_status import (
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+import six
 
 
 class TestOverallStats(ScalyrTestCase):
@@ -105,7 +108,11 @@ class TestReportStatus(ScalyrTestCase):
 
     def setUp(self):
         super(TestReportStatus, self).setUp()
-        self.saved_env = dict(os.environ)
+        self.saved_env = dict(
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            (six.ensure_text(k), six.ensure_text(v))
+            for k, v in six.iteritems(os.environ)
+        )
         os.environ.clear()
         self.time = 1409958853
         self.status = AgentStatus()
@@ -225,7 +232,7 @@ class TestReportStatus(ScalyrTestCase):
         monitor_status.errors = 40
 
     def test_basic(self):
-        output = cStringIO.StringIO()
+        output = io.StringIO()
 
         # Environment variables
         os.environ["SCALYR_API_KEY"] = "This private key should be redacted"
@@ -309,7 +316,7 @@ Failed monitors:
     def test_bad_config(self):
         self.status.config_status.last_error = "Bad stuff"
 
-        output = cStringIO.StringIO()
+        output = io.StringIO()
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help
@@ -376,7 +383,7 @@ Failed monitors:
         self.status.copying_manager_status.last_response_status = "error"
         self.status.copying_manager_status.total_errors = 5
 
-        output = cStringIO.StringIO()
+        output = io.StringIO()
         report_status(output, self.status, self.time)
 
         expected_output = """Scalyr Agent status.  See https://www.scalyr.com/help/scalyr-agent-2 for help

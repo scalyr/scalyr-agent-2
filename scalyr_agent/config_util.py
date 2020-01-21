@@ -15,6 +15,7 @@
 #
 # author:  Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
@@ -33,6 +34,8 @@ from scalyr_agent.json_lib.objects import (
 )
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
 import six
+
+# 2->TODO remove 'str' where is the type check
 
 
 def parse_array_of_strings(strlist, separators=[","]):
@@ -88,10 +91,8 @@ def parse_array_of_strings(strlist, separators=[","]):
 
 
 NUMERIC_TYPES = set(six.integer_types + (float,))
-# 2->TODO remove str, only six.text_type should remain in string_type
-STRING_TYPES = set([str, six.text_type])
-# 2->TODO remove str
-PRIMITIVE_TYPES = NUMERIC_TYPES | set([str, six.text_type, bool])
+STRING_TYPES = set([six.text_type])
+PRIMITIVE_TYPES = NUMERIC_TYPES | set([six.text_type, bool])
 SUPPORTED_TYPES = PRIMITIVE_TYPES | set(
     [JsonArray, JsonObject, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
 )
@@ -100,8 +101,6 @@ ALLOWED_CONVERSIONS = {
     float: STRING_TYPES,
     list: set(
         [
-            # 2->TODO remove str
-            str,
             six.text_type,
             JsonArray,
             ArrayOfStrings,
@@ -109,12 +108,9 @@ ALLOWED_CONVERSIONS = {
         ]
     ),
     JsonArray: set(
-        # 2->TODO remove str
-        [str, six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
+        [six.text_type, ArrayOfStrings, SpaceAndCommaSeparatedArrayOfStrings]
     ),
     JsonObject: STRING_TYPES,
-    # 2->TODO remove str
-    str: SUPPORTED_TYPES,
     six.text_type: SUPPORTED_TYPES,
 }
 
@@ -123,11 +119,7 @@ ALLOWED_CONVERSIONS = {
 # In python 2.6, 2.7 long can be converted to int without error,
 # so we can keep only int as allowed conversion for both int and long input values.
 ALLOWED_CONVERSIONS.update(
-    (
-        # 2->TODO remove str
-        (int_type, set([str, six.text_type, int, float]))
-        for int_type in six.integer_types
-    )
+    ((int_type, set([six.text_type, int, float])) for int_type in six.integer_types)
 )
 
 # [end of 2->TOD0]
@@ -200,7 +192,7 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
     if convert_from in STRING_TYPES:
 
         if convert_to == bool:
-            return str(value).lower() == "true"
+            return six.text_type(value).lower() == "true"
 
         elif convert_to in (JsonArray, JsonObject):
             try:
@@ -306,7 +298,12 @@ def get_config_from_env(
 
     if strval is None:
         env_name = env_name.lower()
+
         strval = os.getenv(env_name)
+
+    # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+    if strval is not None:
+        strval = six.ensure_text(strval)
 
     if strval is None or convert_to is None:
         return strval

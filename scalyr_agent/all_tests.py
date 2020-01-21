@@ -17,6 +17,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -75,6 +76,8 @@ def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
     contained in files ending in '_test.py'.
     """
+    print("Current python version: %s" % sys.version)
+
     test_loader = unittest.defaultTestLoader
     suites = []
     error = False

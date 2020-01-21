@@ -14,15 +14,17 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import division
-
 from __future__ import absolute_import
 from __future__ import print_function
 import codecs
 import sys
 import struct
-import six.moves._thread
+from io import open
+
 import six
+import six.moves._thread
 from six.moves import range
 
 
@@ -147,9 +149,10 @@ def json_encode(obj, output=None):
     @param obj: The object to serialize
     @param output: If not None, a file-like object to which the serialization should be written.
 
-    @type obj: dict|list
+    @type obj: dict|list|six.text_type
     """
-    return _json_encode(obj, output)
+    # 2->TODO additional check in case if some of json libraries return 'str' in python2.
+    return six.ensure_text(_json_encode(obj, output))
 
 
 def json_decode(text):
@@ -207,13 +210,14 @@ def value_to_bool(value):
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is str or value_type is six.text_type:
+    elif value_type is six.text_type:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
 
     raise ValueError(
-        "Cannot convert %s value to bool: %s" % (str(value_type), str(value))
+        "Cannot convert %s value to bool: %s"
+        % (six.text_type(value_type), six.text_type(value))
     )
 
 
@@ -244,7 +248,9 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
             data = f.read()
             return json_parser(data)
         except IOError as e:
-            raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
+            raise JsonReadFileException(
+                file_path, "Read error occurred: " + six.text_type(e)
+            )
         except JsonParseException as e:
             raise JsonReadFileException(
                 file_path,
@@ -252,7 +258,7 @@ def _read_file_as_json(file_path, json_parser, strict_utf8=False):
                 % (e.raw_message, e.line_number, e.position),
             )
         except UnicodeDecodeError as e:
-            raise JsonReadFileException(file_path, "Invalid UTF-8: " + str(e))
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + six.text_type(e))
     finally:
         if f is not None:
             f.close()
@@ -298,7 +304,9 @@ def read_file_as_json(file_path, strict_utf8=False):
         try:
             return json_decode(text)
         except ValueError as e:
-            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+            raise JsonParseException(
+                "JSON parsing failed due to: %s" % six.text_type(e)
+            )
 
     return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
 
@@ -337,18 +345,20 @@ def create_unique_id():
         is also encoded so that is safe to be used in a web URL.
     @rtype: str
     """
-    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    # 2->TODO this function should return unicode.
+    base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    return base64_id.decode("utf-8")
 
 
 def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
-    @type data: str
+    @type data: six.binary_type
     @rtype: str
     """
 
-    if not (data and isinstance(data, six.string_types)):
+    if not (data and isinstance(data, six.binary_type)):
         raise Exception("invalid data to be hashed: %s", repr(data))
 
     if not new_md5:
@@ -549,11 +559,11 @@ def get_pid_tid():
     # noinspection PyBroadException
     try:
         return "(pid=%s) (tid=%s)" % (
-            str(os.getpid()),
-            str(six.moves._thread.get_ident()),
+            six.text_type(os.getpid()),
+            six.text_type(six.moves._thread.get_ident()),
         )
     except:
-        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
+        return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
 
 
 def is_list_of_strings(vals):
@@ -1040,7 +1050,8 @@ class StoppableThread(threading.Thread):
         except Exception as e:
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
-                "Received exception from run method in StoppableThread %s" % str(e)
+                "Received exception from run method in StoppableThread %s"
+                % six.text_type(e)
             )
             return None
 
@@ -1362,7 +1373,8 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                self.__channel.write(struct.pack("i", code) + encoded_content)
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                self.__channel.write(struct.pack(six.ensure_str("i"), code) + encoded_content)
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -1519,7 +1531,8 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                code = struct.unpack("i", self.__channel.read(4))[0]  # Read str length
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                code = struct.unpack(six.ensure_str("i"), self.__channel.read(4))[0]  # Read str length
 
                 # The server sends -1 when it wishes to close the stream.
                 if code < 0:
@@ -1685,7 +1698,7 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = "a" * 100
+COMPRESSION_TEST_STR = b"a" * 100
 
 
 def get_compress_module(compression_type):
