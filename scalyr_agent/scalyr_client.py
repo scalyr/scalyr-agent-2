@@ -1475,12 +1475,13 @@ class Event(object):
             raise Exception("Cannot use both attrs/thread_id and base")
 
         self.__thread_id = None
+        self.__parent_event = None
         if base is not None:
             # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
             # the per-log file attributes.
+            self.__parent_event = base
             self.__serialization_base = base.__serialization_base
             self.__thread_id = base.__thread_id
-            self.__attrs = base.__attrs
             self.__disable_logfile_addevents_format = (
                 base.__disable_logfile_addevents_format
             )
@@ -1502,7 +1503,7 @@ class Event(object):
         self.__has_non_optimal_fields = False
         self.__num_optimal_fields = 0
 
-    def __set_attributes(self, thread_id, attributes, log_line_attributes=False):
+    def __set_attributes(self, thread_id, attributes):
         """ Set the attributes and thread id of an Event.
 
         In the default case of `log_line_attributes` being False this will not add the attributes to the serialization
@@ -1510,8 +1511,8 @@ class Event(object):
         they will be serialized but not set to `__attrs`, so any events based off this one will not inherit them.
         """
         self.__thread_id = thread_id
-        if self.__disable_logfile_addevents_format or not log_line_attributes:
-            self.__attrs = attributes
+        self.__attrs = attributes
+        attributes_to_serialize = self.__get_attributes_to_serialize()
         # A new event.  We have to create the serialization base using provided information/
         # 2->TODO: use BytesIO, make all written data - binary.
         tmp_buffer = StringIO()
@@ -1525,9 +1526,7 @@ class Event(object):
                 tmp_buffer.write("log:")
                 tmp_buffer.write(scalyr_util.json_encode(thread_id))
                 tmp_buffer.write(", ")
-        if (
-            self.__disable_logfile_addevents_format or log_line_attributes
-        ) and attributes is not None:
+        if attributes_to_serialize:
             tmp_buffer.write("attrs:")
             tmp_buffer.write(scalyr_util.json_encode(attributes))
             _rewind_past_close_curly(tmp_buffer)
@@ -1540,40 +1539,54 @@ class Event(object):
 
         self.__serialization_base = tmp_buffer.getvalue()
 
-    def add_missing_attributes(self, attributes, log_line_attributes=False):
-        """ Adds items attributes to the base_event's attributes if the base_event doesn't
+    def __get_attributes_to_serialize(self):
+        if self.__disable_logfile_addevents_format:
+            result = dict()
+            if self.__parent_event and self.__parent_event.__attrs:
+                result = dict(self.__parent_event.__attrs)
+            if self.__attrs:
+                result.update(self.__attrs)
+            return result
+        else:
+            return self.__attrs
+
+    def add_attributes(self, attributes, overwrite_existing=False):
+        """ Adds items attributes to __attrs if the __parent_event doesn't
         already have those attributes set.
 
-        If log_line_attributes is True the attributes will be added to the serialized form of the Event, but not
-        to its `__attrs` field, so they won't be inherited by any events created with this as a base.
+        If overwrite_existing is True an attribute will be added even if the __parent_event has the same key defined,
+        unless the value also matched to avoid wasting bytes.
         """
-        if self.__attrs:
+        if self.__parent_event:
             changed = False
             new_attrs = dict()
-            if not log_line_attributes:
+            if self.__attrs:
                 new_attrs = dict(self.__attrs)
             for key, value in six.iteritems(attributes):
-                if log_line_attributes or not key in self.__attrs:
+                if key not in self.__parent_event.__attrs or (
+                    overwrite_existing and self.__parent_event.__attrs[key] != value
+                ):
                     changed = True
                     new_attrs[key] = value
 
             if changed:
-                self.__set_attributes(
-                    self.__thread_id, new_attrs, log_line_attributes=log_line_attributes
-                )
+                self.__set_attributes(self.__thread_id, new_attrs)
         else:
-            self.__set_attributes(
-                self.__thread_id, attributes, log_line_attributes=log_line_attributes
-            )
+            self.__set_attributes(self.__thread_id, dict(attributes))
 
     @property
     def attrs(self):
         """
-        @return: The attributes object as originally based into the constructor or the constructor of the base
-            object that was to create this instance.
+        @return: The attributes object and its parent event. If both have the same attribute key the parent's will be
+        overwritten by this event's.
         @rtype: dict
         """
-        return self.__attrs
+        result = dict()
+        if self.__parent_event and self.__parent_event.__attrs:
+            result = dict(self.__parent_event.__attrs)
+        if self.__attrs:
+            result.update(self.__attrs)
+        return result
 
     def set_message(self, message):
         """Sets the message field for the attributes for this event.
