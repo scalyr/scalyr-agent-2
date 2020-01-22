@@ -1474,6 +1474,9 @@ class Event(object):
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception("Cannot use both attrs/thread_id and base")
 
+        if self.__attrs is None:
+            self.__attrs = dict()
+
         self.__thread_id = None
         self.__parent_event = None
         if base is not None:
@@ -1542,7 +1545,7 @@ class Event(object):
     def __get_attributes_to_serialize(self):
         if self.__disable_logfile_addevents_format:
             result = dict()
-            if self.__parent_event and self.__parent_event.__attrs:
+            if self.__parent_event:
                 result = dict(self.__parent_event.__attrs)
             if self.__attrs:
                 result.update(self.__attrs)
@@ -1557,22 +1560,22 @@ class Event(object):
         If overwrite_existing is True an attribute will be added even if the __parent_event has the same key defined,
         unless the value also matched to avoid wasting bytes.
         """
+        if attributes:
+            attributes = dict(attributes)
+
         if self.__parent_event:
             changed = False
-            new_attrs = dict()
-            if self.__attrs:
-                new_attrs = dict(self.__attrs)
             for key, value in six.iteritems(attributes):
                 if key not in self.__parent_event.__attrs or (
                     overwrite_existing and self.__parent_event.__attrs[key] != value
                 ):
                     changed = True
-                    new_attrs[key] = value
+                    self.__attrs[key] = value
 
             if changed:
-                self.__set_attributes(self.__thread_id, new_attrs)
+                self.__set_attributes(self.__thread_id, self.__attrs)
         else:
-            self.__set_attributes(self.__thread_id, dict(attributes))
+            self.__set_attributes(self.__thread_id, attributes)
 
     @property
     def attrs(self):
