@@ -2162,7 +2162,7 @@ class LogFileProcessor(object):
         """
         result = Event(base=self.__base_event)
         if line_object.attrs:
-            result.add_missing_attributes(line_object.attrs)
+            result.add_missing_attributes(line_object.attrs, log_line_attributes=True)
         result.set_message(line_object.line)
         if sampling_rate != 1.0:
             result.set_sampling_rate(sampling_rate)

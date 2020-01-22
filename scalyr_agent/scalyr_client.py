@@ -1502,9 +1502,10 @@ class Event(object):
         self.__has_non_optimal_fields = False
         self.__num_optimal_fields = 0
 
-    def __set_attributes(self, thread_id, attributes):
+    def __set_attributes(self, thread_id, attributes, log_line_attributes=False):
         self.__thread_id = thread_id
-        self.__attrs = attributes
+        if self.__disable_logfile_addevents_format or not log_line_attributes:
+            self.__attrs = attributes
         # A new event.  We have to create the serialization base using provided information/
         # 2->TODO: use BytesIO, make all written data - binary.
         tmp_buffer = StringIO()
@@ -1518,7 +1519,9 @@ class Event(object):
                 tmp_buffer.write("log:")
                 tmp_buffer.write(scalyr_util.json_encode(thread_id))
                 tmp_buffer.write(", ")
-        if self.__disable_logfile_addevents_format and attributes is not None:
+        if (
+            self.__disable_logfile_addevents_format or log_line_attributes
+        ) and attributes is not None:
             tmp_buffer.write("attrs:")
             tmp_buffer.write(scalyr_util.json_encode(attributes))
             _rewind_past_close_curly(tmp_buffer)
@@ -1531,22 +1534,28 @@ class Event(object):
 
         self.__serialization_base = tmp_buffer.getvalue()
 
-    def add_missing_attributes(self, attributes):
+    def add_missing_attributes(self, attributes, log_line_attributes=False):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
         already have those attributes set
         """
         if self.__attrs:
             changed = False
-            new_attrs = dict(self.__attrs)
+            new_attrs = dict()
+            if not log_line_attributes:
+                new_attrs = dict(self.__attrs)
             for key, value in six.iteritems(attributes):
-                if not key in new_attrs:
+                if not key in self.__attrs:
                     changed = True
                     new_attrs[key] = value
 
             if changed:
-                self.__set_attributes(self.__thread_id, new_attrs)
+                self.__set_attributes(
+                    self.__thread_id, new_attrs, log_line_attributes=log_line_attributes
+                )
         else:
-            self.__set_attributes(self.__thread_id, attributes)
+            self.__set_attributes(
+                self.__thread_id, attributes, log_line_attributes=log_line_attributes
+            )
 
     @property
     def attrs(self):
