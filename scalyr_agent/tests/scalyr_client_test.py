@@ -164,9 +164,7 @@ class AddEventsRequestTest(ScalyrTestCase):
     def test_set_log_line_attributes(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(1)
-        request.add_log_and_thread("log1", "Hi there", {})
-
-        self.assertTrue(request.add_log_and_thread("log2", "Log two", {}))
+        request.add_log_and_thread("log2", "Log two", {})
 
         event_one = Event().set_message("eventOne")
         event_one.add_missing_attributes({"source": "stdout"}, log_line_attributes=True)
@@ -175,7 +173,7 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\neventOne},ts:"1"}], """
+            """{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
             """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
 
