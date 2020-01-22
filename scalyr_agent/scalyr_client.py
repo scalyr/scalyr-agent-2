@@ -1503,6 +1503,12 @@ class Event(object):
         self.__num_optimal_fields = 0
 
     def __set_attributes(self, thread_id, attributes, log_line_attributes=False):
+        """ Set the attributes and thread id of an Event.
+
+        In the default case of `log_line_attributes` being False this will not add the attributes to the serialization
+        base because those attributes should be included in the attributes of the log. If `log_line_attributes` is True
+        they will be serialized but not set to `__attrs`, so any events based off this one will not inherit them.
+        """
         self.__thread_id = thread_id
         if self.__disable_logfile_addevents_format or not log_line_attributes:
             self.__attrs = attributes
@@ -1536,7 +1542,10 @@ class Event(object):
 
     def add_missing_attributes(self, attributes, log_line_attributes=False):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
-        already have those attributes set
+        already have those attributes set.
+
+        If log_line_attributes is True the attributes will be added to the serialized form of the Event, but not
+        to its `__attrs` field, so they won't be inherited by any events created with this as a base.
         """
         if self.__attrs:
             changed = False
@@ -1544,7 +1553,7 @@ class Event(object):
             if not log_line_attributes:
                 new_attrs = dict(self.__attrs)
             for key, value in six.iteritems(attributes):
-                if not key in self.__attrs:
+                if log_line_attributes or not key in self.__attrs:
                     changed = True
                     new_attrs[key] = value
 

@@ -179,6 +179,31 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.close()
 
+    def test_set_log_line_attributes_with_base_attributes(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(1)
+        request.add_log_and_thread("log2", "Log two", {})
+
+        event_base = Event()
+        event_base.add_missing_attributes(
+            {"source": "stdout", "base": "base"}, log_line_attributes=False
+        )
+
+        event_one = Event(base=event_base)
+        event_one.set_message("eventOne")
+        event_one.add_missing_attributes(
+            {"source": "stdin", "event": "event"}, log_line_attributes=True
+        )
+
+        self.assertTrue(request.add_event(event_one, timestamp=1))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+        )
+        request.close()
+
     def test_set_client_time(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
