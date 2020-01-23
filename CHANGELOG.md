@@ -1,15 +1,15 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
-## 2.0.58 "Karrajor" - Jan 22, 2020
+## 2.0.58 "Karrajor" - Jan 23, 2020
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 22, 2020 11:00 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 23, 2020 10:30 -0800
 --->
 
 Bugs
 * Fixed error in Windows release caused by missing `glob2` module
-
+* Fixed removal of `stream` attribute from logs uploaded using Docker and K8s monitors
 
 ## 2.0.57 "Jupiter 2" - Jan 16, 2020
 
