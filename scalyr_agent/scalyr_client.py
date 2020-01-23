@@ -1469,15 +1469,17 @@ class Event(object):
         # We only stash a copy of attrs for debugging/testing purposes.  We really will just serialize it into
         # __serialization_base.
         self.__log_id = None
-        self.__attrs = attrs
+        if attrs is not None:
+            self.__attrs = dict(attrs)
+        else:
+            self.__attrs = dict()
         self.__disable_logfile_addevents_format = disable_logfile_addevents_format
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception("Cannot use both attrs/thread_id and base")
 
-        if self.__attrs is None:
-            self.__attrs = dict()
-
         self.__thread_id = None
+
+        # Used to get attributes from the parent (such as the logfile attributes) for this event.
         self.__parent_event = None
         if base is not None:
             # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
@@ -1489,7 +1491,7 @@ class Event(object):
                 base.__disable_logfile_addevents_format
             )
         else:
-            self.__set_attributes(thread_id, attrs)
+            self.__set_attributes(thread_id, self.__attrs)
 
         # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
         # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
@@ -1508,10 +1510,6 @@ class Event(object):
 
     def __set_attributes(self, thread_id, attributes):
         """ Set the attributes and thread id of an Event.
-
-        In the default case of `log_line_attributes` being False this will not add the attributes to the serialization
-        base because those attributes should be included in the attributes of the log. If `log_line_attributes` is True
-        they will be serialized but not set to `__attrs`, so any events based off this one will not inherit them.
         """
         self.__thread_id = thread_id
         self.__attrs = attributes
@@ -1543,22 +1541,33 @@ class Event(object):
         self.__serialization_base = tmp_buffer.getvalue()
 
     def __get_attributes_to_serialize(self):
+        """Return the attributes that should be included in the serialization for this specific event.
+        This does not include attributes from its parent if using the logfile_addevents_format, and does not include
+        attributes from this event that already exist in the parent with the same value.
+        """
+        result = dict()
         if self.__disable_logfile_addevents_format:
-            result = dict()
             if self.__parent_event:
                 result = dict(self.__parent_event.__attrs)
             if self.__attrs:
                 result.update(self.__attrs)
-            return result
         else:
-            return self.__attrs
+            if self.__parent_event:
+                for key in self.__attrs:
+                    if (
+                        key not in self.__parent_event.__attrs
+                        or self.__parent_event.__attrs[key] != self.__attrs[key]
+                    ):
+                        result[key] = self.__attrs[key]
+            else:
+                result = self.__attrs
+        return result
 
     def add_attributes(self, attributes, overwrite_existing=False):
         """ Adds items attributes to __attrs if the __parent_event doesn't
         already have those attributes set.
 
-        If overwrite_existing is True an attribute will be added even if the __parent_event has the same key defined,
-        unless the value also matched to avoid wasting bytes.
+        If overwrite_existing is False an attribute will not be added if the key already exists in __attrs.
         """
         if attributes:
             attributes = dict(attributes)
@@ -1566,16 +1575,15 @@ class Event(object):
         if self.__parent_event:
             changed = False
             for key, value in six.iteritems(attributes):
-                if key not in self.__parent_event.__attrs or (
-                    overwrite_existing and self.__parent_event.__attrs[key] != value
-                ):
+                if key not in self.__attrs or overwrite_existing:
                     changed = True
                     self.__attrs[key] = value
 
             if changed:
                 self.__set_attributes(self.__thread_id, self.__attrs)
         else:
-            self.__set_attributes(self.__thread_id, attributes)
+            self.__attrs.update(attributes)
+            self.__set_attributes(self.__thread_id, self.__attrs)
 
     @property
     def attrs(self):
