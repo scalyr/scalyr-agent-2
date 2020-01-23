@@ -1652,7 +1652,7 @@ class LogFileProcessor(object):
         """ Adds items attributes to the base_event's attributes if the base_event doesn't
         already have those attributes set
         """
-        self.__base_event.add_missing_attributes(attributes)
+        self.__base_event.add_attributes(attributes)
 
     def set_max_log_offset_size(self, max_log_offset_size):
         """Sets the max_log_offset_size.
@@ -2162,7 +2162,7 @@ class LogFileProcessor(object):
         """
         result = Event(base=self.__base_event)
         if line_object.attrs:
-            result.add_missing_attributes(line_object.attrs)
+            result.add_attributes(line_object.attrs, overwrite_existing=True)
         result.set_message(line_object.line)
         if sampling_rate != 1.0:
             result.set_sampling_rate(sampling_rate)
