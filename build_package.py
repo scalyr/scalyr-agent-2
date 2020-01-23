@@ -607,7 +607,7 @@ def build_container_builder(
     if coverage_enabled:
         with open("Dockerfile", "r") as file:
             data = file.read()
-        new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage", data)
+        new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage==4.5.4", data)
         new_dockerfile_source = re.sub(
             r"CMD .*\n",
             'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
