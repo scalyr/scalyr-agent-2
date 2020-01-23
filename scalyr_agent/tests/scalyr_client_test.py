@@ -181,6 +181,49 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         request.close()
 
+    def test_set_log_line_attributes(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(1)
+        request.add_log_and_thread("log2", "Log two", {})
+
+        event_one = Event().set_message("eventOne")
+        event_one.add_attributes({"source": "stdout"}, overwrite_existing=True)
+
+        self.assertTrue(request.add_event(event_one, timestamp=1))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+        )
+
+        request.close()
+
+    def test_set_log_line_attributes_with_base_attributes(self):
+        request = AddEventsRequest(self.__body)
+        request.set_client_time(1)
+        request.add_log_and_thread("log2", "Log two", {})
+
+        event_base = Event()
+        event_base.add_attributes(
+            {"source": "stdout", "base": "base"}, overwrite_existing=False
+        )
+
+        event_one = Event(base=event_base)
+        event_one.set_message("eventOne")
+        event_one.add_attributes(
+            {"source": "stdin", "event": "event"}, overwrite_existing=True
+        )
+
+        self.assertTrue(request.add_event(event_one, timestamp=1))
+
+        self.assertEquals(
+            request.get_payload(),
+            """{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+        )
+        request.close()
+
     def test_set_client_time(self):
         request = AddEventsRequest(self.__body)
         request.set_client_time(100)
@@ -447,7 +490,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -459,7 +502,7 @@ class EventTest(ScalyrTestCase):
                 "si": u"1",
                 "sn": 2,
                 "sd": 3,
-                "attrs": {"message": "my_message", "sample_rate": 0.5},
+                "attrs": {"parser": "bar", "message": "my_message", "sample_rate": 0.5},
             },
             test_util.parse_scalyr_request(output_buffer.getvalue()),
         )
@@ -474,7 +517,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3,ts:"42"}',
             output_buffer.getvalue(),
         )
 
@@ -488,7 +531,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message},sd:3}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -501,7 +544,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message},ts:"42"}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},ts:"42"}',
             output_buffer.getvalue(),
         )
 
@@ -514,7 +557,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5}}',
             output_buffer.getvalue(),
         )
 
@@ -527,7 +570,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message},si:"hi"}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},si:"hi"}',
             output_buffer.getvalue(),
         )
 
@@ -540,7 +583,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message},sn:5}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message},sn:5}',
             output_buffer.getvalue(),
         )
 
@@ -568,7 +611,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -603,7 +646,7 @@ class EventTest(ScalyrTestCase):
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"foo", log:"foo", attrs:{"parser":"bar",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
@@ -617,13 +660,13 @@ class EventTest(ScalyrTestCase):
         x.set_sequence_number_delta(3)
         x.set_timestamp(42L)
 
-        x.add_missing_attributes({"trigger_update": "yes"})
+        x.add_attributes({"trigger_update": "yes"})
 
         output_buffer = StringIO()
         x.serialize(output_buffer)
 
         self.assertEquals(
-            '{thread:"foo", log:"foo", attrs:{message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
+            '{thread:"foo", log:"foo", attrs:{"trigger_update":"yes",message:`s\x00\x00\x00\nmy_message,sample_rate:0.5},ts:"42",si:"1",sn:2,sd:3}',
             output_buffer.getvalue(),
         )
 
