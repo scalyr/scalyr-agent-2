@@ -1572,17 +1572,13 @@ class Event(object):
         if attributes:
             attributes = dict(attributes)
 
-        if self.__parent_event:
-            changed = False
-            for key, value in six.iteritems(attributes):
-                if key not in self.__attrs or overwrite_existing:
-                    changed = True
-                    self.__attrs[key] = value
+        changed = False
+        for key, value in six.iteritems(attributes):
+            if key not in self.__attrs or overwrite_existing:
+                changed = True
+                self.__attrs[key] = value
 
-            if changed:
-                self.__set_attributes(self.__thread_id, self.__attrs)
-        else:
-            self.__attrs.update(attributes)
+        if changed:
             self.__set_attributes(self.__thread_id, self.__attrs)
 
     @property
