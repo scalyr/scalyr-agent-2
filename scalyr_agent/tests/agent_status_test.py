@@ -38,6 +38,7 @@ from scalyr_agent.agent_status import (
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.compat import os_environ_unicode
 
 import six
 
@@ -108,11 +109,7 @@ class TestReportStatus(ScalyrTestCase):
 
     def setUp(self):
         super(TestReportStatus, self).setUp()
-        self.saved_env = dict(
-            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-            (six.ensure_text(k), six.ensure_text(v))
-            for k, v in six.iteritems(os.environ)
-        )
+        self.saved_env = dict((k, v)for k, v in six.iteritems(os_environ_unicode))
         os.environ.clear()
         self.time = 1409958853
         self.status = AgentStatus()

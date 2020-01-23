@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import sys
 import struct
+import os
 
 import six
 
@@ -56,3 +57,64 @@ if sys.version_info[:2] == (2, 6):
 
     struct.pack = python2_6_unicode_pack_unpack_wrapper(struct.pack)
     struct.unpack = python2_6_unicode_pack_unpack_wrapper(struct.unpack)
+
+
+if six.PY2:
+    class EnvironUnicode(object):
+        """Just a wrapper for os.environ, to convert its items to unicode in python2."""
+        def __getitem__(self, item):
+            value = os.environ[item]
+            return six.ensure_text(value)
+
+        def get(self, item, default=None):
+            value = os.environ.get(item, default)
+            if value is not None:
+                value = six.ensure_text(value)
+            return value
+
+        def __setitem__(self, key, value):
+            key = six.ensure_text(key)
+            value = six.ensure_text(value)
+            os.environ[key] = value
+
+        @staticmethod
+        def _iterable_elements_to_unicode_generator(iterable):
+            """Generator that gets values from original iterable and converts its 'str' values to 'unicode'"""
+            for element in iterable:
+                if type(element) is tuple:
+                    yield tuple(v.decode("utf-8") if type(v) is six.binary_type else v for v in element)
+                else:
+                    yield six.ensure_text(element)
+
+        def iteritems(self):
+            return self._iterable_elements_to_unicode_generator(six.iteritems(os.environ))
+
+        def items(self):
+            return list(self._iterable_elements_to_unicode_generator(os.environ.items()))
+
+        def iterkeys(self):
+            return self._iterable_elements_to_unicode_generator(six.iterkeys(os.environ))
+
+        def keys(self):
+            return list(self._iterable_elements_to_unicode_generator(os.environ.keys()))
+
+        def itervalues(self):
+            return self._iterable_elements_to_unicode_generator(six.itervalues(os.environ))
+
+        def values(self):
+            return list(self._iterable_elements_to_unicode_generator(os.environ.values()))
+
+        def __iter__(self):
+            return self.iterkeys()
+
+    def os_getenv_unicode(name, default=None):
+        """The same logic as in os.environ, but with None check."""
+        result = os.getenv(name, default)
+        if result is not None:
+            result = six.ensure_text(result)
+        return result
+
+    os_environ_unicode = EnvironUnicode()
+else:
+    os_environ_unicode = os.environ
+    os_getenv_unicode = os.getenv

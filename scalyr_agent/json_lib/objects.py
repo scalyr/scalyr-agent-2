@@ -61,8 +61,9 @@ class JsonObject(object):
             self.__map = {}
         else:
             self.__map = content
+        # 2->TODO convert keys to unicode.
         for key, value in six.iteritems(key_values):
-            self.__map[key] = value
+            self.__map[six.ensure_text(key)] = value
 
     def to_json(self):
         """Returns a string containing the JSON representation of this object.

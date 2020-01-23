@@ -255,7 +255,8 @@ class AgentLogger(logging.Logger):
             module_path = m.group(1)
             self.__monitor_id = m.group(2)[1:-1]
         else:
-            module_path = name
+            # 2->TODO In python2 the 'name' variable with be 'str' in __name__ is passed to this constructor.
+            module_path = six.ensure_text(name)
             self.__monitor_id = None
 
         # If it is from the scaly_agent module, then it is 'core' unless it is one of the monitors.

@@ -1197,8 +1197,9 @@ class StatusReporter(object):
         # We write out the number of bytes in the message followed by the message.  The number of bytes might be
         # different from the message length in the case of higher ascii, but we'll punt on that for now.
         # 2->TODO message needs to be encoded in Python3
-        self.__fp.write(b"%d\n" % len(message))
-        self.__fp.write(b"%s" % six.ensure_binary(message))
+        encoded_message = message.encode("utf-8")
+        self.__fp.write(b"%d\n" % len(encoded_message))
+        self.__fp.write(b"%s" % encoded_message)
         self.__fp.flush()
 
     def read_status(self, timeout=None, timeout_status=None):

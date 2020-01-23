@@ -330,15 +330,15 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         s = socket.socket()
         self.sockets.append(s)
 
-        expected = b"TCP TestXX\n"
+        expected = "TCP TestXX\n"
         self.connect(s, ("localhost", 8514))
-        s.sendall(expected)
+        s.sendall(expected.encode("utf-8"))
         time.sleep(1)
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log", "rb")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
 
         expected = expected.strip()
@@ -364,12 +364,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sockets.append(s)
 
-        expected = ("UDP Test %s" % (uuid.uuid4())).encode("utf-8")
-        s.sendto(expected, ("localhost", 5514))
+        expected = ("UDP Test %s" % (uuid.uuid4()))
+        s.sendto(expected.encode("utf-8"), ("localhost", 5514))
         time.sleep(1)
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
-        f = open("agent_syslog.log", "rb")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
         self.assertTrue(
             expected in actual,
@@ -402,24 +402,24 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         self.connect(tcp1, ("localhost", 8001))
         self.connect(tcp2, ("localhost", 8003))
 
-        expected_udp1 = b"UDP Test"
-        udp.sendto(expected_udp1, ("localhost", 8000))
+        expected_udp1 = "UDP Test"
+        udp.sendto(expected_udp1.encode("utf-8"), ("localhost", 8000))
 
-        expected_udp2 = b"UDP2 Test"
-        udp.sendto(expected_udp2, ("localhost", 8002))
+        expected_udp2 = "UDP2 Test"
+        udp.sendto(expected_udp2.encode("utf-8"), ("localhost", 8002))
 
-        expected_tcp1 = b"TCP Test\n"
-        tcp1.sendall(expected_tcp1)
+        expected_tcp1 = "TCP Test\n"
+        tcp1.sendall(expected_tcp1.encode("utf-8"))
 
-        expected_tcp2 = b"TCP2 Test\n"
-        tcp2.sendall(expected_tcp2)
+        expected_tcp2 = "TCP2 Test\n"
+        tcp2.sendall(expected_tcp2.encode("utf-8"))
 
         time.sleep(1)
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
 
-        f = open("agent_syslog.log", "rb")
+        f = open("agent_syslog.log", "r")
         actual = f.read().strip()
 
         expected_tcp1 = expected_tcp1.strip()

@@ -33,6 +33,8 @@ from scalyr_agent.json_lib.objects import (
     SpaceAndCommaSeparatedArrayOfStrings,
 )
 from scalyr_agent.json_lib.exceptions import JsonConversionException, JsonParseException
+from scalyr_agent import compat
+
 import six
 
 # 2->TODO remove 'str' where is the type check
@@ -294,16 +296,12 @@ def get_config_from_env(
         env_name = "SCALYR_%s" % param_name
 
     env_name = env_name.upper()
-    strval = os.getenv(env_name)
+    # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
+    strval = compat.os_getenv_unicode(env_name)
 
     if strval is None:
         env_name = env_name.lower()
-
-        strval = os.getenv(env_name)
-
-    # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
-    if strval is not None:
-        strval = six.ensure_text(strval)
+        strval = compat.os_getenv_unicode(env_name)
 
     if strval is None or convert_to is None:
         return strval

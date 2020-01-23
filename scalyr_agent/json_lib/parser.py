@@ -239,10 +239,6 @@ class JsonParser(object):
                 return self.__parse_number()
             elif c == "}":
                 return self.__error("'}' can only be used to end an object")
-            # 2->TODO prefixed string parsing can be removed because json_lib is only used to parse configs.
-            #elif c == "`":
-                #return self.__parse_length_prefixed_string()
-            # [end of 2->TODO]
             else:
                 return self.__error("Unexpected character '%s'" % c)
         except IndexError:

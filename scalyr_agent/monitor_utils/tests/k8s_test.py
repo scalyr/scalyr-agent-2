@@ -190,7 +190,7 @@ class TestKubernetesApi(ScalyrTestCase):
             expected_log_msg,
             limit_once_per_x_secs=300,
             limit_key="query-api-log-resp-%s"
-            % md5_hexdigest(self._path.encode("utf-8")),
+            % md5_hexdigest(self._path),
         )
         return debug_log_call
 
@@ -201,7 +201,7 @@ class TestKubernetesApi(ScalyrTestCase):
             expected_log_msg,
             limit_once_per_x_secs=300,
             limit_key="query-api-log-resp-%s"
-            % md5_hexdigest(self._path.encode("utf-8")),
+            % md5_hexdigest(self._path),
         )
 
     def _assert_not_logged(self, mock_logger, expected_log_msg):
@@ -275,7 +275,7 @@ class TestKubernetesApi(ScalyrTestCase):
             expected_log_msg,
             limit_once_per_x_secs=77,
             limit_key="query-api-log-resp-%s"
-            % md5_hexdigest(self._path.encode("utf-8")),
+            % md5_hexdigest(self._path),
         )
 
     def test_query_api_200s_not_logged(self):

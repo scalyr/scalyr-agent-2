@@ -688,16 +688,6 @@ instance."""
         """Invoked once per sample interval to gather a statistic.
         """
 
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is six.text_type:
-                return "%r" % value
-            else:
-                return "%r" % value
-
         status = self._get_status(self._monitor_url)
         if status != None:
             stats = self._parse_general_status(status)

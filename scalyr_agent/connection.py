@@ -518,19 +518,24 @@ class ScalyrHttpConnection(Connection):
                     error_code="client/connectionFailed",
                 )
             raise Exception("client/connectionFailed")
-
+    # 2->TODO ensure that httplib request accepts only binary data, even method name and
+    #  request path python2 httplib can not handle mixed data
     def _post(self, request_path, body):
         self.__http_response = None
         self.__connection.request(
             six.ensure_str("POST"),
-            request_path,
+            six.ensure_str(request_path),
             body=body,
             headers=self._standard_headers,
         )
 
     def _get(self, request_path):
         self.__http_response = None
-        self.__connection.request("GET", request_path, headers=self._standard_headers)
+        self.__connection.request(
+            six.ensure_str("GET"),
+            six.ensure_str(request_path),
+            headers=self._standard_headers
+        )
 
     def response(self):
         if not self.__http_response:

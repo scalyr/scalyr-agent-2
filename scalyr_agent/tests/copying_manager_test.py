@@ -26,11 +26,12 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-
 import logging
 import shutil
 import sys
 import time
+
+from six.moves import range
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -718,7 +719,7 @@ def _add_non_utf8_to_checkpoint_file(path):
     # this string will be replaced with invalid utf8 byte after encoding.
     data["test"] = "__replace_me__"
 
-    json_string = scalyr_util.json_encode(data).encode("utf-8")
+    json_string = scalyr_util.json_encode(data, binary=True)
 
     # replace prepared substring to invalid byte.
     json_string = json_string.replace(b"__replace_me__", b"\x96")

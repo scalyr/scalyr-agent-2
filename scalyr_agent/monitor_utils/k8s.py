@@ -6,6 +6,12 @@ import os
 import random
 import re
 from string import Template
+import threading
+import time
+from time import strftime, gmtime
+import traceback
+from io import open
+
 
 import six
 import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
@@ -15,16 +21,12 @@ import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
-import scalyr_agent.util as util
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
-import threading
-import time
-from time import strftime, gmtime
-import traceback
-from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+import scalyr_agent.util as util
+from scalyr_agent.compat import os_environ_unicode
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -1536,17 +1538,12 @@ class KubernetesApi(object):
     def get_pod_name(self):
         """ Gets the pod name of the pod running the scalyr-agent """
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-        result = os.environ.get("SCALYR_K8S_POD_NAME") or os.environ.get("HOSTNAME")
-        if result is not None:
-            result = six.ensure_text(result)
-        return result
+        return os_environ_unicode.get("SCALYR_K8S_POD_NAME") or os_environ_unicode.get("HOSTNAME")
 
     def get_node_name(self, pod_name):
         """ Gets the node name of the node running the agent """
-        node = os.environ.get("SCALYR_K8S_NODE_NAME")
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-        if node is not None:
-            node = six.ensure_text(node)
+        node = os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
         if not node:
             pod = self.query_pod(self.namespace, pod_name)
             spec = pod.get("spec", {})
@@ -1579,10 +1576,10 @@ class KubernetesApi(object):
         Otherwise return None
         """
 
-        cluster = os.environ.get("SCALYR_K8S_CLUSTER_NAME", "")
+        # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+        cluster = os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME", "")
         if cluster:
-            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-            return six.ensure_text(cluster)
+            return cluster
 
         pod_name = self.get_pod_name()
         pod = self.query_pod(self.namespace, pod_name)
@@ -1856,7 +1853,7 @@ class KubernetesApi(object):
                             "\\n\\n".join(logged_response),
                             limit_once_per_x_secs=self.log_api_ratelimit_interval,
                             limit_key="query-api-log-resp-%s"
-                            % util.md5_hexdigest(path.encode("utf-8")),
+                            % util.md5_hexdigest(path),
                         )
 
     def query_object(self, kind, namespace, name, query_options=None):

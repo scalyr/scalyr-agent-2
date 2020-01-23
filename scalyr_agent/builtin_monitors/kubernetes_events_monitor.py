@@ -18,6 +18,8 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+from scalyr_agent import compat
+
 from scalyr_agent.monitor_utils.k8s import (
     KubernetesApi,
     K8sApiException,
@@ -357,7 +359,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             self.__max_log_rotations = default_rotation_count
 
         # Support legacy disabling of k8s_events via the K8S_EVENTS_DISABLE environment variable
-        k8s_events_disable_envar = os.environ.get("K8S_EVENTS_DISABLE")
+        k8s_events_disable_envar = compat.os_environ_unicode.get("K8S_EVENTS_DISABLE")
         if k8s_events_disable_envar is not None:
             global_log.warn(
                 "The K8S_EVENTS_DISABLE environment variable is deprecated. Please use SCALYR_K8S_EVENTS_DISABLE instead."

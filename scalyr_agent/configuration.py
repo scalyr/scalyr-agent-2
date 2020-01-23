@@ -44,7 +44,7 @@ from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
-
+from scalyr_agent.compat import os_environ_unicode
 
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
@@ -258,7 +258,7 @@ class Configuration(object):
         @return: The default hostname for this host.
         @rtype: str
         """
-        result = socket.gethostname()
+        result = six.ensure_text(socket.gethostname())
         if result is not None and self.strip_domain_from_default_server_host:
             result = result.split(".")[0]
         return result
@@ -2835,10 +2835,10 @@ class Configuration(object):
                         var_name = entry
                         default_value = ""
 
-                    var_value = os.environ.get(var_name)
                     # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-                    if var_value is not None and len(var_value) > 0:
-                        result[var_name] = six.ensure_text(var_value)
+                    var_value = os_environ_unicode.get(var_name)
+                    if var_value:
+                        result[var_name] = var_value
                     else:
                         result[var_name] = default_value
             return result

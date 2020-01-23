@@ -99,7 +99,7 @@ class TestConfigurationDocker(TestConfiguration):
             if value[2] == ArrayOfStrings:
                 # Array of strings should be entered into environment in the user-preferred format
                 # which is without square brackets and quotes around each element
-                envar_value = "[{}]".format(", ".join(param_value))
+                envar_value = ", ".join(param_value)
             else:
                 envar_value = six.text_type(param_value)
                 envar_value = (

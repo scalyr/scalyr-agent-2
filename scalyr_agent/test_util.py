@@ -190,9 +190,8 @@ def parse_scalyr_request(payload):
         length = struct.unpack(six.ensure_str(">i"), x.group(1))[0]
         # Grab the string content as raw bytes.
         raw_string = payload[x.end(1) : x.end(1) + length]
-        rewritten_payload += six.ensure_binary(
-            scalyr_util.json_encode(raw_string.decode("utf-8"))
-        )
+        text_string = raw_string.decode("utf-8")
+        rewritten_payload += scalyr_util.json_encode(text_string, binary=True)
         last_processed_index = x.end(1) + length - 1
     rewritten_payload += payload[last_processed_index + 1 : len(payload)]
 

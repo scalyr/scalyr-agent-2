@@ -35,6 +35,8 @@ import threading
 import time
 from io import open
 
+from scalyr_agent import compat
+
 from scalyr_agent import (
     ScalyrMonitor,
     define_config_option,
@@ -2452,7 +2454,7 @@ class ContainerChecker(object):
 
     def get_cluster_name(self, k8s_cache):
         """ Gets the cluster name that the agent is running on """
-        cluster_name = os.environ.get("SCALYR_K8S_CLUSTER_NAME")
+        cluster_name = compat.os_environ_unicode.get("SCALYR_K8S_CLUSTER_NAME")
         if cluster_name is not None:
             # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
             cluster_name = six.ensure_text(cluster_name)
@@ -2463,7 +2465,7 @@ class ContainerChecker(object):
     def _get_node_name(self):
         """ Gets the node name of the node running the agent from downward API """
         # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
-        node_name = os.environ.get("SCALYR_K8S_NODE_NAME")
+        node_name = compat.os_environ_unicode.get("SCALYR_K8S_NODE_NAME")
         if node_name is not None:
             node_name = six.ensure_text(node_name)
         return node_name
@@ -2471,7 +2473,7 @@ class ContainerChecker(object):
     def _get_pod_name(self):
         """ Gets the pod name of the pod running the agent from downward API"""
         # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
-        pod_name = os.environ.get("SCALYR_K8S_POD_NAME")
+        pod_name = compat.os_environ_unicode.get("SCALYR_K8S_POD_NAME")
         if pod_name is not None:
             pod_name = six.ensure_text(pod_name)
         return pod_name
@@ -3409,13 +3411,9 @@ class KubernetesMonitor(ScalyrMonitor):
         self.__verify_required_env_var("SCALYR_K8S_POD_NAMESPACE")
         self.__verify_required_env_var("SCALYR_K8S_NODE_NAME")
 
-        pod_namespace = os.getenv("SCALYR_K8S_POD_NAMESPACE")
-        pod_name = os.getenv("SCALYR_K8S_POD_NAME")
         # 2->TODO in python2 os.getenv returns 'str' type. Convert it to unicode.
-        if pod_namespace is not None:
-            pod_namespace = six.ensure_text(pod_namespace)
-        if pod_name is not None:
-            pod_name = six.ensure_text(pod_name)
+        pod_namespace = compat.os_getenv_unicode("SCALYR_K8S_POD_NAMESPACE")
+        pod_name = compat.os_getenv_unicode("SCALYR_K8S_POD_NAME")
 
         self.__agent_pod = QualifiedName(pod_namespace, pod_name)
 
@@ -3543,7 +3541,7 @@ class KubernetesMonitor(ScalyrMonitor):
         return result
 
     def __verify_required_env_var(self, env_var_name):
-        if len(os.environ.get(env_var_name, "")) == 0:
+        if len(compat.os_environ_unicode.get(env_var_name, "")) == 0:
             self._logger.error(
                 "ERROR: Missing required environment variable for kubenetes_monitor: %s"
                 % env_var_name
@@ -4027,7 +4025,7 @@ class KubernetesMonitor(ScalyrMonitor):
         for envar in envars_to_log:
             self._logger.info(
                 "Environment variable %s : %s"
-                % (envar, os.environ.get(envar, "<Not set>"))
+                % (envar, compat.os_environ_unicode.get(envar, "<Not set>"))
             )
 
         try:

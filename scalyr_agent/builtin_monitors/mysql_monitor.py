@@ -1082,16 +1082,6 @@ class MysqlMonitor(ScalyrMonitor):
         # to try again
         if self._db is None:
             return
-        # 2->TODO unused?
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is str:
-                return "%r" % value
-            else:
-                return "%r" % value
 
         def print_status_line(key, value, extra_fields):
             """ Emit a status line.

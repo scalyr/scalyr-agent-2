@@ -608,7 +608,8 @@ class LogFileIterator(object):
         # check to see if we need to parse the line as cri.
         # Note: we don't handle multi-line lines.
         if self.__parse_format == "cri":
-            timestamp, stream, tags, message = _parse_cri_log(result)
+            # 2->TODO decode line to parse it.
+            timestamp, stream, tags, message = _parse_cri_log(result.line.decode("utf-8"))
             if message is None:
                 log.warning(
                     "Didn't find a valid log line in CRI format for log %s.  Logging full line."
@@ -617,14 +618,15 @@ class LogFileIterator(object):
                     limit_key=("invalid-cri-format-%s" % self.__path),
                 )
             else:
-                result.line = message
+                result.line = message.encode("utf-8")
                 result.timestamp = timestamp
                 result.attrs = {"raw_timestamp": timestamp, "stream": stream}
 
         # or see if we need to parse it as json
         elif self.__parse_format == "json":
             try:
-                json = scalyr_util.json_decode(result)
+                # 2->TODO decode line to parse it.
+                json = scalyr_util.json_decode(result.line.decode("utf-8"))
 
                 line = None
                 attrs = {}
@@ -656,7 +658,7 @@ class LogFileIterator(object):
                 else:
                     # we found a key match for the message field, so use that for the log line
                     # and store any other fields in the attr dict
-                    result.line = line
+                    result.line = line.encode("utf-8")
                     result.timestamp = timestamp
                     if attrs:
                         result.attrs = attrs
@@ -2447,7 +2449,7 @@ class LogLineRedacter(object):
                         replaced_group = replaced_group.replace(
                             group_hash_indicator,
                             scalyr_util.md5_hexdigest(
-                                (_group + redaction_rule.hash_salt).encode("utf-8")
+                                _group + redaction_rule.hash_salt
                             ),
                             1,
                         )

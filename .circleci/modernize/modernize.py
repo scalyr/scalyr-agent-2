@@ -17,6 +17,7 @@
 #
 # Script used to check the code for python 2/3 compatibility using "python-modernize" tool
 # usage python modernize.py
+# IMPORTANT! Working directory must me scalyr agent project root.
 # optional arguments:
 #   -w --write:  if set, write suggested changes immediately.
 #   -j --processes <jobs count> run concurrently.
@@ -86,6 +87,9 @@ FIXERS = {
     "libmodernize.fixes.fix_urllib_six",
     "libmodernize.fixes.fix_xrange_six",
     "libmodernize.fixes.fix_zip",
+    "libmodernize.fixes.fix_open",
+    "custom_fixers.fix_os_environ_unicode",
+    "custom_fixers.fix_os_getenv_unicode"
 }
 
 # pattern to find start of the area [start of 2->TOD0]
@@ -120,6 +124,7 @@ def get_diff(new_source, original_source, file_path):
 
 class TODOParseError(Exception):
     pass
+
 
 
 def parse_todo_areas(source):
@@ -374,7 +379,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-w",
         "--write",
-        action="store_false",
+        action="store_true",
         default=False,
         help="Write modified files.",
     )
@@ -384,7 +389,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    root = os.path.dirname(os.path.abspath(__file__))
+    root = os.getcwd()
     source_root = os.path.join(root, "scalyr_agent")
 
     # all python files
@@ -397,14 +402,20 @@ if __name__ == "__main__":
         glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
     )
 
-    # files without third party libraries.
-    files_to_process = all_files - third_party_files - venv_files
+    # do not process modernize files.
+    modernize_files = set(
+        glob.glob("{0}/.circleci/modernize/**/*.py".format(root), recursive=True)
+    )
 
-    # do not process script by itself.
-    try:
-        files_to_process.remove(os.path.join(root, "modernize.py"))
-    except KeyError:
-        pass
+    other_files_to_exclude = {
+        os.path.join(source_root, "compat.py"),
+        os.path.join(root, "build_package.py")
+    }
+
+    # files without third party libraries.
+    files_to_process = all_files - third_party_files - venv_files - modernize_files - other_files_to_exclude
+
+
 
     # Create collection with additional modernize parameters for each file.
     files_modernize_params = collections.defaultdict(dict)

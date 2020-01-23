@@ -565,7 +565,7 @@ class ScalyrClientSession(object):
             return add_events_request.get_payload()
 
         return self.__send_request(
-            six.ensure_str("/addEvents"),
+            "/addEvents",
             body_func=generate_body,
             block_on_response=block_on_response,
         )
@@ -823,8 +823,8 @@ class AddEventsRequest(object):
         # we build up events.
         # 2->TODO use BytesIO, make all data that is going to be written here - binary
         string_buffer = io.BytesIO()
-        serialized_base_body = scalyr_util.json_encode(base_body)
-        string_buffer.write(six.ensure_binary(serialized_base_body))
+        serialized_base_body = scalyr_util.json_encode(base_body, binary=True)
+        string_buffer.write(serialized_base_body)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)
@@ -1275,13 +1275,13 @@ class PostFixBuffer(object):
         result = self.__format
         if not self.__disable_logfile_addevents_format:
             result = result.replace(
-                b"LOGS", six.ensure_binary(scalyr_util.json_encode(self.__logs))
+                b"LOGS", scalyr_util.json_encode(self.__logs, binary=True)
             )
         result = result.replace(
             b"TIMESTAMP", six.text_type(self.__client_timestamp).encode("utf-8")
         )
         result = result.replace(
-            b"THREADS", six.ensure_binary(scalyr_util.json_encode(self.__threads))
+            b"THREADS", scalyr_util.json_encode(self.__threads, binary=True)
         )
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
@@ -1529,18 +1529,15 @@ class Event(object):
         if thread_id is not None:
             tmp_buffer.write(b"thread:")
             # 2->TODO: in python3 ujson will return result with unicode type,
-            tmp_buffer.write(six.ensure_binary(scalyr_util.json_encode(thread_id)))
+            tmp_buffer.write(scalyr_util.json_encode(thread_id, binary=True))
             tmp_buffer.write(b", ")
             if not self.__disable_logfile_addevents_format:
                 tmp_buffer.write(b"log:")
-                tmp_buffer.write(six.ensure_binary(scalyr_util.json_encode(thread_id)))
+                tmp_buffer.write(scalyr_util.json_encode(thread_id, binary=True))
                 tmp_buffer.write(b", ")
         if self.__disable_logfile_addevents_format and attributes is not None:
             tmp_buffer.write(b"attrs:")
-            # 2->TODO should we worry about type of keys and values in "attributes"?
-            #  ujson should handle unicode correctly with default option "ensure_ascii=True"
-            # [end of 2->TOD0]
-            tmp_buffer.write(scalyr_util.json_encode(attributes).encode("utf-8"))
+            tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True))
             _rewind_past_close_curly(tmp_buffer)
             tmp_buffer.write(b",")
         else:

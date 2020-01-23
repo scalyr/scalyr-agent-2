@@ -970,7 +970,7 @@ class SyslogHandler(object):
 
                 if cid is not None and cname is not None and clabels is not None:
                     # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
-                    return cname, cid, clabels, data[m.end() :]
+                    return six.ensure_text(cname), six.ensure_text(cid), clabels, six.ensure_text(data[m.end() :])
 
         if self.__docker_regex_full is not None:
             reason_flags += "4"
@@ -980,7 +980,7 @@ class SyslogHandler(object):
 
             if m is not None and m.lastindex == 2:
                 # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
-                return m.group(1), m.group(2), {}, data[m.end() :]
+                return six.ensure_text(m.group(1)), six.ensure_text(m.group(2)), {},six.ensure_text(data[m.end() :])
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
