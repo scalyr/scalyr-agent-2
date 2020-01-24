@@ -319,12 +319,12 @@ class AgentLogger(logging.Logger):
         done before the monitor's "run" method is invoked.
 
         @param metric_name: The string containing the name for the metric.
-        @param metric_value: The value for the metric. The only allowed types are int, long, float, str, bool and
-            unicde.
+        @param metric_value: The value for the metric. The only allowed types are int, long, float, bool and
+        six.text_type.
         @param extra_fields: An optional dict that if specified, will be included as extra fields on the log line.
             These fields can be used in future searches/graphs expressions to restrict which specific instances of the
-            metric are matched/aggregated together. The keys for the dict must be str and the only allowed value types
-            are int, long, float, str, bool, and unicode.
+            metric are matched/aggregated together. The keys for the dict must be six.text_type and the only allowed
+            value types are int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that is reporting the metric. Typically, this does not need to be
             supplied because it defaults to whatever monitor for each the logger was created.
         @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
@@ -611,11 +611,11 @@ class AgentLogger(logging.Logger):
         If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
 
         @param name: The metric name
-        @type name: str
+        @type name: six.text_type
         @param is_metric: Whether or not the name is a metric or field name
         @type is_metric: bool
         @return: The metric / field name to use, which may be the original string.
-        @rtype: str
+        @rtype: six.text_type
         """
         if AgentLogger.__metric_or_field_name_rule.match(name) is not None:
             return name
@@ -653,7 +653,7 @@ class AgentLogger(logging.Logger):
         This may only be called after the metric file for the monitor has been opened.
 
         @param values: A dict containing a mapping from metric name to its value. The only allowed value types are:
-            int, long, float, str, bool, and unicode.
+            int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that created the values. This does not have to be passed in if the
             monitor instance specific logger is used. It defaults to that monitor. However, if the logger is the
             general one for the module, then a monitor instance is required.
@@ -670,7 +670,7 @@ class AgentLogger(logging.Logger):
         This may only be called after the metric file for the monitor has been opened.
 
         @param values: A dict containing a mapping from metric name to its value. The only allowed value types are:
-            int, long, float, str, bool, and unicode.
+            int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that created the values. This does not have to be passed in if the
             monitor instance specific logger is used. It defaults to that monitor. However, if the logger is the
             general one for the module, then a monitor instance is required.

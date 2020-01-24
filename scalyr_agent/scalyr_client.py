@@ -100,15 +100,15 @@ class ScalyrClientSession(object):
             Valid options are bz2, deflate or None.  Defaults to None.
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
 
-        @type server: str
-        @type api_key: str
-        @type agent_version: str
+        @type server: six.text_type
+        @type api_key: six.text_type
+        @type agent_version: six.text_type
         @type quiet: bool
         @type request_deadline: float
-        @type ca_file: str
-        @type intermediate_certs_file: str
+        @type ca_file: six.text_type
+        @type intermediate_certs_file: six.text_type
         @type proxies: dict
-        @type compression_type: str
+        @type compression_type: six.text_type
         @type compression_level: int
         """
         if not quiet:
@@ -219,7 +219,7 @@ class ScalyrClientSession(object):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
 
         @param fragments String fragments to append (in order) to the standard user agent data
-        @type fragments: List of str
+        @type fragments: List of six.text_type
         """
         self.__standard_headers["User-Agent"] = self.__get_user_agent(
             self.__agent_version, fragments
@@ -257,8 +257,8 @@ class ScalyrClientSession(object):
         @param [block_on_response]:  True if this request should block, waiting for the response.  If False, it will
             not block, but instead return a function, that will invoked, will block.
 
-        @type request_path: str
-        @type body: str|None
+        @type request_path: six.text_type
+        @type body: binary_type|None
         @type body_func: func|None
         @type is_post: bool
         @type block_on_response: bool
@@ -626,11 +626,11 @@ class ScalyrClientSession(object):
 
         @param agent_version: The agent version number.
         @param fragments: Additional strings to be appended. Each will be preceded by a semicolon
-        @type agent_version: str
-        @type fragments: List of str
+        @type agent_version: six.text_type
+        @type fragments: List of six.text_type
 
         @return: The user agent string.
-        @rtype: str
+        @rtype: six.text_type
         """
         # We will construct our agent string to look something like:
         # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib

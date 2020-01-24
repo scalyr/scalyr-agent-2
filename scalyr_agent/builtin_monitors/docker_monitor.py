@@ -1279,8 +1279,7 @@ class ContainerChecker(StoppableThread):
         @param path: the path of the log file being configured
         @param attributes: Any attributes to include as part of the log_config['attributes']
         @param base_config: A base set of configuration options to build the log_config from
-        @type parser: str
-        @type path: str
+        @type path: six.text_type
         @type attributes: dict of JsonObject
         @type base_config: dict or JsonObject
         """
@@ -1613,8 +1612,8 @@ class ContainerIdResolver:
             is performed lazily).
         @param cache_clean_secs:  The number of seconds between sweeps to clean the cache.
         @param logger: The logger to use.  This MUST be supplied.
-        @type docker_api_socket: str
-        @type docker_api_version: str
+        @type docker_api_socket: six.text_type
+        @type docker_api_version: six.text_type
         @type cache_expiration_secs: double
         @type cache_clean_secs: double
         @type logger: Logger

@@ -940,10 +940,10 @@ class SyslogHandler(object):
         If that fails, attempts to extract the container id and container name using the `__docker_regex_full`.
 
         @param data: The incoming line
-        @type data: str
+        @type data: six.text_type
         @return: The container name, container id, container labels (or an empty dict) and the rest of the line if extract was successful.  Otherwise,
             None, None, None, None.
-        @rtype: str, str, dict, str
+        @rtype: six.text_type, six.text_type, dict, six.text_type
         """
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.

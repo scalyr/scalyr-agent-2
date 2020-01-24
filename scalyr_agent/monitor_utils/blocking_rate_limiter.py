@@ -136,12 +136,12 @@ class BlockingRateLimiter(object):
         @type max_cluster_rate: float
         @type min_cluster_rate: float
         @type consecutive_success_threshold: int
-        @type strategy: str
+        @type strategy: six.text_type
         @type increase_factor: float
         @type backoff_factor: float
         @type max_concurrency: int
         @type logger: Logger
-        @type name: str
+        @type name: six.text_type
         """
         # Validate input (Note: will raise exception and thus kill the agent process if invalid)
         strategies = [self.STRATEGY_MULTIPLY, self.STRATEGY_RESET_THEN_MULTIPLY]

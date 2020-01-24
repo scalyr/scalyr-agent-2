@@ -152,8 +152,8 @@ class TestConfigurationBase(ScalyrTestCase):
         @param expected_path:  The expected path.  This should use `/`'s as the separator character.  It will be
             converted to this system's actual separators.
 
-        @type actual_path: str
-        @type expected_path: str
+        @type actual_path: six.text_type
+        @type expected_path: six.text_type
         """
         self.assertEquals(actual_path, self.convert_path(expected_path))
 

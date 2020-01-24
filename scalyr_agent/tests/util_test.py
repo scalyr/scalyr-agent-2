@@ -659,10 +659,10 @@ class TestRedirectorServer(ScalyrTestCase):
         """Parses the stream id and the actual content from the encoded content string sent by the server.
 
         @param content: The string sent by the server.
-        @type content: str
+        @type content: six.binary_type
 
         @return: A tuple of the stream_id and the actual content encoded in the sent string.
-        @rtype: (int,str)
+        @rtype: (int,six.text_type)
         """
         prefix_code = content[0:4]
         # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.

@@ -546,7 +546,7 @@ class DockerClientFaker(object):
         @param container_id: The container we are reporting
         @param metric_value:  The value to return
 
-        @type container_id: str
+        @type container_id: six.text_type
         @type metric_value: int
         """
         self.__lock.acquire()

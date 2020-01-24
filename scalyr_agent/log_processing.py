@@ -193,7 +193,7 @@ class LogFileIterator(object):
             purposes.  If None, then will just use the native file system.
         @param checkpoint: The checkpoint object describing where to pick up reading the file.
 
-        @type path: str
+        @type path: six.text_type
         @type config: scalyr_agent.Configuration
         @type file_system: FileSystem
         @type checkpoint: dict

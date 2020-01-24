@@ -78,7 +78,7 @@ class SocketWrapper(object):
     def write(self, input_str):
         """Writes the string to the underlying socket.
         @param input_str: The string to send.
-        @type input_str: str
+        @type input_str: six.binary_Type
         """
         return self.__socket.send(input_str)
 
@@ -86,7 +86,7 @@ class SocketWrapper(object):
         """Reads an entire line from the underlying socket, blocking until a line is received.
 
         @return: The line
-        @rtype: str
+        @rtype: six.binary_type
         """
         data = ""
         while True:
@@ -220,7 +220,7 @@ class DebugConnection(StoppableThread):
 
         @type local: dict
         @type client_connection:
-        @type host: str
+        @type host: six.text_type
         @type port: int
         """
         self.__local = local

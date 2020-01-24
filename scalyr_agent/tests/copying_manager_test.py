@@ -1419,7 +1419,7 @@ class TestableCopyingManager(CopyingManager):
         """Sets the status_message to return as the response for the next AddEventsRequest.
 
         @param status_message: The status message
-        @type status_message: str
+        @type status_message: six.text_type
         """
         self.__test_state_cv.acquire()
         self.__pending_response = status_message
@@ -1431,7 +1431,7 @@ class TestableCopyingManager(CopyingManager):
 
         @param current_point: The point reached by the CopyingManager thread, only valid values are
             `SLEEPING`, `SENDING`, and `RESPONDING`.
-        @type current_point: str
+        @type current_point: six.text_type
         """
         # If we are passing through the required_transition state, consume it to signal we have accomplished
         # the transition.
@@ -1474,8 +1474,8 @@ class TestableCopyingManager(CopyingManager):
             specified state before it gets to `stopping_at`.  Otherwise an AssertionError will be thrown.
               Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
 
-        @type stopping_at: str
-        @type required_transition_state: str or None
+        @type stopping_at: six.text_type
+        @type required_transition_state: six.text_type or None
         """
         self.__test_state_cv.acquire()
         try:

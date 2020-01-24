@@ -86,10 +86,10 @@ class ConnectionFactory:
         @param proxies:  A dict describing the network proxies to use or None if there aren't any.  Only valid if
             use_requests is True.
 
-        @type server: str
+        @type server: six.text_type
         @type request_deadline: float
-        @type ca_file: str
-        @type intermediate_certs_file: str
+        @type ca_file: six.text_type
+        @type intermediate_certs_file: six.text_type
         @type headers: dict
         @type use_requests: bool
         @type use_tlslite: bool

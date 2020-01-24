@@ -176,7 +176,7 @@ class ScalyrAgent(object):
             provide an api token and raise an exception if they fail.
 
         @type controller: PlatformController
-        @type config_file_path: str
+        @type config_file_path: six.text_type
         @type perform_config_check: bool
 
         @return: The return code when the agent exits.
@@ -210,8 +210,8 @@ class ScalyrAgent(object):
         @param command: The command passed in at the commandline for the agent to execute, such as 'start', 'stop', etc.
         @param command_options: The options from the commandline.  These will include 'quiet', 'verbose', etc.
 
-        @type config_file_path: str
-        @type command: str
+        @type config_file_path: six.text_type
+        @type command: six.text_type
 
         @return:  The exit status code to exit with, such as 0 for success.
         @rtype: int
@@ -317,7 +317,7 @@ class ScalyrAgent(object):
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -332,7 +332,7 @@ class ScalyrAgent(object):
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration

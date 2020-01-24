@@ -318,8 +318,8 @@ class MonitorsManager(StoppableThread):
         @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
             instantiating the module in case it needs to packages in other directories.
 
-        @type monitor_module: str
-        @type additional_python_paths: str
+        @type monitor_module: six.text_type
+        @type additional_python_paths: six.text_type
 
         @return:  The class for the ScalyrMonitor in the module.
         @rtype: class
@@ -358,7 +358,7 @@ class MonitorsManager(StoppableThread):
         @param global_config: The global configuration object
 
         @type monitor_config: dict
-        @type additional_python_paths: str
+        @type additional_python_paths: six.text_type
 
         @return:  The appropriate ScalyrMonitor instance as controlled by the configuration.
         @rtype: scalyr_monitor.ScalyrMonitor

@@ -129,7 +129,7 @@ def get_package_root():
     """Returns the absolute path to the scalyr_agent Python package, including the scalyr_agent directory name.
 
     @return: The path to the scalyr_agent directory (which contains the Python package).
-    @rtype: str
+    @rtype: six.text_type
     """
     return __package_root__
 
@@ -143,7 +143,7 @@ def get_install_root():
     the top of the repository when running from the source tree.
 
     @return:  The path to the scalyr-agent-2 directory.
-    @rtype: str
+    @rtype: six.text_type
     """
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
     parent_of_package_install = os.path.dirname(get_package_root())

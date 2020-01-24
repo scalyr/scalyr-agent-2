@@ -77,8 +77,8 @@ def get_json_implementation(lib_name):
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.text_type | six.binary_type
             """
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
@@ -104,8 +104,8 @@ def get_json_implementation(lib_name):
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.text_type | six.binary_type
             """
 
             if fp is not None:

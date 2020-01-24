@@ -495,8 +495,8 @@ class _K8sCache(object):
         @param allow_expired: If true, return the object if it exists in the cache even if expired.
             If false, return None if the object exists but is expired.
 
-        @type namespace: str
-        @type name: str
+        @type namespace: six.text_type
+        @type name: six.text_type
         @type current_time: epoch seconds
         @type allow_expired: bool
         """
@@ -530,8 +530,8 @@ class _K8sCache(object):
         @param name: The object's name
         @param allow_expired: If True, an object is considered present in cache even if it is expired.
 
-        @type namespace: str
-        @type name: str
+        @type namespace: six.text_type
+        @type name: six.text_type
         @type allow_expired: bool
 
         @return: True if the object is cached.  If check_expiration is True and an expiration
