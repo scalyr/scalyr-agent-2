@@ -1573,7 +1573,7 @@ class Event(object):
             attributes = dict(attributes)
 
         changed = False
-        for key, value in six.iteritems(attributes):
+        for key, value in attributes.iteritems():
             if key not in self.__attrs or overwrite_existing:
                 changed = True
                 self.__attrs[key] = value
