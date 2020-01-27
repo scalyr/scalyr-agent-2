@@ -1119,6 +1119,12 @@ class KubernetesCache(object):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod(k8s.namespace, pod_name)
         if pod is None:
+            global_log.warning(
+                "Coud not determine K8s CRI because could not find agent pod: %s"
+                % pod_name,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_pod",
+            )
             return None
 
         status = pod.get("status", {})
@@ -1130,7 +1136,20 @@ class KubernetesCache(object):
                 m = _CID_RE.match(containerId)
                 if m:
                     return m.group(1)
+                else:
+                    global_log.warning(
+                        "Coud not determine K8s CRI because agent container id did not match: %s"
+                        % containerId,
+                        limit_once_per_x_secs=300,
+                        limit_key="k8s_cri_unmatched_container_id",
+                    )
+                    return None
 
+        global_log.warning(
+            "Coud not determine K8s CRI because could not find agent container in pod.",
+            limit_once_per_x_secs=300,
+            limit_key="k8s_cri_no_agent_container",
+        )
         return None
 
     def update_cache(self, run_state):
