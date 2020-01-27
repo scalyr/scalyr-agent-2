@@ -38,18 +38,18 @@ class ByteScannerTests(ScalyrTestCase):
     def test_read_ubyte(self):
         x = ByteScanner("Hi \n")
 
-        self.assertEquals(x.read_ubyte(), "H")
-        self.assertEquals(x.read_ubyte(), "i")
-        self.assertEquals(x.read_ubyte(), " ")
-        self.assertEquals(x.read_ubyte(), "\n")
-        self.assertRaises(IndexError, x.read_ubyte)
+        self.assertEquals(x.read_uchar(), "H")
+        self.assertEquals(x.read_uchar(), "i")
+        self.assertEquals(x.read_uchar(), " ")
+        self.assertEquals(x.read_uchar(), "\n")
+        self.assertRaises(IndexError, x.read_uchar)
 
     def test_read_ubytes(self):
         x = ByteScanner("Hi there\n")
 
-        self.assertEquals(x.read_ubytes(2), "Hi")
-        self.assertEquals(x.read_ubytes(4), " the")
-        self.assertRaises(IndexError, x.read_ubytes, 10)
+        self.assertEquals(x.read_uchars(2), "Hi")
+        self.assertEquals(x.read_uchars(4), " the")
+        self.assertRaises(IndexError, x.read_uchars, 10)
 
     def test_properties(self):
         x = ByteScanner("Hi \n")
@@ -58,22 +58,22 @@ class ByteScannerTests(ScalyrTestCase):
         self.assertFalse(x.at_end)
         self.assertEquals(x.bytes_remaining, 4)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 1)
         self.assertFalse(x.at_end)
         self.assertEquals(x.bytes_remaining, 3)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 2)
         self.assertFalse(x.at_end)
         self.assertEquals(x.bytes_remaining, 2)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 3)
         self.assertFalse(x.at_end)
         self.assertEquals(x.bytes_remaining, 1)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 4)
         self.assertTrue(x.at_end)
         self.assertEquals(x.bytes_remaining, 0)
@@ -81,24 +81,24 @@ class ByteScannerTests(ScalyrTestCase):
     def test_peek_next_ubyte(self):
         x = ByteScanner("Hi \n")
 
-        x.read_ubyte()
-        x.read_ubyte()
+        x.read_uchar()
+        x.read_uchar()
 
-        self.assertEquals(x.peek_next_ubyte(), " ")
-        self.assertEquals(x.peek_next_ubyte(1), "\n")
-        self.assertEquals(x.peek_next_ubyte(2, none_if_bad_index=True), None)
-        self.assertRaises(IndexError, x.peek_next_ubyte, 2)
+        self.assertEquals(x.peek_next_uchar(), " ")
+        self.assertEquals(x.peek_next_uchar(1), "\n")
+        self.assertEquals(x.peek_next_uchar(2, none_if_bad_index=True), None)
+        self.assertRaises(IndexError, x.peek_next_uchar, 2)
 
     def test_peek_next_ubyte_with_negative(self):
         x = ByteScanner("Hi \n")
 
-        x.read_ubyte()
-        x.read_ubyte()
+        x.read_uchar()
+        x.read_uchar()
 
-        self.assertEquals(x.peek_next_ubyte(-1), "i")
-        self.assertEquals(x.peek_next_ubyte(-2), "H")
-        self.assertEquals(x.peek_next_ubyte(-3, none_if_bad_index=True), None)
-        self.assertRaises(IndexError, x.peek_next_ubyte, (-3))
+        self.assertEquals(x.peek_next_uchar(-1), "i")
+        self.assertEquals(x.peek_next_uchar(-2), "H")
+        self.assertEquals(x.peek_next_uchar(-3, none_if_bad_index=True), None)
+        self.assertRaises(IndexError, x.peek_next_uchar, (-3))
 
     def test_line_number_for_offset(self):
         x = ByteScanner("Hi there\nAnother line\nOne more")
@@ -124,7 +124,7 @@ class ByteScannerTests(ScalyrTestCase):
         #                 01234567 8901234567890 12345678
         # Advance to the 'n' in One.
         for i in range(23):
-            x.read_ubyte()
+            x.read_uchar()
 
         self.assertEquals(x.line_number_for_offset(-2), 2)
         self.assertEquals(x.line_number_for_offset(-1), 3)

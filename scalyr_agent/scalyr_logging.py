@@ -705,8 +705,8 @@ class AgentLogger(logging.Logger):
                 raise UnsupportedValueType(key, value)
         self.info(" ".join(string_entries), metric_log_for_monitor=monitor)
 
-    # 2->TODO in python3 findCaller receives stack_info
-    def findCaller(self, stack_info=False):
+    # 2->TODO in python3 findCaller receives stack_info, Also there is a new 'stacklevel' in python3.8
+    def findCaller(self, stack_info=False, stacklevel=1):
         """
         Find the stack frame of the caller so that we can note the source
         file name, line number and function name.
@@ -724,17 +724,7 @@ class AgentLogger(logging.Logger):
             if filename == _srcfile or filename == logging._srcfile:
                 f = f.f_back
                 continue
-            # 2->TODO just copied this from 'findCaller' from python3 logging library. Should we keep it?
-            sinfo = None
-            if stack_info:
-                sio = io.StringIO()
-                sio.write("Stack (most recent call last):\n")
-                traceback.print_stack(f, file=sio)
-                sinfo = sio.getvalue()
-                if sinfo[-1] == "\n":
-                    sinfo = sinfo[:-1]
-                sio.close()
-            rv = (co.co_filename, f.f_lineno, co.co_name, sinfo)
+            rv = (co.co_filename, f.f_lineno, co.co_name, None)
             break
 
         if sys.version_info[0] == 2:

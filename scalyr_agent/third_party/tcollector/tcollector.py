@@ -139,8 +139,8 @@ class Collector(object):
                           self.name, len(out))
                 for line in out.splitlines():
                     LOG.warning('%s: %s', self.name, line)
-        except IOError as xxx_todo_changeme:
-            (err, msg) = xxx_todo_changeme.args
+        except IOError as error:
+            (err, msg) = error.args
             if err != errno.EAGAIN:
                 raise
         except:
@@ -156,8 +156,8 @@ class Collector(object):
             if len(self.buffer):
                 LOG.debug('reading %s, buffer now %d bytes',
                           self.name, len(self.buffer))
-        except IOError as xxx_todo_changeme1:
-            (err, msg) = xxx_todo_changeme1.args
+        except IOError as error:
+            (err, msg) = error.args
             if err != errno.EAGAIN:
                 raise
         except:
