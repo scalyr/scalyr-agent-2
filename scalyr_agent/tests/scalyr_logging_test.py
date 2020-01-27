@@ -245,17 +245,30 @@ class ScalyrLoggingTest(ScalyrTestCase):
         )
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
 
-        string_300 = "a" * 300
+        self.__logger.set_keep_last_record(True)
+        try:
+            string_300 = "a" * 300
 
-        self.__logger.info("First message")
-        self.assertTrue(self.__log_contains("First message"))
+            self.__logger.info("First message")
+            self.assertTrue(self.__log_contains("First message"))
 
-        self.__logger.info("Dropped message %s", string_300)
-        self.assertFalse(self.__log_contains("Dropped message"))
+            self.__logger.info("Dropped message %s", string_300)
+            self.assertFalse(self.__log_contains("Dropped message"))
 
-        self.__logger.info("Second message")
-        self.assertTrue(self.__log_contains("Second message"))
-        self.assertTrue(self.__log_contains("Warning, skipped writing 1 log lines"))
+            self.__logger.info("Second message")
+            has_second_message = self.__log_contains("Second message")
+            last_record = self.__logger.last_record
+            # TODO: Remove these extra asserts once we have determined the cause of this test case
+            # being flaky: https://scalyr.myjetbrains.com/youtrack/issue/AGENT-313
+            self.assertEqual("Second message", last_record.message)
+            self.assertEqual(1, last_record.rate_limited_dropped_records)
+            self.assertTrue(last_record.rate_limited_result)
+            self.assertTrue(last_record.rate_limited_set)
+
+            self.assertTrue(has_second_message)
+            self.assertTrue(self.__log_contains("Warning, skipped writing 1 log lines"))
+        finally:
+            self.__logger.set_keep_last_record(False)
 
     def test_limit_once_per_x_secs(self):
         log = scalyr_logging.getLogger("scalyr_agent.foo")
