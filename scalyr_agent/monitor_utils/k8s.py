@@ -1138,11 +1138,12 @@ class KubernetesCache(object):
                     return m.group(1)
                 else:
                     global_log.warning(
-                        "Coud not determine K8s CRI because agent container id did not match: %s"
-                        % containerId,
+                        "Coud not determine K8s CRI because agent container id did not match: %s: %s"
+                        % (containerId, util.json_encode(container)),
                         limit_once_per_x_secs=300,
                         limit_key="k8s_cri_unmatched_container_id",
                     )
+
                     return None
 
         global_log.warning(
