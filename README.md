@@ -11,7 +11,6 @@ For more information on the Scalyr Agent, please visit https://www.scalyr.com/he
 
 To learn more about Scalyr, visit https://www.scalyr.com.
 
-
 Features
 ========
 
@@ -23,7 +22,6 @@ Key features:
   * Easy-to-use troubleshooting features
   * Modular configuration files
   * Extensibility using monitor plugins
-
 
 Developing
 ==========
