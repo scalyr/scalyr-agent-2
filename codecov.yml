@@ -16,6 +16,12 @@ coverage:
         #threshold: 2%
         #patch: yes
 
+# Code coverage data is relative to scalyr_agent/ directory so we need to
+# prepend it for codecov.io web reports to work correctly since those rely
+# on paths relative to the repo root
+fixes:
+    - "::scalyr_agent/"
+
 comment:
   layout: "reach, diff, flags, files"
   behavior: default
