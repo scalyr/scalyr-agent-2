@@ -16,11 +16,11 @@ coverage:
         #threshold: 2%
         #patch: yes
 
-# Code coverage data is relative to scalyr_agent/ directory so we need to
-# prepend it for codecov.io web reports to work correctly since those rely
-# on paths relative to the repo root
+# Code coverage data needs to be relative to the repo root, but in out reports it's
+# relative to /home/circleci/scalyr-agent-2/ so we need to fix the paths so it works
+# correctly on codecov.io
 fixes:
-    - "::scalyr_agent/"
+    - "/home/circleci/scalyr-agent-2/::
 
 comment:
   layout: "reach, diff, flags, files"
