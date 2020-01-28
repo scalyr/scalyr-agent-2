@@ -13,12 +13,12 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          key: deps-tox-py27-unit-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          key: deps-tox-py27-unit-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
           paths:
             - ".tox"
       - run:
