@@ -18,6 +18,8 @@
 # Module which is used by py.test for customizing test collection and discovery
 # Based on code from scalyr_agent/all_tests.py
 
+from __future__ import absolute_import
+
 import os
 import sys
 
