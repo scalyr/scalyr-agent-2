@@ -322,12 +322,19 @@ jobs:
           path: cov
 
       - run:
-          name: report
+          name: Print coverage report
           working_directory: cov
           command: |
             source ../venv/bin/activate
             coverage report
-            codecov
+
+      - run:
+          name: Upload coverage data to codecov.io
+          working_directory: cov
+          command: |
+            source ../venv/bin/activate
+            coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            codecov --file coverage.xml
 
   modernize-check:
     working_directory: ~/scalyr-agent-2
