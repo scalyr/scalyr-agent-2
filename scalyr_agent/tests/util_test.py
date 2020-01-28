@@ -414,6 +414,25 @@ class TestRateLimiter(ScalyrTestCase):
         self.assertTrue(self.charge_if_available(80))
         self.assertFalse(self.charge_if_available(1))
 
+    def test_custom_bucket_size_and_rate(self):
+        self.__test_rate = RateLimiter(10, 1, current_time=0)
+        self.assertTrue(self.charge_if_available(10))
+        self.assertFalse(self.charge_if_available(10))
+        self.advance_time(1)
+        self.assertFalse(self.charge_if_available(10))
+        self.advance_time(5)
+        self.assertFalse(self.charge_if_available(10))
+
+    def test_zero_bucket_fill_rate(self):
+        self.__test_rate = RateLimiter(100, 0, current_time=0)
+        self.assertTrue(self.charge_if_available(20))
+        self.assertTrue(self.charge_if_available(80))
+        self.assertFalse(self.charge_if_available(1))
+        self.advance_time(1)
+        self.assertFalse(self.charge_if_available(20))
+        self.advance_time(5)
+        self.assertFalse(self.charge_if_available(20))
+
     def test_refill(self):
         self.assertTrue(self.charge_if_available(60))
         self.assertFalse(self.charge_if_available(60))
