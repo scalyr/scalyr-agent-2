@@ -240,14 +240,20 @@ class ScalyrLoggingTest(ScalyrTestCase):
             use_disk=True,
             logs_directory=os.path.dirname(self.__log_path),
             agent_log_file_path=self.__log_path,
-            max_write_burst=250,
+            max_write_burst=500,
             log_write_rate=20000,
         )
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
 
         self.__logger.set_keep_last_record(True)
         try:
-            string_300 = "a" * 300
+            # NOTE: Actual value which is being used for the rate limitting is the formatted value
+            # and that value contains much more information than the string we generate here.
+            # This means that 450 + common formatted string data will aways be > 500 and we need to
+            # make sure that "max_write_burst" value we use is large enough so formatted "First
+            # message" and "Second message" (with a warning) fit in that value, otherwise depending
+            # on the timing and fill rate, the test may fail.
+            string_300 = "a" * 450
 
             self.__logger.info("First message")
             self.assertTrue(self.__log_contains("First message"))
@@ -264,7 +270,6 @@ class ScalyrLoggingTest(ScalyrTestCase):
             self.assertEqual(1, last_record.rate_limited_dropped_records)
             self.assertTrue(last_record.rate_limited_result)
             self.assertTrue(last_record.rate_limited_set)
-
             self.assertTrue(has_second_message)
             self.assertTrue(self.__log_contains("Warning, skipped writing 1 log lines"))
         finally:
