@@ -15,6 +15,7 @@ asn1crypto==0.24.0
 oscrypto==0.19.1
 docker-py==1.10.3
 coverage==4.5.4
+codecov==2.0.15
 
 # cffi==1.12.3
 # asyncio==3.4.3
