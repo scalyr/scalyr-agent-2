@@ -300,7 +300,7 @@ jobs:
           command: |
             virtualenv venv
             source venv/bin/activate
-            pip install coverage
+            pip install coverage "codecov==2.0.15"
             mkdir -p cov
             cp .circleci/.coveragerc_ci cov/.coveragerc
 
@@ -322,6 +322,7 @@ jobs:
           command: |
             source ../venv/bin/activate
             coverage report
+            codecov
 
   modernize-check:
     working_directory: ~/scalyr-agent-2
