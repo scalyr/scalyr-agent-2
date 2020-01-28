@@ -450,7 +450,9 @@ class JsonParser(object):
         start_pos = self.__scanner.position
 
         # Have to consume the beginning quote mark
-        self.__scanner.read_uchar()
+        c = self.__scanner.read_uchar()
+        if c != '"':
+            return self.__error("string literal should start with double quotation mark.")
 
         length = 0
         while True:
