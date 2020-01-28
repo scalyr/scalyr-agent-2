@@ -297,6 +297,7 @@ jobs:
       - restore_cache:
           key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install dependencies
           command: |
             # Small safety check to make sure the build fails if codecov.yml file is invalid.
             # By default codecov doesn't fail on invalid config and simply falls back to
@@ -313,6 +314,7 @@ jobs:
           at: cov
 
       - run:
+          name: Combine coverage
           working_directory: cov
           command: |
             source ../venv/bin/activate
