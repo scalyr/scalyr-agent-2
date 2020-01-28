@@ -31,16 +31,16 @@ from six.moves import range
 from scalyr_agent.json_lib import JsonArray, JsonObject, JsonParseException
 
 
-class ByteScanner(object):
-    """Allows for iterating over a byte input.
+class TextScanner(object):
+    """Allows for iterating over a unicode input.
 
-    ByteScanner wraps an incoming byte array of input and provides
-    methods to iterate over the bytes.  It also provides methods to
+    TextScanner wraps an incoming unicode string of input and provides
+    methods to iterate over the characters.  It also provides methods to
     perform typical conversions.
     """
 
     def __init__(self, string_input, start_pos=0, max_pos=None):
-        """Construct a new instance of a ByteScanner.
+        """Construct a new instance of a TextScanner.
 
         @param string_input: The input to scan. This must be unicode.
         @param start_pos: The index within input to begin the scan.
@@ -57,15 +57,15 @@ class ByteScanner(object):
 
     @property
     def at_end(self):
-        """True if the scanner is at the end of the byte input."""
+        """True if the scanner is at the end of the character input."""
         return self.__pos >= self.__max_pos
 
     @property
     def position(self):
-        """The position of the scan relative to original byte array.
+        """The position of the scan relative to original string.
 
         Notes, if this object does not offset the position by any start_pos
-        used in the construction.  It is relative to the underlying byte array
+        used in the construction.  It is relative to the underlying string
         not the subrange.
         TODO:  This is a bit of a strange contract, but maintaining it since
         that is how the Scalyr Java classes behave as well."""
@@ -83,7 +83,7 @@ class ByteScanner(object):
 
         @return: The line number for the specified position.
 
-        @raise IndexError: If the offset places the position outside of the valid range for the underlying byte
+        @raise IndexError: If the offset places the position outside of the valid range for the underlying character
             range."""
         line_num = 1
         target_pos = self.__pos + offset
@@ -105,12 +105,12 @@ class ByteScanner(object):
         return line_num
 
     @property
-    def bytes_remaining(self):
-        """The number of bytes that may be read before the end is reached."""
+    def characters_remaining(self):
+        """The number of characters that may be read before the end is reached."""
         return self.__max_pos - self.__pos
 
     def read_uchar(self):
-        """Returns the next byte from the buffer.
+        """Returns the next character from the buffer.
 
         @raise IndexError: If the scanner is already at the end of the buffer."""
         self.__check_read_size(1)
@@ -131,9 +131,9 @@ class ByteScanner(object):
         """Returns the next character that will be returned when read_uchar is
         invoked.
 
-        @param offset: Optional argument to allow peeking at not just the next byte but bytes beyond that as well. A
-            value of 0 references the next byte, while 1 is the one after that, etc. You may specify negative indexes,
-            which access the previous bytes returned by read_uchar, -1 for the last, etc.
+        @param offset: Optional argument to allow peeking at not just the next character but characters beyond that as well. A
+            value of 0 references the next character, while 1 is the one after that, etc. You may specify negative indexes,
+            which access the previous characters returned by read_uchar, -1 for the last, etc.
         @param none_if_bad_index: If the index that will be read is outside of the range of the underlying buffer, None
             will be returned instead of raising an exception.
 
@@ -163,7 +163,7 @@ class ByteScanner(object):
         index = self.__pos + read_length - 1
         if index < self.__start_pos or index >= self.__max_pos:
             raise IndexError(
-                "Ran off end of buffer (position %i, limit %i, reading %i bytes"
+                "Ran off end of buffer (position %i, limit %i, reading %i characters)"
                 % (self.__pos, self.__max_pos, read_length)
             )
 
@@ -176,9 +176,9 @@ class ByteScanner(object):
 
 
 class JsonParser(object):
-    """Parses raw byte input into JsonObjects and supports Scalyr's extensions.
+    """Parses text input into JsonObjects and supports Scalyr's extensions.
 
-    JsonParser is the main abstraction for parsing raw byte input
+    JsonParser is the main abstraction for parsing text input
     into JsonObject and other related objects.  It also supports Scalyr's
     extensions to the Json format, including comments and binary data.
     Specifically, the following are allowed:
@@ -201,9 +201,9 @@ class JsonParser(object):
         self.check_duplicate_keys = check_duplicate_keys
 
     @staticmethod
-    def parse(input_bytes, check_duplicate_keys=False):
+    def parse(input_text, check_duplicate_keys=False):
         return JsonParser(
-            ByteScanner(input_bytes), True, check_duplicate_keys
+            TextScanner(input_text), True, check_duplicate_keys
         ).parse_value()
 
     def parse_value(self):
@@ -380,7 +380,7 @@ class JsonParser(object):
         start_pos = self.__scanner.position
         length = 0
         while True:
-            if length >= self.__scanner.bytes_remaining:
+            if length >= self.__scanner.characters_remaining:
                 self.__error("string literal not terminated")
 
             c = self.__scanner.peek_next_uchar(offset=length)
@@ -392,7 +392,7 @@ class JsonParser(object):
             length += 1
 
             if c == "\\":
-                if length >= self.__scanner.bytes_remaining:
+                if length >= self.__scanner.characters_remaining:
                     self.__error("incomplete backslash sequence")
                 length += 1
 
@@ -454,7 +454,7 @@ class JsonParser(object):
 
         length = 0
         while True:
-            if length >= self.__scanner.bytes_remaining:
+            if length >= self.__scanner.characters_remaining:
                 self.__error("string literal not terminated")
 
             c = self.__scanner.peek_next_uchar(offset=length)
@@ -464,7 +464,7 @@ class JsonParser(object):
             length += 1
 
             if c == "\\":
-                if length >= self.__scanner.bytes_remaining:
+                if length >= self.__scanner.characters_remaining:
                     self.__error("incomplete backslash sequence")
                 length += 1
             elif c == "\r" or c == "\n":
@@ -627,8 +627,7 @@ class JsonParser(object):
         start_pos = self.__scanner.position
 
         for i in range(0, len(chars)):
-            # 2->TODO slicing produces byte string in both versions.
-            expected = chars[i: i + 1]
+            expected = chars[i]
             if self.__scanner.at_end:
                 actual = -1
             else:
@@ -678,7 +677,7 @@ class JsonParser(object):
             are not enough characters in the stream, False is returned.
         @rtype: bool
         """
-        if offset + count > self.__scanner.bytes_remaining:
+        if offset + count > self.__scanner.characters_remaining:
             return False
 
         for i in range(offset, offset + count):
@@ -707,10 +706,10 @@ class JsonParser(object):
     def __peek_next_non_whitespace(self):
         """Scan up to the next non-whitespace and return it.
 
-        This will consume all whitespace and comment bytes, searchg for
+        This will consume all whitespace and comment character, searchg for
         the first meaningful parse character.
 
-        @return: The first non-whitespace, non-comment byte, or None if the end
+        @return: The first non-whitespace, non-comment character, or None if the end
             of the buffer is reached."""
 
         while True:
@@ -728,7 +727,7 @@ class JsonParser(object):
             return c
 
 
-def parse(input_bytes, check_duplicate_keys=False):
+def parse(input_text, check_duplicate_keys=False):
     """Parses the input as JSON and returns its contents.
 
     It supports Scalyr's extensions to the Json format, including comments and
@@ -742,9 +741,9 @@ def parse(input_bytes, check_duplicate_keys=False):
      - TODO:  support `b (backtick-b) binary data format used by Scalyr
        servers.
 
-    @param input_bytes: A string containing the bytes to be parsed.
+    @param input_text: A string containing the unicode string to be parsed.
     @param check_duplicate_keys: If true, then we throw an exception if any JSON object contains two entries with the same name.
 
         JsonParseException if there is an error in the parsing.
     """
-    return JsonParser.parse(input_bytes, check_duplicate_keys)
+    return JsonParser.parse(input_text, check_duplicate_keys)

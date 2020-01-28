@@ -78,7 +78,7 @@ class SocketWrapper(object):
     def write(self, input_str):
         """Writes the string to the underlying socket.
         @param input_str: The string to send.
-        @type input_str: six.binary_Type
+        @type input_str: six.binary_type
         """
         return self.__socket.send(input_str)
 

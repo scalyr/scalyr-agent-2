@@ -1279,6 +1279,7 @@ class ContainerChecker(StoppableThread):
         @param path: the path of the log file being configured
         @param attributes: Any attributes to include as part of the log_config['attributes']
         @param base_config: A base set of configuration options to build the log_config from
+        @type default_parser: six.text_type
         @type path: six.text_type
         @type attributes: dict of JsonObject
         @type base_config: dict or JsonObject
