@@ -336,7 +336,7 @@ jobs:
           command: |
             source ../venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            codecov --file coverage.xml
+            codecov --root=/home/circleci/scalyr-agent-2/ --file coverage.xml
 
   modernize-check:
     working_directory: ~/scalyr-agent-2
