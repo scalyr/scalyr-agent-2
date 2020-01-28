@@ -4,6 +4,27 @@
 #
 version: 2
 jobs:
+  unittest-27-tox-wip:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7-jessie-browsers
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+      - run:
+          command: |
+            pip install -r dev-requirements.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - ".tox"
+      - run:
+          command: |
+            tox -e py2.7-unit-tests
+
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -354,6 +375,7 @@ workflows:
   unittest:
     jobs:
       - modernize-check
+      - unittest-27-tox-wip
       - unittest-27
       - unittest-26
       - smoke-standalone-27
