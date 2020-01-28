@@ -23,6 +23,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+scalyr-agent-2-*/
 
 # Installer logs
 pip-log.txt
