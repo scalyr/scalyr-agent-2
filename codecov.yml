@@ -20,7 +20,7 @@ coverage:
 # relative to /home/circleci/scalyr-agent-2/ so we need to fix the paths so it works
 # correctly on codecov.io
 fixes:
-    - "/home/circleci/scalyr-agent-2/::
+    - "/home/circleci/scalyr-agent-2/::"
 
 comment:
   layout: "reach, diff, flags, files"
