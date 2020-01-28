@@ -15,8 +15,9 @@ jobs:
       - restore_cache:
           key: deps-tox-py27-unit-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: "Install tox dependency"
           command: |
-            pip install -r dev-requirements.txt
+            sudo pip install "tox==3.14.3"
       - save_cache:
           key: deps-tox-py27-unit-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
           paths:
