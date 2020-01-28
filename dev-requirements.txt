@@ -3,6 +3,8 @@
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 
 mock==0.8.0
+pytest==4.6.9
+pytest-coverage
 ujson==1.35
 tlslite-ng==0.7.5
 cffi==1.12.3
