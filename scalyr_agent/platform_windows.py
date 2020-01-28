@@ -19,6 +19,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import atexit
 import errno
+from scalyr_agent import compat
 
 __author__ = "guy.hoozdis@gmail.com"
 
@@ -784,7 +785,7 @@ class PipeRedirectorServer(RedirectorServer):
             """
             try:
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-                win32file.WriteFile(self.__pipe_handle, struct.pack(six.ensure_str("I"), 0))
+                win32file.WriteFile(self.__pipe_handle, compat.struct_pack_unicode("I", 0))
                 win32file.FlushFileBuffers(self.__pipe_handle)
             finally:
                 win32pipe.DisconnectNamedPipe(self.__pipe_handle)

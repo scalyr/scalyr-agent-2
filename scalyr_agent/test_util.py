@@ -17,6 +17,7 @@
 # author: Edward Chee <echee@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "echee@scalyr.com"
 
@@ -187,7 +188,7 @@ def parse_scalyr_request(payload):
         rewritten_payload += payload[last_processed_index + 1 : x.start(0)]
         # Read the 4 bytes that describe the length, which is stored in regex group 1.
         # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-        length = struct.unpack(six.ensure_str(">i"), x.group(1))[0]
+        length = compat.struct_unpack_unicode(">i", x.group(1))[0]
         # Grab the string content as raw bytes.
         raw_string = payload[x.end(1) : x.end(1) + length]
         text_string = raw_string.decode("utf-8")

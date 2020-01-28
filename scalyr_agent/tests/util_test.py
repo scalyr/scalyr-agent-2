@@ -17,6 +17,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
@@ -666,7 +667,7 @@ class TestRedirectorServer(ScalyrTestCase):
         """
         prefix_code = content[0:4]
         # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-        code = struct.unpack(six.ensure_str("i"), prefix_code)[0]
+        code = compat.struct_unpack_unicode("i", prefix_code)[0]
         stream_id = code % 2
         num_bytes = code >> 1
 
@@ -763,7 +764,7 @@ class TestRedirectorClient(ScalyrTestCase):
         code = len(encoded_content) * 2 + stream_id
         # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
         self._client_channel.simulate_server_write(
-            struct.pack(six.ensure_str("i"), code) + encoded_content
+            compat.struct_pack_unicode("i", code) + encoded_content
         )
 
 

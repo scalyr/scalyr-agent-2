@@ -26,6 +26,7 @@ from io import open
 import six
 import six.moves._thread
 from six.moves import range
+from scalyr_agent import compat
 
 
 __author__ = "czerwin@scalyr.com"
@@ -1385,7 +1386,7 @@ class RedirectorServer(object):
         try:
             if self.__channel_lock is not None:
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-                self.__channel.write(struct.pack(six.ensure_str("i"), code) + encoded_content)
+                self.__channel.write(compat.struct_pack_unicode("i", code) + encoded_content)
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -1543,7 +1544,7 @@ class RedirectorClient(StoppableThread):
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-                code = struct.unpack(six.ensure_str("i"), self.__channel.read(4))[0]  # Read str length
+                code = compat.struct_unpack_unicode("i", self.__channel.read(4))[0]  # Read str length
 
                 # The server sends -1 when it wishes to close the stream.
                 if code < 0:

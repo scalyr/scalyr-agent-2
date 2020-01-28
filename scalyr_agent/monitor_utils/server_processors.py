@@ -20,6 +20,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
@@ -254,7 +255,7 @@ class Int32RequestParser(object):
             # the complete data payload.
             if num_bytes > self.__prefix_length:
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-                (length,) = struct.unpack(
+                (length,) = compat.struct_unpack_unicode(
                     six.ensure_str(self.__format), input_buffer.read(self.__prefix_length)
                 )
                 if length > self.__max_request_size:

@@ -16,6 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
@@ -42,5 +43,5 @@ def serialize_as_length_prefixed_string(value, output_buffer):
     else:
         to_serialize = value
     # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-    output_buffer.write(struct.pack(six.ensure_str(">i"), len(to_serialize)))
+    output_buffer.write(compat.struct_pack_unicode(">i", len(to_serialize)))
     output_buffer.write(to_serialize)

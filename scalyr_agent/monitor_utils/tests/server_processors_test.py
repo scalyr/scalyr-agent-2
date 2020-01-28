@@ -16,6 +16,7 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
@@ -64,7 +65,7 @@ class TestInt32RequestParser(ScalyrTestCase):
     def run_test_case(self, input_string, length_to_send, truncate_size=None):
         input_buffer = io.BytesIO()
         # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-        input_buffer.write(struct.pack(six.ensure_str("!I"), length_to_send))
+        input_buffer.write(compat.struct_pack_unicode("!I", length_to_send))
         input_buffer.write(input_string)
         if truncate_size is not None:
             input_buffer.truncate(truncate_size)

@@ -16,6 +16,7 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
 
@@ -319,7 +320,7 @@ def _get_default_gateway():
             if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
             # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-            result = socket.inet_ntoa(struct.pack(six.ensure_str("<L"), int(fields[2], 16)))
+            result = socket.inet_ntoa(compat.struct_pack_unicode("<L", int(fields[2], 16)))
     except IOError as e:
         global_log.error(
             "Error while getting the default gateway: %s",

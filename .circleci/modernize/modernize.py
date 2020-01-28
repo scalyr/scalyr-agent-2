@@ -89,7 +89,8 @@ FIXERS = {
     "libmodernize.fixes.fix_zip",
     "libmodernize.fixes.fix_open",
     "custom_fixers.fix_os_environ_unicode",
-    "custom_fixers.fix_os_getenv_unicode"
+    "custom_fixers.fix_os_getenv_unicode",
+    "custom_fixers.fix_struct_unicode"
 }
 
 # pattern to find start of the area [start of 2->TOD0]
@@ -480,7 +481,10 @@ if __name__ == "__main__":
 
     if diffs:
         if args.write:
-            print("Python-modernize found and modernized code in files:")
+            print(
+                "Python-modernize found and modernized code in files:",
+                file=sys.stderr
+            )
         else:
             print(
                 "Python-modernize found code that can be modernized in files:",

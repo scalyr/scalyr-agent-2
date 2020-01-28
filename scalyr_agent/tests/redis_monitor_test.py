@@ -16,6 +16,7 @@
 # author: Imron Alston <imron@scalyr.com>
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
 
@@ -56,8 +57,8 @@ class RedisHostTestCase(unittest.TestCase):
     def test_invalild_utf8_message(self):
         expected = "abc\ufffddef"
 
-        self.entry["command"] = struct.pack(
-            six.ensure_str("3sB13s"), b"abc", 0xCE, b"def"
+        self.entry["command"] = compat.struct_pack_unicode(
+            "3sB13s", b"abc", 0xCE, b"def"
         ).rstrip(b"\0")
 
         self.host.utf8_warning_interval = 1
@@ -70,8 +71,8 @@ class RedisHostTestCase(unittest.TestCase):
     def test_truncated_utf8_message(self):
         expected = "abc... (4 more bytes)"
 
-        self.entry["command"] = struct.pack(
-            six.ensure_str("3sB18s"), b"abc", 0xCE, b"... (4 more bytes)"
+        self.entry["command"] = compat.struct_pack_unicode(
+            "3sB18s", b"abc", 0xCE, b"... (4 more bytes)"
         ).rstrip(b"\0")
 
         self.host.log_entry(self.logger, self.entry)
