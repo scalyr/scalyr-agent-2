@@ -75,6 +75,10 @@ def get_json_implementation(lib_name):
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
@@ -102,6 +106,10 @@ def get_json_implementation(lib_name):
 
         def json_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
