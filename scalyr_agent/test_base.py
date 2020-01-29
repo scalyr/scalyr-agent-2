@@ -212,10 +212,10 @@ class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
         if not self.__assertion_failed:
             shutil.rmtree(self.logs_directory)
 
-    def assertLogFileContainsLine(self, file_path, expression):
+    def assertLogFileContainsRegex(self, file_path, expression):
         """
         Custom assertion function which asserts that the provided log file path contains the provided
-        expression.
+        regular expression.
 
         :param file_path: Path to the file to use.
         :param expression: Regular expression to match against each line in the file.

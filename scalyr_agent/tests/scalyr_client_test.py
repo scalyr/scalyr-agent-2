@@ -930,7 +930,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         # Should log raw (uncompressed) request body / payload
         expected_body = re.escape(r'{"foo":"bar", events: [], logs: [], threads: [], client_time: 11111 }')
-        self.assertLogFileContainsLine(self.agent_debug_log_path, expected_body)
+        self.assertLogFileContainsRegex(self.agent_debug_log_path, expected_body)
 
         # Verify that the compression was indeed enabled since that's the scenario we are testing
         call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
