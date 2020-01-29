@@ -288,6 +288,10 @@ class AgentLogger(logging.Logger):
         self.__monitor = None
         self.__metric_handler = None
 
+        # Used in debugging tests.  If true, the abstraction will save a reference to the last record created.
+        self.__keep_last_record = False
+        self.__last_record = None
+
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
         self.__log_emit_times = {}
@@ -533,6 +537,9 @@ class AgentLogger(logging.Logger):
             result.metric_log_for_monitor.increment_counter(reported_lines=1)
         if result.error_for_monitor is not None:
             result.error_for_monitor.increment_counter(errors=1)
+
+        if self.__keep_last_record:
+            self.__last_record = result
         return result
 
     def exception(self, msg, *args, **kwargs):
@@ -733,6 +740,21 @@ class AgentLogger(logging.Logger):
         else:
             # Python 3.
             return rv
+
+    @property
+    def last_record(self):
+        return self.__last_record
+
+    def set_keep_last_record(self, keep_last):
+        """Updates whether or not to keep the last record created by this logger.
+
+        :param keep_last: Whether or not to keep the last record
+        :type keep_last: bool
+        """
+        if keep_last != self.__keep_last_record:
+            self.__last_record = None
+
+        self.__keep_last_record = keep_last
 
 
 # To help with a hack of extending the Logger class, we need a thread local storage

@@ -1013,6 +1013,12 @@ class _CacheConfigState(object):
             self._lock.release()
 
 
+class AgentPodNotReadyException(Exception):
+    """Raised when the agent pod is not fully ready according to the K8s API server."""
+
+    pass
+
+
 class KubernetesCache(object):
     def __init__(
         self,
@@ -1051,7 +1057,8 @@ class KubernetesCache(object):
 
         self._cluster_name = None
         self._api_server_version = None
-        self._last_full_update = time.time() - cache_expiry_secs - 1
+        # The last time (in seconds since epoch) we updated the K8s version number via a query
+        self._last_api_server_version_update = 0
 
         self._container_runtime = None
         self._initialized = False
@@ -1114,19 +1121,43 @@ class KubernetesCache(object):
         finally:
             self._lock.release()
 
-    def _update_api_server_version(self, k8s):
-        """Update the API server version"""
-        gitver = k8s.get_api_server_version()
+    def _update_api_server_version_if_necessary(self, k8s, current_time=None):
+        """Update the API server version if it has not been successfully update in the last hour.
+        The version number is determined by querying the K8s API server."""
+
+        if current_time is None:
+            current_time = time.time()
+
+        # Check if we have the version set and what time we set it.
         self._lock.acquire()
         try:
-            self._api_server_version = gitver
+            is_version_set = self._api_server_version is not None
+            last_check_time = self._last_api_server_version_update
         finally:
             self._lock.release()
+
+        # We only update if we haven't updated it in the last hour.
+        if not is_version_set or current_time - last_check_time > 3600:
+            # Query the API server to get version.
+            gitver = k8s.get_api_server_version()
+
+            self._lock.acquire()
+            try:
+                self._api_server_version = gitver
+                self._last_api_server_version_update = current_time
+            finally:
+                self._lock.release()
 
     def _get_runtime(self, k8s):
         pod_name = k8s.get_pod_name()
         pod = k8s.query_pod(k8s.namespace, pod_name)
         if pod is None:
+            global_log.warning(
+                "Coud not determine K8s CRI because could not find agent pod: %s"
+                % pod_name,
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_pod",
+            )
             return None
 
         status = pod.get("status", {})
@@ -1134,11 +1165,31 @@ class KubernetesCache(object):
         for container in containers:
             name = container.get("name")
             if name and name == "scalyr-agent":
+                # If the agent container is not ready (according the API server) we cannot get the containerID
+                # and therefore cannot determine the container runtime.  We need to wait a little bit for the
+                # API server to catch up.  We raise this exception which triggers the right things.
+                if not container.get("ready", False):
+                    raise AgentPodNotReadyException()
+
                 containerId = container.get("containerID", "")
                 m = _CID_RE.match(containerId)
                 if m:
                     return m.group(1)
+                else:
+                    global_log.warning(
+                        "Coud not determine K8s CRI because agent container id did not match: %s"
+                        % containerId,
+                        limit_once_per_x_secs=300,
+                        limit_key="k8s_cri_unmatched_container_id",
+                    )
 
+                    return None
+
+        global_log.warning(
+            "Coud not determine K8s CRI because could not find agent container in pod.",
+            limit_once_per_x_secs=300,
+            limit_key="k8s_cri_no_agent_container",
+        )
         return None
 
     def update_cache(self, run_state):
@@ -1147,6 +1198,7 @@ class KubernetesCache(object):
         """
 
         start_time = time.time()
+        retry_delay_secs = None
         while run_state.is_running() and not self.is_initialized():
 
             # get cache state values that will be consistent for the duration of the loop iteration
@@ -1159,12 +1211,16 @@ class KubernetesCache(object):
                 run_state.sleep_but_awaken_if_stopped(
                     random.uniform(0, local_state.cache_start_fuzz_secs)
                 )
-                if not run_state.is_running() or self.is_initialized():
-                    continue
+            # Delay before reattempting to initialize the cache if we had an error last time.
+            if retry_delay_secs is not None:
+                run_state.sleep_but_awaken_if_stopped(retry_delay_secs)
+
+            if not run_state.is_running() or self.is_initialized():
+                continue
 
             try:
                 self._update_cluster_name(local_state.k8s)
-                self._update_api_server_version(local_state.k8s)
+                self._update_api_server_version_if_necessary(local_state.k8s)
                 runtime = self._get_runtime(local_state.k8s)
 
                 self._lock.acquire()
@@ -1180,11 +1236,22 @@ class KubernetesCache(object):
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_init_cache",
                 )
+                # Delay a fixed amount.  TODO: Maybe do exponential backoff here?
+                retry_delay_secs = 0.5
+            except AgentPodNotReadyException:
+                global_log.info(
+                    "Agent container not ready while initializing cache.  Will retry.",
+                    limit_once_per_x_secs=60,
+                    limit_key="k8s_agent_pod_not_ready",
+                )
+                retry_delay_secs = 1.0
             except Exception as e:
                 global_log.warn(
                     "Exception occurred when initializing k8s cache - %s\n%s"
                     % (six.text_type(e), traceback.format_exc())
                 )
+                # Unknown error.  TODO: Maybe do exponential backoff here?
+                retry_delay_secs = 0.5
 
         current_time = time.time()
         elapsed = current_time - start_time
@@ -1205,7 +1272,6 @@ class KubernetesCache(object):
 
         # start the main update loop
         last_purge = time.time()
-        last_version_check_time = 0
         while run_state.is_running():
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
@@ -1219,11 +1285,9 @@ class KubernetesCache(object):
                 self._pods_cache.mark_as_expired(current_time)
 
                 self._update_cluster_name(local_state.k8s)
-
-                # Update the api server version every hour
-                if current_time - last_version_check_time > 3600:
-                    self._update_api_server_version(local_state.k8s)
-                    last_version_check_time = current_time
+                self._update_api_server_version_if_necessary(
+                    local_state.k8s, current_time=current_time
+                )
 
                 if last_purge + local_state.cache_purge_secs < current_time:
                     global_log.log(

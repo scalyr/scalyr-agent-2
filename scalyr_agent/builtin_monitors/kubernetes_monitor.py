@@ -2480,6 +2480,12 @@ class ContainerChecker(object):
 
     def _get_container_runtime(self):
         """ Gets the container runtime currently in use """
+        if not self.k8s_cache:
+            global_log.warning(
+                "Coud not determine K8s CRI because no k8 cache.",
+                limit_once_per_x_secs=300,
+                limit_key="k8s_cri_no_cache",
+            )
         return (self.k8s_cache and self.k8s_cache.get_container_runtime()) or "unknown"
 
     def start(self):
