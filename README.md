@@ -89,8 +89,20 @@ To use pre-commit:
 To update the Pre-commit hooks including black, run `pre-commit autoupdate`.
 This will update `.pre-commit-config.yaml` and will need to be committed to the repository.
 
-
 # Contributing
 
 In the future, we will be pushing guidelines on how to contribute to this repository.  For now, please just
 feel free to submit pull requests to the `master` branch and we will work with you.
+
+## Copyright, License, and Contributors Agreement
+
+Copyright 2014-2020 Scalyr, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use this work except in
+compliance with the License. You may obtain a copy of the License in the [LICENSE](LICENSE.txt) file, or at:
+
+[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+
+By contributing you agree that these contributions are your own (or approved by your employer) and you
+grant a full, complete, irrevocable copyright license to all users and developers of the project,
+present and future, pursuant to the license of the project.
