@@ -21,6 +21,7 @@ __author__ = "czerwin@scalyr.com"
 
 from cStringIO import StringIO
 
+import re
 import mock
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
@@ -33,9 +34,9 @@ from scalyr_agent.scalyr_client import (
     Event,
     ScalyrClientSession,
 )
-from scalyr_agent import scalyr_logging
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 
 
 import scalyr_agent.test_util as test_util
@@ -895,7 +896,7 @@ class PostFixBufferTest(ScalyrTestCase):
         )
 
 
-class ClientSessionTest(ScalyrTestCase):
+class ClientSessionTest(BaseScalyrLogCaptureTestCase):
     def test_user_agent_callback(self):
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
@@ -909,21 +910,15 @@ class ClientSessionTest(ScalyrTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
-    @mock.patch('scalyr_agent.scalyr_client.log')
     @mock.patch('scalyr_agent.scalyr_client.time.time', mock.Mock(return_value=11111))
-    def test_send_request_body_is_logged_raw_uncompressed(self, mock_log):
+    def test_send_request_body_is_logged_raw_uncompressed(self):
         """
         When sending a request with compression available / enabled, raw (uncompressed) request
         body (payload) should be logged under DEBUG log level.
         """
-        self.assertEqual(mock_log.info.call_count, 0)
-
         session = ScalyrClientSession(
             "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
         )
-        # One for "using server" and other for "using session" message
-        self.assertEqual(mock_log.info.call_count, 2)
-        self.assertEqual(mock_log.log.call_count, 0)
 
         session._ScalyrClientSession__connection = mock.Mock()
         session._ScalyrClientSession__receive_response = mock.Mock()
@@ -933,18 +928,10 @@ class ClientSessionTest(ScalyrTestCase):
 
         session.send(add_events_request=add_events_request)
 
-        # Should log raw (uncompressed )request body / payload
-        expected_body = '{"foo":"bar", events: [], logs: [], threads: [], client_time: 11111 }'
+        # Should log raw (uncompressed) request body / payload
+        expected_body = re.escape(r'{"foo":"bar", events: [], logs: [], threads: [], client_time: 11111 }')
+        self.assertLogFileContainsLine(self.agent_debug_log_path, expected_body)
 
-        self.assertEqual(mock_log.log.call_count, 1)
-        call_args = mock_log.log.call_args_list[0][0]
-        log_level = call_args[0]
-        log_message = call_args[1]
-        format_string = call_args[3]
-
-        self.assertEqual(log_level, scalyr_logging.DEBUG_LEVEL_5)
-        self.assertEqual(log_message, 'Sending POST %s with body "%s"')
-        self.assertEqual(format_string, expected_body)
-
+        # Verify that the compression was indeed enabled since that's the scenario we are testing
         call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
         self.assertEqual(call_kwargs['body'], 'compressed')
