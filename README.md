@@ -1,5 +1,5 @@
-scalyr-agent-2
-==============
+# scalyr-agent-2
+
 [![CircleCI](https://circleci.com/gh/scalyr/scalyr-agent-2.svg?style=svg)](https://circleci.com/gh/scalyr/scalyr-agent-2)
 
 This repository holds the source code for the Scalyr Agent, a daemon that collects logs and metrics from
@@ -9,9 +9,7 @@ For more information on the Scalyr Agent, please visit https://www.scalyr.com/he
 
 To learn more about Scalyr, visit https://www.scalyr.com.
 
-
-Features
-========
+# Features
 
 The Scalyr Agent is designed to be lightweight, easy to install, and safe to run on production systems.
 Key features:
@@ -22,9 +20,7 @@ Key features:
   * Modular configuration files
   * Extensibility using monitor plugins
 
-
-Developing
-==========
+# Developing
 
 From this repository, you can create your own RPM and Debian packages containing customized versions of
 the Scalyr Agent. For instance, you can bundle additional monitoring plugins to collect specialized data
@@ -65,7 +61,6 @@ We strongly suggest you use the same platform that you intend to install the age
 This is because tools like `rpmbuild` and `gtar` are more available on the platforms that use those respective
 packaging systems.
 
-
 To build the RPM package, execute the following command in the root directory of this repository
 
     python build_package.py rpm
@@ -75,6 +70,7 @@ To build the Debian package, execute the following command in the root directory
     python build_package.py deb
 
 ## Code Formatting
+
 This project uses the [Black](http://black.readthedocs.io) code autoformatting tool with default settings.
 
 [Pre-commit](https://pre-commit.com) is used to automatically run checks including Black formatting
@@ -86,6 +82,7 @@ To use pre-commit:
 - To manually execute the pre-commit hooks (including black), run `pre-commit run --all-files`
 
 #### Pre-commit and Black Configuration
+
 - `.pre-commit-config.yaml` configures the scripts run by pre-commit
 - `pyproject.toml` configures the Black settings including folder exclusions for `third_party`
 
@@ -93,8 +90,7 @@ To update the Pre-commit hooks including black, run `pre-commit autoupdate`.
 This will update `.pre-commit-config.yaml` and will need to be committed to the repository.
 
 
-Contributing
-============
+# Contributing
 
 In the future, we will be pushing guidelines on how to contribute to this repository.  For now, please just
 feel free to submit pull requests to the `master` branch and we will work with you.
