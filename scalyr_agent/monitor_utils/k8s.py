@@ -1129,7 +1129,7 @@ class KubernetesCache(object):
             self._lock.release()
 
         # We only update if we haven't updated it in the last hour.
-        if is_version_set or current_time - last_check_time > 3600:
+        if not is_version_set or current_time - last_check_time > 3600:
             # Query the API server to get version.
             gitver = k8s.get_api_server_version()
 
