@@ -10,6 +10,7 @@ class FixOsEnvironUnicode(BaseFix):
     and replaces them with 'scalyr_agent.compat.environ_unicode'.
     This is needed because environ returns 'str' in python2 and we need unicode.
     """
+
     BM_compatible = True
     PATTERN = """
                 power< head='os' trailer< dot='.' method='environ' > any* >
@@ -17,13 +18,17 @@ class FixOsEnvironUnicode(BaseFix):
 
     def transform(self, node, results):
         next_sibling = node.next_sibling
-        if next_sibling and next_sibling.type == token.EQUAL and next_sibling.value == "=":
+        if (
+            next_sibling
+            and next_sibling.type == token.EQUAL
+            and next_sibling.value == "="
+        ):
             return
         prev_sibling = node.prev_sibling
         if prev_sibling and prev_sibling.type == token.NAME:
             if prev_sibling.value in ("del", "in"):
                 return
-        method = results['method']
+        method = results["method"]
         method_node = method.parent
         if str(method_node.next_sibling) in (".clear", ".update"):
             return
@@ -32,5 +37,3 @@ class FixOsEnvironUnicode(BaseFix):
         head.value = head.value.replace("os", "compat")
         method.value = "os_environ_unicode"
         node.changed()
-
-

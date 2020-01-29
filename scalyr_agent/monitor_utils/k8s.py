@@ -1602,7 +1602,9 @@ class KubernetesApi(object):
     def get_pod_name(self):
         """ Gets the pod name of the pod running the scalyr-agent """
         # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-        return os_environ_unicode.get("SCALYR_K8S_POD_NAME") or os_environ_unicode.get("HOSTNAME")
+        return os_environ_unicode.get("SCALYR_K8S_POD_NAME") or os_environ_unicode.get(
+            "HOSTNAME"
+        )
 
     def get_node_name(self, pod_name):
         """ Gets the node name of the node running the agent """

@@ -785,7 +785,9 @@ class PipeRedirectorServer(RedirectorServer):
             """
             try:
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-                win32file.WriteFile(self.__pipe_handle, compat.struct_pack_unicode("I", 0))
+                win32file.WriteFile(
+                    self.__pipe_handle, compat.struct_pack_unicode("I", 0)
+                )
                 win32file.FlushFileBuffers(self.__pipe_handle)
             finally:
                 win32pipe.DisconnectNamedPipe(self.__pipe_handle)

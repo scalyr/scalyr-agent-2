@@ -609,7 +609,9 @@ class LogFileIterator(object):
         # Note: we don't handle multi-line lines.
         if self.__parse_format == "cri":
             # 2->TODO decode line to parse it.
-            timestamp, stream, tags, message = _parse_cri_log(result.line.decode("utf-8"))
+            timestamp, stream, tags, message = _parse_cri_log(
+                result.line.decode("utf-8")
+            )
             if message is None:
                 log.warning(
                     "Didn't find a valid log line in CRI format for log %s.  Logging full line."

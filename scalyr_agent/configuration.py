@@ -46,6 +46,7 @@ from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
 
+
 class Configuration(object):
     """Encapsulates the results of a single read of the configuration file.
 

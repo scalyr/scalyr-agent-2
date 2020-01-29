@@ -90,7 +90,7 @@ FIXERS = {
     "libmodernize.fixes.fix_open",
     "custom_fixers.fix_os_environ_unicode",
     "custom_fixers.fix_os_getenv_unicode",
-    "custom_fixers.fix_struct_unicode"
+    "custom_fixers.fix_struct_unicode",
 }
 
 # pattern to find start of the area [start of 2->TOD0]
@@ -125,7 +125,6 @@ def get_diff(new_source, original_source, file_path):
 
 class TODOParseError(Exception):
     pass
-
 
 
 def parse_todo_areas(source):
@@ -410,13 +409,17 @@ if __name__ == "__main__":
 
     other_files_to_exclude = {
         os.path.join(source_root, "compat.py"),
-        os.path.join(root, "build_package.py")
+        os.path.join(root, "build_package.py"),
     }
 
     # files without third party libraries.
-    files_to_process = all_files - third_party_files - venv_files - modernize_files - other_files_to_exclude
-
-
+    files_to_process = (
+        all_files
+        - third_party_files
+        - venv_files
+        - modernize_files
+        - other_files_to_exclude
+    )
 
     # Create collection with additional modernize parameters for each file.
     files_modernize_params = collections.defaultdict(dict)
@@ -482,8 +485,7 @@ if __name__ == "__main__":
     if diffs:
         if args.write:
             print(
-                "Python-modernize found and modernized code in files:",
-                file=sys.stderr
+                "Python-modernize found and modernized code in files:", file=sys.stderr
             )
         else:
             print(

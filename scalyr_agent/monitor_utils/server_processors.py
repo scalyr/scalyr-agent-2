@@ -256,7 +256,8 @@ class Int32RequestParser(object):
             if num_bytes > self.__prefix_length:
                 # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
                 (length,) = compat.struct_unpack_unicode(
-                    six.ensure_str(self.__format), input_buffer.read(self.__prefix_length)
+                    six.ensure_str(self.__format),
+                    input_buffer.read(self.__prefix_length),
                 )
                 if length > self.__max_request_size:
                     raise RequestSizeExceeded(length, self.__max_request_size)

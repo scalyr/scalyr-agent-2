@@ -109,7 +109,7 @@ class TestReportStatus(ScalyrTestCase):
 
     def setUp(self):
         super(TestReportStatus, self).setUp()
-        self.saved_env = dict((k, v)for k, v in six.iteritems(os_environ_unicode))
+        self.saved_env = dict((k, v) for k, v in six.iteritems(os_environ_unicode))
         os.environ.clear()
         self.time = 1409958853
         self.status = AgentStatus()

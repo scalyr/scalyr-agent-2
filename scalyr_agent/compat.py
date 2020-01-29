@@ -41,9 +41,12 @@ def custom_defaultdict(default_type):
 
         return DefaultDict()
 
+
 if six.PY2:
+
     class EnvironUnicode(object):
         """Just a wrapper for os.environ, to convert its items to unicode in python2."""
+
         def __getitem__(self, item):
             value = os.environ[item]
             return six.ensure_text(value)
@@ -64,27 +67,40 @@ if six.PY2:
             """Generator that gets values from original iterable and converts its 'str' values to 'unicode'"""
             for element in iterable:
                 if type(element) is tuple:
-                    yield tuple(v.decode("utf-8") if type(v) is six.binary_type else v for v in element)
+                    yield tuple(
+                        v.decode("utf-8") if type(v) is six.binary_type else v
+                        for v in element
+                    )
                 else:
                     yield six.ensure_text(element)
 
         def iteritems(self):
-            return self._iterable_elements_to_unicode_generator(six.iteritems(os.environ))
+            return self._iterable_elements_to_unicode_generator(
+                six.iteritems(os.environ)
+            )
 
         def items(self):
-            return list(self._iterable_elements_to_unicode_generator(os.environ.items()))
+            return list(
+                self._iterable_elements_to_unicode_generator(os.environ.items())
+            )
 
         def iterkeys(self):
-            return self._iterable_elements_to_unicode_generator(six.iterkeys(os.environ))
+            return self._iterable_elements_to_unicode_generator(
+                six.iterkeys(os.environ)
+            )
 
         def keys(self):
             return list(self._iterable_elements_to_unicode_generator(os.environ.keys()))
 
         def itervalues(self):
-            return self._iterable_elements_to_unicode_generator(six.itervalues(os.environ))
+            return self._iterable_elements_to_unicode_generator(
+                six.itervalues(os.environ)
+            )
 
         def values(self):
-            return list(self._iterable_elements_to_unicode_generator(os.environ.values()))
+            return list(
+                self._iterable_elements_to_unicode_generator(os.environ.values())
+            )
 
         def __iter__(self):
             return self.iterkeys()

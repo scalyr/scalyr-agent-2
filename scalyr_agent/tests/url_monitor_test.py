@@ -72,7 +72,6 @@ class UrlMonitorTestRequest(unittest.TestCase):
         }
         config = MonitorConfig(content=config_data)
         url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
-
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "GET")
         self.assertFalse(actual_request.data is not None)

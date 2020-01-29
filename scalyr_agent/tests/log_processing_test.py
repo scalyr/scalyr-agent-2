@@ -1008,8 +1008,7 @@ class TestLogLineRedactor(ScalyrTestCase):
             redactor,
             unichr(8230) + "auth=password foo=password",
             unichr(8230)
-            + "auth=%s foo=%s"
-            % (md5_hexdigest("password"), md5_hexdigest("password")),
+            + "auth=%s foo=%s" % (md5_hexdigest("password"), md5_hexdigest("password")),
             True,
         )
 

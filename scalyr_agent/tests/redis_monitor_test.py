@@ -29,6 +29,7 @@ from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
 
 import six
 
+
 class DummyLogger(object):
     def __init__(self):
         self.command = ""

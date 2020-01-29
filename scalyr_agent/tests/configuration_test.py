@@ -53,7 +53,9 @@ from mock import patch, Mock
 class TestConfigurationBase(ScalyrTestCase):
     def setUp(self):
         super(TestConfigurationBase, self).setUp()
-        self.original_os_env = dict([(k, v) for k, v in six.iteritems(os_environ_unicode)])
+        self.original_os_env = dict(
+            [(k, v) for k, v in six.iteritems(os_environ_unicode)]
+        )
         self._config_dir = tempfile.mkdtemp()
         self._config_file = os.path.join(self._config_dir, "agent.json")
         self._config_fragments_dir = os.path.join(self._config_dir, "agent.d")

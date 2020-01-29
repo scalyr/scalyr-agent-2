@@ -320,7 +320,9 @@ def _get_default_gateway():
             if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
             # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
-            result = socket.inet_ntoa(compat.struct_pack_unicode("<L", int(fields[2], 16)))
+            result = socket.inet_ntoa(
+                compat.struct_pack_unicode("<L", int(fields[2], 16))
+            )
     except IOError as e:
         global_log.error(
             "Error while getting the default gateway: %s",
@@ -971,7 +973,12 @@ class SyslogHandler(object):
 
                 if cid is not None and cname is not None and clabels is not None:
                     # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
-                    return six.ensure_text(cname), six.ensure_text(cid), clabels, six.ensure_text(data[m.end() :])
+                    return (
+                        six.ensure_text(cname),
+                        six.ensure_text(cid),
+                        clabels,
+                        six.ensure_text(data[m.end() :]),
+                    )
 
         if self.__docker_regex_full is not None:
             reason_flags += "4"
@@ -981,7 +988,12 @@ class SyslogHandler(object):
 
             if m is not None and m.lastindex == 2:
                 # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
-                return six.ensure_text(m.group(1)), six.ensure_text(m.group(2)), {},six.ensure_text(data[m.end() :])
+                return (
+                    six.ensure_text(m.group(1)),
+                    six.ensure_text(m.group(2)),
+                    {},
+                    six.ensure_text(data[m.end() :]),
+                )
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)

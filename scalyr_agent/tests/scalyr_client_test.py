@@ -189,8 +189,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
-            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{"source":"stdout",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
 
         request.close()
@@ -215,8 +215,8 @@ class AddEventsRequestTest(ScalyrTestCase):
 
         self.assertEquals(
             request.get_payload(),
-            """{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
-            """logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
+            b"""{"token":"fakeToken", events: [{attrs:{"event":"event","source":"stdin",message:`s\x00\x00\x00\x08eventOne},ts:"1"}], """
+            b"""logs: [{"attrs":{},"id":"log2"}], threads: [{"id":"log2","name":"Log two"}], client_time: 1 }""",
         )
         request.close()
 

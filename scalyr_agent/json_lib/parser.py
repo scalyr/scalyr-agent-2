@@ -241,7 +241,9 @@ class JsonParser(object):
             elif c == "}":
                 return self.__error("'}' can only be used to end an object")
             elif c == "`":
-                return self.__error("Json_lib parser does not support length prefixed strings any more.")
+                return self.__error(
+                    "Json_lib parser does not support length prefixed strings any more."
+                )
             else:
                 return self.__error("Unexpected character '%s'" % c)
         except IndexError:
@@ -436,9 +438,7 @@ class JsonParser(object):
             c = self.__scanner.peek_next_uchar(offset=length, none_if_bad_index=True)
             if c is None:
                 break
-            elif (
-                c == "_" or "a" <= c <= "z" or "A" <= c <= "Z" or "0" <= c <= "9"
-            ):
+            elif c == "_" or "a" <= c <= "z" or "A" <= c <= "Z" or "0" <= c <= "9":
                 length += 1
             else:
                 break
@@ -452,7 +452,9 @@ class JsonParser(object):
         # Have to consume the beginning quote mark
         c = self.__scanner.read_uchar()
         if c != '"':
-            return self.__error("string literal should start with double quotation mark.")
+            return self.__error(
+                "string literal should start with double quotation mark."
+            )
 
         length = 0
         while True:
@@ -519,7 +521,7 @@ class JsonParser(object):
             elif c == "/":
                 sb.append("/")
             elif c == "u" and i + 5 <= slen:
-                hex_string = s[i + 1: i + 5]
+                hex_string = s[i + 1 : i + 5]
                 i += 4
                 sb.append(unichr(int(hex_string, 16)))
             else:
