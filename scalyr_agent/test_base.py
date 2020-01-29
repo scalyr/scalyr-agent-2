@@ -21,9 +21,13 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
+import os
 import sys
+import re
+import shutil
 import threading
 import time
+import tempfile
 import unittest
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -148,6 +152,76 @@ class BaseScalyrTestCase(unittest.TestCase):
             msg="Inherited setUp method was not invoked by class derived from ScalyrTestCase",
         )
 
+
+class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
+    """
+    Base test class which captures log data produced by code called inside the tests into the log
+    files created in "directory_path" directory as defined by that class variable.
+
+    Directory available via "directory_path" variable is automatically created in a secure random
+    fashion for each test invocation inside setUp() method.
+
+    In addition to creating this directory, this method also sets up agent logging so it logs to
+    files in that directory.
+
+    On tearDown() the log directory is removed if tests pass and assertion hasn't failed, but if the
+    assertion fails, directory is left in place so developer can inspect the log content which might
+    aid with test troubleshooting.
+    """
+    # Path to the directory with the agent logs
+    logs_directory = None  # type: Optional[str]
+
+    # Path to the main agent log file
+    agent_log_path = None  # type: Optional[str]
+
+    # Path to the agent debug log file (populated inside setUp()
+    agent_debug_log_path = None  # type: Optional[str]
+
+    # Variable which indicates if assertLogFileContainsLine assertion was used and it fails
+    # NOTE: Due to us needing to support multiple Python versions and test runners, there is no easy
+    # and simple test runner agnostic way of detecting if tests have failed
+    __assertion_failed = False  # type: bool
+
+    def setUp(self):
+        super(BaseScalyrLogCaptureTestCase, self).setUp()
+
+        self.logs_directory = tempfile.mkdtemp(suffix='agent-tests-log')
+
+        scalyr_logging.set_log_destination(
+            use_disk=True,
+            logs_directory=self.logs_directory,
+            agent_log_file_path='agent.log',
+            agent_debug_log_file_suffix='_debug'
+        )
+        scalyr_logging.__log_manager__.set_log_level(scalyr_logging.DEBUG_LEVEL_5)
+
+        self.agent_log_path = os.path.join(self.logs_directory, 'agent.log')
+        self.agent_debug_log_path = os.path.join(self.logs_directory, 'agent_debug.log')
+
+    def tearDown(self):
+        super(BaseScalyrLogCaptureTestCase, self).tearDown()
+        print(self.logs_directory)
+
+        if not self.__assertion_failed:
+            shutil.rmtree(self.logs_directory)
+
+    def assertLogFileContainsLine(self, file_path, expression):
+        """
+        Custom assertion function which asserts that the provided log file path contains the provided
+        expression.
+
+        :param file_path: Path to the file to use.
+        :param expression: Regular expression to match against each line in the file.
+        """
+        matcher = re.compile(expression)
+
+        with open(file_path, 'r') as fp:
+            for line in fp:
+                if matcher.search(line):
+                    return True
+
+        self.__assertion_failed = True
+        self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
 
 if sys.version_info[:2] < (2, 7):
 
