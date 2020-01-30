@@ -47,6 +47,7 @@ import os
 import re
 import sys
 import shutil
+from io import open
 
 if path.isdir("source_root"):
     sys.path.append("source_root")

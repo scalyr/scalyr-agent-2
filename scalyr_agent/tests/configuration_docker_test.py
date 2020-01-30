@@ -1,6 +1,6 @@
+from __future__ import unicode_literals
 from __future__ import absolute_import
 import os
-from mock import patch, Mock
 
 from scalyr_agent import scalyr_monitor
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
@@ -9,6 +9,9 @@ from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfiguration
+
+from mock import patch, Mock
+import six
 
 
 class TestConfigurationDocker(TestConfiguration):
@@ -48,9 +51,9 @@ class TestConfigurationDocker(TestConfiguration):
         # config_param_name: (custom_env_name, test_value)
         docker_testmap = {
             "container_check_interval": (STANDARD_PREFIX, TEST_INT, int),
-            "docker_api_version": (STANDARD_PREFIX, TEST_STRING, str),
-            "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, str),
-            "log_mode": ("SCALYR_DOCKER_LOG_MODE", TEST_STRING, str),
+            "docker_api_version": (STANDARD_PREFIX, TEST_STRING, six.text_type),
+            "docker_log_prefix": (STANDARD_PREFIX, TEST_STRING, six.text_type),
+            "log_mode": ("SCALYR_DOCKER_LOG_MODE", TEST_STRING, six.text_type),
             "docker_raw_logs": (
                 STANDARD_PREFIX,
                 False,
@@ -80,7 +83,7 @@ class TestConfigurationDocker(TestConfiguration):
                 ArrayOfStrings,
             ),
             "labels_as_attributes": (STANDARD_PREFIX, True, bool),
-            "label_prefix": (STANDARD_PREFIX, TEST_STRING, str),
+            "label_prefix": (STANDARD_PREFIX, TEST_STRING, six.text_type),
             "use_labels_for_log_config": (STANDARD_PREFIX, False, bool),
         }
 
@@ -92,13 +95,13 @@ class TestConfigurationDocker(TestConfiguration):
                 if custom_name == STANDARD_PREFIX
                 else custom_name.upper()
             )
-            envar_value = str(value[1])
+            param_value = value[1]
             if value[2] == ArrayOfStrings:
                 # Array of strings should be entered into environment in the user-preferred format
                 # which is without square brackets and quotes around each element
-                envar_value = envar_value[1:-1]  # strip square brackets
-                envar_value = envar_value.replace("'", "")
+                envar_value = ", ".join(param_value)
             else:
+                envar_value = six.text_type(param_value)
                 envar_value = (
                     envar_value.lower()
                 )  # lower() needed for proper bool encoding

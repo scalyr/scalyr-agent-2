@@ -14,20 +14,23 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
 import os
 import random
-import scalyr_agent.scalyr_logging as scalyr_logging
 import time
 import traceback
+from io import open
 
 try:
     import yappi
 except ImportError:
     yappi = None
+
+import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
 
@@ -177,7 +180,8 @@ class Profiler(object):
         except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Failed to update profiler: %s, %s" % (str(e), traceback.format_exc()),
+                "Failed to update profiler: %s, %s"
+                % (six.text_type(e), traceback.format_exc()),
                 limit_once_per_x_secs=300,
                 limit_key="profiler-update",
             )

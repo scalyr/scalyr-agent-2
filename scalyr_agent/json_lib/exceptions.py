@@ -19,6 +19,7 @@
 #    JsonParseException:  Raised when parsing a string as JSON fails.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 
 __author__ = "czerwin@scalyr.com"
 
