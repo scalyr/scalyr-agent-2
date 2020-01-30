@@ -1,0 +1,30 @@
+codecov:
+  notify:
+    require_ci_to_pass: yes
+
+coverage:
+  precision: 2         # decimal places to display: 0 <= value <= 4
+  round: nearest
+  range: 50...90      # custom range of coverage colors from red -> yellow -> green
+
+  status:
+    project:
+      default:
+        default: false
+        # TODO: Define threshold once we agree on them
+        #target: auto
+        #threshold: 2%
+        #patch: yes
+
+# Code coverage data needs to be relative to the repo root, but in out reports it's
+# relative to /home/circleci/scalyr-agent-2/ so we need to fix the paths so it works
+# correctly on codecov.io
+fixes:
+    - "/home/circleci/scalyr-agent-2/::"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: yes
+  require_head: yes
