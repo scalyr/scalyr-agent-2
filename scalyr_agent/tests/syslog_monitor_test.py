@@ -261,14 +261,17 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
 
 class TestAutoFlushingRotatingFileHandler(AutoFlushingRotatingFileHandler):
     """subclass of AutoFlushingRotatingFileHandler with overridden '_internal_flush'
-    to notify test thread that stream was flushed. """
+    to notify test thread that stream was flushed.
+    AutoFlushingRotatingFileHandler is inherited from old-style class in python2.6, that's why we can not use 'super'.
+    """
 
     def __init__(self, *args, **kwargs):
-        super(TestAutoFlushingRotatingFileHandler, self).__init__(*args, **kwargs)
+        AutoFlushingRotatingFileHandler.__init__(self, *args, **kwargs)
+
         self.event = threading.Event()
 
     def _internal_flush(self):
-        super(TestAutoFlushingRotatingFileHandler, self)._internal_flush()
+        AutoFlushingRotatingFileHandler._internal_flush(self)
         self.event.set()
 
 
