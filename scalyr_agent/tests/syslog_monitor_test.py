@@ -29,15 +29,17 @@ import uuid
 import os
 from io import open
 from io import StringIO
+import threading
 
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogMonitor
 from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
-
+from scalyr_agent.builtin_monitors.syslog_monitor import AutoFlushingRotatingFileHandler
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.util import StoppableThread
 
 import six
+import mock
 
 
 class SyslogFrameParserTestCase(unittest.TestCase):
@@ -257,6 +259,19 @@ class SyslogMonitorConfigTest(SyslogMonitorTestCase):
         )
 
 
+class TestAutoFlushingRotatingFileHandler(AutoFlushingRotatingFileHandler):
+    """subclass of AutoFlushingRotatingFileHandler with overridden '_internal_flush'
+    to notify test thread that stream was flushed. """
+
+    def __init__(self, *args, **kwargs):
+        super(TestAutoFlushingRotatingFileHandler, self).__init__(*args, **kwargs)
+        self.event = threading.Event()
+
+    def _internal_flush(self):
+        super(TestAutoFlushingRotatingFileHandler, self)._internal_flush()
+        self.event.set()
+
+
 class SyslogMonitorConnectTest(SyslogMonitorTestCase):
     @classmethod
     def setUpClass(cls):
@@ -315,6 +330,17 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         return connected
 
+    def wait_for_flush(self):
+        """wait for event from 'TestAutoFlushingRotatingFileHandler._internal_flush'"""
+
+        # Get mocked file handler from _disk_logger.
+        self.monitor._disk_logger.handlers[0].event.wait()
+        self.monitor._disk_logger.handlers[0].event.clear()
+
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler",
+        TestAutoFlushingRotatingFileHandler,
+    )
     def test_run_tcp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -333,7 +359,12 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         expected = "TCP TestXX\n"
         self.connect(s, ("localhost", 8514))
         s.sendall(expected.encode("utf-8"))
-        time.sleep(1)
+
+        # file flush is done, we can safely read it.
+        self.wait_for_flush()
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
@@ -348,6 +379,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             "Unable to find '%s' in output:\n\t %s" % (expected, actual),
         )
 
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler",
+        TestAutoFlushingRotatingFileHandler,
+    )
     def test_run_udp_server(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -366,7 +401,13 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         expected = "UDP Test %s" % (uuid.uuid4())
         s.sendto(expected.encode("utf-8"), ("localhost", 5514))
-        time.sleep(1)
+
+        # file flush is done, we can safely read it.
+        self.wait_for_flush()
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
+
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
         f = open("agent_syslog.log", "r")
@@ -376,6 +417,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             "Unable to find '%s' in output:\n\t %s" % (expected, actual),
         )
 
+    @mock.patch(
+        "scalyr_agent.builtin_monitors.syslog_monitor.AutoFlushingRotatingFileHandler",
+        TestAutoFlushingRotatingFileHandler,
+    )
     def test_run_multiple_servers(self):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
@@ -414,7 +459,11 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         expected_tcp2 = "TCP2 Test\n"
         tcp2.sendall(expected_tcp2.encode("utf-8"))
 
-        time.sleep(1)
+        # file flush is done, we can safely read it.
+        self.wait_for_flush()
+
+        # without close, the logger will interfere with other test cases.
+        self.monitor.close_metric_log()
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
