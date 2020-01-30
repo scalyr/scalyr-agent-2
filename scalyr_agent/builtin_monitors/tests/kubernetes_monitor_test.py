@@ -15,17 +15,11 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
-from six.moves import range
 
 __author__ = "echee@scalyr.com"
 
-
-import mock
-from mock import patch
-import threading
-import time
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
@@ -39,6 +33,10 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.tests.copying_manager_test import FakeMonitor
 from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache, FakeK8s
+
+import mock
+from mock import patch
+from six.moves import range
 
 
 class KubernetesMonitorTest(ScalyrTestCase):

@@ -25,6 +25,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -33,6 +34,9 @@ __author__ = "czerwin@scalyr.com"
 import os
 
 import scalyr_agent.util as scalyr_util
+from scalyr_agent import compat
+
+import six
 
 
 class AgentStatus(object):
@@ -340,7 +344,8 @@ def report_status(output, status, current_time):
 
     if status.config_status.last_error is not None:
         print(
-            "Parsing error:         %s" % str(status.config_status.last_error),
+            "Parsing error:         %s"
+            % six.text_type(status.config_status.last_error),
             file=output,
         )
 
@@ -368,7 +373,7 @@ def report_status(output, status, current_time):
         row = 0
         for kup in sorted_upperkeys:
             key = upper2actualkey.get(kup, kup)
-            val = os.getenv(key)
+            val = compat.os_getenv_unicode(key)
             if not val:
                 val = "<Missing>"
             elif key.upper() in redacted_keys:

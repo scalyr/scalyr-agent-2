@@ -15,6 +15,7 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
@@ -40,91 +41,91 @@ class SyslogRequestParserTestCase(ScalyrTestCase):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
 
-        parser.process("5 hello5 world", handler.handle)
+        parser.process(b"5 hello5 world", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual("hello", handler.values[0])
-        self.assertEqual("world", handler.values[1])
+        self.assertEqual(b"hello", handler.values[0])
+        self.assertEqual(b"world", handler.values[1])
 
     def test_framed_message_incomplete(self):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
 
-        parser.process("11 hello", handler.handle)
+        parser.process(b"11 hello", handler.handle)
 
         self.assertEqual(0, len(handler.values))
 
-        parser.process(" world", handler.handle)
+        parser.process(b" world", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual("hello world", handler.values[0])
+        self.assertEqual(b"hello world", handler.values[0])
 
     def test_framed_message_multiple_incomplete(self):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
 
-        parser.process("11 hello", handler.handle)
+        parser.process(b"11 hello", handler.handle)
 
         self.assertEqual(0, len(handler.values))
-        parser.process(" w", handler.handle)
+        parser.process(b" w", handler.handle)
 
         self.assertEqual(0, len(handler.values))
-        parser.process("or", handler.handle)
+        parser.process(b"or", handler.handle)
 
         self.assertEqual(0, len(handler.values))
-        parser.process("ld", handler.handle)
+        parser.process(b"ld", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual("hello world", handler.values[0])
+        self.assertEqual(b"hello world", handler.values[0])
 
     def test_framed_message_invalid_frame_size(self):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
         self.assertRaises(
-            ValueError, lambda: parser.process("1a1 hello", handler.handle)
+            ValueError, lambda: parser.process(b"1a1 hello", handler.handle)
         )
 
     def test_framed_message_exceeds_max_size(self):
         parser = SyslogRequestParser(None, 11)
         handler = Handler()
-        parser.process("23 hello world h", handler.handle)
-        parser.process("10 lo world .", handler.handle)
+        parser.process(b"23 hello world h", handler.handle)
+        parser.process(b"10 lo world .", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual("23 hello world h", handler.values[0])
-        self.assertEqual(" 10 lo world .", handler.values[1])
+        self.assertEqual(b"23 hello world h", handler.values[0])
+        self.assertEqual(b" 10 lo world .", handler.values[1])
 
     def test_unframed_messages(self):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
-        parser.process("hello\nworld\n", handler.handle)
+        parser.process(b"hello\nworld\n", handler.handle)
 
         self.assertEqual(2, len(handler.values))
-        self.assertEqual("hello", handler.values[0])
-        self.assertEqual("world", handler.values[1])
+        self.assertEqual(b"hello", handler.values[0])
+        self.assertEqual(b"world", handler.values[1])
 
     def test_unframed_messages_incomplete(self):
         parser = SyslogRequestParser(None, 32)
         handler = Handler()
 
-        parser.process("hello", handler.handle)
+        parser.process(b"hello", handler.handle)
         self.assertEqual(0, len(handler.values))
 
-        parser.process(" world\n", handler.handle)
+        parser.process(b" world\n", handler.handle)
 
         self.assertEqual(1, len(handler.values))
-        self.assertEqual("hello world", handler.values[0])
+        self.assertEqual(b"hello world", handler.values[0])
 
     def test_unframed_message_exceeds_max_size(self):
         parser = SyslogRequestParser(None, 13)
         handler = Handler()
 
-        parser.process("in my hand i have ", handler.handle)
+        parser.process(b"in my hand i have ", handler.handle)
         self.assertEqual(1, len(handler.values))
-        self.assertEqual("in my hand i have ", handler.values[0])
-        parser.process("100 dollars\n", handler.handle)
+        self.assertEqual(b"in my hand i have ", handler.values[0])
+        parser.process(b"100 dollars\n", handler.handle)
         self.assertEqual(2, len(handler.values))
-        self.assertEqual("100 dollars", handler.values[1])
+        self.assertEqual(b"100 dollars", handler.values[1])
 
 
 if __name__ == "__main__":

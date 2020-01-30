@@ -1,12 +1,15 @@
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import os
 import re
 import copy
 import logging
 from string import Template
 
-from scalyr_agent import scalyr_logging
+import six
 
+from scalyr_agent import scalyr_logging
 from scalyr_agent.json_lib import JsonObject
 
 # TODO: The plan for this LogConfigManager is to eventually have it as a base class without any of the journald specific
@@ -83,7 +86,7 @@ class LogConfigManager:
             config["journald_unit"] = ".*"
         file_template = Template("journald_${ID}.log")
         regex = re.compile(config["journald_unit"])
-        match_hash = str(hash(config["journald_unit"]))
+        match_hash = six.text_type(hash(config["journald_unit"]))
         if config["journald_unit"] == ".*":
             match_hash = "monitor"
         full_path = os.path.join(

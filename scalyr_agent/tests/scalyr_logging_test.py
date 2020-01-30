@@ -15,6 +15,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
@@ -22,6 +23,7 @@ __author__ = "czerwin@scalyr.com"
 import os
 import re
 import tempfile
+from io import open
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -38,6 +40,7 @@ class ScalyrLoggingTest(ScalyrTestCase):
             agent_log_file_path=self.__log_path,
         )
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
+        self.__logger.set_keep_last_record(False)
 
     def test_output_to_file(self):
         self.__logger.info("Hello world")
@@ -235,40 +238,59 @@ class ScalyrLoggingTest(ScalyrTestCase):
         Drop log messages with log size > max_write_burst but do not drop
         following small log messages
         """
+        max_write_burst = 500
+        log_write_rate = 20000
+
         self.__log_path = tempfile.mktemp(".log")
         scalyr_logging.set_log_destination(
             use_disk=True,
             logs_directory=os.path.dirname(self.__log_path),
             agent_log_file_path=self.__log_path,
-            max_write_burst=250,
-            log_write_rate=20000,
+            max_write_burst=max_write_burst,
+            log_write_rate=log_write_rate,
         )
         self.__logger = scalyr_logging.getLogger("scalyr_agent.agent_main")
 
         self.__logger.set_keep_last_record(True)
-        try:
-            string_300 = "a" * 300
+        # NOTE: Actual value which is being used for the rate limitting is the formatted value
+        # and that value contains much more information than the string we generate here.
+        # This means that 450 + common formatted string data will aways be > 500 and we need to
+        # make sure that "max_write_burst" value we use is large enough so formatted "First
+        # message" and "Second message" (with a warning) fit in that value, otherwise depending
+        # on the timing and fill rate, the test may fail.
+        string_450 = "a" * 450
 
-            self.__logger.info("First message")
-            self.assertTrue(self.__log_contains("First message"))
+        self.__logger.info("First message")
+        self.assertTrue(self.__log_contains("First message"))
 
-            self.__logger.info("Dropped message %s", string_300)
-            self.assertFalse(self.__log_contains("Dropped message"))
+        first_message_record = self.__logger.last_record
+        self.assertEqual(first_message_record.message, 'First message')
 
-            self.__logger.info("Second message")
-            has_second_message = self.__log_contains("Second message")
-            last_record = self.__logger.last_record
-            # TODO: Remove these extra asserts once we have determined the cause of this test case
-            # being flaky: https://scalyr.myjetbrains.com/youtrack/issue/AGENT-313
-            self.assertEqual("Second message", last_record.message)
-            self.assertEqual(1, last_record.rate_limited_dropped_records)
-            self.assertTrue(last_record.rate_limited_result)
-            self.assertTrue(last_record.rate_limited_set)
+        self.__logger.info("Dropped message %s", string_450)
+        self.assertFalse(self.__log_contains("Dropped message"))
 
-            self.assertTrue(has_second_message)
-            self.assertTrue(self.__log_contains("Warning, skipped writing 1 log lines"))
-        finally:
-            self.__logger.set_keep_last_record(False)
+        self.__logger.info("Second message")
+        has_second_message = self.__log_contains("Second message")
+        second_message_record = self.__logger.last_record
+
+        second_message_record = self.__logger.last_record
+        self.assertEqual(second_message_record.message, 'Second message')
+
+        # Verify that formatted first mesage + second message length is not larger then 500
+        # (max_write_burst) which would indicate invalid test which may intermediatly fail
+        # depending on the test timing
+        self.assertEqual(1, second_message_record.rate_limited_dropped_records)
+
+        if ((first_message_record.formatted_size + second_message_record.formatted_size) >=
+                max_write_burst):
+            self.fail('Length of the formatted first and second mesage string is longer than '
+                      '%s bytes (max_write_burst). Increase max_write_burst used or update the '
+                      'strings otherwise tests may occasionally fail.' % (max_write_burst))
+
+        self.assertTrue(second_message_record.rate_limited_result)
+        self.assertTrue(second_message_record.rate_limited_set)
+        self.assertTrue(has_second_message)
+        self.assertTrue(self.__log_contains("Warning, skipped writing 1 log lines"))
 
     def test_limit_once_per_x_secs(self):
         log = scalyr_logging.getLogger("scalyr_agent.foo")

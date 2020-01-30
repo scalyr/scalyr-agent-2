@@ -14,13 +14,16 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
+
+__author__ = "czerwin@scalyr.com"
+
 import os
 import tempfile
 import errno
 import fcntl
-
-__author__ = "czerwin@scalyr.com"
+from io import open
 
 
 from scalyr_agent.platform_posix import StatusReporter, PidfileManager
