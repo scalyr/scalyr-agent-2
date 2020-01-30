@@ -14,9 +14,9 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
+from scalyr_agent import compat
 
 __author__ = "imron@scalyr.com"
 
@@ -30,11 +30,15 @@ import re
 from socket import error as socket_error
 import socket
 import struct
-import six.moves.socketserver
 import threading
 import time
 import traceback
 from string import Template
+from io import open
+
+import six
+from six.moves import range
+import six.moves.socketserver
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -76,7 +80,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.syslog_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
@@ -86,7 +90,7 @@ define_config_option(
     "messages. You can include one or more entries, separated by commas. Each entry must be of the "
     "form ``tcp:NNN`` or ``udp:NNN``. Port numbers are optional, defaulting to 601 for TCP and 514 "
     "for UDP",
-    convert_to=str,
+    convert_to=six.text_type,
     default="tcp",
 )
 
@@ -105,7 +109,7 @@ define_config_option(
     "Optional (defaults to ``agent_syslog.log``). Specifies the file name under which syslog messages "
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
-    convert_to=str,
+    convert_to=six.text_type,
     default="agent_syslog.log",
 )
 
@@ -113,7 +117,7 @@ define_config_option(
     __monitor__,
     "parser",
     "Optional (defaults to ``agentSyslog``). Defines the parser name associated with the log file",
-    convert_to=str,
+    convert_to=six.text_type,
     default="agentSyslog",
 )
 
@@ -169,7 +173,7 @@ define_config_option(
     "check for container ids in the tags of the incoming lines and create log files based on their "
     "container names.",
     default="syslog",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -178,7 +182,7 @@ define_config_option(
     "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
     "only has the container id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
-    convert_to=str,
+    convert_to=six.text_type,
     default="^.*([a-z0-9]{12})\[\d+\]: ?",
 )
 
@@ -188,7 +192,7 @@ define_config_option(
     "Regular expression for parsing out docker logs from a syslog message when the tag sent to syslog "
     "included both the container name and id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
-    convert_to=str,
+    convert_to=six.text_type,
     default="^.*([^/]+)/([^[]+)\[\d+\]: ?",
 )
 
@@ -219,7 +223,7 @@ define_config_option(
     "Note:  You need to map the host's /run/docker.sock to the same value as specified here, using "
     "the -v parameter, e.g.\n"
     "\tdocker run -v /run/docker.sock:/var/scalyr/docker.sock ...",
-    convert_to=str,
+    convert_to=six.text_type,
     default="/var/scalyr/docker.sock",
 )
 
@@ -229,7 +233,7 @@ define_config_option(
     "Optional (defaults to 'auto'). The version of the Docker API to use when communicating to "
     "docker.  WARNING, you must also set the `docker_api_version` configuration option in the docker "
     "monitor to this same value.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="auto",
 )
 
@@ -241,7 +245,7 @@ define_config_option(
     "$CID will be substituted with the name and id of the container that is emitting the logs.  If "
     "the path is not absolute, then it is assumed to be relative to the main Scalyr Agent log "
     "directory.",
-    convert_to=str,
+    convert_to=six.text_type,
     default="containers/${CNAME}.log",
 )
 
@@ -315,12 +319,14 @@ def _get_default_gateway():
             fields = line.strip().split()
             if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
-
-            result = socket.inet_ntoa(struct.pack("<L", int(fields[2], 16)))
+            # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+            result = socket.inet_ntoa(
+                compat.struct_pack_unicode("<L", int(fields[2], 16))
+            )
     except IOError as e:
         global_log.error(
             "Error while getting the default gateway: %s",
-            str(e),
+            six.text_type(e),
             limit_once_per_x_secs=300,
             limit_key="_get_default_gateway_error",
         )
@@ -461,7 +467,7 @@ class SyslogRequestParser(object):
             else:
                 global_log.warning(
                     "Network error while reading from syslog: %s",
-                    str(e),
+                    six.text_type(e),
                     limit_once_per_x_secs=300,
                     limit_key="syslog-network-error",
                 )
@@ -472,6 +478,7 @@ class SyslogRequestParser(object):
 
     def process(self, data, handle_frame):
         """Processes data returned from a previous call to read
+        :type data: six.binary_type
         """
         if not data:
             global_log.warning(
@@ -496,15 +503,16 @@ class SyslogRequestParser(object):
         while self._offset < size:
 
             # get the first byte to determine if framed or not
-            c = self._remaining[self._offset]
-            framed = c >= "0" and c <= "9"
+            # 2->TODO use slicing to get bytes in both python versions.
+            c = self._remaining[self._offset : self._offset + 1]
+            framed = b"0" <= c <= b"9"
 
             skip = 0  # do we need to skip any bytes at the end of the frame (e.g. newlines)
 
             # if framed, read the frame size
             if framed:
                 frame_end = -1
-                pos = self._remaining.find(" ", self._offset)
+                pos = self._remaining.find(b" ", self._offset)
                 if pos != -1:
                     frame_size = int(self._remaining[self._offset : pos])
                     message_offset = pos + 1
@@ -513,7 +521,7 @@ class SyslogRequestParser(object):
                         frame_end = self._offset + frame_size
             else:
                 # not framed, find the first newline
-                frame_end = self._remaining.find("\n", self._offset)
+                frame_end = self._remaining.find(b"\n", self._offset)
                 skip = 1
 
             # if we couldn't find the end of a frame, then it's time
@@ -532,7 +540,7 @@ class SyslogRequestParser(object):
                     frames_handled += 1
                     # add a space to ensure the next frame won't start with a number
                     # and be incorrectly interpreted as a framed message
-                    self._remaining = " "
+                    self._remaining = b" "
                     self._offset = 0
 
                 break
@@ -593,7 +601,9 @@ class SyslogTCPHandler(six.moves.socketserver.BaseRequestHandler):
 
         except Exception as e:
             global_log.warning(
-                "Error handling request: %s\n\t%s", str(e), traceback.format_exc()
+                "Error handling request: %s\n\t%s",
+                six.text_type(e),
+                traceback.format_exc(),
             )
 
         global_log.log(
@@ -615,7 +625,7 @@ class SyslogUDPServer(
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "UDP Server: binding socket to %s" % str(address),
+            "UDP Server: binding socket to %s" % six.text_type(address),
         )
 
         self.allow_reuse_address = True
@@ -641,7 +651,7 @@ class SyslogTCPServer(
         address = (bind_address, port)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "TCP Server: binding socket to %s" % str(address),
+            "TCP Server: binding socket to %s" % six.text_type(address),
         )
 
         self.allow_reuse_address = True
@@ -718,7 +728,7 @@ class LogDeleter(object):
                     except OSError as e:
                         global_log.warn(
                             "Unable to read modification time for file '%s', %s"
-                            % (rotated_file, str(e)),
+                            % (rotated_file, six.text_type(e)),
                             limit_once_per_x_secs=300,
                             limit_key="mtime-%s" % rotated_file,
                         )
@@ -726,7 +736,7 @@ class LogDeleter(object):
             except OSError as e:
                 global_log.warn(
                     "Unable to read modification time for file '%s', %s"
-                    % (matching_file, str(e)),
+                    % (matching_file, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="mtime-%s" % matching_file,
                 )
@@ -755,7 +765,8 @@ class LogDeleter(object):
                 )
             except OSError as e:
                 global_log.warn(
-                    "Error deleting old log file '%s', %s" % (filename, str(e)),
+                    "Error deleting old log file '%s', %s"
+                    % (filename, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="delete-%s" % filename,
                 )
@@ -917,7 +928,9 @@ class SyslogHandler(object):
             )
 
         except Exception as e:
-            global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
+            global_log.error(
+                "Unable to open SyslogMonitor log file: %s" % six.text_type(e)
+            )
             result = None
 
         return result
@@ -930,10 +943,10 @@ class SyslogHandler(object):
         If that fails, attempts to extract the container id and container name using the `__docker_regex_full`.
 
         @param data: The incoming line
-        @type data: str
+        @type data: six.text_type
         @return: The container name, container id, container labels (or an empty dict) and the rest of the line if extract was successful.  Otherwise,
             None, None, None, None.
-        @rtype: str, str, dict, str
+        @rtype: six.text_type, six.text_type, dict, six.text_type
         """
         # The reason flags contains some information about the code path used when a container id is not found.
         # We emit this to the log to help us debug customer issues.
@@ -960,7 +973,12 @@ class SyslogHandler(object):
 
                 if cid is not None and cname is not None and clabels is not None:
                     # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Resolved container name')
-                    return cname, cid, clabels, data[m.end() :]
+                    return (
+                        six.ensure_text(cname),
+                        six.ensure_text(cid),
+                        clabels,
+                        six.ensure_text(data[m.end() :]),
+                    )
 
         if self.__docker_regex_full is not None:
             reason_flags += "4"
@@ -970,7 +988,12 @@ class SyslogHandler(object):
 
             if m is not None and m.lastindex == 2:
                 # global_log.log(scalyr_logging.DEBUG_LEVEL_3, 'Matched cid/cname syslog format')
-                return m.group(1), m.group(2), {}, data[m.end() :]
+                return (
+                    six.ensure_text(m.group(1)),
+                    six.ensure_text(m.group(2)),
+                    {},
+                    six.ensure_text(data[m.end() :]),
+                )
 
         regex_str = self.__get_pattern_str(self.__docker_regex)
         regex_full_str = self.__get_pattern_str(self.__docker_regex_full)
@@ -994,7 +1017,7 @@ class SyslogHandler(object):
         result = None
         if regex_value is not None:
             result = regex_value.pattern
-        return str(result)
+        return six.text_type(result)
 
     def __handle_docker_logs(self, data):
 
@@ -1102,7 +1125,7 @@ class SyslogHandler(object):
         else:
             self.__logger.info(data)
         # We add plus one because the calling code strips off the trailing new lines.
-        self.__line_reporter(data.count("\n") + 1)
+        self.__line_reporter(data.count(b"\n") + 1)
 
 
 class RequestVerifier(object):
@@ -1124,7 +1147,7 @@ class RequestVerifier(object):
         if not result:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_4,
-                "Rejecting request from %s" % str(client_address),
+                "Rejecting request from %s" % six.text_type(client_address),
             )
 
         return result
@@ -1164,7 +1187,8 @@ class SyslogServer(object):
                 accept_ips = [gateway_ip]
 
         global_log.log(
-            scalyr_logging.DEBUG_LEVEL_2, "Accept ips are: %s" % str(accept_ips)
+            scalyr_logging.DEBUG_LEVEL_2,
+            "Accept ips are: %s" % six.text_type(accept_ips),
         )
 
         docker_logging = config.get("mode") == "docker"
@@ -1490,7 +1514,9 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 self.__disk_logger.propagate = False
                 success = True
             except Exception as e:
-                global_log.error("Unable to open SyslogMonitor log file: %s" % str(e))
+                global_log.error(
+                    "Unable to open SyslogMonitor log file: %s" % six.text_type(e)
+                )
 
         return success
 

@@ -16,7 +16,7 @@
 # This monitor imports the Redis SLOWLOG.
 #
 # author:  Imron Alston <imron@scalyr.com>
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
@@ -31,7 +31,7 @@ from scalyr_agent import ScalyrMonitor
 from redis.client import Redis
 from redis.exceptions import ConnectionError, TimeoutError
 
-MORE_BYTES = re.compile("\.\.\. \(\d+ more bytes\)$")
+MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")
 
 
 class RedisHost(object):
@@ -187,14 +187,16 @@ class RedisHost(object):
 
     def log_entry(self, logger, entry):
         # check to see if redis truncated the command
-        match = MORE_BYTES.search(entry["command"])
+        entry_command = entry["command"]
+        match = MORE_BYTES.search(entry_command)
         if match:
             pos, length = match.span()
             pos -= 1
             # find the first byte which is not a 'middle' byte in utf8
             # middle bytes always begin with b10xxxxxx which means they
             # will be >= b10000000 and <= b10111111
-            while pos > 0 and 0x80 <= ord(entry["command"][pos]) <= 0xBF:
+            # 2->TODO use bytes slicing to get single element bytes array in both python versions.
+            while pos > 0 and 0x80 <= ord(entry_command[pos : pos + 1]) <= 0xBF:
                 pos -= 1
 
             # at this point, entry['command'][pos] will either be a single byte character or
@@ -202,24 +204,24 @@ class RedisHost(object):
             # If it's a single character, skip over it so it's included in the slice
             # If it's the start of a truncated multibyte character don't do anything
             # and the truncated bytes will be removed with the slice
-            if ord(entry["command"][pos]) < 0x80:
+            # 2->TODO use bytes slicing to get single element bytes array in both python versions.
+            if ord(entry_command[pos : pos + 1]) < 0x80:
                 pos += 1
 
             # slice off any unwanted parts of the string
-            entry["command"] = entry["command"][:pos] + match.group()
+            entry_command = entry_command[:pos] + match.group()
 
-        command = ""
         try:
-            command = entry["command"].decode("utf8")
+            command = entry_command.decode("utf8")
         except UnicodeDecodeError as e:
             if self.utf8_warning_interval:
                 logger.warn(
                     "Redis command contains invalid utf8: %s"
-                    % binascii.hexlify(entry["command"]),
+                    % binascii.hexlify(entry_command),
                     limit_once_per_x_secs=self.utf8_warning_interval,
                     limit_key="redis-utf8",
                 )
-            command = entry["command"].decode("utf8", "replace")
+            command = entry_command.decode("utf8", "replace")
 
         time_format = "%Y-%m-%d %H:%M:%SZ"
         logger.emit_value(

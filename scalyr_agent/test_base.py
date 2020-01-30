@@ -16,6 +16,7 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -26,6 +27,8 @@ import threading
 import time
 import unittest
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+import six
 
 from scalyr_agent.util import StoppableThread
 
@@ -99,7 +102,7 @@ def _thread_watcher():
     # its threads properly.  Let's get some information on them.
     print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
-        print("Active thread %s daemon=%s" % (t.getName(), str(t.isDaemon())))
+        print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
     print("Done")
 
 
@@ -139,7 +142,7 @@ class BaseScalyrTestCase(unittest.TestCase):
 
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
-        StoppableThread.set_name_prefix("TestCase %s: " % str(self))
+        StoppableThread.set_name_prefix("TestCase %s: " % six.text_type(self))
         return unittest.TestCase.run(self, result=result)
 
     def verify_setup_invoked(self):
@@ -179,26 +182,32 @@ if sys.version_info[:2] < (2, 7):
             if msg is not None:
                 self.assertTrue(obj is None, msg)
             else:
-                self.assertTrue(obj is None, "%s is not None" % (str(obj)))
+                self.assertTrue(obj is None, "%s is not None" % (six.text_type(obj)))
 
         def assertIsNotNone(self, obj, msg=None):
             """Included for symmetry with assertIsNone."""
             if msg is not None:
                 self.assertTrue(obj is not None, msg)
             else:
-                self.assertTrue(obj is not None, "%s is None" % (str(obj)))
+                self.assertTrue(obj is not None, "%s is None" % (six.text_type(obj)))
 
         def assertGreater(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a > b, msg)
             else:
-                self.assertTrue(a > b, "%s is greater than %s" % (str(a), str(b)))
+                self.assertTrue(
+                    a > b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
 
         def assertLess(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a < b, msg)
             else:
-                self.assertTrue(a < b, "%s is greater than %s" % (str(a), str(b)))
+                self.assertTrue(
+                    a < b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
 
 
 else:

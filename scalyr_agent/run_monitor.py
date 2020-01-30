@@ -37,6 +37,7 @@
 #                          gather_sample method.
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
@@ -61,6 +62,8 @@ else:
 # [end of 2->TOD0]
 
 scalyr_init()
+
+import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -105,7 +108,7 @@ def run_standalone_monitor(
     except JsonParseException as e:
         print(
             "Failed to parse the monitor configuration as valid JSON: %s",
-            str(e),
+            six.text_type(e),
             file=sys.stderr,
         )
         return 1
@@ -144,7 +147,7 @@ def run_standalone_monitor(
         while monitor.isAlive():
             time.sleep(0.1)
     except BadMonitorConfiguration as e:
-        print("Invalid monitor configuration: %s" % str(e), file=sys.stderr)
+        print("Invalid monitor configuration: %s" % six.text_type(e), file=sys.stderr)
 
     return 0
 
@@ -211,7 +214,7 @@ if __name__ == "__main__":
     except ValueError:
         print(
             "Invalid value for the --debug-level option: %s.  Must be a number between 0 and 5 "
-            % str(options.debug_level),
+            % six.text_type(options.debug_level),
             file=sys.stderr,
         )
         sys.exit(1)

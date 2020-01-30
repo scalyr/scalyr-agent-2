@@ -64,6 +64,10 @@ elif [[ $PYTHON_VERSION == "2.6.tls12" ]]; then
 elif [[ $PYTHON_VERSION == "2.7.tls12" ]]; then
     export PYENV_VERSION="2.7.12"
     SIMULATE_TLS12_FAILURE=true
+elif [[ $PYTHON_VERSION == "3.6" ]]; then
+    export PYENV_VERSION="3.6.9"
+elif [[ $PYTHON_VERSION == "3.7" ]]; then
+    export PYENV_VERSION="3.7.3"
 fi
 
 
