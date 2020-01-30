@@ -19,7 +19,7 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "saurabh@scalyr.com"
-
+import collections
 import unittest
 
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
@@ -95,9 +95,9 @@ class UrlMonitorTestRequest(unittest.TestCase):
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "POST")
         self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
-        self.assertCountEqual(
-            actual_request.header_items(),
-            [("Header_foo", "foo"), ("Header_bar", "bar")],
+        self.assertEqual(
+            sorted(actual_request.header_items()),
+            sorted([("Header_foo", "foo"), ("Header_bar", "bar")]),
         )
 
     def test_malformed_headers(self):
