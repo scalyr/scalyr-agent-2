@@ -31,7 +31,7 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
     """
     Test class which verified BaseScalyrLogCaptureTestCase works correctly.
     """
-    def test_assertLogFileContainsLineRegex(self):
+    def test_assertLogFileContainsAndDoesntContainLineRegex(self):
         # Log files should have been created in setUp()
         self.assertTrue(os.path.isfile(self.agent_log_path))
         self.assertTrue(os.path.isfile(self.agent_debug_log_path))
@@ -45,11 +45,17 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         self.assertLogFileContainsLineRegex(self.agent_log_path, r'line \d+')
 
         self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
+                          self.agent_log_path, r'line 1\nline 2')
+        self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
                           self.agent_log_path, r'line 4')
         self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
                           self.agent_log_path, r'line \d+\d+')
 
-    def test_assertLogFileContainsRegex(self):
+        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line 1\nline 2')
+        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line 4')
+        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line \d+\d+')
+
+    def test_assertLogFileContainsAndDoesntContainRegex(self):
         # Log files should have been created in setUp()
         self.assertTrue(os.path.isfile(self.agent_log_path))
         self.assertTrue(os.path.isfile(self.agent_debug_log_path))
@@ -67,13 +73,16 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         self.assertRaises(AssertionError, self.assertLogFileContainsRegex,
                           self.agent_log_path, r'line 1\nline 3')
 
+        self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 4')
+        self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 1\n line 3')
+
     @mock.patch('__builtin__.print')
     def tearDown(self, mock_print):
         test_name = self._testMethodName
 
         # NOTE: We only perform those checks for "test_assertLogFileContainsLineRegex" test to avoid
         # overhead for each test method on this class
-        if test_name != 'test_assertLogFileContainsLineRegex':
+        if test_name != 'test_assertLogFileContainsAndDoesntContainLineRegex':
             super(LogCaptureClassTestCase, self).tearDown()
             return
 
@@ -98,8 +107,8 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         print_message_1 = mock_print.call_args_list[0][0][0]
         print_message_2 = mock_print.call_args_list[1][0][0]
 
-        expected_msg_1 = 'Storing agent log file for test "test_assertLogFileContainsLineRegex"'
-        expected_msg_2 = 'Storing agent debug log file for test "test_assertLogFileContainsLineRegex"'
+        expected_msg_1 = 'Storing agent log file for test "test_assertLogFile.*"'
+        expected_msg_2 = 'Storing agent debug log file for test "test_assertLogFile.*"'
 
         self.assertRegexpMatches(print_message_1, expected_msg_1)
         self.assertRegexpMatches(print_message_2, expected_msg_2)
