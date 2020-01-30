@@ -32,6 +32,9 @@
 # "/foo/bar/" and "/foo_bar/".
 
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import os
 import socket
 import subprocess
@@ -79,7 +82,7 @@ def main():
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
             # To prevent duplicte timestamp warnings, we keep track of which mount points we've reported.
             reported_mounts = {}
-            for line in stdout.split("\n"): # pylint: disable=E1103
+            for line in stdout.decode("utf-8").split("\n"): # pylint: disable=E1103
                 fields = line.split()
                 # skip header/blank lines
                 if not line or not fields[2].isdigit():
@@ -107,14 +110,14 @@ def main():
                     continue
                 reported_mounts[mount] = True
 
-                print ("df.1kblocks.total %d %s mount=%s fstype=%s"
-                       % (ts, fields[2], mount, fields[1]))
-                print ("df.1kblocks.used %d %s mount=%s fstype=%s"
-                       % (ts, fields[3], mount, fields[1]))
-                print ("df.1kblocks.free %d %s mount=%s fstype=%s"
-                       % (ts, fields[4], mount, fields[1]))
+                print(("df.1kblocks.total %d %s mount=%s fstype=%s"
+                       % (ts, fields[2], mount, fields[1])))
+                print(("df.1kblocks.used %d %s mount=%s fstype=%s"
+                       % (ts, fields[3], mount, fields[1])))
+                print(("df.1kblocks.free %d %s mount=%s fstype=%s"
+                       % (ts, fields[4], mount, fields[1])))
         else:
-            print >> sys.stderr, "df %s returned %r" % (df_options, df_proc.returncode)
+            print("df %s returned %r" % (df_options, df_proc.returncode), file=sys.stderr)
 
         ts = int(time.time())
         # inodes
@@ -124,7 +127,7 @@ def main():
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
             # To prevent duplicte timestamp warnings, we keep track of which mount points we've reported.
             reported_mounts = {}
-            for line in stdout.split("\n"): # pylint: disable=E1103
+            for line in stdout.decode("utf-8").split("\n"): # pylint: disable=E1103
                 fields = line.split()
                 if not line or not fields[2].isdigit():
                     continue
@@ -136,14 +139,14 @@ def main():
                     continue
                 reported_mounts[mount] = True
 
-                print ("df.inodes.total %d %s mount=%s fstype=%s"
-                       % (ts, fields[2], mount, fields[1]))
-                print ("df.inodes.used %d %s mount=%s fstype=%s"
-                       % (ts, fields[3], mount, fields[1]))
-                print ("df.inodes.free %d %s mount=%s fstype=%s"
-                       % (ts, fields[4], mount, fields[1]))
+                print(("df.inodes.total %d %s mount=%s fstype=%s"
+                       % (ts, fields[2], mount, fields[1])))
+                print(("df.inodes.used %d %s mount=%s fstype=%s"
+                       % (ts, fields[3], mount, fields[1])))
+                print(("df.inodes.free %d %s mount=%s fstype=%s"
+                       % (ts, fields[4], mount, fields[1])))
         else:
-            print >> sys.stderr, "df %s returned %r" % (df_inodes_options, df_proc.returncode)
+            print("df %s returned %r" % (df_inodes_options, df_proc.returncode), file=sys.stderr)
 
         sys.stdout.flush()
         time.sleep(COLLECTION_INTERVAL)

@@ -14,11 +14,17 @@
 #
 """network interface stats for TSDB"""
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import os
 import sys
 import time
 import socket
 import re
+from io import open
+
+from six.moves import range
 
 
 # /proc/net/dev has 16 fields, 8 for receive and 8 for xmit
@@ -83,7 +89,8 @@ def main():
         for line in f_netdev:
             # Scalyr edit
             for interface in network_interface_prefixes:
-                m = re.match("\s+(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line)
+                # 2->TODO is it important to expect at least one space character?
+                m = re.match("\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line)
                 if m:
                     break
             if not m:
@@ -91,10 +98,10 @@ def main():
             stats = m.group(2).split(None)
             for i in range(8):
                 if FIELDS[i]:
-                    print ("proc.net.%s %d %s iface=%s direction=in"
-                           % (FIELDS[i], ts, stats[i], m.group(1)))
-                    print ("proc.net.%s %d %s iface=%s direction=out"
-                           % (FIELDS[i], ts, stats[i+8], m.group(1)))
+                    print(("proc.net.%s %d %s iface=%s direction=in"
+                           % (FIELDS[i], ts, stats[i], m.group(1))))
+                    print(("proc.net.%s %d %s iface=%s direction=out"
+                           % (FIELDS[i], ts, stats[i+8], m.group(1))))
 
         sys.stdout.flush()
         time.sleep(interval)

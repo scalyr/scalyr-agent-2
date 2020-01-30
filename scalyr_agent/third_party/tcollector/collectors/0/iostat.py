@@ -68,10 +68,15 @@
 # %util.  These need to pull in cpu idle counters from /proc.
 
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import os
 import socket
 import sys
 import time
+from io import open
+from six.moves import range
 
 COLLECTION_INTERVAL = 30  # seconds
 
@@ -138,17 +143,17 @@ def main():
             if len(values) == 14:
                 # full stats line
                 for i in range(11):
-                    print ("%s%s %d %s dev=%s"
+                    print(("%s%s %d %s dev=%s"
                            % (metric, FIELDS_DISK[i], ts, values[i+3],
-                              device))
+                              device)))
             elif len(values) == 7:
                 # partial stats line
                 for i in range(4):
-                    print ("%s%s %d %s dev=%s"
+                    print(("%s%s %d %s dev=%s"
                            % (metric, FIELDS_PART[i], ts, values[i+3],
-                              device))
+                              device)))
             else:
-                print >> sys.stderr, "Cannot parse /proc/diskstats line: ", line
+                print("Cannot parse /proc/diskstats line: ", line, file=sys.stderr)
                 continue
 
         sys.stdout.flush()

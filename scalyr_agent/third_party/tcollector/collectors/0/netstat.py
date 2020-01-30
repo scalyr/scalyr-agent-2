@@ -57,12 +57,19 @@ Metrics from /proc/net/netstat (`netstat -s' command):
   - net.stat.tcp.syncookies: SYN cookies (both sent & received).
 """
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import os
 import pwd
 import re
 import resource
 import sys
 import time
+from io import open
+
+import six
+from six.moves import zip
 
 # If we're running as root and this user exists, we'll drop privileges.
 USER = "nobody"
@@ -101,10 +108,10 @@ def main():
     page_size = resource.getpagesize()
 
     try:
-        sockstat = open("/proc/net/sockstat")
-        netstat = open("/proc/net/netstat")
-    except IOError, e:
-        print >>sys.stderr, "Failed to open /proc/net/sockstat: %s" % e
+        sockstat = open("/proc/net/sockstat", encoding="utf-8")
+        netstat = open("/proc/net/netstat", encoding="utf-8")
+    except IOError as e:
+        print("Failed to open /proc/net/sockstat: %s" % e, file=sys.stderr)
         return 13  # Ask tcollector to not re-start us.
 
     # Note: up until v2.6.37-rc2 most of the values were 32 bits.
@@ -127,7 +134,7 @@ def main():
 
     def print_sockstat(metric, value, tags=""):  # Note: tags must start with ' '
         if value is not None:
-            print "net.sockstat.%s %d %s%s" % (metric, ts, value, tags)
+            print("net.sockstat.%s %d %s%s" % (metric, ts, value, tags))
 
 
     # If a line in /proc/net/netstat doesn't start with a word in that dict,
@@ -240,8 +247,8 @@ def main():
             space = " "
         else:
             tags = space = ""
-        print "net.stat.%s.%s %d %s%s%s" % (statstype, metric, ts, value,
-                                            space, tags)
+        print("net.stat.%s.%s %d %s%s%s" % (statstype, metric, ts, value,
+                                            space, tags))
 
     statsdikt = {}
     while True:
@@ -256,7 +263,7 @@ def main():
         stats = netstat.read()
         m = re.match(regexp, data)
         if not m:
-            print >>sys.stderr, "Cannot parse sockstat: %r" % data
+            print("Cannot parse sockstat: %r" % data, file=sys.stderr)
             return 13
 
         # The difference between the first two values is the number of
@@ -291,20 +298,20 @@ def main():
         for line in stats.splitlines():
             line = line.split()
             if line[0] not in known_netstatstypes:
-                print >>sys.stderr, ("Unrecoginized line in /proc/net/netstat:"
-                                     " %r (file=%r)" % (line, stats))
+                print(("Unrecoginized line in /proc/net/netstat:"
+                                     " %r (file=%r)" % (line, stats)), file=sys.stderr)
                 continue
             statstype = line.pop(0)
             statsdikt.setdefault(known_netstatstypes[statstype], []).append(line)
-        for statstype, stats in statsdikt.iteritems():
+        for statstype, stats in six.iteritems(statsdikt):
             # stats is now:
             # [["SyncookiesSent", "SyncookiesRecv", ...], ["1", "2", ....]]
             assert len(stats) == 2, repr(statsdikt)
-            stats = dict(zip(*stats))
+            stats = dict(list(zip(*stats)))
             value = stats.get("ListenDrops")
             if value is not None:  # Undo the kernel's double counting
                 stats["ListenDrops"] = int(value) - int(stats.get("ListenOverflows", 0))
-            for stat, (metric, tags) in known_netstats.iteritems():
+            for stat, (metric, tags) in six.iteritems(known_netstats):
                 value = stats.get(stat)
                 if value is not None:
                     print_netstat(statstype, metric, value, tags)

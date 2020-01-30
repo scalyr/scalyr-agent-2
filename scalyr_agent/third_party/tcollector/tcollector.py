@@ -22,6 +22,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 import atexit
 import errno
 import fcntl
@@ -36,12 +37,14 @@ import sys
 import threading
 import time
 import io
-
 from logging.handlers import RotatingFileHandler
+from optparse import OptionParser
+from io import open
+
 from six.moves.queue import Queue
 from six.moves.queue import Empty
 from six.moves.queue import Full
-from optparse import OptionParser
+
 import six
 from six.moves import range
 
@@ -819,12 +822,12 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
     """
     # Scalyr edit: Set the environment variable to override the sample intervals when the collectors are spawned.
     # This relies on the individual collectors checking this variable.
-    os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = str(sample_interval_secs)
+    os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = six.text_type(sample_interval_secs)
     # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
     os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(options.network_interface_prefixes)
     os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
     # Scalyr edit: Set the environment variable for dfstat.py
-    os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = str(options.local_disks_only)
+    os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = six.text_type(options.local_disks_only)
 
     next_heartbeat = int(time.time() + 600)
     while run_state is None or run_state.is_running():
@@ -886,7 +889,7 @@ def load_config_module(name, options, tags):
     Returns: the reference to the module loaded.
     """
 
-    if isinstance(name, str):
+    if isinstance(name, six.text_type):
       LOG.info('Loading %s', name)
       d = {}
       # Strip the trailing .py
@@ -957,7 +960,7 @@ def write_pid(pidfile):
     """Write our pid to a pidfile."""
     f = open(pidfile, "w")
     try:
-        f.write(str(os.getpid()))
+        f.write(six.text_type(os.getpid()))
     finally:
         f.close()
 
