@@ -399,37 +399,33 @@ jobs:
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
             codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
 
-  modernize-check:
+  lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie-browsers
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-modernize-venv
+          key: deps1-tox-{{ .Branch }}-lint-venv
       - run:
+          name: Install Python dependencies
           command: |
-            virtualenv venv
-            source venv/bin/activate
-            pip install modernize
+            sudo pip install tox
+      - run:
+          name: Run Lint Checks
+          command: |
+            tox -e lint
       - save_cache:
-          key: deps1-{{ .Branch }}-modernize-venv
+          key: deps1-tox-{{ .Branch }}-lint-venv
           paths:
-            - "venv"
-      - run:
-          command: |
-            source venv/bin/activate
-            python .circleci/modernize/modernize.py -j 2
-
-
-
-
+            - "~/.cache/pip."
+            - ".tox"
 
 workflows:
   version: 2
   unittest:
     jobs:
-      - modernize-check
+      - lint-checks
       - unittest-38
       - unittest-37
       - unittest-36
