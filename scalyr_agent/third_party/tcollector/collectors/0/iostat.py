@@ -76,7 +76,6 @@ import socket
 import sys
 import time
 from io import open
-from six.moves import range
 
 COLLECTION_INTERVAL = 30  # seconds
 

@@ -24,8 +24,6 @@ import socket
 import re
 from io import open
 
-from six.moves import range
-
 
 # /proc/net/dev has 16 fields, 8 for receive and 8 for xmit
 # The fields we care about are defined here.  The

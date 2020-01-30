@@ -68,9 +68,6 @@ import sys
 import time
 from io import open
 
-import six
-from six.moves import zip
-
 # If we're running as root and this user exists, we'll drop privileges.
 USER = "nobody"
 
@@ -303,7 +300,7 @@ def main():
                 continue
             statstype = line.pop(0)
             statsdikt.setdefault(known_netstatstypes[statstype], []).append(line)
-        for statstype, stats in six.iteritems(statsdikt):
+        for statstype, stats in statsdikt.items():
             # stats is now:
             # [["SyncookiesSent", "SyncookiesRecv", ...], ["1", "2", ....]]
             assert len(stats) == 2, repr(statsdikt)
@@ -311,7 +308,7 @@ def main():
             value = stats.get("ListenDrops")
             if value is not None:  # Undo the kernel's double counting
                 stats["ListenDrops"] = int(value) - int(stats.get("ListenOverflows", 0))
-            for stat, (metric, tags) in six.iteritems(known_netstats):
+            for stat, (metric, tags) in known_netstats.items():
                 value = stats.get(stat)
                 if value is not None:
                     print_netstat(statstype, metric, value, tags)
