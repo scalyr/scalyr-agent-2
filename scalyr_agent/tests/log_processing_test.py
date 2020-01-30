@@ -905,7 +905,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         # 2->TODO there is a bugfix of 're.subn' in  python3.7 and higher.
         # Empty matches for the pattern are replaced when adjacent to a previous non-empty match.
         # on python3.6 and below it works incorrect and returns "bb...bb" but it should return "bb..bbbbbb" and it does so in python3.7+
-        redacter.add_redaction_rule("(.*)", "bb\\1bb")
+        redacter.add_redaction_rule("(.+)", "bb\\1bb")
 
         # build the utf8 string
         utf8_string = unichr(8230)

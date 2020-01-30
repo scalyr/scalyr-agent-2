@@ -1053,7 +1053,8 @@ class AddEventsRequest(object):
         output_buffer = io.StringIO()
         first_time = True
 
-        for key, value in six.iteritems(self.__timing_data):
+        # sort by key, to get a predictable result.
+        for key, value in sorted(six.iteritems(self.__timing_data), key=lambda el: el[0]):
             if not first_time:
                 output_buffer.write(" ")
             else:

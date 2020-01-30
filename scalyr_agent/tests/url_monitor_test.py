@@ -95,7 +95,7 @@ class UrlMonitorTestRequest(unittest.TestCase):
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "POST")
         self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
-        self.assertEqual(
+        self.assertCountEqual(
             actual_request.header_items(),
             [("Header_foo", "foo"), ("Header_bar", "bar")],
         )
