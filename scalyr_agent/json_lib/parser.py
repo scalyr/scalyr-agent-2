@@ -202,6 +202,14 @@ class JsonParser(object):
 
     @staticmethod
     def parse(input_text, check_duplicate_keys=False):
+        """
+        Parse json string (unicode or valid UTF-8 bytes)
+        :param input_text:
+        :param check_duplicate_keys:
+        :type input_text: six.text_type | six.binary_type
+        :type check_duplicate_keys: bool
+        """
+        input_text = six.ensure_text(input_text)
         return JsonParser(
             TextScanner(input_text), True, check_duplicate_keys
         ).parse_value()
