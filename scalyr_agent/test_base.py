@@ -198,16 +198,16 @@ class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
         self.agent_log_path = os.path.join(self.logs_directory, 'agent.log')
         self.agent_debug_log_path = os.path.join(self.logs_directory, 'agent_debug.log')
 
-        # Print the paths to which we store the output to so they can be introspected by the
-        # developer
-        # TODO: Should we only do this on assertion failure?
-        test_name = self._testMethodName
-        print('Storing agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
-        print('Storing agent debug log file for test "%s" to: %s' % (test_name,
-                                                                     self.agent_debug_log_path))
-
     def tearDown(self):
         super(BaseScalyrLogCaptureTestCase, self).tearDown()
+
+        if self.__assertion_failed:
+            # Print the paths to which we store the output to so they can be introspected by the
+            # developer
+            test_name = self._testMethodName
+            print('Storing agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
+            print('Storing agent debug log file for test "%s" to: %s' % (test_name,
+                                                                        self.agent_debug_log_path))
 
         if not self.__assertion_failed:
             shutil.rmtree(self.logs_directory)
