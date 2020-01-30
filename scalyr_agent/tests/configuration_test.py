@@ -14,15 +14,14 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
-from six.moves import range
 
 __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-from mock import patch, Mock
+from io import open
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
@@ -44,17 +43,24 @@ from scalyr_agent.builtin_monitors.journald_utils import (
     JournaldLogFormatter,
 )
 import scalyr_agent.util as scalyr_util
+from scalyr_agent.compat import os_environ_unicode
+
+import six
+from six.moves import range
+from mock import patch, Mock
 
 
 class TestConfigurationBase(ScalyrTestCase):
     def setUp(self):
         super(TestConfigurationBase, self).setUp()
-        self.original_os_env = dict([(k, v) for k, v in six.iteritems(os.environ)])
+        self.original_os_env = dict(
+            [(k, v) for k, v in six.iteritems(os_environ_unicode)]
+        )
         self._config_dir = tempfile.mkdtemp()
         self._config_file = os.path.join(self._config_dir, "agent.json")
         self._config_fragments_dir = os.path.join(self._config_dir, "agent.d")
         os.makedirs(self._config_fragments_dir)
-        for key in os.environ.keys():
+        for key in os_environ_unicode.keys():
             if "scalyr" in key.lower():
                 del os.environ[key]
 
@@ -75,9 +81,7 @@ class TestConfigurationBase(ScalyrTestCase):
             for key in contents:
                 value = contents[key]
                 value_type = type(value)
-                if key.endswith("path") and (
-                    value_type is str or value_type is six.text_type
-                ):
+                if key.endswith("path") and (value_type is six.text_type):
                     contents[key] = self.convert_path(contents[key])
                 elif value_type in (dict, JsonObject, list, JsonArray):
                     self.__convert_separators(value)
@@ -145,8 +149,8 @@ class TestConfigurationBase(ScalyrTestCase):
         @param expected_path:  The expected path.  This should use `/`'s as the separator character.  It will be
             converted to this system's actual separators.
 
-        @type actual_path: str
-        @type expected_path: str
+        @type actual_path: six.text_type
+        @type expected_path: six.text_type
         """
         self.assertEquals(actual_path, self.convert_path(expected_path))
 
@@ -1040,7 +1044,6 @@ class TestConfiguration(TestConfigurationBase):
           }
         """
         )
-
         os.environ["TEST_VAR"] = "bye"
         config = self._create_test_configuration_instance()
         config.parse()
@@ -1261,7 +1264,7 @@ class TestConfiguration(TestConfigurationBase):
                         return original_verify_or_set_optional_int(*args, **kwargs)
                     elif field_type == float:
                         return original_verify_or_set_optional_float(*args, **kwargs)
-                    elif field_type == str:
+                    elif field_type == six.text_type:
                         return original_verify_or_set_optional_string(*args, **kwargs)
                     elif field_type == ArrayOfStrings:
                         return original_verify_or_set_optional_array_of_strings(
@@ -1273,7 +1276,7 @@ class TestConfiguration(TestConfigurationBase):
             p0.side_effect = capture_aware_field(bool)
             p1.side_effect = capture_aware_field(int)
             p2.side_effect = capture_aware_field(float)
-            p3.side_effect = capture_aware_field(str)
+            p3.side_effect = capture_aware_field(six.text_type)
             p4.side_effect = capture_aware_field(ArrayOfStrings)
 
             # Build the Configuration object tree, also populating the field_types lookup in the process
@@ -1294,7 +1297,7 @@ class TestConfiguration(TestConfigurationBase):
             # prepare fake environment variable values that differ from existing config object
             FAKE_INT = 1234567890
             FAKE_FLOAT = 1234567.89
-            FAKE_STRING = str(FAKE_INT)
+            FAKE_STRING = six.text_type(FAKE_INT)
             FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(["s1", "s2", "s3"])
 
             for field in expected_aware_fields:
@@ -1323,7 +1326,7 @@ class TestConfiguration(TestConfigurationBase):
                     )
                     fake_env[field] = FAKE_FLOAT
 
-                elif field_type == str:
+                elif field_type == six.text_type:
                     self.assertNotEquals(
                         FAKE_STRING, config_obj.get_string(field, none_if_missing=True)
                     )
@@ -1345,9 +1348,11 @@ class TestConfiguration(TestConfigurationBase):
                     # legacy whitespace separator support for 'k8s_ignore_namespaces'
                     if field == "k8s_ignore_namespaces":
                         separator = " "
-                    result = str(separator.join([x for x in fake_field_val])).lower()
+                    result = six.text_type(
+                        separator.join([x for x in fake_field_val])
+                    ).lower()
                 else:
-                    result = str(fake_field_val).lower()
+                    result = six.text_type(fake_field_val).lower()
                 return result
 
             function_lookup = {"get_environment": fake_environment_value}
@@ -1362,7 +1367,7 @@ class TestConfiguration(TestConfigurationBase):
                     value = config._Configuration__get_config().get_int(field)
                 elif field_type == float:
                     value = config._Configuration__get_config().get_float(field)
-                elif field_type == str:
+                elif field_type == six.text_type:
                     value = config._Configuration__get_config().get_string(field)
                 elif field_type == ArrayOfStrings:
                     value = config._Configuration__get_config().get_json_array(field)
@@ -1543,7 +1548,8 @@ class TestConvertConfigParam(TestConfigurationBase):
     def test_none_to_anything(self):
         """"""
         self.assertRaises(
-            BadConfiguration, lambda: convert_config_param("dummy_field", None, str)
+            BadConfiguration,
+            lambda: convert_config_param("dummy_field", None, six.text_type),
         )
         self.assertRaises(
             BadConfiguration, lambda: convert_config_param("dummy_field", None, bool)
@@ -1571,7 +1577,7 @@ class TestConvertConfigParam(TestConfigurationBase):
         )
 
     def test_empty_string(self):
-        self.assertEqual("", convert_config_param("dummy_field", "", str))
+        self.assertEqual("", convert_config_param("dummy_field", "", six.text_type))
         self.assertEqual(False, convert_config_param("dummy_field", "", bool))
         self.assertRaises(
             BadConfiguration, lambda: convert_config_param("dummy_field", "", int)
@@ -1623,10 +1629,12 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
     def test_get_empty_string(self):
         os.environ["SCALYR_K8S_API_URL"] = ""
-        self.assertEqual("", get_config_from_env("k8s_api_url", convert_to=str))
+        self.assertEqual(
+            "", get_config_from_env("k8s_api_url", convert_to=six.text_type)
+        )
 
         del os.environ["SCALYR_K8S_API_URL"]
-        self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=str))
+        self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=six.text_type))
 
 
 class FakeLogWatcher:
@@ -1768,12 +1776,12 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         matched_config = lcm.get_config("test")
         self.assertEqual("TestParser", matched_config["parser"])
         self.assertEqual(
-            str([{u"match_expression": u"a", u"replacement": u"yes"}]),
-            str(matched_config["redaction_rules"]),
+            six.text_type([{"match_expression": "a", "replacement": "yes"}]),
+            six.text_type(matched_config["redaction_rules"]),
         )
         self.assertEqual(
-            str([{u"match_expression": u"INFO", u"sampling_rate": 0.1}]),
-            str(matched_config["sampling_rules"]),
+            six.text_type([{"match_expression": "INFO", "sampling_rate": 0.1}]),
+            six.text_type(matched_config["sampling_rules"]),
         )
         self.assertEqual("true", matched_config["attributes"]["webServer"])
 
@@ -1837,7 +1845,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + str(hash("TEST")) + ".log",
+            self._log_dir, "journald_" + six.text_type(hash("TEST")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())
@@ -1865,7 +1873,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         logger2.info("Other thing")
 
         expected_path = os.path.join(
-            self._log_dir, "journald_" + str(hash("test.*test")) + ".log",
+            self._log_dir, "journald_" + six.text_type(hash("test.*test")) + ".log",
         )
         with open(expected_path) as f:
             self.assertTrue("Find this string" in f.read())

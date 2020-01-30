@@ -2,8 +2,54 @@
 #
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
-version: 2
+version: 2.1
+executors:
+  unittest_python3_executor:
+    machine:
+      image: ubuntu-1604:201903-01
+      docker_layer_caching: true
+commands:
+  unittest_python3:
+    description: "A base command for all unittest jobs"
+    parameters:
+      python_version:
+        type: string
+    steps:
+      - checkout
+      - run:
+          command: |
+            docker build . -t unittest --build-arg PYTHON_VERSION=<< parameters.python_version >> -f .circleci/docker_unified_smoke_unit/unittest/Dockerfile.python3
+            docker run -it -v /home/circleci/scalyr-agent-2:/scalyr-agent-2 unittest
+
 jobs:
+  unittest-38:
+    working_directory: ~/scalyr-agent-2
+    executor: unittest_python3_executor
+    steps:
+      - unittest_python3:
+          python_version: "3.8.1"
+
+  unittest-37:
+    working_directory: ~/scalyr-agent-2
+    executor: unittest_python3_executor
+    steps:
+      - unittest_python3:
+          python_version: "3.7.6"
+
+  unittest-36:
+    working_directory: ~/scalyr-agent-2
+    executor: unittest_python3_executor
+    steps:
+      - unittest_python3:
+          python_version: "3.6.8"
+
+  unittest-35:
+    working_directory: ~/scalyr-agent-2
+    executor: unittest_python3_executor
+    steps:
+      - unittest_python3:
+          python_version: "3.5.9"
+
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -49,6 +95,21 @@ jobs:
           docker_layer_caching: true
       - run:
           command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
+
+  smoke-standalone-37:
+    docker:
+      - image: circleci/python:3.6-jessie-browsers
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          command: |
+            docker container create --name dummy -v shared_vol:/app alpine && \
+            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
+            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=3.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
+            docker rm dummy;
+
 
   smoke-standalone-27:
     docker:
@@ -297,10 +358,16 @@ jobs:
       - restore_cache:
           key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install dependencies
           command: |
+            # Small safety check to make sure the build fails if codecov.yml file is invalid.
+            # By default codecov doesn't fail on invalid config and simply falls back to
+            # system wide default config in case repo local config is invalid. This usually results
+            # in confused and undesired behavior.
+            curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
             virtualenv venv
             source venv/bin/activate
-            pip install coverage
+            pip install coverage "codecov==2.0.15"
             mkdir -p cov
             cp .circleci/.coveragerc_ci cov/.coveragerc
 
@@ -308,6 +375,7 @@ jobs:
           at: cov
 
       - run:
+          name: Combine coverage
           working_directory: cov
           command: |
             source ../venv/bin/activate
@@ -317,11 +385,19 @@ jobs:
           path: cov
 
       - run:
-          name: report
+          name: Print coverage report
           working_directory: cov
           command: |
             source ../venv/bin/activate
             coverage report
+
+      - run:
+          name: Upload coverage data to codecov.io
+          working_directory: cov
+          command: |
+            source ../venv/bin/activate
+            coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
 
   modernize-check:
     working_directory: ~/scalyr-agent-2
@@ -343,7 +419,7 @@ jobs:
       - run:
           command: |
             source venv/bin/activate
-            python modernize.py -j 2
+            python .circleci/modernize/modernize.py -j 2
 
 
 
@@ -354,8 +430,13 @@ workflows:
   unittest:
     jobs:
       - modernize-check
+      - unittest-38
+      - unittest-37
+      - unittest-36
+      - unittest-35
       - unittest-27
       - unittest-26
+      - smoke-standalone-37
       - smoke-standalone-27
       - smoke-standalone-26
       - smoke-standalone-27-tls12

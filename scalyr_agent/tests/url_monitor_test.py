@@ -15,15 +15,18 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "saurabh@scalyr.com"
-
+import collections
 import unittest
-import mock
+
 from scalyr_agent.builtin_monitors.url_monitor import UrlMonitor
 from scalyr_agent.scalyr_monitor import MonitorConfig
 from scalyr_agent.json_lib.objects import JsonArray, JsonObject
+
+import mock
 
 
 class UrlMonitorTestRequest(unittest.TestCase):
@@ -44,7 +47,7 @@ class UrlMonitorTestRequest(unittest.TestCase):
     def test_get_request_no_headers(self):
         mock_logger = mock.MagicMock()
         config_data = {
-            "url": "fooUrl",
+            "url": "http://fooUrl",
             "request_method": "GET",
             "request_data": None,
             "request_headers": [],
@@ -55,13 +58,13 @@ class UrlMonitorTestRequest(unittest.TestCase):
 
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "GET")
-        self.assertFalse(actual_request.has_data())
+        self.assertFalse(actual_request.data is not None)
         self.assertEqual(actual_request.header_items(), [])
 
     def test_get_request_with_headers(self):
         mock_logger = mock.MagicMock()
         config_data = {
-            "url": "fooUrl",
+            "url": "http://fooUrl",
             "request_method": "GET",
             "request_data": None,
             "request_headers": self.legit_headers,
@@ -69,10 +72,9 @@ class UrlMonitorTestRequest(unittest.TestCase):
         }
         config = MonitorConfig(content=config_data)
         url_monitor = UrlMonitor(monitor_config=config, logger=mock_logger)
-
         actual_request = url_monitor.build_request()
         self.assertEqual(actual_request.get_method(), "GET")
-        self.assertFalse(actual_request.has_data())
+        self.assertFalse(actual_request.data is not None)
         self.assertEqual(
             actual_request.header_items(),
             [("Header_foo", "foo"), ("Header_bar", "bar")],
@@ -81,7 +83,7 @@ class UrlMonitorTestRequest(unittest.TestCase):
     def test_post_request_with_data(self):
         mock_logger = mock.MagicMock()
         config_data = {
-            "url": "fooUrl",
+            "url": "http://fooUrl",
             "request_method": "POST",
             "request_data": "{fakejsonthatisnotlegit}",
             "request_headers": self.legit_headers,
@@ -94,8 +96,8 @@ class UrlMonitorTestRequest(unittest.TestCase):
         self.assertEqual(actual_request.get_method(), "POST")
         self.assertEqual(actual_request.data, "{fakejsonthatisnotlegit}")
         self.assertEqual(
-            actual_request.header_items(),
-            [("Header_foo", "foo"), ("Header_bar", "bar")],
+            sorted(actual_request.header_items()),
+            sorted([("Header_foo", "foo"), ("Header_bar", "bar")]),
         )
 
     def test_malformed_headers(self):

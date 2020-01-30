@@ -2,10 +2,10 @@
 source =
     /home/circleci/scalyr-agent-2/
     /usr/share/scalyr-agent-2/py/
-    
+
 [report]
 skip_covered=True
 omit =
+    */.virtualenvs/*
     */venv/*
     */third_party*/*
-    */scalyr-agent/tests/*

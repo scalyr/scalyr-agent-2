@@ -29,7 +29,7 @@ The classes exported by this package are:
 The methods exported are:
   parse                       -- Parses a string as JSON and returns the value.
 """
-
+from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "Steven Czerwinski <czerwin@scalyr.com>"

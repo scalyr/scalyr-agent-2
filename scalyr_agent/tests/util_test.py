@@ -15,10 +15,17 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
 from __future__ import absolute_import
-import six
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
+
+from io import open
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
 
 import datetime
 import os
@@ -26,6 +33,7 @@ import tempfile
 import struct
 import threading
 from mock import patch, MagicMock
+import six
 
 import scalyr_agent.util as scalyr_util
 
@@ -52,7 +60,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 class TestUtilCompression(ScalyrTestCase):
     def setUp(self):
         super(TestUtilCompression, self).setUp()
-        self._data = "The rain in spain. " * 1000
+        self._data = b"The rain in spain. " * 1000
 
     def test_zlib(self):
         """Successful zlib compression"""
@@ -133,7 +141,9 @@ class TestUtil(ScalyrTestCase):
         )
 
     def test_read_file_as_json_with_strict_utf8_json(self):
-        self.__create_file(self.__path, '{ a: "\x96"}')
+        # 2->TODO python3 json libs do not allow serialization with invalid UTF-8.
+        with open(self.__path, "wb") as f:
+            f.write(b'{ a: "\x96"}')
 
         self.assertRaises(
             JsonReadFileException, scalyr_util.read_file_as_json, self.__path, True
@@ -414,6 +424,25 @@ class TestRateLimiter(ScalyrTestCase):
         self.assertTrue(self.charge_if_available(80))
         self.assertFalse(self.charge_if_available(1))
 
+    def test_custom_bucket_size_and_rate(self):
+        self.__test_rate = RateLimiter(10, 1, current_time=0)
+        self.assertTrue(self.charge_if_available(10))
+        self.assertFalse(self.charge_if_available(10))
+        self.advance_time(1)
+        self.assertFalse(self.charge_if_available(10))
+        self.advance_time(5)
+        self.assertFalse(self.charge_if_available(10))
+
+    def test_zero_bucket_fill_rate(self):
+        self.__test_rate = RateLimiter(100, 0, current_time=0)
+        self.assertTrue(self.charge_if_available(20))
+        self.assertTrue(self.charge_if_available(80))
+        self.assertFalse(self.charge_if_available(1))
+        self.advance_time(1)
+        self.assertFalse(self.charge_if_available(20))
+        self.advance_time(5)
+        self.assertFalse(self.charge_if_available(20))
+
     def test_refill(self):
         self.assertTrue(self.charge_if_available(60))
         self.assertFalse(self.charge_if_available(60))
@@ -618,12 +647,12 @@ class TestRedirectorServer(ScalyrTestCase):
     def test_sending_unicode(self):
         self._server.start()
         self.assertEquals(self._channel.accept_count, 1)
-        self._sys.stdout.write(u"caf\xe9")
+        self._sys.stdout.write("caf\xe9")
         self.assertEquals(self._channel.write_count, 1)
         (stream_id, content) = self._parse_sent_bytes(self._channel.last_write)
 
         self.assertEquals(stream_id, 0)
-        self.assertEquals(content, u"caf\xe9")
+        self.assertEquals(content, "caf\xe9")
 
     def test_sending_to_stderr(self):
         self._server.start()
@@ -650,13 +679,14 @@ class TestRedirectorServer(ScalyrTestCase):
         """Parses the stream id and the actual content from the encoded content string sent by the server.
 
         @param content: The string sent by the server.
-        @type content: str
+        @type content: six.binary_type
 
         @return: A tuple of the stream_id and the actual content encoded in the sent string.
-        @rtype: (int,str)
+        @rtype: (int,six.text_type)
         """
         prefix_code = content[0:4]
-        code = struct.unpack("i", prefix_code)[0]
+        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        code = compat.struct_unpack_unicode("i", prefix_code)[0]
         stream_id = code % 2
         num_bytes = code >> 1
 
@@ -691,7 +721,7 @@ class TestRedirectorClient(ScalyrTestCase):
             self._fake_clock.advance_time(set_to=59.0)
             self._client.join()
 
-    def test_receiving_str(self):
+    def test_receiving_bytes(self):
         # Simulate accepting the connection.
         self._accept_client_connection()
         self._send_to_client(0, "Testing")
@@ -701,9 +731,9 @@ class TestRedirectorClient(ScalyrTestCase):
 
     def test_receiving_unicode(self):
         self._accept_client_connection()
-        self._send_to_client(0, u"caf\xe9")
+        self._send_to_client(0, "caf\xe9")
         self._fake_sys.stdout.wait_for_bytes(1.0)
-        self.assertEquals(self._fake_sys.stdout.last_write, u"caf\xe9")
+        self.assertEquals(self._fake_sys.stdout.last_write, "caf\xe9")
 
     def test_connection_timeout(self):
         # We advance the time past 60 seconds which is the connection time out.
@@ -746,10 +776,14 @@ class TestRedirectorClient(ScalyrTestCase):
         self._client_channel.simulate_server_connect()
 
     def _send_to_client(self, stream_id, content):
-        encoded_content = six.text_type(content).encode("utf-8")
+        if type(content) is six.text_type:
+            encoded_content = six.text_type(content).encode("utf-8")
+        else:
+            encoded_content = content
         code = len(encoded_content) * 2 + stream_id
+        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
         self._client_channel.simulate_server_write(
-            struct.pack("i", code) + encoded_content
+            compat.struct_pack_unicode("i", code) + encoded_content
         )
 
 
@@ -819,7 +853,7 @@ class FakeClientChannel(object):
     def __init__(self, fake_clock):
         self._lock = threading.Lock()
         self._allow_connection = False
-        self._pending_content = ""
+        self._pending_content = b""
         self._fake_clock = fake_clock
 
     def connect(self):
@@ -857,7 +891,7 @@ class FakeClientChannel(object):
 
     def simulate_server_write(self, content):
         self._lock.acquire()
-        self._pending_content = "%s%s" % (self._pending_content, content)
+        self._pending_content = b"%s%s" % (self._pending_content, content)
         self._lock.release()
         self._simulate_busy_loop_advance()
 

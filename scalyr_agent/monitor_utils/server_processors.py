@@ -20,10 +20,11 @@
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
 from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
+import io
 import errno
 import socket
 import six.moves.socketserver
@@ -192,7 +193,8 @@ class LineRequestParser(object):
             # it will return whatever line was left without a newline.
             return_line = False
             if bytes_received > 0:
-                if line[-1] == "\n":
+                # 2->TODO use slicing to get bytes on bith python versions.
+                if line[-1:] == b"\n":
                     return_line = True
                 else:
                     # check if we want to return the remaining text when EOF is hit
@@ -252,8 +254,10 @@ class Int32RequestParser(object):
             # Make sure we have 4 bytes so that we can at least read the length prefix, and then try to read
             # the complete data payload.
             if num_bytes > self.__prefix_length:
-                (length,) = struct.unpack(
-                    self.__format, input_buffer.read(self.__prefix_length)
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                (length,) = compat.struct_unpack_unicode(
+                    six.ensure_str(self.__format),
+                    input_buffer.read(self.__prefix_length),
                 )
                 if length > self.__max_request_size:
                     raise RequestSizeExceeded(length, self.__max_request_size)
@@ -440,7 +444,7 @@ class RequestStream(object):
 
         # The actual buffer.  We will maintain an invariant that the position of the buffer is always pointing at
         # the next byte to read.
-        self.__buffer = cStringIO.StringIO()
+        self.__buffer = io.BytesIO()
 
     def read_request(self, timeout=0.5, run_state=None):
         """Attempts to read the next complete request from the socket and return it.
@@ -632,7 +636,7 @@ class RequestStream(object):
         # Read the leftover data and write it into a new buffer.
         remaining_data = self.__buffer.read()
         self.__buffer.close()
-        self.__buffer = cStringIO.StringIO()
+        self.__buffer = io.BytesIO()
         self.__buffer.write(remaining_data)
         self.__current_buffer_size = self.__buffer.tell()
         self.__buffer.seek(0)
@@ -643,5 +647,5 @@ class RequestStream(object):
         """
         if self.__get_buffer_read_position() == self.__get_buffer_write_position():
             self.__buffer.close()
-            self.__buffer = cStringIO.StringIO()
+            self.__buffer = io.BytesIO()
             self.__current_buffer_size = 0

@@ -30,6 +30,7 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
@@ -41,11 +42,14 @@ import gc
 import os
 import sys
 import time
+from io import open
 
 from __scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()
+
+import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -80,6 +84,7 @@ from scalyr_agent.platform_controller import (
     CannotExecuteAsUser,
 )
 from scalyr_agent.platform_controller import AgentNotRunning
+
 
 STATUS_FILE = "last_status"
 
@@ -171,7 +176,7 @@ class ScalyrAgent(object):
             provide an api token and raise an exception if they fail.
 
         @type controller: PlatformController
-        @type config_file_path: str
+        @type config_file_path: six.text_type
         @type perform_config_check: bool
 
         @return: The return code when the agent exits.
@@ -205,8 +210,8 @@ class ScalyrAgent(object):
         @param command: The command passed in at the commandline for the agent to execute, such as 'start', 'stop', etc.
         @param command_options: The options from the commandline.  These will include 'quiet', 'verbose', etc.
 
-        @type config_file_path: str
-        @type command: str
+        @type config_file_path: six.text_type
+        @type command: six.text_type
 
         @return:  The exit status code to exit with, such as 0 for success.
         @rtype: int
@@ -243,7 +248,7 @@ class ScalyrAgent(object):
                 raise Exception(
                     "Error reading configuration file: %s\n"
                     "Terminating agent, please fix the configuration file and restart agent.\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
             else:
                 self.__config = None
@@ -304,7 +309,7 @@ class ScalyrAgent(object):
             else:
                 raise Exception(
                     "Caught exception when attempt to execute command %s.  Exception was %s"
-                    % (command, str(e))
+                    % (command, six.text_type(e))
                 )
 
     def __read_and_verify_config(self, config_file_path):
@@ -312,7 +317,7 @@ class ScalyrAgent(object):
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -327,7 +332,7 @@ class ScalyrAgent(object):
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -383,7 +388,7 @@ class ScalyrAgent(object):
             raise Exception(
                 "Configuration file uses a monitor that is not supported on this system Monitor '%s' "
                 "cannot be used due to: %s.  If you require support for this monitor for your system, "
-                "please e-mail contact@scalyr.com" % (e.monitor_name, str(e))
+                "please e-mail contact@scalyr.com" % (e.monitor_name, six.text_type(e))
             )
         return True
 
@@ -526,7 +531,7 @@ class ScalyrAgent(object):
                 "Terminating agent, please fix the error and restart the agent.",
                 file=sys.stderr,
             )
-            log.error("%s" % str(e))
+            log.error("%s" % six.text_type(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
             return 1
 
@@ -589,7 +594,7 @@ class ScalyrAgent(object):
             self.__controller.is_agent_running(fail_if_not_running=True)
         except AgentNotRunning as e:
             print("The agent does not appear to be running.")
-            print("%s" % str(e))
+            print("%s" % six.text_type(e))
             return 1
 
         # The status works by sending telling the running agent to dump the status into a well known file and
@@ -699,7 +704,7 @@ class ScalyrAgent(object):
                 "Failed to stop the agent because it does not appear to be running.",
                 file=sys.stderr,
             )
-            print("%s" % str(e), file=sys.stderr)
+            print("%s" % six.text_type(e), file=sys.stderr)
             return 0  # For the sake of restart, we need to return non-error code here.
 
     def __status(self):
@@ -856,15 +861,17 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
+                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
                 log.info(
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid())
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version)
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid()),
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version),
                 )
+
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
@@ -1057,7 +1064,7 @@ class ScalyrAgent(object):
                             log.error(
                                 "Bad configuration file seen.  Ignoring, using last known good configuration file.  "
                                 'Exception was "%s"',
-                                str(e),
+                                six.text_type(e),
                                 error_code="badConfigFile",
                             )
                         self.__current_bad_config = new_config
@@ -1167,7 +1174,7 @@ class ScalyrAgent(object):
             print(
                 "Failed to start agent because it is already running.", file=sys.stderr
             )
-            print("%s" % str(e), file=sys.stderr)
+            print("%s" % six.text_type(e), file=sys.stderr)
             sys.exit(4)
 
     def __update_debug_log_level(self, debug_level):
@@ -1658,7 +1665,7 @@ if __name__ == "__main__":
             options.config_filename, args[0], options
         )
     except Exception as mainExcept:
-        print(str(mainExcept), file=sys.stderr)
+        print(six.text_type(mainExcept), file=sys.stderr)
         sys.exit(1)
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
