@@ -212,10 +212,13 @@ class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
         if not self.__assertion_failed:
             shutil.rmtree(self.logs_directory)
 
-    def assertLogFileContainsRegex(self, file_path, expression):
+    def assertLogFileContainsLineRegex(self, file_path, expression):
         """
-        Custom assertion function which asserts that the provided log file path contains the provided
-        regular expression.
+        Custom assertion function which asserts that the provided log file path contains a line
+        which matches the provided line regular expression.
+
+        Keep in mind that this function is line oriented. If you want to perform assertion across
+        multiple lines, you should use "assertLogFileContainsRegex".
 
         :param file_path: Path to the file to use.
         :param expression: Regular expression to match against each line in the file.
@@ -228,7 +231,27 @@ class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
                     return True
 
         self.__assertion_failed = True
-        self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
+        self.fail('File "%s" doesn\'t contain "%s" line expression' % (file_path, expression))
+
+    def assertLogFileContainsRegex(self, file_path, expression):
+        """
+        Custom assertion function which asserts that the provided log file path contains a string
+        which matches the provided regular expression.
+
+        This function performs checks against the whole file content which means it comes handy in
+        scenarios where you need to perform cross line checks.
+
+        :param file_path: Path to the file to use.
+        :param expression: Regular expression to match against the whole file content.
+        """
+        matcher = re.compile(expression)
+
+        with open(file_path, 'r') as fp:
+            content = fp.read()
+
+        if not matcher.search(content):
+            self.__assertion_failed = True
+            self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
 
 if sys.version_info[:2] < (2, 7):
 
