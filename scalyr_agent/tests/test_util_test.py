@@ -17,8 +17,11 @@
 
 from __future__ import absolute_import
 
+from io import open
+
 import os
 import mock
+import six
 
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 
@@ -38,7 +41,7 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
 
         # Write some data to the file and verify assertLogFileContainsLineRegex works correctly
         with open(self.agent_log_path, 'w') as fp:
-            fp.write('line 1\nline 2\nline 3')
+            fp.write(six.text_type('line 1\nline 2\nline 3'))
 
         self.assertLogFileContainsLineRegex(self.agent_log_path, r'line 1')
         self.assertLogFileContainsLineRegex(self.agent_log_path, r'line 2')
@@ -62,7 +65,7 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
 
         # Write some data to the file and verify assertLogFileContainsRegex works correctly
         with open(self.agent_log_path, 'w') as fp:
-            fp.write('line 1\nline 2\nline 3')
+            fp.write(six.text_type('line 1\nline 2\nline 3'))
 
         self.assertLogFileContainsRegex(self.agent_log_path, r'line 1\nline 2')
         self.assertLogFileContainsRegex(self.agent_log_path, r'line 1\nline 2\nline 3')
@@ -76,7 +79,7 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 4')
         self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 1\n line 3')
 
-    @mock.patch('__builtin__.print')
+    @mock.patch('scalyr_agent.test_base.print')
     def tearDown(self, mock_print):
         test_name = self._testMethodName
 
@@ -107,8 +110,8 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         print_message_1 = mock_print.call_args_list[0][0][0]
         print_message_2 = mock_print.call_args_list[1][0][0]
 
-        expected_msg_1 = 'Storing agent log file for test "test_assertLogFile.*"'
-        expected_msg_2 = 'Storing agent debug log file for test "test_assertLogFile.*"'
+        expected_msg_1 = 'Storing agent log file for test "test_assertLogFile'
+        expected_msg_2 = 'Storing agent debug log file for test "test_assertLogFile'
 
-        self.assertRegexpMatches(print_message_1, expected_msg_1)
-        self.assertRegexpMatches(print_message_2, expected_msg_2)
+        self.assertTrue(expected_msg_1 in print_message_1)
+        self.assertTrue(expected_msg_2 in print_message_2)

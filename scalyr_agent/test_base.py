@@ -20,6 +20,8 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
+from io import open
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -37,6 +39,9 @@ import six
 from scalyr_agent.util import StoppableThread
 
 PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
+
+# Need so we can patch print() function for test purposes under both, Python 2 and 3
+print = print
 
 
 def _noop_skip(reason):
@@ -156,7 +161,96 @@ class BaseScalyrTestCase(unittest.TestCase):
         )
 
 
-class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
+if sys.version_info[:2] < (2, 7):
+    class ScalyrTestCase(BaseScalyrTestCase):
+        """The base class for Scalyr tests.
+
+        This is used mainly to hide differences between the test fixtures available in the various Python
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
+        """
+
+        # noinspection PyPep8Naming
+        def __init__(self, methodName="runTest"):
+            # Do not verify the setup was invoked since it relies on addCleanup which is only available in 2.7
+            BaseScalyrTestCase.__init__(
+                self, methodName=methodName, verify_setup_invoked=False
+            )
+
+        def assertIs(self, obj1, obj2, msg=None):
+            """Just like self.assertTrue(a is b), but with a nicer default message."""
+            if obj1 is not obj2:
+                if msg is None:
+                    msg = "%s is not %s" % (obj1, obj2)
+                self.fail(msg)
+
+        def assertIsNone(self, obj, msg=None):
+            """Same as self.assertTrue(obj is None), with a nicer default message."""
+            if msg is not None:
+                self.assertTrue(obj is None, msg)
+            else:
+                self.assertTrue(obj is None, "%s is not None" % (six.text_type(obj)))
+
+        def assertIsNotNone(self, obj, msg=None):
+            """Included for symmetry with assertIsNone."""
+            if msg is not None:
+                self.assertTrue(obj is not None, msg)
+            else:
+                self.assertTrue(obj is not None, "%s is None" % (six.text_type(obj)))
+
+        def assertGreater(self, a, b, msg=None):
+            if msg is not None:
+                self.assertTrue(a > b, msg)
+            else:
+                self.assertTrue(
+                    a > b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
+
+        def assertLess(self, a, b, msg=None):
+            if msg is not None:
+                self.assertTrue(a < b, msg)
+            else:
+                self.assertTrue(
+                    a < b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
+
+
+else:
+    class ScalyrTestCase(BaseScalyrTestCase):
+        """The base class for Scalyr tests.
+
+        This is used mainly to hide differences between the test fixtures available in the various Python
+        versions.
+
+        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
+        """
+
+        # noinspection PyPep8Naming
+        def __init__(self, methodName="runTest"):
+            BaseScalyrTestCase.__init__(
+                self, methodName=methodName, verify_setup_invoked=True
+            )
+
+        def assertIs(self, obj1, obj2, msg=None):
+            unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
+
+        def assertIsNone(self, obj, msg=None):
+            unittest.TestCase.assertIsNone(self, obj, msg=msg)
+
+        def assertIsNotNone(self, obj, msg=None):
+            unittest.TestCase.assertIsNotNone(self, obj, msg=msg)
+
+        def assertGreater(self, a, b, msg=None):
+            unittest.TestCase.assertGreater(self, a, b, msg=msg)
+
+        def assertLess(self, a, b, msg=None):
+            unittest.TestCase.assertLess(self, a, b, msg=msg)
+
+
+class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     """
     Base test class which captures log data produced by code called inside the tests into the log
     files created in "directory_path" directory as defined by that class variable.
@@ -292,92 +386,4 @@ class BaseScalyrLogCaptureTestCase(BaseScalyrTestCase):
         return bool(matcher.search(content))
 
 
-if sys.version_info[:2] < (2, 7):
 
-    class ScalyrTestCase(BaseScalyrTestCase):
-        """The base class for Scalyr tests.
-
-        This is used mainly to hide differences between the test fixtures available in the various Python
-        versions.
-
-        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
-        """
-
-        # noinspection PyPep8Naming
-        def __init__(self, methodName="runTest"):
-            # Do not verify the setup was invoked since it relies on addCleanup which is only available in 2.7
-            BaseScalyrTestCase.__init__(
-                self, methodName=methodName, verify_setup_invoked=False
-            )
-
-        def assertIs(self, obj1, obj2, msg=None):
-            """Just like self.assertTrue(a is b), but with a nicer default message."""
-            if obj1 is not obj2:
-                if msg is None:
-                    msg = "%s is not %s" % (obj1, obj2)
-                self.fail(msg)
-
-        def assertIsNone(self, obj, msg=None):
-            """Same as self.assertTrue(obj is None), with a nicer default message."""
-            if msg is not None:
-                self.assertTrue(obj is None, msg)
-            else:
-                self.assertTrue(obj is None, "%s is not None" % (six.text_type(obj)))
-
-        def assertIsNotNone(self, obj, msg=None):
-            """Included for symmetry with assertIsNone."""
-            if msg is not None:
-                self.assertTrue(obj is not None, msg)
-            else:
-                self.assertTrue(obj is not None, "%s is None" % (six.text_type(obj)))
-
-        def assertGreater(self, a, b, msg=None):
-            if msg is not None:
-                self.assertTrue(a > b, msg)
-            else:
-                self.assertTrue(
-                    a > b,
-                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
-                )
-
-        def assertLess(self, a, b, msg=None):
-            if msg is not None:
-                self.assertTrue(a < b, msg)
-            else:
-                self.assertTrue(
-                    a < b,
-                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
-                )
-
-
-else:
-
-    class ScalyrTestCase(BaseScalyrTestCase):
-        """The base class for Scalyr tests.
-
-        This is used mainly to hide differences between the test fixtures available in the various Python
-        versions.
-
-        WARNING:  Derived classes that override setUp, must be sure to invoke the inherited setUp method.
-        """
-
-        # noinspection PyPep8Naming
-        def __init__(self, methodName="runTest"):
-            BaseScalyrTestCase.__init__(
-                self, methodName=methodName, verify_setup_invoked=True
-            )
-
-        def assertIs(self, obj1, obj2, msg=None):
-            unittest.TestCase.assertIs(self, obj1, obj2, msg=msg)
-
-        def assertIsNone(self, obj, msg=None):
-            unittest.TestCase.assertIsNone(self, obj, msg=msg)
-
-        def assertIsNotNone(self, obj, msg=None):
-            unittest.TestCase.assertIsNotNone(self, obj, msg=msg)
-
-        def assertGreater(self, a, b, msg=None):
-            unittest.TestCase.assertGreater(self, a, b, msg=msg)
-
-        def assertLess(self, a, b, msg=None):
-            unittest.TestCase.assertLess(self, a, b, msg=msg)
