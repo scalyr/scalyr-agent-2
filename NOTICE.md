@@ -4,7 +4,7 @@ Copyright 2014-2020 Scalyr, Inc.
 This repository contains various third party libraries which have been included from other
 projects.
 
-Those libraries are included in the following directories and availble under their corresponding
+Those libraries are included in the following directories and available under their corresponding
 licenses:
 
 * [scalyr_agent/third_party/](https://github.com/scalyr/scalyr-agent-2/tree/master/scalyr_agent/third_party/)
