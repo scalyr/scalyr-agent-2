@@ -465,7 +465,7 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.increment_timing_data(**{"foo": 1, "bar": 2})
         request.increment_timing_data(foo=5)
 
-        self.assertEquals(request.get_timing_data(), "foo=6.0 bar=2.0")
+        self.assertEquals(request.get_timing_data(), "bar=2.0 foo=6.0")
 
 
 class EventTest(ScalyrTestCase):
