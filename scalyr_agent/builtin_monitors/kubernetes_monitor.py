@@ -859,7 +859,7 @@ class WrappedMultiplexedStreamResponse(object):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.APIClient):
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon

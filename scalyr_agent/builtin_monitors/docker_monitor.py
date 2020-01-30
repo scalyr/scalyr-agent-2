@@ -645,7 +645,7 @@ class WrappedMultiplexedStreamResponse(object):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.APIClient):
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -1626,7 +1626,7 @@ class ContainerIdResolver:
         self.__last_cache_clean = time.time()
         self.__cache_expiration_secs = cache_expiration_secs
         self.__cache_clean_secs = cache_clean_secs
-        self.__docker_client = docker.Client(
+        self.__docker_client = docker.APIClient(
             base_url=("unix:/%s" % docker_api_socket), version=docker_api_version
         )
         # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.
