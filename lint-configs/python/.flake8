@@ -1,6 +1,10 @@
 [flake8]
 max-line-length = 130
-ignore = E128,E402,E722,W504
+# W503 is in direct conflict with black rules so we disable it
+# E501 is line length limit which is temporary disabled until we agree on
+# lint length limit
+ignore = E128,E402,E722,W504,E501,W503
+
 # NOTE: For noew we ignore builtin_monitors/ since there are simply too many violations there
 exclude=*.egg/*,build,dist,*third_party/,*third_party_tls/,*third_party_python2/,*builtin_monitors/
 
