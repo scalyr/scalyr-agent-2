@@ -60,3 +60,6 @@ coverage.xml
 xunit.xml
 # Sphinx documentation
 docs/_build/
+
+# MyPy
+.mypy_cache/
