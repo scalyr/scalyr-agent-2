@@ -14,7 +14,9 @@ from io import open
 
 
 import six
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+import six.moves.urllib.request
+import six.moves.urllib.parse
+import six.moves.urllib.error
 from six.moves import range
 
 import scalyr_agent.monitor_utils.annotation_config as annotation_config

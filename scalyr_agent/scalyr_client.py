@@ -118,7 +118,7 @@ class ScalyrClientSession(object):
         self.__full_address = server
 
         # Verify the server address looks right.
-        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
+        parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -299,7 +299,7 @@ class ScalyrClientSession(object):
                         proxies=self.__proxies,
                     )
                     self.total_connections_created += 1
-            except Exception as e:
+            except Exception:
                 return self.__wrap_response_if_necessary(
                     "client/connectionFailed", 0, "", block_on_response
                 )
@@ -808,10 +808,10 @@ class AddEventsRequest(object):
         """
         assert len(base_body) > 0, "The base_body object must have some fields defined."
         assert (
-            not "events" in base_body
+            "events" not in base_body
         ), "The base_body object cannot already have 'events' set."
         assert (
-            not "client_time" in base_body
+            "client_time" not in base_body
         ), "The base_body object cannot already have 'client_time' set."
 
         # As an optimization, we use a StringIO object to serialize the request.  We also

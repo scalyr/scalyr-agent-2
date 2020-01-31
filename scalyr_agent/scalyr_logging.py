@@ -35,7 +35,6 @@ import re
 import sys
 import time
 import threading
-import traceback
 import io
 import inspect
 
@@ -196,7 +195,7 @@ def alternateCurrentFrame():
 
 
 if hasattr(sys, "_getframe"):
-    currentframe = alternateCurrentFrame
+    currentframe = alternateCurrentFrame  # NOQA
 # done filching
 
 
@@ -234,7 +233,7 @@ class AgentLogger(logging.Logger):
     # The regular expression that must match for metric and field names.  Essentially, it has to begin with
     # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this,
     # be sure to fix the __force_valid_metric_or_field_name method below.
-    __metric_or_field_name_rule = re.compile("[_a-zA-Z][\w\.\-]*$")
+    __metric_or_field_name_rule = re.compile(r"[_a-zA-Z][\w\.\-]*$")
 
     def __init__(self, name):
         """Initializes the logger instance with the specified name.
@@ -250,7 +249,7 @@ class AgentLogger(logging.Logger):
         self.__logger_name = name
 
         # Look for the monitor id, which is at the end surrounded by brackets.
-        m = re.match("([^\[]*)(\(.*\))", name)
+        m = re.match(r"([^\[]*)(\(.*\))", name)
         if m:
             module_path = m.group(1)
             self.__monitor_id = m.group(2)[1:-1]
@@ -649,9 +648,9 @@ class AgentLogger(logging.Logger):
                 error_code="client/badFieldName",
             )
 
-        if not re.match("^[_a-zA-Z]", name):
+        if not re.match(r"^[_a-zA-Z]", name):
             name = "sa_" + name
-        return re.sub("[^\w\-\.]", "_", name)
+        return re.sub(r"[^\w\-\.]", "_", name)
 
     def report_values(self, values, monitor=None):
         """Records the specified values (a dict) to the underlying log.
@@ -1095,7 +1094,7 @@ class MetricLogHandler(object):
 
         @return: The handler instance to use.
         """
-        if not file_path in MetricLogHandler.__metric_log_handlers__:
+        if file_path not in MetricLogHandler.__metric_log_handlers__:
             if not MetricLogHandler.__use_stdout__:
                 result = MetricRotatingLogHandler(
                     file_path,

@@ -970,7 +970,7 @@ class MonitorConfig(object):
         return list(self.__map.keys())
 
     def __getitem__(self, field):
-        if not field in self:
+        if field not in self:
             raise KeyError('The missing field "%s" in monitor config.' % field)
         return self.__map[field]
 

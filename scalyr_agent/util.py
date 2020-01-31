@@ -20,7 +20,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 import codecs
 import sys
-import struct
 from io import open
 
 import six
@@ -36,13 +35,9 @@ import base64
 import calendar
 import datetime
 import os
-import random
-import sys
 import threading
 import time
 import uuid
-
-from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
@@ -144,7 +139,7 @@ except ImportError:
         _set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."  # NOQA
         sys.exit(1)
 
 
@@ -468,7 +463,7 @@ def rfc3339_to_datetime(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError as e:
+    except ValueError:
         return None
 
     dt = datetime.datetime(*(tm[0:6]))
@@ -519,7 +514,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError as e:
+    except ValueError:
         return None
 
     nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000

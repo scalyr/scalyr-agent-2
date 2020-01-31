@@ -142,7 +142,7 @@ class JsonObject(object):
         return list(self.__map.keys())
 
     def __getitem__(self, field):
-        if not field in self:
+        if field not in self:
             raise JsonMissingFieldException(
                 'The missing field "%s" in JsonObject.' % field
             )
@@ -200,7 +200,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
 
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         return self.__map[field]
@@ -231,7 +231,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
 
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         value = self.__map[field]
@@ -292,7 +292,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
 
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         value = self.__map[field]
@@ -343,7 +343,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
 
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         value = self.__map[field]
@@ -390,7 +390,7 @@ class JsonObject(object):
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
 
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         value = self.__map[field]
@@ -426,7 +426,7 @@ class JsonObject(object):
 
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
 
         value = self.__map[field]
@@ -463,7 +463,7 @@ class JsonObject(object):
         @raise JsonConversionError: If the underlying field's value is not a JsonObject.
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
         value = self.__map[field]
         if isinstance(value, JsonObject):
@@ -481,7 +481,7 @@ class JsonObject(object):
             object, and returns it.
 
         @raise JsonConversionError: If the underlying field's value is not a JsonObject."""
-        if not field in self:
+        if field not in self:
             self.__map[field] = JsonObject()
         value = self.__map[field]
         if isinstance(value, JsonObject):
@@ -508,7 +508,7 @@ class JsonObject(object):
         @raise JsonConversionError: If the underlying field's value is not a JsonArray.
         @raise JsonMissingFieldException: If the underlying value was not present and no other value was specified to
             be returned using default_value or none_if_missing."""
-        if not field in self:
+        if field not in self:
             return self.__compute_missing_value(field, default_value, none_if_missing)
         value = self.__map[field]
         if isinstance(value, JsonArray):

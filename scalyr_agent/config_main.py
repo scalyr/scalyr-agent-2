@@ -60,7 +60,9 @@ scalyr_init()
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import input
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+import six.moves.urllib.request
+import six.moves.urllib.parse
+import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
@@ -407,7 +409,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                 )
 
             file_name = os.path.basename(new_tarball)
-            if re.match("^scalyr-agent-2\..*\.tar\.gz$", file_name) is None:
+            if re.match(r"^scalyr-agent-2\..*\.tar\.gz$", file_name) is None:
                 raise UpgradeFailure(
                     "The supplied tarball file name does not match the expected format."
                 )

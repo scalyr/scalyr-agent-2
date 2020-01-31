@@ -1057,7 +1057,7 @@ class TestLogLineRedactor(ScalyrTestCase):
 
     def test_multiple_regular_expression_redaction_with_hash_single_group(self):
         redactor = LogLineRedacter("/var/fake_log")
-        redactor.add_redaction_rule("secret(.*?)=([a-z]+\s?)", "secret\\1=\\H2")
+        redactor.add_redaction_rule(r"secret(.*?)=([a-z]+\s?)", "secret\\1=\\H2")
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin ,moretextsecretbar=xxx ,andsecret123=saurabh",
@@ -1074,7 +1074,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self,
     ):
         redactor = LogLineRedacter("/var/fake_log")
-        redactor.add_redaction_rule("secret(.*?)=([a-z]+\s?)", "secret\\2=\\H1")
+        redactor.add_redaction_rule(r"secret(.*?)=([a-z]+\s?)", "secret\\2=\\H1")
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin ,andsecret123=saurabh",
@@ -1086,7 +1086,7 @@ class TestLogLineRedactor(ScalyrTestCase):
     def test_multiple_regular_expression_redaction_with_hash_multiple_groups(self):
         redactor = LogLineRedacter("/var/fake_log")
         redactor.add_redaction_rule(
-            "secret_([\w]+)=([\w]+)__([\w]+)", "secret_\\H1=\\H2__\\H3"
+            r"secret_([\w]+)=([\w]+)__([\w]+)", "secret_\\H1=\\H2__\\H3"
         )
         self._run_case(
             redactor,
@@ -1114,7 +1114,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         lead_text = ""
         trail_text = ""
         redactor.add_redaction_rule(
-            "([\w\.]+)@([\w\.]+)\.([\w]{2,4})", "\\H1 \\H2 \\H3"
+            r"([\w\.]+)@([\w\.]+)\.([\w]{2,4})", "\\H1 \\H2 \\H3"
         )
         self._run_case(
             redactor,
@@ -1963,8 +1963,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(1, events.total_events())
         first_sid, first_sn, sd = events.get_sequence(0)
 
-        self.assertTrue(first_sid != None)
-        self.assertTrue(first_sn != None)
+        self.assertTrue(first_sid is not None)
+        self.assertTrue(first_sn is not None)
         self.assertEqual(None, sd)
 
     def test_sequence_delta(self):
@@ -2068,7 +2068,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2087,7 +2087,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.append_file(self.__path, b"Second line\n")
         log_processor.scan_for_new_bytes()
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2100,7 +2100,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2117,7 +2117,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertTrue(log_processor.is_closed())
 
@@ -2323,8 +2323,6 @@ class TestLogMatcher(ScalyrTestCase):
         config = self._create_log_config(self.__path_one)
         config["rename_logfile"] = "/scalyr/test/$PATH2/$PATH10/log.log"
 
-        path = self.__path_one.split(os.sep)
-
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
@@ -2477,9 +2475,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEqual(0, len(processors))
 
     def test_with_reduction_rules_in_config(self):
-        reduction_rule = JsonObject(
-            **{"match_expression": "My", "replacement": "Your",}
-        )
+        reduction_rule = JsonObject(**{"match_expression": "My", "replacement": "Your"})
         config = self._create_log_config(
             self.__path_one, redaction_rules=[reduction_rule]
         )

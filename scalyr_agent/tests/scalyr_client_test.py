@@ -419,7 +419,6 @@ class AddEventsRequestTest(ScalyrTestCase):
 
     def test_set_position_resets_sequence_compression(self):
         first_id = "1234"
-        second_id = "1235"
         first_number = 1234
         second_number = 4321
         expected_delta = 10

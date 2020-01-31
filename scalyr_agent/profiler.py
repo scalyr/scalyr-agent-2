@@ -25,6 +25,8 @@ import time
 import traceback
 from io import open
 
+import six
+
 try:
     import yappi
 except ImportError:

@@ -48,7 +48,7 @@ except Exception:
 
 __has_pure_python_tls__ = False
 try:
-    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+    from tlslite import HTTPTLSConnection, HandshakeSettings
 
     __has_pure_python_tls__ = True
 except Exception:
@@ -169,7 +169,7 @@ class Connection(object):
     def __init__(self, server, request_deadline, ca_file, headers):
 
         # Verify the server address looks right.
-        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
+        parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -287,7 +287,7 @@ class ScalyrHttpConnection(Connection):
 
         try:
             self._init_connection(pure_python_tls=use_tlslite)
-        except Exception as e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+        except Exception:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
             log.info(
                 "Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation"
             )
@@ -455,7 +455,7 @@ class ScalyrHttpConnection(Connection):
                     if self._ca_file:
                         try:
                             self._validate_chain_certvalidator(self.__connection)
-                        except Exception as e:
+                        except Exception:
                             log.exception("Failure in _validate_chain_certvalidator()")
                             self._validate_chain_openssl()
             else:

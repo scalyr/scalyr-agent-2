@@ -28,10 +28,8 @@ import six
 
 __author__ = "czerwin@scalyr.com"
 
-import datetime
 import errno
 import fnmatch
-import sys
 
 import os
 import random
@@ -39,7 +37,6 @@ import re
 import string
 import threading
 import time
-import timeit
 import uuid
 from io import open
 
@@ -1809,8 +1806,6 @@ class LogFileProcessor(object):
         original_position = self.__log_file_iterator.tell()
         original_events_position = add_events_request.position()
 
-        start_process_time = 0.0
-
         # Some performance analysis timings we use from time to time.
         # fast_get_time = timeit.default_timer
         # start_process_time = fast_get_time()
@@ -1828,9 +1823,6 @@ class LogFileProcessor(object):
             total_redactions = 0
             lines_dropped_by_sampling = 0
             bytes_dropped_by_sampling = 0
-
-            time_spent_reading = 0.0
-            time_spent_serializing = 0.0
 
             buffer_filled = False
             added_thread_id = False
@@ -2824,7 +2816,7 @@ class LogMatcher(object):
                     ):
                         # Note, this next line is for a hack in the kubernetes_monitor to not include the original
                         # log file name.  TODO: Clean this up.
-                        if not "rename_no_original" in self.__log_entry_config:
+                        if "rename_no_original" not in self.__log_entry_config:
                             log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.

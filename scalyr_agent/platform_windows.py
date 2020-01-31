@@ -24,7 +24,6 @@ from scalyr_agent import compat
 __author__ = "guy.hoozdis@gmail.com"
 
 import sys
-import struct
 import random
 import os
 

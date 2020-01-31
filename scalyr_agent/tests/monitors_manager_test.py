@@ -138,7 +138,7 @@ class MonitorsManagerTest(ScalyrTestCase):
                 },
             ],
             [],
-            extra_toplevel_config={"disable_leak_monitors_creation": True,},
+            extra_toplevel_config={"disable_leak_monitors_creation": True},
         )
 
         self.assertEquals(len(test_manager.monitors), 0)

@@ -856,7 +856,7 @@ class PidfileManager(object):
                 self._log("Checked pidfile: does not exist")
                 return None
 
-            if not "\n" in raw_contents:
+            if "\n" not in raw_contents:
                 # This means the write to the pidfile is half-finished, so we just pretend like the file
                 # did not exist.  This means the higher level code will think the agent isn't running, but
                 # that's ok because this can have false negatives (and the agent is just starting, so who's to

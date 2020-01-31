@@ -349,7 +349,7 @@ class LineGrouper(LineMatcher):
         @param line - the next line of input
         @return bool - whether or not the start pattern finds a match in the input line
         """
-        return self._start_pattern.search(line) != None
+        return self._start_pattern.search(line) is not None
 
 
 class ContinueThrough(LineGrouper):
@@ -367,7 +367,7 @@ class ContinueThrough(LineGrouper):
         if not line:
             return True
 
-        return self._continuation_pattern.search(line) != None
+        return self._continuation_pattern.search(line) is not None
 
 
 class ContinuePast(LineGrouper):
@@ -454,7 +454,7 @@ class HaltBefore(LineGrouper):
         return self.__match_single
 
     def _continue_line(self, line):
-        return self._continuation_pattern.search(line) == None
+        return self._continuation_pattern.search(line) is None
 
     def _match_single_line(self):
         # HaltBefore can potentiall match a single line
@@ -497,7 +497,7 @@ class HaltWith(LineGrouper):
             return False
 
         # see if the continuation pattern matches
-        cont = self._continuation_pattern.search(line) == None
+        cont = self._continuation_pattern.search(line) is None
 
         # if it doesn't, then we still continue the line for this input, but we have reached the end ofr
         # the pattern so the next line should end the group

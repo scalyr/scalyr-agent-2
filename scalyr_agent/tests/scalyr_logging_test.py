@@ -70,14 +70,14 @@ class ScalyrLoggingTest(ScalyrTestCase):
         self.__logger.info("Test line %d", 5)
         self.assertTrue(
             self.__log_contains(
-                "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}Z INFO \[core\] "
-                "\[.*\.py:\d+\] Test line 5"
+                r"\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}Z INFO \[core\] "
+                r"\[.*\.py:\d+\] Test line 5"
             )
         )
 
     def test_error_code(self):
         self.__logger.warn("Bad result", error_code="statusCode")
-        self.assertTrue(self.__log_contains('\[error="statusCode"\] Bad result'))
+        self.assertTrue(self.__log_contains(r'\[error="statusCode"\] Bad result'))
 
     def test_child_modules(self):
         child = scalyr_logging.getLogger("scalyr_agent.foo.bar")
