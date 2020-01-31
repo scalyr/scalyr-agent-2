@@ -70,8 +70,8 @@ class ScalyrLoggingTest(ScalyrTestCase):
         self.__logger.info("Test line %d", 5)
         self.assertTrue(
             self.__log_contains(
-                r"\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}Z INFO \[core\] "
-                r"\[.*\.py:\d+\] Test line 5"
+                ("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}Z INFO \[core\] "
+                 "\[.*\.py:\d+\] Test line 5")  # NOQA
             )
         )
 
