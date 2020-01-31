@@ -264,7 +264,7 @@ class ScalyrLoggingTest(ScalyrTestCase):
         self.assertTrue(self.__log_contains("First message"))
 
         first_message_record = self.__logger.last_record
-        self.assertEqual(first_message_record.message, 'First message')
+        self.assertEqual(first_message_record.message, "First message")
 
         self.__logger.info("Dropped message %s", string_450)
         self.assertFalse(self.__log_contains("Dropped message"))
@@ -274,18 +274,21 @@ class ScalyrLoggingTest(ScalyrTestCase):
         second_message_record = self.__logger.last_record
 
         second_message_record = self.__logger.last_record
-        self.assertEqual(second_message_record.message, 'Second message')
+        self.assertEqual(second_message_record.message, "Second message")
 
         # Verify that formatted first mesage + second message length is not larger then 500
         # (max_write_burst) which would indicate invalid test which may intermediatly fail
         # depending on the test timing
         self.assertEqual(1, second_message_record.rate_limited_dropped_records)
 
-        if ((first_message_record.formatted_size + second_message_record.formatted_size) >=
-                max_write_burst):
-            self.fail('Length of the formatted first and second mesage string is longer than '
-                      '%s bytes (max_write_burst). Increase max_write_burst used or update the '
-                      'strings otherwise tests may occasionally fail.' % (max_write_burst))
+        if (
+            first_message_record.formatted_size + second_message_record.formatted_size
+        ) >= max_write_burst:
+            self.fail(
+                "Length of the formatted first and second mesage string is longer than "
+                "%s bytes (max_write_burst). Increase max_write_burst used or update the "
+                "strings otherwise tests may occasionally fail." % (max_write_burst)
+            )
 
         self.assertTrue(second_message_record.rate_limited_result)
         self.assertTrue(second_message_record.rate_limited_set)
