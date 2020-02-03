@@ -43,20 +43,26 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         with open(self.agent_log_path, 'w') as fp:
             fp.write(six.text_type('line 1\nline 2\nline 3'))
 
-        self.assertLogFileContainsLineRegex(self.agent_log_path, r'line 1')
-        self.assertLogFileContainsLineRegex(self.agent_log_path, r'line 2')
-        self.assertLogFileContainsLineRegex(self.agent_log_path, r'line \d+')
+        # file_path argument explicitly provided
+        self.assertLogFileContainsLineRegex(r'line 1', self.agent_log_path)
+        self.assertLogFileContainsLineRegex(r'line 2', self.agent_log_path)
+        self.assertLogFileContainsLineRegex(r'line \d+', self.agent_log_path)
+
+        # file_path argument not provided, should default to agent log path
+        self.assertLogFileContainsLineRegex(r'line 1')
+        self.assertLogFileContainsLineRegex(r'line 2')
+        self.assertLogFileContainsLineRegex(r'line \d+')
 
         self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
-                          self.agent_log_path, r'line 1\nline 2')
+                          r'line 1\nline 2', self.agent_log_path)
         self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
-                          self.agent_log_path, r'line 4')
+                          r'line 4', self.agent_log_path)
         self.assertRaises(AssertionError, self.assertLogFileContainsLineRegex,
-                          self.agent_log_path, r'line \d+\d+')
+                          r'line \d+\d+', self.agent_log_path)
 
-        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line 1\nline 2')
-        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line 4')
-        self.assertLogFileDoesntContainsLineRegex(self.agent_log_path, r'line \d+\d+')
+        self.assertLogFileDoesntContainsLineRegex(r'line 1\nline 2', self.agent_log_path)
+        self.assertLogFileDoesntContainsLineRegex(r'line 4', self.agent_log_path)
+        self.assertLogFileDoesntContainsLineRegex(r'line \d+\d+', self.agent_log_path)
 
     def test_assertLogFileContainsAndDoesntContainRegex(self):
         # Log files should have been created in setUp()
@@ -67,17 +73,17 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         with open(self.agent_log_path, 'w') as fp:
             fp.write(six.text_type('line 1\nline 2\nline 3'))
 
-        self.assertLogFileContainsRegex(self.agent_log_path, r'line 1\nline 2')
-        self.assertLogFileContainsRegex(self.agent_log_path, r'line 1\nline 2\nline 3')
-        self.assertLogFileContainsRegex(self.agent_log_path, r'line 1\nline 2\nline \d+')
+        self.assertLogFileContainsRegex(r'line 1\nline 2', self.agent_log_path)
+        self.assertLogFileContainsRegex(r'line 1\nline 2\nline 3', self.agent_log_path)
+        self.assertLogFileContainsRegex(r'line 1\nline 2\nline \d+', self.agent_log_path)
 
         self.assertRaises(AssertionError, self.assertLogFileContainsRegex,
-                          self.agent_log_path, r'line 4')
+                          r'line 4', self.agent_log_path)
         self.assertRaises(AssertionError, self.assertLogFileContainsRegex,
-                          self.agent_log_path, r'line 1\nline 3')
+                          r'line 1\nline 3', self.agent_log_path)
 
-        self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 4')
-        self.assertLogFileDoesntContainsRegex(self.agent_log_path, r'line 1\n line 3')
+        self.assertLogFileDoesntContainsRegex(r'line 4', self.agent_log_path)
+        self.assertLogFileDoesntContainsRegex(r'line 1\n line 3', self.agent_log_path)
 
     @mock.patch('scalyr_agent.test_base.print')
     def tearDown(self, mock_print):

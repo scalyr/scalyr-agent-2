@@ -309,7 +309,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         if not self.__assertion_failed:
             shutil.rmtree(self.logs_directory)
 
-    def assertLogFileContainsLineRegex(self, file_path, expression):
+    def assertLogFileContainsLineRegex(self, expression, file_path=None):
         """
         Custom assertion function which asserts that the provided log file path contains a line
         which matches the provided line regular expression.
@@ -317,14 +317,16 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         Keep in mind that this function is line oriented. If you want to perform assertion across
         multiple lines, you should use "assertLogFileContainsRegex".
 
-        :param file_path: Path to the file to use.
         :param expression: Regular expression to match against each line in the file.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
         """
+        file_path = file_path or self.agent_log_path
+
         if not self._file_contains_line_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
             self.fail('File "%s" doesn\'t contain "%s" line expression' % (file_path, expression))
 
-    def assertLogFileDoesntContainsLineRegex(self, file_path, expression):
+    def assertLogFileDoesntContainsLineRegex(self, expression, file_path=None):
         """
         Custom assertion function which asserts that the provided log file path doesn\'t contains a
         line which matches the provided line regular expression.
@@ -332,15 +334,17 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         Keep in mind that this function is line oriented. If you want to perform assertion across
         multiple lines, you should use "assertLogFileDoesntContainsRegex".
 
-        :param file_path: Path to the file to use.
         :param expression: Regular expression to match against each line in the file.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
         """
+        file_path = file_path or self.agent_log_path
+
         if self._file_contains_line_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
             self.fail('File "%s" contain "%s" line expression, but it shouldn\'t' % (file_path,
                                                                                      expression))
 
-    def assertLogFileContainsRegex(self, file_path, expression):
+    def assertLogFileContainsRegex(self, expression, file_path=None):
         """
         Custom assertion function which asserts that the provided log file path contains a string
         which matches the provided regular expression.
@@ -348,14 +352,16 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         This function performs checks against the whole file content which means it comes handy in
         scenarios where you need to perform cross line checks.
 
-        :param file_path: Path to the file to use.
         :param expression: Regular expression to match against the whole file content.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
         """
+        file_path = file_path or self.agent_log_path
+
         if not self._file_contains_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
             self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
 
-    def assertLogFileDoesntContainsRegex(self, file_path, expression):
+    def assertLogFileDoesntContainsRegex(self, expression, file_path=None):
         """
         Custom assertion function which asserts that the provided log file path doesn\'t contain a
         string which matches the provided regular expression.
@@ -364,8 +370,14 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         scenarios where you need to perform cross line checks.
 
         :param file_path: Path to the file to use.
-        :param expression: Regular expression to match against the whole file content.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
         """
+        file_path = file_path or self.agent_log_path
+
+        if self._file_contains_regex(file_path=file_path, expression=expression):
+            self.__assertion_failed = True
+            self.fail('File "%s" contain "%s" expression, but it shouldn\'t' % (file_path,
+                                                                                expression))
 
     def _file_contains_line_regex(self, file_path, expression):
         matcher = re.compile(expression)
@@ -384,6 +396,3 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             content = fp.read()
 
         return bool(matcher.search(content))
-
-
-

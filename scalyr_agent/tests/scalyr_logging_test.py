@@ -38,8 +38,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
 
     def test_output_to_file(self):
         self.__logger.info("Hello world")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression='Hello world')
+        self.assertLogFileContainsLineRegex(expression='Hello world')
 
     def test_component_name(self):
         self.assertEquals(self.__logger.component, "core")
@@ -65,28 +64,24 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.__logger.info("Test line %d", 5)
         expression = ("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}.\\d{3}Z INFO \[core\] "
                       "\[.*\.py:\d+\] Test line 5")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression=expression)
+        self.assertLogFileContainsLineRegex(expression=expression)
 
     def test_error_code(self):
         self.__logger.warn("Bad result", error_code="statusCode")
         expression = '\[error="statusCode"\] Bad result'
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression=expression)
+        self.assertLogFileContainsLineRegex(expression=expression)
 
     def test_child_modules(self):
         child = scalyr_logging.getLogger("scalyr_agent.foo.bar")
         child.info("Child statement")
         expression = 'Child statement'
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression=expression)
+        self.assertLogFileContainsLineRegex(expression=expression)
 
     def test_sibling_modules(self):
         child = scalyr_logging.getLogger("external_package.my_monitor")
         child.info("Sibling statement")
         expression = 'Sibling statement'
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression=expression)
+        self.assertLogFileContainsLineRegex(expression=expression)
 
     def test_metric_logging(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
@@ -105,8 +100,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
                                             expression="test_name 5")
         self.assertLogFileContainsLineRegex(file_path=metric_file_path,
                                             expression="foo=5")
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                 expression="foo=5")
+        self.assertLogFileDoesntContainsLineRegex(expression="foo=5")
 
         monitor_logger.closeMetricLog()
 
@@ -126,8 +120,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         expression = 'foobaz is fine'
         self.assertLogFileContainsLineRegex(file_path=metric_file_path,
                                             expression=expression)
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                  expression=expression)
+        self.assertLogFileDoesntContainsLineRegex(expression=expression)
 
         monitor_logger.closeMetricLog()
 
@@ -212,8 +205,7 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         # The value should only appear in the metric log file and not the main one.
         self.assertLogFileContainsLineRegex(file_path=metric_file_path,
                                             expression="foo=5")
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                  expression="foo=5")
+        self.assertLogFileDoesntContainsLineRegex(expression="foo=5")
 
         monitor_logger.closeMetricLog()
 
@@ -234,16 +226,13 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         string_300 = "a" * 300
 
         self.__logger.info("First message")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="First message")
+        self.assertLogFileContainsLineRegex(expression="First message")
 
         self.__logger.info("Dropped message %s", string_300)
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="Dropped message")
+        self.assertLogFileDoesntContainsLineRegex(expression="Dropped message")
 
         self.__logger.info("Second message")
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                  expression="Second message")
+        self.assertLogFileDoesntContainsLineRegex(expression="Second message")
 
     def test_rate_limit_no_write_rate(self):
         """
@@ -272,15 +261,13 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         string_450 = "a" * 450
 
         self.__logger.info("First message")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="First message")
+        self.assertLogFileContainsLineRegex(expression="First message")
 
         first_message_record = self.__logger.last_record
         self.assertEqual(first_message_record.message, 'First message')
 
         self.__logger.info("Dropped message %s", string_450)
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                  expression="Dropped message")
+        self.assertLogFileDoesntContainsLineRegex(expression="Dropped message")
 
         self.__logger.info("Second message")
 
@@ -298,11 +285,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
                       '%s bytes (max_write_burst). Increase max_write_burst used or update the '
                       'strings otherwise tests may occasionally fail.' % (max_write_burst))
 
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="Second message")
+        self.assertLogFileContainsLineRegex(expression="Second message")
         expression = 'Warning, skipped writing 1 log lines'
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression=expression)
+        self.assertLogFileContainsLineRegex(expression=expression)
         self.assertTrue(second_message_record.rate_limited_result)
         self.assertTrue(second_message_record.rate_limited_set)
 
@@ -327,12 +312,9 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             current_time=61.0,
         )
 
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="First record")
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                  expression="Second record")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="Third record")
+        self.assertLogFileContainsLineRegex(expression="First record")
+        self.assertLogFileDoesntContainsLineRegex(expression="Second record")
+        self.assertLogFileContainsLineRegex(expression="Third record")
 
         # Now test with different keys.
         log.info(
@@ -360,14 +342,10 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             current_time=31.0,
         )
 
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="First record")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="Second record")
-        self.assertLogFileContainsLineRegex(file_path=self.agent_log_path,
-                                            expression="Third record")
-        self.assertLogFileDoesntContainsLineRegex(file_path=self.agent_log_path,
-                                                 expression="Fourth record")
+        self.assertLogFileContainsLineRegex(expression="First record")
+        self.assertLogFileContainsLineRegex(expression="Second record")
+        self.assertLogFileContainsLineRegex(expression="Third record")
+        self.assertLogFileDoesntContainsLineRegex(expression="Fourth record")
 
     class FakeMonitor(object):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""
