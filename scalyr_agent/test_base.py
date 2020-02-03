@@ -302,8 +302,8 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             # Print the paths to which we store the output to so they can be introspected by the
             # developer
             test_name = self._testMethodName
-            print('Storing agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
-            print('Storing agent debug log file for test "%s" to: %s' % (test_name,
+            print('Stored agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
+            print('Stored agent debug log file for test "%s" to: %s' % (test_name,
                                                                         self.agent_debug_log_path))
 
         if not self.__assertion_failed:
