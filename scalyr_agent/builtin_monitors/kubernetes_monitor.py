@@ -821,7 +821,8 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_helper(  # pylint: disable=bad-super-call
+        # pylint: disable=bad-super-call
+        for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
             yield item
@@ -838,7 +839,8 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):  # pylint: disable=bad-super-call
+        # pylint: disable=bad-super-call
+        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
 
@@ -3945,7 +3947,8 @@ class KubernetesMonitor(ScalyrMonitor):
 
                     namespace = extra.get("pod_namespace", "invalid-namespace")
                     self._logger.emit_value(
-                        "%s.container_name" % (self._container_runtime),  # pylint: disable=no-member
+                        "%s.container_name"
+                        % (self._container_runtime),  # pylint: disable=no-member
                         info["name"],
                         extra,
                         monitor_id_override="namespace:%s" % namespace,

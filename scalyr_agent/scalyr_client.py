@@ -348,7 +348,10 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:  # pylint: disable=no-member
+                if (
+                    hasattr(error, "errno")
+                    and error.errno is not None  # pylint: disable=no-member
+                ):
                     log.error(
                         'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                         "will re-attempt",
@@ -417,7 +420,10 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:  # pylint: disable=no-member
+                if (
+                    hasattr(error, "errno")
+                    and error.errno is not None  # pylint: disable=no-member
+                ):
                     log.error(
                         'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
                         "connection, will re-attempt",
@@ -1083,7 +1089,8 @@ class AddEventsRequest(object):
         if timestamp is None:
             timestamp = int(time.time() * 1000000000)
 
-        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:  # pylint: disable=used-before-assignment
+        # pylint: disable=used-before-assignment
+        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
             timestamp = __last_time_stamp__ + 1
         __last_time_stamp__ = timestamp
 

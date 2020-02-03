@@ -29,7 +29,10 @@ import time
 from scalyr_agent import ScalyrMonitor
 
 from redis.client import Redis  # pylint: disable=import-error
-from redis.exceptions import ConnectionError, TimeoutError  # pylint: disable=import-error
+from redis.exceptions import (  # pylint: disable=import-error
+    ConnectionError,
+    TimeoutError,
+)
 
 MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")
 

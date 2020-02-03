@@ -34,7 +34,9 @@ import threading
 from io import open
 
 import six
-from requests.packages.urllib3.exceptions import ProtocolError  # pylint: disable=import-error
+from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
+    ProtocolError,
+)
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
@@ -607,7 +609,8 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_helper(  # pylint: disable=bad-super-call
+        # pylint: disable=bad-super-call
+        for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
             yield item
@@ -624,7 +627,8 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):  # pylint: disable=bad-super-call
+        # pylint: disable=bad-super-call
+        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
 
@@ -639,7 +643,8 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(  # pylint: disable=bad-super-call
+        # pylint: disable=bad-super-call
+        for item in super(
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item

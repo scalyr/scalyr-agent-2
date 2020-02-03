@@ -48,7 +48,10 @@ except Exception:
 
 __has_pure_python_tls__ = False
 try:
-    from tlslite import HTTPTLSConnection, HandshakeSettings  # pylint: disable=import-error
+    from tlslite import (  # pylint: disable=import-error
+        HTTPTLSConnection,
+        HandshakeSettings,
+    )
 
     __has_pure_python_tls__ = True
 except Exception:
@@ -344,9 +347,15 @@ class ScalyrHttpConnection(Connection):
         or turning it off completely.
         """
         try:
-            from certvalidator import CertificateValidato  # pylint: disable=import-error,no-name-in-module
-            from certvalidator import ValidationContext  # pylint: disable=import-error,no-name-in-module
-            from asn1crypto import x509, pem  # pylint: disable=import-error,no-name-in-module
+            # pylint: disable=import-error,no-name-in-module
+            from certvalidator import CertificateValidato
+            from certvalidator import ValidationContext
+            from asn1crypto import (
+                x509,
+                pem,
+            )
+
+            # pylint: enable=import-error,no-name-in-module
 
             # validate server certificate chain
             session = tlslite_connection.sock.session
@@ -413,8 +422,8 @@ class ScalyrHttpConnection(Connection):
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
                 validator = CertificateValidator(  # pylint: disable=undefined-variable
-                end_entity_cert, validation_context=context
-            )
+                    end_entity_cert, validation_context=context
+                )
             validator.validate_tls(six.text_type(self._host))
             log.info(
                 "Scalyr server cert chain successfully validated via certvalidator library"
@@ -473,7 +482,7 @@ class ScalyrHttpConnection(Connection):
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s"',
                     self._full_address,
-                    getattr(error, 'message', str(error)),
+                    getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
                 )
             elif __has_ssl__ and isinstance(error, ssl.SSLError):

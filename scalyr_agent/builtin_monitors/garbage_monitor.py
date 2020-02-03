@@ -156,7 +156,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
                 raise BadMonitorConfiguration(
                     "object_dump_types contains a non-string value: %s"
                     % six.text_type(t),
-                    "object_dump_types"
+                    "object_dump_types",
                 )
 
         # and convert the JsonArray to a python list

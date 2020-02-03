@@ -1180,7 +1180,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
-        import pdb; pdb.set_trace()  # XXX BREAKPOINT
 
         status = self._manager.generate_status()
 
