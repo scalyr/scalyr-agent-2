@@ -10,7 +10,7 @@ For more information on the Scalyr Agent, please visit https://www.scalyr.com/he
 
 To learn more about Scalyr, visit https://www.scalyr.com.
 
-# Features
+## Features
 
 The Scalyr Agent is designed to be lightweight, easy to install, and safe to run on production systems.
 Key features:
@@ -21,7 +21,7 @@ Key features:
   * Modular configuration files
   * Extensibility using monitor plugins
 
-# Developing
+## Developing
 
 From this repository, you can create your own RPM and Debian packages containing customized versions of
 the Scalyr Agent. For instance, you can bundle additional monitoring plugins to collect specialized data
@@ -29,7 +29,40 @@ from your servers.
 
 We also welcome submissions from the community.
 
-## Monitor plugins
+### Local Development Environment, Tests and Lint Checks
+
+This repository utilizes ``tox`` Python project for running various lint checks and tests.
+
+For it to work, you need to have ``tox`` Python package installed on the system or inside the virtual
+environment which you use for the development.
+
+```bash
+pip install tox
+```
+
+In addition to that, you also need to have Python version available which is used for a particular
+tox target. By default Python 2.7 is used for the unit tests and Python 3.6 for all the lint checks.
+
+To run all the checks you can simply run tox command:
+
+```bash
+tox
+```
+
+In addition to that, you can also run a specific target or a set of targets using ``-e`` flag. For example:
+
+```bash
+# run all the lint targets
+tox -elint
+# run flake8 and mypy tox target
+tox -eflake8,mypy
+# run py2.7-unit-tests tox target
+tox -epy2.7-unit-tests
+# run coverage tox target
+tox -ecoverage
+```
+
+### Monitor Plugins
 
 Monitor plugins are one of the key features for Scalyr Agent 2.  These plugins can be used to augment the
 functionality of Scalyr Agent 2 beyond just copying logs and metrics.  For example, there are monitor plugins
@@ -45,7 +78,7 @@ directory.
 To learn how to develop plugins, please see the
 [instructions for creating a monitor plugin](docs/CREATING_MONITORS.md).
 
-## Building packages
+### Building Packages
 
 You can use the `build_packages.py` script to build your own RPM or Debian packages.  This is often desirable
 if your company has its own yum or apt repositories, or you have modified the Scalyr Agent 2 code to suit
@@ -70,7 +103,7 @@ To build the Debian package, execute the following command in the root directory
 
     python build_package.py deb
 
-## Code Formatting
+### Code Formatting
 
 This project uses the [Black](http://black.readthedocs.io) code autoformatting tool with default settings.
 
@@ -82,7 +115,7 @@ To use pre-commit:
 - Install the hooks with `pre-commit install`
 - To manually execute the pre-commit hooks (including black), run `pre-commit run --all-files`
 
-#### Pre-commit and Black Configuration
+### Pre-commit and Black Configuration
 
 - `.pre-commit-config.yaml` configures the scripts run by pre-commit
 - `pyproject.toml` configures the Black settings including folder exclusions for `third_party`
@@ -90,7 +123,7 @@ To use pre-commit:
 To update the Pre-commit hooks including black, run `pre-commit autoupdate`.
 This will update `.pre-commit-config.yaml` and will need to be committed to the repository.
 
-# Contributing
+## Contributing
 
 In the future, we will be pushing guidelines on how to contribute to this repository.  For now, please just
 feel free to submit pull requests to the `master` branch and we will work with you.
