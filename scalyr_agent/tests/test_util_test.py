@@ -116,8 +116,8 @@ class LogCaptureClassTestCase(BaseScalyrLogCaptureTestCase):
         print_message_1 = mock_print.call_args_list[0][0][0]
         print_message_2 = mock_print.call_args_list[1][0][0]
 
-        expected_msg_1 = 'Storing agent log file for test "test_assertLogFile'
-        expected_msg_2 = 'Storing agent debug log file for test "test_assertLogFile'
+        expected_msg_1 = 'Stored agent log file for test "test_assertLogFile'
+        expected_msg_2 = 'Stored agent debug log file for test "test_assertLogFile'
 
         self.assertTrue(expected_msg_1 in print_message_1)
         self.assertTrue(expected_msg_2 in print_message_2)
