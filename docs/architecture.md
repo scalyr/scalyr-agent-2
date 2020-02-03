@@ -70,7 +70,7 @@ starting a thread, stopping a thread and asking thread for a status.
 #### LogFileIterator ([log_processing.py](https://github.com/scalyr/scalyr-agent-2/blob/master/scalyr_agent/log_processing.py))
 
 * It's responsible to watch a single file path and give an illusion that you are iterating over
-  all long lines in a log file even if that log file has been rotated.
+  all lines in a log file even if that log file has been rotated.
 * Think of it as a logical file path.
 * There are various "tricks" and heuristics needed to make that work reliably on multiple operating
   systems. Those includes:
