@@ -21,7 +21,6 @@ __author__ = "czerwin@scalyr.com"
 
 from io import BytesIO
 
-import re
 import mock
 
 from scalyr_agent.__scalyr__ import SCALYR_VERSION
@@ -926,7 +925,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
-    @mock.patch('scalyr_agent.scalyr_client.time.time', mock.Mock(return_value=11111))
+    @mock.patch('scalyr_agent.scalyr_client.time.time', mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
         """
         When sending a request with compression available / enabled, raw (uncompressed) request
@@ -941,11 +940,17 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session._ScalyrClientSession__compress = mock.Mock(return_value='compressed')
 
         add_events_request = AddEventsRequest({'foo': 'bar'})
+        event1 = Event(thread_id="foo1", attrs={"parser": "bar1"}).set_message("eventOne")
+        event2 = Event(thread_id="foo2", attrs={"parser": "bar2"}).set_message("eventTwo")
+        add_events_request.add_event(event=event1, timestamp=1)
+        add_events_request.add_event(event=event2, timestamp=2)
 
         session.send(add_events_request=add_events_request)
 
         # Should log raw (uncompressed) request body / payload
-        expected_body = re.escape(r'{"foo":"bar", events: [], logs: [], threads: [], client_time: 11111 }')
+        expected_body = r'{"foo":"bar", events: \[{thread:"foo1", .*'
+        self.assertLogFileContainsRegex(expected_body, file_path=self.agent_debug_log_path)
+        expected_body = r'.*,{thread:"foo2", log:"foo2", attrs:{"parser":"bar2",.*'
         self.assertLogFileContainsRegex(expected_body, file_path=self.agent_debug_log_path)
 
         # Verify that the compression was indeed enabled since that's the scenario we are testing
