@@ -30,6 +30,8 @@ __author__ = "czerwin@scalyr.com"
 
 if False:
     from typing import Dict
+    # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa
+    from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 import logging
 import logging.handlers
@@ -44,7 +46,6 @@ import inspect
 import six
 
 import scalyr_agent.util as util
-from scalyr_agent.scalyr_monitor import ScalyrMonitor
 from scalyr_agent.util import RateLimiter
 
 _METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
