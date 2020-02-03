@@ -126,8 +126,8 @@ CONFIG_OPTIONS = [
 ]
 
 _ = [
-    define_config_option(__monitor__, **option) for option in CONFIG_OPTION  # type: ignore
-]  # pylint: disable=star-args
+    define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS  # type: ignore
+]
 ## End Monitor Configuration
 # #########################################################################################
 
