@@ -76,8 +76,8 @@ class UrlMonitorTestRequest(unittest.TestCase):
         self.assertEqual(actual_request.get_method(), "GET")
         self.assertFalse(actual_request.data is not None)
         self.assertEqual(
-            actual_request.header_items(),
-            [("Header_foo", "foo"), ("Header_bar", "bar")],
+            sorted(actual_request.header_items()),
+            sorted([("Header_foo", "foo"), ("Header_bar", "bar")]),
         )
 
     def test_post_request_with_data(self):
