@@ -1252,10 +1252,9 @@ class ProcessMonitor(ScalyrMonitor):
                         t_pid = int(os.getpid())
                     else:
                         t_pid = int(t_pid)
-                    import pdb; pdb.set_trace()  # XXX BREAKPOINT
                     pids.append(t_pid)
             self.__pids = pids
         return self.__pids
 
 
-__all__ = ['ProcessMonitor']
+__all__ = ["ProcessMonitor"]

@@ -30,6 +30,7 @@ __author__ = "czerwin@scalyr.com"
 
 if False:
     from typing import Dict
+
     # Workaround for a cyclic import - scalyr_monitor depends on scalyr_logging and vice versa
     from scalyr_agent.scalyr_monitor import ScalyrMonitor
 

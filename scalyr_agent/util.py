@@ -139,8 +139,11 @@ except ImportError:
         _set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print("No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting.",
-              file=sys.stderr)
+        print(
+            "No default json library found which should be present in all Python >= 2.6.  "
+            "Python < 2.6 is not supported.  Exiting.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 

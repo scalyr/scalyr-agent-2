@@ -74,7 +74,7 @@ class BlockingRateLimiter(object):
 
     HARD_LIMIT_MIN_CLUSTER_RATE = 1
 
-    registry = {}   # type: Dict[str, BlockingRateLimiter]
+    registry = {}  # type: Dict[str, BlockingRateLimiter]
     registry_lock = threading.Lock()
 
     def __repr__(self):
