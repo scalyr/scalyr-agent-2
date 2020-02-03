@@ -606,6 +606,14 @@ class PosixPlatformController(PlatformController):
 
         # noinspection PyUnusedLocal
         def handle_interrupt(signal_num, frame):
+            if not fork:
+                # When forking is disabled and main process runs in the foreground, we can't CTRL+C
+                # to work as expected and result in the termination handler being started and
+                # process exiting.
+                sys.stderr.write('Received CTRL+C, starting termination handler and exiting...\n')
+                handle_terminate(signal_num, frame)
+                return
+
             if self.__status_handler is not None:
                 self.__status_handler()
 
