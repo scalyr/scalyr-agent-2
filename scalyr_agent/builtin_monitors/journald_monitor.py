@@ -19,13 +19,15 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+if False:
+    from typing import Dict
+
 import datetime
 import os
 import re
 import select
 import threading
 import traceback
-from cStringIO import StringIO
 
 import six
 
@@ -146,7 +148,7 @@ define_config_option(
 # _global_checkpoints dict
 _global_lock = threading.Lock()
 
-_global_checkpoints = {}
+_global_checkpoints = {}  # type: Dict[str, Checkpoint]
 
 
 def load_checkpoints(filename):

@@ -43,7 +43,7 @@ try:
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
+    ssl = None  # type: ignore
 
 
 __has_pure_python_tls__ = False

@@ -1257,7 +1257,7 @@ class ScriptEscalator(object):
             else:
                 # We use the __main__ symbolic module to determine which file was invoked by the python script.
                 # noinspection PyUnresolvedReferences
-                import __main__
+                import __main__  # type: ignore
 
                 script_file_path = __main__.__file__
                 if not os.path.isabs(script_file_path):

@@ -47,7 +47,7 @@ try:
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
+    ssl = None  # type: ignore
 
 
 import scalyr_agent.scalyr_logging as scalyr_logging

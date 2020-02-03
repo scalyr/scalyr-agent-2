@@ -28,6 +28,9 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+if False:
+    from typing import Dict
+
 import logging
 import logging.handlers
 import os
@@ -41,6 +44,7 @@ import inspect
 import six
 
 import scalyr_agent.util as util
+from scalyr_agent.scalyr_monitor import ScalyrMonitor
 from scalyr_agent.util import RateLimiter
 
 _METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
@@ -547,7 +551,7 @@ class AgentLogger(logging.Logger):
 
     # The set of ScalyrMonitor instances that current have only metric logs associated with them.  This is used
     # for error checking.
-    __opened_monitors__ = {}
+    __opened_monitors__ = {}  # type: Dict[ScalyrMonitor,bool]
 
     def openMetricLogForMonitor(
         self,
@@ -1045,7 +1049,7 @@ class MetricLogHandler(object):
         pass
 
     # Static variable that maps file paths to the handlers responsible for them.
-    __metric_log_handlers__ = {}
+    __metric_log_handlers__ = {}  # type: Dict[str, MetricLogHandler]
 
     # Static variable that determines if all metric output will be written to stdout instead of the normal
     # metric log file.
@@ -1607,7 +1611,7 @@ class BadMetricOrFieldName(Exception):
 
 # A sentinel value used to indicate an argument was not specified.  We do not use None to indicate
 # NOT_GIVEN since the argument's value may be None.
-__NOT_GIVEN__ = {}
+__NOT_GIVEN__ = {}  # type: ignore
 
 
 class UnsupportedValueType(Exception):

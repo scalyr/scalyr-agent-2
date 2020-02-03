@@ -20,6 +20,9 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
+if False:
+    from typing import Dict
+
 import random
 import threading
 import time
@@ -71,7 +74,7 @@ class BlockingRateLimiter(object):
 
     HARD_LIMIT_MIN_CLUSTER_RATE = 1
 
-    registry = {}
+    registry = {}   # type: Dict[str, BlockingRateLimiter]
     registry_lock = threading.Lock()
 
     def __repr__(self):

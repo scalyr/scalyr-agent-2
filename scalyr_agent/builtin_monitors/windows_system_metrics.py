@@ -170,7 +170,7 @@ try:
     from operator import methodcaller, attrgetter
 except ImportError:
 
-    def methodcaller(name, *args, **kwargs):
+    def methodcaller(name, *args, **kwargs):  # type: ignore
         def caller(obj):
             return getattr(obj, name)(*args, **kwargs)
 
@@ -190,10 +190,10 @@ except ImportError:
 
         def __str__(self):
             return "<{typename}: ({fieldnames})...>".format(
-                self._typename, self._fieldnames[0]
+                typename=self._typename, fieldnames=self._fieldnames[0]
             )
 
-    METRIC = NamedTupleHack("Metric", "config dispatch")
+    METRIC = NamedTupleHack("Metric", "config dispatch")  # type: ignore
 
 
 METRIC_CONFIG = dict  # pylint: disable=invalid-name

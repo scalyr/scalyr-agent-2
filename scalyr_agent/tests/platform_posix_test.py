@@ -243,5 +243,5 @@ class TestPidfileManager(ScalyrTestCase):
 
 # Disable these tests on non-POSIX
 if os.name != "posix":
-    TestStatusReporter = None  # NOQA
-    TestPidfileManager = None  # NOQA
+    TestStatusReporter = None  # type: ignore # NOQA
+    TestPidfileManager = None  # type: ignore # NOQA
