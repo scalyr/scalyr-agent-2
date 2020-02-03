@@ -483,7 +483,7 @@ class JournaldMonitor(ScalyrMonitor):
     def format_msg(
         self, metric_name, metric_value, extra_fields=None,
     ):
-        string_buffer = StringIO()
+        string_buffer = six.StringIO()
 
         string_buffer.write(
             "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))

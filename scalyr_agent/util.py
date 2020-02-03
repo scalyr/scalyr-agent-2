@@ -49,7 +49,7 @@ from scalyr_agent.platform_controller import CannotExecuteAsUser
 try:
     from hashlib import sha1
 except ImportError:
-    from sha import sha as sha1
+    from sha import sha as sha1  # type: ignore
 
 
 try:
@@ -58,7 +58,7 @@ try:
 
     new_md5 = True
 except ImportError:
-    import md5
+    import md5  # type: ignore
 
     new_md5 = False
 
@@ -139,7 +139,8 @@ except ImportError:
         _set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."  # NOQA
+        print("No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting.",
+              file=sys.stderr)
         sys.exit(1)
 
 

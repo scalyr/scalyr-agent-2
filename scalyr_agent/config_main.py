@@ -26,7 +26,6 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
 import glob
 import os
 import re
@@ -38,6 +37,7 @@ import tempfile
 import traceback
 from io import open
 
+import six
 from distutils import spawn
 from optparse import OptionParser
 
@@ -762,7 +762,7 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
 
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
-        output_buffer = cStringIO.StringIO()
+        output_buffer = six.StringIO()
         input_fp = open(output_file, "r")
         for line in input_fp:
             output_buffer.write(line)
@@ -1107,7 +1107,7 @@ def create_custom_dockerfile(
     )
     fp.close()
 
-    dockerfile_fp = cStringIO.StringIO(dockerfile_contents)
+    dockerfile_fp = six.StringIO(dockerfile_contents)
     # Use the original Dockerfile's attributes (permissions, owner) as a template for the attributes in the archive.
     tarinfo = out_tar.gettarinfo(dockerfile_path)
     tarinfo.size = len(dockerfile_contents)
