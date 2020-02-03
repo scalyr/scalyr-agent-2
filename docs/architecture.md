@@ -43,7 +43,7 @@ starting a thread, stopping a thread and asking thread for a status.
 * It's responsible for reading the log content from disk and sending it to the Scalyr API
 * It's told what it should be reading / copying.
   * It get's a list of log files which it should be copying / uploading to Scalyr + the
-    corresponding log file settings (what parser should be used, any reduction or samplying rules,
+    corresponding log file settings (what parser should be used, any redaction or sampling rules,
     arbitrary attributes associated with that log file, etc.)
 * It also performs glob expansion (user can specify a glob for files to monitor, e.g.
   ``/var/log/mongodb/*.log``)
@@ -70,7 +70,7 @@ starting a thread, stopping a thread and asking thread for a status.
 #### LogFileIterator ([log_processing.py](https://github.com/scalyr/scalyr-agent-2/blob/master/scalyr_agent/log_processing.py))
 
 * It's responsible to watch a single file path and give an illusion that you are iterating over
-  all the bytes in a log file even if that log file has been rotated.
+  all long lines in a log file even if that log file has been rotated.
 * Think of it as a logical file path.
 * There are various "tricks" and heuristics needed to make that work reliably on multiple operating
   systems. Those includes:
@@ -104,5 +104,5 @@ starting a thread, stopping a thread and asking thread for a status.
   picking up that content and sending it to Scalyr API.
 * For safety reasons, there are rate limits put in place for each monitor writes. Each write
   represents data which is sent to the Scalyr API and that's data end user needs to pay for. To
-  avoid or bad plugins which could result in a lot of data being produced and written to disk, rate
+  avoid bad plugins which could result in a lot of data being produced and written to disk, rate
   limits are put in place for each monitor.
