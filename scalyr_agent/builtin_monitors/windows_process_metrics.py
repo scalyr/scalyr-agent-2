@@ -447,7 +447,7 @@ METRICS = (
 )
 _ = [
     define_metric(__monitor__, **metric.config) for metric in METRICS
-]  # pylint: disable=star-args
+]
 
 
 #

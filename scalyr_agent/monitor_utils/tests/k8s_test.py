@@ -243,31 +243,31 @@ class TestKubernetesApi(ScalyrTestCase):
     def test_query_api_log_format(self):
         """Logging is turned on.  Asserts proper debug-logging (url + stacktrace + response content)"""
         kapi = KubernetesApi(log_api_responses=True)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         self._assert_logged(mock_logger, expected_log_msg)
 
     def test_query_api_no_log(self):
         """Logging is turned off"""
         kapi = KubernetesApi(log_api_responses=False)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_min_response_len(self):
         """Fails to satisfy minimum response len.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_min_response_len=3)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_min_latency(self):
         """Fails to satisfy minimum latency.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=10)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_ratelimit(self):
         """Fails to satisfy minimum latency.  Not logged"""
         kapi = KubernetesApi(log_api_responses=True, log_api_ratelimit_interval=77)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         mock_logger.log.assert_called_with(
             scalyr_logging.DEBUG_LEVEL_1,
             expected_log_msg,
@@ -278,7 +278,7 @@ class TestKubernetesApi(ScalyrTestCase):
     def test_query_api_200s_not_logged(self):
         """200 response not logged when 200s are excluded"""
         kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
-        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)
+        mock_logger, expected_log_msg = self._simulate_response(kapi, 200)  # pylint: disable=no-value-for-parameter
         self._assert_not_logged(mock_logger, expected_log_msg)
 
     def test_query_api_non_200_always_logged(self):
@@ -286,7 +286,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True, log_api_exclude_200s=True)
 
         def func():
-            mock_logger, expected_log_msg = self._simulate_response(kapi, 404)
+            mock_logger, expected_log_msg = self._simulate_response(kapi, 404)  # pylint: disable=no-value-for-parameter
             self._assert_logged(mock_logger, expected_log_msg)
 
         self.assertRaises(K8sApiNotFoundException, lambda: func())
@@ -296,7 +296,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True)
 
         def func():
-            mock_logger, expected_log_msg = self._simulate_response(
+            mock_logger, expected_log_msg = self._simulate_response( # pylint: disable=no-value-for-parameter
                 kapi, requests.ReadTimeout()
             )
             self._assert_logged(mock_logger, expected_log_msg)
@@ -308,7 +308,7 @@ class TestKubernetesApi(ScalyrTestCase):
         kapi = KubernetesApi(log_api_responses=True, log_api_min_latency=100)
 
         def func():
-            mock_logger, expected_log_msg = self._simulate_response(
+            mock_logger, expected_log_msg = self._simulate_response( # pylint: disable=no-value-for-parameter
                 kapi, requests.ReadTimeout()
             )
             self._assert_not_logged(mock_logger, expected_log_msg)

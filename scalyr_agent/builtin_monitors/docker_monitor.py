@@ -34,7 +34,7 @@ import threading
 from io import open
 
 import six
-from requests.packages.urllib3.exceptions import ProtocolError
+from requests.packages.urllib3.exceptions import ProtocolError  # pylint: disable=import-error
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
@@ -607,7 +607,7 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_helper(
+        for item in super(DockerClient, self.client)._stream_helper(  # pylint: disable=bad-super-call
             self.response, self.decode
         ):
             yield item
@@ -624,7 +624,7 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(DockerClient, self.client)._stream_raw_result(self.response):
+        for item in super(DockerClient, self.client)._stream_raw_result(self.response):  # pylint: disable=bad-super-call
             yield item
 
 
@@ -639,13 +639,13 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(
+        for item in super(  # pylint: disable=bad-super-call
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.Client):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -1626,7 +1626,7 @@ class ContainerIdResolver:
         self.__last_cache_clean = time.time()
         self.__cache_expiration_secs = cache_expiration_secs
         self.__cache_clean_secs = cache_clean_secs
-        self.__docker_client = docker.Client(
+        self.__docker_client = docker.Client(  # pylint: disable=no-member
             base_url=("unix:/%s" % docker_api_socket), version=docker_api_version
         )
         # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.

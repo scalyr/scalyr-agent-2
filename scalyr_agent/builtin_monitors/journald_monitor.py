@@ -176,7 +176,7 @@ def load_checkpoints(filename):
     except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "No checkpoint file '%s' exists.\n\tAll journald logs for '%s' will be read starting from their current end.",
+            "No checkpoint file '%s' exists.\n\tAll journald logs will be read starting from their current end.",
             filename,
         )
         checkpoints = {}

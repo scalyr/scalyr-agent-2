@@ -516,9 +516,10 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             return 0
 
         except UpgradeFailure as error:
+            message = getattr(error, 'message', str(e))
             print(file=sys.stderr)
             print(
-                "The upgrade failed due to the following reason: %s" % error.message,
+                "The upgrade failed due to the following reason: %s" % (message),
                 file=sys.stderr,
             )
             return 1
@@ -687,7 +688,7 @@ def upgrade_windows_install(
                 # in detached mode and terminate this program.  This means we cannot report any errors that happen
                 # here, but I don't see a way around this for now.
                 # noinspection PyUnresolvedReferences
-                from win32process import DETACHED_PROCESS
+                from win32process import DETACHED_PROCESS  # pylint: disable=import-error
 
                 upgrade_command = ["msiexec.exe", "/i", "{}".format(download_location)]
                 if not use_ui:
@@ -719,9 +720,10 @@ def upgrade_windows_install(
                 )
 
     except UpgradeFailure as error:
+        message = getattr(error, 'message', str(e))
         print(file=sys.stderr)
         print(
-            "The upgrade failed due to the following reason: %s" % error.message,
+            "The upgrade failed due to the following reason: %s" % (message),
             file=sys.stderr,
         )
         if url_path is not None:

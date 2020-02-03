@@ -348,12 +348,12 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:
+                if hasattr(error, "errno") and error.errno is not None:  # pylint: disable=no-member
                     log.error(
                         'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                         "will re-attempt",
                         self.__full_address,
-                        error.errno,
+                        error.errno,  # pylint: disable=no-member
                         six.text_type(error),
                         error_code="client/requestFailed",
                     )
@@ -417,12 +417,12 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:
+                if hasattr(error, "errno") and error.errno is not None:  # pylint: disable=no-member
                     log.error(
                         'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
                         "connection, will re-attempt",
                         self.__full_address,
-                        error.errno,
+                        error.errno,  # pylint: disable=no-member
                         six.text_type(error),
                         error_code="client/requestFailed",
                     )
@@ -1083,7 +1083,7 @@ class AddEventsRequest(object):
         if timestamp is None:
             timestamp = int(time.time() * 1000000000)
 
-        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
+        if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:  # pylint: disable=used-before-assignment
             timestamp = __last_time_stamp__ + 1
         __last_time_stamp__ = timestamp
 

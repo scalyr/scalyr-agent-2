@@ -265,4 +265,4 @@ class DockerMonitorTest(ScalyrTestCase):
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
 
-            start_test()
+            start_test()  # pylint: disable=no-value-for-parameter

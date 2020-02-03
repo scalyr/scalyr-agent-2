@@ -67,7 +67,7 @@ CONFIG_OPTIONS = [
 
 _ = [
     define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS
-]  # pylint: disable=star-args
+]
 # # End Monitor Configuration
 # #########################################################################################
 
@@ -117,8 +117,9 @@ def _gather_metric(method, attribute=None, transform=None):
             # on the exception message, but sometimes you have to do what you have to do.  At least we
             # package a specific version of psutils in with the windows executable, so we should know if
             # the message changes.
+            message = getattr(e, 'message', str(e))
             if (
-                e.message == "couldn't find any physical disk"
+                message == "couldn't find any physical disk"
                 and method == "disk_io_counters"
             ):
                 yield __NO_DISK_PERF__, None
@@ -539,7 +540,7 @@ METRICS = (
 )
 _ = [
     define_metric(__monitor__, **metric.config) for metric in METRICS
-]  # pylint: disable=star-args
+]
 
 #
 # Logging / Reporting - defines the method and content in which the metrics are reported.

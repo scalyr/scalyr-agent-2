@@ -1147,10 +1147,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         class _time_mock(object):
             # This dummy 'time()' should be called on new copying thread iteration
             # to emulate huge gap between last request.
-            def time(_self):
+            def time(_self):  # pylint: disable=no-self-argument
                 result = (
                     orig_time.time()
-                    + self._manager._CopyingManager__config.max_retry_time
+                    + self._manager._CopyingManager__config.max_retry_time  # pylint: disable=no-member
                 )
                 return result
 
@@ -1180,6 +1180,7 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals(2, len(lines))
         self.assertEquals("First line", lines[0])
         self.assertEquals("Second line", lines[1])
+        import pdb; pdb.set_trace()  # XXX BREAKPOINT
 
         status = self._manager.generate_status()
 
