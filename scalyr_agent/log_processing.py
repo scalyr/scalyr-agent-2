@@ -58,7 +58,7 @@ from os.path import isfile, join
 
 if sys.version_info < (3, 5):
     # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
-    import glob2
+    import glob2  # pylint: disable=import-error
 else:
     # Python 3.5 and higher supports `**`
     import glob

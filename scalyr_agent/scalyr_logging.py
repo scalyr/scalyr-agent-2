@@ -472,6 +472,7 @@ class AgentLogger(logging.Logger):
         else:
             __thread_local__.last_error_for_monitor = None
 
+        # pylint: disable=assignment-from-no-return
         if extra is not None:
             result = logging.Logger._log(self, level, msg, args, exc_info, extra)
         elif exc_info is not None:

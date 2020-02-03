@@ -48,7 +48,10 @@ except Exception:
 
 __has_pure_python_tls__ = False
 try:
-    from tlslite import HTTPTLSConnection, HandshakeSettings
+    from tlslite import (  # pylint: disable=import-error
+        HTTPTLSConnection,
+        HandshakeSettings,
+    )
 
     __has_pure_python_tls__ = True
 except Exception:
@@ -344,9 +347,15 @@ class ScalyrHttpConnection(Connection):
         or turning it off completely.
         """
         try:
+            # pylint: disable=import-error,no-name-in-module
             from certvalidator import CertificateValidator
             from certvalidator import ValidationContext
-            from asn1crypto import x509, pem
+            from asn1crypto import (
+                x509,
+                pem,
+            )
+
+            # pylint: enable=import-error,no-name-in-module
 
             # validate server certificate chain
             session = tlslite_connection.sock.session
@@ -412,9 +421,9 @@ class ScalyrHttpConnection(Connection):
                     other_certs=intermediate_certs,
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
-            validator = CertificateValidator(
-                end_entity_cert, validation_context=context
-            )
+                validator = CertificateValidator(
+                    end_entity_cert, validation_context=context
+                )
             validator.validate_tls(six.text_type(self._host))
             log.info(
                 "Scalyr server cert chain successfully validated via certvalidator library"
@@ -466,14 +475,14 @@ class ScalyrHttpConnection(Connection):
                 self.__connection.connect()
         except Exception as error:
             if hasattr(error, "errno"):
-                errno = error.errno
+                errno = error.errno  # pylint: disable=no-member
             else:
                 errno = None
             if isinstance(error, CertValidationError):
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s"',
                     self._full_address,
-                    error.message,
+                    getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
                 )
             elif __has_ssl__ and isinstance(error, ssl.SSLError):

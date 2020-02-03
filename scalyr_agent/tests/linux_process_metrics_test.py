@@ -77,7 +77,7 @@ class TestMetricClass(ScalyrTestCase):
         self.assertEquals(m.type, 123)
 
         # Non-existent
-        self.assertRaises(AttributeError, lambda: m.asdf)
+        self.assertRaises(AttributeError, lambda: m.asdf)  # pylint: disable=no-member
 
         # Ensure cannot mutate
         def mutate():

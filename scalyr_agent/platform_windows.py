@@ -32,6 +32,7 @@ if sys.platform != "win32":
         "Attempting to load platform_windows module on a non-Windows machine"
     )
 
+# pylint: disable=import-error
 # noinspection PyUnresolvedReferences
 import servicemanager
 

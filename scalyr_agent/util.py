@@ -66,7 +66,7 @@ except ImportError:
 def get_json_implementation(lib_name):
 
     if lib_name == "ujson":
-        import ujson
+        import ujson  # pylint: disable=import-error
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.

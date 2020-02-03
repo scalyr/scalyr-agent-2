@@ -445,9 +445,7 @@ METRICS = (
     + _PROCESS_MEMORY_METRICS
     + _PROCESS_DISK_IO_METRICS
 )
-_ = [
-    define_metric(__monitor__, **metric.config) for metric in METRICS
-]  # pylint: disable=star-args
+_ = [define_metric(__monitor__, **metric.config) for metric in METRICS]
 
 
 #
