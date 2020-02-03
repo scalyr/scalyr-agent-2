@@ -348,7 +348,7 @@ class ScalyrHttpConnection(Connection):
         """
         try:
             # pylint: disable=import-error,no-name-in-module
-            from certvalidator import CertificateValidato
+            from certvalidator import CertificateValidator
             from certvalidator import ValidationContext
             from asn1crypto import (
                 x509,
@@ -421,7 +421,7 @@ class ScalyrHttpConnection(Connection):
                     other_certs=intermediate_certs,
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
-                validator = CertificateValidator(  # pylint: disable=undefined-variable
+                validator = CertificateValidator(
                     end_entity_cert, validation_context=context
                 )
             validator.validate_tls(six.text_type(self._host))

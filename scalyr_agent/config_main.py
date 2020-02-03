@@ -516,7 +516,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             return 0
 
         except UpgradeFailure as error:
-            message = getattr(error, "message", str(e))
+            message = getattr(error, "message", str(error))
             print(file=sys.stderr)
             print(
                 "The upgrade failed due to the following reason: %s" % (message),
@@ -722,7 +722,7 @@ def upgrade_windows_install(
                 )
 
     except UpgradeFailure as error:
-        message = getattr(error, "message", str(e))
+        message = getattr(error, "message", str(error))
         print(file=sys.stderr)
         print(
             "The upgrade failed due to the following reason: %s" % (message),
