@@ -30,20 +30,26 @@
 ### END INIT INFO
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import traceback
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+import traceback
 import errno
 import gc
 import os
 import sys
 import time
+from io import open
 
 from __scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()
+
+import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -78,6 +84,7 @@ from scalyr_agent.platform_controller import (
     CannotExecuteAsUser,
 )
 from scalyr_agent.platform_controller import AgentNotRunning
+
 
 STATUS_FILE = "last_status"
 
@@ -169,7 +176,7 @@ class ScalyrAgent(object):
             provide an api token and raise an exception if they fail.
 
         @type controller: PlatformController
-        @type config_file_path: str
+        @type config_file_path: six.text_type
         @type perform_config_check: bool
 
         @return: The return code when the agent exits.
@@ -203,8 +210,8 @@ class ScalyrAgent(object):
         @param command: The command passed in at the commandline for the agent to execute, such as 'start', 'stop', etc.
         @param command_options: The options from the commandline.  These will include 'quiet', 'verbose', etc.
 
-        @type config_file_path: str
-        @type command: str
+        @type config_file_path: six.text_type
+        @type command: six.text_type
 
         @return:  The exit status code to exit with, such as 0 for success.
         @rtype: int
@@ -216,7 +223,7 @@ class ScalyrAgent(object):
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == "version":
-            print "The Scalyr Agent 2 version is %s" % SCALYR_VERSION
+            print("The Scalyr Agent 2 version is %s" % SCALYR_VERSION)
             return 0
 
         # Read the configuration file.  Fail if we can't read it, unless the command is stop or status.
@@ -231,7 +238,7 @@ class ScalyrAgent(object):
             # check if not a tty and override the no check remote variable
             if not sys.stdout.isatty():
                 no_check_remote = not self.__config.check_remote_if_no_tty
-        except Exception, e:
+        except Exception as e:
             # We ignore a bad configuration file for 'stop' and 'status' because sometimes you do just accidentally
             # screw up the config and you want to let the rest of the system work enough to do the stop or get the
             # status.
@@ -241,11 +248,14 @@ class ScalyrAgent(object):
                 raise Exception(
                     "Error reading configuration file: %s\n"
                     "Terminating agent, please fix the configuration file and restart agent.\n%s"
-                    % (str(e), traceback.format_exc())
+                    % (six.text_type(e), traceback.format_exc())
                 )
             else:
                 self.__config = None
-                print >> sys.stderr, "Could not parse configuration file at '%s'" % config_file_path
+                print(
+                    "Could not parse configuration file at '%s'" % config_file_path,
+                    file=sys.stderr,
+                )
 
         self.__controller.consume_config(self.__config, config_file_path)
 
@@ -278,25 +288,28 @@ class ScalyrAgent(object):
                     agent_data_path = self.__config.agent_data_path
                 else:
                     agent_data_path = self.__default_paths.agent_data_path
-                    print >> sys.stderr, "Assuming agent data path is '%s'" % agent_data_path
+                    print(
+                        "Assuming agent data path is '%s'" % agent_data_path,
+                        file=sys.stderr,
+                    )
                 return self.__detailed_status(agent_data_path)
             elif command == "restart":
                 return self.__restart(quiet, no_fork, no_check_remote)
             elif command == "condrestart":
                 return self.__condrestart(quiet, no_fork, no_check_remote)
             else:
-                print >> sys.stderr, 'Unknown command given: "%s".' % command
+                print('Unknown command given: "%s".' % command, file=sys.stderr)
                 return 1
         except SystemExit:
             return 0
-        except Exception, e:
+        except Exception as e:
             # We special case the inner_run_with checks since we know that exception is human-readable.
             if command == "inner_run_with_checks":
                 raise e
             else:
                 raise Exception(
                     "Caught exception when attempt to execute command %s.  Exception was %s"
-                    % (command, str(e))
+                    % (command, six.text_type(e))
                 )
 
     def __read_and_verify_config(self, config_file_path):
@@ -304,7 +317,7 @@ class ScalyrAgent(object):
         having valid configurations.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -319,7 +332,7 @@ class ScalyrAgent(object):
         You must call ``__verify_config`` to read and fully verify the configuration.
 
         @param config_file_path: The path to read the configuration from.
-        @type config_file_path: str
+        @type config_file_path: six.text_type
 
         @return: The configuration object.
         @rtype: scalyr_agent.Configuration
@@ -370,12 +383,12 @@ class ScalyrAgent(object):
                 "monitors_manager": monitors_manager,
                 "copying_manager": copying_manager,
             }
-        except UnsupportedSystem, e:
+        except UnsupportedSystem as e:
             # We want to emit a better error message for this exception, so capture it here.
             raise Exception(
                 "Configuration file uses a monitor that is not supported on this system Monitor '%s' "
                 "cannot be used due to: %s.  If you require support for this monitor for your system, "
-                "please e-mail contact@scalyr.com" % (e.monitor_name, str(e))
+                "please e-mail contact@scalyr.com" % (e.monitor_name, six.text_type(e))
             )
         return True
 
@@ -443,10 +456,11 @@ class ScalyrAgent(object):
                             "clock on this host is too far off from actual time. The agent will keep "
                             "trying to connect in the background."
                         )
-                        print >> sys.stderr, (
+                        print(
                             "Sending request to the server failed due to bad clock skew.  The system "
                             "clock on this host is too far off from actual time. The agent will keep "
-                            "trying to connect in the background."
+                            "trying to connect in the background.",
+                            file=sys.stderr,
                         )
                     elif "invalidApiKey" in ping_result:
                         # TODO:  The server does not yet send this error message, but it will in the future.
@@ -464,11 +478,12 @@ class ScalyrAgent(object):
                             "token could be incorrect. The agent will keep trying to connect in the "
                             "background. You can disable this check with --no-check-remote-server."
                         )
-                        print >> sys.stderr, (
+                        print(
                             "Failed to send request to the server.  The server address could be "
                             "wrong, there could be a network connectivity issue, or the provided "
                             "token could be incorrect. The agent will keep trying to connect in the "
-                            "background. You can disable this check with --no-check-remote-server."
+                            "background. You can disable this check with --no-check-remote-server.",
+                            file=sys.stderr,
                         )
             finally:
                 client.close()
@@ -509,16 +524,22 @@ class ScalyrAgent(object):
         # noinspection PyBroadException
         try:
             self.__perform_config_checks(no_check_remote)
-        except Exception, e:
-            print >> sys.stderr
+        except Exception as e:
+            print(file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
-            print >> sys.stderr, "Terminating agent, please fix the error and restart the agent."
-            log.error("%s" % str(e))
+            print(
+                "Terminating agent, please fix the error and restart the agent.",
+                file=sys.stderr,
+            )
+            log.error("%s" % six.text_type(e))
             log.error("Terminating agent, please fix the error and restart the agent.")
             return 1
 
         if sys.version_info[:2] < (2, 6):
-            print >> sys.stderr, "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019"
+            print(
+                "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019",
+                file=sys.stderr,
+            )
             log.error(
                 "Warning, the Scalyr Agent will not support running on Python 2.4, 2.5 after Oct 2019"
             )
@@ -529,9 +550,11 @@ class ScalyrAgent(object):
 
             if not quiet:
                 if no_check_remote:
-                    print "Configuration verified, starting agent in background."
+                    print("Configuration verified, starting agent in background.")
                 else:
-                    print "Configuration and server connection verified, starting agent in background."
+                    print(
+                        "Configuration and server connection verified, starting agent in background."
+                    )
             self.__controller.start_agent_service(self.__run, quiet, fork=True)
         else:
             self.__controller.start_agent_service(self.__run, quiet, fork=False)
@@ -569,17 +592,18 @@ class ScalyrAgent(object):
 
         try:
             self.__controller.is_agent_running(fail_if_not_running=True)
-        except AgentNotRunning, e:
-            print "The agent does not appear to be running."
-            print "%s" % str(e)
+        except AgentNotRunning as e:
+            print("The agent does not appear to be running.")
+            print("%s" % six.text_type(e))
             return 1
 
         # The status works by sending telling the running agent to dump the status into a well known file and
         # then we read it from there, echoing it to stdout.
         if not os.path.isdir(data_directory):
-            print >> sys.stderr, (
+            print(
                 'Cannot get status due to bad config.  The data path "%s" is not a directory'
-                % data_directory
+                % data_directory,
+                file=sys.stderr,
             )
             return 1
 
@@ -588,15 +612,16 @@ class ScalyrAgent(object):
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
         if os.path.isfile(status_file) and not os.access(status_file, os.W_OK):
-            print >> sys.stderr, (
+            print(
                 "Cannot get status due to insufficient permissions.  The current user does not "
-                'have write access to "%s" as required.' % status_file
+                'have write access to "%s" as required.' % status_file,
+                file=sys.stderr,
             )
             return 1
 
         # Zero out the current file so that we can detect once the agent process has updated it.
         if os.path.isfile(status_file):
-            f = file(status_file, "w")
+            f = open(status_file, "w")
             f.truncate(0)
             f.close()
 
@@ -604,14 +629,15 @@ class ScalyrAgent(object):
         result = self.__controller.request_agent_status()
         if result is not None:
             if result == errno.ESRCH:
-                print >> sys.stderr, "The agent does not appear to be running."
+                print("The agent does not appear to be running.", file=sys.stderr)
                 return 1
             elif result == errno.EPERM:
                 # TODO:  We probably should just get the name of the user running the agent and output it
                 # here, instead of hard coding it to root.
-                print >> sys.stderr, (
+                print(
                     "To view agent status, you must be running as the same user as the agent. "
-                    "Try running this command as root or Administrator."
+                    "Try running this command as root or Administrator.",
+                    file=sys.stderr,
                 )
                 return 2
 
@@ -630,24 +656,26 @@ class ScalyrAgent(object):
                     agent_log = os.path.join(
                         self.__default_paths.agent_log_path, "agent.log"
                     )
-                print >> sys.stderr, (
+                print(
                     "Failed to get status within 5 seconds.  Giving up.  The agent process is "
-                    "possibly stuck.  See %s for more details." % agent_log
+                    "possibly stuck.  See %s for more details." % agent_log,
+                    file=sys.stderr,
                 )
                 return 1
 
             time.sleep(0.03)
 
         if not os.access(status_file, os.R_OK):
-            print >> sys.stderr, (
+            print(
                 "Cannot get status due to insufficient permissions.  The current user does not "
-                'have read access to "%s" as required.' % status_file
+                'have read access to "%s" as required.' % status_file,
+                file=sys.stderr,
             )
             return 1
 
         fp = open(status_file)
         for line in fp:
-            print line.rstrip()
+            print(line.rstrip())
         fp.close()
 
         return 0
@@ -671,9 +699,12 @@ class ScalyrAgent(object):
             self.__controller.is_agent_running(fail_if_not_running=True)
             status = self.__controller.stop_agent_service(quiet)
             return status
-        except AgentNotRunning, e:
-            print >> sys.stderr, "Failed to stop the agent because it does not appear to be running."
-            print >> sys.stderr, "%s" % str(e)
+        except AgentNotRunning as e:
+            print(
+                "Failed to stop the agent because it does not appear to be running.",
+                file=sys.stderr,
+            )
+            print("%s" % six.text_type(e), file=sys.stderr)
             return 0  # For the sake of restart, we need to return non-error code here.
 
     def __status(self):
@@ -683,10 +714,10 @@ class ScalyrAgent(object):
         @rtype: int
         """
         if self.__controller.is_agent_running():
-            print 'The agent is running. For details, use "scalyr-agent-2 status -v".'
+            print('The agent is running. For details, use "scalyr-agent-2 status -v".')
             return 0
         else:
-            print "The agent does not appear to be running."
+            print("The agent does not appear to be running.")
             return 4
 
     def __condrestart(self, quiet, no_fork, no_check_remote):
@@ -714,14 +745,17 @@ class ScalyrAgent(object):
 
         if self.__controller.is_agent_running():
             if not quiet:
-                print "Agent is running, restarting now."
+                print("Agent is running, restarting now.")
             if self.__stop(quiet) != 0:
-                print >> sys.stderr, "Failed to stop the running agent.  Cannot restart until it is killed."
+                print(
+                    "Failed to stop the running agent.  Cannot restart until it is killed.",
+                    file=sys.stderr,
+                )
                 return 1
 
             return self.__start(quiet, no_fork, no_check_remote)
         elif not quiet:
-            print "Agent is not running, not restarting."
+            print("Agent is not running, not restarting.")
             return 0
         else:
             return 0
@@ -752,9 +786,12 @@ class ScalyrAgent(object):
 
         if self.__controller.is_agent_running():
             if not quiet:
-                print "Agent is running, stopping it now."
+                print("Agent is running, stopping it now.")
             if self.__stop(quiet) != 0:
-                print >> sys.stderr, "Failed to stop the running agent.  Cannot restart until it is killed"
+                print(
+                    "Failed to stop the running agent.  Cannot restart until it is killed",
+                    file=sys.stderr,
+                )
                 return 1
 
         return self.__start(quiet, no_fork, no_check_remote)
@@ -824,15 +861,17 @@ class ScalyrAgent(object):
                 else:
                     logs_initial_positions = None
 
+                # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
                 log.info(
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid())
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version)
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
-                    "Starting scalyr agent... (version=%s) %s"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid()),
+                    "Starting scalyr agent... (version=%s) %s (Python version: %s)"
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version),
                 )
+
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
@@ -1020,12 +1059,12 @@ class ScalyrAgent(object):
 
                         self.__verify_can_write_to_logs_and_data(new_config)
 
-                    except Exception, e:
+                    except Exception as e:
                         if self.__current_bad_config is None:
                             log.error(
                                 "Bad configuration file seen.  Ignoring, using last known good configuration file.  "
                                 'Exception was "%s"',
-                                str(e),
+                                six.text_type(e),
                                 error_code="badConfigFile",
                             )
                         self.__current_bad_config = new_config
@@ -1131,9 +1170,11 @@ class ScalyrAgent(object):
         """
         try:
             self.__controller.is_agent_running(fail_if_running=True)
-        except AgentAlreadyRunning, e:
-            print >> sys.stderr, "Failed to start agent because it is already running."
-            print >> sys.stderr, "%s" % str(e)
+        except AgentAlreadyRunning as e:
+            print(
+                "Failed to start agent because it is already running.", file=sys.stderr
+            )
+            print("%s" % six.text_type(e), file=sys.stderr)
             sys.exit(4)
 
     def __update_debug_log_level(self, debug_level):
@@ -1199,7 +1240,7 @@ class ScalyrAgent(object):
         """
         try:
             return os.path.getsize(path)
-        except OSError, e:
+        except OSError as e:
             if e.errno == errno.EPERM:
                 log.warn("Insufficient permissions to read agent logs initial position")
                 return None
@@ -1588,11 +1629,17 @@ if __name__ == "__main__":
     my_controller.consume_options(options)
 
     if len(args) < 1:
-        print >> sys.stderr, 'You must specify a command, such as "start", "stop", or "status".'
+        print(
+            'You must specify a command, such as "start", "stop", or "status".',
+            file=sys.stderr,
+        )
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
-        print >> sys.stderr, 'Too many commands specified.  Only specify one of "start", "stop", "status".'
+        print(
+            'Too many commands specified.  Only specify one of "start", "stop", "status".',
+            file=sys.stderr,
+        )
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif args[0] not in (
@@ -1603,7 +1650,7 @@ if __name__ == "__main__":
         "condrestart",
         "version",
     ):
-        print >> sys.stderr, 'Unknown command given: "%s"' % args[0]
+        print('Unknown command given: "%s"' % args[0], file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
 
@@ -1617,8 +1664,8 @@ if __name__ == "__main__":
         main_rc = ScalyrAgent(my_controller).main(
             options.config_filename, args[0], options
         )
-    except Exception, mainExcept:
-        print >> sys.stderr, str(mainExcept)
+    except Exception as mainExcept:
+        print(six.text_type(mainExcept), file=sys.stderr)
         sys.exit(1)
 
     # We do this outside of the try block above because sys.exit raises an exception itself.

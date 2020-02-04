@@ -17,6 +17,10 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest
@@ -72,6 +76,8 @@ def run_all_tests():
     """Runs all the tests containing this this directory and its children (where tests are
     contained in files ending in '_test.py'.
     """
+    print("Current python version: %s" % sys.version)
+
     test_loader = unittest.defaultTestLoader
     suites = []
     error = False
@@ -79,7 +85,7 @@ def run_all_tests():
         try:
             try:
                 suites.append(test_loader.loadTestsFromName(test_case))
-            except Exception, ex:
+            except Exception as ex:
                 if sys.version_info[:2] < (2, 5) and test_case in PYTHON24_WHITELIST:
                     print(
                         "Warning. Skipping unloadable module '%s'.\n"
@@ -97,7 +103,7 @@ def run_all_tests():
                     )
                 else:
                     raise
-        except Exception, e:
+        except Exception as e:
             error = True
             print(
                 "Error loading test_case '%s'.  %s, %s"

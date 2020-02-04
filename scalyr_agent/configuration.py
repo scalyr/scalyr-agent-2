@@ -16,13 +16,19 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import os
 import re
 import socket
 import time
-import urlparse
+
+import six
+import six.moves.urllib.parse
+from six.moves import range
 
 import scalyr_agent.util as scalyr_util
 
@@ -37,7 +43,8 @@ from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
-from __scalyr__ import get_install_root
+from scalyr_agent.__scalyr__ import get_install_root
+from scalyr_agent.compat import os_environ_unicode
 
 
 class Configuration(object):
@@ -108,8 +115,8 @@ class Configuration(object):
                 self.__config = scalyr_util.read_config_file_as_json(self.__file_path)
 
                 # What implicit entries do we need to add?  metric monitor, agent.log, and then logs from all monitors.
-            except JsonReadFileException, e:
-                raise BadConfiguration(str(e), None, "fileParseError")
+            except JsonReadFileException as e:
+                raise BadConfiguration(six.text_type(e), None, "fileParseError")
 
             # Import any requested variables from the shell and use them for substitutions.
             self.__perform_substitutions(self.__config)
@@ -164,7 +171,7 @@ class Configuration(object):
                 self.__verify_main_config(content, self.__file_path)
                 self.__verify_logs_and_monitors_configs_and_apply_defaults(content, fp)
 
-                for (key, value) in content.iteritems():
+                for (key, value) in six.iteritems(content):
                     if key not in allowed_multiple_keys:
                         self.__config.put(key, value)
 
@@ -191,7 +198,7 @@ class Configuration(object):
                 server = self.__config["scalyr_server"].strip()
                 https_server = server
 
-                parts = urlparse.urlparse(server)
+                parts = six.moves.urllib.parse.urlparse(server)
 
                 # use index-based addressing for 2.4 compatibility
                 scheme = parts[0]
@@ -243,7 +250,7 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-        except BadConfiguration, e:
+        except BadConfiguration as e:
             self.__last_error = e
             raise e
 
@@ -252,7 +259,7 @@ class Configuration(object):
         @return: The default hostname for this host.
         @rtype: str
         """
-        result = socket.gethostname()
+        result = six.ensure_text(socket.gethostname())
         if result is not None and self.strip_domain_from_default_server_host:
             result = result.split(".")[0]
         return result
@@ -2023,7 +2030,7 @@ class Configuration(object):
             config_val = config_object.get_bool(param_name, none_if_missing=True)
         elif param_type == float:
             config_val = config_object.get_float(param_name, none_if_missing=True)
-        elif param_type == str:
+        elif param_type == six.text_type:
             config_val = config_object.get_string(param_name, none_if_missing=True)
         elif param_type == JsonObject:
             config_val = config_object.get_json_object(param_name, none_if_missing=True)
@@ -2378,14 +2385,14 @@ class Configuration(object):
         if count == 0:
             raise BadConfiguration(
                 'A required field is missing.  Object must contain one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
         elif count > 1:
             raise BadConfiguration(
                 'A required field has too many options.  Object must contain only one of "%s".  Error is in %s'
-                % (str(fields), config_description),
+                % (six.text_type(fields), config_description),
                 field,
                 "missingRequired",
             )
@@ -2417,7 +2424,7 @@ class Configuration(object):
         """
         try:
             value = self.__get_config_or_environment_val(
-                config_object, field, str, env_aware, env_name
+                config_object, field, six.text_type, env_aware, env_name
             )
 
             if value is None:
@@ -2658,7 +2665,7 @@ class Configuration(object):
                     raise BadConfiguration(
                         "The element at index=%i is not a json object as required in the array "
                         'field "%s (%s, %s)".  Error is in %s'
-                        % (index, field, type(x), str(x), config_description),
+                        % (index, field, type(x), six.text_type(x), config_description),
                         field,
                         "notJsonObject",
                     )
@@ -2699,7 +2706,8 @@ class Configuration(object):
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
         """
-        separators.sort()
+        # 2->TODO Python3 can not sort None values
+        separators.sort(key=lambda s: s if s is not None else "")
         # For legacy reasons, must support space-separated array of strings
         cls = ArrayOfStrings
         if separators == [None, ","]:
@@ -2716,7 +2724,7 @@ class Configuration(object):
 
             index = 0
             for x in array_of_strings:
-                if not isinstance(x, basestring):
+                if not isinstance(x, six.string_types):
                     raise BadConfiguration(
                         "The element at index=%i is not a string or unicode object as required in the array "
                         'field "%s".  Error is in %s'
@@ -2828,8 +2836,10 @@ class Configuration(object):
                         var_name = entry
                         default_value = ""
 
-                    if var_name in os.environ and len(os.environ[var_name]) > 0:
-                        result[var_name] = os.environ[var_name]
+                    # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+                    var_value = os_environ_unicode.get(var_name)
+                    if var_value:
+                        result[var_name] = var_value
                     else:
                         result[var_name] = default_value
             return result
@@ -2850,7 +2860,7 @@ class Configuration(object):
             result = None
             value_type = type(value)
 
-            if (value_type is str or value_type is unicode) and "$" in value:
+            if value_type is six.text_type and "$" in value:
                 result = perform_str_substitution(value)
             elif isinstance(value, JsonObject):
                 perform_object_substitution(value)
@@ -2866,12 +2876,12 @@ class Configuration(object):
             """
             # We collect the new values and apply them later to avoid messing up the iteration.
             new_values = {}
-            for (key, value) in object_value.iteritems():
+            for (key, value) in six.iteritems(object_value):
                 replace_value = perform_generic_substitution(value)
                 if replace_value is not None:
                     new_values[key] = replace_value
 
-            for (key, value) in new_values.iteritems():
+            for (key, value) in six.iteritems(new_values):
                 object_value[key] = value
 
         def perform_str_substitution(str_value):
@@ -2883,7 +2893,7 @@ class Configuration(object):
             @rtype: str or unicode
             """
             result = str_value
-            for (var_name, value) in substitutions.iteritems():
+            for (var_name, value) in six.iteritems(substitutions):
                 result = result.replace("$%s" % var_name, value)
             return result
 

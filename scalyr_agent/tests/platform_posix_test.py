@@ -14,12 +14,16 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+__author__ = "czerwin@scalyr.com"
+
 import os
 import tempfile
 import errno
 import fcntl
-
-__author__ = "czerwin@scalyr.com"
+from io import open
 
 
 from scalyr_agent.platform_posix import StatusReporter, PidfileManager
@@ -230,7 +234,7 @@ class TestPidfileManager(ScalyrTestCase):
         while True:
             try:
                 os.kill(result, 0)
-            except OSError, e:
+            except OSError as e:
                 # ESRCH indicates the process is not running, in which case we ignore the pidfile.
                 if e.errno == errno.ESRCH:
                     return result

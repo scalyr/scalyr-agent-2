@@ -15,12 +15,17 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "echee@scalyr.com"
 
 import random
 import threading
 import time
 from collections import deque
+
+from six.moves import range
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -131,12 +136,12 @@ class BlockingRateLimiter(object):
         @type max_cluster_rate: float
         @type min_cluster_rate: float
         @type consecutive_success_threshold: int
-        @type strategy: str
+        @type strategy: six.text_type
         @type increase_factor: float
         @type backoff_factor: float
         @type max_concurrency: int
         @type logger: Logger
-        @type name: str
+        @type name: six.text_type
         """
         # Validate input (Note: will raise exception and thus kill the agent process if invalid)
         strategies = [self.STRATEGY_MULTIPLY, self.STRATEGY_RESET_THEN_MULTIPLY]
@@ -198,7 +203,8 @@ class BlockingRateLimiter(object):
         self._name = name
 
         # A queue of tokens
-        self._ripe_time = None
+        # 2->TODO python3 does not allow None in sort. There is sort in 'self._initialize_token_queue()'
+        self._ripe_time = 0.0
         self._token_queue = deque()
         # Condition variable to synchronize access to token queue
         self._token_queue_cv = threading.Condition()

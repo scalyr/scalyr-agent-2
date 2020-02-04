@@ -23,7 +23,8 @@
 #     should only be emitted at most once per X seconds).
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
-import inspect
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -34,10 +35,16 @@ import re
 import sys
 import time
 import threading
-import scalyr_agent.util as util
+import traceback
+import io
+import inspect
 
-from cStringIO import StringIO
+import six
+
+import scalyr_agent.util as util
 from scalyr_agent.util import RateLimiter
+
+_METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
 
 # The debugging levels supported on the debugger logger.  The higher the debug level, the
 # more verbose the output.
@@ -248,7 +255,8 @@ class AgentLogger(logging.Logger):
             module_path = m.group(1)
             self.__monitor_id = m.group(2)[1:-1]
         else:
-            module_path = name
+            # 2->TODO In python2 the 'name' variable with be 'str' in __name__ is passed to this constructor.
+            module_path = six.ensure_text(name)
             self.__monitor_id = None
 
         # If it is from the scaly_agent module, then it is 'core' unless it is one of the monitors.
@@ -279,6 +287,10 @@ class AgentLogger(logging.Logger):
         # which monitor it is reporting for and the associated log handler.
         self.__monitor = None
         self.__metric_handler = None
+
+        # Used in debugging tests.  If true, the abstraction will save a reference to the last record created.
+        self.__keep_last_record = False
+        self.__last_record = None
 
         # A dict that maps limit_keys to the last time any record has been emitted that used that key.  This is
         # used to implement the limit_once_per_x_secs feature.
@@ -312,16 +324,17 @@ class AgentLogger(logging.Logger):
         done before the monitor's "run" method is invoked.
 
         @param metric_name: The string containing the name for the metric.
-        @param metric_value: The value for the metric. The only allowed types are int, long, float, str, bool and
-            unicde.
+        @param metric_value: The value for the metric. The only allowed types are int, long, float, bool and
+        six.text_type.
         @param extra_fields: An optional dict that if specified, will be included as extra fields on the log line.
             These fields can be used in future searches/graphs expressions to restrict which specific instances of the
-            metric are matched/aggregated together. The keys for the dict must be str and the only allowed value types
-            are int, long, float, str, bool, and unicode.
+            metric are matched/aggregated together. The keys for the dict must be six.text_type and the only allowed
+            value types are int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that is reporting the metric. Typically, this does not need to be
             supplied because it defaults to whatever monitor for each the logger was created.
         @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
             of reporting this one value.  The base monitor name will remain unchanged.
+        @type metric_name: six.text_type
         @raise UnsupportedValueType: If the value type is not one of the supported types.
         """
         if monitor is None:
@@ -332,14 +345,14 @@ class AgentLogger(logging.Logger):
                 "Cannot report metric values until metric log file is opened."
             )
 
-        string_buffer = StringIO()
-        if not type(metric_name) in (str, unicode):
+        string_buffer = io.StringIO()
+        if type(metric_name) is not six.text_type:
             raise UnsupportedValueType(metric_name=metric_name)
         metric_name = self.__force_valid_metric_or_field_name(
             metric_name, is_metric=True, logger=self
         )
 
-        if not type(metric_value) in (str, unicode, bool, int, long, float):
+        if type(metric_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
             raise UnsupportedValueType(
                 metric_name=metric_name, metric_value=metric_value
             )
@@ -348,11 +361,11 @@ class AgentLogger(logging.Logger):
 
         if extra_fields is not None:
             for field_name in extra_fields:
-                if not type(field_name) in (str, unicode):
+                if type(field_name) is not six.text_type:
                     raise UnsupportedValueType(field_name=field_name)
 
                 field_value = extra_fields[field_name]
-                if not type(field_value) in (str, unicode, bool, int, long, float):
+                if type(field_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
                     raise UnsupportedValueType(
                         field_name=field_name, field_value=field_value
                     )
@@ -468,20 +481,31 @@ class AgentLogger(logging.Logger):
         return result
 
     def makeRecord(
-        self, name, level, fn, lno, msg, args, exc_info, func=None, extra=None
+        self,
+        name,
+        level,
+        fn,
+        lno,
+        msg,
+        args,
+        exc_info,
+        func=None,
+        extra=None,
+        # 2->TODO in python3 findCaller receives sinfo.
+        sinfo=None,
     ):
         # Invoke the super class's method to make the base record.
         if extra is not None:
             result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info, func, extra
+                self, name, level, fn, lno, msg, args, exc_info, func, extra, sinfo
             )
         elif func is not None:
             result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info, func
+                self, name, level, fn, lno, msg, args, exc_info, func, sinfo
             )
         else:
             result = logging.Logger.makeRecord(
-                self, name, level, fn, lno, msg, args, exc_info
+                self, name, level, fn, lno, msg, args, exc_info, sinfo
             )
 
         # Attach the special fields for the scalyr agent logging code.  These are passed from _log through a thread
@@ -513,6 +537,9 @@ class AgentLogger(logging.Logger):
             result.metric_log_for_monitor.increment_counter(reported_lines=1)
         if result.error_for_monitor is not None:
             result.error_for_monitor.increment_counter(errors=1)
+
+        if self.__keep_last_record:
+            self.__last_record = result
         return result
 
     def exception(self, msg, *args, **kwargs):
@@ -592,11 +619,11 @@ class AgentLogger(logging.Logger):
         If a modification had to be applied, a log warning is emitted, but it is only emitted once per day.
 
         @param name: The metric name
-        @type name: str
+        @type name: six.text_type
         @param is_metric: Whether or not the name is a metric or field name
         @type is_metric: bool
         @return: The metric / field name to use, which may be the original string.
-        @rtype: str
+        @rtype: six.text_type
         """
         if AgentLogger.__metric_or_field_name_rule.match(name) is not None:
             return name
@@ -634,7 +661,7 @@ class AgentLogger(logging.Logger):
         This may only be called after the metric file for the monitor has been opened.
 
         @param values: A dict containing a mapping from metric name to its value. The only allowed value types are:
-            int, long, float, str, bool, and unicode.
+            int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that created the values. This does not have to be passed in if the
             monitor instance specific logger is used. It defaults to that monitor. However, if the logger is the
             general one for the module, then a monitor instance is required.
@@ -651,7 +678,7 @@ class AgentLogger(logging.Logger):
         This may only be called after the metric file for the monitor has been opened.
 
         @param values: A dict containing a mapping from metric name to its value. The only allowed value types are:
-            int, long, float, str, bool, and unicode.
+            int, long, float, bool, and six.text_type.
         @param monitor: The ScalyrMonitor instance that created the values. This does not have to be passed in if the
             monitor instance specific logger is used. It defaults to that monitor. However, if the logger is the
             general one for the module, then a monitor instance is required.
@@ -670,20 +697,23 @@ class AgentLogger(logging.Logger):
         for key in values:
             value = values[key]
             value_type = type(value)
-            if value_type is int or value_type is long or value_type is float:
-                string_entries.append("%s=%s" % (key, str(value)))
+            if value_type in six.integer_types or value_type is float:
+                string_entries.append("%s=%s" % (key, six.text_type(value)))
             elif value_type is bool:
                 value_str = "true"
                 if not value:
                     value_str = "false"
                 string_entries.append("%s=%s" % (key, value_str))
-            elif value_type is str or value_type is unicode:
-                string_entries.append("%s=%s" % (key, str(value).replace('"', '\\"')))
+            elif value_type is six.text_type:
+                string_entries.append(
+                    "%s=%s" % (key, six.text_type(value).replace('"', '\\"'))
+                )
             else:
                 raise UnsupportedValueType(key, value)
         self.info(" ".join(string_entries), metric_log_for_monitor=monitor)
 
-    def findCaller(self):
+    # 2->TODO in python3 findCaller receives stack_info, Also there is a new 'stacklevel' in python3.8
+    def findCaller(self, stack_info=False, stacklevel=1):
         """
         Find the stack frame of the caller so that we can note the source
         file name, line number and function name.
@@ -701,17 +731,30 @@ class AgentLogger(logging.Logger):
             if filename == _srcfile or filename == logging._srcfile:
                 f = f.f_back
                 continue
-            rv = (filename, f.f_lineno, co.co_name)
+            rv = (co.co_filename, f.f_lineno, co.co_name, None)
             break
 
-        if sys.version_info[:3] < (2, 4, 2):
-            # Python 2.4.2 and below expects 2-tuple instead of 3-tuple.
-            # Note however that the docs are imprecise. E.g. the following link suggests 2.4.4 expects a 2 tuple.
-            # https://docs.python.org/release/2.4.4/lib/node341.html.
-            # TODO: for python 3, return a 4 tuple !
-            return rv[:2]
+        if sys.version_info[0] == 2:
+            # Python 2.
+            return rv[:3]
         else:
+            # Python 3.
             return rv
+
+    @property
+    def last_record(self):
+        return self.__last_record
+
+    def set_keep_last_record(self, keep_last):
+        """Updates whether or not to keep the last record created by this logger.
+
+        :param keep_last: Whether or not to keep the last record
+        :type keep_last: bool
+        """
+        if keep_last != self.__keep_last_record:
+            self.__last_record = None
+
+        self.__keep_last_record = keep_last
 
 
 # To help with a hack of extending the Logger class, we need a thread local storage
@@ -810,9 +853,15 @@ class AgentLogFormatter(BaseFormatter):
 
     def formatException(self, ei):
         # We just want to indent the stack trace to make it easier to write a parsing rule to detect it.
-        output = StringIO()
+        output = io.StringIO()
         try:
-            for line in logging.Formatter.formatException(self, ei).splitlines(True):
+            # 2->TODO 'logging.Formatter.formatException' returns binary data (str) in python2,
+            #  so it will not work with io.StringIO here.
+            exception_string = six.ensure_text(
+                logging.Formatter.formatException(self, ei)
+            )
+
+            for line in exception_string.splitlines(True):
                 output.write("  ")
                 output.write(line)
             return output.getvalue()
@@ -898,11 +947,17 @@ class RateLimiterLogFilter(object):
     def filter(self, record):
         if hasattr(record, "rate_limited_set"):
             return record.rate_limited_result
+
         record.rate_limited_set = True
         # Note, it is important we set rate_limited_droppped_records before we invoke the formatter since the
         # formatting is dependent on that value and our formatters cache the result.
         record.rate_limited_dropped_records = self.__dropped_records
         record_str = self.__formatter.format(record)
+
+        # Store size of the original and formatted records on the record object itself. Right now
+        # this is mostly used in the tests, but could also be useful in other contexts.
+        record.original_size = len(record.message)
+        record.formatted_size = len(record_str)
         record.rate_limited_result = self.__rate_limiter.charge_if_available(
             len(record_str)
         )
@@ -1582,34 +1637,42 @@ class UnsupportedValueType(Exception):
             message = (
                 "An unsupported type for a metric name was given.  It must be either str or unicode, but was"
                 '"%s".  This was for metric "%s"'
-                % (str(type(metric_name)), str(metric_name))
+                % (six.text_type(type(metric_name)), six.text_type(metric_name))
             )
         elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
             message = (
                 "An unsupported type for a field name was given.  It must be either str or unicode, but was"
                 '"%s".  This was for field "%s"'
-                % (str(type(field_name)), str(field_name))
+                % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
             message = (
                 'Unsupported metric value type of "%s" with value "%s" for metric="%s".'
                 "Only int, long, float, and str are supported."
-                % (str(type(metric_value)), str(metric_value), metric_name)
+                % (
+                    six.text_type(type(metric_value)),
+                    six.text_type(metric_value),
+                    metric_name,
+                )
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (
                 'Unsupported field value type of "%s" with value "%s" for field="%s".'
                 "Only int, long, float, and str are supported."
-                % (str(type(field_value)), str(field_value), field_name)
+                % (
+                    six.text_type(type(field_value)),
+                    six.text_type(field_value),
+                    field_name,
+                )
             )
         else:
             raise Exception(
                 'Bad combination of fields given for UnsupportedValueType: "%s" "%s" "%s" "%s"'
                 % (
-                    str(metric_name),
-                    str(metric_value),
-                    str(field_name),
-                    str(field_value),
+                    six.text_type(metric_name),
+                    six.text_type(metric_value),
+                    six.text_type(field_name),
+                    six.text_type(field_value),
                 )
             )
         Exception.__init__(self, message)

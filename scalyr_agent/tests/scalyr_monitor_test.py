@@ -15,6 +15,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 
@@ -28,6 +31,8 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 import scalyr_agent.util as scalyr_util
 
+import six
+
 
 class MonitorConfigTest(ScalyrTestCase):
     def test_base(self):
@@ -38,9 +43,9 @@ class MonitorConfigTest(ScalyrTestCase):
                 "int": 1,
                 "bool": True,
                 "string": "hi",
-                "unicode": u"bye",
+                "unicode": "bye",
                 "float": 1.4,
-                "long": 1L,
+                "long": 1,
                 "JsonArray": JsonArray(*test_array),
                 "JsonObject": JsonObject(**test_obj),
             }
@@ -53,9 +58,9 @@ class MonitorConfigTest(ScalyrTestCase):
         self.assertEquals(config["int"], 1)
         self.assertEquals(config["bool"], True)
         self.assertEquals(config["string"], "hi")
-        self.assertEquals(config["unicode"], u"bye")
+        self.assertEquals(config["unicode"], "bye")
         self.assertEquals(config["float"], 1.4)
-        self.assertEquals(config["long"], 1L)
+        self.assertEquals(config["long"], 1)
         self.assertEquals(config["JsonArray"], JsonArray(*test_array))
         self.assertEquals(config["JsonObject"], JsonObject(**test_obj))
 
@@ -67,19 +72,18 @@ class MonitorConfigTest(ScalyrTestCase):
     def test_int_conversion(self):
         self.assertEquals(self.get(1, convert_to=int), 1)
         self.assertEquals(self.get("12", convert_to=int), 12)
-        self.assertEquals(self.get(u"13", convert_to=int), 13)
+        self.assertEquals(self.get("13", convert_to=int), 13)
 
         self.assertRaises(BadMonitorConfiguration, self.get, 2.0, convert_to=int)
         self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=int)
         self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=int)
-        self.assertRaises(BadMonitorConfiguration, self.get, 4L, convert_to=int)
 
     def test_str_conversion(self):
-        self.assertEquals(self.get(1, convert_to=str), "1")
-        self.assertEquals(self.get("ah", convert_to=str), "ah")
-        self.assertEquals(self.get(False, convert_to=str), "False")
-        self.assertEquals(self.get(1.3, convert_to=str), "1.3")
-        self.assertEquals(self.get(1L, convert_to=str), "1")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
+        self.assertEquals(self.get("ah", convert_to=six.text_type), "ah")
+        self.assertEquals(self.get(False, convert_to=six.text_type), "False")
+        self.assertEquals(self.get(1.3, convert_to=six.text_type), "1.3")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
 
         test_array = ["a", "b", "c"]
 
@@ -101,7 +105,8 @@ class MonitorConfigTest(ScalyrTestCase):
             BadMonitorConfiguration,
             # single quotes are invalid JSON
             lambda: self.assertEquals(
-                self.get(str(test_array), convert_to=JsonArray), JsonArray(*test_array)
+                self.get(six.text_type(test_array), convert_to=JsonArray),
+                JsonArray(*test_array),
             ),
         )
 
@@ -113,23 +118,23 @@ class MonitorConfigTest(ScalyrTestCase):
         )
 
     def test_unicode_conversion(self):
-        self.assertEquals(self.get(1, convert_to=unicode), u"1")
-        self.assertEquals(self.get("ah", convert_to=unicode), u"ah")
-        self.assertEquals(self.get(False, convert_to=unicode), u"False")
-        self.assertEquals(self.get(1.3, convert_to=unicode), u"1.3")
-        self.assertEquals(self.get(1L, convert_to=unicode), u"1")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
+        self.assertEquals(self.get("ah", convert_to=six.text_type), "ah")
+        self.assertEquals(self.get(False, convert_to=six.text_type), "False")
+        self.assertEquals(self.get(1.3, convert_to=six.text_type), "1.3")
+        self.assertEquals(self.get(1, convert_to=six.text_type), "1")
 
     def test_long_conversion(self):
-        self.assertEquals(self.get(2, convert_to=long), 2L)
-        self.assertEquals(self.get("3", convert_to=long), 3L)
-        self.assertEquals(self.get(1L, convert_to=long), 1L)
-        self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=long)
-        self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=long)
+        self.assertEquals(self.get(2, convert_to=int), 2)
+        self.assertEquals(self.get("3", convert_to=int), 3)
+        self.assertEquals(self.get(1, convert_to=int), 1)
+        self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=int)
+        self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=int)
 
     def test_float_conversion(self):
         self.assertEquals(self.get(2, convert_to=float), 2.0)
         self.assertEquals(self.get("3.2", convert_to=float), 3.2)
-        self.assertEquals(self.get(1L, convert_to=float), 1.0)
+        self.assertEquals(self.get(1, convert_to=float), 1.0)
         self.assertRaises(BadMonitorConfiguration, self.get, True, convert_to=float)
         self.assertRaises(BadMonitorConfiguration, self.get, "12a", convert_to=float)
 
@@ -141,7 +146,7 @@ class MonitorConfigTest(ScalyrTestCase):
 
         self.assertRaises(BadMonitorConfiguration, self.get, 1, convert_to=bool)
         self.assertRaises(BadMonitorConfiguration, self.get, 2.1, convert_to=bool)
-        self.assertRaises(BadMonitorConfiguration, self.get, 3L, convert_to=bool)
+        self.assertRaises(BadMonitorConfiguration, self.get, 3, convert_to=bool)
 
     def test_list_conversion(self):
         # list -> JsonArray supported

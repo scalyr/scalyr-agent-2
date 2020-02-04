@@ -15,6 +15,9 @@
 #
 # author: Saurabh Jain <saurabh@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "saurabh@scalyr.com"
 
 from scalyr_agent.compat import custom_defaultdict as defaultdict
@@ -25,6 +28,8 @@ from scalyr_agent.builtin_monitors.linux_process_metrics import (
 )
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+from six.moves import range
 
 
 class TestMetricClass(ScalyrTestCase):

@@ -16,6 +16,10 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import sys
@@ -23,6 +27,8 @@ import threading
 import time
 import unittest
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+import six
 
 from scalyr_agent.util import StoppableThread
 
@@ -34,7 +40,7 @@ def _noop_skip(reason):
         if not isinstance(test_func_or_obj, type):
 
             def skip_wrapper(*args, **kwargs):
-                print (
+                print(
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
                 )
@@ -94,10 +100,10 @@ def _thread_watcher():
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
-    print "Detected hung test run.  Active threads are:"
+    print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
-        print "Active thread %s daemon=%s" % (t.getName(), str(t.isDaemon()))
-    print "Done"
+        print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
+    print("Done")
 
 
 def _start_thread_watcher_if_necessary():
@@ -136,7 +142,7 @@ class BaseScalyrTestCase(unittest.TestCase):
 
     def run(self, result=None):
         _start_thread_watcher_if_necessary()
-        StoppableThread.set_name_prefix("TestCase %s: " % str(self))
+        StoppableThread.set_name_prefix("TestCase %s: " % six.text_type(self))
         return unittest.TestCase.run(self, result=result)
 
     def verify_setup_invoked(self):
@@ -176,26 +182,32 @@ if sys.version_info[:2] < (2, 7):
             if msg is not None:
                 self.assertTrue(obj is None, msg)
             else:
-                self.assertTrue(obj is None, "%s is not None" % (str(obj)))
+                self.assertTrue(obj is None, "%s is not None" % (six.text_type(obj)))
 
         def assertIsNotNone(self, obj, msg=None):
             """Included for symmetry with assertIsNone."""
             if msg is not None:
                 self.assertTrue(obj is not None, msg)
             else:
-                self.assertTrue(obj is not None, "%s is None" % (str(obj)))
+                self.assertTrue(obj is not None, "%s is None" % (six.text_type(obj)))
 
         def assertGreater(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a > b, msg)
             else:
-                self.assertTrue(a > b, "%s is greater than %s" % (str(a), str(b)))
+                self.assertTrue(
+                    a > b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
 
         def assertLess(self, a, b, msg=None):
             if msg is not None:
                 self.assertTrue(a < b, msg)
             else:
-                self.assertTrue(a < b, "%s is greater than %s" % (str(a), str(b)))
+                self.assertTrue(
+                    a < b,
+                    "%s is greater than %s" % (six.text_type(a), six.text_type(b)),
+                )
 
 
 else:

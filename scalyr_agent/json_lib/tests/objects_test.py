@@ -15,6 +15,9 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest
@@ -65,7 +68,7 @@ class JsonObjectTests(ScalyrTestCase):
         x = JsonObject(foo=5)
         self.assertEquals(x.get_int("foo"), 5)
 
-        x = JsonObject(foo=5L)
+        x = JsonObject(foo=5)
         self.assertEquals(x.get_int("foo"), 5)
 
         x = JsonObject(foo=5.21)
@@ -91,27 +94,27 @@ class JsonObjectTests(ScalyrTestCase):
         self.assertRaises(JsonMissingFieldException, x.get_int, "none")
 
     def test_get_long(self):
-        x = JsonObject(foo=5L)
-        self.assertEquals(x.get_long("foo"), 5L)
+        x = JsonObject(foo=5)
+        self.assertEquals(x.get_long("foo"), 5)
 
-        x = JsonObject(foo=5L)
-        self.assertEquals(x.get_long("foo"), 5L)
+        x = JsonObject(foo=5)
+        self.assertEquals(x.get_long("foo"), 5)
 
         x = JsonObject(foo=5.21)
-        self.assertEquals(x.get_long("foo"), 5L)
+        self.assertEquals(x.get_long("foo"), 5)
 
         x = JsonObject(foo="5")
-        self.assertEquals(x.get_long("foo"), 5L)
+        self.assertEquals(x.get_long("foo"), 5)
 
         x = JsonObject(foo="5.2")
-        self.assertEquals(x.get_long("foo"), 5L)
+        self.assertEquals(x.get_long("foo"), 5)
 
         # Test that bad strings raise an exception
         x = JsonObject(foo="fhi3")
         self.assertRaises(JsonConversionException, x.get_long, "foo")
 
         # Test the default value is returned if field is missing.
-        self.assertEquals(x.get_long("none", default_value=5L), 5L)
+        self.assertEquals(x.get_long("none", default_value=5), 5)
 
         # Test returns none if missing.
         self.assertEquals(x.get_long("none", none_if_missing=True), None)
@@ -195,7 +198,7 @@ class JsonObjectTests(ScalyrTestCase):
     def test_keys(self):
         x = JsonObject(foo="a", bar=10)
 
-        keys = x.keys()
+        keys = list(x.keys())
         self.assertEquals(len(keys), 2)
         self.assertTrue(keys[0] == "foo" or keys[0] == "bar")
         self.assertTrue(keys[1] == "foo" or keys[1] == "bar")

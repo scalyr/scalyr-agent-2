@@ -14,15 +14,20 @@
 # ------------------------------------------------------------------------
 #
 # author: Edward Chee <echee@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
 
 import threading
-from mock import patch
+
 from scalyr_agent.util import FakeClock, StoppableThread
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
+
+from mock import patch
+from six.moves import range
 
 
 def always_true():
@@ -224,7 +229,7 @@ class BlockingRateLimiterTest(ScalyrTestCase):
 
                 self._outcome_generator_lock.acquire()
                 try:
-                    outcome = reported_outcome_generator.next()
+                    outcome = next(reported_outcome_generator)
                     rate_limiter.release_token(token, outcome)
                 finally:
                     self._outcome_generator_lock.release()

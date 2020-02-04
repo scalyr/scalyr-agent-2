@@ -15,18 +15,21 @@
 #
 #
 # author: Edward Chee <echee@scalyr.com>
-import re
-import struct
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from scalyr_agent import compat
 
 __author__ = "echee@scalyr.com"
 
-
+import re
+import struct
 import atexit
 import logging
 import os
 import shutil
 import tempfile
 import threading
+from io import open
 
 import scalyr_agent.util as scalyr_util
 
@@ -35,6 +38,8 @@ from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_logging import AgentLogger
+
+import six
 
 
 class ScalyrTestUtils(object):
@@ -182,10 +187,12 @@ def parse_scalyr_request(payload):
         # First add in the bytes between the last processed and the start of this match.
         rewritten_payload += payload[last_processed_index + 1 : x.start(0)]
         # Read the 4 bytes that describe the length, which is stored in regex group 1.
-        length = struct.unpack(">i", x.group(1))[0]
+        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        length = compat.struct_unpack_unicode(">i", x.group(1))[0]
         # Grab the string content as raw bytes.
         raw_string = payload[x.end(1) : x.end(1) + length]
-        rewritten_payload += scalyr_util.json_encode(raw_string.decode("utf-8"))
+        text_string = raw_string.decode("utf-8")
+        rewritten_payload += scalyr_util.json_encode(text_string, binary=True)
         last_processed_index = x.end(1) + length - 1
     rewritten_payload += payload[last_processed_index + 1 : len(payload)]
 

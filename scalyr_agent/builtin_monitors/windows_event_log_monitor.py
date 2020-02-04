@@ -14,11 +14,14 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
-import datetime
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import os
-import scalyr_agent.util as scalyr_util
 import threading
 import time
+
+import six
 
 try:
     import win32api
@@ -32,6 +35,7 @@ except ImportError:
     win32con = None
     windll = None
 
+import scalyr_agent.util as scalyr_util
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -46,7 +50,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.windows_event_log_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -56,7 +60,7 @@ define_config_option(
     "Optional (defaults to ``Application, Security, System``). A comma separated list of event sources.\n"
     "You can use this to specify which event sources you are interested in listening to."
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
-    convert_to=str,
+    convert_to=six.text_type,
     default=DEFAULT_SOURCES,
 )
 
@@ -67,7 +71,7 @@ define_config_option(
     "Valid values are: All, Error, Warning, Information, AuditSuccess and AuditFailure"
     '(Vista and later) Cannot be used.  Please use the "channels" parameter instead.',
     default=DEFAULT_EVENTS,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -101,7 +105,7 @@ define_config_option(
     "server_name",
     "Optional (defaults to ``localhost``). The remote server where the event log is to be opened\n",
     default="localhost",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -109,7 +113,7 @@ define_config_option(
     "remote_user",
     "Optional (defaults to ``None``). The username to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -117,7 +121,7 @@ define_config_option(
     "remote_password",
     "Optional (defaults to ``None``). The password to use for authentication on the remote server.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 define_config_option(
@@ -125,7 +129,7 @@ define_config_option(
     "remote_domain",
     "Optional (defaults to ``None``). The domain to which the remote user account belongs.  This option is only valid on Windows Vista and above\n",
     default=None,
-    convert_to=str,
+    convert_to=six.text_type,
 )
 
 
@@ -180,7 +184,7 @@ class OldApi(Api):
         self.__sources = source_list
 
     def load_checkpoints(self, checkpoints, config):
-        for source, record_number in checkpoints.iteritems():
+        for source, record_number in six.iteritems(checkpoints):
             self._checkpoints[source] = record_number
 
     def read_event_log(self):
@@ -239,10 +243,10 @@ class OldApi(Api):
                         # if it is one we are interested in
                         if event.EventType in event_types:
                             event_list.append(event)
-        except Exception, error:
+        except Exception as error:
             self._logger.error(
                 "Error reading from event log: %s",
-                str(error),
+                six.text_type(error),
                 limit_once_per_x_secs=self._error_repeat_interval,
                 limit_key="EventLogError",
             )
@@ -388,7 +392,7 @@ class NewApi(Api):
                         Context=self,
                         Session=self._session,
                     )
-                except Exception, e:
+                except Exception as e:
                     handle = None
                     error_message = win32api.FormatMessage(0)
 
@@ -417,7 +421,7 @@ class NewApi(Api):
         if "bookmarks" not in checkpoints:
             checkpoints["bookmarks"] = {}
 
-        for channel, bookmarkXml in checkpoints["bookmarks"].iteritems():
+        for channel, bookmarkXml in six.iteritems(checkpoints["bookmarks"]):
             self.__bookmarks[channel] = win32evtlog.EvtCreateBookmark(bookmarkXml)
 
         # subscribe to the events
@@ -432,7 +436,7 @@ class NewApi(Api):
 
         self.__bookmark_lock.acquire()
         try:
-            for channel, bookmark in self.__bookmarks.iteritems():
+            for channel, bookmark in six.iteritems(self.__bookmarks):
                 self._checkpoints["bookmarks"][channel] = win32evtlog.EvtRender(
                     bookmark, win32evtlog.EvtRenderBookmark
                 )
@@ -565,9 +569,9 @@ class NewApi(Api):
     def log_event_safe(self, event):
         try:
             self.log_event(event)
-        except Exception, e:
+        except Exception as e:
             try:
-                self._logger.info("%s", str(e))
+                self._logger.info("%s", six.text_type(e))
             except:
                 self._logger.info("Error printing exception information")
 
@@ -581,13 +585,13 @@ class NewApi(Api):
             provider = vals["ProviderName"]
 
         if "ProviderGuid" in vals:
-            vals["ProviderGuid"] = str(vals["ProviderGuid"])
+            vals["ProviderGuid"] = six.text_type(vals["ProviderGuid"])
 
         if "ActivityId" in vals:
-            vals["ActivityId"] = str(vals["ActivityId"])
+            vals["ActivityId"] = six.text_type(vals["ActivityId"])
 
         if "RelatedActivityId" in vals:
-            vals["RelatedActivityId"] = str(vals["RelatedActivityId"])
+            vals["RelatedActivityId"] = six.text_type(vals["RelatedActivityId"])
 
         if "TimeCreated" in vals:
             time_format = "%Y-%m-%d %H:%M:%SZ"
@@ -599,10 +603,10 @@ class NewApi(Api):
             if isinstance(vals["Keywords"], list):
                 vals["Keywords"] = ",".join(vals["Keywords"])
             else:
-                vals["Keywords"] = str(vals["Keywords"])
+                vals["Keywords"] = six.text_type(vals["Keywords"])
 
         if "UserId" in vals:
-            user_id = str(vals["UserId"])
+            user_id = six.text_type(vals["UserId"])
             if user_id.startswith("PySID:"):
                 user_id = user_id[6:]
             vals["UserId"] = user_id
@@ -714,7 +718,9 @@ and System sources:
 
         checkpoints = None
         try:
-            checkpoints = scalyr_util.read_file_as_json(self.__checkpoint_file)
+            checkpoints = scalyr_util.read_file_as_json(
+                self.__checkpoint_file, strict_utf8=True
+            )
         except:
             self._logger.info(
                 "No checkpoint file '%s' exists.\nAll logs will be read starting from their current end.",

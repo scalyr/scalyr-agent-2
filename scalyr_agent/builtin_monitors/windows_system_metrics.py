@@ -31,20 +31,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ------------------------------------------------------------------------
 """
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "Scott Sullivan '<guy.hoozdis@gmail.com>'"
 __version__ = "0.0.1"
 __monitor__ = __name__
 
-import time
 
-from scalyr_agent import ScalyrMonitor, UnsupportedSystem
-from scalyr_agent import define_config_option, define_metric, define_log_field
+import time
 
 try:
     import psutil
 except ImportError:
     psutil = None
+
+import six
+
+from scalyr_agent import ScalyrMonitor, UnsupportedSystem
+from scalyr_agent import define_config_option, define_metric, define_log_field
 
 
 #
@@ -54,7 +59,7 @@ CONFIG_OPTIONS = [
     dict(
         option_name="module",
         option_description="A ScalyrAgent plugin monitor module",
-        convert_to=str,
+        convert_to=six.text_type,
         required_option=True,
         default="windows_system_metrics",
     )
@@ -106,7 +111,7 @@ def _gather_metric(method, attribute=None, transform=None):
             if transform is not None:
                 value = transform(value)
             yield value, None
-        except RuntimeError, e:
+        except RuntimeError as e:
             # Special case the expected exception we see if we call disk_io_counters without the
             # user executing 'diskperf -y' on their machine before use.  Yes, it is a hack relying
             # on the exception message, but sometimes you have to do what you have to do.  At least we

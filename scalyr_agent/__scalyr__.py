@@ -15,11 +15,30 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
+
+# [start of 2->TODO]
+# "Modernize" tool added "six" library as a dependency in this file.
+# But in case of absence of six in site-packages we can not import "six" before scalyr_init.
+# The first option is to provide 2->3 compatibility without "six". This is easy for now,
+# because there is only one incompatible piece of code here.
+# and it can be fixed in code below...
+try:
+    # Python2
+    text_type = unicode
+except NameError:
+    # Python3
+    text_type = str
+# The second option is to assure that "six" library installed in current python environment.
+# [end of 2->TOD0]
+
 
 import inspect
 import os
 import sys
+from io import open
 
 # One of the main things this file does is correctly give the full path to two key directories regardless of install
 # type :
@@ -78,7 +97,6 @@ def scalyr_init():
     # need to change the PYTHONPATH
     if not __is_py2exe__:
         __add_scalyr_package_to_path()
-        __add_third_party_hacks()
 
 
 def __determine_package_root():
@@ -99,7 +117,7 @@ def __determine_package_root():
             file_path = os.path.join(base, file_path)
         file_path = os.path.dirname(os.path.realpath(file_path))
     else:
-        return os.path.dirname(unicode(sys.executable, sys.getfilesystemencoding()))
+        return os.path.dirname(text_type(sys.executable, sys.getfilesystemencoding()))
 
     return file_path
 
@@ -111,7 +129,7 @@ def get_package_root():
     """Returns the absolute path to the scalyr_agent Python package, including the scalyr_agent directory name.
 
     @return: The path to the scalyr_agent directory (which contains the Python package).
-    @rtype: str
+    @rtype: six.text_type
     """
     return __package_root__
 
@@ -125,7 +143,7 @@ def get_install_root():
     the top of the repository when running from the source tree.
 
     @return:  The path to the scalyr-agent-2 directory.
-    @rtype: str
+    @rtype: six.text_type
     """
     # See the listed cases above.  From that, it should be clear that these rules work for the different cases.
     parent_of_package_install = os.path.dirname(get_package_root())
@@ -139,6 +157,9 @@ def get_install_root():
 
 def __add_scalyr_package_to_path():
     """Adds the path for the scalyr package and embedded third party packages to the PYTHONPATH.
+
+    If you add any new paths in this method, be sure to add them near the top of `setup.py` as well so as not
+    to break the Windows builds.
     """
     # prepend the third party directory first so it appears after the package root, third_party_pythonX
     # and third_party_tls directories
@@ -154,48 +175,6 @@ def __add_scalyr_package_to_path():
         sys.path.insert(0, os.path.join(get_package_root(), "third_party_tls"))
 
     sys.path.insert(0, os.path.dirname(get_package_root()))
-
-
-def __add_backport_hack():
-    """Adds the hack to support backport.  This should only be imported for Python 2.7 and higher.
-    """
-    # The backports.ssl_match_hostname third party library (in scalyr_agent/third_party) will not be imported in
-    # for systems that already have any version of the `backports` module installed.  This is depended on by Docker,
-    # so for the most part, our customers weren't hit by this since we control the base python on the image.. but does
-    # impact developers.
-    #
-    # Explaining why it won't be imported is kind of a mess.  It has to do with namespace-based import method it uses
-    # which is not a blessed way of doing things anymore.
-    try:
-        # First, check to see if the ssl_match_hostname can be imported already, hence not needing fix.
-        from backports.ssl_match_hostname import match_hostname
-
-        return
-    except ImportError:
-        pass
-
-    # Otherwise, we do a hack where we import `ssl_match_hostname` by modifying the PYTHONPATHS to include the
-    # third_party/backports directory.. and then monkey patch it into the system.
-    original_path = list(sys.path)
-    try:
-        sys.path.insert(0, os.path.join(get_package_root(), "third_party", "backports"))
-        import ssl_match_hostname
-        import backports
-
-        backports.ssl_match_hostname = ssl_match_hostname
-        ssl_match_hostname.__name__ = "backports.ssl_match_hostname"
-        sys.modules["backports.ssl_match_hostname"] = ssl_match_hostname
-        from backports.ssl_match_hostname import match_hostname
-    finally:
-        sys.path = original_path
-
-
-def __add_third_party_hacks():
-    """Apply hacks to get some of the third party libraries in the `scalyr_agent/third_party` directory
-    to propertly import.
-    """
-    if sys.version_info[:2] >= (2, 7):
-        __add_backport_hack()
 
 
 def __determine_version():

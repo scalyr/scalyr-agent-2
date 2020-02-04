@@ -15,14 +15,27 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+# [start of 2->TODO]
+# Should we keep intermediate data(such as Event.__set_attributes, or AddEventsRequest.set_client_time)
+# as binary from the beginning, or it should keep in as unicode and convert it to bytes when we gather all data together?
+# Here i tried to keep them as binary.
+# [end of 2->TOD0]
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
-import httplib
 import platform
 import re
 import socket
 import sys
 import time
+import io
+
+import six
+from six.moves import map
+from six.moves import range
+import six.moves.http_client
 
 from scalyr_agent.util import verify_and_get_compress_func
 
@@ -40,8 +53,6 @@ except Exception:
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.connection import ConnectionFactory
-
-from cStringIO import StringIO
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -89,15 +100,15 @@ class ScalyrClientSession(object):
             Valid options are bz2, deflate or None.  Defaults to None.
         @param compression_level: An int containing the compression level of compression to use, from 1-9.  Defaults to 9 (max)
 
-        @type server: str
-        @type api_key: str
-        @type agent_version: str
+        @type server: six.text_type
+        @type api_key: six.text_type
+        @type agent_version: six.text_type
         @type quiet: bool
         @type request_deadline: float
-        @type ca_file: str
-        @type intermediate_certs_file: str
+        @type ca_file: six.text_type
+        @type intermediate_certs_file: six.text_type
         @type proxies: dict
-        @type compression_type: str
+        @type compression_type: six.text_type
         @type compression_level: int
         """
         if not quiet:
@@ -208,7 +219,7 @@ class ScalyrClientSession(object):
         """Modifies User-Agent header (applies to all data sent to Scalyr)
 
         @param fragments String fragments to append (in order) to the standard user agent data
-        @type fragments: List of str
+        @type fragments: List of six.text_type
         """
         self.__standard_headers["User-Agent"] = self.__get_user_agent(
             self.__agent_version, fragments
@@ -246,8 +257,8 @@ class ScalyrClientSession(object):
         @param [block_on_response]:  True if this request should block, waiting for the response.  If False, it will
             not block, but instead return a function, that will invoked, will block.
 
-        @type request_path: str
-        @type body: str|None
+        @type request_path: six.text_type
+        @type body: binary_type|None
         @type body_func: func|None
         @type is_post: bool
         @type block_on_response: bool
@@ -288,7 +299,7 @@ class ScalyrClientSession(object):
                         proxies=self.__proxies,
                     )
                     self.total_connections_created += 1
-            except Exception, e:
+            except Exception as e:
                 return self.__wrap_response_if_necessary(
                     "client/connectionFailed", 0, "", block_on_response
                 )
@@ -335,7 +346,7 @@ class ScalyrClientSession(object):
                         )
                         self.__connection.get(request_path)
 
-            except Exception, error:
+            except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, "errno") and error.errno is not None:
                     log.error(
@@ -343,7 +354,7 @@ class ScalyrClientSession(object):
                         "will re-attempt",
                         self.__full_address,
                         error.errno,
-                        str(error),
+                        six.text_type(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -396,7 +407,7 @@ class ScalyrClientSession(object):
                     status_code = self.__connection.status_code()
                     response = self.__connection.response()
                 bytes_received = len(response)
-            except httplib.HTTPException, httpError:
+            except six.moves.http_client.HTTPException as httpError:
                 log.error(
                     "Failed to receive response due to HTTPException '%s'. Closing connection, will re-attempt"
                     % (httpError.__class__.__name__),
@@ -404,7 +415,7 @@ class ScalyrClientSession(object):
                 )
                 return "requestFailed", len(body_str), response
 
-            except Exception, error:
+            except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
                 if hasattr(error, "errno") and error.errno is not None:
                     log.error(
@@ -412,7 +423,7 @@ class ScalyrClientSession(object):
                         "connection, will re-attempt",
                         self.__full_address,
                         error.errno,
-                        str(error),
+                        six.text_type(error),
                         error_code="client/requestFailed",
                     )
                 else:
@@ -554,7 +565,7 @@ class ScalyrClientSession(object):
             return add_events_request.get_payload()
 
         return self.__send_request(
-            "/addEvents", body_func=generate_body, block_on_response=block_on_response
+            "/addEvents", body_func=generate_body, block_on_response=block_on_response,
         )
 
     def close(self, current_time=None):
@@ -613,11 +624,11 @@ class ScalyrClientSession(object):
 
         @param agent_version: The agent version number.
         @param fragments: Additional strings to be appended. Each will be preceded by a semicolon
-        @type agent_version: str
-        @type fragments: List of str
+        @type agent_version: six.text_type
+        @type fragments: List of six.text_type
 
         @return: The user agent string.
-        @rtype: str
+        @rtype: six.text_type
         """
         # We will construct our agent string to look something like:
         # Linux-redhat-7.0;python-2.7.2;agent-2.0.1;ssllib
@@ -675,7 +686,7 @@ class ScalyrClientSession(object):
         ]
         if fragments:
             parts.extend(fragments)
-        return ";".join(map(str, parts))
+        return ";".join(map(six.text_type, parts))
 
     def perform_agent_version_check(self, track="stable"):
         """Query the Scalyr API to determine if a newer version is available
@@ -808,25 +819,27 @@ class AddEventsRequest(object):
         # to JSON without the 'events' field, but then delete the last '}' so that we can manually
         # add in the 'events: [ ... ]' ourselves.  This way we can watch the size of the buffer as
         # we build up events.
-        string_buffer = StringIO()
-        scalyr_util.json_encode(base_body, output=string_buffer)
+        # 2->TODO use BytesIO, make all data that is going to be written here - binary
+        string_buffer = io.BytesIO()
+        serialized_base_body = scalyr_util.json_encode(base_body, binary=True)
+        string_buffer.write(serialized_base_body)
 
         # Now go back and find the last '}' and delete it so that we can open up the JSON again.
         _rewind_past_close_curly(string_buffer)
 
         # Append the start of our events field.
-        string_buffer.write(", events: [")
+        string_buffer.write(b", events: [")
 
         # This buffer keeps track of all of the stuff that must be appended after the events JSON array to terminate
         # the request.  That includes both the threads JSON array and the client timestamp.
         if disable_logfile_addevents_format:
             self.__post_fix_buffer = PostFixBuffer(
-                "], threads: THREADS, client_time: TIMESTAMP }",
+                b"], threads: THREADS, client_time: TIMESTAMP }",
                 disable_logfile_addevents_format,
             )
         else:
             self.__post_fix_buffer = PostFixBuffer(
-                "], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }",
+                b"], logs: LOGS, threads: THREADS, client_time: TIMESTAMP }",
                 disable_logfile_addevents_format,
             )
 
@@ -925,7 +938,7 @@ class AddEventsRequest(object):
         start_pos = self.__buffer.tell()
         # If we already added an event before us, then make sure we add in a comma to separate us from the last event.
         if self.__events_added > 0:
-            self.__buffer.write(",")
+            self.__buffer.write(b",")
 
         timestamp = self.__get_valid_timestamp(timestamp=timestamp)
 
@@ -940,7 +953,10 @@ class AddEventsRequest(object):
         # Check if we exceeded the size, if so chop off what we just added.
         # Also reset previously seen sequence numbers and ids
         if self.current_size > self.__max_size:
+            # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
             self.__buffer.truncate(start_pos)
+            # 2->TODO: new data streams from "io" don't return to the specified position, need to change position manually.
+            self.__buffer.seek(start_pos)
             self.__event_sequencer.restore_from_memento(memento)
             return False
 
@@ -980,7 +996,8 @@ class AddEventsRequest(object):
 
             # Create a buffer for the copying.  We write in the entire JSON and then just back up the length of
             # the old postfix and then add in the new one.
-            rebuild_buffer = StringIO()
+            # 2->TODO: use BytesIO
+            rebuild_buffer = io.BytesIO()
             rebuild_buffer.write(self.__body)
             self.__body = None
             rebuild_buffer.seek(-1 * original_postfix_length, 2)  # os.SEEK_END
@@ -1019,7 +1036,7 @@ class AddEventsRequest(object):
 
         If this is the first time a timing component is being incremented, the initial value is set to zero.
         """
-        for key, value in key_values.iteritems():
+        for key, value in six.iteritems(key_values):
             if key in self.__timing_data:
                 amount = self.__timing_data[key]
             else:
@@ -1033,17 +1050,18 @@ class AddEventsRequest(object):
         @return: A string of the key/value pairs for all timing data.
         @rtype: str
         """
-        output_buffer = StringIO()
+        output_buffer = io.StringIO()
         first_time = True
 
-        for key, value in self.__timing_data.iteritems():
+        # sort by key, to get a predictable result.
+        for key, value in sorted(six.iteritems(self.__timing_data), key=lambda el: el[0]):
             if not first_time:
                 output_buffer.write(" ")
             else:
                 first_time = False
             output_buffer.write(key)
             output_buffer.write("=")
-            output_buffer.write(str(value))
+            output_buffer.write(six.text_type(value))
 
         return output_buffer.getvalue()
 
@@ -1061,10 +1079,10 @@ class AddEventsRequest(object):
         global __last_time_stamp__
 
         if timestamp is None:
-            timestamp = long(time.time() * 1000000000L)
+            timestamp = int(time.time() * 1000000000)
 
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
-            timestamp = __last_time_stamp__ + 1L
+            timestamp = __last_time_stamp__ + 1
         __last_time_stamp__ = timestamp
 
         return timestamp
@@ -1089,7 +1107,9 @@ class AddEventsRequest(object):
         @param position: The position token representing the previous state.
         """
         self.__events_added = position.events_added
+        # 2->TODO: io._IOBase does set new position after truncate, need to do seek explicitly.
         self.__buffer.truncate(position.buffer_size)
+        self.__buffer.seek(position.buffer_size)
         self.__post_fix_buffer.set_position(position.postfix_buffer_position)
 
         # reset previously seen sequence id and numbers
@@ -1189,6 +1209,7 @@ def _calculate_per_log_extra_bytes():
 
 
 class PostFixBuffer(object):
+    # 2->TODO this is binary buffer. Make it work only with binary data.
     """Buffer for the items that must be written after the events JSON array, which typically means
     the client timestamp and the threads JSON array.
 
@@ -1204,13 +1225,13 @@ class PostFixBuffer(object):
         @param format_string: The format for the buffer.  The output of this buffer will be this format string
             with the keywords THREADS and TIMESTAMP replaced with the json serialized form of the threads
             JSON array and the timestamp.
-        @type format_string: str
+        @type format_string: six.binary_type
         """
         # Make sure the keywords are used in the format string.
-        assert "THREADS" in format_string
-        assert "TIMESTAMP" in format_string
+        assert b"THREADS" in format_string
+        assert b"TIMESTAMP" in format_string
         if not disable_logfile_addevents_format:
-            assert "LOGS" in format_string
+            assert b"LOGS" in format_string
 
         self.__disable_logfile_addevents_format = disable_logfile_addevents_format
 
@@ -1247,13 +1268,20 @@ class PostFixBuffer(object):
         @type cache_size: bool
 
         @return: The post fix to include at the end of the AddEventsRequest.
-        @rtype: str
+        @rtype: six.binary_data
         """
+
         result = self.__format
         if not self.__disable_logfile_addevents_format:
-            result = result.replace("LOGS", scalyr_util.json_encode(self.__logs))
-        result = result.replace("TIMESTAMP", str(self.__client_timestamp))
-        result = result.replace("THREADS", scalyr_util.json_encode(self.__threads))
+            result = result.replace(
+                b"LOGS", scalyr_util.json_encode(self.__logs, binary=True)
+            )
+        result = result.replace(
+            b"TIMESTAMP", six.text_type(self.__client_timestamp).encode("utf-8")
+        )
+        result = result.replace(
+            b"THREADS", scalyr_util.json_encode(self.__threads, binary=True)
+        )
 
         # As an extra extra precaution, we update the current_size to be what it actually turned out to be.  We could
         # assert here to make sure it's always equal (it should be) but we don't want errors to cause issues for
@@ -1278,7 +1306,10 @@ class PostFixBuffer(object):
         @rtype: bool
         """
         new_timestamp = int(timestamp)
-        size_difference = len(str(new_timestamp)) - len(str(self.__client_timestamp))
+        # 2->TODO timestamp should contain only ascii characters, so bytes count and characters count should be the same.
+        size_difference = len(six.text_type(new_timestamp)) - len(
+            six.text_type(self.__client_timestamp)
+        )
 
         if (
             fail_if_buffer_exceeds is not None
@@ -1293,6 +1324,7 @@ class PostFixBuffer(object):
     def add_log_and_thread_entry(
         self, thread_id, thread_name, log_attrs, fail_if_buffer_exceeds=None
     ):
+        # 2->TODO: Make it work with binary.
         """Adds in a new thread entry that will be included in the post fix.
 
 
@@ -1452,23 +1484,29 @@ class Event(object):
         # We only stash a copy of attrs for debugging/testing purposes.  We really will just serialize it into
         # __serialization_base.
         self.__log_id = None
-        self.__attrs = attrs
+        if attrs is not None:
+            self.__attrs = dict(attrs)
+        else:
+            self.__attrs = dict()
         self.__disable_logfile_addevents_format = disable_logfile_addevents_format
         if (attrs is not None or thread_id is not None) and base is not None:
             raise Exception("Cannot use both attrs/thread_id and base")
 
         self.__thread_id = None
+
+        # Used to get attributes from the parent (such as the logfile attributes) for this event.
+        self.__parent_event = None
         if base is not None:
             # We are creating an event that is a copy of an existing one.  Re-use the serialization base to capture
             # the per-log file attributes.
+            self.__parent_event = base
             self.__serialization_base = base.__serialization_base
             self.__thread_id = base.__thread_id
-            self.__attrs = base.__attrs
             self.__disable_logfile_addevents_format = (
                 base.__disable_logfile_addevents_format
             )
         else:
-            self.__set_attributes(thread_id, attrs)
+            self.__set_attributes(thread_id, self.__attrs)
 
         # The typical per-event fields.  Note, all of the fields below are stored as strings, in the serialized
         # forms for their event fields EXCEPT message.  For example, since ``sequence_id`` should be a string on the
@@ -1486,58 +1524,92 @@ class Event(object):
         self.__num_optimal_fields = 0
 
     def __set_attributes(self, thread_id, attributes):
+        """ Set the attributes and thread id of an Event.
+        """
         self.__thread_id = thread_id
         self.__attrs = attributes
+        attributes_to_serialize = self.__get_attributes_to_serialize()
         # A new event.  We have to create the serialization base using provided information/
-        tmp_buffer = StringIO()
+        # 2->TODO: should it be bytes, or it will be better to leave it  as unicode and just convert it
+        tmp_buffer = io.BytesIO()
         # Open base for the event object.
-        tmp_buffer.write("{")
+        tmp_buffer.write(b"{")
         if thread_id is not None:
-            tmp_buffer.write("thread:")
-            tmp_buffer.write(scalyr_util.json_encode(thread_id))
-            tmp_buffer.write(", ")
+            tmp_buffer.write(b"thread:")
+            # 2->TODO: in python3 ujson will return result with unicode type,
+            tmp_buffer.write(scalyr_util.json_encode(thread_id, binary=True))
+            tmp_buffer.write(b", ")
             if not self.__disable_logfile_addevents_format:
-                tmp_buffer.write("log:")
-                tmp_buffer.write(scalyr_util.json_encode(thread_id))
-                tmp_buffer.write(", ")
-        if self.__disable_logfile_addevents_format and attributes is not None:
-            tmp_buffer.write("attrs:")
-            tmp_buffer.write(scalyr_util.json_encode(attributes))
+                tmp_buffer.write(b"log:")
+                tmp_buffer.write(scalyr_util.json_encode(thread_id, binary=True))
+                tmp_buffer.write(b", ")
+        if attributes_to_serialize:
+            tmp_buffer.write(b"attrs:")
+            tmp_buffer.write(scalyr_util.json_encode(attributes, binary=True))
             _rewind_past_close_curly(tmp_buffer)
-            tmp_buffer.write(",")
+            tmp_buffer.write(b",")
         else:
-            tmp_buffer.write("attrs:{")
+            tmp_buffer.write(b"attrs:{")
 
         # Add the message field into the json object.
-        tmp_buffer.write("message:")
+        tmp_buffer.write(b"message:")
 
         self.__serialization_base = tmp_buffer.getvalue()
 
-    def add_missing_attributes(self, attributes):
-        """ Adds items attributes to the base_event's attributes if the base_event doesn't
-        already have those attributes set
+    def __get_attributes_to_serialize(self):
+        """Return the attributes that should be included in the serialization for this specific event.
+        This does not include attributes from its parent if using the logfile_addevents_format, and does not include
+        attributes from this event that already exist in the parent with the same value.
         """
-        if self.__attrs:
-            changed = False
-            new_attrs = dict(self.__attrs)
-            for key, value in attributes.iteritems():
-                if not key in new_attrs:
-                    changed = True
-                    new_attrs[key] = value
-
-            if changed:
-                self.__set_attributes(self.__thread_id, new_attrs)
+        result = dict()
+        if self.__disable_logfile_addevents_format:
+            if self.__parent_event:
+                result = dict(self.__parent_event.__attrs)
+            if self.__attrs:
+                result.update(self.__attrs)
         else:
-            self.__set_attributes(self.__thread_id, attributes)
+            if self.__parent_event:
+                for key in self.__attrs:
+                    if (
+                        key not in self.__parent_event.__attrs
+                        or self.__parent_event.__attrs[key] != self.__attrs[key]
+                    ):
+                        result[key] = self.__attrs[key]
+            else:
+                result = self.__attrs
+        return result
+
+    def add_attributes(self, attributes, overwrite_existing=False):
+        """ Adds items attributes to __attrs if the __parent_event doesn't
+        already have those attributes set.
+
+        If overwrite_existing is False an attribute will not be added if the key already exists in __attrs.
+        """
+        if attributes:
+            attributes = dict(attributes)
+
+        changed = False
+        for key, value in six.iteritems(attributes):
+            if key not in self.__attrs or overwrite_existing:
+                changed = True
+                self.__attrs[key] = value
+
+        if changed:
+            self.__set_attributes(self.__thread_id, self.__attrs)
 
     @property
     def attrs(self):
         """
-        @return: The attributes object as originally based into the constructor or the constructor of the base
-            object that was to create this instance.
+        @return: The attributes object and its parent event. If both have the same attribute key the parent's will be
+        overwritten by this event's.
         @rtype: dict
         """
-        return self.__attrs
+        result = dict()
+        if self.__parent_event and self.__parent_event.__attrs:
+            result = dict(self.__parent_event.__attrs)
+        if self.__attrs:
+            result.update(self.__attrs)
+        return result
 
     def set_message(self, message):
         """Sets the message field for the attributes for this event.
@@ -1549,7 +1621,7 @@ class Event(object):
         """
         if self.__message is None and message is not None:
             self.__num_optimal_fields += 1
-        if message is unicode:
+        if type(message) is six.text_type:
             self.__message = message.encode("utf-8")
         else:
             self.__message = message
@@ -1574,7 +1646,7 @@ class Event(object):
         # The timestamp field is serialized as a string to get around overflow issues, so put it in string form now.
         if self.__timestamp is None and timestamp is not None:
             self.__num_optimal_fields += 1
-        self.__timestamp = '"%s"' % str(timestamp)
+        self.__timestamp = b'"%s"' % six.text_type(timestamp).encode("utf-8")
         return self
 
     @property
@@ -1586,7 +1658,7 @@ class Event(object):
         """
         # We have to cut off the quotes we surrounded the field with when we serialized it.
         if self.__timestamp is not None:
-            return long(self.__timestamp[1:-1])
+            return int(self.__timestamp[1:-1])
         else:
             return None
 
@@ -1606,7 +1678,7 @@ class Event(object):
         @rtype: Event
         """
         # This is serialized as a string to get around overflow issues, so put in a string now.
-        self.__sequence_id = '"%s"' % str(sequence_id)
+        self.__sequence_id = ('"%s"' % sequence_id).encode("utf-8")
         self.__has_non_optimal_fields = True
         return self
 
@@ -1635,7 +1707,7 @@ class Event(object):
         """
         self.__has_non_optimal_fields = True
         # It is serialized as a number, so just a toString is called for.
-        self.__sequence_number = str(sequence_number)
+        self.__sequence_number = six.text_type(sequence_number).encode("utf-8")
         return self
 
     @property
@@ -1646,7 +1718,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number is not None:
-            return long(self.__sequence_number)
+            return int(self.__sequence_number)
         else:
             return None
 
@@ -1662,7 +1734,9 @@ class Event(object):
         # It is serialized as a number, so just a toString is called for.
         if self.__sequence_number_delta is None and sequence_number_delta is not None:
             self.__num_optimal_fields += 1
-        self.__sequence_number_delta = str(sequence_number_delta)
+        self.__sequence_number_delta = six.text_type(sequence_number_delta).encode(
+            "utf-8"
+        )
         return self
 
     @property
@@ -1673,7 +1747,7 @@ class Event(object):
         """
         # We have to convert it back to a number.
         if self.__sequence_number_delta is not None:
-            return long(self.__sequence_number_delta)
+            return int(self.__sequence_number_delta)
         else:
             return None
 
@@ -1686,14 +1760,15 @@ class Event(object):
         @rtype: Event
         """
         self.__has_non_optimal_fields = True
-        self.__sampling_rate = str(rate)
+        self.__sampling_rate = six.text_type(rate).encode("utf-8")
         return self
 
     def serialize(self, output_buffer):
         """Serialize the event into ``output_buffer``.
 
         @param output_buffer: The buffer to serialize to.
-        @type output_buffer: StringIO
+        # 2->TODO: output_buffer needs to be BytesIO
+        @type output_buffer: BytesIO
         """
         output_buffer.write(self.__serialization_base)
         # Use a special serialization format for message so that we don't have to send CPU time escaping it.  This
@@ -1704,28 +1779,27 @@ class Event(object):
 
         # We fast path the very common case of just a timestamp and sequence delta fields.
         if not self.__has_non_optimal_fields and self.__num_optimal_fields == 3:
-            output_buffer.write("}")
-            output_buffer.write(",sd:")
+            output_buffer.write(b"}")
+            output_buffer.write(b",sd:")
             output_buffer.write(self.__sequence_number_delta)
-            output_buffer.write(",ts:")
+            output_buffer.write(b",ts:")
             output_buffer.write(self.__timestamp)
         else:
             self.__write_field_if_not_none(
-                ",sample_rate:", self.__sampling_rate, output_buffer
+                b",sample_rate:", self.__sampling_rate, output_buffer
             )
             # close off attrs object.
-            output_buffer.write("}")
-
-            self.__write_field_if_not_none(",ts:", self.__timestamp, output_buffer)
-            self.__write_field_if_not_none(",si:", self.__sequence_id, output_buffer)
+            output_buffer.write(b"}")
+            self.__write_field_if_not_none(b",ts:", self.__timestamp, output_buffer)
+            self.__write_field_if_not_none(b",si:", self.__sequence_id, output_buffer)
             self.__write_field_if_not_none(
-                ",sn:", self.__sequence_number, output_buffer
+                b",sn:", self.__sequence_number, output_buffer
             )
             self.__write_field_if_not_none(
-                ",sd:", self.__sequence_number_delta, output_buffer
+                b",sd:", self.__sequence_number_delta, output_buffer
             )
         # close off the event object.
-        output_buffer.write("}")
+        output_buffer.write(b"}")
 
     def __write_field_if_not_none(self, field_name, field_value, output_buffer):
         """If the specified field value is not None, then emit the field name and the value to the output buffer.
@@ -1736,8 +1810,12 @@ class Event(object):
 
         @type field_name: str
         @type field_value: str or None
-        @type output_buffer: StringIO
+        @type output_buffer: BytesIO
         """
+        # [start of 2->TODO]
+        # BytesIO type needed. filed_name and field_value should be passed as binary.
+        # In other case, we should convert them here.
+        # [end of 2->TOD0]
         if field_value is not None:
             output_buffer.write(field_name)
             output_buffer.write(field_value)
@@ -1752,12 +1830,13 @@ def _rewind_past_close_curly(output_buffer):
     @param output_buffer:  The buffer to rewind.
     @type output_buffer: StringO
     """
+    # 2->TODO make binary literals.
     # Now go back and find the last '}' and delete it so that we can open up the JSON again.
     location = output_buffer.tell()
     while location > 0:
         location -= 1
         output_buffer.seek(location)
-        if output_buffer.read(1) == "}":
+        if output_buffer.read(1) == b"}":
             break
 
     # Now look for the first non-white character.  We need to add in a comma after it.
@@ -1770,7 +1849,7 @@ def _rewind_past_close_curly(output_buffer):
             break
 
     # If the character happened to a comma, back up over that since we want to write our own comma.
-    if location > 0 and last_char == ",":
+    if location > 0 and last_char == b",":
         location -= 1
 
     if location < 0:
@@ -1821,7 +1900,7 @@ def create_connection_helper(host, port, timeout=None, source_address=None):
             sock.connect(sa)
             return sock
 
-        except socket.error, _:
+        except socket.error as _:
             err = _
             if sock is not None:
                 sock.close()

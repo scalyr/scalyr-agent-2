@@ -14,11 +14,19 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
 from __future__ import division
-
+from __future__ import absolute_import
+from __future__ import print_function
+import codecs
 import sys
 import struct
-import thread
+from io import open
+
+import six
+import six.moves._thread
+from six.moves import range
+from scalyr_agent import compat
 
 
 __author__ = "czerwin@scalyr.com"
@@ -67,11 +75,15 @@ def get_json_implementation(lib_name):
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
             # ujson does not raise exception if you pass it a JsonArray/JsonObject while producing wrong encoding.
             # Detect and complain loudly.
@@ -94,11 +106,15 @@ def get_json_implementation(lib_name):
 
         def json_dumps_custom(obj, fp):
             """Serialize the objection.
+            Note, this function returns different types (text vs binary) based on which version of Python you are using.
+            We leave the type unchanged here because the code that invokes this function
+            will convert it to the final desired return type.
+            Otherwise, we'd be double converting the result in some cases.
             :param obj: The object to serialize
             :param fp: If not None, then a file-like object to which the serialized JSON will be written.
             :type obj: dict
-            :return: If fp is not None, then the str representing the serialization.
-            :rtype: str
+            :return: If fp is not None, then the string representing the serialization.
+            :rtype: Python3 - six.text_type, Python2 - six.binary_type
             """
 
             if fp is not None:
@@ -136,15 +152,25 @@ def get_json_lib():
     return _json_lib
 
 
-def json_encode(obj, output=None):
+def json_encode(obj, output=None, binary=False):
     """Encodes an object into a JSON string.
 
     @param obj: The object to serialize
     @param output: If not None, a file-like object to which the serialization should be written.
-
-    @type obj: dict|list
+    @param binary: If True return binary string, otherwise text string.
+    @type obj: dict|list|six.text_type
+    @type binary: bool
     """
-    return _json_encode(obj, output)
+    # 2->TODO encode json according to 'binary' flag.
+    if binary:
+
+        result = six.ensure_binary(_json_encode(obj, None))
+        if output:
+            output.write(result)
+        else:
+            return result
+    else:
+        return six.ensure_text(_json_encode(obj, output))
 
 
 def json_decode(text):
@@ -184,6 +210,9 @@ def json_scalyr_config_decode(text):
     return json_lib.parse(text)
 
 
+_NUMERIC_TYPES = six.integer_types + (float,)
+
+
 def value_to_bool(value):
     """
     Duplicates "JsonObject.__num_to_bool" functionality.
@@ -192,24 +221,25 @@ def value_to_bool(value):
     value_type = type(value)
     if value_type is bool:
         return value
-    elif value_type in (int, long, float):
+    elif value_type in _NUMERIC_TYPES:
         value = float(value)
         # return True if the value is one, False if it is zero
         if abs(value) < 1e-10:
             return False
         if abs(1 - value) < 1e-10:
             return True
-    elif value_type is str or value_type is unicode:
+    elif value_type is six.text_type:
         return not value == "" and not value == "f" and not value.lower() == "false"
     elif value is None:
         return False
 
     raise ValueError(
-        "Cannot convert %s value to bool: %s" % (str(value_type), str(value))
+        "Cannot convert %s value to bool: %s"
+        % (six.text_type(value_type), six.text_type(value))
     )
 
 
-def _read_file_as_json(file_path, json_parser):
+def _read_file_as_json(file_path, json_parser, strict_utf8=False):
     """Reads the entire file as a JSON value and return it.
 
     @param file_path: the path to the file to read
@@ -229,17 +259,24 @@ def _read_file_as_json(file_path, json_parser):
                 raise JsonReadFileException(file_path, "The file does not exist.")
             if not os.access(file_path, os.R_OK):
                 raise JsonReadFileException(file_path, "The file is not readable.")
-            f = open(file_path, "r")
+            if strict_utf8:
+                f = codecs.open(file_path, "r", encoding="utf-8")
+            else:
+                f = open(file_path, "r")
             data = f.read()
             return json_parser(data)
-        except IOError, e:
-            raise JsonReadFileException(file_path, "Read error occurred: " + str(e))
-        except JsonParseException, e:
+        except IOError as e:
+            raise JsonReadFileException(
+                file_path, "Read error occurred: " + six.text_type(e)
+            )
+        except JsonParseException as e:
             raise JsonReadFileException(
                 file_path,
                 "JSON parsing error occurred: %s (line %i, byte position %i)"
                 % (e.raw_message, e.line_number, e.position),
             )
+        except UnicodeDecodeError as e:
+            raise JsonReadFileException(file_path, "Invalid UTF-8: " + six.text_type(e))
     finally:
         if f is not None:
             f.close()
@@ -263,7 +300,7 @@ def read_config_file_as_json(file_path):
     return _read_file_as_json(file_path, json_lib.parse)
 
 
-def read_file_as_json(file_path):
+def read_file_as_json(file_path, strict_utf8=False):
     """Reads the entire file as a JSON value and return it.  This returns JSON objects represented as
     `dict`s, `list`s and primitive types.
 
@@ -272,6 +309,8 @@ def read_file_as_json(file_path):
 
     @param file_path: the path to the file to read
     @type file_path: str
+    @param strict_utf8: If true invalid UTF-8 read from the file will raise an exception
+    @type strict_utf8: bool
 
     @return: The JSON value contained in the file.  This is typically a dict, but could be primitive
         values such as int or str if that is all the file contains.
@@ -283,9 +322,11 @@ def read_file_as_json(file_path):
         try:
             return json_decode(text)
         except ValueError as e:
-            raise JsonParseException("JSON parsing failed due to: %s" % str(e))
+            raise JsonParseException(
+                "JSON parsing failed due to: %s" % six.text_type(e)
+            )
 
-    return _read_file_as_json(file_path, parse_standard_json)
+    return _read_file_as_json(file_path, parse_standard_json, strict_utf8=strict_utf8)
 
 
 def atomic_write_dict_as_json_file(file_path, tmp_path, info):
@@ -320,27 +361,31 @@ def create_unique_id():
     """
     @return: A value that will be unique for all values generated by all machines.  The value
         is also encoded so that is safe to be used in a web URL.
-    @rtype: str
+    @rtype: six.text_type
     """
-    return base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    # 2->TODO this function should return unicode.
+    base64_id = base64.urlsafe_b64encode(sha1(uuid.uuid1().bytes).digest())
+    return base64_id.decode("utf-8")
 
 
 def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
     @param data: data to be digested(hashed)
-    @type data: str
-    @rtype: str
+    @type data: six.binary_type
+    @rtype: six.text_type
     """
 
-    if not (data and isinstance(data, basestring)):
+    if not (data and isinstance(data, six.text_type)):
         raise Exception("invalid data to be hashed: %s", repr(data))
+
+    encoded_data = data.encode("utf-8")
 
     if not new_md5:
         m = md5.new()
     else:
         m = md5()
-    m.update(data)
+    m.update(encoded_data)
 
     return m.hexdigest()
 
@@ -423,7 +468,7 @@ def rfc3339_to_datetime(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError as e:
         return None
 
     dt = datetime.datetime(*(tm[0:6]))
@@ -474,10 +519,10 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError, e:
+    except ValueError as e:
         return None
 
-    nano_seconds = long(calendar.timegm(tm[0:6])) * 1000000000L
+    nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
     nanos = 0
 
     # now add the fractional part
@@ -495,7 +540,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
         # strip the final 'Z' and use the final number for processing
         fractions = fractions[:-1]
         to_nanos = 9 - len(fractions)
-        nanos = long(long(fractions) * 10 ** to_nanos)
+        nanos = int(int(fractions) * 10 ** to_nanos)
 
     return nano_seconds + nanos
 
@@ -529,13 +574,16 @@ def format_time(time_value):
 def get_pid_tid():
     """Returns a string containing the current process and thread id in the format "(pid=%pid) (tid=%tid)".
     @return: The string containing the process and thread id.
-    @rtype: str
+    @rtype: six.text_type
     """
     # noinspection PyBroadException
     try:
-        return "(pid=%s) (tid=%s)" % (str(os.getpid()), str(thread.get_ident()))
+        return "(pid=%s) (tid=%s)" % (
+            six.text_type(os.getpid()),
+            six.text_type(six.moves._thread.get_ident()),
+        )
     except:
-        return "(pid=%s) (tid=Unknown)" % (str(os.getpid()))
+        return "(pid=%s) (tid=Unknown)" % (six.text_type(os.getpid()))
 
 
 def is_list_of_strings(vals):
@@ -543,7 +591,7 @@ def is_list_of_strings(vals):
     try:
         # check if everything is a string
         for val in vals:
-            if not isinstance(val, basestring):
+            if not isinstance(val, six.string_types):
                 return False
     except:
         # vals is not enumerable
@@ -551,6 +599,35 @@ def is_list_of_strings(vals):
 
     # everything is a string
     return True
+
+
+def get_parser_from_config(base_config, attributes, default_parser):
+    """
+    Checks the various places that the parser option could be set and returns
+    the value with the highest precedence, or `default_parser` if no parser was found
+    @param base_config: a set of log config options for a logfile
+    @param attributes: a set of attributes to apply to a logfile
+    @param default_parser: the default parser if no parser setting is found in base_config or attributes
+    """
+    # check all the places `parser` might be set
+    # highest precedence is base_config['attributes']['parser'] - this is if
+    # `com.scalyr.config.log.attributes.parser is set as a label
+    if "attributes" in base_config and "parser" in base_config["attributes"]:
+        return base_config["attributes"]["parser"]
+
+    # next precedence is base_config['parser'] - this is if
+    # `com.scalyr.config.log.parser` is set as a label
+    if "parser" in base_config:
+        return base_config["parser"]
+
+    # lowest precedence is attributes['parser'] - this is if
+    # `parser` is a label and labels are being uploaded as attributes
+    # and the `parser` label passes the attribute filters
+    if "parser" in attributes:
+        return attributes["parser"]
+
+    # if we are here, then we found nothing so return the default
+    return default_parser
 
 
 class JsonReadFileException(Exception):
@@ -961,7 +1038,7 @@ class StoppableThread(threading.Thread):
         """Sets a prefix to add to the beginning of all threads from this point forward.
 
         @param name_prefix: The prefix or None if no prefix should be used.
-        @type name_prefix: str or None
+        @type name_prefix: six.text_type or None
         """
         StoppableThread.__name_lock.acquire()
         try:
@@ -990,10 +1067,11 @@ class StoppableThread(threading.Thread):
                 self.__target(self._run_state)
             else:
                 self.run_and_propagate()
-        except Exception, e:
+        except Exception as e:
             self.__exception_info = sys.exc_info()
             logging.getLogger().warn(
-                "Received exception from run method in StoppableThread %s" % str(e)
+                "Received exception from run method in StoppableThread %s"
+                % six.text_type(e)
             )
             return None
 
@@ -1039,9 +1117,11 @@ class StoppableThread(threading.Thread):
         """
         threading.Thread.join(self, timeout)
         if not self.isAlive() and self.__exception_info is not None:
-            raise self.__exception_info[0], self.__exception_info[
-                1
-            ], self.__exception_info[2]
+            six.reraise(
+                self.__exception_info[0],
+                self.__exception_info[1],
+                self.__exception_info[2],
+            )
 
 
 class RateLimiter(object):
@@ -1192,10 +1272,10 @@ class ScriptEscalator(object):
             return self.__controller.run_as_user(
                 self.__desired_user, script_file_path, script_binary, script_args
             )
-        except CannotExecuteAsUser, e:
+        except CannotExecuteAsUser as e:
             if not handle_error:
                 raise e
-            print >>sys.stderr, (
+            print(
                 "Failing, cannot %s as the correct user.  The command must be executed using the "
                 "same account that owns the configuration file.  The configuration file is owned by "
                 "%s whereas the current user is %s.  Changing user failed due to the following "
@@ -1206,7 +1286,8 @@ class ScriptEscalator(object):
                     self.__running_user,
                     e.error_message,
                     self.__desired_user,
-                )
+                ),
+                file=sys.stderr,
             )
             return 1
 
@@ -1302,7 +1383,7 @@ class RedirectorServer(object):
         """
         # We have to be careful about how we encode the bytes.  It's better to assume it is utf-8 and just
         # serialize it that way.
-        encoded_content = unicode(content).encode("utf-8")
+        encoded_content = six.text_type(content).encode("utf-8")
         # When we send over a chunk of bytes to the client, we prefix it with a code that identifies which
         # stream it should go to (stdout or stderr) and how many bytes we are sending.  To encode this information
         # into a single integer, we just shift the len of the bytes over by one and set the lower bit to 0 if it is
@@ -1312,7 +1393,10 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                self.__channel.write(struct.pack("i", code) + encoded_content)
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                self.__channel.write(
+                    compat.struct_pack_unicode("i", code) + encoded_content
+                )
             elif stream_id == RedirectorServer.STDOUT_STREAM_ID:
                 self.__sys.stdout.write(content)
             else:
@@ -1469,7 +1553,10 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                code = struct.unpack("i", self.__channel.read(4))[0]  # Read str length
+                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                code = compat.struct_unpack_unicode("i", self.__channel.read(4))[
+                    0
+                ]  # Read str length
 
                 # The server sends -1 when it wishes to close the stream.
                 if code < 0:
@@ -1544,7 +1631,7 @@ class RedirectorClient(StoppableThread):
 
         @type deadline: float
         @type last_loop_time: float
-        @type description: str
+        @type description: six.text_type
         """
         current_time = self.__time()
         poll_deadline = RedirectorClient.BUSY_LOOP_POLL_INTERVAL + last_loop_time
@@ -1635,7 +1722,7 @@ class RedirectorClient(StoppableThread):
             pass
 
 
-COMPRESSION_TEST_STR = "a" * 100
+COMPRESSION_TEST_STR = b"a" * 100
 
 
 def get_compress_module(compression_type):

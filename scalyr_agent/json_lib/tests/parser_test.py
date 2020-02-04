@@ -15,99 +15,104 @@
 #
 # author:  Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "czerwin@scalyr.com"
 
 import unittest
 
-from scalyr_agent.json_lib.parser import ByteScanner, JsonParser, JsonParseException
+from scalyr_agent.json_lib.parser import TextScanner, JsonParser, JsonParseException
 
 from scalyr_agent.test_base import ScalyrTestCase
+
+from six.moves import range
 
 
 class ByteScannerTests(ScalyrTestCase):
     def test_constructor(self):
-        x = ByteScanner("Hi there")
+        x = TextScanner("Hi there")
 
         self.assertEquals(x.position, 0)
 
     def test_read_ubyte(self):
-        x = ByteScanner("Hi \n")
+        x = TextScanner("Hi \n")
 
-        self.assertEquals(x.read_ubyte(), "H")
-        self.assertEquals(x.read_ubyte(), "i")
-        self.assertEquals(x.read_ubyte(), " ")
-        self.assertEquals(x.read_ubyte(), "\n")
-        self.assertRaises(IndexError, x.read_ubyte)
+        self.assertEquals(x.read_uchar(), "H")
+        self.assertEquals(x.read_uchar(), "i")
+        self.assertEquals(x.read_uchar(), " ")
+        self.assertEquals(x.read_uchar(), "\n")
+        self.assertRaises(IndexError, x.read_uchar)
 
     def test_read_ubytes(self):
-        x = ByteScanner("Hi there\n")
+        x = TextScanner("Hi there\n")
 
-        self.assertEquals(x.read_ubytes(2), "Hi")
-        self.assertEquals(x.read_ubytes(4), " the")
-        self.assertRaises(IndexError, x.read_ubytes, 10)
+        self.assertEquals(x.read_uchars(2), "Hi")
+        self.assertEquals(x.read_uchars(4), " the")
+        self.assertRaises(IndexError, x.read_uchars, 10)
 
     def test_properties(self):
-        x = ByteScanner("Hi \n")
+        x = TextScanner("Hi \n")
 
         self.assertEquals(x.position, 0)
         self.assertFalse(x.at_end)
-        self.assertEquals(x.bytes_remaining, 4)
+        self.assertEquals(x.characters_remaining, 4)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 1)
         self.assertFalse(x.at_end)
-        self.assertEquals(x.bytes_remaining, 3)
+        self.assertEquals(x.characters_remaining, 3)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 2)
         self.assertFalse(x.at_end)
-        self.assertEquals(x.bytes_remaining, 2)
+        self.assertEquals(x.characters_remaining, 2)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 3)
         self.assertFalse(x.at_end)
-        self.assertEquals(x.bytes_remaining, 1)
+        self.assertEquals(x.characters_remaining, 1)
 
-        x.read_ubyte()
+        x.read_uchar()
         self.assertEquals(x.position, 4)
         self.assertTrue(x.at_end)
-        self.assertEquals(x.bytes_remaining, 0)
+        self.assertEquals(x.characters_remaining, 0)
 
     def test_peek_next_ubyte(self):
-        x = ByteScanner("Hi \n")
+        x = TextScanner("Hi \n")
 
-        x.read_ubyte()
-        x.read_ubyte()
+        x.read_uchar()
+        x.read_uchar()
 
-        self.assertEquals(x.peek_next_ubyte(), " ")
-        self.assertEquals(x.peek_next_ubyte(1), "\n")
-        self.assertEquals(x.peek_next_ubyte(2, none_if_bad_index=True), None)
-        self.assertRaises(IndexError, x.peek_next_ubyte, 2)
+        self.assertEquals(x.peek_next_uchar(), " ")
+        self.assertEquals(x.peek_next_uchar(1), "\n")
+        self.assertEquals(x.peek_next_uchar(2, none_if_bad_index=True), None)
+        self.assertRaises(IndexError, x.peek_next_uchar, 2)
 
     def test_peek_next_ubyte_with_negative(self):
-        x = ByteScanner("Hi \n")
+        x = TextScanner("Hi \n")
 
-        x.read_ubyte()
-        x.read_ubyte()
+        x.read_uchar()
+        x.read_uchar()
 
-        self.assertEquals(x.peek_next_ubyte(-1), "i")
-        self.assertEquals(x.peek_next_ubyte(-2), "H")
-        self.assertEquals(x.peek_next_ubyte(-3, none_if_bad_index=True), None)
-        self.assertRaises(IndexError, x.peek_next_ubyte, (-3))
+        self.assertEquals(x.peek_next_uchar(-1), "i")
+        self.assertEquals(x.peek_next_uchar(-2), "H")
+        self.assertEquals(x.peek_next_uchar(-3, none_if_bad_index=True), None)
+        self.assertRaises(IndexError, x.peek_next_uchar, (-3))
 
     def test_line_number_for_offset(self):
-        x = ByteScanner("Hi there\nAnother line\nOne more")
+        x = TextScanner("Hi there\nAnother line\nOne more")
 
         self.assertEquals(x.line_number_for_offset(4), 1)
         self.assertEquals(x.line_number_for_offset(9), 2)
         self.assertEquals(x.line_number_for_offset(23), 3)
 
-        x = ByteScanner("Hi there\rAnother line")
+        x = TextScanner("Hi there\rAnother line")
 
         self.assertEquals(x.line_number_for_offset(4), 1)
         self.assertEquals(x.line_number_for_offset(9), 2)
 
-        x = ByteScanner("Hi there\r\nAnother line")
+        x = TextScanner("Hi there\r\nAnother line")
 
         self.assertEquals(x.line_number_for_offset(4), 1)
         self.assertEquals(x.line_number_for_offset(10), 2)
@@ -115,11 +120,11 @@ class ByteScannerTests(ScalyrTestCase):
         self.assertRaises(IndexError, x.line_number_for_offset, 25)
 
     def test_line_number_for_offset_with_negative_offset(self):
-        x = ByteScanner("Hi there\nAnother line\nOne more")
+        x = TextScanner("Hi there\nAnother line\nOne more")
         #                 01234567 8901234567890 12345678
         # Advance to the 'n' in One.
         for i in range(23):
-            x.read_ubyte()
+            x.read_uchar()
 
         self.assertEquals(x.line_number_for_offset(-2), 2)
         self.assertEquals(x.line_number_for_offset(-1), 3)
@@ -140,7 +145,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x, -10.5)
 
         x = JsonParser.parse("12345678901234567890")
-        self.assertEquals(x, 12345678901234567890L)
+        self.assertEquals(x, 12345678901234567890)
 
         self.assertRaises(JsonParseException, JsonParser.parse, "1..e")
 
@@ -155,7 +160,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x, "Hi there\n")
 
         x = JsonParser.parse('"Hi there\\ua000"')
-        self.assertEquals(x, u"Hi there\ua000")
+        self.assertEquals(x, "Hi there\ua000")
 
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there')
 
@@ -164,10 +169,6 @@ class JsonParserTests(ScalyrTestCase):
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there \\')
 
         self.assertRaises(JsonParseException, JsonParser.parse, '"Hi there" + Hi')
-
-    def test_parsing_length_prefixed_strings(self):
-        x = JsonParser.parse("`s\x00\x00\x00\x0cHowdy folks!")
-        self.assertEquals("Howdy folks!", x)
 
     def test_triple_quoted_strings(self):
         x = JsonParser.parse('"""Howdy\n"folks"!"""')
@@ -248,6 +249,27 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(len(x), 2)
         self.assertEquals(x.get("a"), 5)
         self.assertEquals(x.get("b"), 7)
+
+    def test_parse_from_bytes(self):
+        self.assertEqual(JsonParser.parse(b"123"), 123)
+        self.assertEqual(JsonParser.parse(b"-10.5"), -10.5)
+        self.assertEqual(JsonParser.parse(b'"""Howdy\n"folks"!"""'), """Howdy\n"folks"!""")
+        self.assertEqual(JsonParser.parse(b"true"), True)
+        self.assertEqual(JsonParser.parse(b"null"), None)
+        self.assertEqual(JsonParser.parse(b" // Hi there\n  45"), 45)
+
+        x = JsonParser.parse(b"[1, 2, 3]")
+        self.assertEquals(len(x), 3)
+        self.assertEquals(x[0], 1)
+        self.assertEquals(x[1], 2)
+        self.assertEquals(x[2], 3)
+
+        x = JsonParser.parse(b"{ a: 5, b:3, c:true, d: \"Hello\"}")
+        self.assertEquals(len(x), 4)
+        self.assertEquals(x.get("a"), 5)
+        self.assertEquals(x.get("b"), 3)
+        self.assertEquals(x.get("c"), True)
+        self.assertEquals(x.get("d"), "Hello")
 
 
 def main():

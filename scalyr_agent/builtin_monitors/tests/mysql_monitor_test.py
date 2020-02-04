@@ -15,6 +15,9 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "imron@scalyr.com"
 
 import sys

@@ -15,6 +15,9 @@
 #
 # author: Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
 
 from scalyr_agent.monitor_utils.annotation_config import process_annotations
@@ -34,7 +37,7 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = process_annotations(annotations)
 
-        self.assertEquals(0, len(result.keys()))
+        self.assertEquals(0, len(list(result.keys())))
 
     def test_annotation_object(self):
         annotations = {
@@ -44,7 +47,7 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(3, len(result.keys()))
+        self.assertEquals(3, len(list(result.keys())))
         self.assertEquals("item1", result["item1"])
         self.assertEquals("item2", result["item2"])
         self.assertEquals("item3", result["item3"])
@@ -61,7 +64,7 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(2, len(result.keys()))
+        self.assertEquals(2, len(list(result.keys())))
         self.assertEquals(3, len(result["item1"]))
         self.assertEquals(4, len(result["item2"]))
 
@@ -86,7 +89,7 @@ class TestAnnotationConfig(ScalyrTestCase):
         }
 
         result = process_annotations(annotations)
-        self.assertEquals(2, len(result.keys()))
+        self.assertEquals(2, len(list(result.keys())))
         self.assertEquals(3, len(result["item1"]))
         self.assertEquals(4, len(result["item2"]))
 

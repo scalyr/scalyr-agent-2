@@ -15,14 +15,11 @@
 #
 # author: Edward Chee <echee@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-
-import mock
-from mock import patch
-import threading
-import time
 
 from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
@@ -36,6 +33,10 @@ from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.tests.copying_manager_test import FakeMonitor
 from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache, FakeK8s
+
+import mock
+from mock import patch
+from six.moves import range
 
 
 class KubernetesMonitorTest(ScalyrTestCase):
@@ -271,6 +272,10 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
         # try to mark it as active.
         warmer = self.__warmer_test_instance
         fake_cache = self.__fake_cache
+
+        # Stop the warmer thread since we don't need it for the test, and to avoid a race condition that sometimes
+        # results in finding too many "already_warm" results
+        warmer.stop()
 
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)

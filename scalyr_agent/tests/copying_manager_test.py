@@ -14,18 +14,24 @@
 # ------------------------------------------------------------------------
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 import threading
+from io import open
+
 
 __author__ = "czerwin@scalyr.com"
 
 
 import os
 import tempfile
-
 import logging
 import shutil
 import sys
 import time
+
+from six.moves import range
 
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
@@ -45,6 +51,12 @@ from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.json_lib import JsonObject, JsonArray
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
+
+from scalyr_agent import scalyr_init
+
+scalyr_init()
+
+import six
 
 ONE_MB = 1024 * 1024
 
@@ -694,6 +706,38 @@ def _shift_time_in_checkpoint_file(path, delta):
     fp.close()
 
 
+def _add_non_utf8_to_checkpoint_file(path):
+    """
+    Add a unicode character to the checkpoint data stored in file located in "path"
+    """
+    fp = open(path, "r")
+    data = scalyr_util.json_decode(fp.read())
+    fp.close()
+    # 2-> TODO json libraries do not allow serialize bytes string with invalid UTF-8(ujson)or even bytes in general(json).
+    # so to test this case we must write non-utf8 byte directly, without serializing.
+
+    # this string will be replaced with invalid utf8 byte after encoding.
+    data["test"] = "__replace_me__"
+
+    json_string = scalyr_util.json_encode(data, binary=True)
+
+    # replace prepared substring to invalid byte.
+    json_string = json_string.replace(b"__replace_me__", b"\x96")
+
+    fp = open(path, "wb")
+    fp.write(json_string)
+    fp.close()
+
+
+def _write_bad_checkpoint_file(path):
+    """
+    Write invalid JSON in file located in "path"
+    """
+    fp = open(path, "w")
+    fp.write(scalyr_util.json_encode("}data{,:,,{}"))
+    fp.close()
+
+
 class CopyingManagerEnd2EndTest(ScalyrTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
@@ -1022,6 +1066,74 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         self.assertEquals("Third line", lines[0])
         self.assertEquals("Fourth line", lines[1])
 
+    def test_start_with_bad_checkpoint(self):
+        # Check totally mangled checkpoint file in the form of invalid JSON, should be treated as not having one at all
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+        controller.stop()
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        _write_bad_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
+        )
+        _write_bad_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
+        )
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
+        # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
+        self.assertEquals(0, len(lines))
+
+    def test_start_with_non_utf8_checkpoint(self):
+        # Check checkpoint file with invalid UTF-8 in it, should be treated the same as not having one at all
+        controller = self.__create_test_instance()
+        previous_root_dir = os.path.dirname(self.__test_log_file)
+
+        self.__append_log_lines("First line", "Second line")
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        self.assertEquals(2, len(lines))
+        self.assertEquals("First line", lines[0])
+        self.assertEquals("Second line", lines[1])
+        controller.stop()
+
+        self.__append_log_lines("Third line", "Fourth line")
+
+        _add_non_utf8_to_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "active-checkpoints.json")
+        )
+        _add_non_utf8_to_checkpoint_file(
+            os.path.join(self._config.agent_data_path, "checkpoints.json")
+        )
+
+        controller = self.__create_test_instance(
+            root_dir=previous_root_dir, auto_start=False
+        )
+        self._manager.start_manager()
+        (request, responder_callback) = controller.wait_for_rpc()
+        lines = self.__extract_lines(request)
+
+        # In the case of a bad checkpoint file, the agent should just pretend the checkpoint file does not exist and
+        # start reading the logfiles from the end. In this case, that means lines three and four will be skipped.
+        self.assertEquals(0, len(lines))
+
     def test_stale_request(self):
         controller = self.__create_test_instance()
         self.__append_log_lines("First line", "Second line")
@@ -1045,8 +1157,6 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
                     orig_time.time()
                     + self._manager._CopyingManager__config.max_retry_time
                 )
-                # restore original 'time' module
-                copying_manager.time = orig_time
                 return result
 
         # replace time module with dummy time object.
@@ -1310,7 +1420,7 @@ class TestableCopyingManager(CopyingManager):
         """Sets the status_message to return as the response for the next AddEventsRequest.
 
         @param status_message: The status message
-        @type status_message: str
+        @type status_message: six.text_type
         """
         self.__test_state_cv.acquire()
         self.__pending_response = status_message
@@ -1322,7 +1432,7 @@ class TestableCopyingManager(CopyingManager):
 
         @param current_point: The point reached by the CopyingManager thread, only valid values are
             `SLEEPING`, `SENDING`, and `RESPONDING`.
-        @type current_point: str
+        @type current_point: six.text_type
         """
         # If we are passing through the required_transition state, consume it to signal we have accomplished
         # the transition.
@@ -1365,8 +1475,8 @@ class TestableCopyingManager(CopyingManager):
             specified state before it gets to `stopping_at`.  Otherwise an AssertionError will be thrown.
               Only valid values are `SLEEPING`, `SENDING`, `RESPONDING`
 
-        @type stopping_at: str
-        @type required_transition_state: str or None
+        @type stopping_at: six.text_type
+        @type required_transition_state: six.text_type or None
         """
         self.__test_state_cv.acquire()
         try:

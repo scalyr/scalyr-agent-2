@@ -13,8 +13,12 @@
 # limitations under the License.
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
+
+from scalyr_agent import compat
 
 from scalyr_agent.monitor_utils.k8s import (
     KubernetesApi,
@@ -31,10 +35,12 @@ import os
 import re
 import traceback
 import time
-import urllib
-
 import logging
 import logging.handlers
+
+import six
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -59,7 +65,7 @@ define_config_option(
     __monitor__,
     "module",
     "Always ``scalyr_agent.builtin_monitors.kubernetes_events_monitor``",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 
@@ -104,7 +110,7 @@ define_config_option(
     "Optional (defaults to ``kubernetes_events.log``). Specifies the file name under which event messages "
     "are stored. The file will be placed in the default Scalyr log directory, unless it is an "
     "absolute path",
-    convert_to=str,
+    convert_to=six.text_type,
     default="kubernetes_events.log",
     env_name="SCALYR_K8S_MESSAGE_LOG",
 )
@@ -125,7 +131,7 @@ define_config_option(
     "event_object_filter",
     "Optional (defaults to %s). A list of event object types to filter on. "
     "If set, only events whose `involvedObject` `kind` is on this list will be included."
-    % str(EVENT_OBJECT_FILTER_DEFAULTS),
+    % six.text_type(EVENT_OBJECT_FILTER_DEFAULTS),
     convert_to=ArrayOfStrings,
     default=EVENT_OBJECT_FILTER_DEFAULTS,
     env_name="SCALYR_K8S_EVENT_OBJECT_FILTER",
@@ -144,7 +150,7 @@ define_config_option(
     __monitor__,
     "leader_node",
     "Optional (defaults to None). Force the `leader` to be the scalyr-agent that runs on this node.",
-    convert_to=str,
+    convert_to=six.text_type,
     default=None,
     env_name="SCALYR_K8S_LEADER_NODE",
 )
@@ -314,7 +320,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         try:
             attributes = JsonObject({"monitor": "json"})
             self.log_config["attributes"] = attributes
-        except Exception, e:
+        except Exception as e:
             global_log.error(
                 "Error setting monitor attribute in KubernetesEventMonitor"
             )
@@ -353,12 +359,12 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             self.__max_log_rotations = default_rotation_count
 
         # Support legacy disabling of k8s_events via the K8S_EVENTS_DISABLE environment variable
-        k8s_events_disable_envar = os.environ.get("K8S_EVENTS_DISABLE")
+        k8s_events_disable_envar = compat.os_environ_unicode.get("K8S_EVENTS_DISABLE")
         if k8s_events_disable_envar is not None:
             global_log.warn(
                 "The K8S_EVENTS_DISABLE environment variable is deprecated. Please use SCALYR_K8S_EVENTS_DISABLE instead."
             )
-            legacy_disable = str(k8s_events_disable_envar).lower()
+            legacy_disable = six.text_type(k8s_events_disable_envar).lower()
         else:
             legacy_disable = "false"
 
@@ -395,9 +401,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 self.__disk_logger.setLevel(logging.INFO)
                 self.__disk_logger.propagate = False
                 success = True
-            except Exception, e:
+            except Exception as e:
                 global_log.error(
-                    "Unable to open KubernetesEventsMonitor log file: %s" % str(e)
+                    "Unable to open KubernetesEventsMonitor log file: %s"
+                    % six.text_type(e)
                 )
 
         return success
@@ -425,7 +432,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 retry_error_context=node,
                 retry_error_limit_key="k8se_check_if_alive",
             )
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node
             )
@@ -523,7 +530,9 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             # alive
             if self._check_labels:
                 query = "?labelSelector=%s" % (
-                    urllib.quote("agent.config.scalyr.com/events_leader_candidate=true")
+                    six.moves.urllib.parse.quote(
+                        "agent.config.scalyr.com/events_leader_candidate=true"
+                    )
                 )
                 new_leader = self._check_nodes_for_leader(k8s, query)
 
@@ -564,9 +573,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             )
             self._current_leader = None
             return None
-        except K8sApiException, e:
+        except K8sApiException as e:
             global_log.error(
-                "get current leader: %s, %s" % (str(e), traceback.format_exc())
+                "get current leader: %s, %s"
+                % (six.text_type(e), traceback.format_exc())
             )
 
         return self._current_leader
@@ -587,10 +597,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 leader = self._get_current_leader(k8s)
 
             # check if this node is the current leader node
-        except Exception, e:
+        except Exception as e:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_0,
-                "Unexpected error checking for leader: %s" % (str(e)),
+                "Unexpected error checking for leader: %s" % (six.text_type(e)),
             )
 
         return leader is not None and self._node_name == leader
@@ -676,7 +686,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             last_check = time.time() - self._leader_check_interval
 
             last_reported_leader = None
-            while not self._is_stopped():
+            while not self._is_thread_stopped():
                 current_time = time.time()
 
                 # if we are the leader, we could be going through this loop before the leader_check_interval
@@ -688,7 +698,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                         # if not, then sleep and try again
                         global_log.log(
                             scalyr_logging.DEBUG_LEVEL_1,
-                            "Leader is %s" % (str(self._current_leader)),
+                            "Leader is %s" % (six.text_type(self._current_leader)),
                         )
                         if (
                             self._current_leader is not None
@@ -696,7 +706,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                         ):
                             global_log.info(
                                 "Kubernetes event leader is %s"
-                                % str(self._current_leader)
+                                % six.text_type(self._current_leader)
                             )
                             last_reported_leader = self._current_leader
                         if k8s_cache is not None:
@@ -707,7 +717,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
 
                     global_log.log(
                         scalyr_logging.DEBUG_LEVEL_1,
-                        "Leader is %s" % (str(self._current_leader)),
+                        "Leader is %s" % (six.text_type(self._current_leader)),
                     )
                 try:
                     if last_reported_leader != self._current_leader:
@@ -725,10 +735,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                     for line in lines:
                         try:
                             json = scalyr_util.json_decode(line)
-                        except Exception, e:
+                        except Exception as e:
                             global_log.warning(
                                 "Error parsing event json: %s, %s, %s"
-                                % (line, str(e), traceback.format_exc())
+                                % (line, six.text_type(e), traceback.format_exc())
                             )
                             continue
 
@@ -781,7 +791,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 global_log.log(
                                     scalyr_logging.DEBUG_LEVEL_1,
                                     "Ignoring event due to unknown kind %s - %s"
-                                    % (kind, str(metadata)),
+                                    % (kind, six.text_type(metadata)),
                                 )
                                 continue
 
@@ -830,8 +840,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                             self.__disk_logger.info(
                                 "event=%s extra=%s"
                                 % (
-                                    str(scalyr_util.json_encode(obj)),
-                                    str(scalyr_util.json_encode(extra_fields)),
+                                    six.text_type(scalyr_util.json_encode(obj)),
+                                    six.text_type(
+                                        scalyr_util.json_encode(extra_fields)
+                                    ),
                                 )
                             )
 
@@ -843,10 +855,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                                 )
                                 break
 
-                        except Exception, e:
+                        except Exception as e:
                             global_log.exception(
                                 "Failed to process single k8s event line due to following exception: %s, %s, %s"
-                                % (repr(e), str(e), traceback.format_exc()),
+                                % (repr(e), six.text_type(e), traceback.format_exc()),
                                 limit_once_per_x_secs=300,
                                 limit_key="k8s-stream-events-general-exception",
                             )
@@ -865,10 +877,10 @@ class KubernetesEventsMonitor(ScalyrMonitor):
                 except ConnectionError:
                     # ignore these, and just carry on querying in the next loop
                     pass
-                except Exception, e:
+                except Exception as e:
                     global_log.exception(
                         "Failed to stream k8s events due to the following exception: %s, %s, %s"
-                        % (repr(e), str(e), traceback.format_exc())
+                        % (repr(e), six.text_type(e), traceback.format_exc())
                     )
 
             if k8s_cache is not None:

@@ -15,6 +15,8 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
@@ -26,6 +28,8 @@ import scalyr_agent.util as scalyr_util
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClockCounter
+
+import six
 
 
 class MonitorsManagerTest(ScalyrTestCase):
@@ -275,7 +279,7 @@ class MonitorsManagerTest(ScalyrTestCase):
 
         def mock_get_user_agent_fragment_2():
             fragment_polls.increment()
-            return test_frag + str(fragment_polls.count())
+            return test_frag + six.text_type(fragment_polls.count())
 
         for mon in [patched_monitor_0, patched_monitor_1]:
             mon.get_user_agent_fragment = mock_get_user_agent_fragment_2

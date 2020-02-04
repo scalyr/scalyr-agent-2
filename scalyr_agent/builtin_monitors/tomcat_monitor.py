@@ -17,12 +17,17 @@
 #
 # Note, this can be run in standalone mode by:
 #     python -m scalyr_agent.run_monitor scalyr_agent.builtin_monitors.tomcat_monitor
-import httplib
-import urllib2
+from __future__ import unicode_literals
+from __future__ import absolute_import
+from __future__ import print_function
+
 import socket
-import urlparse
 import base64
 import re
+
+import six.moves.urllib.parse
+import six.moves.http_client
+import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -50,26 +55,26 @@ define_config_option(
     "Allows you to distinguish between values recorded by different monitors. This is especially "
     "useful if you are running multiple PostgreSQL instances on a single server; you can monitor each "
     "instance with a separate tomcatql_monitor record in the Scalyr Agent configuration.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_url",
     "Name of host machine the agent will connect to PostgreSQL to retrieve monitoring data.",
-    convert_to=str,
+    convert_to=six.text_type,
     required_option=True,
 )
 define_config_option(
     __monitor__,
     "monitor_user",
     "The username required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
     "monitor_password",
     "The pasword associated with the monitor_user required to access the monitor URL.",
-    convert_to=str,
+    convert_to=six.text_type,
 )
 define_config_option(
     __monitor__,
@@ -239,7 +244,7 @@ define_log_field(__monitor__, "value", "The metric value.")
 # Note - the use of a global is ugly, but this form is more compatible than with another
 # method mentioned which would not require the global.  (The cleaner version was added
 # in Python 2.7.)
-class BindableHTTPConnection(httplib.HTTPConnection):
+class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
     def connect(self):
         """Connect to the host and port specified in __init__."""
         self.sock = socket.socket()
@@ -258,7 +263,7 @@ def BindableHTTPConnectionFactory(source_ip):
     return _get
 
 
-class BindableHTTPHandler(urllib2.HTTPHandler):
+class BindableHTTPHandler(six.moves.urllib.request.HTTPHandler):
     def http_open(self, req):
         return self.do_open(BindableHTTPConnectionFactory(httpSourceAddress), req)
 
@@ -270,7 +275,7 @@ def _convert_to_megabytes(value):
     if len(parts) < 2:
         return None
     scale_multiplier = {"kb": 0.001, "mb": 1.0, "gb": 1000.0, "tb": 1000000.0}
-    if parts[1].lower() not in scale_multiplier.keys():
+    if parts[1].lower() not in list(scale_multiplier.keys()):
         return None
     multiplier = scale_multiplier[parts[1].lower()]
     try:
@@ -278,7 +283,7 @@ def _convert_to_megabytes(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception, e:
+    except Exception as e:
         return None
     return val * multiplier
 
@@ -293,7 +298,7 @@ def _convert_to_milliseconds(value):
         "s": 1000.0,
         "ms": 1.0,
     }
-    if parts[1].lower() not in scale_multiplier.keys():
+    if parts[1].lower() not in list(scale_multiplier.keys()):
         return None
     multiplier = scale_multiplier[parts[1].lower()]
     try:
@@ -301,7 +306,7 @@ def _convert_to_milliseconds(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception, e:
+    except Exception as e:
         return None
     return val * multiplier
 
@@ -412,8 +417,8 @@ instance."""
         data = None
         # verify that the URL is valid
         try:
-            testurl = urlparse.urlparse(url)
-        except Exception, e:
+            testurl = six.moves.urllib.parse.urlparse(url)
+        except Exception as e:
             print(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % url
@@ -421,16 +426,16 @@ instance."""
             return data
         # attempt to request server status
         try:
-            request = urllib2.Request(self._monitor_url)
+            request = six.moves.urllib.request.Request(self._monitor_url)
             if self._monitor_user != None:
                 b64cred = base64.encodestring(
                     "%s:%s" % (self._monitor_user, self._monitor_password)
                 ).replace("\n", "")
                 request.add_header("Authorization", "Basic %s" % b64cred)
-            opener = urllib2.build_opener(BindableHTTPHandler)
+            opener = six.moves.urllib.request.build_opener(BindableHTTPHandler)
             handle = opener.open(request)
             data = handle.read()
-        except urllib2.HTTPError, err:
+        except six.moves.urllib.error.HTTPError as err:
             message = (
                 "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ",
                 err.code,
@@ -446,7 +451,7 @@ instance."""
                 )
             self._logger.error(message)
             data = None
-        except urllib2.URLError, err:
+        except six.moves.urllib.error.URLError as err:
             message = (
                 "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
                 err,
@@ -458,7 +463,7 @@ instance."""
                 )
             self._logger.error(message)
             data = None
-        except Exception, e:
+        except Exception as e:
             self._logger.error(
                 "An error occurred attempting to request the server status: %s" % e
             )
@@ -682,16 +687,6 @@ instance."""
     def gather_sample(self):
         """Invoked once per sample interval to gather a statistic.
         """
-
-        def get_value_as_str(value):
-            if type(value) is int:
-                return "%d" % value
-            elif type(value) is float:
-                return "%f" % value
-            elif type(value) is str:
-                return "%r" % value
-            else:
-                return "%r" % value
 
         status = self._get_status(self._monitor_url)
         if status != None:

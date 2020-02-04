@@ -20,14 +20,18 @@
 # https://www.scalyr.com/help/creating-a-monitor-plugin
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
+__author__ = "czerwin@scalyr.com"
+
 import inspect
 import os
 import sys
 import time
-
-__author__ = "czerwin@scalyr.com"
-
 from threading import Lock
+
+import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -248,7 +252,7 @@ class ScalyrMonitor(StoppableThread):
         """
         # noinspection PyBroadException
         try:
-            while not self._is_stopped():
+            while not self._is_thread_stopped():
                 # noinspection PyBroadException
                 adjustment = 0
                 try:
@@ -381,7 +385,8 @@ class ScalyrMonitor(StoppableThread):
             self._logger.closeMetricLog()
             self.__metric_log_open = False
 
-    def _is_stopped(self):
+    # 2->TODO '_is_stopped' name is reserved in python3
+    def _is_thread_stopped(self):
         """Returns whether or not the "stop" method has been invoked."""
         return not self._run_state.is_running()
 
@@ -406,8 +411,8 @@ def load_monitor_class(module_name, additional_python_paths):
     @param additional_python_paths: A list of paths (separate by os.pathsep) to add to the PYTHONPATH when
         instantiating the module in case it needs to read other packages.
 
-    @type module_name: str
-    @type additional_python_paths: str
+    @type module_name: six.text_type
+    @type additional_python_paths: six.text_type
 
     @return: A tuple containing the class for the monitor and the MonitorInformation object for it.
     @rtype: (class, MonitorInformation)
@@ -434,7 +439,7 @@ def load_monitor_class(module_name, additional_python_paths):
             value = getattr(module, attr)
             if not inspect.isclass(value):
                 continue
-            if "ScalyrMonitor" in str(value.__bases__):
+            if "ScalyrMonitor" in six.text_type(value.__bases__):
                 MonitorInformation.set_monitor_info(
                     module_name, description=value.__doc__
                 )
@@ -471,11 +476,11 @@ def define_config_option(
     @param required_option: If True, then this is option considered to be required and when the configuration
         is parsed for the monitor, a BadMonitorConfiguration exception if the field is not present.
     @param convert_to: If not None, then will convert the value for the option to the specified type. Only int,
-        bool, float, long, str, and unicode are supported. If the type conversion cannot be done, a
+        bool, float, long, and six.text_type are supported. If the type conversion cannot be done, a
         BadMonitorConfiguration exception is raised during configuration parsing. The only true conversions allowed are
-        those from str, unicode value to other types such as int, bool, long, float. Trivial conversions are allowed
+        those from six.text_type value to other types such as int, bool, long, float. Trivial conversions are allowed
         from int, long to float, but not the other way around. Additionally, any primitive type can be converted to
-        str, unicode.
+        six.text_type.
     @param default: The value to assign to the option if the option is not present in the configuration. This is
         ignored if 'required_option' is True.
     @param max_value: If not None, the maximum allowed value for option. Raises a BadMonitorConfiguration if the
@@ -532,13 +537,13 @@ def define_metric(
     @param category: The category of the metric.  Each category will get its own table when printing the documentation.
         This should be used when there are many metrics and they need to be broken down into smaller groups.
 
-    @type monitor_module: str
-    @type metric_name: str
-    @type description: str
+    @type monitor_module: six.text_type
+    @type metric_name: six.text_type
+    @type description: six.text_type
     @type extra_fields: dict
-    @type unit: str
+    @type unit: six.text_type
     @type cumulative: bool
-    @type category: str
+    @type category: six.text_type
     """
 
     info = MetricDescription()
@@ -594,7 +599,7 @@ class MonitorInformation(object):
         """Returns the module the monitor is defined in.
 
         @return: The module the monitor is defined in.
-        @rtype: str
+        @rtype: six.text_type
         """
         return self.__monitor_module
 
@@ -603,7 +608,7 @@ class MonitorInformation(object):
         """Returns a description for the monitor using markdown.
 
         @return: The description
-        @rtype: str
+        @rtype: six.text_type
         """
         return self.__description
 
@@ -614,7 +619,9 @@ class MonitorInformation(object):
         @return: A list of the options
         @rtype: list of ConfigOption
         """
-        return sorted(self.__options.itervalues(), key=self.__get_insert_sort_position)
+        return sorted(
+            six.itervalues(self.__options), key=self.__get_insert_sort_position
+        )
 
     @property
     def metrics(self):
@@ -623,7 +630,9 @@ class MonitorInformation(object):
         @return: A list of metric descriptions
         @rtype: list of MetricDescription
         """
-        return sorted(self.__metrics.itervalues(), key=self.__get_insert_sort_position)
+        return sorted(
+            six.itervalues(self.__metrics), key=self.__get_insert_sort_position
+        )
 
     @property
     def log_fields(self):
@@ -633,7 +642,7 @@ class MonitorInformation(object):
         @rtype: list of LogFieldDescription
         """
         return sorted(
-            self.__log_fields.itervalues(), key=self.__get_insert_sort_position
+            six.itervalues(self.__log_fields), key=self.__get_insert_sort_position
         )
 
     def __get_insert_sort_position(self, item):
@@ -664,8 +673,8 @@ class MonitorInformation(object):
         @param metric: If not None, adds the specified metric description to the monitor's information.
         @param log_field: If not None, adds the specified log field description to the monitor's information.
 
-        @type monitor_module: str
-        @type description: str
+        @type monitor_module: six.text_type
+        @type description: six.text_type
         @type option: ConfigOption
         @type metric: MetricDescription
         @type log_field: LogFieldDescription
@@ -694,7 +703,7 @@ class MonitorInformation(object):
                 # If there are extra fields, we use that as part of the key name to store the metric under to
                 # avoid collisions with the same metric but different extra fields registered.
                 info.__metrics[
-                    "%s%s" % (metric.metric_name, str(metric.extra_fields))
+                    "%s%s" % (metric.metric_name, six.text_type(metric.extra_fields))
                 ] = metric
             # Stash a position attribute to capture what the insert order was for the metrics.
             setattr(metric, "sort_pos", info.__counter)
@@ -709,7 +718,7 @@ class MonitorInformation(object):
         """Returns the MonitorInformation object for the monitor defined in ``monitor_module``.
 
         @param monitor_module: The module the monitor is defined in.
-        @type monitor_module: str
+        @type monitor_module: six.text_type
 
         @return: The information for the specified monitor, or none if it has not been loaded.
         @rtype: MonitorInformation
@@ -856,11 +865,11 @@ class MonitorConfig(object):
         @param required_field: If True, then will raise a BadMonitorConfiguration exception if the field is not
             present.
         @param convert_to: If not None, then will convert the value for the field to the specified type. Only int,
-            bool, float, long, str, and unicode are supported. If the type conversion cannot be done, a
+            bool, float, long, and six.text_type are supported. If the type conversion cannot be done, a
             BadMonitorConfiguration exception is raised. The only conversions allowed are those mapped out in
             ALLOWED_CONVERSIONS. Trivial conversions are allowed from int, long to
-            float, but not the other way around. Additionally, any primitive type can be converted to str, unicode.
-            str, unicode can be converted to complex types such as ArrayOfStrings, JsonArray, JsonObject as long as
+            float, but not the other way around. Additionally, any primitive type can be converted to six.text_type.
+            six.text_type can be converted to complex types such as ArrayOfStrings, JsonArray, JsonObject as long as
             they can be correctly parsed.
         @param default: The value to return if the field is not present in the configuration. This is ignored if
             'required_field' is True.
@@ -918,47 +927,47 @@ class MonitorConfig(object):
             if max_value is not None and result > max_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; maximum is %s'
-                    % (str(result), field, str(max_value)),
+                    % (six.text_type(result), field, six.text_type(max_value)),
                     field,
                 )
 
             if min_value is not None and result < min_value:
                 raise BadMonitorConfiguration(
                     'Value of %s in field "%s" is invalid; minimum is %s'
-                    % (str(result), field, str(min_value)),
+                    % (six.text_type(result), field, six.text_type(min_value)),
                     field,
                 )
 
             return result
-        except BadConfiguration, e:
+        except BadConfiguration as e:
             raise BadMonitorConfiguration(message=e.message, field=e.field)
 
     def __iter__(self):
-        return self.__map.iterkeys()
+        return six.iterkeys(self.__map)
 
     def iteritems(self):
         """Returns an iterator over the items (key/value tuple) for this object."""
-        return self.__map.iteritems()
+        return six.iteritems(self.__map)
 
     def itervalues(self):
         """Returns an iterator over the values for this object."""
-        return self.__map.itervalues()
+        return six.itervalues(self.__map)
 
     def iterkeys(self):
         """Returns an iterator over the keys for this object."""
-        return self.__map.iterkeys()
+        return six.iterkeys(self.__map)
 
     def items(self):
         """Returns a list of items (key/value tuple) for this object."""
-        return self.__map.items()
+        return list(self.__map.items())
 
     def values(self):
         """Returns a list of values for this object."""
-        return self.__map.values()
+        return list(self.__map.values())
 
     def keys(self):
         """Returns a list keys for this object."""
-        return self.__map.keys()
+        return list(self.__map.keys())
 
     def __getitem__(self, field):
         if not field in self:

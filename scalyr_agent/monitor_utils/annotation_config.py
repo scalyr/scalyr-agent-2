@@ -14,7 +14,12 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+from __future__ import unicode_literals
+from __future__ import absolute_import
+
 __author__ = "imron@scalyr.com"
+
+import six
 
 import re
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -136,7 +141,7 @@ def process_annotations(
 
     # first split out any scalyr log-config annotations
     items = {}
-    for annotation_key, annotation_value in annotations.iteritems():
+    for annotation_key, annotation_value in six.iteritems(annotations):
         m = annotation_prefix_re.match(annotation_key)
         if m:
             key = m.group(2)
@@ -155,7 +160,6 @@ def process_annotations(
 
 def _is_int(string):
     """Returns true or false depending on whether or not the passed in string can be converted to an int"""
-    result = False
     try:
         value = int(string)
         result = True
@@ -174,8 +178,8 @@ def _process_annotation_items(items, hyphens_as_underscores):
         m = SCALYR_ANNOTATION_ELEMENT_RE.match(key)
         if m:
             root_key = m.group(1)
-            if _is_int(root_key):
-                return int(root_key)
+            # 2->TODO Python3 does not support mixed types sorting.
+            #  One of the solutions is to keep all keys as strings, and sort them lexicographically.
             return root_key
 
         return key
@@ -210,7 +214,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
 
     # sort dict by the value of the first sub key (up to the first '.')
     # this ensures that all items of the same key are processed together
-    sorted_items = sorted(items.iteritems(), key=sort_annotation)
+    sorted_items = sorted(six.iteritems(items), key=sort_annotation)
 
     current_object = None
     previous_key = None
@@ -233,7 +237,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
             if is_object == is_array:
                 raise BadAnnotationConfig(
                     "Annotation cannot be both a dict and a list for '%s'.  Current key: %s, previous key: %s"
-                    % (key, str(root_key), str(previous_key))
+                    % (key, six.text_type(root_key), six.text_type(previous_key))
                 )
 
             # create an empty object if None exists
@@ -263,7 +267,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
             if is_object == is_array:
                 raise BadAnnotationConfig(
                     "Annotation cannot be both a dict and a list.  Current key: %s, previous key: %s"
-                    % (key, str(previous_key))
+                    % (key, six.text_type(previous_key))
                 )
 
             # if there was a previous key
@@ -290,7 +294,7 @@ def _process_annotation_items(items, hyphens_as_underscores):
     # if the result should be an array, return values as a JsonArray, sorted by numeric order of keys
     if is_array:
         result = JsonArray(
-            *[r[1] for r in sorted(result.iteritems(), key=sort_numeric)]
+            *[r[1] for r in sorted(six.iteritems(result), key=sort_numeric)]
         )
     else:
         # return values as a JsonObject

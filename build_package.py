@@ -23,6 +23,9 @@
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 __author__ = "czerwin@scalyr.com"
 
 import errno
@@ -46,6 +49,13 @@ from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_ini
 
 scalyr_init()
 
+# [start of 2->TODO]
+# Check for suitability.
+# Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+from six.moves import range
+
+# [end of 2->TOD0]
+
 # The root of the Scalyr repository should just be the parent of this file.
 __source_root__ = get_install_root()
 
@@ -61,7 +71,7 @@ PACKAGE_TYPES = [
 ]
 
 
-def build_package(package_type, variant, no_versioned_file_name):
+def build_package(package_type, variant, no_versioned_file_name, coverage_enabled):
     """Builds the scalyr-agent-2 package specified by the arguments.
 
     The package is left in the current working directory.  The file name of the
@@ -73,6 +83,7 @@ def build_package(package_type, variant, no_versioned_file_name):
         as 'rpm').
     @param no_versioned_file_name:  If True, will not embed a version number in the resulting artifact's file name.
         This only has an affect if building one of the tarball formats.
+    @param coverage_enabled: If True, enables coverage analysis. Patches Dockerfile to run agent with coverage.
 
     @return: The file name of the produced package.
     """
@@ -106,6 +117,7 @@ def build_package(package_type, variant, no_versioned_file_name):
                 "docker/docker-syslog-config",
                 "scalyr-docker-agent-syslog",
                 ["scalyr/scalyr-agent-docker-syslog", "scalyr/scalyr-agent-docker"],
+                coverage_enabled=coverage_enabled,
             )
         elif package_type == "docker_json_builder":
             # An image for running on Docker configured to fetch logs via the file system (the container log
@@ -120,6 +132,7 @@ def build_package(package_type, variant, no_versioned_file_name):
                 "docker/docker-json-config",
                 "scalyr-docker-agent-json",
                 ["scalyr/scalyr-agent-docker-json"],
+                coverage_enabled=coverage_enabled,
             )
         elif package_type == "k8s_builder":
             # An image for running the agent on Kubernetes.
@@ -132,6 +145,7 @@ def build_package(package_type, variant, no_versioned_file_name):
                 "docker/k8s-config",
                 "scalyr-k8s-agent",
                 ["scalyr/scalyr-k8s-agent"],
+                coverage_enabled=coverage_enabled,
             )
         else:
             assert package_type in ("deb", "rpm")
@@ -169,9 +183,14 @@ def build_win32_installer_package(variant, version):
     @return: The file name of the built package.
     """
     if os.getenv("WIX") is None:
-        print >> sys.stderr, "Error, the WIX toolset does not appear to be installed."
-        print >> sys.stderr, "Please install it to build the Windows Scalyr Agent installer."
-        print >> sys.stderr, "See http://wixtoolset.org."
+        print(
+            "Error, the WIX toolset does not appear to be installed.", file=sys.stderr
+        )
+        print(
+            "Please install it to build the Windows Scalyr Agent installer.",
+            file=sys.stderr,
+        )
+        print("See http://wixtoolset.org.", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -179,10 +198,19 @@ def build_win32_installer_package(variant, version):
     except ImportError:
         # noinspection PyUnusedLocal
         psutil = None
-        print >> sys.stderr, "Error, the psutil Python module is not installed.  This is required to build the"
-        print >> sys.stderr, "Windows version of the Scalyr Agent.  Please download and install it."
-        print >> sys.stderr, "See http://pythonhosted.org/psutil/"
-        print >> sys.stderr, 'On many systems, executing "pip install psutil" will install the package.'
+        print(
+            "Error, the psutil Python module is not installed.  This is required to build the",
+            file=sys.stderr,
+        )
+        print(
+            "Windows version of the Scalyr Agent.  Please download and install it.",
+            file=sys.stderr,
+        )
+        print("See http://pythonhosted.org/psutil/", file=sys.stderr)
+        print(
+            'On many systems, executing "pip install psutil" will install the package.',
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     make_directory("source_root")
@@ -508,6 +536,7 @@ def build_container_builder(
     base_configs,
     image_name,
     image_repos,
+    coverage_enabled=False,
 ):
     """Builds an executable script in the current working directory that will build the container image for the various
     Docker and Kubernetes targets.  This script embeds all assets it needs in it so it can be a standalone artifact.
@@ -529,6 +558,7 @@ def build_container_builder(
     @param image_name:  The name for the image that is being built.  Will be used for the artifact's name.
     @param image_repos:  A list of repositories that should be added as tags to the image once it is built.
         Each repository will have two tags added -- one for the specific agent version and one for `latest`.
+    @param coverage_enabled: Path Dockerfile to run agent with enabled coverage.
 
     @return: The file name of the built artifact.
     """
@@ -572,6 +602,22 @@ def build_container_builder(
     # rethink this.
     tar_out = StringIO()
     tar = tarfile.open("assets.tar.gz", "w|gz", tar_out)
+
+    # if coverage enabled patch Dockerfile to install coverage package with pip.
+    if coverage_enabled:
+        with open("Dockerfile", "r") as file:
+            data = file.read()
+        new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage==4.5.4", data)
+        new_dockerfile_source = re.sub(
+            r"CMD .*\n",
+            'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
+            '"--no-fork", "--no-change-user", "start"]',
+            new_dockerfile_source,
+        )
+
+        with open("Dockerfile", "w") as file:
+            file.write(new_dockerfile_source)
+
     tar.add("Dockerfile")
     tar.add(source_tarball)
     tar.close()
@@ -812,7 +858,6 @@ def build_base_files(base_configs="config"):
     shutil.copy(
         make_path(agent_source_root, "VERSION"), os.path.join("scalyr_agent", "VERSION")
     )
-
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
     #
@@ -882,7 +927,7 @@ def make_directory(path):
     converted_path = convert_path(path)
     try:
         os.makedirs(converted_path)
-    except OSError, error:
+    except OSError as error:
         if error.errno == errno.EEXIST and os.path.isdir(converted_path):
             pass
         else:
@@ -1140,22 +1185,24 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
 
         if return_code != 0 and not fail_quietly:
             if command_name is not None:
-                print >> sys.stderr, "Executing %s failed and returned a non-zero result of %d" % (
-                    command_name,
-                    return_code,
+                print(
+                    "Executing %s failed and returned a non-zero result of %d"
+                    % (command_name, return_code,),
+                    file=sys.stderr,
                 )
             else:
-                print >> sys.stderr, (
+                print(
                     "Executing the following command failed and returned a non-zero result of %d"
-                    % return_code
+                    % return_code,
+                    file=sys.stderr,
                 )
-                print >> sys.stderr, '  Command: "%s"' % command_str
+                print('  Command: "%s"' % command_str, file=sys.stderr)
 
-            print >> sys.stderr, "The output was:"
-            print >> sys.stderr, output_str
+            print("The output was:", file=sys.stderr)
+            print(output_str, file=sys.stderr)
 
             if exit_on_fail:
-                print >> sys.stderr, "Exiting due to failure."
+                print("Exiting due to failure.", file=sys.stderr)
                 sys.exit(1)
 
         return return_code, output_str
@@ -1299,10 +1346,10 @@ def create_change_logs():
                 # If a sublist, then recursively call this function, increasing the level.
                 print_release_notes(output_fp, note, level_prefixes, level + 1)
                 if level == 0:
-                    print >> output_fp
+                    print(file=output_fp)
             else:
                 # Otherwise emit the note with the prefix for this level.
-                print >> output_fp, "%s%s" % (prefix, note)
+                print("%s%s" % (prefix, note), file=output_fp)
 
     # Handle the RPM log first.  We parse CHANGELOG.md and then emit the notes in the expected format.
     fp = open("changelog-rpm", "w")
@@ -1312,19 +1359,23 @@ def create_change_logs():
 
             # RPM expects the leading line for a relesae to start with an asterisk, then have
             # the name of the person doing the release, their e-mail and then the version.
-            print >> fp, "* %s %s <%s> %s" % (
-                date_str,
-                release["packager"],
-                release["packager_email"],
-                release["version"],
+            print(
+                "* %s %s <%s> %s"
+                % (
+                    date_str,
+                    release["packager"],
+                    release["packager_email"],
+                    release["version"],
+                ),
+                file=fp,
             )
-            print >> fp
-            print >> fp, "Release: %s (%s)" % (release["version"], release["name"])
-            print >> fp
+            print(file=fp)
+            print("Release: %s (%s)" % (release["version"], release["name"]), file=fp)
+            print(file=fp)
             # Include the release notes, with the first level with no indent, an asterisk for the second level
             # and a dash for the third.
             print_release_notes(fp, release["notes"], ["", " * ", "   - "])
-            print >> fp
+            print(file=fp)
     finally:
         fp.close()
 
@@ -1337,14 +1388,16 @@ def create_change_logs():
             date_str = time.strftime(
                 "%a, %d %b %Y %H:%M:%S %z", time.localtime(release["time"])
             )
-            print >> fp, "scalyr-agent-2 (%s) stable; urgency=low" % release["version"]
+            print(
+                "scalyr-agent-2 (%s) stable; urgency=low" % release["version"], file=fp
+            )
             # Include release notes with an indented first level (using asterisk, then a dash for the next level,
             # finally a plus sign.
             print_release_notes(fp, release["notes"], [" * ", "   - ", "     + "])
-            print >> fp, "-- %s <%s>  %s" % (
-                release["packager"],
-                release["packager_email"],
-                date_str,
+            print(
+                "-- %s <%s>  %s"
+                % (release["packager"], release["packager_email"], date_str,),
+                file=fp,
             )
     finally:
         fp.close()
@@ -1534,7 +1587,7 @@ def parse_change_log():
 
         try:
             time_value = parse_date(packager_info.group(3))
-        except ValueError, err:
+        except ValueError as err:
             raise BadChangeLogFormat(err.message)
 
         releases.append(
@@ -1573,7 +1626,7 @@ def get_build_info():
         )
         if rc != 0:
             packager_email = "unknown"
-        print >> build_info_buffer, "Packaged by: %s" % packager_email.strip()
+        print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
         # Determine the last commit from the log.
         (_, commit_id) = run_command(
@@ -1581,17 +1634,18 @@ def get_build_info():
             exit_on_fail=True,
             command_name="git",
         )
-        print >> build_info_buffer, "Latest commit: %s" % commit_id.strip()
+        print("Latest commit: %s" % commit_id.strip(), file=build_info_buffer)
 
         # Include the branch just for safety sake.
         (_, branch) = run_command(
             "git branch | cut -d ' ' -f 2", exit_on_fail=True, command_name="git"
         )
-        print >> build_info_buffer, "From branch: %s" % branch.strip()
+        print("From branch: %s" % branch.strip(), file=build_info_buffer)
 
         # Add a timestamp.
-        print >> build_info_buffer, "Build time: %s" % strftime(
-            "%Y-%m-%d %H:%M:%S UTC", gmtime()
+        print(
+            "Build time: %s" % strftime("%Y-%m-%d %H:%M:%S UTC", gmtime()),
+            file=build_info_buffer,
         )
 
         __build_info__ = build_info_buffer.getvalue()
@@ -1671,32 +1725,45 @@ if __name__ == "__main__":
         "itself.  The file should be one built by a previous run of this script.",
     )
 
+    parser.add_option(
+        "",
+        "--coverage",
+        dest="coverage",
+        action="store_true",
+        default=False,
+        help="Enable coverage analysis. Can be used in smoketests. Only works with docker/k8s.",
+    )
+
     (options, args) = parser.parse_args()
     # If we are just suppose to create the build_info, then do it and exit.  We do not bother to check to see
     # if they specified a package.
     if options.build_info_only:
         write_to_file(get_build_info(), "build_info")
-        print "Built build_info"
+        print("Built build_info")
         sys.exit(0)
 
     if len(args) < 1:
-        print >> sys.stderr, "You must specify the package you wish to build, one of the following: %s." % ", ".join(
-            PACKAGE_TYPES
+        print(
+            "You must specify the package you wish to build, one of the following: %s."
+            % ", ".join(PACKAGE_TYPES),
+            file=sys.stderr,
         )
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif len(args) > 1:
-        print >> sys.stderr, "You may only specify one package to build."
+        print("You may only specify one package to build.", file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
     elif args[0] not in PACKAGE_TYPES:
-        print >> sys.stderr, 'Unknown package type given: "%s"' % args[0]
+        print('Unknown package type given: "%s"' % args[0], file=sys.stderr)
         parser.print_help(sys.stderr)
         sys.exit(1)
 
     if options.build_info is not None:
         set_build_info(options.build_info)
 
-    artifact = build_package(args[0], options.variant, options.no_versioned_file_name)
-    print "Built %s" % artifact
+    artifact = build_package(
+        args[0], options.variant, options.no_versioned_file_name, options.coverage,
+    )
+    print("Built %s" % artifact)
     sys.exit(0)
