@@ -10,6 +10,7 @@ ecdsa==0.13.2
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1
+requests==2.15.1
 docker==4.1.0
 coverage==4.5.4
 

@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y build-essential git bash
 RUN mkdir -p /tmp/scalyr/src
 
 # install python dependencies
-RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi docker==4.1.0
+RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi requests==2.15.1 docker==4.1.0
 
 # clone the source from the master branch of the main scalyr repository
 WORKDIR /tmp/scalyr
