@@ -29,6 +29,9 @@ from your servers.
 
 We also welcome submissions from the community.
 
+For information on the agent architecture and code abstractions, please refer to the
+[architecture.md](docs/architecture.md) document.
+
 ## Monitor plugins
 
 Monitor plugins are one of the key features for Scalyr Agent 2.  These plugins can be used to augment the
