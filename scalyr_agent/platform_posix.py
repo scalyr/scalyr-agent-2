@@ -600,6 +600,11 @@ class PosixPlatformController(PlatformController):
         """
         self._log_init_debug("Starting agent %s" % scalyr_util.get_pid_tid())
 
+        # NOTE: Other code calls "_log_init_debug" method which is responsible for buffering the
+        # log lines until the agent initialization phase has finished.
+        # We don't need to do that and can use a regular logger object inside the signal handlers,
+        # because by the time signal handlers are set up and signal handler function is called,
+        # agent and logging initialization process is already completed.
         logger = scalyr_logging.getLogger("scalyr_agent")
 
         # noinspection PyUnusedLocal
