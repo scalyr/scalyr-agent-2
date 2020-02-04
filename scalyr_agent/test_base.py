@@ -20,11 +20,17 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
+from io import open
+
 __author__ = "czerwin@scalyr.com"
 
+import os
 import sys
+import re
+import shutil
 import threading
 import time
+import tempfile
 import unittest
 import scalyr_agent.scalyr_logging as scalyr_logging
 
@@ -33,6 +39,9 @@ import six
 from scalyr_agent.util import StoppableThread
 
 PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
+
+# Need so we can patch print() function for test purposes under both, Python 2 and 3
+print = print
 
 
 def _noop_skip(reason):
@@ -153,7 +162,6 @@ class BaseScalyrTestCase(unittest.TestCase):
 
 
 if sys.version_info[:2] < (2, 7):
-
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -211,7 +219,6 @@ if sys.version_info[:2] < (2, 7):
 
 
 else:
-
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -241,3 +248,151 @@ else:
 
         def assertLess(self, a, b, msg=None):
             unittest.TestCase.assertLess(self, a, b, msg=msg)
+
+
+class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
+    """
+    Base test class which captures log data produced by code called inside the tests into the log
+    files created in "directory_path" directory as defined by that class variable.
+
+    Directory available via "directory_path" variable is automatically created in a secure random
+    fashion for each test invocation inside setUp() method.
+
+    In addition to creating this directory, this method also sets up agent logging so it logs to
+    files in that directory.
+
+    On tearDown() the log directory is removed if tests pass and assertion hasn't failed, but if the
+    assertion fails, directory is left in place so developer can inspect the log content which might
+    aid with test troubleshooting.
+    """
+    # Path to the directory with the agent logs
+    logs_directory = None  # type: Optional[str]
+
+    # Path to the main agent log file
+    agent_log_path = None  # type: Optional[str]
+
+    # Path to the agent debug log file (populated inside setUp()
+    agent_debug_log_path = None  # type: Optional[str]
+
+    # Variable which indicates if assertLogFileContainsLine assertion was used and it fails
+    # NOTE: Due to us needing to support multiple Python versions and test runners, there is no easy
+    # and simple test runner agnostic way of detecting if tests have failed
+    __assertion_failed = False  # type: bool
+
+    def setUp(self):
+        super(BaseScalyrLogCaptureTestCase, self).setUp()
+
+        self.logs_directory = tempfile.mkdtemp(suffix='agent-tests-log')
+
+        scalyr_logging.set_log_destination(
+            use_disk=True,
+            logs_directory=self.logs_directory,
+            agent_log_file_path='agent.log',
+            agent_debug_log_file_suffix='_debug'
+        )
+        scalyr_logging.__log_manager__.set_log_level(scalyr_logging.DEBUG_LEVEL_5)
+
+        self.agent_log_path = os.path.join(self.logs_directory, 'agent.log')
+        self.agent_debug_log_path = os.path.join(self.logs_directory, 'agent_debug.log')
+
+    def tearDown(self):
+        super(BaseScalyrLogCaptureTestCase, self).tearDown()
+
+        if self.__assertion_failed:
+            # Print the paths to which we store the output to so they can be introspected by the
+            # developer
+            test_name = self._testMethodName
+            print('Stored agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
+            print('Stored agent debug log file for test "%s" to: %s' % (test_name,
+                                                                        self.agent_debug_log_path))
+
+        if not self.__assertion_failed:
+            shutil.rmtree(self.logs_directory)
+
+    def assertLogFileContainsLineRegex(self, expression, file_path=None):
+        """
+        Custom assertion function which asserts that the provided log file path contains a line
+        which matches the provided line regular expression.
+
+        Keep in mind that this function is line oriented. If you want to perform assertion across
+        multiple lines, you should use "assertLogFileContainsRegex".
+
+        :param expression: Regular expression to match against each line in the file.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
+        """
+        file_path = file_path or self.agent_log_path
+
+        if not self._file_contains_line_regex(file_path=file_path, expression=expression):
+            self.__assertion_failed = True
+            self.fail('File "%s" doesn\'t contain "%s" line expression' % (file_path, expression))
+
+    def assertLogFileDoesntContainsLineRegex(self, expression, file_path=None):
+        """
+        Custom assertion function which asserts that the provided log file path doesn\'t contains a
+        line which matches the provided line regular expression.
+
+        Keep in mind that this function is line oriented. If you want to perform assertion across
+        multiple lines, you should use "assertLogFileDoesntContainsRegex".
+
+        :param expression: Regular expression to match against each line in the file.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
+        """
+        file_path = file_path or self.agent_log_path
+
+        if self._file_contains_line_regex(file_path=file_path, expression=expression):
+            self.__assertion_failed = True
+            self.fail('File "%s" contain "%s" line expression, but it shouldn\'t' % (file_path,
+                                                                                     expression))
+
+    def assertLogFileContainsRegex(self, expression, file_path=None):
+        """
+        Custom assertion function which asserts that the provided log file path contains a string
+        which matches the provided regular expression.
+
+        This function performs checks against the whole file content which means it comes handy in
+        scenarios where you need to perform cross line checks.
+
+        :param expression: Regular expression to match against the whole file content.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
+        """
+        file_path = file_path or self.agent_log_path
+
+        if not self._file_contains_regex(file_path=file_path, expression=expression):
+            self.__assertion_failed = True
+            self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
+
+    def assertLogFileDoesntContainsRegex(self, expression, file_path=None):
+        """
+        Custom assertion function which asserts that the provided log file path doesn\'t contain a
+        string which matches the provided regular expression.
+
+        This function performs checks against the whole file content which means it comes handy in
+        scenarios where you need to perform cross line checks.
+
+        :param file_path: Path to the file to use.
+        :param file_path: Path to the file to use. If not specified, it defaults to agent log file.
+        """
+        file_path = file_path or self.agent_log_path
+
+        if self._file_contains_regex(file_path=file_path, expression=expression):
+            self.__assertion_failed = True
+            self.fail('File "%s" contain "%s" expression, but it shouldn\'t' % (file_path,
+                                                                                expression))
+
+    def _file_contains_line_regex(self, file_path, expression):
+        matcher = re.compile(expression)
+
+        with open(file_path, 'r') as fp:
+            for line in fp:
+                if matcher.search(line):
+                    return True
+
+        return False
+
+    def _file_contains_regex(self, file_path, expression):
+        matcher = re.compile(expression)
+
+        with open(file_path, 'r') as fp:
+            content = fp.read()
+
+        return bool(matcher.search(content))
