@@ -406,6 +406,7 @@ def remove_newlines_and_truncate(input_string, char_limit):
     @return:  The string with all newlines replaced with spaces and truncated.
     @rtype: str
     """
+    input_string = six.ensure_text(input_string)
     return input_string.replace("\n", " ").replace("\r", " ")[0:char_limit]
 
 
