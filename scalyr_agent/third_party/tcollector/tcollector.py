@@ -535,12 +535,18 @@ class SenderThread(threading.Thread):
                        ]
 
                 for col in all_living_collectors():
-                    strs.append(('collector.lines_sent', 'collector='
-                                 + col.name, col.lines_sent))
-                    strs.append(('collector.lines_received', 'collector='
-                                 + col.name, col.lines_received))
-                    strs.append(('collector.lines_invalid', 'collector='
-                                 + col.name, col.lines_invalid))
+                    strs.append((
+                        'collector.lines_sent',
+                        'collector=' + col.name, col.lines_sent
+                    ))
+                    strs.append((
+                        'collector.lines_received',
+                        'collector=' + col.name, col.lines_received
+                    ))
+                    strs.append((
+                        'collector.lines_invalid',
+                        'collector=' + col.name, col.lines_invalid
+                    ))
 
                 ts = int(time.time())
                 strout = ["tcollector.%s %d %d %s"

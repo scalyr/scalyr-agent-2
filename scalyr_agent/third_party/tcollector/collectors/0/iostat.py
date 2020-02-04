@@ -142,15 +142,17 @@ def main():
             if len(values) == 14:
                 # full stats line
                 for i in range(11):
-                    print(("%s%s %d %s dev=%s"
-                           % (metric, FIELDS_DISK[i], ts, values[i+3],
-                              device)))
+                    print(
+                        "%s%s %d %s dev=%s"
+                        % (metric, FIELDS_DISK[i], ts, values[i+3], device)
+                    )
             elif len(values) == 7:
                 # partial stats line
                 for i in range(4):
-                    print(("%s%s %d %s dev=%s"
-                           % (metric, FIELDS_PART[i], ts, values[i+3],
-                              device)))
+                    print(
+                        "%s%s %d %s dev=%s"
+                        % (metric, FIELDS_PART[i], ts, values[i+3], device)
+                    )
             else:
                 print("Cannot parse /proc/diskstats line: ", line, file=sys.stderr)
                 continue

@@ -295,8 +295,10 @@ def main():
         for line in stats.splitlines():
             line = line.split()
             if line[0] not in known_netstatstypes:
-                print(("Unrecoginized line in /proc/net/netstat:"
-                                     " %r (file=%r)" % (line, stats)), file=sys.stderr)
+                print(
+                    "Unrecoginized line in /proc/net/netstat: %r (file=%r)"
+                    % (line, stats), file=sys.stderr
+                )
                 continue
             statstype = line.pop(0)
             statsdikt.setdefault(known_netstatstypes[statstype], []).append(line)

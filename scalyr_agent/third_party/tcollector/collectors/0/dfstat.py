@@ -110,12 +110,18 @@ def main():
                     continue
                 reported_mounts[mount] = True
 
-                print(("df.1kblocks.total %d %s mount=%s fstype=%s"
-                       % (ts, fields[2], mount, fields[1])))
-                print(("df.1kblocks.used %d %s mount=%s fstype=%s"
-                       % (ts, fields[3], mount, fields[1])))
-                print(("df.1kblocks.free %d %s mount=%s fstype=%s"
-                       % (ts, fields[4], mount, fields[1])))
+                print(
+                    "df.1kblocks.total %d %s mount=%s fstype=%s"
+                    % (ts, fields[2], mount, fields[1])
+                )
+                print(
+                    "df.1kblocks.used %d %s mount=%s fstype=%s"
+                    % (ts, fields[3], mount, fields[1])
+                )
+                print(
+                    "df.1kblocks.free %d %s mount=%s fstype=%s"
+                    % (ts, fields[4], mount, fields[1])
+                )
         else:
             print("df %s returned %r" % (df_options, df_proc.returncode), file=sys.stderr)
 
@@ -139,12 +145,18 @@ def main():
                     continue
                 reported_mounts[mount] = True
 
-                print(("df.inodes.total %d %s mount=%s fstype=%s"
-                       % (ts, fields[2], mount, fields[1])))
-                print(("df.inodes.used %d %s mount=%s fstype=%s"
-                       % (ts, fields[3], mount, fields[1])))
-                print(("df.inodes.free %d %s mount=%s fstype=%s"
-                       % (ts, fields[4], mount, fields[1])))
+                print(
+                    "df.inodes.total %d %s mount=%s fstype=%s"
+                    % (ts, fields[2], mount, fields[1])
+                )
+                print(
+                    "df.inodes.used %d %s mount=%s fstype=%s"
+                    % (ts, fields[3], mount, fields[1])
+                )
+                print(
+                    "df.inodes.free %d %s mount=%s fstype=%s"
+                    % (ts, fields[4], mount, fields[1])
+                )
         else:
             print("df %s returned %r" % (df_inodes_options, df_proc.returncode), file=sys.stderr)
 

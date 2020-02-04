@@ -67,7 +67,7 @@ def main():
     interval = COLLECTION_INTERVAL
 
     # Scalyr edit:
-    network_interface_prefixes = str.split(NETWORK_INTERFACE_PREFIX, ',')
+    network_interface_prefixes = NETWORK_INTERFACE_PREFIX.split(',')
     for i in range(len(network_interface_prefixes)):
         network_interface_prefixes[i] = network_interface_prefixes[i].strip()
 
@@ -86,6 +86,7 @@ def main():
         ts = int(time.time())
         for line in f_netdev:
             # Scalyr edit
+            m = None
             for interface in network_interface_prefixes:
                 # 2->TODO is it important to expect at least one space character?
                 m = re.match("\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line)
@@ -96,10 +97,14 @@ def main():
             stats = m.group(2).split(None)
             for i in range(8):
                 if FIELDS[i]:
-                    print(("proc.net.%s %d %s iface=%s direction=in"
-                           % (FIELDS[i], ts, stats[i], m.group(1))))
-                    print(("proc.net.%s %d %s iface=%s direction=out"
-                           % (FIELDS[i], ts, stats[i+8], m.group(1))))
+                    print(
+                        "proc.net.%s %d %s iface=%s direction=in"
+                        % (FIELDS[i], ts, stats[i], m.group(1))
+                    )
+                    print(
+                        "proc.net.%s %d %s iface=%s direction=out"
+                        % (FIELDS[i], ts, stats[i+8], m.group(1))
+                    )
 
         sys.stdout.flush()
         time.sleep(interval)
