@@ -947,11 +947,17 @@ class RateLimiterLogFilter(object):
     def filter(self, record):
         if hasattr(record, "rate_limited_set"):
             return record.rate_limited_result
+
         record.rate_limited_set = True
         # Note, it is important we set rate_limited_droppped_records before we invoke the formatter since the
         # formatting is dependent on that value and our formatters cache the result.
         record.rate_limited_dropped_records = self.__dropped_records
         record_str = self.__formatter.format(record)
+
+        # Store size of the original and formatted records on the record object itself. Right now
+        # this is mostly used in the tests, but could also be useful in other contexts.
+        record.original_size = len(record.message)
+        record.formatted_size = len(record_str)
         record.rate_limited_result = self.__rate_limiter.charge_if_available(
             len(record_str)
         )

@@ -358,10 +358,16 @@ jobs:
       - restore_cache:
           key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install dependencies
           command: |
+            # Small safety check to make sure the build fails if codecov.yml file is invalid.
+            # By default codecov doesn't fail on invalid config and simply falls back to
+            # system wide default config in case repo local config is invalid. This usually results
+            # in confused and undesired behavior.
+            curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
             virtualenv venv
             source venv/bin/activate
-            pip install coverage
+            pip install coverage "codecov==2.0.15"
             mkdir -p cov
             cp .circleci/.coveragerc_ci cov/.coveragerc
 
@@ -369,6 +375,7 @@ jobs:
           at: cov
 
       - run:
+          name: Combine coverage
           working_directory: cov
           command: |
             source ../venv/bin/activate
@@ -378,11 +385,19 @@ jobs:
           path: cov
 
       - run:
-          name: report
+          name: Print coverage report
           working_directory: cov
           command: |
             source ../venv/bin/activate
             coverage report
+
+      - run:
+          name: Upload coverage data to codecov.io
+          working_directory: cov
+          command: |
+            source ../venv/bin/activate
+            coverage xml --rcfile=.coveragerc -i -o coverage.xml
+            codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
 
   modernize-check:
     working_directory: ~/scalyr-agent-2
