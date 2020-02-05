@@ -97,7 +97,7 @@ if "win32" == sys.platform:
         try:
             import py2exe.mf as modulefinder
         except ImportError:
-            import modulefinder
+            import modulefinder  # type: ignore
         import win32com
 
         for p in win32com.__path__[1:]:
@@ -106,7 +106,7 @@ if "win32" == sys.platform:
         for extra in ["win32com.shell"]:  # ,"win32com.mapi"
             __import__(extra)
             m = sys.modules[extra]
-            for p in m.__path__[1:]:
+            for p in m.__path__[1:]:  # type: ignore
                 modulefinder.AddPackagePath(extra, p)
     except ImportError:
         # no build path setup, no worries.
