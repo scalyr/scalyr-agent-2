@@ -609,21 +609,23 @@ class PosixPlatformController(PlatformController):
 
         # noinspection PyUnusedLocal
         def handle_interrupt(signal_num, frame):
-          """
-          Signal handler which is invoked on SIGINT signal.
+            """
+            Signal handler which is invoked on SIGINT signal.
 
-          It takes care of gracefully shutting down the process when running in foreground
-          (non-fork) mode.
-          """
-          logger.debug("Received SIGINT signal")
+            It takes care of gracefully shutting down the process when running in foreground
+            (non-fork) mode.
+            """
+            logger.debug("Received SIGINT signal")
 
-          if not fork:
-            # When forking is disabled and main process runs in the foreground, we can't CTRL+C
-            # to work as expected and result in the termination handler being started and
-            # process exiting.
-            sys.stderr.write('Received CTRL+C, starting termination handler and exiting...\n')
-            handle_terminate(signal_num, frame)
-            return
+            if not fork:
+                # When forking is disabled and main process runs in the foreground, we can't CTRL+C
+                # to work as expected and result in the termination handler being started and
+                # process exiting.
+                sys.stderr.write(
+                    "Received CTRL+C, starting termination handler and exiting...\n"
+                )
+                handle_terminate(signal_num, frame)
+                return
 
         # noinspection PyUnusedLocal
         def handle_terminate(signal_num, frame):
@@ -635,7 +637,7 @@ class PosixPlatformController(PlatformController):
             logger.debug("Received SIGTERM signal")
 
             if self.__termination_handler is not None:
-                logger.debug('Invoking termination handler...')
+                logger.debug("Invoking termination handler...")
                 self.__termination_handler()
 
         # noinspection PyUnusedLocal
@@ -648,7 +650,7 @@ class PosixPlatformController(PlatformController):
             logger.debug("Received SIGUSR1 signal")
 
             if self.__status_handler is not None:
-                logger.debug('Invoking status handler...')
+                logger.debug("Invoking status handler...")
                 self.__status_handler()
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
