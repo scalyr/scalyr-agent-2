@@ -19,6 +19,7 @@
 # Based on code from scalyr_agent/all_tests.py
 
 from __future__ import absolute_import
+from __future__ import print_function
 
 import os
 import sys
@@ -74,9 +75,11 @@ for module_fqdn in PRE_PYTHON27_WHITELIST:
     except (ImportError, AttributeError) as e:
         if sys.version_info[:2] < (2, 7) or True:
             print(
-                "Warning. Skipping unloadable module '%s'.\n"
-                "This module was whitelisted as non-critical for pre-2.7 testing.\n"
-                "Module-load exception message: '%s'\n" % (module_fqdn, e)
+                (
+                    "Warning. Skipping unloadable module '%s'.\n"
+                    "This module was whitelisted as non-critical for pre-2.7 testing.\n"
+                    "Module-load exception message: '%s'\n" % (module_fqdn, e)
+                )
             )
             module_path = get_module_path_for_fqdn(module_fqdn)
             collect_ignore.append(module_path)
@@ -87,9 +90,11 @@ for module_fqdn in PYTHON24_WHITELIST:
     except (ImportError, AttributeError) as e:
         if sys.version_info[:2] < (2, 5):
             print(
-                "Warning. Skipping unloadable module '%s'.\n"
-                "This module was whitelisted as non-critical for Python 2.4 testing.\n"
-                "Module-load exception message: '%s'\n" % (module_fqdn, e)
+                (
+                    "Warning. Skipping unloadable module '%s'.\n"
+                    "This module was whitelisted as non-critical for Python 2.4 testing.\n"
+                    "Module-load exception message: '%s'\n" % (module_fqdn, e)
+                )
             )
             module_path = get_module_path_for_fqdn(module_fqdn)
             collect_ignore.append(module_path)
