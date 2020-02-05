@@ -41,10 +41,6 @@ import tempfile
 import time
 import uuid
 
-import six
-
-# NOTE: We can't use six.StringIO, since latest version of six may not be available when running
-# this script
 from io import StringIO
 from io import BytesIO
 
@@ -58,6 +54,7 @@ scalyr_init()
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+import six
 from six.moves import range
 
 # [end of 2->TOD0]
