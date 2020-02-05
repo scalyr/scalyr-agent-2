@@ -312,7 +312,9 @@ class ScalyrClientSession(object):
             else:
                 body_str = ""
 
-            body_str_raw = body_str
+            # Workaround to fix issue with logging non utf-8 characters. We simply ignore
+            # non utf-8 characters
+            body_str_raw = body_str.decode("utf-8", "ignore")
 
             self.total_request_bytes_sent += len(body_str) + len(request_path)
 

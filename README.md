@@ -29,6 +29,9 @@ from your servers.
 
 We also welcome submissions from the community.
 
+For information on the agent architecture and code abstractions, please refer to the
+[architecture.md](docs/architecture.md) document.
+
 ### Local Development Environment, Tests and Lint Checks
 
 This repository utilizes ``tox`` Python project for running various lint checks and tests.

@@ -35,6 +35,7 @@ from io import open
 
 import six
 
+from scalyr_agent import scalyr_logging
 from scalyr_agent.platform_controller import (
     PlatformController,
     DefaultPaths,
@@ -599,14 +600,55 @@ class PosixPlatformController(PlatformController):
         """
         self._log_init_debug("Starting agent %s" % scalyr_util.get_pid_tid())
 
-        # noinspection PyUnusedLocal
-        def handle_terminate(signal_num, frame):
-            if self.__termination_handler is not None:
-                self.__termination_handler()
+        # NOTE: Other code calls "_log_init_debug" method which is responsible for buffering the
+        # log lines until the agent initialization phase has finished.
+        # We don't need to do that and can use a regular logger object inside the signal handlers,
+        # because by the time signal handlers are set up and signal handler function is called,
+        # agent and logging initialization process is already completed.
+        logger = scalyr_logging.getLogger("scalyr_agent")
 
         # noinspection PyUnusedLocal
         def handle_interrupt(signal_num, frame):
+          """
+          Signal handler which is invoked on SIGINT signal.
+
+          It takes care of gracefully shutting down the process when running in foreground
+          (non-fork) mode.
+          """
+          logger.debug("Received SIGINT signal")
+
+          if not fork:
+            # When forking is disabled and main process runs in the foreground, we can't CTRL+C
+            # to work as expected and result in the termination handler being started and
+            # process exiting.
+            sys.stderr.write('Received CTRL+C, starting termination handler and exiting...\n')
+            handle_terminate(signal_num, frame)
+            return
+
+        # noinspection PyUnusedLocal
+        def handle_terminate(signal_num, frame):
+            """
+            Signal handler which is invoked on SIGTERM signal.
+
+            It takes care of invoking the agent termination handler function.
+            """
+            logger.debug("Received SIGTERM signal")
+
+            if self.__termination_handler is not None:
+                logger.debug('Invoking termination handler...')
+                self.__termination_handler()
+
+        # noinspection PyUnusedLocal
+        def handle_sigusr1(signal_num, frame):
+            """
+            Signal handler which is invoked on SIGUSR1 signal.
+
+            It takes care of invoking the status handler function.
+            """
+            logger.debug("Received SIGUSR1 signal")
+
             if self.__status_handler is not None:
+                logger.debug('Invoking status handler...')
                 self.__status_handler()
 
         # Start the daemon by forking off a new process.  When it returns, we are either the original process
@@ -622,11 +664,13 @@ class PosixPlatformController(PlatformController):
                     % (self.__pidfile, six.text_type(self.__read_pidfile()))
                 )
 
-        # Register for the TERM and INT signals.  If we get a TERM, we terminate the process.  If we
-        # get a INT, then we write a status file.. this is what a process will send us when the command
-        # scalyr-agent-2 status -v is invoked.
+        # Register signal handlers for various signals.
+        # On TERM we terminate the process, in USR1 we write a status file and on INT we terminate
+        # the process when running in foreground (non-fork) mode
+        # scalyr-agent-2 status -v uses SIGUSR1 underneath
         original_term = signal.signal(signal.SIGTERM, handle_terminate)
         original_interrupt = signal.signal(signal.SIGINT, handle_interrupt)
+        original_usr1 = signal.signal(signal.SIGUSR1, handle_sigusr1)
 
         try:
             self.__is_initializing = False
@@ -640,6 +684,7 @@ class PosixPlatformController(PlatformController):
         finally:
             signal.signal(signal.SIGTERM, original_term)
             signal.signal(signal.SIGINT, original_interrupt)
+            signal.signal(signal.SIGUSR1, original_usr1)
 
     def stop_agent_service(self, quiet):
         """Stop the daemon
@@ -708,7 +753,7 @@ class PosixPlatformController(PlatformController):
             return errno.ESRCH
 
         try:
-            os.kill(pid, signal.SIGINT)
+            os.kill(pid, signal.SIGUSR1)
         except OSError as e:
             if e.errno == errno.ESRCH or e.errno == errno.EPERM:
                 return e.errno
