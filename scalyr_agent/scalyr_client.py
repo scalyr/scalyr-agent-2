@@ -312,6 +312,8 @@ class ScalyrClientSession(object):
             else:
                 body_str = ""
 
+            body_str_raw = body_str
+
             self.total_request_bytes_sent += len(body_str) + len(request_path)
 
             if self.__compress:
@@ -337,7 +339,7 @@ class ScalyrClientSession(object):
                             scalyr_logging.DEBUG_LEVEL_5,
                             'Sending POST %s with body "%s"',
                             request_path,
-                            body_str,
+                            body_str_raw
                         )
                         self.__connection.post(request_path, body=body_str)
                     else:
