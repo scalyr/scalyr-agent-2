@@ -35,7 +35,6 @@ from scalyr_agent.builtin_monitors.syslog_monitor import SyslogFrameParser
 from scalyr_agent.monitor_utils.server_processors import RequestSizeExceeded
 
 import scalyr_agent.scalyr_logging as scalyr_logging
-from scalyr_agent.util import StoppableThread
 
 import six
 
@@ -292,7 +291,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
             s.close()
 
         # stop any running monitors - this might be open if an exception was thrown before a test called monitor.stop()
-        if self.monitor != None:
+        if self.monitor is not None:
             self.monitor.stop(wait_on_join=False)
 
         self.logger.removeHandler(self.handler)

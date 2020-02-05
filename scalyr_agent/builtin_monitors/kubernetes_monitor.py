@@ -821,6 +821,7 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
@@ -838,6 +839,7 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
@@ -853,13 +855,13 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
-        for item in super(
+        for item in super(  # pylint: disable=bad-super-call
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.Client):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -3929,7 +3931,7 @@ class KubernetesMonitor(ScalyrMonitor):
         if self.__gather_k8s_pod_info:
             cluster_info = self.__get_cluster_info(cluster_name)
 
-            containers = self._container_enumerator.get_containers(
+            containers = self._container_enumerator.get_containers(  # pylint: disable=no-member
                 k8s_cache=k8s_cache,
                 k8s_include_by_default=self.__include_all,
                 k8s_namespaces_to_exclude=self.__namespaces_to_ignore,
@@ -3945,7 +3947,8 @@ class KubernetesMonitor(ScalyrMonitor):
 
                     namespace = extra.get("pod_namespace", "invalid-namespace")
                     self._logger.emit_value(
-                        "%s.container_name" % (self._container_runtime),
+                        "%s.container_name"
+                        % (self._container_runtime),  # pylint: disable=no-member
                         info["name"],
                         extra,
                         monitor_id_override="namespace:%s" % namespace,

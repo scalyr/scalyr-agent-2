@@ -38,7 +38,6 @@ from scalyr_agent.log_watcher import LogWatcher
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.log_processing import LogMatcher, LogFileProcessor
 from scalyr_agent.agent_status import CopyingManagerStatus
-from scalyr_agent.scalyr_client import AddEventsRequest
 
 log = scalyr_logging.getLogger(__name__)
 
@@ -1512,7 +1511,7 @@ class CopyingManager(StoppableThread, LogWatcher):
 
         if logs_initial_positions is not None:
             for log_path in logs_initial_positions:
-                if not log_path in checkpoints:
+                if log_path not in checkpoints:
                     checkpoints[log_path] = LogFileProcessor.create_checkpoint(
                         logs_initial_positions[log_path]
                     )

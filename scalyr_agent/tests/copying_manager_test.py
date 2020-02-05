@@ -46,17 +46,14 @@ from scalyr_agent.configuration import Configuration
 from scalyr_agent.copying_manager import CopyingParameters, CopyingManager
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
-from scalyr_agent.test_base import skip, ScalyrTestCase
+from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
-from scalyr_agent.json_lib import JsonObject, JsonArray
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
 
 from scalyr_agent import scalyr_init
 
 scalyr_init()
-
-import six
 
 ONE_MB = 1024 * 1024
 
@@ -567,9 +564,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_from_monitors(self):
-        test_manager = self._create_test_instance(
-            [], [{"path": "/tmp/hi_monitor.log",}]
-        )
+        test_manager = self._create_test_instance([], [{"path": "/tmp/hi_monitor.log"}])
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
@@ -610,7 +605,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_monitor_log_config_updated(self):
-        test_manager = self._create_test_instance([], [{"path": "hi_monitor.log"},])
+        test_manager = self._create_test_instance([], [{"path": "hi_monitor.log"}])
         self.assertEquals(len(test_manager.log_matchers), 2)
         self.assertEquals(
             test_manager.log_matchers[0].config["path"],
@@ -628,7 +623,7 @@ class CopyingManagerInitializationTest(ScalyrTestCase):
         )
 
     def test_remove_log_path_with_non_existing_path(self):
-        test_manager = self._create_test_instance([], [{"path": "test.log"},])
+        test_manager = self._create_test_instance([], [{"path": "test.log"}])
         # check that removing a non-existent path runs without throwing an exception
         test_manager.remove_log_path("test_monitor", "blahblah.log")
 
@@ -1152,10 +1147,10 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
         class _time_mock(object):
             # This dummy 'time()' should be called on new copying thread iteration
             # to emulate huge gap between last request.
-            def time(_self):
+            def time(_self):  # pylint: disable=no-self-argument
                 result = (
                     orig_time.time()
-                    + self._manager._CopyingManager__config.max_retry_time
+                    + self._manager._CopyingManager__config.max_retry_time  # pylint: disable=no-member
                 )
                 return result
 

@@ -27,7 +27,7 @@ __author__ = "czerwin@scalyr.com"
 # and it can be fixed in code below...
 try:
     # Python2
-    text_type = unicode
+    text_type = unicode  # type: ignore
 except NameError:
     # Python3
     text_type = str

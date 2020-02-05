@@ -29,7 +29,7 @@ import errno
 import string
 from datetime import datetime
 
-import pg8000
+import pg8000  # pylint: disable=import-error
 import six
 from six.moves import zip
 

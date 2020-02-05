@@ -126,8 +126,8 @@ CONFIG_OPTIONS = [
 ]
 
 _ = [
-    define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS
-]  # pylint: disable=star-args
+    define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS  # type: ignore
+]
 ## End Monitor Configuration
 # #########################################################################################
 
@@ -445,9 +445,7 @@ METRICS = (
     + _PROCESS_MEMORY_METRICS
     + _PROCESS_DISK_IO_METRICS
 )
-_ = [
-    define_metric(__monitor__, **metric.config) for metric in METRICS
-]  # pylint: disable=star-args
+_ = [define_metric(__monitor__, **metric.config) for metric in METRICS]
 
 
 #

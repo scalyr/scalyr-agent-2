@@ -1,4 +1,4 @@
-# Python CircleCI 2.0 configuration file
+# Python CircleCI 2.1 configuration file
 #
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
@@ -53,43 +53,36 @@ jobs:
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
         environment:
           PYTHONPATH=./scalyr_agent/third_party
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          key: deps1-tox-{{ .Branch }}-py27-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install Dependencies
           command: |
-            virtualenv venv
-            source venv/bin/activate
-            pip install -r dev-requirements.txt
-      - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "venv"
+            sudo pip install "tox==3.14.3"
       - run:
+          name: Run unit tests with coverage
           command: |
-            source venv/bin/activate
-            coverage run run_tests.py
+            tox -ecoverage
             mkdir -p coverage-unittest-27
             mv .coverage coverage-unittest-27/.coverage.unittest-27
-
+      - save_cache:
+          key: deps1-tox-{{ .Branch }}-py27-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+            - ".tox"
       - persist_to_workspace:
           root: coverage-unittest-27
           paths:
             .coverage.unittest-27
 
-      - store_artifacts:
-          path: xunit.xml
-
-      - store_artifacts:
-          path: cover/
-
   unittest-26:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
@@ -109,7 +102,6 @@ jobs:
             docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
             docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=3.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
             docker rm dummy;
-
 
   smoke-standalone-27:
     docker:
@@ -192,7 +184,6 @@ jobs:
           root: coverage-smoke-docker-json
           paths:
             .coverage.smoke-docker-json
-
 
   smoke-docker-syslog:
     docker:
@@ -278,7 +269,6 @@ jobs:
           root: coverage-smoke-k8s
           paths:
             .coverage.smoke-k8s
-
 
   smoke-k8s-helm:
     machine:
@@ -399,37 +389,33 @@ jobs:
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
             codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
 
-  modernize-check:
+  lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6-jessie-browsers
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-modernize-venv
+          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install Python dependencies
           command: |
-            virtualenv venv
-            source venv/bin/activate
-            pip install modernize
+            sudo pip install "tox==3.14.3"
+      - run:
+          name: Run Lint Checks
+          command: |
+            tox -e lint
       - save_cache:
-          key: deps1-{{ .Branch }}-modernize-venv
+          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "venv"
-      - run:
-          command: |
-            source venv/bin/activate
-            python .circleci/modernize/modernize.py -j 2
-
-
-
-
+            - "~/.cache/pip."
+            - ".tox"
 
 workflows:
   version: 2
   unittest:
     jobs:
-      - modernize-check
+      - lint-checks
       - unittest-38
       - unittest-37
       - unittest-36

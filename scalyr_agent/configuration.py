@@ -356,10 +356,6 @@ class Configuration(object):
         return self.__get_config().get_int("k8s_cache_expiry_secs")
 
     @property
-    def k8s_cache_expiry_secs(self):
-        return self.__get_config().get_int("k8s_cache_expiry_secs")
-
-    @property
     def k8s_cache_expiry_fuzz_secs(self):
         return self.__get_config().get_int("k8s_cache_expiry_fuzz_secs")
 
@@ -1066,7 +1062,7 @@ class Configuration(object):
         if api_key:
             config.put("api_key", api_key)
 
-        if not "api_key" in config:
+        if "api_key" not in config:
             raise BadConfiguration(
                 'The configuration file is missing the required field "api_key" that '
                 "sets the authentication key to use when writing logs to Scalyr.  Please update "
