@@ -3,53 +3,78 @@
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
 version: 2.1
-executors:
-  unittest_python3_executor:
-    machine:
-      image: ubuntu-1604:201903-01
-      docker_layer_caching: true
 commands:
-  unittest_python3:
-    description: "A base command for all unittest jobs"
+  unittest_tox:
+    description: "A base command for all tox based unit test jobs"
     parameters:
       python_version:
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, etc.)"
         type: string
+      tox_version:
+        description: "tox package version to use"
+        type: string
+        default: "3.14.3"
     steps:
       - checkout
+      - restore_cache:
+          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
       - run:
+          name: Install Dependencies
           command: |
-            docker build . -t unittest --build-arg PYTHON_VERSION=<< parameters.python_version >> -f .circleci/docker_unified_smoke_unit/unittest/Dockerfile.python3
-            docker run -it -v /home/circleci/scalyr-agent-2:/scalyr-agent-2 unittest
+            pip install "tox==<< parameters.tox_version >>"
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            tox -epy<< parameters.python_version >>-unit-tests
+      - save_cache:
+          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+            - ".tox"
 
 jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
-    executor: unittest_python3_executor
+    docker:
+      - image: circleci/python:3.8
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
     steps:
-      - unittest_python3:
-          python_version: "3.8.1"
+      - unittest_tox:
+          python_version: "3.8"
 
   unittest-37:
     working_directory: ~/scalyr-agent-2
-    executor: unittest_python3_executor
+    docker:
+      - image: circleci/python:3.7
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
     steps:
-      - unittest_python3:
-          python_version: "3.7.6"
+      - unittest_tox:
+          python_version: "3.7"
 
   unittest-36:
     working_directory: ~/scalyr-agent-2
-    executor: unittest_python3_executor
+    docker:
+      - image: circleci/python:3.6
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
     steps:
-      - unittest_python3:
-          python_version: "3.6.8"
+      - unittest_tox:
+          python_version: "3.6"
 
   unittest-35:
     working_directory: ~/scalyr-agent-2
-    executor: unittest_python3_executor
+    docker:
+      - image: circleci/python:3.5
+        environment:
+          PYTHONPATH=./scalyr_agent/third_party
     steps:
-      - unittest_python3:
-          python_version: "3.5.9"
+      - unittest_tox:
+          python_version: "3.5"
 
+  # NOTE: This tox target is different then other ones because we also want to run code coverage
+  # and persist the result
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
