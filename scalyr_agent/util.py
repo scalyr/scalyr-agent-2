@@ -18,6 +18,10 @@ from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
+
+if False:
+    from typing import Union
+
 import codecs
 import sys
 import struct
@@ -391,6 +395,7 @@ def md5_hexdigest(data):
 
 
 def remove_newlines_and_truncate(input_string, char_limit):
+    # type (Union[str, bytes], int) -> str
     """Returns the input string but with all newlines removed and truncated.
 
     The newlines are replaced with spaces.  This is done both for carriage return and newline.
@@ -400,7 +405,7 @@ def remove_newlines_and_truncate(input_string, char_limit):
     @param input_string: The string to transform
     @param char_limit: The maximum number of characters the resulting string should be
 
-    @type input_string: str
+    @type input_string: str or bytes
     @type char_limit: int
 
     @return:  The string with all newlines replaced with spaces and truncated.
