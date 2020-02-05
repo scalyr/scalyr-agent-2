@@ -382,7 +382,7 @@ jobs:
             curl --max-time 10 --data-binary @codecov.yml https://codecov.io/validate | grep -i 'Valid!'
             virtualenv venv
             source venv/bin/activate
-            pip install coverage "codecov==2.0.15"
+            pip install "coverage==4.5.4" "codecov==2.0.15"
             mkdir -p cov
             cp .circleci/.coveragerc_ci cov/.coveragerc
 
