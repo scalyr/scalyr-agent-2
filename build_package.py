@@ -46,6 +46,7 @@ import six
 # NOTE: We can't use six.StringIO, since latest version of six may not be available when running
 # this script
 from io import StringIO
+from io import BytesIO
 
 from optparse import OptionParser
 from time import gmtime, strftime
@@ -604,7 +605,7 @@ def build_container_builder(
 
     # Tar it up but hold the tarfile in memory.  Note, if the source tarball really becomes massive, might have to
     # rethink this.
-    tar_out = StringIO()
+    tar_out = BytesIO()
     tar = tarfile.open("assets.tar.gz", "w|gz", tar_out)
 
     # if coverage enabled patch Dockerfile to install coverage package with pip.
@@ -627,8 +628,8 @@ def build_container_builder(
     tar.close()
 
     # Write one file that has the contents of the script followed by the contents of the tarfile.
-    builder_fp = open(output_name, "w")
-    builder_fp.write(base_script)
+    builder_fp = open(output_name, "wb")
+    builder_fp.write(base_script.encode("utf-8"))
     builder_fp.write(tar_out.getvalue())
     builder_fp.close()
 
@@ -1179,9 +1180,9 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
         output_buffer = StringIO()
-        input_fp = open(output_file, "r")
+        input_fp = open(output_file, "rb")
         for line in input_fp:
-            output_buffer.write(line)
+            output_buffer.write(line.decode("utf-8"))
         input_fp.close()
 
         output_str = output_buffer.getvalue()
@@ -1211,7 +1212,7 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
 
         if isinstance(output_str, six.binary_type):
             # Ensure we return unicode type
-            output_str = output_str.decode('utf-8')
+            output_str = output_str.decode("utf-8")
 
         return return_code, output_str
 
@@ -1634,7 +1635,8 @@ def get_build_info():
             "git config user.email", fail_quietly=True, command_name="git"
         )
         if rc != 0:
-            packager_email = "unknown"
+            packager_email = u"unknown"
+
         print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
         # Determine the last commit from the log.
@@ -1653,7 +1655,8 @@ def get_build_info():
 
         # Add a timestamp.
         print(
-            "Build time: %s" % strftime("%Y-%m-%d %H:%M:%S UTC", gmtime()),
+            "Build time: %s"
+            % six.text_type(strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())),
             file=build_info_buffer,
         )
 
