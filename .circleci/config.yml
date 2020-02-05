@@ -91,7 +91,7 @@ jobs:
 
   smoke-standalone-37:
     docker:
-      - image: circleci/python:3.6-jessie-browsers
+      - image: circleci/python:3.6-jessie
     steps:
       - checkout
       - setup_remote_docker:
@@ -105,7 +105,7 @@ jobs:
 
   smoke-standalone-27:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - checkout
       - setup_remote_docker:
@@ -118,7 +118,7 @@ jobs:
             docker rm dummy;
   smoke-standalone-26:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - checkout
       - setup_remote_docker:
@@ -131,7 +131,7 @@ jobs:
             docker rm dummy;
   smoke-standalone-27-tls12:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - checkout
       - setup_remote_docker:
@@ -144,7 +144,7 @@ jobs:
             docker rm dummy;
   smoke-standalone-26-tls12:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - checkout
       - setup_remote_docker:
@@ -158,7 +158,7 @@ jobs:
 
   smoke-docker-json:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
@@ -187,7 +187,7 @@ jobs:
 
   smoke-docker-syslog:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
@@ -340,7 +340,7 @@ jobs:
   coverage:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
         environment:
           PYTHONPATH=./scalyr_agent/third_party
     steps:
@@ -392,7 +392,7 @@ jobs:
   lint-checks:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:3.6-jessie-browsers
+      - image: circleci/python:3.6-jessie
     steps:
       - checkout
       - restore_cache:
