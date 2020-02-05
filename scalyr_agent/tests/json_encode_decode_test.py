@@ -31,7 +31,7 @@ UJSON = 2
 
 
 class EncodeDecodeTest(ScalyrTestCase):
-    """This test ensures that JsonObject and JsonArray can be correctly encoded/decoded with different JSON libraries"""
+    """This test ensures that the different json libraries can correctly encode/decode with the same results."""
 
     def _setlib(self, library):
         if library == JSON:
@@ -80,6 +80,23 @@ class EncodeDecodeTest(ScalyrTestCase):
 
     def test_list2(self):
         self.__test_encode_decode(r'[1,2,"a"]', [1, 2, "a"])
+
+    def test_binary_input(self):
+        # test that json libraries can deserialize binary string.
+        binary_json_string = b'{"key": "value"}'
+
+        original_lib = util.get_json_lib()
+
+        expected = {"key": "value"}
+
+        try:
+            util._set_json_lib("json")
+            self.assertEqual(util.json_decode(binary_json_string), expected)
+            util._set_json_lib("ujson")
+            self.assertEqual(util.json_decode(binary_json_string), expected)
+
+        finally:
+            util._set_json_lib(original_lib)
 
     def __test_encode_decode(self, text, obj):
         def __runtest(library):
