@@ -256,6 +256,7 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
+        # pylint: disable=unexpected-keyword-arg
         bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
         bhc.source_ip = source_ip
         return bhc

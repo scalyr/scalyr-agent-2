@@ -3,6 +3,9 @@
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 
 mock==0.8.0
+tox==3.14.3
+pytest==4.6.9
+pytest-coverage
 ujson==1.35
 tlslite-ng==0.7.5
 cffi==1.12.3
@@ -10,8 +13,10 @@ ecdsa==0.13.2
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1
-docker-py==1.10.3
+docker-py==1.10.6
 coverage==4.5.4
+codecov==2.0.15
+requests==2.18.0
 
 # cffi==1.12.3
 # asyncio==3.4.3

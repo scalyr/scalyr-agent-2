@@ -53,6 +53,8 @@ __all__ = [
     "parse",
     "JsonObject",
     "JsonArray",
+    "ArrayOfStrings",
+    "SpaceAndCommaSeparatedArrayOfStrings",
     "JsonConversionException",
     "JsonMissingFieldException",
     "JsonParseException",

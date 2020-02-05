@@ -40,7 +40,6 @@
 
 from __future__ import absolute_import
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
-from codecs import open  # To use a consistent encoding
 from os import path
 
 import os
@@ -78,7 +77,7 @@ if "win32" == sys.platform:
         del parts[3]
         _file_version = ".".join(parts)
 
-    version = re.compile("^\d+(\.\d+)?(\.\d+)?(\.\d+)?$")
+    version = re.compile(r"^\d+(\.\d+)?(\.\d+)?(\.\d+)?$")
 
     # if we still don't have a valid version string, then bail
     if not version.match(_file_version):
@@ -98,8 +97,8 @@ if "win32" == sys.platform:
         try:
             import py2exe.mf as modulefinder
         except ImportError:
-            import modulefinder
-        import win32com, sys
+            import modulefinder  # type: ignore
+        import win32com
 
         for p in win32com.__path__[1:]:
             modulefinder.AddPackagePath("win32com", p)
@@ -107,13 +106,13 @@ if "win32" == sys.platform:
         for extra in ["win32com.shell"]:  # ,"win32com.mapi"
             __import__(extra)
             m = sys.modules[extra]
-            for p in m.__path__[1:]:
+            for p in m.__path__[1:]:  # type: ignore
                 modulefinder.AddPackagePath(extra, p)
     except ImportError:
         # no build path setup, no worries.
         pass
 
-    import py2exe
+    import py2exe  # pylint: disable=import-error # NOQA
 
 # Get the long description from the relevant file
 f = open(path.join(get_install_root(), "DESCRIPTION.rst"), encoding="utf-8")
