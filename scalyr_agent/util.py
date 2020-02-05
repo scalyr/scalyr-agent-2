@@ -127,7 +127,15 @@ def get_json_implementation(lib_name):
             else:
                 return json.dumps(obj, sort_keys=True, separators=(",", ":"))
 
-        return lib_name, json_dumps_custom, json.loads
+        if sys.version_info[0] == 3 and sys.version_info[1] < 6:
+            # wrap native json library 'loads' in Python3.5 and below, because it does not accept bytes.
+            def json_loads(string, *args, **kwargs):
+                string = six.ensure_text(string)
+                return json.loads(string, *args, **kwargs)
+        else:
+            json_loads = json.loads
+
+        return lib_name, json_dumps_custom, json_loads
 
 
 _json_lib = None
