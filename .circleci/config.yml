@@ -110,7 +110,7 @@ jobs:
       - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: docker run -it -e TEST_BRANCH=${CIRCLE_BRANCH} -e PYTHON_VERSION=2.6 scalyr/scalyr-agent-ci-unittest:4 /tmp/unittest.sh
 
@@ -120,7 +120,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
@@ -134,7 +134,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
@@ -147,7 +147,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
@@ -160,7 +160,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
@@ -173,7 +173,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - run:
           command: |
             docker container create --name dummy -v shared_vol:/app alpine && \
@@ -186,7 +186,7 @@ jobs:
       - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - checkout
       - restore_cache:
           key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
@@ -215,7 +215,7 @@ jobs:
       - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
-          docker_layer_caching: true
+          docker_layer_caching: false
       - checkout
       - restore_cache:
           key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
