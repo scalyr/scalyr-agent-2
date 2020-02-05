@@ -394,7 +394,7 @@ def md5_hexdigest(data):
 
 
 def remove_newlines_and_truncate(input_string, char_limit):
-    # type (Union[str, bytes], int) -> str
+    # type: (Union[str, bytes], int) -> str
     """Returns the input string but with all newlines removed and truncated.
 
     The newlines are replaced with spaces.  This is done both for carriage return and newline.
