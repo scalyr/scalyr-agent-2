@@ -22,13 +22,14 @@ from __future__ import absolute_import
 
 import os
 import sys
+import importlib
 
 # A list of directory globs which are ignored under all Python versions.
 # Those paths represent bundled third party dependencies
 GLOBAL_WHITELIST = [
-    'scalyr_agent/third_party/*',
-    'scalyr_agent/third_party_tls/*',
-    'scalyr_agent/third_party_python2/*',
+    "scalyr_agent/third_party/*",
+    "scalyr_agent/third_party_tls/*",
+    "scalyr_agent/third_party_python2/*",
 ]
 
 # A list of Python module FQDNs or file paths relative to this directory (repo
@@ -53,16 +54,42 @@ PRE_PYTHON27_WHITELIST = [
 collect_ignore_glob = []
 collect_ignore_glob.extend(GLOBAL_WHITELIST)
 
-collect_ignore = ['setup.py']
+collect_ignore = ["setup.py"]
 
-if sys.version_info[:2] < (2, 5) or True:
-    for module_fqdn in PYTHON24_WHITELIST:
-        module_path = module_fqdn.replace('.', os.path.sep) + '.py'
-        module_path = os.path.abspath(module_path)
-        collect_ignore.append(module_path)
 
-if sys.version_info[:2] < (2, 7) or True:
-    for module_fqdn in PRE_PYTHON27_WHITELIST:
-        module_path = module_fqdn.replace('.', os.path.sep) + '.py'
-        module_path = os.path.abspath(module_path)
-        collect_ignore.append(module_path)
+def get_module_path_for_fqdn(module_fqdn):
+    # type: (str) -> str
+    """
+    Return path to the module based on the module fqdn.
+    """
+    module_path = module_fqdn.replace(".", os.path.sep) + ".py"
+    module_path = os.path.abspath(module_path)
+    return module_path
+
+
+# Skip unloadable modules under different versions
+for module_fqdn in PRE_PYTHON27_WHITELIST:
+    try:
+        mod = importlib.import_module(module_fqdn)
+    except (ImportError, AttributeError) as e:
+        if sys.version_info[:2] < (2, 7) or True:
+            print(
+                "Warning. Skipping unloadable module '%s'.\n"
+                "This module was whitelisted as non-critical for pre-2.7 testing.\n"
+                "Module-load exception message: '%s'\n" % (module_fqdn, e)
+            )
+            module_path = get_module_path_for_fqdn(module_fqdn)
+            collect_ignore.append(module_path)
+
+for module_fqdn in PYTHON24_WHITELIST:
+    try:
+        mod = importlib.import_module(module_fqdn)
+    except (ImportError, AttributeError) as e:
+        if sys.version_info[:2] < (2, 5):
+            print(
+                "Warning. Skipping unloadable module '%s'.\n"
+                "This module was whitelisted as non-critical for Python 2.4 testing.\n"
+                "Module-load exception message: '%s'\n" % (module_fqdn, e)
+            )
+            module_path = get_module_path_for_fqdn(module_fqdn)
+            collect_ignore.append(module_path)
