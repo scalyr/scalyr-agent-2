@@ -41,7 +41,9 @@ import tempfile
 import time
 import uuid
 
-from six.StringIO import StringIO
+# NOTE: We can't use six.StringIO, since latest version of six may not be available when running
+# this script
+from io import StringIO
 
 from optparse import OptionParser
 from time import gmtime, strftime
