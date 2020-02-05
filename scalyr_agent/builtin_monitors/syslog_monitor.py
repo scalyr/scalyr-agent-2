@@ -1380,7 +1380,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         self.__server_list = self.__build_server_list(self._config.get("protocols"))
 
         # our disk logger and handler
-        self._disk_logger = None
+        self.__disk_logger = None
         self.__log_handler = None
 
         # whether or not to accept only connections created on this localhost.
@@ -1490,13 +1490,13 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         and instead create our own logger which will log raw messages out to disk.
         """
         name = __name__ + "-" + self.__message_log + ".syslog"
-        self._disk_logger = logging.getLogger(name)
+        self.__disk_logger = logging.getLogger(name)
 
         # assume successful for when the logger handler has already been created
         success = True
 
         # only configure once -- assumes all configuration happens on the same thread
-        if len(self._disk_logger.handlers) == 0:
+        if len(self.__disk_logger.handlers) == 0:
             # logger handler hasn't been created yet, so assume unsuccssful
             success = False
             try:
@@ -1509,9 +1509,9 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
 
                 formatter = logging.Formatter()
                 self.__log_handler.setFormatter(formatter)
-                self._disk_logger.addHandler(self.__log_handler)
-                self._disk_logger.setLevel(logging.INFO)
-                self._disk_logger.propagate = False
+                self.__disk_logger.addHandler(self.__log_handler)
+                self.__disk_logger.setLevel(logging.INFO)
+                self.__disk_logger.propagate = False
                 success = True
             except Exception as e:
                 global_log.error(
@@ -1522,7 +1522,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
 
     def close_metric_log(self):
         if self.__log_handler:
-            self._disk_logger.removeHandler(self.__log_handler)
+            self.__disk_logger.removeHandler(self.__log_handler)
             self.__log_handler.close()
 
     def set_log_watcher(self, log_watcher):
@@ -1565,7 +1565,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
 
         rotate_options = self._get_log_rotation_configuration()
         try:
-            if self._disk_logger is None:
+            if self.__disk_logger is None:
                 raise Exception("No disk logger available for Syslog Monitor")
 
             # create the main server from the first item in the server list
@@ -1573,7 +1573,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             self.__server = SyslogServer(
                 protocol[0],
                 protocol[1],
-                self._disk_logger,
+                self.__disk_logger,
                 self._config,
                 line_reporter,
                 accept_remote=self.__accept_remote_connections,
@@ -1589,7 +1589,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
                 server = SyslogServer(
                     p[0],
                     p[1],
-                    self._disk_logger,
+                    self.__disk_logger,
                     self._config,
                     line_reporter,
                     accept_remote=self.__accept_remote_connections,
