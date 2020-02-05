@@ -53,7 +53,7 @@ jobs:
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
         environment:
           PYTHONPATH=./scalyr_agent/third_party
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   unittest-26:
     docker:
-      - image: circleci/python:2.7-jessie-browsers
+      - image: circleci/python:2.7-jessie
     steps:
       - setup_remote_docker:
           docker_layer_caching: true
