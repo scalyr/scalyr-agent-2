@@ -41,6 +41,8 @@ import tempfile
 import time
 import uuid
 
+import six
+
 # NOTE: We can't use six.StringIO, since latest version of six may not be available when running
 # this script
 from io import StringIO
@@ -1162,7 +1164,7 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
         exit_on_fail will be ignored.
     @param command_name: The name to use to identify the command in error output.
 
-    @return: The exist status of the command.
+    @return: The exist status and output string of the command.
     """
     # We have to use a temporary file to hold the output to stdout and stderr.
     output_file = tempfile.mktemp()
@@ -1206,6 +1208,10 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
             if exit_on_fail:
                 print("Exiting due to failure.", file=sys.stderr)
                 sys.exit(1)
+
+        if isinstance(output_str, six.binary_type):
+            # Ensure we return unicode type
+            output_str = output_str.decode('utf-8')
 
         return return_code, output_str
 
