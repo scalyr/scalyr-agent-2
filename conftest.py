@@ -73,7 +73,7 @@ for module_fqdn in PRE_PYTHON27_WHITELIST:
     try:
         mod = importlib.import_module(module_fqdn)
     except (ImportError, AttributeError) as e:
-        if sys.version_info[:2] < (2, 7) or True:
+        if sys.version_info[:2] < (2, 7):
             print(
                 (
                     "Warning. Skipping unloadable module '%s'.\n"
