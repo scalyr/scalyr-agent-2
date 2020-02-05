@@ -310,7 +310,7 @@ class ScalyrClientSession(object):
                 else:
                     body_str = body
             else:
-                body_str = ""
+                body_str = b""
 
             # Workaround to fix issue with logging non utf-8 characters. We simply ignore
             # non utf-8 characters
@@ -409,7 +409,9 @@ class ScalyrClientSession(object):
                     status_code = 200
                 else:
                     status_code = self.__connection.status_code()
-                    response = self.__connection.response()
+                    response_bytes = self.__connection.response()
+                    response = response_bytes.decode("utf-8")
+
                 bytes_received = len(response)
             except six.moves.http_client.HTTPException as httpError:
                 log.error(
