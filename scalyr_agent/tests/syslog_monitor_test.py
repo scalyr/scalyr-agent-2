@@ -332,7 +332,10 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         expected = "TCP TestXX\n"
         self.connect(s, ("localhost", 8514))
         s.sendall(expected.encode("utf-8"))
-        time.sleep(1)
+
+        # NOTE: Code below relies on sleep. Ideally we should reduce reliance on sleep to make it
+        # more robust and less likely to fail depending on timing.
+        time.sleep(2)
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
@@ -365,9 +368,13 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         expected = "UDP Test %s" % (uuid.uuid4())
         s.sendto(expected.encode("utf-8"), ("localhost", 5514))
-        time.sleep(1)
+
+        # NOTE: Code below relies on sleep. Ideally we should reduce reliance on sleep to make it
+        # more robust and less likely to fail depending on timing.
+        time.sleep(2)
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
+
         f = open("agent_syslog.log", "r")
         actual = f.read().strip()
         self.assertTrue(
@@ -413,7 +420,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         expected_tcp2 = "TCP2 Test\n"
         tcp2.sendall(expected_tcp2.encode("utf-8"))
 
-        time.sleep(1)
+        # NOTE: Code below relies on sleep. Ideally we should reduce reliance on sleep to make it
+        # more robust and less likely to fail depending on timing.
+        time.sleep(2)
 
         self.monitor.stop(wait_on_join=False)
         self.monitor = None
