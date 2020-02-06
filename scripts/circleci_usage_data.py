@@ -121,7 +121,7 @@ def get_usage_data_for_branch(
         raise ValueError("Invalid CIRCLE_CI_API_TOKEN or project_slug")
 
     items = response.json().get("items", [])
-    items = [item for item in items if status != "all" and item["status"] != status]
+    items = [item for item in items if (status == "all" or item["status"] == status)]
 
     if not items:
         return
