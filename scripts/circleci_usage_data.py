@@ -38,23 +38,68 @@ from io import StringIO
 
 import requests
 
+# See https://circleci.com/pricing/#comparison-table
 CREDIT_BUNDLE_PRICE = 15.0
 CREDIT_BUNDLE_UNIT_COUNT = 25000.0
 
 # Price for a single CPU usage credit
 PRICE_PER_CREDIT = CREDIT_BUNDLE_PRICE / CREDIT_BUNDLE_UNIT_COUNT
 
-GITHUB_API_PRS_URL = (
-    "https://api.github.com/repos/scalyr/scalyr-agent-2/pulls?state=all&per_page=500"
-)
+GITHUB_API_PRS_URL = "https://api.github.com/repos/{project_slug}/pulls"
+GITHUB_API_SEARCH_URL = "https://api.github.com/search/issues"
 CIRCLE_CI_API_INSIGHTS_URL = (
     "https://circleci.com/api/v2/insights/{project_slug}/workflows/{workflow}"
 )
-
 CIRCLE_CI_WORKFLOW_VIEW_URL = "https://circleci.com/workflow-run/{workflow_id}"
 
 CIRCLE_CI_API_TOKEN = compat.os_environ_unicode.get("CIRCLE_CI_API_TOKEN", None)
 MAILGUN_API_TOKEN = compat.os_environ_unicode.get("MAILGUN_API_TOKEN", None)
+
+
+def get_all_branches_for_repo(project_slug):
+    # type: (str) -> List[str]
+    """
+    Retrieve all the branches (including deleted ones) for a particular repo.
+
+    NOTE: This function utilizes pulls API endpoint since /branches one doesn't include deleted
+    branches.
+    """
+    # 1. Retrieve all the PRs for last week
+    url = GITHUB_API_SEARCH_URL.format(project_slug=project_slug)
+
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+    week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(
+        "%Y-%m-%d"
+    )
+
+    query = "repo:{project_slug} is:pr created:{week_ago}..{now}".format(
+        project_slug=project_slug, week_ago=week_ago, now=now
+    )
+    params = {"q": query, "per_page": "1000", "sort": "created"}
+
+    response = requests.get(url, params=params)
+    data = response.json()
+    pull_numbers = [item["number"] for item in data["items"]]
+
+    # 2. Retrieve all the branches and filtered ones which haven't been updated during last week
+    # (based on the PR activity)
+    # 1. Retrieve all the branches
+    url = GITHUB_API_PRS_URL.format(project_slug=project_slug)
+    params = {"per_page": "100", "sort": "created", "direction": "desc", "state": "all"}
+    response = requests.get(url, params=params)
+    data = response.json()
+
+    branches = []
+    for item in data:
+        branch_ref = item.get("head", {}).get("ref", None)
+        pull_number = item["number"]
+
+        if not branch_ref or pull_number not in pull_numbers:
+            continue
+
+        branches.append(branch_ref)
+
+    return branches
 
 
 def get_usage_data_for_branch(
@@ -64,11 +109,6 @@ def get_usage_data_for_branch(
     """
     Get usage data for the provided project and write it to the provided buffer.
     """
-    buff.write(
-        u'Usage data for recent workflow runs for workflow "%s" with status="%s" and branch "%s"\n\n'
-        % (workflow, status, branch)
-    )
-
     url = CIRCLE_CI_API_INSIGHTS_URL.format(
         project_slug=project_slug, workflow=workflow
     )
@@ -80,13 +120,19 @@ def get_usage_data_for_branch(
     if response.status_code == 404:
         raise ValueError("Invalid CIRCLE_CI_API_TOKEN or project_slug")
 
-    data = response.json()
+    items = response.json().get("items", [])
+    items = [item for item in items if status != "all" and item["status"] != status]
+
+    if not items:
+        return
+
+    buff.write(
+        u'Usage data for recent workflow runs for workflow "%s" with status="%s" and branch "%s"\n\n'
+        % (workflow, status, branch)
+    )
 
     count = 0
-    for item in data.get("items", []):
-        if status != "all" and item["status"] != status:
-            continue
-
+    for item in items:
         workflow_view_url = CIRCLE_CI_WORKFLOW_VIEW_URL.format(workflow_id=item["id"])
         price_estimate = round(item["credits_used"] * PRICE_PER_CREDIT, 2)
 
@@ -109,7 +155,9 @@ def print_usage_data(
 ):
     # type: (str, str, str, str, int, Optional[List[str]]) -> None
     if branch == "all":
-        branches = []
+        branches = get_all_branches_for_repo(
+            project_slug=project_slug.replace("gh/", "")
+        )
     else:
         branches = [branch]
 
@@ -134,8 +182,12 @@ def print_usage_data(
     value = buff.getvalue()
 
     if emails:
-        date = datetime.datetime.now().strftime("%A, %b %d %Y")
-        subject = u"Circle CI Usage Report on Day %s" % (date)
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
+        week_ago = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime(
+            "%Y-%m-%d"
+        )
+
+        subject = u"Circle CI Usage Report For Period %s - %s" % (week_ago, now)
         send_email(to=emails, subject=subject, text=value)
         print(("Sent email report to %s" % (",".join(emails))))
     else:
@@ -148,7 +200,7 @@ def send_email(to, subject, text):
         "https://api.mailgun.net/v3/kami.mailgun.org/messages",
         auth=("api", MAILGUN_API_TOKEN),
         data={
-            "from": "Circle CI Usage Report <mailgun@kami.mailgun.org>",
+            "from": "Circle CI Usage Reporter <mailgun@kami.mailgun.org>",
             "to": to,
             "subject": subject,
             "text": text,
@@ -201,7 +253,7 @@ if __name__ == "__main__":
     if not CIRCLE_CI_API_TOKEN:
         raise ValueError("CIRCLE_CI_API_TOKEN environment variable is not set")
 
-    emails = ",".split(args.emails) if args.emails else []
+    emails = args.emails.split(",") if args.emails else []
     if emails and not MAILGUN_API_TOKEN:
         raise ValueError("MAILGUN_API_TOKEN environment variable is not set")
 
