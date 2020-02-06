@@ -37,8 +37,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.8
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - unittest_tox:
           python_version: "3.8"
@@ -47,8 +45,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.7
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - unittest_tox:
           python_version: "3.7"
@@ -57,8 +53,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - unittest_tox:
           python_version: "3.6"
@@ -67,8 +61,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.5
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - unittest_tox:
           python_version: "3.5"
@@ -79,8 +71,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - checkout
       - restore_cache:
@@ -366,8 +356,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7-jessie
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - checkout
       - restore_cache:
