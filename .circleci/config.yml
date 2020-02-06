@@ -478,11 +478,11 @@ workflows:
             - smoke-k8s
   weekly-circle-ci-usage-report:
     triggers:
-     # - schedule:
-     #     cron: "0 0 * * 0"
-     #     filters:
-     #       branches:
-     #         only:
-     #           - master
+      - schedule:
+          cron: "0 0 * * 0"
+          filters:
+            branches:
+              only:
+                - master
     jobs:
       - send-circle-ci-usage-report
