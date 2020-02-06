@@ -59,12 +59,12 @@ collect_ignore = ["setup.py"]
 
 # NOTE: Older version of pytest (<= 3.2.5 )which is used under Python 2.6 doesn't support
 # collect_ignore_glob directive
-if sys.version_info[:0] == (2, 6):
+if sys.version_info[:2] == (2, 6):
     import fnmatch
 
     for directory in GLOBAL_WHITELIST:
-        for root, dirnames, filenames in os.walk(directory.replace('/*', '/')):
-            for filename in fnmatch.filter(filenames, '*.py'):
+        for root, dirnames, filenames in os.walk(directory.replace("/*", "/")):
+            for filename in fnmatch.filter(filenames, "*.py"):
                 file_path = os.path.join(root, filename)
                 collect_ignore.append(file_path)
 
