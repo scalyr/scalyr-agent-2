@@ -155,8 +155,10 @@ def send_email(to, subject, text):
         },
     )
 
-    if response.status_code != 200:
+    if response.status_code == 401:
         raise ValueError("Invalid value for MAILGUN_API_TOKEN environment variable")
+    elif response.status_code != 200:
+        raise ValueError("Failed to send email: %s" % (response.text))
 
 
 if __name__ == "__main__":
