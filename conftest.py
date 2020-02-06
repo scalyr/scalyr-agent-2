@@ -33,6 +33,12 @@ GLOBAL_WHITELIST = [
     "scalyr_agent/third_party_python2/*",
 ]
 
+GLOBAL_WHITELIST_PYTHON26 = [
+    "scalyr_agent/third_party/",
+    "scalyr_agent/third_party_tls/",
+    "scalyr_agent/third_party_python2/",
+]
+
 # A list of Python module FQDNs or file paths relative to this directory (repo
 # root) to be ignored under Python 2.4
 PYTHON24_WHITELIST = [
@@ -57,6 +63,16 @@ collect_ignore_glob.extend(GLOBAL_WHITELIST)
 
 collect_ignore = ["setup.py"]
 
+# NOTE: Older version of pytest which is used under Python 2.6 doesn't support collect_ignore_glob
+if sys.version_info[:0] == (2, 6) or True:
+    import fnmatch
+
+    for directory in GLOBAL_WHITELIST_PYTHON26:
+        for root, dirnames, filenames in os.walk(directory):
+            for filename in fnmatch.filter(filenames, '*.py'):
+                file_path = os.path.join(root, filename)
+                collect_ignore.append(file_path)
+
 
 def get_module_path_for_fqdn(module_fqdn):
     # type: (str) -> str
@@ -72,7 +88,7 @@ def get_module_path_for_fqdn(module_fqdn):
 for module_fqdn in PRE_PYTHON27_WHITELIST:
     try:
         mod = importlib.import_module(module_fqdn)
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError, SyntaxError) as e:
         if sys.version_info[:2] < (2, 7):
             print(
                 (
@@ -87,7 +103,7 @@ for module_fqdn in PRE_PYTHON27_WHITELIST:
 for module_fqdn in PYTHON24_WHITELIST:
     try:
         mod = importlib.import_module(module_fqdn)
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError, SyntaxError) as e:
         if sys.version_info[:2] < (2, 5):
             print(
                 (
