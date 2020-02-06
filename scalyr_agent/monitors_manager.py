@@ -276,7 +276,7 @@ class MonitorsManager(StoppableThread):
 
         for entry in all_monitors:
             module_name = entry["module"].split(".")[-1]
-            if not module_name in monitors_by_module_name:
+            if module_name not in monitors_by_module_name:
                 index = 1
             else:
                 index = monitors_by_module_name[module_name] + 1
@@ -291,7 +291,7 @@ class MonitorsManager(StoppableThread):
         # to clean up it's name in the logs.
         for entry in all_monitors:
             module_name = entry["module"].split(".")[-1]
-            if monitors_by_module_name[module_name] == 1 and not module_name in had_id:
+            if monitors_by_module_name[module_name] == 1 and module_name not in had_id:
                 entry["id"] = ""
 
         result = []

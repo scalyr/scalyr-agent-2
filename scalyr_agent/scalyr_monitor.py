@@ -25,6 +25,10 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+if False:
+    from typing import Dict
+    from types import ModuleType
+
 import inspect
 import os
 import sys
@@ -659,7 +663,7 @@ class MonitorInformation(object):
         """
         return getattr(item, "sort_pos")
 
-    __monitor_info__ = {}
+    __monitor_info__ = {}  # type: Dict[ModuleType, MonitorInformation]
 
     @staticmethod
     def set_monitor_info(
@@ -970,7 +974,7 @@ class MonitorConfig(object):
         return list(self.__map.keys())
 
     def __getitem__(self, field):
-        if not field in self:
+        if field not in self:
             raise KeyError('The missing field "%s" in monitor config.' % field)
         return self.__map[field]
 

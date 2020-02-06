@@ -20,6 +20,9 @@ from __future__ import unicode_literals
 from __future__ import absolute_import
 from __future__ import print_function
 
+if False:
+    from typing import Optional
+
 from io import open
 
 __author__ = "czerwin@scalyr.com"
@@ -162,6 +165,7 @@ class BaseScalyrTestCase(unittest.TestCase):
 
 
 if sys.version_info[:2] < (2, 7):
+
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -219,6 +223,7 @@ if sys.version_info[:2] < (2, 7):
 
 
 else:
+
     class ScalyrTestCase(BaseScalyrTestCase):
         """The base class for Scalyr tests.
 
@@ -265,6 +270,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     assertion fails, directory is left in place so developer can inspect the log content which might
     aid with test troubleshooting.
     """
+
     # Path to the directory with the agent logs
     logs_directory = None  # type: Optional[str]
 
@@ -282,18 +288,18 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def setUp(self):
         super(BaseScalyrLogCaptureTestCase, self).setUp()
 
-        self.logs_directory = tempfile.mkdtemp(suffix='agent-tests-log')
+        self.logs_directory = tempfile.mkdtemp(suffix="agent-tests-log")
 
         scalyr_logging.set_log_destination(
             use_disk=True,
             logs_directory=self.logs_directory,
-            agent_log_file_path='agent.log',
-            agent_debug_log_file_suffix='_debug'
+            agent_log_file_path="agent.log",
+            agent_debug_log_file_suffix="_debug",
         )
         scalyr_logging.__log_manager__.set_log_level(scalyr_logging.DEBUG_LEVEL_5)
 
-        self.agent_log_path = os.path.join(self.logs_directory, 'agent.log')
-        self.agent_debug_log_path = os.path.join(self.logs_directory, 'agent_debug.log')
+        self.agent_log_path = os.path.join(self.logs_directory, "agent.log")
+        self.agent_debug_log_path = os.path.join(self.logs_directory, "agent_debug.log")
 
     def tearDown(self):
         super(BaseScalyrLogCaptureTestCase, self).tearDown()
@@ -302,9 +308,14 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             # Print the paths to which we store the output to so they can be introspected by the
             # developer
             test_name = self._testMethodName
-            print('Stored agent log file for test "%s" to: %s' % (test_name, self.agent_log_path))
-            print('Stored agent debug log file for test "%s" to: %s' % (test_name,
-                                                                        self.agent_debug_log_path))
+            print(
+                'Stored agent log file for test "%s" to: %s'
+                % (test_name, self.agent_log_path)
+            )
+            print(
+                'Stored agent debug log file for test "%s" to: %s'
+                % (test_name, self.agent_debug_log_path)
+            )
 
         if not self.__assertion_failed:
             shutil.rmtree(self.logs_directory)
@@ -322,9 +333,14 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
         """
         file_path = file_path or self.agent_log_path
 
-        if not self._file_contains_line_regex(file_path=file_path, expression=expression):
+        if not self._file_contains_line_regex(
+            file_path=file_path, expression=expression
+        ):
             self.__assertion_failed = True
-            self.fail('File "%s" doesn\'t contain "%s" line expression' % (file_path, expression))
+            self.fail(
+                'File "%s" doesn\'t contain "%s" line expression'
+                % (file_path, expression)
+            )
 
     def assertLogFileDoesntContainsLineRegex(self, expression, file_path=None):
         """
@@ -341,8 +357,10 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
         if self._file_contains_line_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
-            self.fail('File "%s" contain "%s" line expression, but it shouldn\'t' % (file_path,
-                                                                                     expression))
+            self.fail(
+                'File "%s" contain "%s" line expression, but it shouldn\'t'
+                % (file_path, expression)
+            )
 
     def assertLogFileContainsRegex(self, expression, file_path=None):
         """
@@ -359,7 +377,9 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
         if not self._file_contains_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
-            self.fail('File "%s" doesn\'t contain "%s" expression' % (file_path, expression))
+            self.fail(
+                'File "%s" doesn\'t contain "%s" expression' % (file_path, expression)
+            )
 
     def assertLogFileDoesntContainsRegex(self, expression, file_path=None):
         """
@@ -376,13 +396,15 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
 
         if self._file_contains_regex(file_path=file_path, expression=expression):
             self.__assertion_failed = True
-            self.fail('File "%s" contain "%s" expression, but it shouldn\'t' % (file_path,
-                                                                                expression))
+            self.fail(
+                'File "%s" contain "%s" expression, but it shouldn\'t'
+                % (file_path, expression)
+            )
 
     def _file_contains_line_regex(self, file_path, expression):
         matcher = re.compile(expression)
 
-        with open(file_path, 'r') as fp:
+        with open(file_path, "r") as fp:
             for line in fp:
                 if matcher.search(line):
                     return True
@@ -392,7 +414,7 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
     def _file_contains_regex(self, file_path, expression):
         matcher = re.compile(expression)
 
-        with open(file_path, 'r') as fp:
+        with open(file_path, "r") as fp:
             content = fp.read()
 
         return bool(matcher.search(content))

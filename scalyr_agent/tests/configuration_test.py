@@ -1382,7 +1382,7 @@ class TestConfiguration(TestConfigurationBase):
                     self.assertEquals(value, fake_env[field])
                     self.assertNotEquals(value, config_file_value)
 
-        patch_and_start_test()
+        patch_and_start_test()  # pylint: disable=no-value-for-parameter
 
     def test_log_excludes_from_config(self):
         self._write_file_with_separator_conversion(

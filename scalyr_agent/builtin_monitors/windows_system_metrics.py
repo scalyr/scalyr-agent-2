@@ -65,9 +65,7 @@ CONFIG_OPTIONS = [
     )
 ]
 
-_ = [
-    define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS
-]  # pylint: disable=star-args
+_ = [define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS]
 # # End Monitor Configuration
 # #########################################################################################
 
@@ -117,8 +115,9 @@ def _gather_metric(method, attribute=None, transform=None):
             # on the exception message, but sometimes you have to do what you have to do.  At least we
             # package a specific version of psutils in with the windows executable, so we should know if
             # the message changes.
+            message = getattr(e, "message", str(e))
             if (
-                e.message == "couldn't find any physical disk"
+                message == "couldn't find any physical disk"
                 and method == "disk_io_counters"
             ):
                 yield __NO_DISK_PERF__, None
@@ -170,7 +169,7 @@ try:
     from operator import methodcaller, attrgetter
 except ImportError:
 
-    def methodcaller(name, *args, **kwargs):
+    def methodcaller(name, *args, **kwargs):  # type: ignore
         def caller(obj):
             return getattr(obj, name)(*args, **kwargs)
 
@@ -190,10 +189,10 @@ except ImportError:
 
         def __str__(self):
             return "<{typename}: ({fieldnames})...>".format(
-                self._typename, self._fieldnames[0]
+                typename=self._typename, fieldnames=self._fieldnames[0]
             )
 
-    METRIC = NamedTupleHack("Metric", "config dispatch")
+    METRIC = NamedTupleHack("Metric", "config dispatch")  # type: ignore
 
 
 METRIC_CONFIG = dict  # pylint: disable=invalid-name
@@ -537,9 +536,7 @@ METRICS = (
     + _DISK_IO_METRICS
     + _DISK_USAGE_METRICS
 )
-_ = [
-    define_metric(__monitor__, **metric.config) for metric in METRICS
-]  # pylint: disable=star-args
+_ = [define_metric(__monitor__, **metric.config) for metric in METRICS]
 
 #
 # Logging / Reporting - defines the method and content in which the metrics are reported.
