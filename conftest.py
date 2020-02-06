@@ -33,12 +33,6 @@ GLOBAL_WHITELIST = [
     "scalyr_agent/third_party_python2/*",
 ]
 
-GLOBAL_WHITELIST_PYTHON26 = [
-    "scalyr_agent/third_party/",
-    "scalyr_agent/third_party_tls/",
-    "scalyr_agent/third_party_python2/",
-]
-
 # A list of Python module FQDNs or file paths relative to this directory (repo
 # root) to be ignored under Python 2.4
 PYTHON24_WHITELIST = [
@@ -63,12 +57,13 @@ collect_ignore_glob.extend(GLOBAL_WHITELIST)
 
 collect_ignore = ["setup.py"]
 
-# NOTE: Older version of pytest which is used under Python 2.6 doesn't support collect_ignore_glob
-if sys.version_info[:0] == (2, 6) or True:
+# NOTE: Older version of pytest (<= 3.2.5 )which is used under Python 2.6 doesn't support
+# collect_ignore_glob directive
+if sys.version_info[:0] == (2, 6):
     import fnmatch
 
-    for directory in GLOBAL_WHITELIST_PYTHON26:
-        for root, dirnames, filenames in os.walk(directory):
+    for directory in GLOBAL_WHITELIST:
+        for root, dirnames, filenames in os.walk(directory.replace('/*', '/')):
             for filename in fnmatch.filter(filenames, '*.py'):
                 file_path = os.path.join(root, filename)
                 collect_ignore.append(file_path)
