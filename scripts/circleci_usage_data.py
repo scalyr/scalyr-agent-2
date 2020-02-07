@@ -114,7 +114,7 @@ def get_usage_data_for_branch(
     :param branch: Branch to return data work.
     :param limit: Maximum number of workflow runs we want to see for a particular branch. NOTE: This
                   is different from the API limit parameter because API returns data for all the
-                  workflow ones and not only the ones we are interested in and perform late filtering
+                  workflow run and not only the ones we are interested in and perform late filtering
                   on.
     """
     url = CIRCLE_CI_API_INSIGHTS_URL.format(
