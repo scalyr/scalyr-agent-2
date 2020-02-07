@@ -99,8 +99,6 @@ jobs:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: dockershelf/python:2.6-dev
-        environment:
-          PYTHONPATH=./scalyr_agent/third_party
     steps:
       - checkout
       - restore_cache:
