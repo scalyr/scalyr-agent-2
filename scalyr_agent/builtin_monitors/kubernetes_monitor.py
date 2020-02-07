@@ -282,10 +282,10 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_cache_init_abort_delay",
-    "Optional (defaults to 20). The number of seconds to wait for initialization of the kubernetes cache before aborting "
+    "Optional (defaults to 120). The number of seconds to wait for initialization of the kubernetes cache before aborting "
     "the kubernetes_monitor.",
     convert_to=int,
-    default=20,
+    default=120,
 )
 
 define_config_option(
@@ -2467,6 +2467,10 @@ class ContainerChecker(object):
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache(self._global_config)
 
+            # TODO: Uncomment after the v59 release.  This is a bit of a risky change that needs more testing
+            # to ensure we do not hurt some class of customers.
+            # self.__verify_service_account()
+
             if self.__controlled_warmer is not None:
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
                 self.__controlled_warmer.start()
@@ -2475,29 +2479,27 @@ class ContainerChecker(object):
             message_delay = 5
             start_time = time.time()
             message_time = start_time
-            abort = False
 
             # wait until the k8s_cache is initialized before aborting
             while not self.k8s_cache.is_initialized():
                 time.sleep(delay)
                 current_time = time.time()
-                # see if we need to print a message
-                elapsed = current_time - message_time
-                if elapsed > message_delay:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "start() - waiting for Kubernetes cache to be initialized",
-                    )
-                    message_time = current_time
+                last_initialization_error = self.k8s_cache.last_initialization_error()
+                if last_initialization_error is not None:
+                    # see if we need to abort the monitor because we've been waiting too long for init
+                    if current_time - start_time > self.__k8s_cache_init_abort_delay:
+                        raise K8sInitException(
+                            "Kubernetes monitor failed to start due to cache initialization error: %s"
+                            % last_initialization_error
+                        )
 
-                # see if we need to abort the monitor because we've been waiting too long for init
-                elapsed = current_time - start_time
-                if elapsed > self.__k8s_cache_init_abort_delay:
-                    abort = True
-                    break
-
-            if abort:
-                raise K8sInitException("Unable to initialize kubernetes cache")
+                    # see if we need to print a message
+                    if current_time - message_time > message_delay:
+                        self._logger.warning(
+                            "Kubernetes monitor not started yet (will retry) due to error in cache initialization %s",
+                            last_initialization_error,
+                        )
+                        message_time = current_time
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
@@ -2582,12 +2584,13 @@ class ContainerChecker(object):
                 "Initialization complete.  Starting k8s monitor for Scalyr",
             )
             self.__thread.start()
-
-        except K8sInitException, e:
+        except K8sInitException as e:
+            e_as_text = str(e)
             global_log.warn(
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
-                % (str(e))
+                % e_as_text
             )
+            k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
         except Exception, e:
             global_log.warn(
@@ -3135,6 +3138,20 @@ class ContainerChecker(object):
                 result.append({"cid": cid, "stream": "raw", "log_config": log_config})
 
         return result
+
+    def __verify_service_account(self):
+        """
+        Verifies that the appropriate service account information can be read from the pod, otherwise raises
+        a `K8sInitException`.  This is meant to catch common configuration issues.
+        """
+        if self._global_config.k8s_verify_api_queries and not (
+            os.path.isfile(self._global_config.k8s_service_account_cert)
+            and os.access(self._global_config.k8s_service_account_cert, os.R_OK)
+        ):
+            raise K8sInitException(
+                "Service account certificate not found at '%s'.  Be sure "
+                "'automountServiceAccountToken' is set to True"
+            )
 
 
 class KubernetesMonitor(ScalyrMonitor):
