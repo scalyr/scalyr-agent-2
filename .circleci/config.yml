@@ -8,7 +8,7 @@ commands:
     description: "A base command for all tox based unit test jobs"
     parameters:
       python_version:
-        description: "Python version to use (e.g. 3.5, 3.6, 3.7, etc.)"
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)"
         type: string
       tox_version:
         description: "tox package version to use"
@@ -102,7 +102,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "py26-unit-tests-requirements.txt" }}
       - run:
           name: Install Dependencies
           command: |
@@ -114,7 +114,7 @@ jobs:
           command: |
             tox -epy2.6-unit-tests
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "py26-unit-tests-requirements.txt" }}
           paths:
             - "~/.cache/pip."
             - ".tox"
@@ -424,7 +424,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
           name: Install Python dependencies
           command: |
@@ -434,7 +434,7 @@ jobs:
           command: |
             tox -e lint
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
             - "~/.cache/pip."
             - ".tox"
