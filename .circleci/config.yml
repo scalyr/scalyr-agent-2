@@ -8,16 +8,35 @@ commands:
     description: "A base command for all tox based unit test jobs"
     parameters:
       python_version:
-        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)"
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)."
         type: string
       tox_version:
-        description: "tox package version to use"
+        description: "tox package version to use."
         type: string
         default: "3.14.3"
+      apt_dependencies:
+        description: "Any optional apt dependencies which should be installed."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target to run."
+        type: string
+      store_coverage:
+        description: "True to persist / store coverage data."
+        type: boolean
+        default: false
     steps:
       - checkout
       - restore_cache:
           key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+      - when:
+          condition: << parameters.apt_dependencies >>
+          steps:
+            - run:
+                name: Install APT Dependencies
+                command: |
+                    apt-get update -y
+                    apt-get install -y << parameters.apt_dependencies >>
       - run:
           name: Install Dependencies
           command: |
@@ -25,12 +44,24 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            tox -epy<< parameters.python_version >>-unit-tests
+            tox -e<< parameters.tox_target >>
       - save_cache:
           key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
             - ".tox"
+      - when:
+          condition: << parameters.store_coverage >>
+          steps:
+            - run:
+                name: Move Coverage Data
+                command: |
+                    mkdir -p coverage-unittest-<< parameters.python_version >>
+                    mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
+            - persist_to_workspace:
+                root: coverage-unittest-<< parameters.python_version >>
+                paths:
+                    .coverage.unittest-<< parameters.python_version >>
 
 jobs:
   unittest-38:
@@ -40,6 +71,7 @@ jobs:
     steps:
       - unittest_tox:
           python_version: "3.8"
+          tox_target: "py3.8-unit-tests"
 
   unittest-37:
     working_directory: ~/scalyr-agent-2
@@ -48,6 +80,7 @@ jobs:
     steps:
       - unittest_tox:
           python_version: "3.7"
+          tox_target: "py3.7-unit-tests"
 
   unittest-36:
     working_directory: ~/scalyr-agent-2
@@ -56,6 +89,7 @@ jobs:
     steps:
       - unittest_tox:
           python_version: "3.6"
+          tox_target: "py3.6-unit-tests"
 
   unittest-35:
     working_directory: ~/scalyr-agent-2
@@ -64,60 +98,28 @@ jobs:
     steps:
       - unittest_tox:
           python_version: "3.5"
+          tox_target: "py3.5-unit-tests"
 
-  # NOTE: This tox target is different then other ones because we also want to run code coverage
-  # and persist the result
   unittest-27:
     working_directory: ~/scalyr-agent-2
     docker:
-      - image: circleci/python:2.7-jessie
+      - image: circleci/python:2.7
     steps:
-      - checkout
-      - restore_cache:
-          key: deps1-tox-{{ .Branch }}-py27-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
-      - run:
-          name: Install Dependencies
-          command: |
-            sudo pip install "tox==3.14.3"
-      - run:
-          name: Run unit tests with coverage
-          command: |
-            tox -ecoverage
-            mkdir -p coverage-unittest-27
-            mv .coverage coverage-unittest-27/.coverage.unittest-27
-      - save_cache:
-          key: deps1-tox-{{ .Branch }}-py27-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/.cache/pip."
-            - ".tox"
-      - persist_to_workspace:
-          root: coverage-unittest-27
-          paths:
-            .coverage.unittest-27
+      - unittest_tox:
+          python_version: "2.7"
+          tox_target: "coverage"
+          store_coverage: true
 
   unittest-26:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: dockershelf/python:2.6-dev
     steps:
-      - checkout
-      - restore_cache:
-          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "py26-unit-tests-requirements.txt" }}
-      - run:
-          name: Install Dependencies
-          command: |
-            apt-get update -y
-            apt-get install -y procps
-            pip install "tox==2.9.1"
-      - run:
-          name: Run Unit Tests under Python 2.6
-          command: |
-            tox -epy2.6-unit-tests
-      - save_cache:
-          key: deps1-tox-{{ .Branch }}-2.6-unit-tests-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "py26-unit-tests-requirements.txt" }}
-          paths:
-            - "~/.cache/pip."
-            - ".tox"
+      - unittest_tox:
+          python_version: "2.6"
+          tox_version: "2.9.1"
+          tox_target: "py2.6-unit-tests"
+          apt_dependencies: "procps"
 
   smoke-standalone-37:
     docker:
@@ -397,6 +399,8 @@ jobs:
           working_directory: cov
           command: |
             source ../venv/bin/activate
+            ls -la .
+            ls -la ../*coverage* || true
             coverage combine
 
       - store_artifacts:
