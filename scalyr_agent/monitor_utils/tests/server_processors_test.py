@@ -39,8 +39,6 @@ from scalyr_agent.monitor_utils.server_processors import (
 from scalyr_agent.util import FakeRunState
 from scalyr_agent.test_base import ScalyrTestCase
 
-import six
-
 
 class TestInt32RequestParser(ScalyrTestCase):
     def setUp(self):

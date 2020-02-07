@@ -32,7 +32,7 @@ try:
     # noinspection PyPep8Naming
     import six.moves.cPickle as pickle
 except ImportError:
-    import pickle
+    import pickle  # type: ignore
 
 from scalyr_agent import StoppableThread
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field

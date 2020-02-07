@@ -43,12 +43,15 @@ try:
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
+    ssl = None  # type: ignore
 
 
 __has_pure_python_tls__ = False
 try:
-    from tlslite import TLSConnection, HTTPTLSConnection, HandshakeSettings
+    from tlslite import (  # pylint: disable=import-error
+        HTTPTLSConnection,
+        HandshakeSettings,
+    )
 
     __has_pure_python_tls__ = True
 except Exception:
@@ -169,7 +172,7 @@ class Connection(object):
     def __init__(self, server, request_deadline, ca_file, headers):
 
         # Verify the server address looks right.
-        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
+        parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -287,7 +290,7 @@ class ScalyrHttpConnection(Connection):
 
         try:
             self._init_connection(pure_python_tls=use_tlslite)
-        except Exception as e:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
+        except Exception:  # echee TODO: more specific exception representative of TLS1.2 incompatibility
             log.info(
                 "Exception while attempting to init HTTP Connection.  Falling back to pure-python TLS implementation"
             )
@@ -344,9 +347,15 @@ class ScalyrHttpConnection(Connection):
         or turning it off completely.
         """
         try:
+            # pylint: disable=import-error,no-name-in-module
             from certvalidator import CertificateValidator
             from certvalidator import ValidationContext
-            from asn1crypto import x509, pem
+            from asn1crypto import (
+                x509,
+                pem,
+            )
+
+            # pylint: enable=import-error,no-name-in-module
 
             # validate server certificate chain
             session = tlslite_connection.sock.session
@@ -412,9 +421,9 @@ class ScalyrHttpConnection(Connection):
                     other_certs=intermediate_certs,
                     # whitelisted_certs=[end_entity_cert.sha1_fingerprint],
                 )
-            validator = CertificateValidator(
-                end_entity_cert, validation_context=context
-            )
+                validator = CertificateValidator(
+                    end_entity_cert, validation_context=context
+                )
             validator.validate_tls(six.text_type(self._host))
             log.info(
                 "Scalyr server cert chain successfully validated via certvalidator library"
@@ -455,7 +464,7 @@ class ScalyrHttpConnection(Connection):
                     if self._ca_file:
                         try:
                             self._validate_chain_certvalidator(self.__connection)
-                        except Exception as e:
+                        except Exception:
                             log.exception("Failure in _validate_chain_certvalidator()")
                             self._validate_chain_openssl()
             else:
@@ -466,14 +475,14 @@ class ScalyrHttpConnection(Connection):
                 self.__connection.connect()
         except Exception as error:
             if hasattr(error, "errno"):
-                errno = error.errno
+                errno = error.errno  # pylint: disable=no-member
             else:
                 errno = None
             if isinstance(error, CertValidationError):
                 log.error(
                     'Failed to connect to "%s" because of server certificate validation error: "%s"',
                     self._full_address,
-                    error.message,
+                    getattr(error, "message", str(error)),
                     error_code="client/connectionFailed",
                 )
             elif __has_ssl__ and isinstance(error, ssl.SSLError):

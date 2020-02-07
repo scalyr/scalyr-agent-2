@@ -23,6 +23,7 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+scalyr-agent-2-*/
 
 # Installer logs
 pip-log.txt
@@ -32,7 +33,6 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .coverage
-.coveragerc
 .cache
 nosetests.xml
 coverage.xml
@@ -60,3 +60,6 @@ coverage.xml
 xunit.xml
 # Sphinx documentation
 docs/_build/
+
+# MyPy
+.mypy_cache/

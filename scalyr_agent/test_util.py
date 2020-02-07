@@ -22,7 +22,6 @@ from scalyr_agent import compat
 __author__ = "echee@scalyr.com"
 
 import re
-import struct
 import atexit
 import logging
 import os
@@ -35,11 +34,8 @@ import scalyr_agent.util as scalyr_util
 
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
-from scalyr_agent.json_lib import JsonArray, JsonObject
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_logging import AgentLogger
-
-import six
 
 
 class ScalyrTestUtils(object):

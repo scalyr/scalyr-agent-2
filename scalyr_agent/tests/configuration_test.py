@@ -1382,7 +1382,7 @@ class TestConfiguration(TestConfigurationBase):
                     self.assertEquals(value, fake_env[field])
                     self.assertNotEquals(value, config_file_value)
 
-        patch_and_start_test()
+        patch_and_start_test()  # pylint: disable=no-value-for-parameter
 
     def test_log_excludes_from_config(self):
         self._write_file_with_separator_conversion(
@@ -1774,15 +1774,21 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
 
         lcm = LogConfigManager(config, None)
         matched_config = lcm.get_config("test")
-        self.assertEqual("TestParser", matched_config["parser"])
-        self.assertEqual(
-            six.text_type([{"match_expression": "a", "replacement": "yes"}]),
-            six.text_type(matched_config["redaction_rules"]),
-        )
-        self.assertEqual(
-            six.text_type([{"match_expression": "INFO", "sampling_rate": 0.1}]),
-            six.text_type(matched_config["sampling_rules"]),
-        )
+
+        # NOTE: We need to sort the values since we can't rely on dict ordering
+        expected = [{"match_expression": "a", "replacement": "yes"}]
+        expected[0] = sorted(expected[0].items())
+
+        actual = list(matched_config["redaction_rules"])
+        actual[0] = sorted(actual[0].items())
+        self.assertEqual(expected, actual)
+
+        expected = [{"match_expression": "INFO", "sampling_rate": 0.1}]
+        expected[0] = sorted(expected[0].items())
+
+        actual = list(matched_config["sampling_rules"])
+        actual[0] = sorted(actual[0].items())
+        self.assertEqual(expected, actual)
         self.assertEqual("true", matched_config["attributes"]["webServer"])
 
     def test_default_logger(self):

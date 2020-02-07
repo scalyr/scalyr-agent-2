@@ -53,7 +53,7 @@ class WorkingDirectory:
         self.savedPath = os.getcwd()
         os.chdir(self.newPath)
 
-    def __exit__(self, etype, value, traceback):
+    def __exit__(self, etype=None, value=None, traceback=None):
         os.chdir(self.savedPath)
 
 

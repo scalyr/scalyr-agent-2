@@ -18,9 +18,12 @@ from __future__ import unicode_literals
 from __future__ import division
 from __future__ import absolute_import
 from __future__ import print_function
+
+if False:
+    from typing import Union
+
 import codecs
 import sys
-import struct
 from io import open
 
 import six
@@ -36,13 +39,9 @@ import base64
 import calendar
 import datetime
 import os
-import random
-import sys
 import threading
 import time
 import uuid
-
-from collections import deque
 
 import scalyr_agent.json_lib as json_lib
 from scalyr_agent.compat import custom_any as any
@@ -54,7 +53,7 @@ from scalyr_agent.platform_controller import CannotExecuteAsUser
 try:
     from hashlib import sha1
 except ImportError:
-    from sha import sha as sha1
+    from sha import sha as sha1  # type: ignore
 
 
 try:
@@ -63,7 +62,7 @@ try:
 
     new_md5 = True
 except ImportError:
-    import md5
+    import md5  # type: ignore
 
     new_md5 = False
 
@@ -71,7 +70,7 @@ except ImportError:
 def get_json_implementation(lib_name):
 
     if lib_name == "ujson":
-        import ujson
+        import ujson  # pylint: disable=import-error
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.
@@ -144,7 +143,11 @@ except ImportError:
         _set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
-        print >>sys.stderr, "No default json library found which should be present in all Python >= 2.6.  " "Python < 2.6 is not supported.  Exiting."
+        print(
+            "No default json library found which should be present in all Python >= 2.6.  "
+            "Python < 2.6 is not supported.  Exiting.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
@@ -391,6 +394,7 @@ def md5_hexdigest(data):
 
 
 def remove_newlines_and_truncate(input_string, char_limit):
+    # type: (Union[str, bytes], int) -> str
     """Returns the input string but with all newlines removed and truncated.
 
     The newlines are replaced with spaces.  This is done both for carriage return and newline.
@@ -400,12 +404,13 @@ def remove_newlines_and_truncate(input_string, char_limit):
     @param input_string: The string to transform
     @param char_limit: The maximum number of characters the resulting string should be
 
-    @type input_string: str
+    @type input_string: str or bytes
     @type char_limit: int
 
     @return:  The string with all newlines replaced with spaces and truncated.
     @rtype: str
     """
+    input_string = six.ensure_text(input_string)
     return input_string.replace("\n", " ").replace("\r", " ")[0:char_limit]
 
 
@@ -468,7 +473,7 @@ def rfc3339_to_datetime(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError as e:
+    except ValueError:
         return None
 
     dt = datetime.datetime(*(tm[0:6]))
@@ -519,7 +524,7 @@ def rfc3339_to_nanoseconds_since_epoch(string):
     # create a datetime object
     try:
         tm = time.strptime(parts[0], "%Y-%m-%dT%H:%M:%S")
-    except ValueError as e:
+    except ValueError:
         return None
 
     nano_seconds = int(calendar.timegm(tm[0:6])) * 1000000000
@@ -1261,7 +1266,7 @@ class ScriptEscalator(object):
             else:
                 # We use the __main__ symbolic module to determine which file was invoked by the python script.
                 # noinspection PyUnresolvedReferences
-                import __main__
+                import __main__  # type: ignore
 
                 script_file_path = __main__.__file__
                 if not os.path.isabs(script_file_path):
