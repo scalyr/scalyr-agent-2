@@ -167,7 +167,7 @@ def print_usage_data(
             project_slug=project_slug.replace("gh/", "")
         )
         # We always include master branch
-        branches += ['master']
+        branches += ["master"]
     else:
         branches = [branch]
 
