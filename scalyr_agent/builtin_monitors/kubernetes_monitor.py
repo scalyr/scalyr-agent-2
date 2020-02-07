@@ -2619,11 +2619,12 @@ class ContainerChecker(object):
             self.__thread.start()
 
         except K8sInitException as e:
+            e_as_text = six.text_type(e)
             global_log.warn(
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
-                % (six.text_type(e))
+                % e_as_text
             )
-            k8s_utils.terminate_agent_process(e.message)
+            k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
         except Exception as e:
             global_log.warn(
