@@ -166,6 +166,8 @@ def print_usage_data(
         branches = get_all_branches_for_repo(
             project_slug=project_slug.replace("gh/", "")
         )
+        # We always include master branch
+        branches += ['master']
     else:
         branches = [branch]
 
