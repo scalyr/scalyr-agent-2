@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2014 Scalyr Inc.
+# Copyright 2014-2020 Scalyr Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -108,6 +108,14 @@ def get_usage_data_for_branch(
     # type: (StringIO, str, str, str, str, int) -> None
     """
     Get usage data for the provided project and write it to the provided buffer.
+
+    :param status: Only return data for workflow runs with the provided status. "all" for all the
+                   available statuses.
+    :param branch: Branch to return data work.
+    :param limit: Maximum number of workflow runs we want to see for a particular branch. NOTE: This
+                  is different from the API limit parameter because API returns data for all the
+                  workflow ones and not only the ones we are interested in and perform late filtering
+                  on.
     """
     url = CIRCLE_CI_API_INSIGHTS_URL.format(
         project_slug=project_slug, workflow=workflow
@@ -190,8 +198,8 @@ def print_usage_data(
         subject = u"Circle CI Usage Report For Period %s - %s" % (week_ago, now)
         send_email(to=emails, subject=subject, text=value)
         print(("Sent email report to %s" % (",".join(emails))))
-    else:
-        print(value)
+
+    print(value)
 
 
 def send_email(to, subject, text):
@@ -214,10 +222,18 @@ def send_email(to, subject, text):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Circle CI usage data")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Retrieve and print / email Circle CI usage data "
+            "for a particular project and workflow."
+        )
+    )
     parser.add_argument(
         "--project_slug",
-        help="Project slug in the following format: <vcs>/<org name>/<repo name>",
+        help=(
+            "Project slug in the following format: <vcs>/<org name>/<repo name> "
+            "(e.g. gh/scalyr/scalyr-agent-2)"
+        ),
         default="gh/scalyr/scalyr-agent-2",
     )
     parser.add_argument(
@@ -226,20 +242,24 @@ if __name__ == "__main__":
         default="unittest",
     )
     parser.add_argument(
-        "--status", help="Workflow status to filter on.", default="success"
+        "--status",
+        help='Workflow status to filter on. "all" for all available statuses.',
+        default="success",
     )
     parser.add_argument(
-        "--branch", help="Branch to print the usage data for", default="master"
+        "--branch",
+        help='Branch to print the usage data for. "all" for all the active branches.',
+        default="master",
     )
     parser.add_argument(
         "--limit",
         help="Maximum number of workflow runs per branch to print data for.",
         type=int,
-        default="10",
+        default=10,
     )
     parser.add_argument(
         "--emails",
-        help="If provided, report will also be emailed to those addresses",
+        help="If provided, report will also be emailed to those addresses (comma separated list).",
         type=str,
         default=None,
         required=False,
