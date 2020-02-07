@@ -25,6 +25,13 @@ import os
 import sys
 import importlib
 
+__all__ = [
+    "get_module_path_for_fqdn",
+    "get_module_fqdn_for_path",
+    "collect_ignore",
+    "collect_ignore_glob",
+]
+
 # A list of directory globs which are ignored under all Python versions.
 # Those paths represent bundled third party dependencies
 GLOBAL_WHITELIST = [
@@ -77,6 +84,19 @@ def get_module_path_for_fqdn(module_fqdn):
     module_path = module_fqdn.replace(".", os.path.sep) + ".py"
     module_path = os.path.abspath(module_path)
     return module_path
+
+
+def get_module_fqdn_for_path(module_path):
+    # type: (str) -> str
+    """
+    Return fully qualified module name for the provided absolute module path starting with
+    scalyr_agent. package.
+    """
+    index = module_path.find("scalyr_agent")
+    if index != -1:
+        module_path = module_path[module_path.find("scalyr_agent") :]
+    module_fqdn = module_path.replace(os.path.sep, ".").replace(".py", "")
+    return module_fqdn
 
 
 # Skip unloadable modules under different versions
