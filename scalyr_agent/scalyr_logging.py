@@ -238,7 +238,7 @@ class AgentLogger(logging.Logger):
 
     # The regular expression that must match for metric and field names.  Essentially, it has to begin with
     # a letter or underscore, and only contain letters, digits, periods, underscores, and dashes.  If you change this,
-    # be sure to fix the __force_valid_metric_or_field_name method below.
+    # be sure to fix the force_valid_metric_or_field_name method below.
     __metric_or_field_name_rule = re.compile(r"[_a-zA-Z][\w\.\-]*$")
 
     def __init__(self, name):
