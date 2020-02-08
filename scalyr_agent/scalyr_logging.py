@@ -353,7 +353,7 @@ class AgentLogger(logging.Logger):
         string_buffer = io.StringIO()
         if type(metric_name) is not six.text_type:
             raise UnsupportedValueType(metric_name=metric_name)
-        metric_name = self.__force_valid_metric_or_field_name(
+        metric_name = self.force_valid_metric_or_field_name(
             metric_name, is_metric=True, logger=self
         )
 
@@ -375,7 +375,7 @@ class AgentLogger(logging.Logger):
                         field_name=field_name, field_value=field_value
                     )
 
-                field_name = self.__force_valid_metric_or_field_name(
+                field_name = self.force_valid_metric_or_field_name(
                     field_name, is_metric=False, logger=self
                 )
 
@@ -613,7 +613,7 @@ class AgentLogger(logging.Logger):
             self.__monitor = None
 
     @staticmethod
-    def __force_valid_metric_or_field_name(name, is_metric=True, logger=None):
+    def force_valid_metric_or_field_name(name, is_metric=True, logger=None):
         """Forces the given metric or field name to be valid.
 
         A valid metric/field name must being with a letter or underscore and only contain alphanumeric characters including
