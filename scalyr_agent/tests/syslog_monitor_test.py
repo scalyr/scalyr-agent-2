@@ -353,13 +353,6 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         return connected
 
-    def wait_for_flush(self):
-        """wait for event from 'TestAutoFlushingRotatingFileHandler._internal_flush'"""
-
-        # Get mocked file handler from _disk_logger.
-        self.monitor._disk_logger.handlers[0].event.wait()
-        self.monitor._disk_logger.handlers[0].event.clear()
-
     def send_and_wait_for_lines(self, sock, data, dest_addr=None, expected_line_count=1):
         """
         Send data through a 'sock' socket.
