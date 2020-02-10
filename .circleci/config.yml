@@ -443,6 +443,21 @@ jobs:
             - "~/.cache/pip."
             - ".tox"
 
+  send-circle-ci-usage-report:
+    description: "Job which emails weekly Circle CI usage report"
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6-jessie
+    steps:
+      - checkout
+      - run:
+          name: Email Usage Report
+          command: |
+            export PYTHONPATH=.
+            python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
+                --workflow=unittest --status=success --branch=all --limit=5 \
+                --email=tomaz@scalyr.com
+
 workflows:
   version: 2
   unittest:
@@ -468,3 +483,13 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
+  weekly-circle-ci-usage-report:
+    triggers:
+      - schedule:
+          cron: "0 0 * * 0"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+      - send-circle-ci-usage-report
