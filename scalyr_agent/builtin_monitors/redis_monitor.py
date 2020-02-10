@@ -33,7 +33,7 @@ from redis.exceptions import (  # pylint: disable=import-error
     TimeoutError,
 )
 
-MORE_BYTES = re.compile(r"\.\.\. \(\d+ more bytes\)$")
+MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")  # NOQA
 
 
 class RedisHost(object):

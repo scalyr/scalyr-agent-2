@@ -2308,7 +2308,7 @@ class CRIEnumerator(ContainerEnumerator):
                 limit_key="kubelet-api-connect",
             )
             self._query_filesystem = True
-        except Exception as e:
+        except Exception:
             global_log.exception(
                 "Error querying kubelet API for running pods and containers",
                 limit_once_per_x_secs=300,

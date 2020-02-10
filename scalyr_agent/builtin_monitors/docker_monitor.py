@@ -766,7 +766,7 @@ def _get_containers(
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
-                        except Exception as e:
+                        except Exception:
                             logger.error(
                                 "Error inspecting container '%s'" % cid,
                                 limit_once_per_x_secs=300,
@@ -1917,7 +1917,6 @@ class DockerOptions(object):
         """
 
         # get a local copy of the default docker config options
-        label_exclude_globs = self.label_exclude_globs
         label_include_globs = self.label_include_globs
         use_labels_for_log_config = self.use_labels_for_log_config
         label_prefix = self.label_prefix
@@ -1937,7 +1936,6 @@ class DockerOptions(object):
             )
             # if there was an error, reset all values back to defaults
             # TODO(Tomaz): This code seems wrong and unused?
-            label_exclude_globs = self.label_exclude_glob  # NOQA
             label_include_globs = self.label_include_globs  # NOQA
             use_labels_for_log_config = self.use_labels_for_log_config  # NOQA
             label_prefix = self.label_prefix  # NOQA

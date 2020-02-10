@@ -265,7 +265,7 @@ options, see Configuration Reference.
         # verify that the URL is valid
         try:
             url = six.moves.urllib.parse.urlparse(self.__url)
-        except Exception as e:
+        except Exception:
             self._logger.error(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % self.__url
