@@ -2735,6 +2735,10 @@ class ContainerChecker(object):
                         if not pod:
                             pass
                             # Don't log any warnings here for now
+                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            # pod_namespace = info["k8s_info"].get(
+                            #     "pod_namespace", "invalid_namespace"
+                            # )
                             # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                             #                      limit_once_per_x_secs=300,
                             #                      limit_key='check-container-pod-info-%s' % cid)
