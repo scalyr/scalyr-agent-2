@@ -144,6 +144,12 @@ define_metric(
 
 define_metric(
     __monitor__,
+    "app.mem.majflt",
+    "The number of page faults requiring physical I/O.",
+)
+
+define_metric(
+    __monitor__,
     "app.disk.bytes",
     "Total bytes read from disk.",
     extra_fields={"type": "read"},
@@ -183,6 +189,14 @@ define_metric(
     "app.io.fds",
     "The number of open file descriptors help by process.",
     extra_fields={"type": "open"},
+)
+
+define_metric(
+    __monitor__,
+    "app.io.wait",
+    "The number of aggregated block I/O delays, in 1/100ths of a second.",
+    unit="secs:0.01",
+    cumulative=True,
 )
 
 define_log_field(__monitor__, "monitor", "Always ``linux_process_metrics``.")
@@ -497,9 +511,14 @@ class StatReader(BaseReader):
         # Then the fields we want are just at fixed field positions in the
         # string.  Just grab them.
 
+        # See http://man7.org/linux/man-pages/man5/proc.5.html for reference on field numbers
+        # Keep in mind that we chop first 3 values away (pid, command line, state), so you need to
+        # subtract 3 from the field numbers from the man page (e.g. on the man page nice is number
+        # 19, but in our case it's 16 aka 19 - 3)
         process_uptime = self.__get_uptime_ms() - self.calculate_time_ms(
             int(fields[19])
         )
+
         collector.update(
             {
                 Metric("app.cpu", "user"): self.__calculate_time_cs(int(fields[11])),
@@ -507,6 +526,8 @@ class StatReader(BaseReader):
                 Metric("app.uptime", None): process_uptime,
                 Metric("app.nice", None): float(fields[16]),
                 Metric("app.threads", None): int(fields[17]),
+                Metric("app.mem.majflt", None): int(fields[9]),
+                Metric("app.io.wait", None): int(fields[39]) if len(fields) >= 39 else 0,
             }
         )
         return collector
@@ -829,11 +850,13 @@ class ProcessTracker(object):
       app.mem.bytes type=resident:      the number of bytes of resident memory in use
       app.mem.bytes type=peak_vmsize:   the maximum number of bytes used for virtual memory for process
       app.mem.bytes type=peak_resident: the maximum number of bytes of resident memory ever used by process
+      app.mem.majflt:                   the number of page faults requiring physical I/O.
       app.disk.bytes type=read:         the number of bytes read from disk
       app.disk.requests type=read:      the number of disk requests.
       app.disk.bytes type=write:        the number of bytes written to disk
       app.disk.requests type=write:     the number of disk requests.
       app.io.fds type=open:             the number of file descriptors held open by the process
+      app.io.wait:                      the number of aggregated block I/O delays, in 1/100ths of a second.
     """
 
     def __init__(self, pid, logger, monitor_id=None):
