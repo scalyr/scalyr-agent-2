@@ -412,12 +412,17 @@ if __name__ == "__main__":
         os.path.join(root, "build_package.py"),
     }
 
+    smoke_test_files = set(
+        glob.glob("{0}/tests/**/*.py".format(root), recursive=True)
+    )
+
     # files without third party libraries.
     files_to_process = (
         all_files
         - third_party_files
         - venv_files
         - modernize_files
+        - smoke_test_files
         - other_files_to_exclude
     )
 
