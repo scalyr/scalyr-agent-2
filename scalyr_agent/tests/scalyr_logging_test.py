@@ -311,6 +311,15 @@ class ScalyrLoggingTest(ScalyrTestCase):
         self.assertTrue(self.__log_contains("Third record"))
         self.assertFalse(self.__log_contains("Fourth record"))
 
+    def test_force_valid_metric_or_field_name(self):
+        name = "abc$#%^&123"
+        fixed_name = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(name)
+        self.assertEqual(fixed_name, "abc_____123")
+
+        name2 = "abc123"
+        fixed_name2 = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(name2)
+        self.assertEqual(fixed_name2, name2)
+
     class FakeMonitor(object):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""
 
