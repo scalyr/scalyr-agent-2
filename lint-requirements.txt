@@ -1,0 +1,6 @@
+# This file contains requirements which are needed by the lint test targets
+black==19.10b0
+modernize==0.7
+flake8==3.7.9
+pylint==2.4.4
+mypy==0.761

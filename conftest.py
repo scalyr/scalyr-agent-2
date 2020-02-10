@@ -25,6 +25,13 @@ import os
 import sys
 import importlib
 
+__all__ = [
+    "get_module_path_for_fqdn",
+    "get_module_fqdn_for_path",
+    "collect_ignore",
+    "collect_ignore_glob",
+]
+
 # A list of directory globs which are ignored under all Python versions.
 # Those paths represent bundled third party dependencies
 GLOBAL_WHITELIST = [
@@ -57,6 +64,17 @@ collect_ignore_glob.extend(GLOBAL_WHITELIST)
 
 collect_ignore = ["setup.py"]
 
+# NOTE: Older version of pytest (<= 3.2.5 )which is used under Python 2.6 doesn't support
+# collect_ignore_glob directive
+if sys.version_info[:2] == (2, 6):
+    import fnmatch
+
+    for directory in GLOBAL_WHITELIST:
+        for root, dirnames, filenames in os.walk(directory.replace("/*", "/")):
+            for filename in fnmatch.filter(filenames, "*.py"):
+                file_path = os.path.join(root, filename)
+                collect_ignore.append(file_path)
+
 
 def get_module_path_for_fqdn(module_fqdn):
     # type: (str) -> str
@@ -68,11 +86,24 @@ def get_module_path_for_fqdn(module_fqdn):
     return module_path
 
 
+def get_module_fqdn_for_path(module_path):
+    # type: (str) -> str
+    """
+    Return fully qualified module name for the provided absolute module path starting with
+    scalyr_agent. package.
+    """
+    index = module_path.find("scalyr_agent")
+    if index != -1:
+        module_path = module_path[module_path.find("scalyr_agent") :]
+    module_fqdn = module_path.replace(os.path.sep, ".").replace(".py", "")
+    return module_fqdn
+
+
 # Skip unloadable modules under different versions
 for module_fqdn in PRE_PYTHON27_WHITELIST:
     try:
         mod = importlib.import_module(module_fqdn)
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError, SyntaxError) as e:
         if sys.version_info[:2] < (2, 7):
             print(
                 (
@@ -87,7 +118,7 @@ for module_fqdn in PRE_PYTHON27_WHITELIST:
 for module_fqdn in PYTHON24_WHITELIST:
     try:
         mod = importlib.import_module(module_fqdn)
-    except (ImportError, AttributeError) as e:
+    except (ImportError, AttributeError, SyntaxError) as e:
         if sys.version_info[:2] < (2, 5):
             print(
                 (
