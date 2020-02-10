@@ -7,7 +7,7 @@ max-line-length = 130
 ignore = E128,E402,E722,W504,E501,E203,W503
 
 # NOTE: For now we ignore builtin_monitors/ since there are simply too many violations there
-exclude=*.egg/*,build,dist,*third_party/,*third_party_tls/,*third_party_python2/,*builtin_monitors/
+exclude=*.egg/*,build,dist,*third_party/,*third_party_tls/,*third_party_python2/
 
 # NOTE: This requires flake8 >= 3.0.0 to work correctly.
 # If old version is used (< 3.0.0), it will select all the errors and it wont ignore ones
