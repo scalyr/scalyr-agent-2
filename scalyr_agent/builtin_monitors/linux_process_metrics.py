@@ -143,9 +143,7 @@ define_metric(
 )
 
 define_metric(
-    __monitor__,
-    "app.mem.majflt",
-    "The number of page faults requiring physical I/O.",
+    __monitor__, "app.mem.majflt", "The number of page faults requiring physical I/O.",
 )
 
 define_metric(
@@ -260,7 +258,7 @@ class Metric(object):
         )
 
     def __repr__(self):
-        return ('<Metric name=%s,type=%s>' % (self.name, self.type))
+        return "<Metric name=%s,type=%s>" % (self.name, self.type)
 
 
 class MetricPrinter:
@@ -358,9 +356,12 @@ class BaseReader:
                     )
                 elif e.errno == errno.ENOENT:
                     self._logger.error(
-                        ("The agent cannot read %s.  Your system may not support that proc file "
-                         "type or the process with pid \"%s\" doesn't exist"),
-                        filename, self._pid
+                        (
+                            "The agent cannot read %s.  Your system may not support that proc file "
+                            'type or the process with pid "%s" doesn\'t exist'
+                        ),
+                        filename,
+                        self._pid,
                     )
                 # Ignore 'process not found' errors (likely caused because the process exited
                 # but re-raise the exception for all other errors
@@ -527,7 +528,9 @@ class StatReader(BaseReader):
                 Metric("app.nice", None): float(fields[16]),
                 Metric("app.threads", None): int(fields[17]),
                 Metric("app.mem.majflt", None): int(fields[9]),
-                Metric("app.io.wait", None): int(fields[39]) if len(fields) >= 39 else 0,
+                Metric("app.io.wait", None): int(fields[39])
+                if len(fields) >= 39
+                else 0,
             }
         )
         return collector
@@ -896,7 +899,7 @@ class ProcessTracker(object):
         return collector
 
     def __repr__(self):
-        return ('<ProcessTracker pid=%s,monitor_id=%s>' % (self.pid, self.monitor_id))
+        return "<ProcessTracker pid=%s,monitor_id=%s>" % (self.pid, self.monitor_id)
 
 
 class ProcessList(object):
