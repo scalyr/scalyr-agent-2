@@ -386,7 +386,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
     def test_losing_read_access(self):
         # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
-        if sys.platform == "win32":
+        if sys.platform == "win32" or sys.version_info[:2] == (2, 6):
             return
 
         self.append_file(self.__path, b"L001\n", b"L002\n")
