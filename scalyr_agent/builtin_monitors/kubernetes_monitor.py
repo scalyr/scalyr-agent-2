@@ -1071,7 +1071,7 @@ class ControlledCacheWarmer(StoppableThread):
         # has already been warmed.
         self.__lock.acquire()
         try:
-            if not container_id in self.__active_pods:
+            if container_id not in self.__active_pods:
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(
                     pod_namespace, pod_name
                 )
@@ -1140,7 +1140,6 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: dict  (int, int)
         """
         self.__lock.acquire()
-        result = {}
         try:
             return self.__gather_report_stats()
         finally:
@@ -1680,8 +1679,8 @@ def _get_containers(
 
                     if glob_list:
                         add_container = False
-                        for glob in glob_list:
-                            if fnmatch.fnmatch(name, glob):
+                        for glob_pattern in glob_list:
+                            if fnmatch.fnmatch(name, glob_pattern):
                                 add_container = True
                                 break
 
@@ -2034,9 +2033,9 @@ class CRIEnumerator(ContainerEnumerator):
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
         self._container_glob = "%s/*.log" % self._log_base
-        self._pod_re = re.compile("^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
+        self._pod_re = re.compile(r"^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
         self._info_re = re.compile(
-            "^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
+            r"^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
         )
 
     def _get_containers(
@@ -2076,8 +2075,8 @@ class CRIEnumerator(ContainerEnumerator):
                 add_container = True
                 if glob_list:
                     add_container = False
-                    for glob in glob_list:
-                        if fnmatch.fnmatch(cname, glob):
+                    for glob_pattern in glob_list:
+                        if fnmatch.fnmatch(cname, glob_pattern):
                             add_container = True
                             break
 
@@ -2229,7 +2228,6 @@ class CRIEnumerator(ContainerEnumerator):
                 metadata = pod.get("metadata", {})
                 pod_name = metadata.get("name", "")
                 pod_namespace = metadata.get("namespace", "")
-                pod_uid = metadata.get("uid", "")
 
                 # ignore anything that is in an excluded namespace
                 if pod_namespace in k8s_namespaces_to_exclude:
@@ -2495,7 +2493,7 @@ class ContainerChecker(object):
 
         try:
             k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._config.get("k8s_verify_api_queries")
+            self._config.get("k8s_verify_api_queries")
 
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache(self._global_config)
@@ -2732,10 +2730,6 @@ class ContainerChecker(object):
                 for cid, info in six.iteritems(running_containers):
                     pod = None
                     if "k8s_info" in info:
-                        pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                        pod_namespace = info["k8s_info"].get(
-                            "pod_namespace", "invalid_namespace"
-                        )
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
@@ -2914,7 +2908,7 @@ class ContainerChecker(object):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception as e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in KubernetesMonitor")
             raise
 
@@ -3163,8 +3157,6 @@ class ContainerChecker(object):
 
         attributes = self.__get_base_attributes()
 
-        prefix = self.__log_prefix + "-"
-
         for cid, info in six.iteritems(containers):
             log_config = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
@@ -3366,7 +3358,6 @@ class KubernetesMonitor(ScalyrMonitor):
 
     def _initialize(self):
         """This method gets called every 30 seconds regardless"""
-        data_path = ""
         log_path = ""
         host_hostname = ""
 
@@ -3385,7 +3376,6 @@ class KubernetesMonitor(ScalyrMonitor):
         )
 
         if self._global_config:
-            data_path = self._global_config.agent_data_path
             log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
@@ -4010,7 +4000,7 @@ class KubernetesMonitor(ScalyrMonitor):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()

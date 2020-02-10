@@ -47,7 +47,6 @@ except ImportError:
     )
 
 from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util

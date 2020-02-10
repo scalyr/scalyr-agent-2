@@ -10,7 +10,8 @@ import socket
 
 import six
 import six.moves.http_client
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+import six.moves.urllib.request
+import six.moves.urllib.error
 import six.moves.urllib.parse
 
 from scalyr_agent.scalyr_monitor import (

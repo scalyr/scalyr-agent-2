@@ -27,11 +27,12 @@ import re
 
 import six.moves.urllib.parse
 import six.moves.http_client
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
 
 from scalyr_agent import (
     ScalyrMonitor,
-    UnsupportedSystem,
     define_config_option,
     define_metric,
     define_log_field,
@@ -244,6 +245,8 @@ define_log_field(__monitor__, "value", "The metric value.")
 # Note - the use of a global is ugly, but this form is more compatible than with another
 # method mentioned which would not require the global.  (The cleaner version was added
 # in Python 2.7.)
+
+
 class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
     def connect(self):
         """Connect to the host and port specified in __init__."""
@@ -284,7 +287,7 @@ def _convert_to_megabytes(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception as e:
+    except Exception:
         return None
     return val * multiplier
 
@@ -307,7 +310,7 @@ def _convert_to_milliseconds(value):
             val = float(parts[0])
         else:
             val = float(int(parts[0]))
-    except Exception as e:
+    except Exception:
         return None
     return val * multiplier
 
@@ -418,7 +421,7 @@ instance."""
         data = None
         # verify that the URL is valid
         try:
-            testurl = six.moves.urllib.parse.urlparse(url)
+            six.moves.urllib.parse.urlparse(url)
         except Exception as e:
             print(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
@@ -428,7 +431,7 @@ instance."""
         # attempt to request server status
         try:
             request = six.moves.urllib.request.Request(self._monitor_url)
-            if self._monitor_user != None:
+            if self._monitor_user is not None:
                 b64cred = base64.encodestring(
                     "%s:%s" % (self._monitor_user, self._monitor_password)
                 ).replace("\n", "")
@@ -481,13 +484,15 @@ instance."""
         start = status.find("<h1>JVM</h1>")
         if start > -1:
             m = re.match(
-                r"[\w\W]*Free memory: ([\w\W]*) Total memory: ([\w\W]*) Max memory: ([\w\W]*)<\/p>[\w\W]*"
-                "Max threads: ([\d]*) Current thread count: ([\d]*) Current thread busy: ([\d]*)[\w\W]*"
-                "Max processing time: ([\w\W]*) Processing time: ([\w\W]*)[\w\W]*"
-                "Request count: ([\d]*) Error count: ([\d]*) Bytes received: ([\w\W]*) Bytes sent: ([\w\W]*)<\/p><table[\w\W]*",
+                (
+                    r"[\w\W]*Free memory: ([\w\W]*) Total memory: ([\w\W]*) Max memory: ([\w\W]*)<\/p>[\w\W]*"
+                    r"Max threads: ([\d]*) Current thread count: ([\d]*) Current thread busy: ([\d]*)[\w\W]*"
+                    r"Max processing time: ([\w\W]*) Processing time: ([\w\W]*)[\w\W]*"
+                    r"Request count: ([\d]*) Error count: ([\d]*) Bytes received: ([\w\W]*) Bytes sent: ([\w\W]*)<\/p><table[\w\W]*"
+                ),
                 status[start + 12 :],
             )
-            if m != None:
+            if m is not None:
                 result["memory_free"] = [
                     "memory_bytes",
                     _convert_to_megabytes(m.group(1)),
@@ -550,14 +555,16 @@ instance."""
         start = status.find("<h1>JVM</h1>")
         if start > -1:
             m = re.match(
-                r"[\w\W]*CMS Old Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Eden Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Survivor Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*CMS Perm Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
-                "[\w\W]*Code Cache<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr><\/tbody><\/table>[\w\W]+",
+                (
+                    r"[\w\W]*CMS Old Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Eden Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Survivor Space<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*CMS Perm Gen<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr>"
+                    r"[\w\W]*Code Cache<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><td>([\w\W]*)<\/td><\/tr><\/tbody><\/table>[\w\W]+"
+                ),
                 status[start + 12 :],
             )
-            if m != None:
+            if m is not None:
                 # result["cms_old_gen.type"] = m.group(1)
                 result["cms_old_gen.initial"] = [
                     "initial",
@@ -690,11 +697,11 @@ instance."""
         """
 
         status = self._get_status(self._monitor_url)
-        if status != None:
+        if status is not None:
             stats = self._parse_general_status(status)
             heap = self._parse_heap_status(status)
 
-            if stats != None:
+            if stats is not None:
                 for key in stats.keys():
                     extra = None
                     if len(stats[key]) == 4:
@@ -702,7 +709,7 @@ instance."""
                     self._logger.emit_value(
                         "tomcat.runtime.%s" % stats[key][0], stats[key][1], extra
                     )
-            if heap != None:
+            if heap is not None:
                 for key in heap.keys():
                     extra = {heap[key][2]: heap[key][3]}
                     self._logger.emit_value(

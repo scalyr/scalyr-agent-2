@@ -5,9 +5,10 @@
 # scalyr_agent.builtin_monitors.apache_monitor
 from __future__ import absolute_import
 import six.moves.http_client
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
-import socket
+import six.moves.urllib.request
+import six.moves.urllib.error
 import six.moves.urllib.parse
+import socket
 
 from scalyr_agent import (
     ScalyrMonitor,

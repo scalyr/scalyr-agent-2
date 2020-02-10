@@ -22,7 +22,6 @@ from __future__ import absolute_import
 __author__ = "imron@scalyr.com"
 
 import binascii
-import codecs
 import re
 import time
 
@@ -34,7 +33,7 @@ from redis.exceptions import (  # pylint: disable=import-error
     TimeoutError,
 )
 
-MORE_BYTES = re.compile(b"\.\.\. \(\d+ more bytes\)$")
+MORE_BYTES = re.compile(r"\.\.\. \(\d+ more bytes\)$")
 
 
 class RedisHost(object):
@@ -77,7 +76,7 @@ class RedisHost(object):
 
     def valid(self):
         """Check if we are currently connected to a redis instance"""
-        return self.__redis != None
+        return self.__redis is not None
 
     def __update_latest(self, redis):
         """Get the most recent entry in the slow log and store its ID.
@@ -101,7 +100,7 @@ class RedisHost(object):
                 self.last_timestamp = latest[0]["start_time"]
 
     def check_for_reset(self, info):
-        if not "run_id" in info:
+        if "run_id" not in info:
             raise Exception(
                 "Unsupported redis version.  redis_monitor requires a version of redis >= 2.4.17"
             )
@@ -216,7 +215,7 @@ class RedisHost(object):
 
         try:
             command = entry_command.decode("utf8")
-        except UnicodeDecodeError as e:
+        except UnicodeDecodeError:
             if self.utf8_warning_interval:
                 logger.warn(
                     "Redis command contains invalid utf8: %s"
@@ -398,8 +397,8 @@ Additional configuration options are as follows:
         for host in self.__redis_hosts:
             new_connection = not host.valid()
             try:
-                entries = host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
-            except ConnectionError as e:
+                host.log_slowlog_entries(self._logger, self.__lines_to_fetch)
+            except ConnectionError:
                 if new_connection:
                     self._logger.error(
                         "Unable to establish connection: %s" % (host.display_string),
@@ -410,5 +409,5 @@ Additional configuration options are as follows:
                     self._logger.error(
                         "Connection to redis lost: %s" % host.display_string
                     )
-            except TimeoutError as e:
+            except TimeoutError:
                 self._logger.warn("Connection timed out: %s" % host.display_string)
