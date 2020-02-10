@@ -344,8 +344,9 @@ class BaseReader:
                     )
                 elif e.errno == errno.ENOENT:
                     self._logger.error(
-                        "The agent cannot read %s.  Your system may not support that proc file type",
-                        filename,
+                        ("The agent cannot read %s.  Your system may not support that proc file "
+                         "type or the process with pid \"%s\" doesn't exist"),
+                        filename, self._pid
                     )
                 # Ignore 'process not found' errors (likely caused because the process exited
                 # but re-raise the exception for all other errors
