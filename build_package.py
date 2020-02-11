@@ -570,7 +570,10 @@ def build_container_builder(
     # Make a copy of the right Dockerfile to embed in the script.
     shutil.copy(make_path(agent_source_root, dockerfile), "Dockerfile")
     # copy requirements file with dependencies for docker builds.
-    shutil.copy(make_path(agent_source_root, os.path.join("docker", "requirements.txt")), "requirements.txt")
+    shutil.copy(
+        make_path(agent_source_root, os.path.join("docker", "requirements.txt")),
+        "requirements.txt",
+    )
 
     if variant is None:
         version_string = version
