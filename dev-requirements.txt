@@ -2,6 +2,13 @@
 # These dependencies are not needed to run the Scalyr Agent, but mainly used for
 # running test suites, and mocking Python Objects for the Scalyr Agent.
 
+# Testing tools and libraries
+tox==3.14.3
 mock==0.8.0
+pytest==4.6.9
+pytest-coverage
 coverage==4.5.4
+codecov==2.0.15
+
+# Test / 3rd party dependencies
 -r extra-requirements.txt

@@ -19,7 +19,7 @@
 # description: Manages the Scalyr Agent 2, which provides log copying
 #     and basic system metric collection.
 ###
-### BEGIN INIT INFO
+## BEGIN INIT INFO # NOQA
 # Provides: scalyr-agent-2
 # Required-Start: $network
 # Required-Stop: $network
@@ -27,7 +27,7 @@
 # Default-Stop: 0 1 6
 # Description: Manages the Scalyr Agent 2, which provides log copying
 #     and back system metric collection.
-### END INIT INFO
+### END INIT INFO # NOQA
 #
 # author: Steven Czerwinski <czerwin@scalyr.com>
 from __future__ import unicode_literals

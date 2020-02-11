@@ -41,7 +41,9 @@ import tempfile
 import time
 import uuid
 
-from cStringIO import StringIO
+from io import StringIO
+from io import BytesIO
+
 from optparse import OptionParser
 from time import gmtime, strftime
 
@@ -52,6 +54,7 @@ scalyr_init()
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+import six
 from six.moves import range
 
 # [end of 2->TOD0]
@@ -194,10 +197,9 @@ def build_win32_installer_package(variant, version):
         sys.exit(1)
 
     try:
-        import psutil
+        import psutil  # NOQA
     except ImportError:
         # noinspection PyUnusedLocal
-        psutil = None
         print(
             "Error, the psutil Python module is not installed.  This is required to build the",
             file=sys.stderr,
@@ -243,9 +245,9 @@ def build_win32_installer_package(variant, version):
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
     #
     # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
-    recursively_delete_dirs_by_name("\.idea", "tests")
+    recursively_delete_dirs_by_name(r"\.idea", "tests")
     recursively_delete_files_by_name(
-        ".*\.pyc", ".*\.pyo", ".*\.pyd", "all_tests\.py", ".*~"
+        r".*\.pyc", r".*\.pyo", r".*\.pyd", r"all_tests\.py", r".*~"
     )
 
     # exclude all the third_party_tls libs under windows
@@ -403,9 +405,9 @@ def create_wxs_file(template_path, dist_path, destination_path):
         if "<!-- EXPAND_FROM_BIN" in template_lines[0]:
             result.extend(expand_template(template_lines, dist_files))
         else:
-            l = template_lines[0]
+            line = template_lines[0]
             del template_lines[0]
-            result.append(l)
+            result.append(line)
 
     # Write the resulting lines out.
     f = open(destination_path, "wb")
@@ -437,7 +439,7 @@ def expand_template(input_lines, dist_files):
     """
     # First, see if there were any files that should be excluded.  This will be in the first line, prefaced by
     # EXCLUDED and a comma separated list.
-    match = re.search("EXCLUDE:(\S*)", input_lines[0])
+    match = re.search(r"EXCLUDE:(\S*)", input_lines[0])
     del input_lines[0]
 
     if match is not None:
@@ -449,13 +451,13 @@ def expand_template(input_lines, dist_files):
     template_lines = []
     found_end = False
     while len(input_lines) > 0:
-        l = input_lines[0]
+        line = input_lines[0]
         del input_lines[0]
-        if "<!-- EXPAND_FROM_BIN" in l:
+        if "<!-- EXPAND_FROM_BIN" in line:
             found_end = True
             break
         else:
-            template_lines.append(l)
+            template_lines.append(line)
 
     if not found_end:
         raise Exception("Did not find termination for EXPAND_FROM_BIN")
@@ -602,7 +604,7 @@ def build_container_builder(
 
     # Tar it up but hold the tarfile in memory.  Note, if the source tarball really becomes massive, might have to
     # rethink this.
-    tar_out = StringIO()
+    tar_out = BytesIO()
     tar = tarfile.open("assets.tar.gz", "w|gz", tar_out)
 
     # if coverage enabled patch Dockerfile to install coverage package with pip.
@@ -626,8 +628,8 @@ def build_container_builder(
     tar.close()
 
     # Write one file that has the contents of the script followed by the contents of the tarfile.
-    builder_fp = open(output_name, "w")
-    builder_fp.write(base_script)
+    builder_fp = open(output_name, "wb")
+    builder_fp.write(base_script.encode("utf-8"))
     builder_fp.write(tar_out.getvalue())
     builder_fp.close()
 
@@ -865,9 +867,9 @@ def build_base_files(base_configs="config"):
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
     #
     # Don't include the tests directories.  Also, don't include the .idea directory created by IDE.
-    recursively_delete_dirs_by_name("\.idea", "tests")
+    recursively_delete_dirs_by_name(r"\.idea", "tests")
     recursively_delete_files_by_name(
-        ".*\.pyc", ".*\.pyo", ".*\.pyd", "all_tests\.py", ".*~"
+        r".*\.pyc", r".*\.pyo", r".*\.pyd", r"all_tests\.py", r".*~"
     )
 
     os.chdir("..")
@@ -1116,7 +1118,7 @@ def parse_date(date_str):
     adjusted = date_str.replace("Sept", "Sep")
 
     # Find the timezone string at the end of the string.
-    if re.search("[\-+]\d\d\d\d$", adjusted) is None:
+    if re.search(r"[\-+]\d\d\d\d$", adjusted) is None:
         raise ValueError(
             "Value '%s' does not meet required time format of 'MMM DD, YYYY HH:MM +ZZZZ' (or "
             "as an example, ' 'Oct 10, 2014 17:00 -0700'" % date_str
@@ -1163,7 +1165,7 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
         exit_on_fail will be ignored.
     @param command_name: The name to use to identify the command in error output.
 
-    @return: The exist status of the command.
+    @return: The exist status and output string of the command.
     """
     # We have to use a temporary file to hold the output to stdout and stderr.
     output_file = tempfile.mktemp()
@@ -1178,9 +1180,9 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
         output_buffer = StringIO()
-        input_fp = open(output_file, "r")
+        input_fp = open(output_file, "rb")
         for line in input_fp:
-            output_buffer.write(line)
+            output_buffer.write(line.decode("utf-8"))
         input_fp.close()
 
         output_str = output_buffer.getvalue()
@@ -1208,6 +1210,10 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
                 print("Exiting due to failure.", file=sys.stderr)
                 sys.exit(1)
 
+        if isinstance(output_str, six.binary_type):
+            # Ensure we return unicode type
+            output_str = output_str.decode("utf-8")
+
         return return_code, output_str
 
     finally:
@@ -1223,7 +1229,7 @@ def create_scriptlets():
     """
     fp = open("preinstall.sh", "w")
     fp.write(
-        """#!/bin/bash
+        r"""#!/bin/bash
 
 # Always remove the .pyc files.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.
@@ -1238,7 +1244,7 @@ exit 0;
 
     fp = open("preuninstall.sh", "w")
     fp.write(
-        """#!/bin/bash
+        r"""#!/bin/bash
 
 # We only need to tweak the rc config if this is an uninstall of the package
 # (rather than just removing this version because we are upgrading to
@@ -1278,7 +1284,7 @@ exit 0;
     # Create the postinstall.sh script.
     fp = open("postinstall.sh", "w")
     fp.write(
-        """#!/bin/bash
+        r"""#!/bin/bash
 
 config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
 script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
@@ -1421,10 +1427,10 @@ def parse_change_log():
     """
     # Some regular expressions matching what we expect to see in CHANGELOG.md.
     # Each release section should start with a '##' line for major header.
-    release_matcher = re.compile('## ([\d\._]+) "(.*)"')
+    release_matcher = re.compile(r'## ([\d\._]+) "(.*)"')
     # The expected pattern we will include in a HTML comment to give information on the packager.
     packaged_matcher = re.compile(
-        "Packaged by (.*) <(.*)> on (\w+ \d+, \d+ \d+:\d\d [+-]\d\d\d\d)"
+        r"Packaged by (.*) <(.*)> on (\w+ \d+, \d+ \d+:\d\d [+-]\d\d\d\d)"
     )
 
     # Listed below are the deliminators we use to extract the structure from the changelog release
@@ -1450,20 +1456,20 @@ def parse_change_log():
         # The level down is ' *'.
         {
             "up": re.compile("## "),
-            "down": re.compile("\* "),
-            "same": re.compile("[^\s\*\-#]"),
+            "down": re.compile(r"\* "),
+            "same": re.compile(r"[^\s\*\-#]"),
             "prefix": "",
         },
         # Second level always begins with an asterisk.
         {
-            "up": re.compile("[^\s\*\-#]"),
+            "up": re.compile(r"[^\s\*\-#]"),
             "down": re.compile("    - "),
-            "same": re.compile("\* "),
+            "same": re.compile(r"\* "),
             "prefix": "* ",
         },
         # Third level always begins with '  -'
         {
-            "up": re.compile("\* "),
+            "up": re.compile(r"\* "),
             "down": None,
             "same": re.compile("    - "),
             "prefix": "    - ",
@@ -1591,7 +1597,8 @@ def parse_change_log():
         try:
             time_value = parse_date(packager_info.group(3))
         except ValueError as err:
-            raise BadChangeLogFormat(err.message)
+            message = getattr(err, "message", str(err))
+            raise BadChangeLogFormat(message)
 
         releases.append(
             {
@@ -1628,7 +1635,8 @@ def get_build_info():
             "git config user.email", fail_quietly=True, command_name="git"
         )
         if rc != 0:
-            packager_email = "unknown"
+            packager_email = u"unknown"
+
         print("Packaged by: %s" % packager_email.strip(), file=build_info_buffer)
 
         # Determine the last commit from the log.
@@ -1647,7 +1655,8 @@ def get_build_info():
 
         # Add a timestamp.
         print(
-            "Build time: %s" % strftime("%Y-%m-%d %H:%M:%S UTC", gmtime()),
+            "Build time: %s"
+            % six.text_type(strftime("%Y-%m-%d %H:%M:%S UTC", gmtime())),
             file=build_info_buffer,
         )
 
