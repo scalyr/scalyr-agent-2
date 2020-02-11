@@ -28,7 +28,7 @@ try:
     import win32evtlog
     import win32evtlogutil
     import win32con
-    from ctypes import windll
+    from ctypes import windll  # type: ignore
 except ImportError:
     win32evtlog = None
     win32evtlogutil = None

@@ -6,11 +6,11 @@ from __future__ import absolute_import
 import re
 
 import six
-from pysnmp import hlapi
-from pysnmp.smi.error import MibNotFoundError
+from pysnmp import hlapi  # pylint: disable=import-error
+from pysnmp.smi.error import MibNotFoundError  # pylint: disable=import-error
 
-import pysnmp
-from pysnmp.hlapi import (
+import pysnmp  # pylint: disable=import-error
+from pysnmp.hlapi import (  # pylint: disable=import-error
     CommunityData,
     ObjectIdentity,
     ObjectType,
@@ -20,7 +20,6 @@ from pysnmp.hlapi import (
 )
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
-from scalyr_agent.json_lib import JsonObject
 
 __monitor__ = __name__
 

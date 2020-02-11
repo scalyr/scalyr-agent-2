@@ -49,7 +49,7 @@ if sys.version_info[0] < 2 or (sys.version_info[0] == 2 and sys.version_info[1] 
 # in both agent_main.py and config_main.py
 #
 # noinspection PyUnresolvedReferences,PyPackageRequirements
-import pymysql
+import pymysql  # pylint: disable=import-error
 
 __monitor__ = __name__
 

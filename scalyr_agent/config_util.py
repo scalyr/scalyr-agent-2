@@ -20,8 +20,6 @@ from __future__ import absolute_import
 
 __author__ = "echee@scalyr.com"
 
-
-import os
 import re
 
 import scalyr_agent.util as scalyr_util

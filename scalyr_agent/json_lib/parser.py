@@ -22,8 +22,6 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-import struct
-
 import six
 from six import unichr
 from six.moves import range
@@ -52,7 +50,7 @@ class TextScanner(object):
         self.__pos = start_pos
         self.__start_pos = start_pos
         self.__max_pos = len(string_input)
-        if not max_pos is None:
+        if max_pos is not None:
             self.__max_pos = max_pos
 
     @property

@@ -72,7 +72,7 @@ from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 
 from scalyr_agent.configuration import Configuration
-from scalyr_agent.platform_controller import PlatformController, DefaultPaths
+from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent.json_lib import JsonParseException
 
 log = scalyr_logging.getLogger("scalyr_agent.run_monitor")

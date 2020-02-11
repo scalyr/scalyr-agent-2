@@ -1257,4 +1257,4 @@ class ProcessMonitor(ScalyrMonitor):
         return self.__pids
 
 
-__all__ = [ProcessMonitor]
+__all__ = ["ProcessMonitor"]
