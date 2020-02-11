@@ -5,7 +5,10 @@ FROM python:2.7-slim as scalyr-dependencies
 MAINTAINER Scalyr Inc <support@scalyr.com>
 
 RUN apt-get update && apt-get install -y build-essential
-RUN pip --no-cache-dir install --root /tmp/dependencies ujson yappi requests==2.15.1 docker==4.1.0
+
+# install python dependencies
+ADD requirements.txt requirements.txt
+RUN pip --no-cache-dir install --root /tmp/dependencies -r requirements.txt
 
 # main image - copies dependencies from scalyr-dependencies and extracts
 # the tar-zipped file containing the scalyr-agent code
