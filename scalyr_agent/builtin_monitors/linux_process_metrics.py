@@ -255,7 +255,7 @@ class Metric(object):
             "app.uptime",
             "app.disk.bytes",
             "app.disk.requests",
-            "app.io.wait"
+            "app.io.wait",
         )
 
     def __repr__(self):
