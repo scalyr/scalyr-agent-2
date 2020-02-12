@@ -110,8 +110,14 @@ commands:
             CAPTURE_INTERVAL: 10
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
           command: |
+            # Created directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
+
+            # Run the agent process and capture the metrics
             ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
+
+            # Send line count values for various log levels
+            ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
       - save_cache:
           key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
