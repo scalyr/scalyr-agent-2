@@ -247,6 +247,12 @@ if __name__ == '__main__':
                         required=True,
                         default=10,
                         help=('How long capture metrics for (in seconds).'))
+    parser.add_argument('--capture-interval',
+                        type=float,
+                        required=True,
+                        default=1,
+                        help=('How often to capture gauge metrics during the capture time '
+                              '(in seconds).'))
     parser.add_argument('--commit-date',
                         type=str,
                         required=False,
