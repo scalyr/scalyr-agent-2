@@ -1917,6 +1917,7 @@ class DockerOptions(object):
         """
 
         # get a local copy of the default docker config options
+        label_exclude_globs = self.label_exclude_globs
         label_include_globs = self.label_include_globs
         use_labels_for_log_config = self.use_labels_for_log_config
         label_prefix = self.label_prefix
@@ -1930,16 +1931,17 @@ class DockerOptions(object):
             self.label_prefix = monitor.label_prefix
             self.labels_as_attributes = monitor.labels_as_attributes
         except Exception as e:
+            # Configuration from monitor failes (values not available on the monitor),
+            # fall back to the default configuration
             global_log.warning(
                 "Error getting docker config from docker monitor - %s.  Using defaults"
                 % six.text_type(e)
             )
-            # if there was an error, reset all values back to defaults
-            # TODO(Tomaz): This code seems wrong and unused?
-            label_include_globs = self.label_include_globs  # NOQA
-            use_labels_for_log_config = self.use_labels_for_log_config  # NOQA
-            label_prefix = self.label_prefix  # NOQA
-            labels_as_attributes = self.labels_as_attributes  # NOQA
+            self.label_exclude_globs = label_exclude_globs
+            self.label_include_globs = label_include_globs
+            self.use_labels_for_log_config = use_labels_for_log_config
+            self.label_prefix = label_prefix
+            self.labels_as_attributes = labels_as_attributes
 
 
 class DockerMonitor(ScalyrMonitor):

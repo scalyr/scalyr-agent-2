@@ -3,14 +3,17 @@ from __future__ import absolute_import
 import os
 
 from scalyr_agent import scalyr_monitor
+from scalyr_agent import scalyr_logging
 from scalyr_agent.builtin_monitors.docker_monitor import DockerMonitor
+from scalyr_agent.builtin_monitors.docker_monitor import DockerOptions
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
 from scalyr_agent.tests.configuration_test import TestConfiguration
 
-from mock import patch, Mock
+
+from mock import patch, Mock, PropertyMock
 import six
 
 
@@ -239,3 +242,47 @@ class TestConfigurationDocker(TestConfiguration):
         self.assertEquals(type(exclude_globs), ArrayOfStrings)
         self.assertEquals(include_elems, list(include_globs))
         self.assertEquals(exclude_elems, list(exclude_globs))
+
+    @patch.object(DockerMonitor, "_initialize", Mock())
+    def test_configure_from_monitor(self):
+        monitor_config = {'module': 'foo'}
+        logger = scalyr_logging.getLogger(__name__)
+
+        monitor = DockerMonitor(monitor_config=monitor_config, logger=logger)
+        monitor.label_exclude_globs = ['a']
+        monitor.label_include_globs = ['b']
+        monitor.use_labels_for_log_config = False
+        monitor.label_prefix = 'fooo'
+        monitor.labels_as_attributes = False
+
+        options = DockerOptions(label_include_globs=['c'], use_labels_for_log_config=True,
+                                label_prefix='bar', labels_as_attributes=True,
+                                label_exclude_globs=['d'])
+        self.assertEqual(options.label_exclude_globs, ['d'])
+        self.assertEqual(options.label_include_globs, ['c'])
+        self.assertEqual(options.use_labels_for_log_config, True)
+        self.assertEqual(options.label_prefix, 'bar')
+        self.assertEqual(options.use_labels_for_log_config, True)
+
+        # Monitor values should be used
+        options.configure_from_monitor(monitor)
+
+        self.assertEqual(options.label_include_globs, ['b'])
+        self.assertEqual(options.label_exclude_globs, ['a'])
+        self.assertEqual(options.use_labels_for_log_config, False)
+        self.assertEqual(options.label_prefix, 'fooo')
+        self.assertEqual(options.use_labels_for_log_config, False)
+
+        # Not all the values are available on Docker monitor, should fall back to the previously
+        # set values
+        monitor.label_include_globs = ['h']
+        type(monitor).label_prefix = PropertyMock(side_effect=KeyError('not set'))
+
+        # Monitor values not available, should use the default / currently set values
+        options.configure_from_monitor(monitor)
+
+        self.assertEqual(options.label_include_globs, ['b'])
+        self.assertEqual(options.label_exclude_globs, ['a'])
+        self.assertEqual(options.use_labels_for_log_config, False)
+        self.assertEqual(options.label_prefix, 'fooo')
+        self.assertEqual(options.use_labels_for_log_config, False)
