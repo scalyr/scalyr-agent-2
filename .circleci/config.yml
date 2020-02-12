@@ -48,7 +48,7 @@ commands:
       - save_cache:
           key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
+            - "~/.cache/pip"
             - ".tox"
       - when:
           condition: << parameters.store_coverage >>
@@ -62,6 +62,58 @@ commands:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
                     .coverage.unittest-<< parameters.python_version >>
+  codespeed_agent_process_benchmark:
+    description: "A base command which runs CodeSpeed agent process level benchmarks"
+    parameters:
+      codespeed_executable:
+        description: "CodeSpeed executable name."
+        type: string
+      codespeed_environment:
+        description: "CodeSpeed environment name."
+        type: string
+        default: "Circle CI Docker Executor Medium Size"
+      agent_config:
+        description: "Path to the agent config to use."
+        type: string
+      cache_key_name:
+        description: "Circle CI cache key name"
+        type: string
+        default: "Circle CI cache key name"
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install -r benchmarks/scripts/requirements.txt
+      - run:
+          name: Run Agent And Capture Resource Utilization
+          # NOTE: The following variables are specified in the Circle CI us and
+          # handles as secrets:
+          # - CODESPEED_AUTH
+          environment:
+            CODESPEED_URL: "http://bb33a9f9.ngrok.io"
+            CODESPEED_PROJECT: "scalyr-agent-2"
+            CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
+            CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
+            CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
+            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
+            # monitor for the agent process) should stabilize in a couple of minutes so it makes
+            # no sense to run that benchmark longer.
+            RUN_TIME: 120
+            CAPTURE_INTERVAL: 10
+            AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
+          command: |
+            mkdir -p ~/scalyr-agent-dev/{log,config,data}
+            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
+      - save_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/scalyr-agent-dev/log
 
 jobs:
   unittest-38:
@@ -443,90 +495,27 @@ jobs:
             - "~/.cache/pip."
             - ".tox"
 
-  # TODO: Reduce duplication and use Circle CI parameters for benchmark jobs
   benchmarks-idle-agent-py-27:
-    # TODO: Only run on merge to master
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:2.7.17
     steps:
-      - checkout
-      - restore_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
-      # TODO: Use requirements file
-      - run:
-          name: Install Dependencies
-          command: |
-            pip install -r benchmarks/scripts/requirements.txt
-      - run:
-          name: Capture Agent Resource Utilization
-          # NOTE: The following variables are specified in the Circle CI us and
-          # handles as secrets:
-          # - CODESPEED_AUTH
-          environment:
-            CODESPEED_URL: "http://bb33a9f9.ngrok.io"
-            CODESPEED_PROJECT: "scalyr-agent-2"
-            CODESPEED_EXECUTABLE: "Python 2.7.17"
-            CODESPEED_ENVIRONMENT: "Circle CI Docker Executor Medium Size"
-            CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
-            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
-            # monitor for the agent process) should stabilize in a couple of minutes so it makes
-            # no sense to run that benchmark longer.
-            RUN_TIME: 120
-            CAPTURE_INTERVAL: 10
-            AGENT_CONFIG_FILE: benchmarks/configs/agent_no_monitored_logs.json
-          command: |
-            mkdir -p ~/scalyr-agent-dev/{log,config,data}
-            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
-      - save_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
-          paths:
-            - "~/.cache/pip."
-      # NOTE: We store the logs to ease with troubleshooting / debugging
-      - store_artifacts:
-          path: ~/scalyr-agent-dev/log
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          cache_key_name: "benchmarks-idle-27"
 
   benchmarks-idle-agent-py-35:
-    # TODO: Only run on merge to master
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.5.9
     steps:
-      - checkout
-      - restore_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
-      # TODO: Use requirements file
-      - run:
-          name: Install Dependencies
-          command: |
-            pip install -r benchmarks/scripts/requirements.txt
-      - run:
-          name: Capture Agent Resource Utilization
-          # NOTE: The following variables are specified in the Circle CI us and
-          # handles as secrets:
-          # - CODESPEED_AUTH
-          environment:
-            CODESPEED_URL: "http://bb33a9f9.ngrok.io"
-            CODESPEED_PROJECT: "scalyr-agent-2"
-            CODESPEED_EXECUTABLE: "Python 3.5.9"
-            CODESPEED_ENVIRONMENT: "Circle CI Docker Executor Medium Size"
-            CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
-            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
-            # monitor for the agent process) should stabilize in a couple of minutes so it makes
-            # no sense to run that benchmark longer.
-            RUN_TIME: 120
-            CAPTURE_INTERVAL: 10
-            AGENT_CONFIG_FILE: benchmarks/configs/agent_no_monitored_logs.json
-          command: |
-            mkdir -p ~/scalyr-agent-dev/{log,config,data}
-            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
-      - save_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
-          paths:
-            - "~/.cache/pip."
-      # NOTE: We store the logs to ease with troubleshooting / debugging
-      - store_artifacts:
-          path: ~/scalyr-agent-dev/log
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          cache_key_name: "benchmarks-idle-35"
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
