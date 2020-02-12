@@ -469,9 +469,11 @@ jobs:
             CODESPEED_EXECUTABLE: "Python 2.7.17"
             CODESPEED_ENVIRONMENT: "Circle CI Docker Executor Medium Size"
             CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
+            RUN_TIME: 60
+            CAPTURE_INTERVAL: 10
           command: |
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
-            ./scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}" 60
+            ./scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
       - save_cache:
           key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "dev-requirements.txt" }}
           paths:
