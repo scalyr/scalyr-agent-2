@@ -392,7 +392,7 @@ class NewApi(Api):
                         Context=self,
                         Session=self._session,
                     )
-                except Exception as e:
+                except Exception:
                     handle = None
                     error_message = win32api.FormatMessage(0)
 

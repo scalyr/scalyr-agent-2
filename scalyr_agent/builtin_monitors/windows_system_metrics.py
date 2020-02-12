@@ -204,7 +204,7 @@ GATHER_METRIC = _gather_metric
 # ============================    System CPU    ===================================
 # =================================================================================
 _SYSTEM_CPU_METRICS = [
-    METRIC(  ## ------------------  User CPU ----------------------------
+    METRIC(  # ------------------  User CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
             description="The amount of time in seconds the CPU has spent executing instructions in user space.",
@@ -215,7 +215,7 @@ _SYSTEM_CPU_METRICS = [
         ),
         GATHER_METRIC("cpu_times", "user"),
     ),
-    METRIC(  ## ------------------  System CPU ----------------------------
+    METRIC(  # ------------------  System CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
             description="The amount of time in seconds the CPU has spent executing instructions in kernel space.",
@@ -226,7 +226,7 @@ _SYSTEM_CPU_METRICS = [
         ),
         GATHER_METRIC("cpu_times", "system"),
     ),
-    METRIC(  ## ------------------  Idle CPU ----------------------------
+    METRIC(  # ------------------  Idle CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.cpu",
             description="The amount of time in seconds the CPU has been idle.",
@@ -258,7 +258,7 @@ def calculate_uptime(boot_time):
 # ========================    UPTIME METRICS     ===============================
 # =================================================================================
 _UPTIME_METRICS = [
-    METRIC(  ## ------------------  System Boot Time   ----------------------------
+    METRIC(  # ------------------  System Boot Time   ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.uptime",
             description="Seconds since the system boot time.",
@@ -277,36 +277,36 @@ _UPTIME_METRICS = [
 # ========================    Swap Memory    ===============================
 # =================================================================================
 _VIRTUAL_MEMORY_METRICS = [
-    METRIC(  ## ------------------    Total Swap Memory    ----------------------------
+    METRIC(  # ------------------    Total Swap Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.total",
             description="The number of bytes of swap space available.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "swap",},
+            extra_fields={"type": "swap"},
         ),
         GATHER_METRIC("swap_memory", "total"),
     ),
-    METRIC(  ## ------------------    Used Virtual Memory    ----------------------------
+    METRIC(  # ------------------    Used Virtual Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.used",
             description="The number of bytes of swap currently in use.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "swap",},
+            extra_fields={"type": "swap"},
         ),
         GATHER_METRIC("swap_memory", "used"),
     ),
-    METRIC(  ## ------------------    Free Virtual Memory    ----------------------------
+    METRIC(  # ------------------    Free Virtual Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.free",
             description="The number of bytes of swap currently free.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "swap",},
+            extra_fields={"type": "swap"},
         ),
         GATHER_METRIC("swap_memory", "free"),
     ),
@@ -318,40 +318,40 @@ _VIRTUAL_MEMORY_METRICS = [
 # ========================    Physical Memory    ===============================
 # =================================================================================
 _PHYSICAL_MEMORY_METRICS = [
-    METRIC(  ## ------------------    Total Physical Memory    ----------------------------
+    METRIC(  # ------------------    Total Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.total",
             description="The number of bytes of RAM.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "physical",},
+            extra_fields={"type": "physical"},
         ),
         GATHER_METRIC("virtual_memory", "total"),
     ),
-    METRIC(  ## ------------------    Used Physical Memory    ----------------------------
+    METRIC(  # ------------------    Used Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.used",
             description="The number of bytes of RAM currently in use.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "physical",},
+            extra_fields={"type": "physical"},
         ),
         GATHER_METRIC("virtual_memory", "used"),
     ),
-    METRIC(  ## ------------------    Free Physical Memory    ----------------------------
+    METRIC(  # ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.free",
             description="The number of bytes of RAM that are not in use.",
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "physical",},
+            extra_fields={"type": "physical"},
         ),
         GATHER_METRIC("virtual_memory", "free"),
     ),
-    METRIC(  ## ------------------    Free Physical Memory    ----------------------------
+    METRIC(  # ------------------    Free Physical Memory    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.memory.available",
             description="The number of bytes of RAM that are available for allocation.  This includes memory "
@@ -359,7 +359,7 @@ _PHYSICAL_MEMORY_METRICS = [
             category="Memory",
             unit="bytes",
             # cumulative      = {cumulative},
-            extra_fields={"type": "physical",},
+            extra_fields={"type": "physical"},
         ),
         GATHER_METRIC("virtual_memory", "available"),
     ),
@@ -374,47 +374,47 @@ _PHYSICAL_MEMORY_METRICS = [
 _NETWORK_IO_METRICS = [
     # TODO: Add in per-interface metrics.  This can be gathered using psutils.  You just have to set pernic=True
     # on the call to network_io_counters.  The current structure of this code makes it difficult though.
-    METRIC(  ## ------------------   Bytes Sent  ----------------------------
+    METRIC(  # ------------------   Bytes Sent  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.bytes",
             description="The number of bytes transmitted by the network interfaces.",
             category="Network",
             unit="bytes",
             cumulative=True,
-            extra_fields={"direction": "sent",},
+            extra_fields={"direction": "sent"},
         ),
         GATHER_METRIC("network_io_counters", "bytes_sent"),
     ),
-    METRIC(  ## ------------------   Bytes Recv  ----------------------------
+    METRIC(  # ------------------   Bytes Recv  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.bytes",
             description="The number of bytes received by the network interfaces.",
             category="Network",
             unit="bytes",
             cumulative=True,
-            extra_fields={"direction": "recv",},
+            extra_fields={"direction": "recv"},
         ),
         GATHER_METRIC("network_io_counters", "bytes_recv"),
     ),
-    METRIC(  ## ------------------   Packets Sent  ----------------------------
+    METRIC(  # ------------------   Packets Sent  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.packets",
             description="The number of packets transmitted by the network intefaces.",
             category="Network",
             unit="packets",
             cumulative=True,
-            extra_fields={"direction": "sent",},
+            extra_fields={"direction": "sent"},
         ),
         GATHER_METRIC("network_io_counters", "packets_sent"),
     ),
-    METRIC(  ## ------------------   Packets Recv  ----------------------------
+    METRIC(  # ------------------   Packets Recv  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.network.packets",
             description="The number of packets received by the network interfaces.",
             category="Network",
             unit="packets",
             cumulative=True,
-            extra_fields={"direction": "recv",},
+            extra_fields={"direction": "recv"},
         ),
         GATHER_METRIC("network_io_counters", "packets_recv"),
     ),
@@ -429,7 +429,7 @@ _NETWORK_IO_METRICS = [
 # ========================     Disk IO Counters     ===============================
 # =================================================================================
 _DISK_IO_METRICS = [
-    METRIC(  ## ------------------   Disk Bytes Read    ----------------------------
+    METRIC(  # ------------------   Disk Bytes Read    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.bytes",
             description="The number of bytes read from disk.",
@@ -440,7 +440,7 @@ _DISK_IO_METRICS = [
         ),
         GATHER_METRIC("disk_io_counters", "read_bytes"),
     ),
-    METRIC(  ## ------------------  Disk Bytes Written  ----------------------------
+    METRIC(  # ------------------  Disk Bytes Written  ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.bytes",
             description="The number of bytes written to disk.",
@@ -451,7 +451,7 @@ _DISK_IO_METRICS = [
         ),
         GATHER_METRIC("disk_io_counters", "write_bytes"),
     ),
-    METRIC(  ## ------------------   Disk Read Count    ----------------------------
+    METRIC(  # ------------------   Disk Read Count    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.ops",
             description="The number of disk read operations issued since boot time.",
@@ -462,7 +462,7 @@ _DISK_IO_METRICS = [
         ),
         GATHER_METRIC("disk_io_counters", "read_count"),
     ),
-    METRIC(  ## ------------------   Disk Write Count    ----------------------------
+    METRIC(  # ------------------   Disk Write Count    ----------------------------
         METRIC_CONFIG(
             metric_name="winsys.disk.io.ops",
             description="The number of disk write operations issued since boot time.",
