@@ -49,8 +49,6 @@ def send_value_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, co
     url = '%s/result/add/json/' % (codespeed_url)
     data = {'json': json.dumps(payload)}
 
-    print(payload)
-
     logger.debug('Sending data to "%s" (data=%s)' % (codespeed_url, data))
 
     resp = requests.post(url=url, data=data, auth=codespeed_auth)
