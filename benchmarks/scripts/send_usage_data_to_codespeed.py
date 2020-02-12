@@ -91,6 +91,22 @@ METRICS_COUNTERS = {
 }  # type: Dict[str, Metric]
 
 
+def bytes_to_megabytes(value):
+    if not value:
+        return value
+
+    return (float(value) / 1048576)
+
+
+# Functions for formatting metrics values
+# We use those so we operate in more user-friendly units. It makes no sense to track memory usae
+# in bytes when in reality, actual usage will never be smaller than a couple of MBs
+METRIC_FORMAT_FUNCTIONS = {
+    'memory_usage_rss': bytes_to_megabytes,
+    'memory_usage_vms': bytes_to_megabytes,
+}
+
+
 def send_data_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, codespeed_executable,
                            codespeed_environment, branch, commit_id, result, commit_date=None):
     # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, dict, Optional[datetime]) -> None
@@ -154,7 +170,8 @@ def capture_metrics(tracker, metrics, values):
 
     for metric_name, metric_obj in metrics.items():
         value = process_metrics[metric_obj]
-        values[metric_name].append(value)
+        format_func = METRIC_FORMAT_FUNCTIONS.get(metric_name, lambda val: val)
+        values[metric_name].append(format_func(value))
 
     return values
 
