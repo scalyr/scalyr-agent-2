@@ -26,6 +26,8 @@ import unittest
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
 
+import six
+
 JSON = 1
 UJSON = 2
 
@@ -81,23 +83,6 @@ class EncodeDecodeTest(ScalyrTestCase):
     def test_list2(self):
         self.__test_encode_decode(r'[1,2,"a"]', [1, 2, "a"])
 
-    def test_binary_input(self):
-        # test that json libraries can deserialize binary string.
-        binary_json_string = b'{"key": "value"}'
-
-        original_lib = util.get_json_lib()
-
-        expected = {"key": "value"}
-
-        try:
-            util._set_json_lib("json")
-            self.assertEqual(util.json_decode(binary_json_string), expected)
-            util._set_json_lib("ujson")
-            self.assertEqual(util.json_decode(binary_json_string), expected)
-
-        finally:
-            util._set_json_lib(original_lib)
-
     def __test_encode_decode(self, text, obj):
         def __runtest(library):
             original_lib = util.get_json_lib()
@@ -105,10 +90,12 @@ class EncodeDecodeTest(ScalyrTestCase):
             self._setlib(library)
             try:
                 text2 = util.json_encode(obj)
-                self.assertEquals(text, text2)
+                self.assertEquals(six.ensure_text(text), text2)
                 obj2 = util.json_decode(text2)
                 text3 = util.json_encode(obj2)
-                self.assertEquals(text, text3)
+                self.assertEquals(six.ensure_text(text), text3)
+                obj3 = util.json_decode(text)
+                self.assertEquals(obj3, obj)
             finally:
                 util._set_json_lib(original_lib)
 
@@ -116,6 +103,10 @@ class EncodeDecodeTest(ScalyrTestCase):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
+
+        # do the same check but now with binary string.
+        if type(text) is six.text_type:
+            self.__test_encode_decode(text.encode("utf-8"), obj)
 
 
 def main():
