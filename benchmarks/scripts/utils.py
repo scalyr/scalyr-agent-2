@@ -121,6 +121,8 @@ def add_common_parser_arguments(parser):
                         default=False,
                         help=('Set script log level to DEBUG.'))
 
+    return parser
+
 
 def parse_auth_credentials(value):
     # type: (str) -> Optional[Tuple[str, str]]

@@ -36,6 +36,8 @@ Dependencies:
     - numpy
 """
 
+from __future__ import absolute_import
+
 if False:
     from typing import Dict
     from typing import Tuple
@@ -63,11 +65,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '../../')))
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
 
-from .utils import initialize_logging
-from .utils import add_common_parser_arguments
-from .utils import parse_auth_credentials
-from .utils import parse_commit_date
-from .utils import send_payload_to_codespeed
+from utils import initialize_logging
+from utils import add_common_parser_arguments
+from utils import parse_auth_credentials
+from utils import parse_commit_date
+from utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
 

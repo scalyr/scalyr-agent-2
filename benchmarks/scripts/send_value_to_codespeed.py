@@ -17,6 +17,8 @@
 Script which sends a single value to CodeSpeed.
 """
 
+from __future__ import absolute_import
+
 if False:
     from typing import Tuple
     from typing import Optional
@@ -24,10 +26,10 @@ if False:
 import logging
 import argparse
 
-from .utils import initialize_logging
-from .utils import add_common_parser_arguments
-from .utils import parse_auth_credentials
-from .utils import send_payload_to_codespeed
+from utils import initialize_logging
+from utils import add_common_parser_arguments
+from utils import parse_auth_credentials
+from utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
 
