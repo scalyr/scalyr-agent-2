@@ -60,7 +60,7 @@ import requests
 import numpy as np
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '../')))
+sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '../../')))
 
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
