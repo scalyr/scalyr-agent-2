@@ -26,12 +26,14 @@ import unittest
 from scalyr_agent import util
 from scalyr_agent.test_base import ScalyrTestCase
 
+import six
+
 JSON = 1
 UJSON = 2
 
 
 class EncodeDecodeTest(ScalyrTestCase):
-    """This test ensures that JsonObject and JsonArray can be correctly encoded/decoded with different JSON libraries"""
+    """This test ensures that the different json libraries can correctly encode/decode with the same results."""
 
     def _setlib(self, library):
         if library == JSON:
@@ -88,17 +90,23 @@ class EncodeDecodeTest(ScalyrTestCase):
             self._setlib(library)
             try:
                 text2 = util.json_encode(obj)
-                self.assertEquals(text, text2)
+                self.assertEquals(six.ensure_text(text), text2)
                 obj2 = util.json_decode(text2)
                 text3 = util.json_encode(obj2)
-                self.assertEquals(text, text3)
+                self.assertEquals(six.ensure_text(text), text3)
+                obj3 = util.json_decode(text)
+                self.assertEquals(obj3, obj)
             finally:
                 util._set_json_lib(original_lib)
 
-        if sys.version_info[:2] > (2, 4):
+        if sys.version_info[:2] > (2, 4) and sys.version_info[:2] != (2, 6):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
+
+        # do the same check but now with binary string.
+        if isinstance(text, six.text_type):
+            self.__test_encode_decode(text.encode("utf-8"), obj)
 
 
 def main():
