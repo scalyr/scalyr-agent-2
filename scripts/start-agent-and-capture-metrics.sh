@@ -52,9 +52,11 @@ CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_
 # How long to run the agent process and capture the metrics for (in seconds)
 COMMIT_HASH=${1}
 RUN_TIME=${2-"60"}
-CODESPEED_PROJECT=${3-"scalyr-agent-2"}
-CODESPEED_EXECUTABLE=${4-"Python 2.7.17"}
-CODESPEED_ENVIRONMENT=${5-"Circle CI Docker Executor Medium Size"}
+
+CODESPEED_PROJECT=${CODESPEED_PROJECT-"scalyr-agent-2"}
+CODESPEED_EXECUTABLE=${CODESPEED_EXECUTABLE-"Python 2.7.17"}
+CODESPEED_ENVIRONMENT=${CODESPEED_ENVIRONMENT-"Circle CI Docker Executor Medium Size"}
+CODESPEED_BRANCH=${CODESPEED_BRANCH-"master"}
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
 
@@ -88,7 +90,7 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --codespeed-project=\"${CODESPEED_PROJECT}\" \
     --codespeed-executable=\"${CODESPEED_EXECUTABLE}\" \
     --codespeed-environment=\"${CODESPEED_ENVIRONMENT}\" \
-    --branch=master \
+    --branch=\"${CODESPEED_BRANCH}\" \
     --commit-id=\"${COMMIT_HASH}\" \
     --debug"
 
