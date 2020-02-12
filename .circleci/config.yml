@@ -459,7 +459,6 @@ jobs:
             pip install requests numpy
       - run:
           name: Capture Agent Resource Utilization
-          no_output_timeout: "10m"
           # NOTE: The following variables are specified in the Circle CI us and
           # handles as secrets:
           # - CODESPEED_AUTH
