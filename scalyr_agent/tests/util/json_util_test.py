@@ -105,7 +105,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             __runtest(JSON)
 
         # do the same check but now with binary string.
-        if type(text) is six.text_type:
+        if isinstance(text, six.text_type):
             self.__test_encode_decode(text.encode("utf-8"), obj)
 
 
