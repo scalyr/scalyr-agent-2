@@ -1,0 +1,16 @@
+{
+  // api_key: "",  // specified via environment variable
+  scalyr_server: "agent.scalyr.com",
+  debug_level: "5",
+
+  server_attributes: {
+     serverHost: "codespeed-benchmarks.dev",
+     tier: "benchmarks"
+  }
+
+  logs: [
+  ],
+
+  monitors: [
+  ]
+}
