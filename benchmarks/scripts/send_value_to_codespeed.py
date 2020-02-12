@@ -19,14 +19,15 @@ Script which sends a single value to CodeSpeed.
 
 if False:
     from typing import Tuple
-    from typing import List
     from typing import Optional
 
-import json
 import logging
 import argparse
 
-import requests
+from .utils import initialize_logging
+from .utils import add_common_parser_arguments
+from .utils import parse_auth_credentials
+from .utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
 
@@ -37,67 +38,28 @@ def send_value_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, co
     payload = [{
         'commitid': commit_id,
         'branch': branch,
-
         'project': codespeed_project,
         'executable': codespeed_executable,
         'benchmark': codespeed_benchmark,
         'environment': codespeed_environment,
-
         'result_value': value,
     }]
 
-    url = '%s/result/add/json/' % (codespeed_url)
-    data = {'json': json.dumps(payload)}
-
-    logger.debug('Sending data to "%s" (data=%s)' % (codespeed_url, data))
-
-    resp = requests.post(url=url, data=data, auth=codespeed_auth)
-
-    if resp.status_code != 202:
-        raise ValueError(('Failed to POST data to CodeSpeed instance (status_code=%s): %s' %
-                          (resp.status_code, resp.text)))
-
-    view_report_url = '%s/changes/?rev=%s' % (codespeed_url, commit_id)
-    logger.info('Successfully submitted data to %s' % (codespeed_url))
-    logger.info('Report should now be available at %s' % (view_report_url))
+    send_payload_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
+                              commit_id=commit_id, payload=payload)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=('Send single value to CodeSpeed'))
-    parser.add_argument('--codespeed-url',
-                        type=str,
-                        required=True,
-                        help=('URL of a CodeSpeed instance to send metrics to.'))
-    parser.add_argument('--codespeed-auth',
-                        type=str,
-                        required=False,
-                        default='',
-                        help=('CodeSpeed auth credentials in the format of username:password'))
-    parser.add_argument('--codespeed-project',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed project to submit metrics for.'))
-    parser.add_argument('--codespeed-executable',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed executable to submit metrics for.'))
-    parser.add_argument('--codespeed-environment',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed environment to submit metrics for.'))
+
+    # Add common arguments
+    parser = add_common_parser_arguments(parser=parser)
+
+    # Add arguments which are specific to this script
     parser.add_argument('--codespeed-benchmark',
                         type=str,
                         required=True,
                         help=('Name of the CodeSpeed benchmark.'))
-    parser.add_argument('--branch',
-                        type=str,
-                        required=True,
-                        default='master',
-                        help=('Name of the branch this capture belongs to.'))
-    parser.add_argument('--commit-id',
-                        type=str,
-                        required=True,
-                        help=('Git commit hash (revision) this capture belongs to.'))
     parser.add_argument('--value',
                         type=int,
                         required=True,
@@ -105,22 +67,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.codespeed_auth:
-        if len(args.codespeed_auth.split(':')) != 2:
-            raise ValueError('--codespeed-auth argument must be in the following format: '
-                            '--codespeed_auth=<username:password>')
+    codespeed_auth = parse_auth_credentials(args.codespeed_auth)
 
-        # Split it into (username, password) tuple
-        split = args.codespeed_auth.split(':')[:2]  # type: List[str]
-        codespeed_auth = (split[0], split[1])
-
-    # Remove trailing slash (if any)
-    codespeed_url = args.codespeed_url
-    if codespeed_url.endswith('/'):
-        codespeed_url = codespeed_url[:-1]
-
-    # initialize_logging(debug=args.debug)
-    send_value_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
+    initialize_logging(debug=args.debug)
+    send_value_to_codespeed(codespeed_url=args.codespeed_url, codespeed_auth=codespeed_auth,
          codespeed_project=args.codespeed_project, codespeed_executable=args.codespeed_executable,
          codespeed_environment=args.codespeed_environment,
          codespeed_benchmark=args.codespeed_benchmark,

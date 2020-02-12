@@ -51,12 +51,10 @@ import sys
 import time
 import logging
 import argparse
-import json
 
 from datetime import datetime
 from collections import defaultdict
 
-import requests
 import numpy as np
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +62,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '../../')))
 
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
+
+from .utils import initialize_logging
+from .utils import add_common_parser_arguments
+from .utils import parse_auth_credentials
+from .utils import parse_commit_date
+from .utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
 
@@ -139,20 +143,8 @@ def send_data_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, cod
 
         payload.append(item)
 
-    url = '%s/result/add/json/' % (codespeed_url)
-    data = {'json': json.dumps(payload)}
-
-    logger.debug('Sending data to "%s" (data=%s)' % (codespeed_url, data))
-
-    resp = requests.post(url=url, data=data, auth=codespeed_auth)
-
-    if resp.status_code != 202:
-        raise ValueError(('Failed to POST data to CodeSpeed instance (status_code=%s): %s' %
-                          (resp.status_code, resp.text)))
-
-    view_report_url = '%s/changes/?rev=%s' % (codespeed_url, commit_id)
-    logger.info('Successfully submitted data to %s' % (codespeed_url))
-    logger.info('Report should now be available at %s' % (view_report_url))
+    send_payload_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
+                              commit_id=commit_id, payload=payload)
 
 
 def capture_metrics(tracker, metrics, values):
@@ -174,19 +166,6 @@ def capture_metrics(tracker, metrics, values):
         values[metric_name].append(format_func(value))
 
     return values
-
-
-def initialize_logging(debug=False):
-    """
-    Initialize logging for this script.
-    """
-    if debug:
-        log_level = logging.DEBUG
-    else:
-        log_level = logging.INFO
-
-    logger.setLevel(log_level)
-    logging.basicConfig(level=log_level)
 
 
 def main(pid, codespeed_url, codespeed_auth, codespeed_project, codespeed_executable,
@@ -252,6 +231,11 @@ def main(pid, codespeed_url, codespeed_auth, codespeed_project, codespeed_execut
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=('Capture process level metric data and submit it '
                                                   'to CodeSpeed instance'))
+
+    # Add common arguments
+    parser = add_common_parser_arguments(parser=parser)
+
+    # Add arguments which are specific to this script
     parser.add_argument('--pid',
                         type=int,
                         required=True,
@@ -261,78 +245,19 @@ if __name__ == '__main__':
                         required=True,
                         default=10,
                         help=('How long capture metrics for (in seconds).'))
-    parser.add_argument('--capture-interval',
-                        type=float,
-                        required=True,
-                        default=1,
-                        help=('How often to capture gauge metrics during the capture time '
-                              '(in seconds).'))
-    parser.add_argument('--codespeed-url',
-                        type=str,
-                        required=True,
-                        help=('URL of a CodeSpeed instance to send metrics to.'))
-    parser.add_argument('--codespeed-auth',
-                        type=str,
-                        required=False,
-                        default='',
-                        help=('CodeSpeed auth credentials in the format of username:password'))
-    parser.add_argument('--codespeed-project',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed project to submit metrics for.'))
-    parser.add_argument('--codespeed-executable',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed executable to submit metrics for.'))
-    parser.add_argument('--codespeed-environment',
-                        type=str,
-                        required=True,
-                        help=('Name of the CodeSpeed environment to submit metrics for.'))
-    parser.add_argument('--branch',
-                        type=str,
-                        required=True,
-                        default='master',
-                        help=('Name of the branch this capture belongs to.'))
-    parser.add_argument('--commit-id',
-                        type=str,
-                        required=True,
-                        help=('Git commit hash (revision) this capture belongs to.'))
     parser.add_argument('--commit-date',
                         type=str,
                         required=False,
                         help=('Date of a git commit. If not provided, it defaults to current '
                               'date.'))
-    parser.add_argument('--debug',
-                        action='store_true',
-                        default=False)
 
     args = parser.parse_args()
 
-    if args.codespeed_auth:
-        if len(args.codespeed_auth.split(':')) != 2:
-            raise ValueError('--codespeed-auth argument must be in the following format: '
-                            '--codespeed_auth=<username:password>')
-
-        # Split it into (username, password) tuple
-        split = args.codespeed_auth.split(':')[:2]  # type: List[str]
-        codespeed_auth = (split[0], split[1])
-
-    # Remove traling slash (if any)
-    codespeed_url = args.codespeed_url
-    if codespeed_url.endswith('/'):
-        codespeed_url = codespeed_url[:-1]
-
-    # Validate date is in the correct format (YYYY-mm-ddTHH:mm:ss)
-    commit_date = None  # type: Optional[datetime]
-    if args.commit_date:
-        try:
-            commit_date = datetime.strptime(args.commit_date, '%Y-%m-%dT%H:%I:%S')
-        except ValueError:
-            msg = ('Got invalid date: %s. Date must be in the following format: %s' %
-                   (args.commit_date, '%Y-%m-%dT%H:%I:%S'))
+    codespeed_auth = parse_auth_credentials(args.codespeed_auth)
+    commit_date = parse_commit_date(args.commit_date)
 
     initialize_logging(debug=args.debug)
-    main(pid=args.pid, codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
+    main(pid=args.pid, codespeed_url=args.codespeed_url, codespeed_auth=codespeed_auth,
          codespeed_project=args.codespeed_project, codespeed_executable=args.codespeed_executable,
          codespeed_environment=args.codespeed_environment, branch=args.branch,
          commit_id=args.commit_id, commit_date=commit_date)
