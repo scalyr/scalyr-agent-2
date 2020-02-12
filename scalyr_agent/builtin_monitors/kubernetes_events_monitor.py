@@ -31,7 +31,6 @@ import scalyr_agent.monitor_utils.k8s as k8s_utils
 from scalyr_agent.third_party.requests.exceptions import ConnectionError
 
 import datetime
-import os
 import re
 import traceback
 import time
@@ -39,7 +38,9 @@ import logging
 import logging.handlers
 
 import six
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
 
 
 from scalyr_agent import (
@@ -48,7 +49,6 @@ from scalyr_agent import (
     AutoFlushingRotatingFileHandler,
 )
 from scalyr_agent.scalyr_logging import BaseFormatter
-from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 import scalyr_agent.util as scalyr_util
 from scalyr_agent.json_lib import JsonObject
@@ -57,7 +57,7 @@ import scalyr_agent.scalyr_logging as scalyr_logging
 
 global_log = scalyr_logging.getLogger(__name__)
 
-SCALYR_CONFIG_ANNOTATION_RE = re.compile("^(agent\.config\.scalyr\.com/)(.+)")
+SCALYR_CONFIG_ANNOTATION_RE = re.compile(r"^(agent\.config\.scalyr\.com/)(.+)")
 
 __monitor__ = __name__
 
@@ -320,7 +320,7 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         try:
             attributes = JsonObject({"monitor": "json"})
             self.log_config["attributes"] = attributes
-        except Exception as e:
+        except Exception:
             global_log.error(
                 "Error setting monitor attribute in KubernetesEventMonitor"
             )
@@ -424,15 +424,14 @@ class KubernetesEventsMonitor(ScalyrMonitor):
         if node is None:
             return False
 
-        result = {}
         try:
             # this call will throw an exception on failure
-            result = k8s.query_api_with_retries(
+            k8s.query_api_with_retries(
                 "/api/v1/nodes/%s" % node,
                 retry_error_context=node,
                 retry_error_limit_key="k8se_check_if_alive",
             )
-        except Exception as e:
+        except Exception:
             global_log.log(
                 scalyr_logging.DEBUG_LEVEL_1, "_check_if_alive False for node %s" % node
             )
@@ -647,8 +646,8 @@ class KubernetesEventsMonitor(ScalyrMonitor):
             return
 
         try:
-            k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._global_config.k8s_verify_api_queries
+            self._global_config.k8s_api_url
+            self._global_config.k8s_verify_api_queries
 
             # We only create the k8s_cache while we are the leader
             k8s_cache = None
