@@ -38,18 +38,23 @@ if [ -z "${CODESPEED_AUTH}" ]; then
     exit 2
 fi
 
+if [ -z "${AGENT_CONFIG_FILE}" ]; then
+    echo "AGENT_CONFIG_FILE environment variable not set."
+    exit 2
+fi
+
 if [ $# -lt 1 ]; then
     echo "Usage: ${0} <commit hash>"
     exit 2
 fi
 
-AGENT_ENTRY_POINT=$(realpath $(echo "${SCRIPT_DIR}/../scalyr_agent/agent_main.py"))
-AGENT_CONFIG_FILE="scripts/benchmarks/configs/agent_no_monitored_logs.json"
+AGENT_ENTRY_POINT=$(realpath $(echo "${SCRIPT_DIR}/../../scalyr_agent/agent_main.py"))
+AGENT_CONFIG_FILE=$(realpath $(echo "${SCRIPT_DIR}/../../${AGENT_CONFIG_FILE}"))
+
 AGENT_START_COMMAND="python ${AGENT_ENTRY_POINT} start --no-fork --no-change-user --config=${AGENT_CONFIG_FILE}"
 
 CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_codespeed.py"))
 
-COMMIT_HASH=${1}
 
 # How long to run the agent process and capture the metrics for (in seconds)
 RUN_TIME=${RUN_TIME-"60"}
@@ -59,6 +64,8 @@ CODESPEED_PROJECT=${CODESPEED_PROJECT-"scalyr-agent-2"}
 CODESPEED_EXECUTABLE=${CODESPEED_EXECUTABLE-"Python 2.7.17"}
 CODESPEED_ENVIRONMENT=${CODESPEED_ENVIRONMENT-"Circle CI Docker Executor Medium Size"}
 CODESPEED_BRANCH=${CODESPEED_BRANCH-"master"}
+
+COMMIT_HASH=${1}
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
 

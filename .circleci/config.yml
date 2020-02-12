@@ -471,9 +471,10 @@ jobs:
             CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
             RUN_TIME: 60
             CAPTURE_INTERVAL: 10
+            AGENT_CONFIG_FILE: benchmarks/configs/agent_no_monitored_logs.json
           command: |
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
-            ./scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
+            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
       - save_cache:
           key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "dev-requirements.txt" }}
           paths:
