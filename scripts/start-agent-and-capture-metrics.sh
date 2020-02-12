@@ -38,8 +38,8 @@ if [ -z "${CODESPEED_AUTH}" ]; then
     exit 2
 fi
 
-if [ $# -lt 2 ]; then
-    echo "Usage: ${0} <commit hash> <run time in seconds>"
+if [ $# -lt 1 ]; then
+    echo "Usage: ${0} <commit hash>"
     exit 2
 fi
 
@@ -49,9 +49,11 @@ AGENT_START_COMMAND="python ${AGENT_ENTRY_POINT} start --no-fork --no-change-use
 
 CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_codespeed.py"))
 
-# How long to run the agent process and capture the metrics for (in seconds)
 COMMIT_HASH=${1}
-RUN_TIME=${2-"60"}
+
+# How long to run the agent process and capture the metrics for (in seconds)
+RUN_TIME=${RUN_TIME-"60"}
+CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
 
 CODESPEED_PROJECT=${CODESPEED_PROJECT-"scalyr-agent-2"}
 CODESPEED_EXECUTABLE=${CODESPEED_EXECUTABLE-"Python 2.7.17"}
@@ -84,7 +86,7 @@ trap cleanup EXIT
 CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --pid=${AGENT_PROCESS_PID} \
     --capture-time=${RUN_TIME} \
-    --capture-interval=1 \
+    --capture-interval=${CAPTURE_INTERVAL} \
     --codespeed-url=\"${CODESPEED_URL}\" \
     --codespeed-auth=\"${CODESPEED_AUTH}\" \
     --codespeed-project=\"${CODESPEED_PROJECT}\" \
