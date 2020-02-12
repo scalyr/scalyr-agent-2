@@ -368,6 +368,18 @@ class Configuration(object):
         return self.__get_config().get_int("k8s_cache_purge_secs")
 
     @property
+    def k8s_service_account_cert(self):
+        return self.__get_config().get_string("k8s_service_account_cert")
+
+    @property
+    def k8s_service_account_token(self):
+        return self.__get_config().get_string("k8s_service_account_token")
+
+    @property
+    def k8s_service_account_namespace(self):
+        return self.__get_config().get_string("k8s_service_account_namespace")
+
+    @property
     def k8s_log_api_responses(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool("k8s_log_api_responses")
@@ -1654,6 +1666,30 @@ class Configuration(object):
             config,
             "k8s_cache_purge_secs",
             300,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_cert",
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_token",
+            "/var/run/secrets/kubernetes.io/serviceaccount/token",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_namespace",
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
             description,
             apply_defaults,
             env_aware=True,
