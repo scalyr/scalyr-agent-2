@@ -1265,7 +1265,7 @@ class LogFileIterator(object):
         found_new_line = False
         new_line_checker = None
         if check_for_new_lines:
-            new_line_checker = re.compile(r"[\n\r]")
+            new_line_checker = re.compile(b"[\n\r]")
 
         for pending_file in self.__pending_files:
             if read_position < pending_file.position_end:
