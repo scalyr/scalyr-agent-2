@@ -4,7 +4,7 @@
 
 # Testing tools and libraries
 tox==3.14.3
-mock==0.8.0
+mock==3.0.5
 pytest==4.6.9
 pytest-coverage
 coverage==4.5.4
