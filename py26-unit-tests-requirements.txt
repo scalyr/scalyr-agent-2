@@ -6,7 +6,7 @@ importlib==1.0.4
 mock==0.8.0
 pytest==3.2.5
 tlslite-ng==0.7.5
-ecdsa==0.13.2
+ecdsa==0.13.3
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1

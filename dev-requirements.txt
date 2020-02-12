@@ -14,7 +14,7 @@ codecov==2.0.15
 ujson==1.35
 tlslite-ng==0.7.5
 cffi==1.12.3
-ecdsa==0.13.2
+ecdsa==0.13.3
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1
