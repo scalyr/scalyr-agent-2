@@ -1,7 +1,12 @@
 # Python CircleCI 2.1 configuration file
 #
-# Check https://circleci.com/docs/2.0/language-python/ for more details
-#
+# Check https://circleci.com/docs/2.2/language-python/ for more details
+
+master_only: &master_only
+  filters:
+    branches:
+      only: performance_tracking
+
 version: 2.1
 commands:
   unittest_tox:
@@ -559,8 +564,11 @@ workflows:
 #            - smoke-k8s
   benchmarks:
     jobs:
-      - benchmarks-idle-agent-py-27
-      - benchmarks-idle-agent-py-35
+      - benchmarks-idle-agent-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-py-35:
+          <<: *master_only
+
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
