@@ -86,7 +86,7 @@ commands:
       - run:
           name: Install Dependencies
           command: |
-            pip install -r benchmarks/scripts/requirements.txt
+            pip install --user -r benchmarks/scripts/requirements.txt
       - run:
           name: Run Agent And Capture Resource Utilization
           # NOTE: The following variables are specified in the Circle CI us and
@@ -517,6 +517,28 @@ jobs:
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
           cache_key_name: "benchmarks-idle-35"
 
+  benchmarks-idle-agent-py-37:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.7.5
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.7.5 - idle conf"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          cache_key_name: "benchmarks-idle-37"
+
+  benchmarks-idle-agent-py-38:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.8.1
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.8.1 - idle conf"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          cache_key_name: "benchmarks-idle-38"
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -561,6 +583,8 @@ workflows:
     jobs:
       - benchmarks-idle-agent-py-27
       - benchmarks-idle-agent-py-35
+      - benchmarks-idle-agent-py-37
+      - benchmarks-idle-agent-py-38
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
