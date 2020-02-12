@@ -28,7 +28,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -46,10 +46,9 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
-            - ".tox"
       - when:
           condition: << parameters.store_coverage >>
           steps:
@@ -196,14 +195,14 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
       - run:
@@ -225,14 +224,14 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
       - run:
@@ -376,7 +375,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install dependencies
           command: |
@@ -428,7 +427,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
           name: Install Python dependencies
           command: |
@@ -438,10 +437,9 @@ jobs:
           command: |
             tox -e lint
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
             - "~/.cache/pip."
-            - ".tox"
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
