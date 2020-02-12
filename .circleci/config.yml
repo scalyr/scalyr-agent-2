@@ -451,12 +451,12 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
       # TODO: Use requirements file
       - run:
           name: Install Dependencies
           command: |
-            pip install requests numpy
+            pip install -r benchmarks/scripts/requirements.txt
       - run:
           name: Capture Agent Resource Utilization
           # NOTE: The following variables are specified in the Circle CI us and
@@ -475,7 +475,7 @@ jobs:
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
             ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
       - save_cache:
-          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps1-{{ .Branch }}-benchmarks-idle-27-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
             - "~/.cache/pip."
       # NOTE: We store the logs to ease with troubleshooting / debugging
