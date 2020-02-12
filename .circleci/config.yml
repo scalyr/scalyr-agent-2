@@ -468,7 +468,10 @@ jobs:
             CODESPEED_EXECUTABLE: "Python 2.7.17"
             CODESPEED_ENVIRONMENT: "Circle CI Docker Executor Medium Size"
             CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
-            RUN_TIME: 60
+            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
+            # monitor for the agent process) should stabilize in a couple of minutes so it makes
+            # no sense to run that benchmark longer.
+            RUN_TIME: 120
             CAPTURE_INTERVAL: 10
             AGENT_CONFIG_FILE: benchmarks/configs/agent_no_monitored_logs.json
           command: |
