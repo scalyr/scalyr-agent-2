@@ -127,6 +127,7 @@ def get_json_implementation(lib_name):
             def json_loads(string, *args, **kwargs):
                 string = six.ensure_text(string)
                 return json.loads(string, *args, **kwargs)
+
         else:
             json_loads = json.loads
 
