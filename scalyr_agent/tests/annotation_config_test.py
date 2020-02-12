@@ -114,7 +114,7 @@ class TestAnnotationConfig(ScalyrTestCase):
 
         result = process_annotations(
             annotations,
-            annotation_prefix_re=re.compile("^(com\.scalyr\.config\.log\.)(.+)"),
+            annotation_prefix_re=re.compile(r"^(com\.scalyr\.config\.log\.)(.+)"),
             hyphens_as_underscores=True,
         )
 

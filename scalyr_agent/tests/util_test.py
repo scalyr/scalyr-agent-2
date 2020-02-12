@@ -30,7 +30,6 @@ scalyr_init()
 import datetime
 import os
 import tempfile
-import struct
 import threading
 from mock import patch, MagicMock
 import six
@@ -359,7 +358,7 @@ class TestUtil(ScalyrTestCase):
             "something": "something",
             "other something": ["thing1", "thing2"],
             "parser": "config_parser",
-            "attributes": {"parser": "config_attributes_parser",},
+            "attributes": {"parser": "config_attributes_parser"},
         }
         attributes = {
             "nothing": 0,

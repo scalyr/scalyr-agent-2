@@ -47,7 +47,7 @@ try:
     __has_ssl__ = True
 except Exception:
     __has_ssl__ = False
-    ssl = None
+    ssl = None  # type: ignore
 
 
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -118,7 +118,7 @@ class ScalyrClientSession(object):
         self.__full_address = server
 
         # Verify the server address looks right.
-        parsed_server = re.match("^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
+        parsed_server = re.match(r"^(http://|https://|)([^:]*)(:\d+|)$", server.lower())
 
         if parsed_server is None:
             raise Exception('Could not parse server address "%s"' % server)
@@ -299,7 +299,7 @@ class ScalyrClientSession(object):
                         proxies=self.__proxies,
                     )
                     self.total_connections_created += 1
-            except Exception as e:
+            except Exception:
                 return self.__wrap_response_if_necessary(
                     "client/connectionFailed", 0, "", block_on_response
                 )
@@ -341,7 +341,7 @@ class ScalyrClientSession(object):
                             scalyr_logging.DEBUG_LEVEL_5,
                             'Sending POST %s with body "%s"',
                             request_path,
-                            body_str_raw
+                            body_str_raw,
                         )
                         self.__connection.post(request_path, body=body_str)
                     else:
@@ -352,12 +352,15 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:
+                if (
+                    hasattr(error, "errno")
+                    and error.errno is not None  # pylint: disable=no-member
+                ):
                     log.error(
                         'Failed to connect to "%s" due to errno=%d.  Exception was %s.  Closing connection, '
                         "will re-attempt",
                         self.__full_address,
-                        error.errno,
+                        error.errno,  # pylint: disable=no-member
                         six.text_type(error),
                         error_code="client/requestFailed",
                     )
@@ -422,12 +425,15 @@ class ScalyrClientSession(object):
 
             except Exception as error:
                 # TODO: Do not just catch Exception.  Do narrower scope.
-                if hasattr(error, "errno") and error.errno is not None:
+                if (
+                    hasattr(error, "errno")
+                    and error.errno is not None  # pylint: disable=no-member
+                ):
                     log.error(
                         'Failed to receive response to "%s" due to errno=%d.  Exception was %s.  Closing '
                         "connection, will re-attempt",
                         self.__full_address,
-                        error.errno,
+                        error.errno,  # pylint: disable=no-member
                         six.text_type(error),
                         error_code="client/requestFailed",
                     )
@@ -813,10 +819,10 @@ class AddEventsRequest(object):
         """
         assert len(base_body) > 0, "The base_body object must have some fields defined."
         assert (
-            not "events" in base_body
+            "events" not in base_body
         ), "The base_body object cannot already have 'events' set."
         assert (
-            not "client_time" in base_body
+            "client_time" not in base_body
         ), "The base_body object cannot already have 'client_time' set."
 
         # As an optimization, we use a StringIO object to serialize the request.  We also
@@ -1059,7 +1065,9 @@ class AddEventsRequest(object):
         first_time = True
 
         # sort by key, to get a predictable result.
-        for key, value in sorted(six.iteritems(self.__timing_data), key=lambda el: el[0]):
+        for key, value in sorted(
+            six.iteritems(self.__timing_data), key=lambda el: el[0]
+        ):
             if not first_time:
                 output_buffer.write(" ")
             else:
@@ -1086,6 +1094,7 @@ class AddEventsRequest(object):
         if timestamp is None:
             timestamp = int(time.time() * 1000000000)
 
+        # pylint: disable=used-before-assignment
         if __last_time_stamp__ is not None and timestamp <= __last_time_stamp__:
             timestamp = __last_time_stamp__ + 1
         __last_time_stamp__ = timestamp

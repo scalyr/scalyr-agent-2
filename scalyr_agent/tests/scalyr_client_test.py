@@ -422,7 +422,6 @@ class AddEventsRequestTest(ScalyrTestCase):
 
     def test_set_position_resets_sequence_compression(self):
         first_id = "1234"
-        second_id = "1235"
         first_number = 1234
         second_number = 4321
         expected_delta = 10
@@ -468,7 +467,8 @@ class AddEventsRequestTest(ScalyrTestCase):
         request.increment_timing_data(**{"foo": 1, "bar": 2})
         request.increment_timing_data(foo=5)
 
-        self.assertEquals(request.get_timing_data(), "bar=2.0 foo=6.0")
+        # can't rely on stable order in "get_timing_data()" return value
+        self.assertEquals(sorted(request.get_timing_data()), sorted("foo=6.0 bar=2.0"))
 
 
 class EventTest(ScalyrTestCase):
@@ -925,7 +925,7 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         session.augment_user_agent(frags)
         self.assertEquals(get_user_agent(), base_ua + ";" + ";".join(frags))
 
-    @mock.patch('scalyr_agent.scalyr_client.time.time', mock.Mock(return_value=0))
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
     def test_send_request_body_is_logged_raw_uncompressed(self):
         """
         When sending a request with compression available / enabled, raw (uncompressed) request
@@ -937,11 +937,15 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         session._ScalyrClientSession__connection = mock.Mock()
         session._ScalyrClientSession__receive_response = mock.Mock()
-        session._ScalyrClientSession__compress = mock.Mock(return_value='compressed')
+        session._ScalyrClientSession__compress = mock.Mock(return_value="compressed")
 
-        add_events_request = AddEventsRequest({'foo': 'bar'})
-        event1 = Event(thread_id="foo1", attrs={"parser": "bar1"}).set_message("eventOne")
-        event2 = Event(thread_id="foo2", attrs={"parser": "bar2"}).set_message("eventTwo")
+        add_events_request = AddEventsRequest({"foo": "bar"})
+        event1 = Event(thread_id="foo1", attrs={"parser": "bar1"}).set_message(
+            "eventOne"
+        )
+        event2 = Event(thread_id="foo2", attrs={"parser": "bar2"}).set_message(
+            "eventTwo"
+        )
         add_events_request.add_event(event=event1, timestamp=1)
         add_events_request.add_event(event=event2, timestamp=2)
 
@@ -949,10 +953,14 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
 
         # Should log raw (uncompressed) request body / payload
         expected_body = r'{"foo":"bar", events: \[{thread:"foo1", .*'
-        self.assertLogFileContainsRegex(expected_body, file_path=self.agent_debug_log_path)
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )
         expected_body = r'.*,{thread:"foo2", log:"foo2", attrs:{"parser":"bar2",.*'
-        self.assertLogFileContainsRegex(expected_body, file_path=self.agent_debug_log_path)
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )
 
         # Verify that the compression was indeed enabled since that's the scenario we are testing
         call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
-        self.assertEqual(call_kwargs['body'], 'compressed')
+        self.assertEqual(call_kwargs["body"], "compressed")

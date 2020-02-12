@@ -28,8 +28,8 @@ from scalyr_agent.json_lib import JsonArray
 
 global_log = scalyr_logging.getLogger(__name__)
 
-SCALYR_ANNOTATION_PREFIX_RE = re.compile("^(log\.config\.scalyr\.com/)(.+)")
-SCALYR_ANNOTATION_ELEMENT_RE = re.compile("([^.]+)\.(.+)")
+SCALYR_ANNOTATION_PREFIX_RE = re.compile(r"^(log\.config\.scalyr\.com/)(.+)")
+SCALYR_ANNOTATION_ELEMENT_RE = re.compile(r"([^.]+)\.(.+)")
 
 
 class BadAnnotationConfig(Exception):
@@ -137,8 +137,6 @@ def process_annotations(
 
     """
 
-    result = {}
-
     # first split out any scalyr log-config annotations
     items = {}
     for annotation_key, annotation_value in six.iteritems(annotations):
@@ -161,7 +159,7 @@ def process_annotations(
 def _is_int(string):
     """Returns true or false depending on whether or not the passed in string can be converted to an int"""
     try:
-        value = int(string)
+        int(string)
         result = True
     except ValueError:
         result = False

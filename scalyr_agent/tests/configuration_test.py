@@ -261,6 +261,19 @@ class TestConfiguration(TestConfigurationBase):
 
         self.assertEquals(config.pipeline_threshold, 1.1)
 
+        self.assertEquals(
+            config.k8s_service_account_cert,
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+        )
+        self.assertEquals(
+            config.k8s_service_account_token,
+            "/var/run/secrets/kubernetes.io/serviceaccount/token",
+        )
+        self.assertEquals(
+            config.k8s_service_account_namespace,
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
+        )
+
         self.assertEquals(len(config.log_configs), 2)
         self.assertPathEquals(
             config.log_configs[0].get_string("path"), "/var/log/tomcat6/access.log"
@@ -354,6 +367,10 @@ class TestConfiguration(TestConfigurationBase):
             http_proxy: "http://foo.com",
             https_proxy: "https://bar.com",
 
+            k8s_service_account_cert: "foo_cert",
+            k8s_service_account_token: "foo_token",
+            k8s_service_account_namespace: "foo_namespace",
+
             logs: [ { path: "/var/log/tomcat6/access.log", ignore_stale_files: true} ],
             journald_logs: [ { journald_unit: ".*", parser: "journald_catchall" } ]
           }
@@ -415,6 +432,10 @@ class TestConfiguration(TestConfigurationBase):
         self.assertFalse(config.verify_server_certificate)
         self.assertTrue(config.debug_init)
         self.assertTrue(config.pidfile_advanced_reuse_guard)
+
+        self.assertEquals(config.k8s_service_account_cert, "foo_cert")
+        self.assertEquals(config.k8s_service_account_token, "foo_token")
+        self.assertEquals(config.k8s_service_account_namespace, "foo_namespace")
 
         self.assertTrue(config.log_configs[0].get_bool("ignore_stale_files"))
         self.assertEqual(
@@ -1382,7 +1403,7 @@ class TestConfiguration(TestConfigurationBase):
                     self.assertEquals(value, fake_env[field])
                     self.assertNotEquals(value, config_file_value)
 
-        patch_and_start_test()
+        patch_and_start_test()  # pylint: disable=no-value-for-parameter
 
     def test_log_excludes_from_config(self):
         self._write_file_with_separator_conversion(

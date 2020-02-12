@@ -1,4 +1,6 @@
 codecov:
+  # Avoid "Missing base report" issues
+  allow_coverage_offsets: true
   notify:
     require_ci_to_pass: yes
 

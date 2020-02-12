@@ -112,7 +112,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             finally:
                 util._set_json_lib(original_lib)
 
-        if sys.version_info[:2] > (2, 4):
+        if sys.version_info[:2] > (2, 4) and sys.version_info[:2] != (2, 6):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)

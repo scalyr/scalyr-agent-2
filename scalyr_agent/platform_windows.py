@@ -24,7 +24,6 @@ from scalyr_agent import compat
 __author__ = "guy.hoozdis@gmail.com"
 
 import sys
-import struct
 import random
 import os
 
@@ -33,6 +32,7 @@ if sys.platform != "win32":
         "Attempting to load platform_windows module on a non-Windows machine"
     )
 
+# pylint: disable=import-error
 # noinspection PyUnresolvedReferences
 import servicemanager
 

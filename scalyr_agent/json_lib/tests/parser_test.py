@@ -253,7 +253,9 @@ class JsonParserTests(ScalyrTestCase):
     def test_parse_from_bytes(self):
         self.assertEqual(JsonParser.parse(b"123"), 123)
         self.assertEqual(JsonParser.parse(b"-10.5"), -10.5)
-        self.assertEqual(JsonParser.parse(b'"""Howdy\n"folks"!"""'), """Howdy\n"folks"!""")
+        self.assertEqual(
+            JsonParser.parse(b'"""Howdy\n"folks"!"""'), """Howdy\n"folks"!"""
+        )
         self.assertEqual(JsonParser.parse(b"true"), True)
         self.assertEqual(JsonParser.parse(b"null"), None)
         self.assertEqual(JsonParser.parse(b" // Hi there\n  45"), 45)
@@ -264,7 +266,7 @@ class JsonParserTests(ScalyrTestCase):
         self.assertEquals(x[1], 2)
         self.assertEquals(x[2], 3)
 
-        x = JsonParser.parse(b"{ a: 5, b:3, c:true, d: \"Hello\"}")
+        x = JsonParser.parse(b'{ a: 5, b:3, c:true, d: "Hello"}')
         self.assertEquals(len(x), 4)
         self.assertEquals(x.get("a"), 5)
         self.assertEquals(x.get("b"), 3)
