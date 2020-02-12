@@ -236,6 +236,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.max_sequence_number, 1024 ** 4)
         self.assertEquals(config.line_completion_wait_time, 5)
         self.assertEquals(config.read_page_size, 64 * 1024)
+        self.assertEquals(config.internal_parse_max_line_size, config.read_page_size)
         self.assertEquals(config.copy_staleness_threshold, 15 * 60)
         self.assertEquals(config.log_deletion_delay, 10 * 60)
 
@@ -347,6 +348,7 @@ class TestConfiguration(TestConfigurationBase):
             max_sequence_number: 1024,
             line_completion_wait_time: 120,
             read_page_size: 3072,
+            internal_parse_max_line_size: 4013,
             copy_staleness_threshold: 240,
             log_deletion_delay: 300,
             debug_init: true,
@@ -404,6 +406,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.max_sequence_number, 1 * 1024)
         self.assertEquals(config.line_completion_wait_time, 2 * 60)
         self.assertEquals(config.read_page_size, 3 * 1024)
+        self.assertEquals(config.internal_parse_max_line_size, 4013)
         self.assertEquals(config.copy_staleness_threshold, 4 * 60)
         self.assertEquals(config.log_deletion_delay, 5 * 60)
 
