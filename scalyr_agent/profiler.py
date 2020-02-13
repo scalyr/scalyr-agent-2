@@ -118,7 +118,9 @@ class Profiler(object):
         path = os.path.join(config.agent_log_path, config.profile_log_name)
         if os.path.exists(path):
             os.remove(path)
-        stats.save(path, "callgrind")
+
+        # pylint bug https://github.com/PyCQA/pylint/labels/topic-inference
+        stats.save(path, "callgrind")  # pylint: disable=no-member
 
         lines = 0
 
