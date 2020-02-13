@@ -802,6 +802,15 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 result,
                             )
 
+                            if result == 'parseResponseFailed':
+                                # Log the whole response body in case parsing it fails to see what
+                                # response / error server returned
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    'Received server response which we failed to parse as JSON: %s',
+                                    full_response,
+                                )
+
                             if (
                                 result == "success"
                                 or "discardBuffer" in result
