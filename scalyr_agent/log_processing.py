@@ -427,10 +427,10 @@ class LogFileIterator(object):
         @return: A tuple containing a (sequence_id, sequence_number)
         @rtype: (six.text_type, int)
         """
-        # Add in to the position for thingy
         if self.__extended_line_position is None:
             return self.__sequence_id, self.__sequence_number_at_mark + self.__position
         else:
+            # Add in the fragment position to get a unique sequence number
             return (
                 self.__sequence_id,
                 self.__sequence_number_at_mark
@@ -648,14 +648,15 @@ class LogFileIterator(object):
         if available_buffer_bytes == 0 and not more_file_bytes_available:
             return LogLine(line=b"")
 
-        # Keep our underlying buffer of bytes filled up.
-        if (
-            self.__buffer is None
-            or more_file_bytes_available
-            and (
-                available_buffer_bytes < self.__max_line_length
-                or not self.__have_buffer_for_fragment_position(available_buffer_bytes)
-            )
+        # Do we need more bytes to have at least max_line_bytes in available in the buffer.
+        need_more_bytes_for_max_line = available_buffer_bytes < self.__max_line_length
+        # If we are on an extended line, do we need more bytes in buffer to read the next fragment
+        need_more_bytes_for_fragment_position = not self.__have_buffer_for_fragment_position(
+            available_buffer_bytes
+        )
+
+        if more_file_bytes_available and (
+            need_more_bytes_for_max_line or need_more_bytes_for_fragment_position
         ):
             self.__fill_buffer(current_time)
 
@@ -775,11 +776,12 @@ class LogFileIterator(object):
             # buffer position just at the start of the extended log line.
             self.__buffer.seek(original_buffer_position)
 
-            # If we have a previous fragment position but just reread the extended line (which may happen during
-            # seeks or restoring from a checkpoint), check to make sure we that looks like it is the same one as
+            # If we have a previous fragment position but just reread the extended line (which may happen when
+            # restoring from a checkpoint), check to make sure we that looks like it is the same one as
             # we got last time we parsed the line. Otherwise, invalidate the fragment position.  This will cause us to
-            # just copy the extended line again, It may be different if they changed configuration parameters for the
-            # max extended line size, etc.
+            # just copy the extended line again. It may be different if they changed configuration parameters for the
+            # max extended line size across agent restarts (including soft restarts) and we are restoring from
+            # a previous checkpoint.
             if (
                 self.__extended_line_position is not None
                 and not self.__extended_line_position.is_valid_for_line(
@@ -1763,7 +1765,7 @@ class LogFileIterator(object):
             Returns the next fragment from the extend log line pointed at by the fragment position.
 
             :param fragment_position: The fragment position pointing at the next fragment to read.
-            :param max_line_length: The maximim line lenght, used to control the maximum size of the
+            :param max_line_length: The maximum line length, used to control the maximum size of the
                 returned fragments.
 
             :type fragment_position: LogFileIterator.ExtendedLinePosition
