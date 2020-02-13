@@ -884,6 +884,11 @@ class Configuration(object):
         return self.__get_config().get_float("line_completion_wait_time")
 
     @property
+    def internal_parse_max_line_size(self):
+        """Returns the configuration value for 'internal_parse_max_line_size'."""
+        return self.__get_config().get_int("internal_parse_max_line_size")
+
+    @property
     def max_log_offset_size(self):
         """Returns the configuration value for 'max_log_offset_size'."""
         return self.__get_config().get_int("max_log_offset_size")
@@ -1470,6 +1475,15 @@ class Configuration(object):
             config,
             "read_page_size",
             64 * 1024,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
+        self.__verify_or_set_optional_int(
+            config,
+            "internal_parse_max_line_size",
+            config.get_int("read_page_size", 64 * 1024),
             description,
             apply_defaults,
             env_aware=True,
