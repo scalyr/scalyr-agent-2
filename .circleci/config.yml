@@ -80,10 +80,18 @@ commands:
       agent_config:
         description: "Path to the agent config to use."
         type: string
+      run_time:
+        description: "How long to run the capture for (in seconds)."
+        type: integer
+        default: 120
       capture_line_counts:
         description: "True to submit log line counts for each log level to CodeSpeed."
         type: boolean
         default: false
+      fixture_file_url:
+        description: "Optional URL to the fixture which is used by the tests and should be downloaded."
+        type: string
+        default: ""
       cache_key_name:
         description: "Circle CI cache key name"
         type: string
@@ -109,22 +117,27 @@ commands:
             CODESPEED_PROJECT: "scalyr-agent-2"
             CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
             CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
-            CODESPEED_BRANCH: "${CIRCLE_BRANCH}"  # TODO: Remove after testing
+            CODESPEED_BRANCH: "${CIRCLE_BRANCH}"
             # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
             # monitor for the agent process) should stabilize in a couple of minutes so it makes
             # no sense to run that benchmark longer.
-            RUN_TIME: 120
+            RUN_TIME: << parameters.run_time >>
             CAPTURE_INTERVAL: 10
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
           command: |
-            # Created directories which are needed by the agent process
+            # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
+
+            # Download any fixture files (if specified)
+            if [ ! -z "<< parameters.fixture_file_url >>" ]; then
+                wget --directory-prefix=/tmp "<< parameters.fixture_file_url >>"
+            fi
 
             # Run the agent process and capture the metrics
             ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
 
             # Send line count values for various log levels
-            if [ "<< parameters.capture_line_counts>>" = "true" ]; then
+            if [ "<< parameters.capture_line_counts >>" = "true" ]; then
                 ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
             fi
       - save_cache:
@@ -539,6 +552,32 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-35"
 
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -584,6 +623,10 @@ workflows:
       - benchmarks-idle-agent-py-27:
           <<: *master_only
       - benchmarks-idle-agent-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
