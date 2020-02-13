@@ -5,7 +5,7 @@
   debug_level: "5",
 
   server_attributes: {
-     serverHost: "codespeed-benchmarks.dev",
+     serverHost: "ci-codespeed-benchmarks-idle-agent",
      tier: "benchmarks"
   }
 
