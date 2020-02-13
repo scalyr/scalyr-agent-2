@@ -102,7 +102,7 @@ commands:
             CODESPEED_PROJECT: "scalyr-agent-2"
             CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
             CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
-            CODESPEED_BRANCH: "performance_tracking"  # TODO: Remove after testing
+            CODESPEED_BRANCH: "${CIRCLE_BRANCH}"  # TODO: Remove after testing
             # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
             # monitor for the agent process) should stabilize in a couple of minutes so it makes
             # no sense to run that benchmark longer.
