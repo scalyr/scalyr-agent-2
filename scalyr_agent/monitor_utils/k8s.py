@@ -23,6 +23,7 @@ import scalyr_agent.monitor_utils.annotation_config as annotation_config
 from scalyr_agent.monitor_utils.annotation_config import BadAnnotationConfig
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 import scalyr_agent.third_party.requests as requests
+from scalyr_agent.third_party.requests import ConnectionError
 from scalyr_agent.util import StoppableThread
 from scalyr_agent.json_lib import JsonObject
 
@@ -1604,14 +1605,14 @@ class KubernetesApi(object):
 
         # The k8s API requires us to pass in an authentication token
         # which we can obtain from a token file in a 'well known' location
-        token = ""
+        self.token = ""
 
         try:
             # using with is ok here, because we need to be running
             # a recent version of python for various 3rd party libs
             f = open(token_file, "r")
             try:
-                token = f.read()
+                self.token = f.read()
             finally:
                 f.close()
         except IOError:
@@ -1630,7 +1631,7 @@ class KubernetesApi(object):
         except IOError:
             pass
 
-        self._standard_headers["Authorization"] = "Bearer %s" % (token)
+        self._standard_headers["Authorization"] = "Bearer %s" % (self.token)
 
         # A rate limiter should normally be passed unless no rate limiting is desired.
         self._query_options_max_retries = query_options_max_retries
@@ -2122,16 +2123,20 @@ class KubeletApi(object):
         A class for querying the kubelet API
     """
 
-    def __init__(self, k8s, port=10255, host_ip=None):
+    def __init__(self, k8s, port=10250, host_ip=None, protocol="https"):
         """
         @param k8s - a KubernetesApi object
         """
-        if host_ip is None:
+        self._fallback = False
+        self._host_ip = host_ip
+        self._protocol = protocol
+        self._port = port
+        if self._host_ip is None:
             try:
                 pod_name = k8s.get_pod_name()
                 pod = k8s.query_pod(k8s.namespace, pod_name)
                 status = pod.get("status", {})
-                host_ip = status.get("hostIP", None)
+                self._host_ip = status.get("hostIP", None)
                 # Don't raise exception for now
                 # if host_ip is None:
                 #     raise KubeletApiException( "Unable to get host IP for pod: %s/%s" % (k8s.namespace, pod_name) )
@@ -2142,34 +2147,63 @@ class KubeletApi(object):
         self._session = requests.Session()
         headers = {
             "Accept": "application/json",
+            "Authorization": "Bearer %s" % k8s.token,
         }
         self._session.headers.update(headers)
 
-        global_log.info("KubeletApi host ip = %s" % host_ip)
-        if host_ip:
-            self._http_host = "http://%s:%d" % (host_ip, port)
-        else:
-            self._http_host = None
+        global_log.info("KubeletApi host ip = %s" % self._host_ip)
+        self._build_host()
         self._timeout = 20.0
+
+    def _build_host(self):
+        if self._host_ip:
+            self._host = "%s://%s:%d" % (self._protocol, self._host_ip, self._port)
+        else:
+            self._host = None
+
+    def _switch_to_fallback(self):
+        self._fallback = True
+        self._port = 10255
+        self._protocol = "http"
+        self._build_host()
 
     def query_api(self, path):
         """ Queries the kubelet API at 'path', and converts OK responses to JSON objects
         """
-        url = self._http_host + path
-        response = self._session.get(url, timeout=self._timeout)
+        url = self._host + path
+        try:
+            response = self._session.get(url, timeout=self._timeout, verify=False)
+        except ConnectionError as e:
+            if not self._fallback:
+                global_log.warning(
+                    "Connection error while querying the Kubelet API: %s. Falling back to older endpoint."
+                    % six.text_type(e),
+                )
+                self._switch_to_fallback()
+                return self.query_api(path)
+            else:
+                raise e
         response.encoding = "utf-8"
         if response.status_code != 200:
-            global_log.log(
-                scalyr_logging.DEBUG_LEVEL_3,
-                "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
-                % (url, response.status_code, len(response.text)),
-                limit_once_per_x_secs=300,
-                limit_key="kubelet_api_query",
-            )
-            raise KubeletApiException(
-                "Invalid response from Kubelet API when querying '%s': %s"
-                % (path, six.text_type(response))
-            )
+            if not self._fallback:
+                global_log.warning(
+                    "Invalid response while querying the Kubelet API: %d. Falling back to older endpoint."
+                    % response.status_code,
+                )
+                self._switch_to_fallback()
+                return self.query_api(path)
+            else:
+                global_log.warning(
+                    scalyr_logging.DEBUG_LEVEL_3,
+                    "Invalid response from Kubelet API.\n\turl: %s\n\tstatus: %d\n\tresponse length: %d"
+                    % (url, response.status_code, len(response.text)),
+                    limit_once_per_x_secs=300,
+                    limit_key="kubelet_api_query",
+                )
+                raise KubeletApiException(
+                    "Invalid response from Kubelet API when querying '%s': %s"
+                    % (path, six.text_type(response))
+                )
 
         return util.json_decode(response.text)
 
