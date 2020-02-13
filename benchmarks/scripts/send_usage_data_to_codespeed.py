@@ -93,7 +93,10 @@ METRICS_COUNTERS = {
 
     # IO related metrics
     'io_read_count_requests': Metric(name='app.disk.requests', _type='read'),
-    'io_write_count_requests': Metric(name='app.disk.requests', _type='write')
+    'io_write_count_requests': Metric(name='app.disk.requests', _type='write'),
+
+    'io_read_count_bytes': Metric(name='app.disk.bytes', _type='read'),
+    'io_write_count_bytes': Metric(name='app.disk.bytes', _type='write')
 }  # type: Dict[str, Metric]
 
 
