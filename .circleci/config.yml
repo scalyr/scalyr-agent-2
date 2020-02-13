@@ -127,6 +127,12 @@ commands:
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
 
+            # NOTE: We explicitly specify a commit date to avoid CodeSpeed from
+            # late setting the actual date once it fetches all the commits for a
+            # branch
+            export TZ=UTC
+            export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
+
             # Download any fixture files (if specified)
             if [ ! -z "<< parameters.fixture_file_url >>" ]; then
                 wget --directory-prefix=/tmp "<< parameters.fixture_file_url >>"

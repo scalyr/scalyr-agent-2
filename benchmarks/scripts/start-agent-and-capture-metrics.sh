@@ -55,10 +55,10 @@ AGENT_START_COMMAND="python ${AGENT_ENTRY_POINT} start --no-fork --no-change-use
 
 CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_codespeed.py"))
 
-
 # How long to run the agent process and capture the metrics for (in seconds)
 RUN_TIME=${RUN_TIME-"60"}
 CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
+COMMIT_DATE=${COMMIT_DATE=""}
 
 CODESPEED_PROJECT=${CODESPEED_PROJECT-"scalyr-agent-2"}
 CODESPEED_EXECUTABLE=${CODESPEED_EXECUTABLE-"Python 2.7.17"}
@@ -68,6 +68,7 @@ CODESPEED_BRANCH=${CODESPEED_BRANCH-"master"}
 COMMIT_HASH=${1}
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
+echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
 
 # 1. Start the agent
 echo "Starting agent process..."
@@ -100,6 +101,7 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --codespeed-executable=\"${CODESPEED_EXECUTABLE}\" \
     --codespeed-environment=\"${CODESPEED_ENVIRONMENT}\" \
     --branch=\"${CODESPEED_BRANCH}\" \
+    --commit-date=\"${COMMIT_DATE}\" \
     --commit-id=\"${COMMIT_HASH}\" \
     --debug"
 

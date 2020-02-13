@@ -139,7 +139,7 @@ def send_data_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, cod
         }
 
         if commit_date:
-            item['revision_date'] = commit_date.strftime('%Y-%m-%dT%H:%I:%S')
+            item['revision_date'] = commit_date.strftime('%Y-%m-%d %H:%M:%S')
 
         # Include optional pre-computed data for gauge metrics
         for key in ['min', 'max', 'std_dev']:

@@ -52,7 +52,7 @@ def send_value_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, co
     }]
 
     if commit_date:
-        payload[0]['revision_date'] = commit_date.strftime('%Y-%m-%dT%H:%I:%S')
+        payload[0]['revision_date'] = commit_date.strftime('%Y-%m-%d %H:%M:%S')
 
     send_payload_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
                               commit_id=commit_id, payload=payload)

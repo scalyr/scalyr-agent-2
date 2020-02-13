@@ -28,6 +28,8 @@ if [ $# -lt 1 ]; then
     exit 2
 fi
 
+COMMIT_DATE=${COMMIT_DATE=""}
+
 COMMIT_HASH=${1}
 
 LINES_COUNT_INFO_LEVEL=$(cat ${AGENT_LOG_FILE_PATH}  | grep -a -P '^.*\s+INFO \[.*\].*$' | wc -l)
@@ -41,7 +43,10 @@ COMMON_COMMAND_LINE_ARGS="--codespeed-url=\"${CODESPEED_URL}\" \
     --codespeed-executable=\"${CODESPEED_EXECUTABLE}\" \
     --codespeed-environment=\"${CODESPEED_ENVIRONMENT}\" \
     --branch=\"${CODESPEED_BRANCH}\" \
+    --commit-date=\"${COMMIT_DATE}\" \
     --commit-id=\"${COMMIT_HASH}\""
+
+echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
 
 eval python ${SEND_VALUE_SCRPT_PATH} ${COMMON_COMMAND_LINE_ARGS} \
     --codespeed-benchmark="log_lines_info" \

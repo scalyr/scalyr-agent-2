@@ -16,8 +16,7 @@
 This module contains various utility functions for sending data to CodeSpeed.
 """
 
-import datetime
-
+from datetime import datetime
 from argparse import ArgumentParser  # NOQA
 
 if False:
@@ -119,8 +118,8 @@ def add_common_parser_arguments(parser):
     parser.add_argument('--commit-date',
                         type=str,
                         required=False,
-                        help=('Date of a git commit. If not provided, it defaults to current '
-                              'date.'))
+                        help=('Date of a git commit in YYYY-MM-DD HH:MM:SS format. If not '
+                              'provided, it defaults to current date.'))
     parser.add_argument('--debug',
                         action='store_true',
                         default=False,
@@ -158,10 +157,10 @@ def parse_commit_date(value):
 
     # Validate date is in the correct format (YYYY-mm-ddTHH:mm:ss)
     try:
-        commit_date = datetime.strptime(value, '%Y-%m-%dT%H:%I:%S')
+        commit_date = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
     except ValueError:
         msg = ('Got invalid date string: %s. Date must be in the following format: %s' %
-               (value, '%Y-%m-%dT%H:%I:%S'))
+               (value, '%Y-%m-%d %H:%M:%S'))
         raise ValueError(msg)
 
     return commit_date
