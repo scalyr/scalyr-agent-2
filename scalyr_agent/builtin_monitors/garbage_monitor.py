@@ -275,7 +275,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
                     dump_kind="live",
                 )
 
-        except Exception as e:
+        except Exception:
             global_log.info("error gathering sample %s", traceback.format_exc())
 
     def stop(self, wait_on_join=True, join_timeout=5):

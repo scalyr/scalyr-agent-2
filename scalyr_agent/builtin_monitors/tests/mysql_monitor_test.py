@@ -21,7 +21,6 @@ from __future__ import print_function
 __author__ = "imron@scalyr.com"
 
 import sys
-from mock import patch
 
 from scalyr_agent import UnsupportedSystem
 from scalyr_agent.test_base import ScalyrTestCase
@@ -29,7 +28,7 @@ from scalyr_agent.test_base import ScalyrTestCase
 
 class MySqlMonitorTest(ScalyrTestCase):
     def _import_mysql_monitor(self):
-        import scalyr_agent.builtin_monitors.mysql_monitor
+        import scalyr_agent.builtin_monitors.mysql_monitor  # NOQA
 
         self.assertTrue(True)
 
