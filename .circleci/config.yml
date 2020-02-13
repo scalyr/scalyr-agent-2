@@ -560,6 +560,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
           fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          run_time: 140
           capture_line_counts: false
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
 
@@ -573,6 +574,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
           fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          run_time: 140
           capture_line_counts: false
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
 
