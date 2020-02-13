@@ -26,17 +26,21 @@ if False:
 import logging
 import argparse
 
+from datetime import datetime
+
 from utils import initialize_logging
 from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
+from utils import parse_commit_date
 from utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
 
 
 def send_value_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, codespeed_executable,
-                            codespeed_environment, codespeed_benchmark, branch, commit_id, value):
-    # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, str, int) -> None
+                            codespeed_environment, codespeed_benchmark, branch, commit_id, value,
+                            commit_date=None):
+    # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, str, int, Optional[datetime]) -> None
     payload = [{
         'commitid': commit_id,
         'branch': branch,
@@ -46,6 +50,9 @@ def send_value_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, co
         'environment': codespeed_environment,
         'result_value': value,
     }]
+
+    if commit_date:
+        payload[0]['revision_date'] = commit_date.strftime('%Y-%m-%dT%H:%I:%S')
 
     send_payload_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
                               commit_id=commit_id, payload=payload)
@@ -70,6 +77,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     codespeed_auth = parse_auth_credentials(args.codespeed_auth)
+    commit_date = parse_commit_date(args.commit_date)
 
     initialize_logging(debug=args.debug)
     send_value_to_codespeed(codespeed_url=args.codespeed_url, codespeed_auth=codespeed_auth,
@@ -78,4 +86,5 @@ if __name__ == '__main__':
          codespeed_benchmark=args.codespeed_benchmark,
          branch=args.branch,
          commit_id=args.commit_id,
-         value=args.value)
+         value=args.value,
+         commit_date=commit_date)

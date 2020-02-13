@@ -116,6 +116,11 @@ def add_common_parser_arguments(parser):
                         type=str,
                         required=True,
                         help=('Git commit hash (revision) this capture belongs to.'))
+    parser.add_argument('--commit-date',
+                        type=str,
+                        required=False,
+                        help=('Date of a git commit. If not provided, it defaults to current '
+                              'date.'))
     parser.add_argument('--debug',
                         action='store_true',
                         default=False,

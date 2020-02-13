@@ -256,11 +256,6 @@ if __name__ == '__main__':
                         default=1,
                         help=('How often to capture gauge metrics during the capture time '
                               '(in seconds).'))
-    parser.add_argument('--commit-date',
-                        type=str,
-                        required=False,
-                        help=('Date of a git commit. If not provided, it defaults to current '
-                              'date.'))
 
     args = parser.parse_args()
 
