@@ -412,9 +412,7 @@ if __name__ == "__main__":
         os.path.join(root, "build_package.py"),
     }
 
-    smoke_test_files = set(
-        glob.glob("{0}/tests/**/*.py".format(root), recursive=True)
-    )
+    smoke_test_files = set(glob.glob("{0}/tests/**/*.py".format(root), recursive=True))
 
     # files without third party libraries.
     files_to_process = (

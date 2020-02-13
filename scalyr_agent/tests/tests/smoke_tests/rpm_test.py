@@ -1,19 +1,23 @@
 from pathlib import Path
 import shutil
+import pathlib
 
 import pytest
 import docker
 import docker.types
 import docker.errors
 
-from tests.tools.agent_verifier import AgentVerifier, CollectorSpawnMatcher, LogMatchCase
-from ..tools.agent_runner import BaseAgentContainerRunner
+# from tests.tools.agent_verifier import AgentVerifier, CollectorSpawnMatcher, LogMatchCase
+from scalyr_agent.tests.tests.tools.agent_runner import (
+    DirectAgentRunner,
+)
 
-from ..tools.utils import create_temp_dir
+from ..tools.utils import create_temp_dir_with_constant_name
 
 
 def _open(path):
     import os
+
     os.system("xdg-open {}".format(path))
 
 
@@ -35,19 +39,22 @@ def _clear_docker(docker_client):
 
 @pytest.fixture(scope="session")
 def docker_client():
-    client = docker.DockerClient()
+    client = docker.Client()
     _clear_docker(client)
     return client
 
 
 def build_image(docker_client, path, tag, **kwargs):
     print(f"The '{tag}' image build started.")
-    img, build_logs = docker_client.images.build(path=path, tag=f"{tag}", rm=True, **kwargs)
+    img, build_logs = docker_client.images.build(
+        path=path, tag=f"{tag}", rm=True, **kwargs
+    )
     output = "".join([log.get("stream", "") for log in build_logs])
     print(
         "========================================================\n",
         output,
-        "========================================================\n")
+        "========================================================\n",
+    )
     print(f"The '{tag}' image build finished.")
     return img
 
@@ -56,20 +63,22 @@ def build_image(docker_client, path, tag, **kwargs):
 def package_builder_image(docker_client):
     """Image prepared to produce agent packages within it."""
     build_context_path = str(Path(test_root_dir, "package_builder"))
-    img = build_image(docker_client, build_context_path, "scalyr_agent_test_package_builder")
+    img = build_image(
+        docker_client, build_context_path, "scalyr_agent_test_package_builder"
+    )
     return img
 
 
 @pytest.fixture(scope="session")
 def rpm_package_path(docker_client, package_builder_image):
     """Create agent rpm package by running container instantiated from 'scalyr_package_builder'"""
-    package_directory = create_temp_dir()
+    package_directory = create_temp_dir_with_constant_name()
     docker_client.containers.run(
         "scalyr_agent_test_package_builder",
         name="scalyr_package_builder",
         mounts=[
             docker.types.Mount("/agent_source", root_dir, type="bind"),
-            docker.types.Mount("/package_result", package_directory.name, type="bind")
+            docker.types.Mount("/package_result", package_directory.name, type="bind"),
         ],
         working_dir="/package_result",
         command="python /agent_source/build_package.py rpm",
@@ -84,11 +93,11 @@ def rpm_package_path(docker_client, package_builder_image):
 
 
 def _build_rpm_image(docker_client, rpm_package_path, python_version="python3"):
-    temp_build_context_path = create_temp_dir()
+    temp_build_context_path = create_temp_dir_with_constant_name()
 
     shutil.copy(
         rpm_package_path,
-        Path(temp_build_context_path.name, Path(rpm_package_path).name)
+        Path(temp_build_context_path.name, Path(rpm_package_path).name),
     )
 
     rpm_dockerfile_path = Path(test_root_dir, "rpm", "Dockerfile")
@@ -129,7 +138,7 @@ def _agent_container_runner_factory(container_name, image, request):
         image=image,
         docker_client=docker_client,
         test_config=test_config,
-        agent_json_config=agent_config
+        agent_json_config=agent_config,
     )
     return runner
 
@@ -137,9 +146,7 @@ def _agent_container_runner_factory(container_name, image, request):
 @pytest.fixture(scope="session")
 def agent_config():
     d = {
-        "server_attributes": {
-            "serverHost": ""
-        },
+        "server_attributes": {"serverHost": ""},
     }
     return d.copy()
 
@@ -147,9 +154,7 @@ def agent_config():
 @pytest.fixture(scope="session")
 def agent_rpm_python2(agent_rpm_image_python2, request):
     runner = _agent_container_runner_factory(
-        "scalyr_agent_test_rpm_smoke_python2",
-        agent_rpm_image_python2,
-        request
+        "scalyr_agent_test_rpm_smoke_python2", agent_rpm_image_python2, request
     )
     yield runner
 
@@ -159,48 +164,75 @@ def agent_rpm_python2(agent_rpm_image_python2, request):
 @pytest.fixture(scope="session")
 def agent_rpm_python3(agent_rpm_image_python3, request):
     runner = _agent_container_runner_factory(
-        "scalyr_agent_test_rpm_smoke_python3",
-        agent_rpm_image_python3,
-        request
+        "scalyr_agent_test_rpm_smoke_python3", agent_rpm_image_python3, request
     )
     yield runner
 
     runner.stop()
 
 
-def test_python3(agent_rpm_python3: BaseAgentContainerRunner, test_config):
-    data_json_file = agent_rpm_python3.add_log_file(
-        "/var/log/scalyr-agent-2/data.json",
-        attributes={"parser": "json"},
-        mode="w"
-    )
+# def test_python3(agent_rpm_python3: BaseAgentContainerRunner, test_config):
+#     data_json_file = agent_rpm_python3.add_log_file(
+#         "/var/log/scalyr-agent-2/data.json", attributes={"parser": "json"}, mode="w"
+#     )
+#
+#     agent_rpm_python3.run()
+#
+#     agent_verifier = AgentVerifier(
+#         test_config["agent_settings"]["SCALYR_SERVER"],
+#         test_config["agent_settings"]["SCALYR_READ_KEY"],
+#         test_config["agent_settings"]["HOST_NAME"],
+#         agent_runner=agent_rpm_python3,
+#     )
+#
+#     agent_verifier.verify()
+#
+#
+# def test_python2(agent_rpm_python2: BaseAgentContainerRunner, test_config):
+#     data_json_file = agent_rpm_python2.add_log_file(
+#         "/var/log/scalyr-agent-2/data.json", attributes={"parser": "json"}, mode="w"
+#     )
+#
+#     agent_rpm_python2.run()
+#
+#     agent_verifier = AgentVerifier(
+#         test_config["agent_settings"]["SCALYR_SERVER"],
+#         test_config["agent_settings"]["SCALYR_READ_KEY"],
+#         test_config["agent_settings"]["HOST_NAME"],
+#         agent_runner=agent_rpm_python2,
+#     )
+#
+#     agent_verifier.verify()
 
-    agent_rpm_python3.run()
 
-    agent_verifier = AgentVerifier(
-        test_config["agent_settings"]["SCALYR_SERVER"],
-        test_config["agent_settings"]["SCALYR_READ_KEY"],
-        test_config["agent_settings"]["HOST_NAME"],
-        agent_runner=agent_rpm_python3
-    )
+# @pytest.mark.usefixtures("agent_environment")
+# def test_agent_basic(test_config):
+#     import os
+#     r = os.getenv("SCALYR_API_KEY")
+#     runner = DirectAgentRunner()
+#     runner.start()
+#
+#     while True:
+#         print(runner.read_file_content(runner._agent_log_file_path))
+#
+#     return
 
-    agent_verifier.verify()
+@pytest.mark.usefixtures("agent_environment")
+def test_agent_basic(test_config):
+    from scalyr_agent.tests.tests.tools.docker.builder import AgentDockerImageBuilder
+
+    builder = AgentDockerImageBuilder()
+    builder.build()
 
 
-def test_python2(agent_rpm_python2: BaseAgentContainerRunner, test_config):
-    data_json_file = agent_rpm_python2.add_log_file(
-        "/var/log/scalyr-agent-2/data.json",
-        attributes={"parser": "json"},
-        mode="w"
-    )
+    return
 
-    agent_rpm_python2.run()
+    import os
+    r = os.getenv("SCALYR_API_KEY")
+    runner = DirectAgentRunner()
+    runner.start()
 
-    agent_verifier = AgentVerifier(
-        test_config["agent_settings"]["SCALYR_SERVER"],
-        test_config["agent_settings"]["SCALYR_READ_KEY"],
-        test_config["agent_settings"]["HOST_NAME"],
-        agent_runner=agent_rpm_python2
-    )
+    while True:
+        print(runner.read_file_content(runner._agent_log_file_path))
 
-    agent_verifier.verify()
+    return

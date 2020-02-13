@@ -70,7 +70,9 @@ class LogMatchCase:
                 if line:
                     break
                 if time.time() - start_time >= timeout:
-                    matchers_string = "".join([f"    {str(m)}\n" for m in self._matchers])
+                    matchers_string = "".join(
+                        [f"    {str(m)}\n" for m in self._matchers]
+                    )
                     raise AssertionError(
                         f"Timeout. Log match case could not find needed lines for next matchers:\n{matchers_string}"
                     )
@@ -87,12 +89,13 @@ class LogMatchCase:
 
 
 class AgentVerifier:
-    def __init__(self,
-                 scalyr_server,
-                 read_api_key,
-                 host_name,
-                 agent_runner: BaseAgentContainerRunner
-                 ):
+    def __init__(
+        self,
+        scalyr_server,
+        read_api_key,
+        host_name,
+        agent_runner: BaseAgentContainerRunner,
+    ):
         self._read_api_key = read_api_key
         self._scalyr_server = scalyr_server
         self._host_name = host_name
@@ -110,10 +113,7 @@ class AgentVerifier:
 
         query = f"https://{self._scalyr_server}/api/query?queryType=log&{params_str}"
 
-        filters = {
-            "$serverHost": self._host_name,
-            "$logfile": log_file
-        }
+        filters = {"$serverHost": self._host_name, "$logfile": log_file}
 
         filter_fragments = list()
 
@@ -134,24 +134,27 @@ class AgentVerifier:
 
         return io.StringIO("\n".join(messages))
 
-
     def verify(self):
         self._verify_system_metrics_monitor_log()
         self._verify_agent_log()
 
     def _verify_agent_log(self):
 
-        collectors_case = LogMatchCase([
-            CollectorSpawnMatcher("ifstat.py"),
-            CollectorSpawnMatcher("dfstat.py"),
-            CollectorSpawnMatcher("iostat.py"),
-            CollectorSpawnMatcher("procstats.py"),
-            CollectorSpawnMatcher("netstat.py"),
-        ])
+        collectors_case = LogMatchCase(
+            [
+                CollectorSpawnMatcher("ifstat.py"),
+                CollectorSpawnMatcher("dfstat.py"),
+                CollectorSpawnMatcher("iostat.py"),
+                CollectorSpawnMatcher("procstats.py"),
+                CollectorSpawnMatcher("netstat.py"),
+            ]
+        )
 
         collectors_case.feed(self._runner.agent_log_file)
 
-        remote_stream = self.request(self._runner.agent_log_file.container_path, line_count=1000)
+        remote_stream = self.request(
+            self._runner.agent_log_file.container_path, line_count=1000
+        )
 
         collectors_case.feed(remote_stream)
 
@@ -172,5 +175,7 @@ class AgentVerifier:
             if count >= 220:
                 break
 
-        remote_lines = self.request(self._runner.agent_system_metrics_monitor_log_file.container_path, line_count=220)
-
+        remote_lines = self.request(
+            self._runner.agent_system_metrics_monitor_log_file.container_path,
+            line_count=220,
+        )

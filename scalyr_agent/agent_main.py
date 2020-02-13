@@ -44,7 +44,10 @@ import sys
 import time
 from io import open
 
-from __scalyr__ import SCALYR_VERSION, scalyr_init
+try:
+    from __scalyr__ import SCALYR_VERSION, scalyr_init
+except ModuleNotFoundError:
+    from .__scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -1576,7 +1579,7 @@ class WorkerThread(object):
             self.__scalyr_client.close()
 
 
-if __name__ == "__main__":
+def main():
     my_controller = PlatformController.new_platform()
     parser = OptionParser(
         usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
@@ -1670,3 +1673,7 @@ if __name__ == "__main__":
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
     sys.exit(main_rc)
+
+
+if __name__ == "__main__":
+    main()
