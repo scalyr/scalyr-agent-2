@@ -5,6 +5,8 @@
   // Circle CI doesn't have access to CA bundle file so we disable certificate verification
   verify_server_certificate: false,
   debug_level: "5",
+  // We want to consume whole file from the beginning
+  max_log_offset_size: 104857600,
 
   server_attributes: {
      serverHost: "ci-codespeed-benchmarks-single-50mb-access-log-agent",
@@ -12,7 +14,11 @@
   }
 
   logs: [
-     { path: "/tmp/access_log_50_mb.log", attributes: { parser: "accessLog" } }
+     {
+         path: "/tmp/access_log_50_mb.log",
+         attributes: { parser: "accessLog" },
+         copy_from_start: true
+     }
   ],
 
   monitors: [
