@@ -80,6 +80,10 @@ commands:
       agent_config:
         description: "Path to the agent config to use."
         type: string
+      capture_line_counts:
+        description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
       cache_key_name:
         description: "Circle CI cache key name"
         type: string
@@ -120,7 +124,9 @@ commands:
             ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
 
             # Send line count values for various log levels
-            ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
+            if [ "<< parameters.capture_line_counts>>" = "true" ]; then
+                ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
+            fi
       - save_cache:
           key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
           paths:
@@ -518,6 +524,7 @@ jobs:
           codespeed_executable: "Python 2.7.17 - idle conf"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          capture_line_counts: true
           cache_key_name: "benchmarks-idle-27"
 
   benchmarks-idle-agent-py-35:
@@ -529,6 +536,7 @@ jobs:
           codespeed_executable: "Python 3.5.9 - idle conf"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          capture_line_counts: true
           cache_key_name: "benchmarks-idle-35"
 
   send-circle-ci-usage-report:
