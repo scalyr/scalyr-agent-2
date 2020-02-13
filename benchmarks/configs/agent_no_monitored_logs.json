@@ -1,6 +1,7 @@
 {
   // api_key: "",  // specified via environment variable
-  scalyr_server: "agent.scalyr.com",
+  // NOTE: The key defined as Circle CI env variable is available in qatesting
+  scalyr_server: "app-qatesting.scalyr.com",
   debug_level: "5",
 
   server_attributes: {
