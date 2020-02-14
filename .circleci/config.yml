@@ -538,7 +538,7 @@ jobs:
       - image: circleci/python:2.7.17
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 2.7.17 - idle conf"
+          codespeed_executable: "Python 2.7.17 - idle conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
           capture_line_counts: true
@@ -550,11 +550,35 @@ jobs:
       - image: circleci/python:3.5.9
     steps:
       - codespeed_agent_process_benchmark:
-          codespeed_executable: "Python 3.5.9 - idle conf"
+          codespeed_executable: "Python 3.5.9 - idle conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-35"
+
+  benchmarks-idle-agent-no-monitors-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-27"
+
+  benchmarks-idle-agent-no-monitors-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-35"
 
   benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
     working_directory: ~/scalyr-agent-2
@@ -629,6 +653,10 @@ workflows:
       - benchmarks-idle-agent-py-27:
           <<: *master_only
       - benchmarks-idle-agent-py-35:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-35:
           <<: *master_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
           <<: *master_only
