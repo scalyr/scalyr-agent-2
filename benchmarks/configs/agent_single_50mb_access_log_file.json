@@ -1,17 +1,6 @@
 {
-  // api_key: "",  // specified via environment variable
-  // NOTE: The key defined as Circle CI env variable is available in qatesting
-  scalyr_server: "app-qatesting.scalyr.com",
-  // Circle CI doesn't have access to CA bundle file so we disable certificate verification
-  verify_server_certificate: false,
-  debug_level: "5",
-  // We want to consume whole file from the beginning
+  // We want to consume whole file from the beginning so we set max offset to 100 MB
   max_log_offset_size: 104857600,
-
-  server_attributes: {
-     serverHost: "ci-codespeed-benchmarks-single-50mb-access-log-agent",
-     tier: "benchmarks"
-  }
 
   logs: [
      {
