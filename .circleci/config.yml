@@ -91,6 +91,10 @@ commands:
         description: "Optional URL to the fixture which is used by the tests and should be downloaded."
         type: string
         default: ""
+      agent_post_run_command:
+        description: "Optional bash command / script to run after staring the agent metrics capture script."
+        type: string
+        default: ""
       cache_key_name:
         description: "Circle CI cache key name"
         type: string
@@ -138,10 +142,27 @@ commands:
                 wget --directory-prefix=/tmp "<< parameters.fixture_file_url >>"
             fi
 
-            # Run the agent process and capture the metrics
-            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}"
+            # Create a file which is used for benchmarks which utilize randomly
+            # generated data
+            touch /tmp/random.log
 
-            # Send line count values for various log levels
+            # Run the agent process and capture the metrics
+            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}" &> /tmp/capture_script.log &
+            CAPTURE_SCRIPT_PID=$!
+
+            # Run any post agent run script (if defined)
+            # NOTE: We intentionally sleep for a bit to give agent time to fully
+            # start up
+            if [ ! -z "<< parameters.agent_post_run_command >>" ]; then
+                sleep 2
+                << parameters.agent_post_run_command >>
+            fi
+
+            # Wait for capture script to finish
+            wait ${CAPTURE_SCRIPT_PID}
+            cat /tmp/capture_script.log
+
+            # Send line count values for various log levels (if enabled)
             if [ "<< parameters.capture_line_counts >>" = "true" ]; then
                 ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
             fi
@@ -608,6 +629,34 @@ jobs:
           capture_line_counts: false
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
 
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          run_time: 140
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-27"
+
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          run_time: 140
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          capture_line_counts: false
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -661,6 +710,10 @@ workflows:
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
           <<: *master_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
