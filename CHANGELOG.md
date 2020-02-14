@@ -1,6 +1,20 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.0.59 "Lady MacBeth" - Feb 13, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Feb 13, 2020 10:30 -0800
+--->
+
+Feature
+* Improved support for handling long log lines captured by `kubernetes_monitor` and `docker_monitor`.  When parsing docker logs, the serialized JSON objects can now be up to `internal_parse_max_line_size` bytes (defaults to 64KB).  This replaces the requirement they be less than `max_line_size`.  The `log` field extracted from the JSON object is still subjected to the `max_line_size` limit.
+* Improved handling when `kubernetes_monitor` fails due to an uninitialized K8s cache.  If a `kubernetes_monitor` becomes stuck for 2 minutes and cannot initialize, the agent will terminate its container to allow for K8s to restart it.
+
+Bugs
+* Add additional diagnostic information to help customers troubleshoot issues in the `kubernetes_monitor` due to failures in K8s cache initialization.
+* Fix bug due to protected access in the `journald_monitor`.
+
 ## 2.0.58 "Karrajor" - Jan 23, 2020
 
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 23, 2020 10:30 -0800
