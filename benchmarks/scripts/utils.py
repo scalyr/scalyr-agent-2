@@ -23,6 +23,7 @@ from argparse import ArgumentParser  # NOQA
 
 if False:
     from typing import List
+    from typing import Dict
     from typing import Tuple
     from typing import Optional
 
@@ -57,7 +58,7 @@ def initialize_logging(debug=False):
 
 
 def send_payload_to_codespeed(codespeed_url, codespeed_auth, commit_id, payload):
-    # type: (str, Optional[Tuple[str, str]], str, dict) -> None
+    # type: (str, Optional[Tuple[str, str]], str, List[Dict]) -> None
     """
     Send provided payload to CodeSpeed.
     """
@@ -176,7 +177,7 @@ def parse_auth_credentials(value):
 
 
 def parse_commit_date(value):
-    # type: (str) -> datetime
+    # type: (str) -> Optional[datetime]
     """
     Parse commit date from a string in the following format into a datetime object.
     """
