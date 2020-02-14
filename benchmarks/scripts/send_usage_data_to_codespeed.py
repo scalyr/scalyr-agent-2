@@ -60,7 +60,7 @@ from collections import defaultdict
 import numpy as np
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, '../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "../../")))
 
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
@@ -76,27 +76,23 @@ logger = logging.getLogger(__name__)
 
 METRICS_GAUGES = {
     # CPU usage related metrics
-    'cpu_threads': Metric(name='app.threads', _type=None),
-
+    "cpu_threads": Metric(name="app.threads", _type=None),
     # Memory usage related metrics
-    'memory_usage_rss': Metric(name='app.mem.bytes', _type='resident'),
-    'memory_usage_vms': Metric(name='app.mem.bytes', _type='vmsize'),
-
+    "memory_usage_rss": Metric(name="app.mem.bytes", _type="resident"),
+    "memory_usage_vms": Metric(name="app.mem.bytes", _type="vmsize"),
     # IO related metrics
-    'io_open_fds': Metric(name='app.io.fds', _type='open'),
+    "io_open_fds": Metric(name="app.io.fds", _type="open"),
 }  # type: Dict[str, Metric]
 
 METRICS_COUNTERS = {
     # CPU usage related metrics
-    'cpu_time_user': Metric(name='app.cpu', _type='user'),
-    'cpu_time_system': Metric(name='app.cpu', _type='system'),
-
+    "cpu_time_user": Metric(name="app.cpu", _type="user"),
+    "cpu_time_system": Metric(name="app.cpu", _type="system"),
     # IO related metrics
-    'io_read_count_requests': Metric(name='app.disk.requests', _type='read'),
-    'io_write_count_requests': Metric(name='app.disk.requests', _type='write'),
-
-    'io_read_count_bytes': Metric(name='app.disk.bytes', _type='read'),
-    'io_write_count_bytes': Metric(name='app.disk.bytes', _type='write')
+    "io_read_count_requests": Metric(name="app.disk.requests", _type="read"),
+    "io_write_count_requests": Metric(name="app.disk.requests", _type="write"),
+    "io_read_count_bytes": Metric(name="app.disk.bytes", _type="read"),
+    "io_write_count_bytes": Metric(name="app.disk.bytes", _type="write"),
 }  # type: Dict[str, Metric]
 
 
@@ -104,20 +100,29 @@ def bytes_to_megabytes(value):
     if not value:
         return value
 
-    return (float(value) / 1048576)
+    return float(value) / 1048576
 
 
 # Functions for formatting metrics values
 # We use those so we operate in more user-friendly units. It makes no sense to track memory usae
 # in bytes when in reality, actual usage will never be smaller than a couple of MBs
 METRIC_FORMAT_FUNCTIONS = {
-    'memory_usage_rss': bytes_to_megabytes,
-    'memory_usage_vms': bytes_to_megabytes,
+    "memory_usage_rss": bytes_to_megabytes,
+    "memory_usage_vms": bytes_to_megabytes,
 }
 
 
-def send_data_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, codespeed_executable,
-                           codespeed_environment, branch, commit_id, result, commit_date=None):
+def send_data_to_codespeed(
+    codespeed_url,
+    codespeed_auth,
+    codespeed_project,
+    codespeed_executable,
+    codespeed_environment,
+    branch,
+    commit_id,
+    result,
+    commit_date=None,
+):
     # type: (str, Optional[Tuple[str, str]], str, str, str, str, str, dict, Optional[datetime]) -> None
     """
     Submit captured data to CodeSpeed instance.
@@ -127,29 +132,31 @@ def send_data_to_codespeed(codespeed_url, codespeed_auth, codespeed_project, cod
         benchmark = metric_name
 
         item = {
-            'commitid': commit_id,
-            'branch': branch,
-
-            'project': codespeed_project,
-            'executable': codespeed_executable,
-            'benchmark': benchmark,
-            'environment': codespeed_environment,
-
-            'result_value': metric_result['value'],
+            "commitid": commit_id,
+            "branch": branch,
+            "project": codespeed_project,
+            "executable": codespeed_executable,
+            "benchmark": benchmark,
+            "environment": codespeed_environment,
+            "result_value": metric_result["value"],
         }
 
         if commit_date:
-            item['revision_date'] = commit_date.strftime('%Y-%m-%d %H:%M:%S')
+            item["revision_date"] = commit_date.strftime("%Y-%m-%d %H:%M:%S")
 
         # Include optional pre-computed data for gauge metrics
-        for key in ['min', 'max', 'std_dev']:
+        for key in ["min", "max", "std_dev"]:
             if metric_result.get(key, None) is not None:
-                item['min'] = metric_result[key]
+                item["min"] = metric_result[key]
 
         payload.append(item)
 
-    send_payload_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
-                              commit_id=commit_id, payload=payload)
+    send_payload_to_codespeed(
+        codespeed_url=codespeed_url,
+        codespeed_auth=codespeed_auth,
+        commit_id=commit_id,
+        payload=payload,
+    )
 
 
 def capture_metrics(tracker, metrics, values):
@@ -173,8 +180,17 @@ def capture_metrics(tracker, metrics, values):
     return values
 
 
-def main(pid, codespeed_url, codespeed_auth, codespeed_project, codespeed_executable,
-         codespeed_environment, branch, commit_id, commit_date=None):
+def main(
+    pid,
+    codespeed_url,
+    codespeed_auth,
+    codespeed_project,
+    codespeed_executable,
+    codespeed_environment,
+    branch,
+    commit_id,
+    commit_date=None,
+):
     # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime]) -> None
     """
     Main entry point / run loop for the script.
@@ -189,12 +205,12 @@ def main(pid, codespeed_url, codespeed_auth, codespeed_project, codespeed_execut
     captured_values = defaultdict(list)  # type: Dict[str, List[T_metric_value]]
 
     while time.time() <= end_time:
-        logger.debug('Capturing gauge metrics...')
+        logger.debug("Capturing gauge metrics...")
         capture_metrics(tracker=tracker, metrics=METRICS_GAUGES, values=captured_values)
         time.sleep(args.capture_interval)
 
     # Capture counter metrics
-    logger.debug('Capturing counter metrics...')
+    logger.debug("Capturing counter metrics...")
     capture_metrics(tracker=tracker, metrics=METRICS_COUNTERS, values=captured_values)
 
     # Generate final result object and calculate derivatives for gauge metrics
@@ -210,52 +226,65 @@ def main(pid, codespeed_url, codespeed_auth, codespeed_project, codespeed_execut
         std_dev = np.std(values)
 
         result[metric_name] = {
-            'value': percentile_999,
-            'min': minimum,
-            'max': maximum,
-            'std_dev': std_dev
+            "value": percentile_999,
+            "min": minimum,
+            "max": maximum,
+            "std_dev": std_dev,
         }
 
     for metric_name in METRICS_COUNTERS.keys():
         metric_value = captured_values[metric_name][0]
-        result[metric_name] = {
-            'value': metric_value
-        }
+        result[metric_name] = {"value": metric_value}
 
-    logger.debug('Captured data: %s' % (str(result)))
-    logger.info('Capture complete, submitting metrics to CodeSpeed...')
-    send_data_to_codespeed(codespeed_url=codespeed_url, codespeed_auth=codespeed_auth,
-                           codespeed_project=codespeed_project,
-                           codespeed_executable=codespeed_executable,
-                           codespeed_environment=codespeed_environment, branch=branch,
-                           commit_id=commit_id,
-                           result=result,
-                           commit_date=commit_date)
+    logger.debug("Captured data: %s" % (str(result)))
+    logger.info("Capture complete, submitting metrics to CodeSpeed...")
+    send_data_to_codespeed(
+        codespeed_url=codespeed_url,
+        codespeed_auth=codespeed_auth,
+        codespeed_project=codespeed_project,
+        codespeed_executable=codespeed_executable,
+        codespeed_environment=codespeed_environment,
+        branch=branch,
+        commit_id=commit_id,
+        result=result,
+        commit_date=commit_date,
+    )
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=('Capture process level metric data and submit it '
-                                                  'to CodeSpeed instance'))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=(
+            "Capture process level metric data and submit it " "to CodeSpeed instance"
+        )
+    )
 
     # Add common arguments
     parser = add_common_parser_arguments(parser=parser)
 
     # Add arguments which are specific to this script
-    parser.add_argument('--pid',
-                        type=int,
-                        required=True,
-                        help=('ID of a process to capture metrics for.'))
-    parser.add_argument('--capture-time',
-                        type=int,
-                        required=True,
-                        default=10,
-                        help=('How long capture metrics for (in seconds).'))
-    parser.add_argument('--capture-interval',
-                        type=float,
-                        required=True,
-                        default=1,
-                        help=('How often to capture gauge metrics during the capture time '
-                              '(in seconds).'))
+    parser.add_argument(
+        "--pid",
+        type=int,
+        required=True,
+        help=("ID of a process to capture metrics for."),
+    )
+    parser.add_argument(
+        "--capture-time",
+        type=int,
+        required=True,
+        default=10,
+        help=("How long capture metrics for (in seconds)."),
+    )
+    parser.add_argument(
+        "--capture-interval",
+        type=float,
+        required=True,
+        default=1,
+        help=(
+            "How often to capture gauge metrics during the capture time "
+            "(in seconds)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -263,7 +292,14 @@ if __name__ == '__main__':
     commit_date = parse_commit_date(args.commit_date)
 
     initialize_logging(debug=args.debug)
-    main(pid=args.pid, codespeed_url=args.codespeed_url, codespeed_auth=codespeed_auth,
-         codespeed_project=args.codespeed_project, codespeed_executable=args.codespeed_executable,
-         codespeed_environment=args.codespeed_environment, branch=args.branch,
-         commit_id=args.commit_id, commit_date=commit_date)
+    main(
+        pid=args.pid,
+        codespeed_url=args.codespeed_url,
+        codespeed_auth=codespeed_auth,
+        codespeed_project=args.codespeed_project,
+        codespeed_executable=args.codespeed_executable,
+        codespeed_environment=args.codespeed_environment,
+        branch=args.branch,
+        commit_id=args.commit_id,
+        commit_date=commit_date,
+    )
