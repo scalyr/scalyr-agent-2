@@ -1,4 +1,4 @@
-# scalyr-agent-2
+# Scalyr Agent (scalyr-agent-2)
 
 [![CircleCI](https://circleci.com/gh/scalyr/scalyr-agent-2.svg?style=svg)](https://circleci.com/gh/scalyr/scalyr-agent-2) 
 [![codecov](https://codecov.io/gh/scalyr/scalyr-agent-2/branch/master/graph/badge.svg)](https://codecov.io/gh/scalyr/scalyr-agent-2)
