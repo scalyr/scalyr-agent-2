@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script which generates and writes random lines to the provided file path
-
-# NOTE: We don't care into secure values here so we use non blocking and faster
+# Script which generates and writes random lines to the provided file path. For
+# simplicy and speed (avoding the overhead of generating random lines and / or
+# reading from a dictionary, it simply reads random bytes from /dev/urandom).
+#
+# NOTE: We don't care about secure values here so we use non blocking and faster
 # /dev/urandom and not /dev/random
-
 
 # Path to which we should write data to
 FILE_PATH=${1-"/tmp/random.log"}
@@ -25,13 +26,13 @@ FILE_PATH=${1-"/tmp/random.log"}
 # Single chunk size
 # NOTE: We write in smaller chunks with a delay in between to make sure agent
 # doesn't fall to far behind
-CHUNK_SIZE=${2:-"2M"}  # in MB
+CHUNK_SIZE=${2:-"2M"}
 
 # How many chunks to write. If this value is 5 and CHUNK_SIZE is 4, we will
-# write 50 MB in total (5 * 4)
+# write 20 MB in total (5 * 4)
 CHUNKS_COUNT=${3-5}
 
-# line / word length in characters
+# Line / word length in characters
 WORD_LENGTH=${4-"100"}
 
 # How long to wait between writting each chunk

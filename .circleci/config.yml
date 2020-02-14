@@ -77,7 +77,7 @@ commands:
         type: string
         default: "Circle CI Docker Executor Medium Size"
       agent_config:
-        description: "Path to the agent config to use."
+        description: "Path to the agent config file to use."
         type: string
       run_time:
         description: "How long to run the capture for (in seconds)."
@@ -92,7 +92,7 @@ commands:
         type: string
         default: ""
       agent_post_run_command:
-        description: "Optional bash command / script to run after staring the agent metrics capture script."
+        description: "Optional bash command / script to run after staring the agent and the metrics capture script."
         type: string
         default: ""
       cache_key_name:
@@ -133,7 +133,7 @@ commands:
 
             # NOTE: We explicitly specify a commit date to avoid CodeSpeed from
             # late setting the actual date once it fetches all the commits for a
-            # branch
+            # branch / revision
             export TZ=UTC
             export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
 
@@ -159,8 +159,10 @@ commands:
             fi
 
             # Wait for capture script to finish
-            wait ${CAPTURE_SCRIPT_PID}
-            cat /tmp/capture_script.log
+            set +e
+            sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
+            wait ${CAPTURE_SCRIPT_PID} || true
+            set -e
 
             # Send line count values for various log levels (if enabled)
             if [ "<< parameters.capture_line_counts >>" = "true" ]; then
