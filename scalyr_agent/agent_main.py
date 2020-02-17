@@ -44,7 +44,10 @@ import sys
 import time
 from io import open
 
-from __scalyr__ import SCALYR_VERSION, scalyr_init
+try:
+    from __scalyr__ import SCALYR_VERSION, scalyr_init
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -1213,14 +1216,14 @@ class ScalyrAgent(object):
             if not os.path.isfile(ca_file):
                 raise ValueError(
                     'Invalid path "%s" specified for the "ca_cert_path" config '
-                    "option: file doesn't exist" % (ca_file)
+                    "option: file does not exist" % (ca_file)
                 )
 
             if not os.path.isfile(intermediate_certs_file):
                 raise ValueError(
                     'Invalid path "%s" specified for the '
                     '"intermediate_certs_path" config '
-                    "option: file doesn't exist" % (intermediate_certs_file)
+                    "option: file does not exist" % (intermediate_certs_file)
                 )
         else:
             ca_file = None
