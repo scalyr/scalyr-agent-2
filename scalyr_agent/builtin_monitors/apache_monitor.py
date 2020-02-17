@@ -5,9 +5,10 @@
 # scalyr_agent.builtin_monitors.apache_monitor
 from __future__ import absolute_import
 import six.moves.http_client
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
-import socket
+import six.moves.urllib.request
+import six.moves.urllib.error
 import six.moves.urllib.parse
+import socket
 
 from scalyr_agent import (
     ScalyrMonitor,
@@ -128,6 +129,7 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
+        # pylint: disable=unexpected-keyword-arg
         bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
         bhc.source_ip = source_ip
         return bhc
@@ -263,7 +265,7 @@ options, see Configuration Reference.
         # verify that the URL is valid
         try:
             url = six.moves.urllib.parse.urlparse(self.__url)
-        except Exception as e:
+        except Exception:
             self._logger.error(
                 "The URL configured for requesting the status page appears to be invalid.  Please verify that the URL is correct in your monitor configuration.  The specified url: %s"
                 % self.__url

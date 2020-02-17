@@ -28,10 +28,8 @@ import six
 
 __author__ = "czerwin@scalyr.com"
 
-import datetime
 import errno
 import fnmatch
-import sys
 
 import os
 import random
@@ -39,7 +37,6 @@ import re
 import string
 import threading
 import time
-import timeit
 import uuid
 from io import open
 
@@ -61,7 +58,7 @@ from os.path import isfile, join
 
 if sys.version_info < (3, 5):
     # We use a third party library for pre-Python 3.5 to get recursive glob support (**)
-    import glob2
+    import glob2  # pylint: disable=import-error
 else:
     # Python 3.5 and higher supports `**`
     import glob
@@ -229,6 +226,20 @@ class LogFileIterator(object):
 
         # The current position we are reading from, relative to the position that was last passed into mark.
         self.__position = 0
+
+        # An extended line is when we temporarily keep a log line larger than max log line size in memory
+        # for the purpose of splitting it up into fragments (which will be under the max log line size).
+        # We do this when applying an internal parsing, like JSON or CRI, so that we can extract a full
+        # JSON object before splitting up the resulting line content.  When the iterator is iterating
+        # over an extended line, memory usage will go up because we will be keeping multiple pages of
+        # data in the buffer and will have an extra copy of the line content in extended_line_buffer.
+        #
+        # If `__extended_line_position` is not None, then it means we are iterating over the fragments
+        # of a extended_line and this variable points to where we have left off.
+        self.__extended_line_position = None
+        # The saved copy of the extended_line.
+        self.__extended_line_buffer = None
+
         # The BytesIO buffer holding the bytes to be read.
         self.__buffer = None
         # This is a list of LogFileIterator.BufferEntry which maps which portions of the buffer map to which mark
@@ -272,9 +283,16 @@ class LogFileIterator(object):
         self.__json_log_key = log_config.get("json_message_field", "log")
         self.__json_timestamp_key = log_config.get("json_timestamp_field", "time")
 
+        if self.__parse_format == "json" or self.__parse_format == "cri":
+            self.__max_extended_line_length = config.internal_parse_max_line_size
+        else:
+            self.__max_extended_line_length = config.max_line_size
+
         # create the line matcher objects for matching single and multiple lines
         self.__line_matcher = LineMatcher.create_line_matchers(
-            log_config, config.max_line_size, config.line_completion_wait_time
+            log_config,
+            max(config.max_line_size, self.__max_extended_line_length),
+            config.line_completion_wait_time,
         )
 
         # Stat just used in testing to verify pages are being read correctly.
@@ -315,6 +333,9 @@ class LogFileIterator(object):
 
                 if "position" in checkpoint:
                     self.__position = checkpoint["position"]
+                    self.__extended_line_position = LogFileIterator.ExtendedLinePosition.from_checkpoint(
+                        checkpoint
+                    )
                     for state in checkpoint["pending_files"]:
                         if not state["is_log_file"] or self.__file_system.trust_inodes:
                             (file_object, file_size, inode) = self.__open_file_by_inode(
@@ -363,7 +384,9 @@ class LogFileIterator(object):
         """
         self.__line_matcher = line_matcher
 
-    def set_parameters(self, max_line_length=None, page_size=None):
+    def set_parameters(
+        self, max_line_length=None, page_size=None, max_extended_line_length=None
+    ):
         """Sets the various parameters for reading the file.
 
         This is used for testing purposes.
@@ -371,13 +394,22 @@ class LogFileIterator(object):
         @param max_line_length: The maximum allowed line size or None if you do not wish to change the current value.
         @param page_size: How much data is read from the file at a given time. or None if you do not wish to change
             the current value.
+        @param max_extended_line_length:  The maximum allowed internal line size or None if you do not wish to change
+            the current value.
         @type max_line_length: int or None
         @type page_size: int or None
+        @type max_extended_line_length: int or None
         """
         if max_line_length is not None:
             self.__max_line_length = max_line_length
+        if max_extended_line_length is not None:
+            self.__max_extended_line_length = max_extended_line_length
+        else:
+            self.__max_extended_line_length = self.__max_line_length
 
-        self.__line_matcher.max_line_length = self.__max_line_length
+        self.__line_matcher.max_line_length = max(
+            self.__max_line_length, self.__max_extended_line_length
+        )
 
         if page_size is not None:
             self.__page_size = page_size
@@ -395,7 +427,16 @@ class LogFileIterator(object):
         @return: A tuple containing a (sequence_id, sequence_number)
         @rtype: (six.text_type, int)
         """
-        return self.__sequence_id, self.__sequence_number_at_mark + self.__position
+        if self.__extended_line_position is None:
+            return self.__sequence_id, self.__sequence_number_at_mark + self.__position
+        else:
+            # Add in the fragment position to get a unique sequence number
+            return (
+                self.__sequence_id,
+                self.__sequence_number_at_mark
+                + self.__position
+                + self.__extended_line_position.bytes_from_start,
+            )
 
     def __increase_sequence_number(self, amount):
         """Increases the sequence number and resets both the sequence number and the id
@@ -456,6 +497,11 @@ class LogFileIterator(object):
 
         self.__increase_sequence_number(self.__position)
         self.__position -= position_delta
+        if self.__extended_line_buffer is not None:
+            # We need to shift the position tracked by the buffer.  Set to None if this
+            # extended_line started before the mark.
+            if not self.__extended_line_buffer.update_for_mark(position_delta):
+                self.__extended_line_buffer = None
 
         self.__pending_files = new_pending_files
         self.__mark_generation = LogFileIterator.MarkGeneration(
@@ -477,9 +523,12 @@ class LogFileIterator(object):
         if dest is not None:
             dest.mark_generation = self.__mark_generation
             dest.mark_offset = self.__position
+            dest.fragment_offset = self.__extended_line_position
             return dest
         else:
-            return LogFileIterator.Position(self.__mark_generation, self.__position)
+            return LogFileIterator.Position(
+                self.__mark_generation, self.__position, self.__extended_line_position
+            )
 
     def seek(self, position):
         """Sets the position to the supposed position value.
@@ -503,6 +552,7 @@ class LogFileIterator(object):
             self.__reset_buffer()
 
         self.__position = mark_offset
+        self.__extended_line_position = position.fragment_offset
 
     def bytes_between_positions(self, first, second):
         """Returns the number of bytes between the two positions.
@@ -520,7 +570,12 @@ class LogFileIterator(object):
                 "Attempt to compare positions from two different mark generations"
             )
 
-        return second.mark_offset - first.mark_offset
+        result = second.mark_offset - first.mark_offset
+        if second.fragment_offset is not None:
+            result += second.fragment_offset.bytes_from_start
+        if first.fragment_offset is not None:
+            result -= first.fragment_offset.bytes_from_start
+        return result
 
     def readline(self, current_time=None):
         """Returns the next line from the file.
@@ -530,7 +585,16 @@ class LogFileIterator(object):
         then a line will be returned using the available bytes up to the max line size.  Second, if there are bytes
         available, and sufficient time has past without seeing a newline, then the available lines are returned.
 
-        If the 'parse_format' configuration item is 'json' then this function will also attempt to process the line as json,
+        Note, when configured for internal parsing (parse_format is 'json' or 'cri', see below), the spirit of the above
+        rules are followed but the behavior is slightly tweaked.  Specifically, when trying to apply the internal
+        parsing, this will wait for up until `internal_parse_max_line_size` bytes to get a whole JSON or
+        CRI line.  When it applies the parsing, it will still only return line fragments up to the max line
+        size (by splitting the result of the parsing).  If `internal_parse_max_line_size` is greater than
+        the page size, this may mean this object consumes multiple pages of memory.
+
+        Internal parsing:
+
+        If the 'parse_format' configuration item is 'json' then this function will attempt to process the line as json,
         extracting a log message, a timestamp and any other remaining fields, all of which are returned as a LogLine object.
 
         When parsing as json, each line is required to be a fully formed json object, otherwise the full contents of
@@ -560,6 +624,19 @@ class LogFileIterator(object):
         @return: A LogLine object.  The line attribute will be the line read from the iterator, or an empty string if none is available
         @rtype: LogLine
         """
+        # Read from the extended line buffer if we are in the middle of iterating over fragments from
+        # an extended line.  Because we do not aggressively None out extended_line_buffer, we need to
+        # check the position and the buffer match up.  (We do not aggressively None out the buffer to
+        # promote reuse between seeks).
+        if (
+            self.__extended_line_position is not None
+            and self.__extended_line_buffer is not None
+            and self.__extended_line_position.is_valid_for_line(
+                self.__extended_line_buffer, self.__position
+            )
+        ):
+            return self.__read_next_fragment_from_extended_line_buffer()
+
         if current_time is None:
             current_time = time.time()
 
@@ -571,10 +648,15 @@ class LogFileIterator(object):
         if available_buffer_bytes == 0 and not more_file_bytes_available:
             return LogLine(line=b"")
 
-        # Keep our underlying buffer of bytes filled up.
-        if self.__buffer is None or (
-            available_buffer_bytes < self.__max_line_length
-            and more_file_bytes_available
+        # Do we need more bytes to have at least max_line_bytes in available in the buffer.
+        need_more_bytes_for_max_line = available_buffer_bytes < self.__max_line_length
+        # If we are on an extended line, do we need more bytes in buffer to read the next fragment
+        need_more_bytes_for_fragment_position = not self.__have_buffer_for_fragment_position(
+            available_buffer_bytes
+        )
+
+        if more_file_bytes_available and (
+            need_more_bytes_for_max_line or need_more_bytes_for_fragment_position
         ):
             self.__fill_buffer(current_time)
 
@@ -588,22 +670,31 @@ class LogFileIterator(object):
         #            'Mismatch between expected index and actual %ld %ld',
         #            expected_buffer_index, original_buffer_index)
 
+        original_buffer_position = self.__buffer.tell()
+
         # read a complete line from our line_matcher
         next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
+        # Check to see if we allow for extended lines, and if so, then read more pages so that
+        # we can parse an entire extended line.
+        if (
+            len(next_line) == 0
+            and self.__max_extended_line_length > self.__max_line_length
+        ):
+            while (
+                self.__available_buffer_bytes() < self.__max_extended_line_length
+                and self.__more_file_bytes_available()
+            ):
+                if self.__append_page_to_buffer(
+                    self.__page_size, check_for_new_lines=True
+                ):
+                    break
+            next_line = self.__line_matcher.readline(self.__buffer, current_time)
+
         result = LogLine(line=next_line)
 
         if len(result.line) == 0:
             return result
-
-        self.__position = self.__determine_mark_position(self.__buffer.tell())
-
-        # Just a sanity check.
-        # if len(self.__buffer_contents_index) > 0:
-        #    expected_size = self.__buffer_contents_index[-1].buffer_index_end
-        #    actual_size = self.__file_system.get_file_size(self.__buffer)
-        #    if expected_size != actual_size:
-        #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
-        #                                              expected_size, actual_size)
 
         # check to see if we need to parse the line as cri.
         # Note: we don't handle multi-line lines.
@@ -673,7 +764,91 @@ class LogFileIterator(object):
                     limit_key=("bad-json-%s" % self.__path),
                 )
 
+        raw_line_length = self.__buffer.tell() - original_buffer_position
+
+        # See if we should be using an extended log line to represent this line.  If we do, we will
+        # essentially iterate over the contents, returning fragments sized to the maximum line size.
+        if raw_line_length > self.__max_line_length:
+            self.__extended_line_buffer = LogFileIterator.ExtendedLineBuffer(
+                result, self.__position, raw_line_length
+            )
+            # As part of the invariant for iterating over the extended log line, we always leave the
+            # buffer position just at the start of the extended log line.
+            self.__buffer.seek(original_buffer_position)
+
+            # If we have a previous fragment position but just reread the extended line (which may happen when
+            # restoring from a checkpoint), check to make sure we that looks like it is the same one as
+            # we got last time we parsed the line. Otherwise, invalidate the fragment position.  This will cause us to
+            # just copy the extended line again. It may be different if they changed configuration parameters for the
+            # max extended line size across agent restarts (including soft restarts) and we are restoring from
+            # a previous checkpoint.
+            if (
+                self.__extended_line_position is not None
+                and not self.__extended_line_position.is_valid_for_line(
+                    self.__extended_line_buffer, self.__position
+                )
+            ):
+                log.warning(
+                    "Mismatch from previous extended log line for '%s'.  Could be due to config change"
+                    % self.__path,
+                    limit_once_per_x_secs=300,
+                    limit_key=("mismatch-extended-lines-%s" % self.__path),
+                )
+                self.__extended_line_position = None
+
+            if self.__extended_line_position is None:
+                self.__extended_line_position = (
+                    self.__extended_line_buffer.get_initial_fragment_position()
+                )
+
+            return self.__read_next_fragment_from_extended_line_buffer()
+        else:
+            self.__position = self.__determine_mark_position(self.__buffer.tell())
+
+            # Just a sanity check.
+            # if len(self.__buffer_contents_index) > 0:
+            #    expected_size = self.__buffer_contents_index[-1].buffer_index_end
+            #    actual_size = self.__file_system.get_file_size(self.__buffer)
+            #    if expected_size != actual_size:
+            #        assert expected_size == actual_size, ('Mismatch between expected and actual size %ld %ld',
+            #                                              expected_size, actual_size)
+
         return result
+
+    def __read_next_fragment_from_extended_line_buffer(self):
+        """Return the next fragment from the extended line buffer for the current position.
+
+        This will appropriately advance iterator's state.
+
+        :return: The LogLine representing the fragment.
+        :rtype: LogLine
+        """
+        (
+            result,
+            self.__extended_line_position,
+        ) = self.__extended_line_buffer.get_next_fragment(
+            self.__extended_line_position, self.__max_line_length
+        )
+        if self.__extended_line_position is None:
+            self.__buffer.seek(self.__extended_line_buffer.raw_size, 1)
+            self.__position = self.__determine_mark_position(self.__buffer.tell())
+
+        return result
+
+    def __have_buffer_for_fragment_position(self, available_buffer_bytes):
+        """
+        Returns true if we are in the middle of iterating over an extended log line and we have
+        enough bytes in the buffer to completely read it yet.
+
+        :param available_buffer_bytes: The number of bytes available in the buffer.
+        :type available_buffer_bytes: int
+        :return: True if we have enough bytes to read the extended log line
+        :rtype: bool
+        """
+        return (
+            self.__extended_line_position is None
+            or self.__extended_line_position.total_raw_bytes <= available_buffer_bytes
+        )
 
     def advance_to_end(self, current_time=None):
         """Advance the iterator to point at the end of the log file and begin reading from there.
@@ -1004,9 +1179,6 @@ class LogFileIterator(object):
         new_buffer = BytesIO()
         new_buffer_content_index = []
 
-        # What position we need to read from the files.
-        read_position = self.__position
-
         # Grab whatever is left over in the current buffer.  We first see if the position is even in
         # the buffer.
         buffer_index = self.__determine_buffer_index(self.__position)
@@ -1028,7 +1200,6 @@ class LogFileIterator(object):
                     entry.position_start = entry.position_end - (
                         entry.buffer_index_end - entry.buffer_index_start
                     )
-                    read_position = entry.position_end
 
             # Now read the bytes.  We should get the number of bytes we just found in all of the entries.
             tmp = self.__buffer.read()
@@ -1039,13 +1210,65 @@ class LogFileIterator(object):
                     % (expected_bytes, new_buffer.tell(), tmp)
                 )
 
-        leftover_bytes = new_buffer.tell()
+        self.__buffer = new_buffer
+        self.__buffer.seek(0)
+        self.__buffer_contents_index = new_buffer_content_index
+
+        if len(self.__buffer_contents_index) > 0:
+            self.__position = self.__buffer_contents_index[0].position_start
 
         # Just in case a file has been rotated recently, we refresh our list before we read it.
         self.__refresh_pending_files(current_time)
 
-        # Now we go through the files and get as many bytes as we can.
+        # Read enough of a page to get us a full page.
+        self.__append_page_to_buffer(self.__page_size - self.__buffer.tell())
+
+        # If we are currently iterating over an extended log line, then read more pages to
+        # get enough bytes to hold the entire line.
+        if self.__extended_line_position is not None:
+            while (
+                self.__available_buffer_bytes()
+                < self.__extended_line_position.total_raw_bytes
+                and self.__more_file_bytes_available()
+            ):
+                self.__append_page_to_buffer(self.__page_size)
+
+    def __append_page_to_buffer(self, page_size, check_for_new_lines=False):
+        """
+        Reads a page of bytes from disk and appends it to the end of the buffer.
+
+        Optionally will check to see if there are any newline characters in the newly read bytes.
+
+        :param page_size: The number of bytes to read
+        :param check_for_new_lines: If True, will scan the newly read bytes for newline characters.
+
+        :type page_size: int
+        :type check_for_new_lines: bool
+
+        :return: If `check_for_new_lines` is True, then returns True or False to indicate if the newly
+            read bytes had newline characters.
+        :rtype: bool or None
+        """
+        # Go through the files and get up to page_size worth of bytes.
         should_have_bytes = False
+
+        if len(self.__buffer_contents_index) > 0:
+            read_position = self.__buffer_contents_index[-1].position_end
+        else:
+            read_position = self.__position
+
+        original_buffer_position = self.__buffer.tell()
+        # Seek to the end
+        self.__buffer.seek(0, 2)
+        initial_size = self.__buffer.tell()
+
+        end_size = initial_size + page_size
+
+        found_new_line = False
+        new_line_checker = None
+        if check_for_new_lines:
+            new_line_checker = re.compile(b"[\n\r]")
+
         for pending_file in self.__pending_files:
             if read_position < pending_file.position_end:
                 should_have_bytes = True
@@ -1056,27 +1279,29 @@ class LogFileIterator(object):
                 content = self.__read_file_chunk(
                     pending_file,
                     read_position,
-                    min(self.__page_size - new_buffer.tell(), bytes_left_in_file),
+                    min(end_size - self.__buffer.tell(), bytes_left_in_file),
                 )
+
                 if content is not None:
-                    buffer_start = new_buffer.tell()
-                    new_buffer.write(content)
-                    buffer_end = new_buffer.tell()
-                    new_buffer_content_index.append(
+                    if check_for_new_lines and not found_new_line:
+                        found_new_line = new_line_checker.match(content) is not None
+
+                    buffer_start = self.__buffer.tell()
+                    self.__buffer.write(content)
+                    buffer_end = self.__buffer.tell()
+                    self.__buffer_contents_index.append(
                         LogFileIterator.BufferEntry(
                             read_position, buffer_start, buffer_end - buffer_start
                         )
                     )
                 read_position = pending_file.position_end
-                if new_buffer.tell() >= self.__page_size:
+                if self.__buffer.tell() >= end_size:
                     break
 
-        buffer_size = new_buffer.tell()
+        buffer_size = self.__buffer.tell()
 
         self.page_reads += 1
-        self.__buffer = new_buffer
-        self.__buffer.seek(0)
-        self.__buffer_contents_index = new_buffer_content_index
+        self.__buffer.seek(original_buffer_position)
 
         if len(self.__buffer_contents_index) > 0:
             # We may not have been able to read the bytes at the current position if those files have become
@@ -1109,9 +1334,11 @@ class LogFileIterator(object):
                     "Mismatch between expected and actual size %ld %ld %ld %ld",
                     expected_size,
                     actual_size,
-                    leftover_bytes,
-                    actual_size - leftover_bytes,
+                    initial_size,
+                    actual_size - initial_size,
                 )
+        if check_for_new_lines:
+            return found_new_line
 
     def __read_file_chunk(self, file_state, read_position_relative_to_mark, num_bytes):
         """Reads a portion of the file in file_state and returns it.
@@ -1320,6 +1547,9 @@ class LogFileIterator(object):
             result["sequence_id"] = self.__sequence_id
             result["sequence_number"] = self.__sequence_number_at_mark
 
+        if self.__extended_line_position is not None:
+            self.__extended_line_position.to_checkpoint(result)
+
         return result
 
     @staticmethod
@@ -1429,11 +1659,13 @@ class LogFileIterator(object):
     class Position(object):
         """Represents a position in the iterator."""
 
-        def __init__(self, mark_generation, position):
+        def __init__(self, mark_generation, position, fragment_offset):
             # The offset from the mark generation.
             self.mark_offset = position
             # The mark generation that was current when this position was made.
             self.mark_generation = mark_generation
+            # If we are iterating over an extended log line, the position within that line we left off at.
+            self.fragment_offset = fragment_offset
 
         def get_offset_into_buffer(self):
             """Returns the number of bytes this position is from the most recent mark() call.
@@ -1492,6 +1724,255 @@ class LogFileIterator(object):
                 position += current_generation.__offset_to_next
                 current_generation = current_generation.__next_generation
             return position
+
+    class ExtendedLineBuffer(object):
+        """
+        Holds the entire contents of an extended log line including any attributes and timestamps
+        associated with the entire line.
+
+        Note, this abstraction draws a distinction between the line data it holds versuses
+        the raw bytes that were read from disk to create this extended line.  The line data
+        is derived by applying an internal parsing step in the LogFileIterator
+        on the raw disk bytes, such as parsing the JSON object and extracting the `log` field as the
+        line content when the parsing format is "json".  The data and data_size refers to the
+        resulting line content and the raw size refers to the original size of the bytes read from
+        disk.  The data_size should always be smaller than the raw_size.
+
+        """
+
+        def __init__(self, extended_line, mark_position_start, raw_size):
+            """
+            Creates an instance.
+            :param extended_line: The extended log line
+            :param mark_position_start: The position from the LogFileIterator's mark where this line's
+                bytes began.
+            :param raw_size:  The number of raw bytes that were read to created the extended line.
+
+            :type extended_line: LogLine
+            :type mark_position_start: int
+            :type raw_size: int
+            """
+            self.__data = extended_line.line
+            self.__attrs = extended_line.attrs
+            self.__timestamp = extended_line.timestamp
+            self.__data_size = len(self.__data)
+
+            self.__raw_size = raw_size
+            self.__mark_position_start = mark_position_start
+
+        def get_next_fragment(self, fragment_position, max_line_length):
+            """
+            Returns the next fragment from the extend log line pointed at by the fragment position.
+
+            :param fragment_position: The fragment position pointing at the next fragment to read.
+            :param max_line_length: The maximum line length, used to control the maximum size of the
+                returned fragments.
+
+            :type fragment_position: LogFileIterator.ExtendedLinePosition
+            :type max_line_length: int
+
+            :return: A tuple of the LogLine object for the fragment as well as the new fragment
+                position (pointing to the next fragment in the extended line) or None if there
+                are no more fragments.
+            :rtype: Tuple[LogLine, LogFileIterator.ExtendedLinePosition]
+            """
+            # noinspection PyProtectedMember
+            line_start = fragment_position._position_in_line_data
+            line_end = line_start + max_line_length
+            if line_end >= self.__data_size:
+                # We will be at the end of the extended line after this fragment.
+                line_end = self.__data_size
+                finish_position = None
+            else:
+                finish_position = self._get_fragment_position(line_end)
+
+            line_result = LogLine(self.__data[line_start:line_end])
+            line_result.timestamp = self.__timestamp
+            line_result.attrs = self.__attrs
+
+            return line_result, finish_position
+
+        def get_initial_fragment_position(self):
+            """
+            :return: A fragment position pointing to the first fragment in this extended line.
+            :rtype: LogFileIterator.ExtendedLinePosition
+            """
+            return self._get_fragment_position(0)
+
+        def update_for_mark(self, position_delta):
+            """
+            Updates the internal information when `mark` is called on the LogFileIterator this extended
+            log line belongs to.
+
+            Also, determines if this extended log line is still after the new mark position.
+
+            :param position_delta: The delta change in the mark position caused by the mark.
+            :type position_delta: long
+            :return: True is this extended log line is after the new mark position.
+            :rtype: bool
+            """
+            self.__mark_position_start -= position_delta
+            return self.__mark_position_start >= 0
+
+        @property
+        def raw_size(self):
+            return self.__raw_size
+
+        @property
+        def _data_size(self):
+            return self.__data_size
+
+        @property
+        def _mark_position_start(self):
+            return self.__mark_position_start
+
+        def _get_fragment_position(self, fragment_offset_in_data):
+            """
+            Returns a new position object pointing to the fragment that begins at the specified offset
+            in the line data.
+
+            :param fragment_offset_in_data: The offset in the data where the fragment begins
+            :type fragment_offset_in_data: int
+            :return: The offset
+            :rtype: LogFileIterator.ExtendedLinePosition
+            """
+            return LogFileIterator.ExtendedLinePosition(
+                fragment_offset_in_data, self.__data_size, self.__raw_size
+            )
+
+    class ExtendedLinePosition(object):
+        """
+        Represents the position of the next line fragment to read when iterating over an
+        extended line.
+
+        One of the design principles of this abstraction is that the LogFileIterator can use it
+        to do all operations (except returning the actual log bytes) even if the extended line content
+        (stored in a `ExtendedLineBuffer object) is no longer held in memory. This situation can arise
+        if we are restoring a position from a checkpoint and the iterator has not actually read the
+        extended line content yet.
+
+        This abstraction also has error checking to help detect if, when the extended line content
+        is read in again, it does not match up with the previous line this position referred to.
+        These checks are not full proof, but good enough to protect against the situations that could
+        arise(such as changes in configuration values that result in difference lengths of
+        log lines being read).
+        """
+
+        def __init__(self, data_position, data_size, raw_size):
+            """
+            Creates an instance.
+
+            :param data_position: The offset of where the fragment begins in the underlying line data.
+            :param data_size: The number of bytes in the line data.
+            :param raw_size: The number of bytes read to create the extend log line.
+            :type data_position: int
+            :type data_size: int
+            :type raw_size: long
+            """
+            self.__data_position = data_position
+            self.__raw_size = raw_size
+            self.__data_size = data_size
+            self.__overhead_size = raw_size - data_size
+
+        @staticmethod
+        def from_checkpoint(checkpoint):
+            """
+            Creates an instance from a checkpoint state object.
+
+            :param checkpoint: The checkpoint
+            :type checkpoint: dict
+            :return: The corresponding position object.
+            :rtype: LogFileIterator.ExtendedLinePosition
+            """
+            if (
+                "elp_position" not in checkpoint
+                or "elp_raw_size" not in checkpoint
+                or "elp_overhead_size" not in checkpoint
+            ):
+                return None
+            position = checkpoint["elp_position"]
+            raw_size = checkpoint["elp_raw_size"]
+            overhead_size = checkpoint["elp_overhead_size"]
+            return LogFileIterator.ExtendedLinePosition(
+                position, raw_size - overhead_size, raw_size
+            )
+
+        def is_valid_for_line(self, extended_line_buffer, mark_position):
+            """
+            Returns true if this fragment position seems to be valid for the given extended line.
+
+            :param extended_line_buffer: The extended line to check.
+            :param mark_position: The mark position associated with this fragment offset
+            :return: True if this fragment position is valid for the extended line.
+
+            :type extended_line_buffer: LogFileIterator.ExtendedLineBuffer
+            :type mark_position: int
+            :rtype: bool
+            """
+            # noinspection PyProtectedMember
+            return (
+                self.__raw_size == extended_line_buffer.raw_size
+                and self.__data_size == extended_line_buffer._data_size
+                and mark_position == extended_line_buffer._mark_position_start
+            )
+
+        def to_checkpoint(self, checkpoint):
+            """
+            Adds the state information for this fragment to the checkpoint object.
+
+            :param checkpoint: The checkpoint object to update.
+            :type checkpoint: dict
+            """
+            checkpoint["elp_position"] = self.__data_position
+            checkpoint["elp_raw_size"] = self.__raw_size
+            checkpoint["elp_overhead_size"] = self.__overhead_size
+
+        @property
+        def bytes_from_start(self):
+            """
+            Expresses the position of this fragment in terms of the number of raw bytes from the
+            start of the raw extended log line.
+
+            Note, this number does not really correspond to exactly in the raw bytes where the
+            fragment it begins.  It just has the property that all fragments will have an increasing
+            value for `bytes_from_start` and eventually gets to the raw size.
+
+            :return: The estimated position of the fragment in number of raw bytes from the start.
+            :rtype: long
+            """
+            if self.__data_position > 0:
+                # We fake this out by modeling it as the first fragment consuming all of the overhead
+                # bytes.  After that, the value just advances by the number of data bytes for each
+                # fragment.
+                return self.__data_position + self.__overhead_size
+            else:
+                return 0
+
+        @property
+        def bytes_to_end(self):
+            """Similar to `bytes_to_end` but expressed in the number of raw bytes to the end of the
+            extended log line.
+
+            :return: The estimated position relative to the end of the extended log line.
+            :rtype: long
+            """
+            return self.__raw_size - self.bytes_from_start
+
+        @property
+        def total_raw_bytes(self):
+            """
+            :return: The number of raw bytes in extended log line referred to by this position.
+            :rtype: long
+            """
+            return self.__raw_size
+
+        @property
+        def _position_in_line_data(self):
+            """
+            :return: The fragment position expressed as offset into the line data.
+            :rtype: long
+            """
+            return self.__data_position
 
 
 class LogFileProcessor(object):
@@ -1809,8 +2290,6 @@ class LogFileProcessor(object):
         original_position = self.__log_file_iterator.tell()
         original_events_position = add_events_request.position()
 
-        start_process_time = 0.0
-
         # Some performance analysis timings we use from time to time.
         # fast_get_time = timeit.default_timer
         # start_process_time = fast_get_time()
@@ -1828,9 +2307,6 @@ class LogFileProcessor(object):
             total_redactions = 0
             lines_dropped_by_sampling = 0
             bytes_dropped_by_sampling = 0
-
-            time_spent_reading = 0.0
-            time_spent_serializing = 0.0
 
             buffer_filled = False
             added_thread_id = False
@@ -2824,7 +3300,7 @@ class LogMatcher(object):
                     ):
                         # Note, this next line is for a hack in the kubernetes_monitor to not include the original
                         # log file name.  TODO: Clean this up.
-                        if not "rename_no_original" in self.__log_entry_config:
+                        if "rename_no_original" not in self.__log_entry_config:
                             log_attributes["original_file"] = matched_file
 
                     # Create the processor to handle this log.

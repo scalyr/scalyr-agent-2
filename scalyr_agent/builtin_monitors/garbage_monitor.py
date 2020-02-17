@@ -155,7 +155,8 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
             if not isinstance(t, six.string_types):
                 raise BadMonitorConfiguration(
                     "object_dump_types contains a non-string value: %s"
-                    % six.text_type(t)
+                    % six.text_type(t),
+                    "object_dump_types",
                 )
 
         # and convert the JsonArray to a python list
@@ -274,7 +275,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
                     dump_kind="live",
                 )
 
-        except Exception as e:
+        except Exception:
             global_log.info("error gathering sample %s", traceback.format_exc())
 
     def stop(self, wait_on_join=True, join_timeout=5):

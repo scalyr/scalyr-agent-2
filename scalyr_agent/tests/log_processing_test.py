@@ -154,14 +154,20 @@ class TestLogFileIterator(ScalyrTestCase):
 
         self.write_file(self.__path, b"")
 
-        log_config = {"path": self.__path}
-        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
-
-        self.log_file = LogFileIterator(
-            self.__path, DEFAULT_CONFIG, log_config, file_system=self.__file_system
-        )
+        self.log_file = self._create_iterator({"path": self.__path})
         self.log_file.set_parameters(max_line_length=5, page_size=20)
         self.scan_for_new_bytes()
+
+    def _create_iterator(self, log_config, checkpoint=None):
+        log_config = DEFAULT_CONFIG.parse_log_config(log_config)
+
+        return LogFileIterator(
+            log_config.get("path", self.__path),
+            DEFAULT_CONFIG,
+            log_config,
+            file_system=self.__file_system,
+            checkpoint=checkpoint,
+        )
 
     def tearDown(self):
         self.log_file.close()
@@ -386,7 +392,7 @@ class TestLogFileIterator(ScalyrTestCase):
 
     def test_losing_read_access(self):
         # Since it cannot keep file handles open when their permissions are changed, win32 cannot handle this case:
-        if sys.platform == "win32":
+        if sys.platform == "win32" or sys.version_info[:2] == (2, 6):
             return
 
         self.append_file(self.__path, b"L001\n", b"L002\n")
@@ -821,6 +827,195 @@ class TestLogFileIterator(ScalyrTestCase):
         # The numbers might not be perfect because some file systems do not return a mod time with fractional secs.
         self.assertTrue(abs(known_time - self.log_file.last_modification_time) < 1)
 
+    def test_parse_as_json(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(max_line_length=100, page_size=500)
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001"}\n{"log": "L002"}\n')
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        self.assertEquals(self.readline().line, b"L002")
+
+    def test_extend_log_line_parsing(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001"}\n{"log": "L002"}\n')
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        self.assertEquals(self.readline().line, b"L002")
+
+    def test_extend_log_line_parsing_with_line_splitting(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path, b'{"log": "L001L002L003L004"}\n{"log": "L005L006L007"}\n'
+        )
+        self.scan_for_new_bytes()
+        for i in range(1, 5):
+            self.assertEquals(self.readline().line, b"L00%d" % i)
+            if i < 4:
+                self.assertEquals(
+                    self.log_file.tell().fragment_offset.bytes_from_start, 12 + 4 * i
+                )
+            else:
+                self.assertIsNone(self.log_file.tell().fragment_offset)
+
+        for i in range(5, 8):
+            self.assertEquals(self.readline().line, b"L00%d" % i)
+            if i < 7:
+                self.assertEquals(
+                    self.log_file.tell().fragment_offset.bytes_from_start,
+                    12 + 4 * (i - 4),
+                )
+            else:
+                self.assertIsNone(self.log_file.tell().fragment_offset)
+
+    def test_extended_log_line_tell_and_seek(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(
+            self.__path, b'{"log": "L001L002L003L004"}\n{"log": "L005L006L007"}\n'
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        self.assertEquals(self.readline().line, b"L002")
+        position = self.log_file.tell()
+        self.assertEquals(self.readline().line, b"L003")
+        self.log_file.seek(position)
+        self.assertEquals(self.readline().line, b"L003")
+
+    def test_extended_log_line_tell_and_seek_across_lines(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004"}\n')
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        position = self.log_file.tell()
+        self.assertEquals(self.readline().line, b"L002")
+        self.assertEquals(self.readline().line, b"L003")
+        self.log_file.seek(position)
+        self.assertEquals(self.readline().line, b"L002")
+
+    def test_extended_log_line_tell_and_seek_with_marking(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004L005"}\n')
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        self.assertEquals(self.readline().line, b"L002")
+        self.assertEquals(self.readline().line, b"L003")
+        position_a = self.log_file.tell()
+        self.assertEquals(self.readline().line, b"L004")
+        position_b = self.log_file.tell()
+        self.assertEquals(self.readline().line, b"L005")
+        self.log_file.mark(position_a)
+        self.log_file.seek(position_b)
+        self.assertEquals(self.readline().line, b"L005")
+
+    def test_extended_log_line_checkpoint(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001L002"}\n{"log": "L003L004L005"}\n')
+        self.scan_for_new_bytes()
+
+        self.assertEquals(self.readline().line, b"L001")
+        self.assertEquals(self.readline().line, b"L002")
+        self.assertEquals(self.readline().line, b"L003")
+        self.log_file.mark(self.log_file.tell())
+
+        saved_checkpoint = self.log_file.get_mark_checkpoint()
+        self.assertTrue("elp_position" in saved_checkpoint)
+
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True},
+            checkpoint=saved_checkpoint,
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L004")
+
+    def test_extended_log_line_bytes_between_positions(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001L002L003"}\n')
+        self.scan_for_new_bytes()
+        start_position = self.log_file.tell()
+        self.assertEquals(self.readline().line, b"L001")
+        second_position = self.log_file.tell()
+        self.assertEquals(
+            self.log_file.bytes_between_positions(start_position, second_position), 16
+        )
+        self.assertEquals(self.readline().line, b"L002")
+        third_position = self.log_file.tell()
+        self.assertEquals(
+            self.log_file.bytes_between_positions(second_position, third_position), 4
+        )
+
+    def test_extended_log_line_get_sequence(self):
+        self.log_file.close()
+        self.log_file = self._create_iterator(
+            {"path": self.__path, "parse_lines_as_json": True}
+        )
+        self.log_file.set_parameters(
+            max_line_length=4, page_size=5, max_extended_line_length=100
+        )
+        self.scan_for_new_bytes()
+        self.append_file(self.__path, b'{"log": "L001L002L003"}\n')
+        self.scan_for_new_bytes()
+        self.assertEquals(self.readline().line, b"L001")
+        _, first_sequence_number = self.log_file.get_sequence()
+        self.assertEquals(self.readline().line, b"L002")
+        _, second_sequence_number = self.log_file.get_sequence()
+        self.assertGreater(second_sequence_number, first_sequence_number)
+
     def write_file(self, path, *lines):
         contents = b"".join(lines)
         file_handle = open(path, "wb")
@@ -1057,7 +1252,7 @@ class TestLogLineRedactor(ScalyrTestCase):
 
     def test_multiple_regular_expression_redaction_with_hash_single_group(self):
         redactor = LogLineRedacter("/var/fake_log")
-        redactor.add_redaction_rule("secret(.*?)=([a-z]+\s?)", "secret\\1=\\H2")
+        redactor.add_redaction_rule(r"secret(.*?)=([a-z]+\s?)", "secret\\1=\\H2")
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin ,moretextsecretbar=xxx ,andsecret123=saurabh",
@@ -1074,7 +1269,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         self,
     ):
         redactor = LogLineRedacter("/var/fake_log")
-        redactor.add_redaction_rule("secret(.*?)=([a-z]+\s?)", "secret\\2=\\H1")
+        redactor.add_redaction_rule(r"secret(.*?)=([a-z]+\s?)", "secret\\2=\\H1")
         self._run_case(
             redactor,
             "sometext.... secretoption=czerwin ,andsecret123=saurabh",
@@ -1086,7 +1281,7 @@ class TestLogLineRedactor(ScalyrTestCase):
     def test_multiple_regular_expression_redaction_with_hash_multiple_groups(self):
         redactor = LogLineRedacter("/var/fake_log")
         redactor.add_redaction_rule(
-            "secret_([\w]+)=([\w]+)__([\w]+)", "secret_\\H1=\\H2__\\H3"
+            r"secret_([\w]+)=([\w]+)__([\w]+)", "secret_\\H1=\\H2__\\H3"
         )
         self._run_case(
             redactor,
@@ -1114,7 +1309,7 @@ class TestLogLineRedactor(ScalyrTestCase):
         lead_text = ""
         trail_text = ""
         redactor.add_redaction_rule(
-            "([\w\.]+)@([\w\.]+)\.([\w]{2,4})", "\\H1 \\H2 \\H3"
+            r"([\w\.]+)@([\w\.]+)\.([\w]{2,4})", "\\H1 \\H2 \\H3"
         )
         self._run_case(
             redactor,
@@ -1963,8 +2158,8 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.assertEqual(1, events.total_events())
         first_sid, first_sn, sd = events.get_sequence(0)
 
-        self.assertTrue(first_sid != None)
-        self.assertTrue(first_sn != None)
+        self.assertTrue(first_sid is not None)
+        self.assertTrue(first_sn is not None)
         self.assertEqual(None, sd)
 
     def test_sequence_delta(self):
@@ -2068,7 +2263,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2087,7 +2282,7 @@ class TestLogFileProcessor(ScalyrTestCase):
         self.append_file(self.__path, b"Second line\n")
         log_processor.scan_for_new_bytes()
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2100,7 +2295,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertFalse(log_processor.is_closed())
 
@@ -2117,7 +2312,7 @@ class TestLogFileProcessor(ScalyrTestCase):
             events, current_time=self.__fake_time
         )
         completion_callback(LogFileProcessor.SUCCESS)
-        status = log_processor.generate_status()
+        log_processor.generate_status()
 
         self.assertTrue(log_processor.is_closed())
 
@@ -2323,8 +2518,6 @@ class TestLogMatcher(ScalyrTestCase):
         config = self._create_log_config(self.__path_one)
         config["rename_logfile"] = "/scalyr/test/$PATH2/$PATH10/log.log"
 
-        path = self.__path_one.split(os.sep)
-
         matcher = LogMatcher(self.__config, config)
 
         processors = matcher.find_matches(dict(), dict())
@@ -2477,9 +2670,7 @@ class TestLogMatcher(ScalyrTestCase):
         self.assertEqual(0, len(processors))
 
     def test_with_reduction_rules_in_config(self):
-        reduction_rule = JsonObject(
-            **{"match_expression": "My", "replacement": "Your",}
-        )
+        reduction_rule = JsonObject(**{"match_expression": "My", "replacement": "Your"})
         config = self._create_log_config(
             self.__path_one, redaction_rules=[reduction_rule]
         )

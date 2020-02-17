@@ -34,7 +34,9 @@ import threading
 from io import open
 
 import six
-from requests.packages.urllib3.exceptions import ProtocolError
+from requests.packages.urllib3.exceptions import (  # pylint: disable=import-error
+    ProtocolError,
+)
 
 from scalyr_agent import ScalyrMonitor, define_config_option, define_metric
 import scalyr_agent.util as scalyr_util
@@ -50,7 +52,7 @@ global_log = scalyr_logging.getLogger(__name__)
 
 __monitor__ = __name__
 
-DOCKER_LABEL_CONFIG_RE = re.compile("^(com\.scalyr\.config\.log\.)(.+)")
+DOCKER_LABEL_CONFIG_RE = re.compile(r"^(com\.scalyr\.config\.log\.)(.+)")
 
 define_config_option(
     __monitor__,
@@ -607,6 +609,7 @@ class WrappedStreamResponse(object):
         self.decode = self.decode
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_helper(
             self.response, self.decode
         ):
@@ -624,6 +627,7 @@ class WrappedRawResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(DockerClient, self.client)._stream_raw_result(self.response):
             yield item
 
@@ -639,13 +643,14 @@ class WrappedMultiplexedStreamResponse(object):
         self.response = response
 
     def __iter__(self):
+        # pylint: disable=bad-super-call
         for item in super(
             DockerClient, self.client
         )._multiplexed_response_stream_helper(self.response):
             yield item
 
 
-class DockerClient(docker.Client):
+class DockerClient(docker.APIClient):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -761,7 +766,7 @@ def _get_containers(
                             if get_labels:
                                 config = info.get("Config", {})
                                 labels = config.get("Labels", None)
-                        except Exception as e:
+                        except Exception:
                             logger.error(
                                 "Error inspecting container '%s'" % cid,
                                 limit_once_per_x_secs=300,
@@ -945,7 +950,7 @@ class ContainerChecker(StoppableThread):
         )
 
         # if querying the docker api fails, set the container list to empty
-        if self.containers == None:
+        if self.containers is None:
             self.containers = {}
 
         self.docker_logs = self.__get_docker_logs(self.containers)
@@ -1321,7 +1326,7 @@ class ContainerChecker(StoppableThread):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception as e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in DockerMonitor")
             raise
 
@@ -1626,7 +1631,7 @@ class ContainerIdResolver:
         self.__last_cache_clean = time.time()
         self.__cache_expiration_secs = cache_expiration_secs
         self.__cache_clean_secs = cache_clean_secs
-        self.__docker_client = docker.Client(
+        self.__docker_client = docker.APIClient(  # pylint: disable=no-member
             base_url=("unix:/%s" % docker_api_socket), version=docker_api_version
         )
         # The set of container ids that have not been used since the last cleaning.  These are eviction candidates.
@@ -1676,7 +1681,7 @@ class ContainerIdResolver:
 
             # self.__logger.log(scalyr_logging.DEBUG_LEVEL_3, 'Docker could not resolve id="%s"', container_id)
 
-        except Exception as e:
+        except Exception:
             self.__logger.error(
                 'Error seen while attempting resolving docker cid="%s"', container_id
             )
@@ -1926,16 +1931,17 @@ class DockerOptions(object):
             self.label_prefix = monitor.label_prefix
             self.labels_as_attributes = monitor.labels_as_attributes
         except Exception as e:
+            # Configuration from monitor failes (values not available on the monitor),
+            # fall back to the default configuration
             global_log.warning(
                 "Error getting docker config from docker monitor - %s.  Using defaults"
                 % six.text_type(e)
             )
-            # if there was an error, reset all values back to defaults
-            label_exclude_globs = self.label_exclude_globs
-            label_include_globs = self.label_include_globs
-            use_labels_for_log_config = self.use_labels_for_log_config
-            label_prefix = self.label_prefix
-            labels_as_attributes = self.labels_as_attributes
+            self.label_exclude_globs = label_exclude_globs
+            self.label_include_globs = label_include_globs
+            self.use_labels_for_log_config = use_labels_for_log_config
+            self.label_prefix = label_prefix
+            self.labels_as_attributes = labels_as_attributes
 
 
 class DockerMonitor(ScalyrMonitor):
@@ -1953,9 +1959,9 @@ class DockerMonitor(ScalyrMonitor):
 
     To use this functionality, you must properly configure the agent by setting the `labels_as_attributes` configuration option to `true`. All of the docker monitor configuration options related to this feature are as follows:`
 
-    * **labels\_as\_attributes** - When `true` upload labels that pass the include/exclude filters (see below) as log attributes for the logs generated by the container.  Defaults to `false`
-    *  **label\_include\_globs** - A list of [glob strings](https://docs.python.org/2/library/fnmatch.html) used to include labels to be uploaded as log attributes.  Any label that matches any glob in this list will be included as an attribute, as long as it not excluded by `label_exclude_globs`.  Defaults to `[ '*' ]` (everything)
-    *  **label\_exclude\_globs** - A list of glob strings used to exclude labels from being uploaded as log attributes.  Any label that matches any glob on this list will be excluded as an attribute.  Exclusion rules are applied *after* inclusion rules.  Defaults to `[ 'com.scalyr.config.*' ]`
+    * **labels\\_as\\_attributes** - When `true` upload labels that pass the include/exclude filters (see below) as log attributes for the logs generated by the container.  Defaults to `false`
+    *  **label\\_include\\_globs** - A list of [glob strings](https://docs.python.org/2/library/fnmatch.html) used to include labels to be uploaded as log attributes.  Any label that matches any glob in this list will be included as an attribute, as long as it not excluded by `label_exclude_globs`.  Defaults to `[ '*' ]` (everything)
+    *  **label\\_exclude\\_globs** - A list of glob strings used to exclude labels from being uploaded as log attributes.  Any label that matches any glob on this list will be excluded as an attribute.  Exclusion rules are applied *after* inclusion rules.  Defaults to `[ 'com.scalyr.config.*' ]`
     *  **label_prefix** - A string to add to the beginning of any label key before uploading it as a log attribute.  e.g. if the value for `label_prefix` is `docker_` then the container labels `app` and `tier` will be uploaded to Scalyr with attribute keys `docker_app` and `docker_tier`.  Defaults to ''
 
     You can change these config options by editing the `agent.d/docker.json` file. Please [follow the instructions here](https://www.scalyr.com/help/install-agent-docker#modify-config) to export the configuration of your running Scalyr Agent.
@@ -2395,7 +2401,7 @@ class DockerMonitor(ScalyrMonitor):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()

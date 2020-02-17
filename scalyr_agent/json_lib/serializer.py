@@ -20,9 +20,6 @@ from scalyr_agent import compat
 
 __author__ = "czerwin@scalyr.com"
 
-import struct
-from io import BytesIO
-
 import six
 
 

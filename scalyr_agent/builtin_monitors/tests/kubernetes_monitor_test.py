@@ -25,14 +25,12 @@ from scalyr_agent.builtin_monitors.kubernetes_monitor import (
     KubernetesMonitor,
     ControlledCacheWarmer,
 )
-from scalyr_agent.monitor_utils.k8s import K8sApiTemporaryError, K8sApiPermanentError
 from scalyr_agent.copying_manager import CopyingManager
-from scalyr_agent.json_lib import JsonObject, JsonArray
 from scalyr_agent.util import FakeClock, FakeClockCounter
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.tests.copying_manager_test import FakeMonitor
-from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache, FakeK8s
+from scalyr_agent.monitor_utils.tests.k8s_test import FakeCache
 
 import mock
 from mock import patch
@@ -66,7 +64,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
             fake_clock = FakeClock()
             manager, _ = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
-                    {"module": "scalyr_agent.builtin_monitors.kubernetes_monitor",}
+                    {"module": "scalyr_agent.builtin_monitors.kubernetes_monitor"}
                 ],
                 extra_toplevel_config={
                     "user_agent_refresh_interval": manager_poll_interval,
@@ -150,7 +148,7 @@ class KubernetesMonitorTest(ScalyrTestCase):
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
 
-            start_test()
+            start_test()  # pylint: disable=no-value-for-parameter
 
 
 class ControlledCacheWarmerTest(ScalyrTestCase):
@@ -537,7 +535,7 @@ class TestExtraServerAttributes(ScalyrTestCase):
             fake_clock = FakeClock()
             monitors_manager, config = ScalyrTestUtils.create_test_monitors_manager(
                 config_monitors=[
-                    {"module": "scalyr_agent.builtin_monitors.kubernetes_monitor",}
+                    {"module": "scalyr_agent.builtin_monitors.kubernetes_monitor"}
                 ],
                 extra_toplevel_config={
                     "user_agent_refresh_interval": manager_poll_interval

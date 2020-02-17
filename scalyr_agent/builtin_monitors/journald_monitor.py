@@ -19,13 +19,15 @@ from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
 
+if False:
+    from typing import Dict
+
 import datetime
 import os
 import re
 import select
 import threading
 import traceback
-from cStringIO import StringIO
 
 import six
 
@@ -45,7 +47,6 @@ except ImportError:
     )
 
 from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
@@ -146,7 +147,7 @@ define_config_option(
 # _global_checkpoints dict
 _global_lock = threading.Lock()
 
-_global_checkpoints = {}
+_global_checkpoints = {}  # type: Dict[str, Checkpoint]
 
 
 def load_checkpoints(filename):
@@ -174,7 +175,7 @@ def load_checkpoints(filename):
     except:
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_1,
-            "No checkpoint file '%s' exists.\n\tAll journald logs for '%s' will be read starting from their current end.",
+            "No checkpoint file '%s' exists.\n\tAll journald logs will be read starting from their current end.",
             filename,
         )
         checkpoints = {}
@@ -288,7 +289,7 @@ class JournaldMonitor(ScalyrMonitor):
         self._extra_fields = self._config.get("journal_fields")
         if self._extra_fields is not None:
             for field_name in self._extra_fields:
-                fixed_field_name = scalyr_logging.AgentLogger.__force_valid_metric_or_field_name(
+                fixed_field_name = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
                     field_name, is_metric=False
                 )
                 if field_name != fixed_field_name:
@@ -483,7 +484,7 @@ class JournaldMonitor(ScalyrMonitor):
     def format_msg(
         self, metric_name, metric_value, extra_fields=None,
     ):
-        string_buffer = StringIO()
+        string_buffer = six.StringIO()
 
         string_buffer.write(
             "%s %s" % (metric_name, scalyr_util.json_encode(metric_value))

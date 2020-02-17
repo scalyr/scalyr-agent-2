@@ -28,7 +28,7 @@ try:
     import win32evtlog
     import win32evtlogutil
     import win32con
-    from ctypes import windll
+    from ctypes import windll  # type: ignore
 except ImportError:
     win32evtlog = None
     win32evtlogutil = None
@@ -392,7 +392,7 @@ class NewApi(Api):
                         Context=self,
                         Session=self._session,
                     )
-                except Exception as e:
+                except Exception:
                     handle = None
                     error_message = win32api.FormatMessage(0)
 

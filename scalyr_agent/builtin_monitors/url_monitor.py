@@ -21,7 +21,9 @@ from __future__ import absolute_import
 import re
 
 import six
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
 import six.moves.http_cookiejar
 import six.moves.http_client
 

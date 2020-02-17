@@ -26,7 +26,6 @@ from __future__ import print_function
 
 __author__ = "czerwin@scalyr.com"
 
-import cStringIO
 import glob
 import os
 import re
@@ -38,6 +37,7 @@ import tempfile
 import traceback
 from io import open
 
+import six
 from distutils import spawn
 from optparse import OptionParser
 
@@ -60,7 +60,9 @@ scalyr_init()
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
 from six.moves import input
-import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
+import six.moves.urllib.request
+import six.moves.urllib.parse
+import six.moves.urllib.error
 
 # [end of 2->TOD0]
 
@@ -407,7 +409,7 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
                 )
 
             file_name = os.path.basename(new_tarball)
-            if re.match("^scalyr-agent-2\..*\.tar\.gz$", file_name) is None:
+            if re.match(r"^scalyr-agent-2\..*\.tar\.gz$", file_name) is None:
                 raise UpgradeFailure(
                     "The supplied tarball file name does not match the expected format."
                 )
@@ -514,9 +516,10 @@ def upgrade_tarball_install(config, new_tarball, preserve_old_install):
             return 0
 
         except UpgradeFailure as error:
+            message = getattr(error, "message", str(error))
             print(file=sys.stderr)
             print(
-                "The upgrade failed due to the following reason: %s" % error.message,
+                "The upgrade failed due to the following reason: %s" % (message),
                 file=sys.stderr,
             )
             return 1
@@ -685,7 +688,9 @@ def upgrade_windows_install(
                 # in detached mode and terminate this program.  This means we cannot report any errors that happen
                 # here, but I don't see a way around this for now.
                 # noinspection PyUnresolvedReferences
-                from win32process import DETACHED_PROCESS
+                from win32process import (  # pylint: disable=import-error
+                    DETACHED_PROCESS,
+                )
 
                 upgrade_command = ["msiexec.exe", "/i", "{}".format(download_location)]
                 if not use_ui:
@@ -717,9 +722,10 @@ def upgrade_windows_install(
                 )
 
     except UpgradeFailure as error:
+        message = getattr(error, "message", str(error))
         print(file=sys.stderr)
         print(
-            "The upgrade failed due to the following reason: %s" % error.message,
+            "The upgrade failed due to the following reason: %s" % (message),
             file=sys.stderr,
         )
         if url_path is not None:
@@ -760,7 +766,7 @@ def run_command(command_str, exit_on_fail=True, command_name=None, grep_for=None
 
         # Read the output back into a string.  We cannot use a cStringIO.StringIO buffer directly above with
         # subprocess.call because that method expects fileno support which StringIO doesn't support.
-        output_buffer = cStringIO.StringIO()
+        output_buffer = six.StringIO()
         input_fp = open(output_file, "r")
         for line in input_fp:
             output_buffer.write(line)
@@ -1105,7 +1111,7 @@ def create_custom_dockerfile(
     )
     fp.close()
 
-    dockerfile_fp = cStringIO.StringIO(dockerfile_contents)
+    dockerfile_fp = six.StringIO(dockerfile_contents)
     # Use the original Dockerfile's attributes (permissions, owner) as a template for the attributes in the archive.
     tarinfo = out_tar.gettarinfo(dockerfile_path)
     tarinfo.size = len(dockerfile_contents)

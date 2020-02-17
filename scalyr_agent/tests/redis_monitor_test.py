@@ -22,12 +22,8 @@ __author__ = "imron@scalyr.com"
 
 import time
 import unittest
-import struct
 
-from scalyr_agent.builtin_monitors.redis_monitor import RedisMonitor
 from scalyr_agent.builtin_monitors.redis_monitor import RedisHost
-
-import six
 
 
 class DummyLogger(object):
@@ -44,7 +40,6 @@ class DummyLogger(object):
 
 class RedisHostTestCase(unittest.TestCase):
     def setUp(self):
-        config = {"module": "scalyr_agent.builtin_monitors.syslog_monitor"}
         self.logger = DummyLogger()
         self.host = RedisHost("localhost", 6379, "", 1000)
 

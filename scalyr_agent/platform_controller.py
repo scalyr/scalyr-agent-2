@@ -20,6 +20,10 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
+if False:
+    from typing import List
+    from typing import Type
+
 
 import sys
 
@@ -33,7 +37,7 @@ class PlatformController:
         self._install_type = INSTALL_TYPE
 
     # A list of PlatformController classes that have been registered for use.
-    __platform_classes__ = []
+    __platform_classes__ = []  # type: List[Type[PlatformController]]
     __platforms_registered__ = False
 
     @staticmethod
