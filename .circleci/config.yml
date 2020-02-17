@@ -83,18 +83,22 @@ commands:
         description: "How long to run the capture for (in seconds)."
         type: integer
         default: 120
-      capture_line_counts:
-        description: "True to submit log line counts for each log level to CodeSpeed."
-        type: boolean
-        default: false
-      fixture_file_url:
-        description: "Optional URL to the fixture which is used by the tests and should be downloaded."
+      capture_interval:
+        description: "How often to capture agent process level metrics during the process run time (in seconds)."
+        type: integer
+        default: 10
+      agent_pre_run_command:
+        description: "Optional bash command / script to run before staring the agent and the metrics capture script."
         type: string
         default: ""
       agent_post_run_command:
         description: "Optional bash command / script to run after staring the agent and the metrics capture script."
         type: string
         default: ""
+      capture_line_counts:
+        description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
       cache_key_name:
         description: "Circle CI cache key name"
         type: string
@@ -112,9 +116,8 @@ commands:
             pip install --user "cffi==1.12.3"
       - run:
           name: Run Agent And Capture Resource Utilization
-          # NOTE: The following variables are specified in the Circle CI us and
-          # handles as secrets:
-          # - CODESPEED_AUTH
+          # NOTE: The following variables are specified in the Circle CI WebUI
+          # and are handles as secrets: CODESPEED_AUTH
           environment:
             CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
             CODESPEED_PROJECT: "scalyr-agent-2"
@@ -125,7 +128,7 @@ commands:
             # monitor for the agent process) should stabilize in a couple of minutes so it makes
             # no sense to run that benchmark longer.
             RUN_TIME: << parameters.run_time >>
-            CAPTURE_INTERVAL: 10
+            CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
           command: |
             # Create directories which are needed by the agent process
@@ -137,14 +140,11 @@ commands:
             export TZ=UTC
             export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
 
-            # Download any fixture files (if specified)
-            if [ ! -z "<< parameters.fixture_file_url >>" ]; then
-                wget --directory-prefix=/tmp "<< parameters.fixture_file_url >>"
+            # Run any pre agent run script (if defined)
+            if [ ! -z "<< parameters.agent_pre_run_command >>" ]; then
+                echo "Running agent pre run command..."
+                << parameters.agent_pre_run_command >>
             fi
-
-            # Create a file which is used for benchmarks which utilize randomly
-            # generated data
-            touch /tmp/random.log
 
             # Run the agent process and capture the metrics
             ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}" &> /tmp/capture_script.log &
@@ -154,6 +154,7 @@ commands:
             # NOTE: We intentionally sleep for a bit to give agent time to fully
             # start up
             if [ ! -z "<< parameters.agent_post_run_command >>" ]; then
+                echo "Running agent post run command..."
                 sleep 2
                 << parameters.agent_post_run_command >>
             fi
@@ -612,7 +613,7 @@ jobs:
           codespeed_executable: "Python 2.7.17 - loaded conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
-          fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
           run_time: 140
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
@@ -626,11 +627,14 @@ jobs:
           codespeed_executable: "Python 3.5.9 - loaded conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
-          fixture_file_url: "https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
           run_time: 140
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
 
+  # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
+  # which is being written to during the benchmark must existing before the
+  # agent process is started.
   benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -641,6 +645,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
           run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-27"
@@ -655,6 +660,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
           run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
