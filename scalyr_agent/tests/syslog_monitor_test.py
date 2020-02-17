@@ -263,6 +263,7 @@ class TestSyslogMonitor(SyslogMonitor):
     """subclass of SyslogMonitor with overridden 'increment_counter'.
         Provides ability to suspend test thread until written lines are handled by 'increment_counter' method.
         """
+
     def __init__(self, *args, **kwargs):
         super(TestSyslogMonitor, self).__init__(*args, **kwargs)
         # wakes up the main test thread when new line added, and line counter incremented.
@@ -272,8 +273,7 @@ class TestSyslogMonitor(SyslogMonitor):
 
     def increment_counter(self, reported_lines=0, errors=0):
         super(TestSyslogMonitor, self).increment_counter(
-            reported_lines=reported_lines,
-            errors=errors
+            reported_lines=reported_lines, errors=errors
         )
 
         with self._increment_line_cv:
@@ -291,7 +291,9 @@ class TestSyslogMonitor(SyslogMonitor):
             while self._reported_lines_count != expected_line_number:
                 self._increment_line_cv.wait(timeout)
                 if time.time() - start_time >= timeout:
-                    raise OSError("Could not wait for written lines because the timeout has occurred.")
+                    raise OSError(
+                        "Could not wait for written lines because the timeout has occurred."
+                    )
             self._reported_lines_count = 0
 
 
@@ -353,7 +355,9 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
 
         return connected
 
-    def send_and_wait_for_lines(self, sock, data, dest_addr=None, expected_line_count=1):
+    def send_and_wait_for_lines(
+        self, sock, data, dest_addr=None, expected_line_count=1
+    ):
         """
         Send data through a 'sock' socket.
         :param dest_addr: if not None, sends 'data' via UDP.
@@ -373,7 +377,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "tcp:8514",
-            "log_flush_delay": 0.0
+            "log_flush_delay": 0.0,
         }
 
         self.monitor = TestSyslogMonitor(config, self.logger)
@@ -393,9 +397,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         expected_line2 = "Line2"
         expected_line3 = "Line3"
         self.send_and_wait_for_lines(
-            s,
-            expected_line2 + "\n" + expected_line3 + "\n",
-            expected_line_count=2
+            s, expected_line2 + "\n" + expected_line3 + "\n", expected_line_count=2
         )
 
         # without close, the logger will interfere with other test cases.
@@ -424,7 +426,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:5514",
-            "log_flush_delay": 0.0
+            "log_flush_delay": 0.0,
         }
         self.monitor = TestSyslogMonitor(
             config, scalyr_logging.getLogger("syslog_monitor[test]")
@@ -456,7 +458,7 @@ class SyslogMonitorConnectTest(SyslogMonitorTestCase):
         config = {
             "module": "scalyr_agent.builtin_monitors.syslog_monitor",
             "protocols": "udp:8000, tcp:8001, udp:8002, tcp:8003",
-            "log_flush_delay": 0.0
+            "log_flush_delay": 0.0,
         }
         self.monitor = TestSyslogMonitor(
             config, scalyr_logging.getLogger("syslog_monitor[test]")
