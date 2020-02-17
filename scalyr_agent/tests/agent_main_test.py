@@ -14,6 +14,8 @@
 
 from __future__ import absolute_import
 
+import sys
+
 import mock
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -49,9 +51,13 @@ class AgentMainTestCase(ScalyrTestCase):
             r'Invalid path "/tmp/doesnt.exist" specified for the "ca_cert_path" config '
             "option: file does not exist"
         )
-        self.assertRaisesRegexp(
-            ValueError, expected_msg, agent._ScalyrAgent__create_client
-        )
+
+        if sys.version_info[:2] < (2, 7):
+            self.assertRaises(ValueError, agent._ScalyrAgent__create_client)
+        else:
+            self.assertRaisesRegexp(
+                ValueError, expected_msg, agent._ScalyrAgent__create_client
+            )
 
         # intermediate_certs_path file doesn't exist
         config.verify_server_certificate = True
@@ -68,6 +74,10 @@ class AgentMainTestCase(ScalyrTestCase):
             r'Invalid path "/tmp/doesnt.exist" specified for the '
             '"intermediate_certs_path" config option: file does not exist'
         )
-        self.assertRaisesRegexp(
-            ValueError, expected_msg, agent._ScalyrAgent__create_client
-        )
+
+        if sys.version_info[:2] < (2, 7):
+            self.assertRaises(ValueError, agent._ScalyrAgent__create_client)
+        else:
+            self.assertRaisesRegexp(
+                ValueError, expected_msg, agent._ScalyrAgent__create_client
+            )
