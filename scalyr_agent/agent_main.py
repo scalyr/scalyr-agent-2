@@ -152,6 +152,9 @@ class ScalyrAgent(object):
         # possible.
         self.__run_state = None
 
+        # Store references to the OverallStats class instance
+        self.__base_overall_stats = None
+
         # Whether or not the unsafe debugging mode is running (meaning the RemoteShell is accepting connections
         # on the local host port and the memory profiler is turned on).  Note, this mode is very unsafe since
         # arbitrary python commands can be executed by any user on the system as the user running the agent.
@@ -825,7 +828,7 @@ class ScalyrAgent(object):
 
         # The stats we track for the lifetime of the agent.  This variable tracks the accumulated stats since the
         # last stat reset (the stats get reset every time we read a new configuration).
-        base_overall_stats = OverallStats()
+        self.__base_overall_stats = OverallStats()
         # We only emit the overall stats once ever ten minutes.  Track when we last reported it.
         last_overall_stats_report_time = time.time()
         # We only emit the bandwidth stats once every minute.  Track when we last reported it.
@@ -952,7 +955,9 @@ class ScalyrAgent(object):
                         # Log the overall stats once every 10 mins.
                         if current_time > last_overall_stats_report_time + 600:
                             self.__log_overall_stats(
-                                self.__calculate_overall_stats(base_overall_stats)
+                                self.__calculate_overall_stats(
+                                    self.__base_overall_stats
+                                )
                             )
                             last_overall_stats_report_time = current_time
 
@@ -964,7 +969,9 @@ class ScalyrAgent(object):
                         # Log the bandwidth-related stats once every minute:
                         if current_time > last_bw_stats_report_time + 60:
                             self.__log_bandwidth_stats(
-                                self.__calculate_overall_stats(base_overall_stats)
+                                self.__calculate_overall_stats(
+                                    self.__base_overall_stats
+                                )
                             )
                             last_bw_stats_report_time = current_time
 
@@ -1085,8 +1092,8 @@ class ScalyrAgent(object):
                     )
                     # We are about to reset the current workers and ScalyrClientSession, so we will lose their
                     # contribution to the stats, so recalculate the base.
-                    base_overall_stats = self.__calculate_overall_stats(
-                        base_overall_stats
+                    self.__base_overall_stats = self.__calculate_overall_stats(
+                        self.__base_overall_stats
                     )
                     log.info("New configuration file seen.")
                     log.info("Stopping copying and metrics threads.")
@@ -1153,7 +1160,7 @@ class ScalyrAgent(object):
 
                 # Log the stats one more time before we terminate.
                 self.__log_overall_stats(
-                    self.__calculate_overall_stats(base_overall_stats)
+                    self.__calculate_overall_stats(self.__base_overall_stats)
                 )
 
             except Exception:
@@ -1528,7 +1535,18 @@ class ScalyrAgent(object):
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
             tmp_file = open(tmp_file_path, "w")
-            report_status(tmp_file, self.__generate_status(), time.time())
+
+            status_format = self.__config.status_format
+
+            agent_status = self.__generate_status()
+
+            if status_format == "text":
+                report_status(tmp_file, self.__generate_status(), time.time())
+            elif status_format == "json":
+                status_data = agent_status.to_dict()
+                status_data["overall_stats"] = self.__base_overall_stats.to_dict()
+                tmp_file.write(scalyr_util.json_encode(status_data))
+
             tmp_file.close()
             tmp_file = None
 

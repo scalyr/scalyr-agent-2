@@ -809,6 +809,11 @@ class Configuration(object):
         return self.__get_config().get_int("debug_level")
 
     @property
+    def status_format(self):
+        """Returns the configuration value for 'status_format'."""
+        return self.__get_config().get_string("status_format")
+
+    @property
     def ca_cert_path(self):
         """Returns the configuration value for 'ca_cert_path'."""
         return self.__get_config().get_string("ca_cert_path")
@@ -1576,6 +1581,17 @@ class Configuration(object):
                 "debug_level",
                 "badDebugLevel",
             )
+
+        self.__verify_or_set_optional_string(
+            config,
+            "status_format",
+            "text",
+            description,
+            apply_defaults,
+            env_aware=False,
+            valid_values=["text", "json"],
+        )
+
         self.__verify_or_set_optional_float(
             config,
             "request_deadline",
@@ -2452,6 +2468,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        valid_values=None,
     ):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
@@ -2467,6 +2484,7 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param valid_values: Optional list with valid values for this tring.
         """
         try:
             value = self.__get_config_or_environment_val(
@@ -2484,6 +2502,14 @@ class Configuration(object):
                 % (field, config_description),
                 field,
                 "notString",
+            )
+
+        if value is not None and valid_values and value not in valid_values:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Valid values are: %s'
+                % (value, field, ", ".join(valid_values)),
+                field,
+                "invalidValue",
             )
 
     def __verify_or_set_optional_int(
