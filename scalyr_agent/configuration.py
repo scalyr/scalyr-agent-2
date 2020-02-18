@@ -368,6 +368,18 @@ class Configuration(object):
         return self.__get_config().get_int("k8s_cache_purge_secs")
 
     @property
+    def k8s_service_account_cert(self):
+        return self.__get_config().get_string("k8s_service_account_cert")
+
+    @property
+    def k8s_service_account_token(self):
+        return self.__get_config().get_string("k8s_service_account_token")
+
+    @property
+    def k8s_service_account_namespace(self):
+        return self.__get_config().get_string("k8s_service_account_namespace")
+
+    @property
     def k8s_log_api_responses(self):
         # UNDOCUMENTED_CONFIG
         return self.__get_config().get_bool("k8s_log_api_responses")
@@ -870,6 +882,11 @@ class Configuration(object):
     def line_completion_wait_time(self):
         """Returns the configuration value for 'line_completion_wait_time'."""
         return self.__get_config().get_float("line_completion_wait_time")
+
+    @property
+    def internal_parse_max_line_size(self):
+        """Returns the configuration value for 'internal_parse_max_line_size'."""
+        return self.__get_config().get_int("internal_parse_max_line_size")
 
     @property
     def max_log_offset_size(self):
@@ -1463,6 +1480,15 @@ class Configuration(object):
             env_aware=True,
         )
 
+        self.__verify_or_set_optional_int(
+            config,
+            "internal_parse_max_line_size",
+            config.get_int("read_page_size", 64 * 1024),
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+
         # The minimum time we wait for a log file to reappear on a file system after it has been removed before
         # we consider it deleted.
         self.__verify_or_set_optional_float(
@@ -1654,6 +1680,30 @@ class Configuration(object):
             config,
             "k8s_cache_purge_secs",
             300,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_cert",
+            "/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_token",
+            "/var/run/secrets/kubernetes.io/serviceaccount/token",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "k8s_service_account_namespace",
+            "/var/run/secrets/kubernetes.io/serviceaccount/namespace",
             description,
             apply_defaults,
             env_aware=True,

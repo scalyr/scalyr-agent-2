@@ -292,10 +292,10 @@ define_config_option(
 define_config_option(
     __monitor__,
     "k8s_cache_init_abort_delay",
-    "Optional (defaults to 20). The number of seconds to wait for initialization of the kubernetes cache before aborting "
+    "Optional (defaults to 120). The number of seconds to wait for initialization of the kubernetes cache before aborting "
     "the kubernetes_monitor.",
     convert_to=int,
-    default=20,
+    default=120,
 )
 
 define_config_option(
@@ -861,7 +861,7 @@ class WrappedMultiplexedStreamResponse(object):
             yield item
 
 
-class DockerClient(docker.Client):  # pylint: disable=no-member
+class DockerClient(docker.APIClient):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -1071,7 +1071,7 @@ class ControlledCacheWarmer(StoppableThread):
         # has already been warmed.
         self.__lock.acquire()
         try:
-            if not container_id in self.__active_pods:
+            if container_id not in self.__active_pods:
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(
                     pod_namespace, pod_name
                 )
@@ -1140,7 +1140,6 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: dict  (int, int)
         """
         self.__lock.acquire()
-        result = {}
         try:
             return self.__gather_report_stats()
         finally:
@@ -1680,8 +1679,8 @@ def _get_containers(
 
                     if glob_list:
                         add_container = False
-                        for glob in glob_list:
-                            if fnmatch.fnmatch(name, glob):
+                        for glob_pattern in glob_list:
+                            if fnmatch.fnmatch(name, glob_pattern):
                                 add_container = True
                                 break
 
@@ -2034,9 +2033,9 @@ class CRIEnumerator(ContainerEnumerator):
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
         self._container_glob = "%s/*.log" % self._log_base
-        self._pod_re = re.compile("^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
+        self._pod_re = re.compile(r"^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
         self._info_re = re.compile(
-            "^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
+            r"^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
         )
 
     def _get_containers(
@@ -2076,8 +2075,8 @@ class CRIEnumerator(ContainerEnumerator):
                 add_container = True
                 if glob_list:
                     add_container = False
-                    for glob in glob_list:
-                        if fnmatch.fnmatch(cname, glob):
+                    for glob_pattern in glob_list:
+                        if fnmatch.fnmatch(cname, glob_pattern):
                             add_container = True
                             break
 
@@ -2229,7 +2228,6 @@ class CRIEnumerator(ContainerEnumerator):
                 metadata = pod.get("metadata", {})
                 pod_name = metadata.get("name", "")
                 pod_namespace = metadata.get("namespace", "")
-                pod_uid = metadata.get("uid", "")
 
                 # ignore anything that is in an excluded namespace
                 if pod_namespace in k8s_namespaces_to_exclude:
@@ -2310,7 +2308,7 @@ class CRIEnumerator(ContainerEnumerator):
                 limit_key="kubelet-api-connect",
             )
             self._query_filesystem = True
-        except Exception as e:
+        except Exception:
             global_log.exception(
                 "Error querying kubelet API for running pods and containers",
                 limit_once_per_x_secs=300,
@@ -2495,10 +2493,14 @@ class ContainerChecker(object):
 
         try:
             k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._config.get("k8s_verify_api_queries")
+            self._config.get("k8s_verify_api_queries")
 
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache(self._global_config)
+
+            # TODO: Uncomment after the v59 release.  This is a bit of a risky change that needs more testing
+            # to ensure we do not hurt some class of customers.
+            # self.__verify_service_account()
 
             if self.__controlled_warmer is not None:
                 self.__controlled_warmer.set_k8s_cache(self.k8s_cache)
@@ -2508,29 +2510,27 @@ class ContainerChecker(object):
             message_delay = 5
             start_time = time.time()
             message_time = start_time
-            abort = False
 
             # wait until the k8s_cache is initialized before aborting
             while not self.k8s_cache.is_initialized():
                 time.sleep(delay)
                 current_time = time.time()
-                # see if we need to print a message
-                elapsed = current_time - message_time
-                if elapsed > message_delay:
-                    self._logger.log(
-                        scalyr_logging.DEBUG_LEVEL_0,
-                        "start() - waiting for Kubernetes cache to be initialized",
-                    )
-                    message_time = current_time
+                last_initialization_error = self.k8s_cache.last_initialization_error()
+                if last_initialization_error is not None:
+                    # see if we need to abort the monitor because we've been waiting too long for init
+                    if current_time - start_time > self.__k8s_cache_init_abort_delay:
+                        raise K8sInitException(
+                            "Kubernetes monitor failed to start due to cache initialization error: %s"
+                            % last_initialization_error
+                        )
 
-                # see if we need to abort the monitor because we've been waiting too long for init
-                elapsed = current_time - start_time
-                if elapsed > self.__k8s_cache_init_abort_delay:
-                    abort = True
-                    break
-
-            if abort:
-                raise K8sInitException("Unable to initialize kubernetes cache")
+                    # see if we need to print a message
+                    if current_time - message_time > message_delay:
+                        self._logger.warning(
+                            "Kubernetes monitor not started yet (will retry) due to error in cache initialization %s",
+                            last_initialization_error,
+                        )
+                        message_time = current_time
 
             # check to see if the user has manually specified a cluster name, and if so then
             # force enable 'Starbuck' features
@@ -2617,10 +2617,12 @@ class ContainerChecker(object):
             self.__thread.start()
 
         except K8sInitException as e:
+            e_as_text = six.text_type(e)
             global_log.warn(
                 "Failed to start container checker - %s. Aborting kubernetes_monitor"
-                % (six.text_type(e))
+                % e_as_text
             )
+            k8s_utils.terminate_agent_process(getattr(e, "message", e_as_text))
             raise
         except Exception as e:
             global_log.warn(
@@ -2728,15 +2730,15 @@ class ContainerChecker(object):
                 for cid, info in six.iteritems(running_containers):
                     pod = None
                     if "k8s_info" in info:
-                        pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                        pod_namespace = info["k8s_info"].get(
-                            "pod_namespace", "invalid_namespace"
-                        )
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
                             pass
                             # Don't log any warnings here for now
+                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            # pod_namespace = info["k8s_info"].get(
+                            #     "pod_namespace", "invalid_namespace"
+                            # )
                             # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                             #                      limit_once_per_x_secs=300,
                             #                      limit_key='check-container-pod-info-%s' % cid)
@@ -2910,7 +2912,7 @@ class ContainerChecker(object):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception as e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in KubernetesMonitor")
             raise
 
@@ -3159,8 +3161,6 @@ class ContainerChecker(object):
 
         attributes = self.__get_base_attributes()
 
-        prefix = self.__log_prefix + "-"
-
         for cid, info in six.iteritems(containers):
             log_config = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
@@ -3169,6 +3169,20 @@ class ContainerChecker(object):
                 result.append({"cid": cid, "stream": "raw", "log_config": log_config})
 
         return result
+
+    def __verify_service_account(self):
+        """
+        Verifies that the appropriate service account information can be read from the pod, otherwise raises
+        a `K8sInitException`.  This is meant to catch common configuration issues.
+        """
+        if self._global_config.k8s_verify_api_queries and not (
+            os.path.isfile(self._global_config.k8s_service_account_cert)
+            and os.access(self._global_config.k8s_service_account_cert, os.R_OK)
+        ):
+            raise K8sInitException(
+                "Service account certificate not found at '%s'.  Be sure "
+                "'automountServiceAccountToken' is set to True"
+            )
 
 
 class KubernetesMonitor(ScalyrMonitor):
@@ -3348,7 +3362,6 @@ class KubernetesMonitor(ScalyrMonitor):
 
     def _initialize(self):
         """This method gets called every 30 seconds regardless"""
-        data_path = ""
         log_path = ""
         host_hostname = ""
 
@@ -3367,7 +3380,6 @@ class KubernetesMonitor(ScalyrMonitor):
         )
 
         if self._global_config:
-            data_path = self._global_config.agent_data_path
             log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
@@ -3992,7 +4004,7 @@ class KubernetesMonitor(ScalyrMonitor):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()

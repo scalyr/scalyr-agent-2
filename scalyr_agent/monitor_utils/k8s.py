@@ -6,12 +6,12 @@ import os
 import random
 import re
 from string import Template
+import sys
 import threading
 import time
 from time import strftime, gmtime
 import traceback
 from io import open
-
 
 import six
 import six.moves.urllib.request
@@ -124,6 +124,19 @@ def cache(global_config):
     # update the config and return current cache
     _k8s_cache.update_config(cache_config)
     return _k8s_cache
+
+
+def terminate_agent_process(reason):
+    """Terminate this agent process, causing the pod running the agent to restart the agent container.
+
+    :param reason: The termination reason which will be written in the K8s termination log and crash report.
+    :type reason: six.text_type
+    """
+    try:
+        with open("/dev/termination-log", "w") as fp:
+            fp.write(reason)
+    finally:
+        sys.exit(1)
 
 
 class K8sApiException(Exception):
@@ -1064,6 +1077,7 @@ class KubernetesCache(object):
 
         self._container_runtime = None
         self._initialized = False
+        self._last_initialization_error = "Initialization not started"
 
         self._thread = None
 
@@ -1113,6 +1127,36 @@ class KubernetesCache(object):
             self._lock.release()
 
         return result
+
+    def last_initialization_error(self):
+        """Returns the last error experienced while initializing the cache.
+        Returns None if it is initialized."""
+        self._lock.acquire()
+        try:
+            if self._initialized:
+                return None
+            else:
+                return self._last_initialization_error
+        finally:
+            self._lock.release()
+
+    def _update_initialization_error(self, component, message):
+        """Updates the last initialization error message experienced.
+
+        :param component: The component of the cache being initialized when the error occurred
+        :param message: The error message
+
+        :type component: six.text_type
+        :type message: six.text_type
+        """
+        self._lock.acquire()
+        try:
+            self._last_initialization_error = (
+                'Unable to initialize %s in K8s cache due to "%s"'
+                % (component, message)
+            )
+        finally:
+            self._lock.release()
 
     def _update_cluster_name(self, k8s):
         """Updates the cluster name"""
@@ -1202,7 +1246,6 @@ class KubernetesCache(object):
         start_time = time.time()
         retry_delay_secs = None
         while run_state.is_running() and not self.is_initialized():
-
             # get cache state values that will be consistent for the duration of the loop iteration
             local_state = self._state.copy_state()
 
@@ -1220,37 +1263,53 @@ class KubernetesCache(object):
             if not run_state.is_running() or self.is_initialized():
                 continue
 
+            # Records which component is being initialized.  Used in error messages below.
+            component = "cluster name"
             try:
                 self._update_cluster_name(local_state.k8s)
+                component = "api version"
                 self._update_api_server_version_if_necessary(local_state.k8s)
+                component = "runtime"
                 runtime = self._get_runtime(local_state.k8s)
 
                 self._lock.acquire()
                 try:
                     self._container_runtime = runtime
                     self._initialized = True
+                    self._last_initialization_error = None
                 finally:
                     self._lock.release()
             except K8sApiException as e:
                 global_log.warn(
-                    "Exception occurred when initializing k8s cache - %s"
-                    % (six.text_type(e)),
+                    "K8s API exception while updating %s in K8s cache (will retry) - %s"
+                    % (component, six.text_type(e)),
                     limit_once_per_x_secs=300,
                     limit_key="k8s_api_init_cache",
+                )
+                self._update_initialization_error(
+                    component, "K8s API error %s" % six.text_type(e)
                 )
                 # Delay a fixed amount.  TODO: Maybe do exponential backoff here?
                 retry_delay_secs = 0.5
             except AgentPodNotReadyException:
                 global_log.info(
-                    "Agent container not ready while initializing cache.  Will retry.",
+                    "Agent container not ready while initializing cache (will retry)",
                     limit_once_per_x_secs=60,
                     limit_key="k8s_agent_pod_not_ready",
+                )
+                self._update_initialization_error(
+                    component, "Agent container not ready"
                 )
                 retry_delay_secs = 1.0
             except Exception as e:
                 global_log.warn(
-                    "Exception occurred when initializing k8s cache - %s\n%s"
-                    % (six.text_type(e), traceback.format_exc())
+                    "Exception occurred when updating %s in K8s cache (will retry) - %s\n%s"
+                    % (component, six.text_type(e), traceback.format_exc()),
+                    limit_once_per_x_secs=60,
+                    limit_key="k8s_init_generic_error",
+                )
+                self._update_initialization_error(
+                    component, "Unhandled error %s" % six.text_type(e)
                 )
                 # Unknown error.  TODO: Maybe do exponential backoff here?
                 retry_delay_secs = 0.5
@@ -1478,6 +1537,8 @@ class KubernetesApi(object):
 
         if not verify_api_queries:
             kwargs["ca_file"] = None
+        elif global_config:
+            kwargs["ca_file"] = global_config.k8s_service_account_cert
 
         if global_config:
             kwargs.update(
@@ -1492,6 +1553,8 @@ class KubernetesApi(object):
                     "rate_limiter": BlockingRateLimiter.get_instance(
                         rate_limiter_key, global_config, logger=global_log
                     ),
+                    "token_file": global_config.k8s_service_account_token,
+                    "namespace_file": global_config.k8s_service_account_namespace,
                 }
             )
         return KubernetesApi(**kwargs)
@@ -1509,16 +1572,10 @@ class KubernetesApi(object):
         agent_log_path=None,
         query_options_max_retries=3,
         rate_limiter=None,
+        token_file="/var/run/secrets/kubernetes.io/serviceaccount/token",
+        namespace_file="/var/run/secrets/kubernetes.io/serviceaccount/namespace",
     ):
         """Init the kubernetes object"""
-
-        # fixed well known location for authentication token required to
-        # query the API
-        token_file = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-
-        # fixed well known location for namespace file
-        namespace_file = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
-
         self.log_api_responses = log_api_responses
         self.log_api_exclude_200s = log_api_exclude_200s
         self.log_api_min_response_len = log_api_min_response_len

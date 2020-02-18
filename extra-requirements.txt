@@ -1,0 +1,11 @@
+# faster json library. NOTE: requires python headers.
+ujson==1.35
+
+# this library is needed to start agent with docker monitor in standalone mode(not inside docker container).
+docker==4.1.0
+
+# the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
+# to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
+requests==2.15.1
+
+yappi==1.2.3

@@ -47,7 +47,6 @@ except ImportError:
     )
 
 from scalyr_agent import ScalyrMonitor, define_config_option
-from scalyr_agent.json_lib import JsonObject
 import scalyr_agent.scalyr_logging as scalyr_logging
 from scalyr_agent.scalyr_monitor import BadMonitorConfiguration
 import scalyr_agent.util as scalyr_util
@@ -290,7 +289,7 @@ class JournaldMonitor(ScalyrMonitor):
         self._extra_fields = self._config.get("journal_fields")
         if self._extra_fields is not None:
             for field_name in self._extra_fields:
-                fixed_field_name = scalyr_logging.AgentLogger.__force_valid_metric_or_field_name(
+                fixed_field_name = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(
                     field_name, is_metric=False
                 )
                 if field_name != fixed_field_name:
