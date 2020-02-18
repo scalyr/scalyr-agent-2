@@ -41,7 +41,10 @@ class RequestSender:
     def send_request(self, request):
         request_query = request.build()
 
-        fill_query = "https://{}/api/query?queryType=log&{}".format(
+        protocol = "https://" if not self._server_address.startswith("http") else ""
+
+        fill_query = "{}{}/api/query?queryType=log&{}".format(
+            protocol,
             self._server_address,
             request_query
         )
