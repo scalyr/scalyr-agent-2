@@ -91,7 +91,7 @@ class AgentLogVerifier(AgentVerifier):
 
         # create request to fetch agent.log file data.
         request = ScalyrRequest(
-            read_api_key=os.environ["SCALYR_READ_KEY"],
+            read_api_key=os.environ["READ_API_KEY"],
             max_count=5000,
             start_time=self._start_time
         )
@@ -144,7 +144,7 @@ class DataJsonVerifier(AgentVerifier):
         self._agent_host_name = os.environ["AGENT_HOST_NAME"]
 
         request = ScalyrRequest(
-            read_api_key=os.environ["SCALYR_READ_KEY"],
+            read_api_key=os.environ["READ_API_KEY"],
             max_count=5000,
             start_time=self._start_time
         )
