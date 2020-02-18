@@ -40,7 +40,7 @@ def test_config(request):
 
     agent_settings_names = [
         "SCALYR_API_KEY",
-        "SCALYR_READ_KEY",
+        "READ_API_KEY",
         "SCALYR_SERVER",
         "AGENT_HOST_NAME",
     ]
@@ -62,7 +62,7 @@ def agent_settings(test_config):
 def agent_environment(test_config):
     names = [
         "SCALYR_API_KEY",
-        "SCALYR_READ_KEY",
+        "READ_API_KEY",
         "SCALYR_SERVER",
         "AGENT_HOST_NAME"
     ]
