@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+from __future__ import print_function
 import time
 
 import requests
@@ -43,14 +45,15 @@ class RequestSender:
 
         protocol = "https://" if not self._server_address.startswith("http") else ""
 
-        fill_query = "{}{}/api/query?queryType=log&{}".format(
+        full_query = "{}{}/api/query?queryType=log&{}".format(
             protocol,
             self._server_address,
             request_query
         )
+        print(full_query)
 
         with requests.Session() as session:
-            resp = session.get(fill_query)
+            resp = session.get(full_query)
 
         if resp.status_code != 200:
             a = resp.json()
