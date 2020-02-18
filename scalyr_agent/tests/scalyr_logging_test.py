@@ -371,6 +371,20 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         fixed_name2 = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(name2)
         self.assertEqual(fixed_name2, name2)
 
+    def test_output_to_file_with_stdout(self):
+        self.__logger.info("Hello world", force_stdout=True)
+        self.assertLogFileContainsLineRegex(expression="Hello world")
+
+    def test_output_to_file_with_stderr(self):
+        self.__logger.info("Hello world", force_stderr=True)
+        self.assertLogFileContainsLineRegex(expression="Hello world")
+
+    def test_output_to_file_with_stdout_stderr(self):
+        self.__logger.info("Hello world", force_stdout=True)
+        self.assertLogFileContainsLineRegex(expression="Hello world")
+        self.__logger.info("Hello world again", force_stderr=True)
+        self.assertLogFileContainsLineRegex(expression="Hello world again")
+
     class FakeMonitor(object):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""
 

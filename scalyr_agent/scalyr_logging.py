@@ -254,6 +254,9 @@ class AgentLogger(logging.Logger):
         """
         self.__logger_name = name
 
+        self.__stdout_handler = None
+        self.__stderr_handler = None
+
         # Look for the monitor id, which is at the end surrounded by brackets.
         m = re.match(r"([^\[]*)(\(.*\))", name)
         if m:
@@ -308,6 +311,12 @@ class AgentLogger(logging.Logger):
         # Be sure to add this to the manager's list of logger instances.  This will also set the log level to the
         # right level.
         __log_manager__.add_logger_instance(self)
+
+    def set_stdout_handler(self, handler):
+        self.__stdout_handler = handler
+
+    def set_stderr_handler(self, handler):
+        self.__stderr_handler = handler
 
     def emit_value(
         self,
@@ -405,6 +414,8 @@ class AgentLogger(logging.Logger):
         current_time=None,
         emit_to_metric_log=False,
         monitor_id_override=None,
+        force_stdout=False,
+        force_stderr=False,
     ):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
@@ -472,6 +483,14 @@ class AgentLogger(logging.Logger):
         else:
             __thread_local__.last_error_for_monitor = None
 
+        stdout_handler = self.__stdout_handler
+        stderr_handler = self.__stderr_handler
+
+        if force_stdout and stdout_handler:
+            logging.Logger.addHandler(self, stdout_handler)
+        if force_stderr and stderr_handler:
+            logging.Logger.addHandler(self, stderr_handler)
+
         # pylint: disable=assignment-from-no-return
         if extra is not None:
             result = logging.Logger._log(self, level, msg, args, exc_info, extra)
@@ -483,6 +502,11 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_metric_log_for_monitor = None
         __thread_local__.last_error_for_monitor = None
         __thread_local__.last_monitor_id_override = None
+
+        if force_stdout and stdout_handler:
+            logging.Logger.removeHandler(self, stdout_handler)
+        if force_stderr and stderr_handler:
+            logging.Logger.removeHandler(self, stderr_handler)
 
         return result
 
@@ -1325,6 +1349,11 @@ class AgentLogManager(object):
         self.__main_log_handler = None
         self.__debug_log_handler = None
 
+        # logging.Handler objects for use when logging with `force_stdout` or `force_stderr` enabled.
+        # These handlers get added and removed to/from the logger within its own `_log` method.
+        self.__force_stdout_handler = None
+        self.__force_stderr_handler = None
+
         # If True, then logging will be sent to stdout rather than the file names mentioned above.
         self.__use_stdout = True
 
@@ -1390,6 +1419,8 @@ class AgentLogManager(object):
 
         self.__recreate_main_handler()
         self.__recreate_debug_handler()
+        self.__recreate_force_stdout_handler()
+        self.__recreate_force_stderr_handler()
         self.__reset_root_logger()
         MetricLogHandler.set_use_stdout(use_stdout)
 
@@ -1406,6 +1437,8 @@ class AgentLogManager(object):
         try:
             self.__loggers.append(new_instance)
             new_instance.setLevel(self.__log_level)
+            new_instance.set_stdout_handler(self.__force_stdout_handler)
+            new_instance.set_stderr_handler(self.__force_stderr_handler)
         finally:
             self.__lock.release()
 
@@ -1482,8 +1515,31 @@ class AgentLogManager(object):
             self.__debug_log_fn, is_debug=True
         )
 
-    def __recreate_handler(self, file_path, is_debug=False):
-        """Creates and returns an appropriate handler for either the main or debug log.
+    def __recreate_force_stdout_handler(self):
+        """Recreates the stdout log handler according to the variables set on this instance.
+
+        If self.__stdout is set, then the handler will be set to `None` to avoid duplicate logs to stdout, otherwise
+        it will be the same logger as a main handler with self.__stdout set to True.
+
+        You must invoke `__reset_root_logger` at some point after this call for it to take effect.
+        """
+        self.__force_stdout_handler = self.__recreate_handler(
+            self.__main_log_fn, is_force_stdout=True
+        )
+
+    def __recreate_force_stderr_handler(self):
+        """Recreates the stderr log handler according to the variables set on this instance.
+
+        You must invoke `__reset_root_logger` at some point after this call for it to take effect.
+        """
+        self.__force_stderr_handler = self.__recreate_handler(
+            self.__main_log_fn, is_force_stderr=True
+        )
+
+    def __recreate_handler(
+        self, file_path, is_debug=False, is_force_stdout=False, is_force_stderr=False
+    ):
+        """Creates and returns an appropriate handler for either the main, debug, forced stdout, or force stderr log.
 
         @param file_path: The file name for the log file.  This is only used if the logger should not be writing to
             stdout (as determined by self.__use_stdout).
@@ -1497,10 +1553,14 @@ class AgentLogManager(object):
         """
         if is_debug and not self.__is_debug_on:
             return None
+        if self.__use_stdout and is_force_stdout:
+            return None
 
         # Create the right type of handler.
-        if self.__use_stdout:
+        if self.__use_stdout or is_force_stdout:
             handler = logging.StreamHandler(sys.stdout)
+        elif is_force_stderr:
+            handler = logging.StreamHandler(sys.stderr)
         else:
             handler = logging.handlers.RotatingFileHandler(
                 file_path,
@@ -1526,7 +1586,8 @@ class AgentLogManager(object):
     def __reset_root_logger(self):
         """Reset the handlers on the root logger to be only the handlers we want.
 
-        This must be invoked whenever you rebuild either the `__main_log_handler` or `__debug_log_handler`.
+        This must be invoked whenever you rebuild either the `__main_log_handler`, `__debug_log_handler`,
+        `__force_stdout_handler`, or `__force_stderr_handler`.
         """
         # Because we gather logs from all modules, we add our handlers to the top most Logger.  The records will
         # propagate up there and then we will write them to disk or stdout.
@@ -1540,6 +1601,10 @@ class AgentLogManager(object):
         root_logger.addHandler(self.__main_log_handler)
         if self.__debug_log_handler is not None:
             root_logger.addHandler(self.__debug_log_handler)
+
+        for logger_instance in self.__loggers:
+            logger_instance.set_stdout_handler(self.__force_stdout_handler)
+            logger_instance.set_stderr_handler(self.__force_stderr_handler)
 
     def __create_main_log_path(self, agent_log_file_path, logs_directory):
         """Creates and returns the file name to use for the main log.
