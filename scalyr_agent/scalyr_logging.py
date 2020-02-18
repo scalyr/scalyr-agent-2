@@ -439,6 +439,9 @@ class AgentLogger(logging.Logger):
             This must only be used if this logger was assigned to a specific monitor.
         @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
             of reporting this one value.  The base monitor name will remain unchanged.
+        @param force_stdout: If True, will write the log to stdout as well as the configured log file, no effect if
+            the log already goes to stdout.
+        @param force_stderr: If True, will write the log to stderr as well as the configured log file.
         """
         if current_time is None:
             current_time = time.time()
