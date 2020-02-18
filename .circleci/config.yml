@@ -86,7 +86,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -105,7 +105,7 @@ commands:
             export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
