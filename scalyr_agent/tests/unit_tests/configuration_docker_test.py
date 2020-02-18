@@ -10,7 +10,7 @@ from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.monitors_manager import MonitorsManager
 from scalyr_agent.json_lib.objects import ArrayOfStrings
 from scalyr_agent.test_util import FakeAgentLogger, FakePlatform
-from scalyr_agent.tests.configuration_test import TestConfiguration
+from scalyr_agent.tests.unit_tests.configuration_test import TestConfiguration
 
 
 from mock import patch, Mock, PropertyMock
