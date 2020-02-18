@@ -1,5 +1,7 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+
 import configparser
-import pathlib
 import os
 import collections
 
@@ -10,16 +12,11 @@ def pytest_addoption(parser):
     parser.addoption("--config", action="store")
 
 
-class InfiniteDict(collections.defaultdict):
-    def __init__(self):
-        super(InfiniteDict, self).__init__(self.__class__)
-
-
-def _get_config_value(parser, name):
+def _get_config_value(parser, name, default=None):
     try:
         return parser[name]
     except KeyError:
-        return None
+        return default
 
 
 def _get_env_or_config_value(env_name, parser, config_name=None):
@@ -32,19 +29,20 @@ def _get_env_or_config_value(env_name, parser, config_name=None):
 @pytest.fixture(scope="session")
 def test_config(request):
     config_path = request.config.getoption("--config")
+    print(config_path)
 
     config = configparser.ConfigParser()
     config.read(config_path)
 
     result_config = dict()
 
-    parser_agent_settings = _get_config_value(config, "agent_settings")
+    parser_agent_settings = _get_config_value(config, "agent_settings", default=dict())
 
     agent_settings_names = [
         "SCALYR_API_KEY",
         "SCALYR_READ_KEY",
         "SCALYR_SERVER",
-        "SCALYR_TEST_HOST_NAME",
+        "AGENT_HOST_NAME",
     ]
     agent_settings = dict()
     for name in agent_settings_names:
@@ -55,18 +53,26 @@ def test_config(request):
     return result_config
 
 
+@pytest.fixture(scope="session")
+def agent_settings(test_config):
+    return test_config["agent_settings"]
+
+
 @pytest.fixture()
 def agent_environment(test_config):
     names = [
         "SCALYR_API_KEY",
         "SCALYR_READ_KEY",
         "SCALYR_SERVER",
-        "SCALYR_TEST_HOST_NAME"
+        "AGENT_HOST_NAME"
     ]
 
     agent_settings = test_config["agent_settings"]
     for name in names:
-        os.environ[name] = agent_settings[name]
+        env_var_value = agent_settings[name]
+        if not env_var_value:
+            raise NameError("'{}' environment variable must be specified.".format(name))
+        os.environ[name] = env_var_value
 
     yield
 

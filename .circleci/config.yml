@@ -62,6 +62,54 @@ commands:
                 paths:
                     .coverage.unittest-<< parameters.python_version >>
 
+  smoke-standalone-tox:
+    description: "A base command for all tox based smoke test jobs"
+    parameters:
+      python_version:
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)."
+        type: string
+      tox_version:
+        description: "tox package version to use."
+        type: string
+        default: "3.14.3"
+      apt_dependencies:
+        description: "Any optional apt dependencies which should be installed."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target to run."
+        type: string
+      store_coverage:
+        description: "True to persist / store coverage data."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+      - when:
+          condition: << parameters.apt_dependencies >>
+          steps:
+            - run:
+                name: Install APT Dependencies
+                command: |
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< parameters.tox_version >>"
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
+            tox -e<< parameters.tox_target >>
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+
+
 jobs:
   unittest-38:
     working_directory: ~/scalyr-agent-2
@@ -441,6 +489,62 @@ jobs:
           paths:
             - "~/.cache/pip."
 
+  smoke-standalone-38-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+        - image: circleci/python:3.8
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.8"
+          tox_target: "py3.8-smoke-tests"
+
+  smoke-standalone-37-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.7"
+          tox_target: "py3.7-smoke-tests"
+
+  smoke-standalone-36-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.6"
+          tox_target: "py3.6-smoke-tests"
+
+  smoke-standalone-35-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.5"
+          tox_target: "py3.5-smoke-tests"
+
+  smoke-standalone-27-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.7"
+          tox_target: "py2.7-smoke-tests"
+
+
+  smoke-standalone-26-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image:  dockershelf/python:2.6-dev
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.6"
+          tox_target: "py2.6-smoke-tests"
+
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -481,6 +585,14 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
+  smoketests:
+    jobs:
+      - smoke-standalone-38-new
+      - smoke-standalone-37-new
+      - smoke-standalone-36-new
+      - smoke-standalone-35-new
+      - smoke-standalone-27-new
+      - smoke-standalone-26-new
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
