@@ -809,11 +809,6 @@ class Configuration(object):
         return self.__get_config().get_int("debug_level")
 
     @property
-    def status_format(self):
-        """Returns the configuration value for 'status_format'."""
-        return self.__get_config().get_string("status_format")
-
-    @property
     def ca_cert_path(self):
         """Returns the configuration value for 'ca_cert_path'."""
         return self.__get_config().get_string("ca_cert_path")
@@ -1581,16 +1576,6 @@ class Configuration(object):
                 "debug_level",
                 "badDebugLevel",
             )
-
-        self.__verify_or_set_optional_string(
-            config,
-            "status_format",
-            "text",
-            description,
-            apply_defaults,
-            env_aware=False,
-            valid_values=["text", "json"],
-        )
 
         self.__verify_or_set_optional_float(
             config,

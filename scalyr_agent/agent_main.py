@@ -87,6 +87,9 @@ from scalyr_agent.platform_controller import AgentNotRunning
 
 
 STATUS_FILE = "last_status"
+STATUS_FORMAT_FILE = "status_format"
+
+VALID_STATUS_FORMATS = ['text', 'json']
 
 
 def _update_disabled_until(config_value, current_time):
@@ -192,6 +195,7 @@ class ScalyrAgent(object):
         my_options = Options()
         my_options.quiet = True
         my_options.verbose = False
+        my_options.status_format = 'text'
         my_options.no_fork = True
         my_options.no_change_user = True
         my_options.no_check_remote = False
@@ -221,6 +225,7 @@ class ScalyrAgent(object):
         """
         quiet = command_options.quiet
         verbose = command_options.verbose
+        status_format = command_options.status_format
         no_fork = command_options.no_fork
         no_check_remote = False
 
@@ -295,7 +300,7 @@ class ScalyrAgent(object):
                         "Assuming agent data path is '%s'" % agent_data_path,
                         file=sys.stderr,
                     )
-                return self.__detailed_status(agent_data_path)
+                return self.__detailed_status(agent_data_path, status_format=status_format)
             elif command == "restart":
                 return self.__restart(quiet, no_fork, no_check_remote)
             elif command == "condrestart":
@@ -570,7 +575,7 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def __detailed_status(self, data_directory):
+    def __detailed_status(self, data_directory, status_format='text'):
         """Execute the status -v command.
 
         This will request the current agent to dump its detailed status to a file in the data directory, which
@@ -582,6 +587,11 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        if status_format not in VALID_STATUS_FORMATS:
+            print("Invalid status format: %s. Valid formats are: %s" %
+                  (status_format, ', '.join(VALID_STATUS_FORMATS)))
+            return 1
+
         # First, see if we have to change the user that is executing this script to match the owner of the config.
         if self.__escalator.is_user_change_required():
             try:
@@ -611,6 +621,7 @@ class ScalyrAgent(object):
             return 1
 
         status_file = os.path.join(data_directory, STATUS_FILE)
+        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
 
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
@@ -627,6 +638,11 @@ class ScalyrAgent(object):
             f = open(status_file, "w")
             f.truncate(0)
             f.close()
+
+        # Write the file with the format we need to use
+        with open(status_format_file, 'w') as fp:
+            status_format = six.text_type(status_format)
+            fp.write(status_format)
 
         # Signal to the running process.  This should cause that process to write to the status file
         result = self.__controller.request_agent_status()
@@ -1526,6 +1542,18 @@ class ScalyrAgent(object):
 
     def __report_status_to_file(self):
         """Handles the signal sent to request this process write its current detailed status out."""
+        # First determine the format user request. If no file with the requested format, we assume
+        # text format is used (this way it's backward compatible and works correctly on upgraded)
+        status_format = 'text'
+
+        status_format_file = os.path.join(self.__config.agent_data_path, STATUS_FORMAT_FILE)
+        if os.path.isfile(status_format_file):
+            with open(status_format_file, 'r') as fp:
+                status_format = fp.read().strip()
+
+        if not status_format or status_format not in VALID_STATUS_FORMATS:
+            status_format = 'text'
+
         tmp_file = None
         try:
             # We do a little dance to write the status.  We write it to a temporary file first, and then
@@ -1539,8 +1567,6 @@ class ScalyrAgent(object):
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
             tmp_file = open(tmp_file_path, "w")
-
-            status_format = self.__config.status_format
 
             agent_status = self.__generate_status()
 
@@ -1627,6 +1653,13 @@ if __name__ == "__main__":
         default=False,
         help="For status command, prints detailed information about running agent.",
     )
+    parser.add_option(
+        "--format",
+        dest="status_format",
+        default='text',
+        help="Format to use (text / json) for the agent status command.",
+    )
+
     parser.add_option(
         "",
         "--no-fork",
