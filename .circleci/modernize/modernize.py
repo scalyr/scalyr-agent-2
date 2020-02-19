@@ -285,7 +285,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     expected_source = """
 from __future__ import absolute_import
@@ -300,7 +300,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print("Not to modernize") 
+print("Not to modernize")
 """
 
     new_source = modernize_source_string(orig_source)
@@ -317,7 +317,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -338,7 +338,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -357,7 +357,7 @@ d = dict()
 for _ in d.items():
     pass
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -384,6 +384,13 @@ if __name__ == "__main__":
         help="Write modified files.",
     )
     parser.add_argument(
+        "files",
+        metavar="FILES",
+        type=str,
+        nargs="+",
+        help="File paths to run the script on. If not specified it runs on all the files.",
+    )
+    parser.add_argument(
         "-j", "--processes", default=1, type=int, help="Run modernize concurrently."
     )
 
@@ -392,34 +399,37 @@ if __name__ == "__main__":
     root = os.getcwd()
     source_root = os.path.join(root, "scalyr_agent")
 
-    # all python files
-    all_files = set(glob.glob("{}/**/*.py".format(root), recursive=True))
+    if not args.files:
+        # all python files
+        all_files = set(glob.glob("{}/**/*.py".format(root), recursive=True))
 
-    venv_files = set(glob.glob("{}/venv/**/*".format(root), recursive=True))
+        venv_files = set(glob.glob("{}/venv/**/*".format(root), recursive=True))
 
-    # do not modernize third_party libraries.
-    third_party_files = set(
-        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
-    )
+        # do not modernize third_party libraries.
+        third_party_files = set(
+            glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
+        )
 
-    # do not process modernize files.
-    modernize_files = set(
-        glob.glob("{0}/.circleci/modernize/**/*.py".format(root), recursive=True)
-    )
+        # do not process modernize files.
+        modernize_files = set(
+            glob.glob("{0}/.circleci/modernize/**/*.py".format(root), recursive=True)
+        )
 
-    other_files_to_exclude = {
-        os.path.join(source_root, "compat.py"),
-        os.path.join(root, "build_package.py"),
-    }
+        other_files_to_exclude = {
+            os.path.join(source_root, "compat.py"),
+            os.path.join(root, "build_package.py"),
+        }
 
-    # files without third party libraries.
-    files_to_process = (
-        all_files
-        - third_party_files
-        - venv_files
-        - modernize_files
-        - other_files_to_exclude
-    )
+        # files without third party libraries.
+        files_to_process = (
+            all_files
+            - third_party_files
+            - venv_files
+            - modernize_files
+            - other_files_to_exclude
+        )
+    else:
+        files_to_process = list(set(args.files))
 
     # Create collection with additional modernize parameters for each file.
     files_modernize_params = collections.defaultdict(dict)
@@ -441,11 +451,11 @@ if __name__ == "__main__":
 
     current_file_number = 1
 
-    def progress_message():
+    def progress_message(file_path):
         global current_file_number
         print(
-            "Processing {} of {}.".format(
-                current_file_number, total_files_count, flush=True
+            "Processing {} ({}) of {}.".format(
+                current_file_number, file_path, total_files_count, flush=True
             )
         )
         current_file_number += 1
@@ -461,7 +471,7 @@ if __name__ == "__main__":
                 **files_modernize_params[file_path]
             )
             if not is_concurrent:
-                progress_message()
+                progress_message(file_path)
 
             diffs[file_path] = diff
 
@@ -472,7 +482,7 @@ if __name__ == "__main__":
         for file_path, future in list(diffs.items()):
             try:
                 diffs[file_path] = future.result()
-                progress_message()
+                progress_message(file_path)
             except TODOParseError as e:
                 print("Can not modernize file: {}".format(file_path))
                 raise
