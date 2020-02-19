@@ -44,7 +44,7 @@ import six
 
 
 class TestOverallStats(ScalyrTestCase):
-    def test_read_file_as_json(self):
+    def test___add___method(self):
         a = OverallStats()
         b = OverallStats()
 
