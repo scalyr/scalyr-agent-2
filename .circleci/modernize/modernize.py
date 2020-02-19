@@ -387,7 +387,7 @@ if __name__ == "__main__":
         "files",
         metavar="FILES",
         type=str,
-        nargs="+",
+        nargs="?",
         help="File paths to run the script on. If not specified it runs on all the files.",
     )
     parser.add_argument(
