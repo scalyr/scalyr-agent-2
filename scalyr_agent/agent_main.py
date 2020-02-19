@@ -974,8 +974,12 @@ class ScalyrAgent(object):
                     if self.__config.disable_overall_stats:
                         log.log(scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled")
                     else:
-                        # Log the overall stats once every 10 mins.
-                        if current_time > last_overall_stats_report_time + 600:
+                        # Log the overall stats once every 10 mins (by default)
+                        log_stats_delta = self.__config.overall_stats_log_interval
+                        if (
+                            current_time
+                            > last_overall_stats_report_time + log_stats_delta
+                        ):
                             self.__overall_stats = self.__calculate_overall_stats(
                                 base_overall_stats
                             )
@@ -988,7 +992,8 @@ class ScalyrAgent(object):
                         )
                     else:
                         # Log the bandwidth-related stats once every minute:
-                        if current_time > last_bw_stats_report_time + 60:
+                        log_stats_delta = self.__config.bandwidth_stats_log_interval
+                        if current_time > last_bw_stats_report_time + log_stats_delta:
                             self.___overall_stats = self.__calculate_overall_stats(
                                 base_overall_stats
                             )
