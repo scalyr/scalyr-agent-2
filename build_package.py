@@ -1234,10 +1234,10 @@ def create_scriptlets():
     fp.write(
         r"""#!/bin/bash
 
-# Always remove the .pyc files.  This covers problems for old packages that didn't have the remove in the
+# Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.
 if [ -d /usr/share/scalyr-agent-2 ]; then
-  find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
+  find /usr/share/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
 fi
 
 exit 0;
@@ -1276,8 +1276,8 @@ if [ "$1" == "0" -o "$1" == "remove" ]; then
   fi
 fi
 
-# Always remove the .pyc files
-find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
+# Always remove the .pyc files and __pycache__ directories
+find /usr/share/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
 
 exit 0;
 """
