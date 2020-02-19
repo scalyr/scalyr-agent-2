@@ -1911,3 +1911,33 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
+
+    def test___verify_or_set_optional_string_with_valid_values(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Valid value
+        config_object = JsonObject(content={"foo": "bar"})
+        config._Configuration__verify_or_set_optional_string(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            valid_values=["bar", "baz"],
+        )
+        self.assertEqual(config_object["foo"], "bar")
+
+        # 2. Not a valid value
+        config_object = JsonObject(content={"foo": "invalid"})
+        expected_msg = (
+            'Got invalid value "invalid" for field "foo". Valid values are: bar, baz'
+        )
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_string,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            valid_values=["bar", "baz"],
+        )
