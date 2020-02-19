@@ -32,7 +32,7 @@ repos:
       name: mypy
       # NOTE: We intentionally want to run in incremental mode to speed this check up
       # (which is not the case for tox -elint target and CI where we want to avoid using
-      # MyPy cache)>
+      # MyPy cache)
       entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
       language: script
       types: [file, python]
