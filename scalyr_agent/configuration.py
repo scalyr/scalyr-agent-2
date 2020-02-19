@@ -2497,7 +2497,7 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
-        @param valid_values: Optional list with valid values for this tring.
+        @param valid_values: Optional list with valid values for this string.
         """
         try:
             value = self.__get_config_or_environment_val(
