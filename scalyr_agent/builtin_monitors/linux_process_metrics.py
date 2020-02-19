@@ -156,7 +156,6 @@ define_metric(
     "app.disk.requests",
     "Total disk read requests.",
     extra_fields={"type": "read"},
-    unit="bytes",
     cumulative=True,
 )
 
@@ -174,7 +173,6 @@ define_metric(
     "app.disk.requests",
     "Total disk write requests.",
     extra_fields={"type": "write"},
-    unit="bytes",
     cumulative=True,
 )
 
