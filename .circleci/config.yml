@@ -597,7 +597,7 @@ jobs:
         - image: circleci/python:2.7
     steps:
       - smoke-package-tox:
-          python_version: "python2"
+          python_version: "2.7"
           tox_target: "py2-rpm-smoke-tests"
 
   smoke-rpm-python3-new:
@@ -606,7 +606,7 @@ jobs:
         - image: circleci/python:3.6
     steps:
       - smoke-package-tox:
-          python_version: "python3"
+          python_version: "3.6"
           tox_target: "py3-rpm-smoke-tests"
 
 
