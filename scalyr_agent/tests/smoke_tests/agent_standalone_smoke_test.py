@@ -182,7 +182,7 @@ class DataJsonVerifier(AgentVerifier):
 
 @pytest.mark.usefixtures("agent_environment")
 def test_uploaded_data(agent_settings, request):
-    runner_type = request.config.getoption("--runner_type")
+    runner_type = request.config.getoption("--runner-type")
     if runner_type == "PACKAGE":
         installation_type = PACKAGE_INSTALL
     else:

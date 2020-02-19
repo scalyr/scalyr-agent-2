@@ -13,7 +13,8 @@ from .tools.compat import Path
 def pytest_addoption(parser):
     parser.addoption("--config", action="store")
     parser.addoption("--package-python-version", action="store")
-    parser.addoption("--runner_type", action="store", default="STANDALONE")
+    parser.addoption("--runner-type", action="store", default="STANDALONE")
+    parser.addoption("--docker-host", action="store", default="")
     return
 
 

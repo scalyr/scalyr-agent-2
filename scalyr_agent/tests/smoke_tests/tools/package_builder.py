@@ -21,8 +21,8 @@ RUN gem install --no-document fpm
     """
 
 
-def build_package_builder_image(image_tag, recreate_on_exists=False):
-    docker_client = docker.DockerClient()
+def build_package_builder_image(image_tag, docker_client=None):
+    docker_client = docker_client or docker.DockerClient()
 
     # if docker_client.images.list(name=image_tag):
     #     if not recreate_on_exists:

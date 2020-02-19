@@ -27,8 +27,8 @@ RUN python3 -m pip install -r extra-requirements.txt
     """
 
 
-def build_rpm_builder_image(image_tag, recreate_on_exists=False):
-    docker_client = docker.DockerClient()
+def build_rpm_builder_image(image_tag, docker_client=None):
+    docker_client = docker_client or docker.DockerClient()
 
     build_context_path = create_temp_dir_with_constant_name(".scalyr_agent_test")
     agent_source_path = build_context_path / "agent_source"
