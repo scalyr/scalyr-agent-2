@@ -22,6 +22,7 @@ __author__ = "czerwin@scalyr.com"
 
 import io
 import os
+import json
 
 from scalyr_agent.agent_status import (
     OverallStats,
@@ -444,3 +445,37 @@ Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
         self.assertEquals(expected_output, output.getvalue())
+
+    def test_status_to_dict(self):
+        result = self.status.to_dict()
+
+        # Simple value on the OverallStats object
+        self.assertEqual(result["user"], "root")
+        self.assertEqual(result["version"], "2.0.0.beta.7")
+
+        # Verify nested status objects are recursively serialized to simple native types
+        config_status = result["config_status"]
+        self.assertEqual(config_status["status"], "Good")
+        self.assertEqual(config_status["last_error"], None)
+        self.assertEqual(config_status["last_check_time"], 1409958853)
+
+        copying_manager_status = result["copying_manager_status"]
+        self.assertEqual(copying_manager_status["last_attempt_size"], 10000)
+        self.assertEqual(copying_manager_status["log_matchers"][0]["is_glob"], False)
+        self.assertEqual(
+            copying_manager_status["log_matchers"][0]["log_path"],
+            "/var/logs/tomcat6/access.log",
+        )
+
+        monitor_manager_status = result["monitor_manager_status"]
+        self.assertEqual(monitor_manager_status["total_alive_monitors"], 2)
+        self.assertEqual(monitor_manager_status["monitors_status"][0]["errors"], 2)
+        self.assertEqual(monitor_manager_status["monitors_status"][0]["is_alive"], True)
+        self.assertEqual(
+            monitor_manager_status["monitors_status"][0]["monitor_name"],
+            "linux_process_metrics(agent)",
+        )
+
+        # Verify dict contains only simple types - JSON.dumps would fail if it doesn't
+        result_json = json.dumps(result)
+        self.assertEqual(json.loads(result_json), result)
