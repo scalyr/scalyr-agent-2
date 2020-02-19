@@ -593,21 +593,21 @@ jobs:
 
   smoke-rpm-python2-new:
     working_directory: ~/scalyr-agent-2
-      docker:
-          - image: circleci/python:2.7
-      steps:
-        - smoke-package-tox:
-            python_version: "python2"
-            tox_target: "py2-rpm-smoke-tests"
+    docker:
+        - image: circleci/python:2.7
+    steps:
+      - smoke-package-tox:
+          python_version: "python2"
+          tox_target: "py2-rpm-smoke-tests"
 
   smoke-rpm-python3-new:
     working_directory: ~/scalyr-agent-2
-      docker:
-          - image: circleci/python:3.6
-      steps:
-        - smoke-package-tox:
-            python_version: "python3"
-            tox_target: "py3-rpm-smoke-tests"
+    docker:
+        - image: circleci/python:3.6
+    steps:
+      - smoke-package-tox:
+          python_version: "python3"
+          tox_target: "py3-rpm-smoke-tests"
 
 
   send-circle-ci-usage-report:
