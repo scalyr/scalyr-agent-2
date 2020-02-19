@@ -102,7 +102,7 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
+            export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
@@ -132,6 +132,8 @@ commands:
         default: false
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
       - when:
@@ -594,7 +596,7 @@ jobs:
   smoke-rpm-python2-new:
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:2.7
+      - image: circleci/python:2.7
     steps:
       - smoke-package-tox:
           python_version: "2.7"
@@ -603,7 +605,7 @@ jobs:
   smoke-rpm-python3-new:
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:3.6
+      - image: circleci/python:3.6
     steps:
       - smoke-package-tox:
           python_version: "3.6"
