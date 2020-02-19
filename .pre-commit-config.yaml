@@ -23,10 +23,11 @@ repos:
       name: pylint
       entry: .tox/lint/bin/pylint -E --rcfile=./lint-configs/python/.pylintrc
       language: script
+      types: [file, python]
   - repo: local
     hooks:
     - id: mypy
       name: mypy
-      entry: .tox/lint/bin/mypy --pretty --no-incremental --config-file ./lint-configs/python/mypy.ini
+      entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
       language: script
       types: [file, python]
