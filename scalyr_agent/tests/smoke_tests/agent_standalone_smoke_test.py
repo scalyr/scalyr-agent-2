@@ -12,6 +12,7 @@ import re
 import six
 import pytest
 
+from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent.tests.smoke_tests.tools.agent_runner import AgentRunner
 from scalyr_agent.tests.smoke_tests.tools.request import ScalyrRequest, RequestSender
 
@@ -180,8 +181,13 @@ class DataJsonVerifier(AgentVerifier):
 
 
 @pytest.mark.usefixtures("agent_environment")
-def test_uploaded_data(agent_settings):
-    runner = AgentRunner()
+def test_uploaded_data(agent_settings, request):
+    runner_type = request.config.getoption("--runner_type")
+    if runner_type == "PACKAGE":
+        installation_type = PACKAGE_INSTALL
+    else:
+        installation_type = DEV_INSTALL
+    runner = AgentRunner(installation_type)
 
     request_sender = RequestSender(
         server_address=agent_settings["SCALYR_SERVER"],

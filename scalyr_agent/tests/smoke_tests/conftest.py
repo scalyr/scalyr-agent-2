@@ -7,9 +7,14 @@ import collections
 
 import pytest
 
+from .tools.compat import Path
+
 
 def pytest_addoption(parser):
     parser.addoption("--config", action="store")
+    parser.addoption("--package-python-version", action="store")
+    parser.addoption("--runner_type", action="store", default="STANDALONE")
+    return
 
 
 def _get_config_value(parser, name, default=None):
@@ -29,10 +34,11 @@ def _get_env_or_config_value(env_name, parser, config_name=None):
 @pytest.fixture(scope="session")
 def test_config(request):
     config_path = request.config.getoption("--config")
-    print(config_path)
-
-    config = configparser.ConfigParser()
-    config.read(config_path)
+    if config_path and Path(config_path).exists():
+        config = configparser.ConfigParser()
+        config.read(config_path)
+    else:
+        config = dict()
 
     result_config = dict()
 

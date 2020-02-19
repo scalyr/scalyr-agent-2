@@ -1,11 +1,12 @@
 import tempfile
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
 import shutil
 import os
 
+from .compat import Path
+
+from scalyr_agent.__scalyr__ import get_package_root
+
+import six
 
 def get_env(name):
     try:
@@ -19,7 +20,7 @@ def create_temp_dir(prefix="scalyr_agent_testing"):
 
 
 def create_temp_dir_with_constant_name(name):
-    # type: (str) -> Path
+    # type: (six.text_type) -> Path
     """
     Create temporary directory but with constant name.
     :param name: tmp directory name.
@@ -27,7 +28,7 @@ def create_temp_dir_with_constant_name(name):
     """
     tmp_dir_path = Path(tempfile.gettempdir()) / name
     if tmp_dir_path.exists():
-        shutil.rmtree(tmp_dir_path, ignore_errors=True)
+        shutil.rmtree(six.text_type(tmp_dir_path), ignore_errors=True)
     tmp_dir_path.mkdir(exist_ok=True)
 
     return tmp_dir_path
@@ -37,3 +38,19 @@ def create_temp_named_file(mode, prefix="scalyr_test_"):
     return tempfile.NamedTemporaryFile(mode, prefix="scalyr_test_", suffix=".file")
 
 
+def copy_agent_source(dest_path):
+    root_path = Path(get_package_root()).parent
+    shutil.copytree(
+        six.text_type(root_path),
+        six.text_type(dest_path),
+        ignore=shutil.ignore_patterns(
+            "*.pyc",
+            "__pycache__",
+            "*.egg-info",
+            ".tox",
+            ".pytest*",
+            ".mypy*",
+            ".idea",
+            ".git"
+        ),
+    )
