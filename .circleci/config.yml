@@ -145,7 +145,7 @@ commands:
       - run:
           name: Install Dependencies
           command: |
-            pip install "tox==<< parameters.tox_version >>" ----package-python-version << parameters.python_version >>
+            pip install "tox==<< parameters.tox_version >>" --package-python-version << parameters.python_version >>
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
