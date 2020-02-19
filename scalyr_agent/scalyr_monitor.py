@@ -732,6 +732,12 @@ class MonitorInformation(object):
         else:
             return None
 
+    def __repr__(self):
+        return "<MonitorInformation monitor_module=%s,metrics=%s>" % (
+            self.__monitor_module,
+            self.__metrics,
+        )
+
 
 class ConfigOption(object):
     """Simple object to hold the fields for a single configuration option.
@@ -781,6 +787,12 @@ class MetricDescription(object):
         # The category for this metric.  This needs only to be supplied if the metric list is long for a particular
         # monitor.
         self.category = None
+
+    def __repr__(self):
+        return (
+            "<MetricDescription metric_name=%s,unit=%s,cumulative=%s,extra_fields=%s>"
+            % (self.metric_name, self.unit, self.cumulative, str(self.extra_fields))
+        )
 
 
 class LogFieldDescription(object):
