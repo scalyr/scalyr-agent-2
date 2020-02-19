@@ -14,6 +14,13 @@ repos:
       types: [file, python]
   - repo: local
     hooks:
+    - id: modernize
+      name: modernize
+      entry: .tox/lint/bin/python .circleci/modernize/modernize.py -j 2 --write
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
     - id: flake8
       name: flake8
       entry: .tox/lint/bin/flake8 --config lint-configs/python/.flake8
