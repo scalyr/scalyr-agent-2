@@ -44,7 +44,10 @@ import sys
 import time
 from io import open
 
-from __scalyr__ import SCALYR_VERSION, scalyr_init
+try:
+    from __scalyr__ import SCALYR_VERSION, scalyr_init
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION, scalyr_init
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -1234,6 +1237,21 @@ class ScalyrAgent(object):
         if self.__config.verify_server_certificate:
             ca_file = self.__config.ca_cert_path
             intermediate_certs_file = self.__config.intermediate_certs_path
+
+            # Validate provided CA cert file and intermediate cert file exists. If they don't
+            # exist, throw and fail early and loudly
+            if not os.path.isfile(ca_file):
+                raise ValueError(
+                    'Invalid path "%s" specified for the "ca_cert_path" config '
+                    "option: file does not exist" % (ca_file)
+                )
+
+            if not os.path.isfile(intermediate_certs_file):
+                raise ValueError(
+                    'Invalid path "%s" specified for the '
+                    '"intermediate_certs_path" config '
+                    "option: file does not exist" % (intermediate_certs_file)
+                )
         else:
             ca_file = None
             intermediate_certs_file = None
