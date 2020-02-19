@@ -579,26 +579,20 @@ workflows:
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
-      - smoke-standalone-38-new
-      - smoke-standalone-37-new
-      - smoke-standalone-36-new
-      - smoke-standalone-35-new
-      - smoke-standalone-27-new
-      - smoke-standalone-26-new
       - coverage:
           requires:
             - unittest-27
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
-#  smoketests:
-#    jobs:
-#      - smoke-standalone-38-new
-#      - smoke-standalone-37-new
-#      - smoke-standalone-36-new
-#      - smoke-standalone-35-new
-#      - smoke-standalone-27-new
-#      - smoke-standalone-26-new
+  smoketests:
+    jobs:
+      - smoke-standalone-38-new
+      - smoke-standalone-37-new
+      - smoke-standalone-36-new
+      - smoke-standalone-35-new
+      - smoke-standalone-27-new
+      - smoke-standalone-26-new
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
