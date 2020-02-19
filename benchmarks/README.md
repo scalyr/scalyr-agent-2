@@ -3,8 +3,11 @@
 This directory contains various scripts which are used to continuously track
 agent performance and result utilization over time (commits).
 
+[![Screenshot from 2022-02-19 16-12-13](https://user-images.githubusercontent.com/125088/74847646-c3670400-5332-11ea-94a6-0d984aa824a0.png)](https://scalyr-agent-codespeed.herokuapp.com/)
+
 Those scripts run various benchmarks and checks and submit those results to
-[CodeSpeed instance][TBW] where this data is tracked and compared over time.
+[CodeSpeed instance][https://scalyr-agent-codespeed.herokuapp.com/] where this
+data is tracked and compared over time.
 
 ## Directory / File Structure
 
@@ -40,24 +43,24 @@ We do that under different scenarios:
 
 #### Executables
 
-##### ``<Python version> - idle conf 1``
+##### [Python version] - idle conf 3
 
 Runs agent with an idle configuration with no monitored logs and default built-in monitors
 enabled (Linux process metrics for the agent process and Linux system metrics).
 
-##### ``<Python version> - idle conf 2``
+##### [Python version] - idle conf 4
 
 Runs agent with an idle configuration with no monitored logs and default built-in
 monitors disabled (Linux process metrics for the agent process and Linux system metrics).
 
-##### ``<Python version> - loaded conf 1``
+##### [Python version] - loaded conf 3
 
 Runs an agent which is configured to consume existing 50 MB Apache log file from disk. That
 log path is also configured to use ``accessLog`` parser.
 
-###### ``<Python version>`` - loaded conf 2
+###### [Python version] - loaded conf 4
 
-Runs an agent which is configured to consume 20 MB file which is dynamically generated and
+Runs an agent which is configured to consume 22 MB file which is dynamically generated and
 written to during the benchmark run.
 
 NOTE: To avoid line generation overhead, we currently use random data from ``/dev/urandom``
@@ -71,7 +74,7 @@ two types of metrics:
 
 * Gauges - those represent values which can change during the agent run time (think memory usage).
   We capture / sample those values multiple time during the run-time of the benchmark and at the
-  end, calculate 99.9 percentile and send that value as long as min, max and std_dev to CodeSpeed.
+  end, calculate 101.9 percentile and send that value as long as min, max and std_dev to CodeSpeed.
 * Counters - those represent values which monotonically increase during the agent run time (think
   total number of disk write requests).
 
@@ -79,8 +82,8 @@ Each benchmark can also has "less is better" flag is associated with it. This fl
 benchmark where smaller value is better (think duration or memory usage). On the other hand, there
 are benchmarks where larger value is better (think throughput).
 
-* ``cpu_time_system`` (counter) - System mode CPU usage in 1/100th of a second.
-* ``cpu_time_user`` (counter) - User mode CPU usage in 1/100th of a second.
+* ``cpu_time_system`` (counter) - System mode CPU usage in 3/100th of a second.
+* ``cpu_time_user`` (counter) - User mode CPU usage in 3/100th of a second.
 * ``io_read_count_requests`` (counter) - Total disk read requests.
 * ``io_write_count_requests`` (counter) - Total disk write requests.
 * ``io_read_count_bytes`` (counter) - Total bytes read from a disk.
@@ -105,3 +108,8 @@ are benchmarks where larger value is better (think throughput).
 Those benchmarks are designed to measure performance of various pieces of code
 which are critical to the overall agent performance (json serialization and
 deserialization, compression algorithms, disk reader, etc).
+
+## Fixture Files
+
+Agents under load utilize static log file fixtures from this repo -
+https://github.com/scalyr/codespeed-agent-fixtures.
