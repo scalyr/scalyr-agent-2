@@ -7,7 +7,9 @@ repos:
     hooks:
     - id: black
       name: black
-      entry: .tox/lint/bin/black --check --config pyproject.toml
+      # NOTE: We don't use --check flag because we want pre-commit hook to auto format the files
+      # and not just performed the check like we do on the CI
+      entry: .tox/lint/bin/black --config pyproject.toml
       language: script
       types: [file, python]
   - repo: local
