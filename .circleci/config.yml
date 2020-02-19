@@ -145,12 +145,12 @@ commands:
       - run:
           name: Install Dependencies
           command: |
-            pip install "tox==<< parameters.tox_version >>" --package-python-version << parameters.python_version >>
+            pip install "tox==<< parameters.tox_version >>"
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
             export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
-            tox -e<< parameters.tox_target >>
+            tox -e<< parameters.tox_target >> --package-python-version << parameters.python_version >>
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
