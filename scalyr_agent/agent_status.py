@@ -32,6 +32,7 @@ from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
 import os
+import copy
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -50,8 +51,7 @@ class BaseAgentStatus(object):
         Return dictionary version of the status object. This dictionary contains only simple /
         native values and is JSON serializable.
         """
-        result = {}
-        result = self.__dict__
+        result = copy.deepcopy(self.__dict__)
 
         # Recursively convert nested objects to dicts
         for key, value in result.items():
