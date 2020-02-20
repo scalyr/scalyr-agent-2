@@ -7,7 +7,16 @@ repos:
     hooks:
     - id: black
       name: black
-      entry: .tox/lint/bin/black --check --config pyproject.toml
+      # NOTE: We don't use --check flag because we want pre-commit hook to auto format the files
+      # and not just performed the check like we do on the CI
+      entry: .tox/lint/bin/black --config pyproject.toml
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
+    - id: modernize
+      name: modernize
+      entry: .tox/lint/bin/python .circleci/modernize/modernize.py -j 2 --write
       language: script
       types: [file, python]
   - repo: local
@@ -28,6 +37,9 @@ repos:
     hooks:
     - id: mypy
       name: mypy
-      entry: .tox/lint/bin/mypy --pretty --no-incremental --config-file ./lint-configs/python/mypy.ini
+      # NOTE: We intentionally want to run in incremental mode to speed this check up
+      # (which is not the case for tox -elint target and CI where we want to avoid using
+      # MyPy cache)
+      entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
       language: script
       types: [file, python]
