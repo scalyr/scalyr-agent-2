@@ -703,7 +703,6 @@ jobs:
           name: ""
           command: |
             python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
-            cat ~/Dockerfile.base
 
       - restore_cache:
           key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
@@ -780,82 +779,6 @@ jobs:
       - build-rpm-image-new:
           python_version: "python2"
           tox_target: "py2-rpm-smoke-tests"
-
-#  build-rpm-image-new:
-#    working_directory: ~/scalyr-agent-2
-#    docker:
-#      - image: circleci/python:3.6
-#    parameters:
-#      python_version:
-#        type: string
-#      tox_target:
-#        type: string
-#    steps:
-#      - checkout
-#      - setup_remote_docker:
-#          docker_layer_caching: false
-#      - restore_cache:
-#          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-#
-#      - run:
-#          name: Install Dependencies
-#          command: |
-#            pip install -r dev-requirements.txt
-#            pip install "tox==<< pipeline.parameters.default_tox_version >>"
-#
-#      - run:
-#          name: ""
-#          command: |
-#            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
-#            cat ~/Dockerfile
-#
-#      - restore_cache:
-#          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
-#
-#      - run:
-#          name: ""
-#          command: |
-#            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
-#            cat ~/Dockerfile
-#
-#      - restore_cache:
-#          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
-#
-##      - run:
-##          name: ""
-##          command: |
-##            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder/image.tar
-##            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image
-#
-#      - run:
-#          name: Run Unit Tests under Python << parameters.python_version >>
-#          command: |
-#            export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
-#            tox -e<< parameters.tox_target >> -- --circleci-build ~/rpm-base-distribution-image
-#
-#      - save_cache:
-#          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
-#          paths:
-#            - "~/.cache/pip."
-
-#  smoke-rpm-python2-new:
-#    working_directory: ~/scalyr-agent-2
-#    docker:
-#      - image: circleci/python:2.7
-#    steps:
-#      - smoke-package-tox:
-#          python_version: "2.7"
-#          tox_target: "py2-rpm-smoke-tests"
-#
-#  smoke-rpm-python3-new:
-#    working_directory: ~/scalyr-agent-2
-#    docker:
-#      - image: circleci/python:3.6
-#    steps:
-#      - smoke-package-tox:
-#          python_version: "3.6"
-#          tox_target: "py3-rpm-smoke-tests"
-
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
