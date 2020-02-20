@@ -244,7 +244,7 @@ class Metric(object):
         )
 
     def __repr__(self):
-        return ('<Metric name=%s,type=%s>' % (self.name, self.type))
+        return "<Metric name=%s,type=%s>" % (self.name, self.type)
 
 
 class MetricPrinter:
@@ -870,7 +870,7 @@ class ProcessTracker(object):
         return collector
 
     def __repr__(self):
-        return ('<ProcessTracker pid=%s,monitor_id=%s>' % (self.pid, self.monitor_id))
+        return "<ProcessTracker pid=%s,monitor_id=%s>" % (self.pid, self.monitor_id)
 
 
 class ProcessList(object):
