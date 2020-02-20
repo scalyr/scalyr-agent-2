@@ -228,7 +228,7 @@ commands:
             cat ~/Dockerfile
 
       - restore_cache:
-          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
 
       - run:
           name: ""
@@ -706,12 +706,12 @@ jobs:
             cat ~/Dockerfile.base
 
       - restore_cache:
-          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
 
       - run:
           name: ""
           command: |
-            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distibution-package-builder
+            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder
 
       - save_cache:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
@@ -719,9 +719,9 @@ jobs:
             - "~/.cache/pip."
 
       - save_cache:
-          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
           paths:
-            - "~/distibution-package-builder"
+            - "~/distribution-package-builder"
 
   build-rpm-base-image-new:
     working_directory: ~/scalyr-agent-2
@@ -810,7 +810,7 @@ jobs:
 #            cat ~/Dockerfile
 #
 #      - restore_cache:
-#          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+#          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
 #
 #      - run:
 #          name: ""
@@ -824,7 +824,7 @@ jobs:
 ##      - run:
 ##          name: ""
 ##          command: |
-##            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distibution-package-builder/image.tar
+##            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder/image.tar
 ##            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image
 #
 #      - run:
@@ -874,29 +874,29 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
-    jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-37
-      - smoke-standalone-27
-      - smoke-standalone-26
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
+#  unittest:
+#    jobs:
+#      - lint-checks
+#      - unittest-38
+#      - unittest-37
+#      - unittest-36
+#      - unittest-35
+#      - unittest-27
+#      - unittest-26
+#      - smoke-standalone-37
+#      - smoke-standalone-27
+#      - smoke-standalone-26
+#      - smoke-standalone-27-tls12
+#      - smoke-standalone-26-tls12
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - coverage:
+#          requires:
+#            - unittest-27
+#            - smoke-docker-json
+#            - smoke-docker-syslog
+#            - smoke-k8s
   smoketests:
     jobs:
       - build-distribution-package-builder-new

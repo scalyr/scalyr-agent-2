@@ -66,7 +66,7 @@ class Builder(object):
             print("Save image file to '{}'.".format(self.image_tag))
             self.save(image_file_path)
         else:
-            print("Image file '{}' exists. Use it and skip build.".format(self.image_tag))
+            print("Image file '{}' exists. Use it and skip the build.".format(self.image_tag))
             self.load(image_file_path)
 
     def load(self, path):  # type: (Path) -> None
