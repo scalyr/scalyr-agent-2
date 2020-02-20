@@ -175,6 +175,7 @@ def capture_metrics(tracker, metrics, values):
         raise ValueError('Process with pid "%s" is not alive' % (tracker.pid))
 
     process_metrics = tracker.collect()
+    logger.debug("Captured metrics: %s" % (str(process_metrics)))
 
     for metric_name, metric_obj in metrics.items():
         value = process_metrics[metric_obj]
