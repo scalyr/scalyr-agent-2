@@ -88,11 +88,11 @@ commands:
         type: integer
         default: 10
       agent_pre_run_command:
-        description: "Optional bash command / script to run before staring the agent and the metrics capture script."
+        description: "Optional bash command / script to run before starting the agent and the metrics capture script."
         type: string
         default: ""
       agent_post_run_command:
-        description: "Optional bash command / script to run after staring the agent and the metrics capture script."
+        description: "Optional bash command / script to run after starting the agent and the metrics capture script."
         type: string
         default: ""
       capture_line_counts:
