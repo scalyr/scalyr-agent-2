@@ -16,7 +16,7 @@ repos:
     hooks:
     - id: modernize
       name: modernize
-      entry: .tox/lint/bin/python .circleci/modernize/modernize.py -j 2 --write
+      entry: .tox/lint/bin/python .circleci/modernize/modernize.py --write
       language: script
       types: [file, python]
   - repo: local
