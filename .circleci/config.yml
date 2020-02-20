@@ -942,29 +942,29 @@ jobs:
 
 workflows:
   version: 2
-#  unittest:
-#    jobs:
-#      - lint-checks
-#      - unittest-38
-#      - unittest-37
-#      - unittest-36
-#      - unittest-35
-#      - unittest-27
-#      - unittest-26
-#      - smoke-standalone-37
-#      - smoke-standalone-27
-#      - smoke-standalone-26
-#      - smoke-standalone-27-tls12
-#      - smoke-standalone-26-tls12
-#      - smoke-docker-json
-#      - smoke-docker-syslog
-#      - smoke-k8s
-#      - coverage:
-#          requires:
-#            - unittest-27
-#            - smoke-docker-json
-#            - smoke-docker-syslog
-#            - smoke-k8s
+  unittest:
+    jobs:
+      - lint-checks
+      - unittest-38
+      - unittest-37
+      - unittest-36
+      - unittest-35
+      - unittest-27
+      - unittest-26
+      - smoke-standalone-37
+      - smoke-standalone-27
+      - smoke-standalone-26
+      - smoke-standalone-27-tls12
+      - smoke-standalone-26-tls12
+      - smoke-docker-json
+      - smoke-docker-syslog
+      - smoke-k8s
+      - coverage:
+          requires:
+            - unittest-27
+            - smoke-docker-json
+            - smoke-docker-syslog
+            - smoke-k8s
 
   smoketests:
     jobs:
@@ -974,13 +974,17 @@ workflows:
           requires:
             - build-distribution-package-builder-new
             - build-rpm-base-image-new
-    #      - smoke-standalone-38-new
-    #      - smoke-standalone-37-new
-    #      - smoke-standalone-36-new
-    #      - smoke-standalone-35-new
-    #      - smoke-standalone-27-new
-    #      - smoke-standalone-26-new
-            -
+      - build-rpm-image_py3-new:
+          requires:
+            - build-distribution-package-builder-new
+            - build-rpm-base-image-new
+      - smoke-standalone-38-new
+      - smoke-standalone-37-new
+      - smoke-standalone-36-new
+      - smoke-standalone-35-new
+      - smoke-standalone-27-new
+      - smoke-standalone-26-new
+
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
