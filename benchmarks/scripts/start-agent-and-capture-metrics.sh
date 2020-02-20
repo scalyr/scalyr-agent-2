@@ -27,16 +27,9 @@
 set -e
 
 SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
+source "${SCRIPT_DIR}/common.sh"
 
-# Verify mandatory environment variables are set
-if [ -z "${CODESPEED_URL}" ]; then
-    exit 2
-fi
-
-if [ -z "${CODESPEED_AUTH}" ]; then
-    echo "CODESPEED_AUTH environment variable not set."
-    exit 2
-fi
+verify_mandatory_common_env_variables_are_set
 
 if [ -z "${AGENT_CONFIG_FILE}" ]; then
     echo "AGENT_CONFIG_FILE environment variable not set."
@@ -57,15 +50,9 @@ CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_
 
 # How long to run the agent process and capture the metrics for (in seconds)
 RUN_TIME=${RUN_TIME-"60"}
+
+# How often to capture metrics during the capture run time (in seconds)
 CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
-COMMIT_DATE=${COMMIT_DATE=""}
-
-CODESPEED_PROJECT=${CODESPEED_PROJECT-"scalyr-agent-2"}
-CODESPEED_EXECUTABLE=${CODESPEED_EXECUTABLE-"Python 2.7.17"}
-CODESPEED_ENVIRONMENT=${CODESPEED_ENVIRONMENT-"Circle CI Docker Executor Medium Size"}
-CODESPEED_BRANCH=${CODESPEED_BRANCH-"master"}
-
-COMMIT_HASH=${1}
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
 echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
