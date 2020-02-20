@@ -53,7 +53,10 @@ def initialize_logging(debug=False):
     else:
         log_level = logging.INFO
 
-    logger.setLevel(log_level)
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]  # type: ignore
+    for logger in loggers:
+        logger.setLevel(log_level)
+
     logging.basicConfig(level=log_level)
 
 
