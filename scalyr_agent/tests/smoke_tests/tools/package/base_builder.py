@@ -71,7 +71,8 @@ class Builder(object):
 
     def load(self, path):  # type: (Path) -> None
         with path.open("rb") as f:
-            self._docker.images.load(f.read())
+            image = self._docker.images.load(f.read())[0]
+            image.tag(self.image_tag)
 
     def save(self, path):  # type: (Path) -> None
         image = self._docker.images.list(name=self.image_tag)
@@ -79,7 +80,7 @@ class Builder(object):
             if not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("wb") as f:
-                for chunk in image[0].save(named=self.image_tag):
+                for chunk in image[0].save():
                     f.write(chunk)
 
             print("Image '{}' saved.".format(self.image_tag))
