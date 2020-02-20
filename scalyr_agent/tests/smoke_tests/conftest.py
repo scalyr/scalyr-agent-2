@@ -12,8 +12,8 @@ from .tools.compat import Path
 
 def pytest_addoption(parser):
     parser.addoption("--config", action="store")
-    parser.addoption("--package-python-version", action="store")
     parser.addoption("--runner-type", action="store", default="STANDALONE")
+    parser.addoption("--package-python-version", action="store")
     parser.addoption("--package-skip-image-build", action="store", default=False, type=bool)
     return
 

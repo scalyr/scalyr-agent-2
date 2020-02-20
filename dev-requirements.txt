@@ -11,7 +11,5 @@ coverage==4.5.4
 codecov==2.0.15
 PyYAML==5.3
 docker==4.1.0
+six==1.13.0
 pathlib2==2.3.5; python_version <= '2.7'
-
-# Test / 3rd party dependencies
--r extra-requirements.txt

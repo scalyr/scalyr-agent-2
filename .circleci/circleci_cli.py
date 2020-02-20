@@ -57,17 +57,17 @@ if __name__ == '__main__':
 
     new_local_config_path = os.path.join(circleci_dir, "config.yml~")
 
-    # call circleci to create new 2.0 compatible config file.
-    with open(new_local_config_path, "wb") as f:
-        output = subprocess.check_call(
-            ["circleci", "config", "process", config_path],
-            stdout=f
-        )
-
-    # set root user for all job with "setup_remote_docker"
-    set_root_user_for_docker_jobs(new_local_config_path)
-
     try:
+        # call circleci to create new 2.0 compatible config file.
+        with open(new_local_config_path, "wb") as f:
+            output = subprocess.check_call(
+                ["circleci", "config", "process", config_path],
+                stdout=f
+            )
+
+        # set root user for all job with "setup_remote_docker"
+        set_root_user_for_docker_jobs(new_local_config_path)
+
         # replace original config with new.
         shutil.copy(new_local_config_path, config_path)
 

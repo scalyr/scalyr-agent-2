@@ -9,45 +9,50 @@ import six
 
 from scalyr_agent.tests.smoke_tests.tools.utils import create_temp_dir_with_constant_name
 
-from scalyr_agent.tests.smoke_tests.tools.package_builder import build_package_builder_image
-from scalyr_agent.tests.smoke_tests.tools.rpm_image_builder import build_rpm_builder_image
-from scalyr_agent.tests.smoke_tests.tools.utils import copy_agent_source
+from .tools.package.base_builder import Builder
+from .tools.package.distribution_package_builder.build_image import DistributionPackageBuilder
+from .tools.package.rpm.build_image import RpmBaseDistributionImageBuilder
+from .tools.utils import copy_agent_source
 
 dockerfile = \
     """
-FROM scalyr_test_agent_package_builder as package_builder
+FROM {package_builder_image} as package_builder
 ADD ./agent_source /agent_source
 WORKDIR /package
 RUN python /agent_source/build_package.py rpm
-FROM scalyr_test_agent_rpm_builder as rpm_base
-ARG PYTHON_VERSION=python2
+FROM {rpm_base_image} as rpm_base
 COPY --from=package_builder /package/scalyr-agent*.rpm /scalyr-agent.rpm
 COPY --from=package_builder /agent_source /agent_source
 RUN rpm -i scalyr-agent.rpm
-RUN ln -s -f /usr/bin/$PYTHON_VERSION /usr/bin/python
+RUN ln -s -f /usr/bin/{python_version} /usr/bin/python
 WORKDIR /agent_source
-CMD python -m pytest /agent_source/scalyr_agent/tests/smoke_tests/agent_standalone_smoke_test.py --config config.ini --runner-type PACKAGE
-
+CMD python -m pytest /agent_source/scalyr_agent/tests/smoke_tests/standalone_smoke_test.py --config config.ini --runner-type PACKAGE
     """
 
 
-def build_rpm_agent_image(image_tag, python_version, docker_client=None):
-    build_context_path = create_temp_dir_with_constant_name(".scalyr_agent_test")
-    agent_source_path = build_context_path / "agent_source"
+class RpmDistributionImageBuilder(Builder):
+    IMAGE_TAG = "scalyr_test_rpm_distribution_image"
 
-    copy_agent_source(agent_source_path)
-    dockerfile_path = build_context_path / "Dockerfile"
-    dockerfile_path.write_text(dockerfile)
+    def __init__(
+            self,
+            python_version,
+            docker_client=None,
+            skip_if_exists=False,
+    ):
+        super(RpmDistributionImageBuilder, self).__init__(
+            docker_client=docker_client,
+            skip_if_exists=skip_if_exists,
+            copy_agent_source=True,
+        )
+        self._python_version = python_version
 
-    docker_client = docker_client or docker.DockerClient()
-
-    docker_client.images.build(
-        tag=image_tag,
-        path=six.text_type(build_context_path),
-        dockerfile=six.text_type(dockerfile_path),
-        buildargs={"PYTHON_VERSION": python_version},
-        rm=True,
-    )
+    @property
+    def dockerfile(self):  # type: () -> six.text_type
+        return dockerfile.format(
+            python_version=self._python_version,
+            package_builder_image=DistributionPackageBuilder.IMAGE_TAG,
+            rpm_base_image=RpmBaseDistributionImageBuilder.IMAGE_TAG
+        )
 
 
 @pytest.mark.usefixtures("agent_environment")
@@ -56,19 +61,26 @@ def test_rpm_agent(request):
 
     python_version = request.config.getoption("--package-python-version")
     skip_image_build = request.config.getoption("--package-skip-image-build")
-    build_package_builder_image(
-        "scalyr_test_agent_package_builder",
+
+    dist_package_builder = DistributionPackageBuilder(
         docker_client=docker_client,
         skip_if_exists=skip_image_build
     )
-    build_rpm_builder_image(
-        "scalyr_test_agent_rpm_builder",
+    dist_package_builder.build()
+
+    rpm_base_distr_builder = RpmBaseDistributionImageBuilder(
         docker_client=docker_client,
         skip_if_exists=skip_image_build
     )
 
-    rpm_agent_image_tag = "scalyr_test_agent_rpm_image_{}".format(python_version)
-    build_rpm_agent_image(rpm_agent_image_tag, python_version, docker_client=docker_client)
+    rpm_base_distr_builder.build()
+
+    rpm_distr_builder = RpmDistributionImageBuilder(
+        python_version,
+        docker_client=docker_client,
+        skip_if_exists=skip_image_build
+    )
+    rpm_distr_builder.build()
 
     environment = dict(
         (env_name, os.environ[env_name])
@@ -80,8 +92,8 @@ def test_rpm_agent(request):
         ]
     )
     output = docker_client.containers.run(
-        name="scalyr_test_agent_rpm_{}".format(python_version),
-        image=rpm_agent_image_tag,
+        name="{}_{}".format(rpm_distr_builder.IMAGE_TAG, python_version),
+        image=rpm_distr_builder.IMAGE_TAG,
         environment=environment,
         detach=False,
         stdout=True,

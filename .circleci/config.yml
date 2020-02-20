@@ -3,6 +3,11 @@
 # Check https://circleci.com/docs/2.0/language-python/ for more details
 #
 version: 2.1
+parameters:
+  default_tox_version:
+    type: string
+    default: "3.14.3"
+
 commands:
   unittest_tox:
     description: "A base command for all tox based unit test jobs"
@@ -28,15 +33,15 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
             - run:
                 name: Install APT Dependencies
                 command: |
-                    apt-get update -y
-                    apt-get install -y << parameters.apt_dependencies >>
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
       - run:
           name: Install Dependencies
           command: |
@@ -46,7 +51,7 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
       - when:
@@ -55,12 +60,12 @@ commands:
             - run:
                 name: Move Coverage Data
                 command: |
-                    mkdir -p coverage-unittest-<< parameters.python_version >>
-                    mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
+                  mkdir -p coverage-unittest-<< parameters.python_version >>
+                  mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
             - persist_to_workspace:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
-                    .coverage.unittest-<< parameters.python_version >>
+                  .coverage.unittest-<< parameters.python_version >>
 
   smoke-standalone-tox:
     description: "A base command for all tox based smoke test jobs"
@@ -86,7 +91,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -105,7 +110,7 @@ commands:
             export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
@@ -135,7 +140,7 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - restore_cache:
           key: smoke-rpm_image-{{ .Branch }}-<< parameters.python_version >>-{{ checksum "dev-requirements.txt" }}
       - restore_cache:
@@ -185,7 +190,7 @@ commands:
             fi
 
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
       - save_cache:
@@ -197,6 +202,52 @@ commands:
           paths:
             - "~/smoke-package_bulder"
 
+  build-rpm-image-new:
+    parameters:
+      python_version:
+        type: string
+      tox_target:
+        type: string
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install -r dev-requirements.txt
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
+            cat ~/Dockerfile
+
+      - restore_cache:
+          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
+
+      - restore_cache:
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            export AGENT_HOST_NAME=agent-rpm-smoke-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+            tox -e<< parameters.tox_target >> -- --circleci-build ~/rpm-base-distribution-image
+
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
 
 jobs:
   unittest-38:
@@ -580,7 +631,7 @@ jobs:
   smoke-standalone-38-new:
     working_directory: ~/scalyr-agent-2
     docker:
-        - image: circleci/python:3.8
+      - image: circleci/python:3.8
     steps:
       - smoke-standalone-tox:
           python_version: "3.8"
@@ -632,23 +683,178 @@ jobs:
           python_version: "2.6"
           tox_target: "py2.6-smoke-tests"
 
-  smoke-rpm-python2-new:
-    working_directory: ~/scalyr-agent-2
-    docker:
-      - image: circleci/python:2.7
-    steps:
-      - smoke-package-tox:
-          python_version: "2.7"
-          tox_target: "py2-rpm-smoke-tests"
-
-  smoke-rpm-python3-new:
+  build-distribution-package-builder-new:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package-tox:
-          python_version: "3.6"
+      - checkout
+      - setup_remote_docker:
+            docker_layer_caching: false
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install -r dev-requirements.txt
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile.base
+            cat ~/Dockerfile.base
+
+      - restore_cache:
+          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distibution-package-builder
+
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+
+      - save_cache:
+          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+          paths:
+            - "~/distibution-package-builder"
+
+  build-rpm-base-image-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install -r dev-requirements.txt
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
+
+      - restore_cache:
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+
+      - run:
+          name: ""
+          command: |
+            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --circleci-build ~/rpm-base-distribution-image
+
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+
+      - save_cache:
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          paths:
+            - "~/rpm-base-distribution-image"
+
+
+  build-rpm-image_py3-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - build-rpm-image-new:
+          python_version: "python3"
           tox_target: "py3-rpm-smoke-tests"
+
+  build-rpm-image_py2-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - build-rpm-image-new:
+          python_version: "python2"
+          tox_target: "py2-rpm-smoke-tests"
+
+#  build-rpm-image-new:
+#    working_directory: ~/scalyr-agent-2
+#    docker:
+#      - image: circleci/python:3.6
+#    parameters:
+#      python_version:
+#        type: string
+#      tox_target:
+#        type: string
+#    steps:
+#      - checkout
+#      - setup_remote_docker:
+#          docker_layer_caching: false
+#      - restore_cache:
+#          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+#
+#      - run:
+#          name: Install Dependencies
+#          command: |
+#            pip install -r dev-requirements.txt
+#            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+#
+#      - run:
+#          name: ""
+#          command: |
+#            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
+#            cat ~/Dockerfile
+#
+#      - restore_cache:
+#          key: smoke-distibution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+#
+#      - run:
+#          name: ""
+#          command: |
+#            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
+#            cat ~/Dockerfile
+#
+#      - restore_cache:
+#          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+#
+##      - run:
+##          name: ""
+##          command: |
+##            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distibution-package-builder/image.tar
+##            python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image
+#
+#      - run:
+#          name: Run Unit Tests under Python << parameters.python_version >>
+#          command: |
+#            export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
+#            tox -e<< parameters.tox_target >> -- --circleci-build ~/rpm-base-distribution-image
+#
+#      - save_cache:
+#          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+#          paths:
+#            - "~/.cache/pip."
+
+#  smoke-rpm-python2-new:
+#    working_directory: ~/scalyr-agent-2
+#    docker:
+#      - image: circleci/python:2.7
+#    steps:
+#      - smoke-package-tox:
+#          python_version: "2.7"
+#          tox_target: "py2-rpm-smoke-tests"
+#
+#  smoke-rpm-python3-new:
+#    working_directory: ~/scalyr-agent-2
+#    docker:
+#      - image: circleci/python:3.6
+#    steps:
+#      - smoke-package-tox:
+#          python_version: "3.6"
+#          tox_target: "py3-rpm-smoke-tests"
 
 
   send-circle-ci-usage-report:
@@ -693,14 +899,24 @@ workflows:
             - smoke-k8s
   smoketests:
     jobs:
-      - smoke-standalone-38-new
-      - smoke-standalone-37-new
-      - smoke-standalone-36-new
-      - smoke-standalone-35-new
-      - smoke-standalone-27-new
-      - smoke-standalone-26-new
-      - smoke-rpm-python3-new
-      - smoke-rpm-python2-new
+      - build-distribution-package-builder-new
+      - build-rpm-base-image-new
+      - build-rpm-image_py3-new:
+          requires:
+            - build-distribution-package-builder-new
+            - build-rpm-base-image-new
+      - build-rpm-image_py2-new:
+          requires:
+            - build-distribution-package-builder-new
+            - build-rpm-base-image-new
+      #      - smoke-standalone-38-new
+      #      - smoke-standalone-37-new
+      #      - smoke-standalone-36-new
+      #      - smoke-standalone-35-new
+      #      - smoke-standalone-27-new
+      #      - smoke-standalone-26-new
+#      - smoke-rpm-python3-new
+#      - smoke-rpm-python2-new
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:
