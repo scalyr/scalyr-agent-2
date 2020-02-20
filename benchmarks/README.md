@@ -91,6 +91,8 @@ are benchmarks where larger value is better (think throughput).
 
 * ``cpu_threads`` (counter) - Number of threads spawned during the agent process run time.
 * ``memory_usage_rss`` (counter) - Resident memory usage in MB.
+* ``memory_usage_rss_shared`` (counter) - Shared part of the resident memory usage in MB.
+* ``memory_usage_rss_private`` (counter) - Private part of the resident memory usage in MB.
 * ``memory_usage_vss`` (counter) - Virtual memory usage in MB.
 * ``io_open_fds`` (counter) - Number of open file descriptors.
 
