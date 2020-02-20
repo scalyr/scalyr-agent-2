@@ -60,20 +60,21 @@ def test_rpm_agent(request):
     docker_client = docker.from_env()
 
     python_version = request.config.getoption("--package-python-version")
-    skip_image_build = request.config.getoption("--package-skip-image-build")
+    skip_image_build = request.config.getoption("--package-skip-if-images-exist")
 
-    dist_package_builder = DistributionPackageBuilder(
-        docker_client=docker_client,
-        skip_if_exists=skip_image_build
-    )
-    dist_package_builder.build()
+    if not skip_image_build:
+        dist_package_builder = DistributionPackageBuilder(
+            docker_client=docker_client,
+            skip_if_exists=skip_image_build
+        )
+        dist_package_builder.build()
 
-    rpm_base_distr_builder = RpmBaseDistributionImageBuilder(
-        docker_client=docker_client,
-        skip_if_exists=skip_image_build
-    )
+        rpm_base_distr_builder = RpmBaseDistributionImageBuilder(
+            docker_client=docker_client,
+            skip_if_exists=skip_image_build
+        )
 
-    rpm_base_distr_builder.build()
+        rpm_base_distr_builder.build()
 
     rpm_distr_builder = RpmDistributionImageBuilder(
         python_version,
