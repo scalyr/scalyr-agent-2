@@ -147,7 +147,7 @@ def send_data_to_codespeed(
         # Include optional pre-computed data for gauge metrics
         for key in ["min", "max", "std_dev"]:
             if metric_result.get(key, None) is not None:
-                item["min"] = metric_result[key]
+                item[key] = metric_result[key]
 
         payload.append(item)
 
