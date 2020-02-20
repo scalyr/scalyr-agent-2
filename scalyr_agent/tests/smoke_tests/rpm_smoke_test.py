@@ -52,7 +52,6 @@ def build_rpm_agent_image(image_tag, python_version, docker_client=None):
 
 @pytest.mark.usefixtures("agent_environment")
 def test_rpm_agent(request):
-    docker_host = request.config.getoption("--docker-host")
     docker_client = docker.from_env()
 
     python_version = request.config.getoption("--package-python-version")

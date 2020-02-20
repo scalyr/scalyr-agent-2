@@ -136,6 +136,10 @@ commands:
           docker_layer_caching: false
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-rpm_image-{{ checksum "dev-requirements.txt" }}
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-smoke-package_bulder-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -148,6 +152,16 @@ commands:
           name: Install Dependencies
           command: |
             pip install "tox==<< parameters.tox_version >>"
+
+      - run:
+          name: Install Dependencies
+          command: |
+            if [[ -f "~/smoke-rpm_image/agent_base_image.tar" ]]; then
+                docker load -i ~/smoke-rpm_image/agent_base_image.tar
+            fi
+            if [[ -f "~/smoke-package_bulder/package_builder.tar" ]]; then
+                docker load -i ~/smoke-package_bulder/package_builder.tar
+            fi
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
@@ -157,6 +171,14 @@ commands:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-rpm_image-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/smoke-rpm_image"
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-rpm-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/smoke-package_bulder"
 
 
 jobs:
