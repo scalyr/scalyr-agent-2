@@ -137,9 +137,9 @@ commands:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-rpm_image-{{ checksum "dev-requirements.txt" }}
+          key: smoke-rpm_image-{{ .Branch }}-<< parameters.python_version >>-{{ checksum "dev-requirements.txt" }}
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-smoke-package_bulder-{{ checksum "dev-requirements.txt" }}
+          key: smoke-package_bulder-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -183,11 +183,11 @@ commands:
           paths:
             - "~/.cache/pip."
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-rpm_image-{{ checksum "dev-requirements.txt" }}
+          key: smoke-rpm_image-{{ .Branch }}-<< parameters.python_version >>-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/smoke-rpm_image"
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-smoke-package_bulder-{{ checksum "dev-requirements.txt" }}
+          key: smoke-package_bulder-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/smoke-package_bulder"
 
