@@ -7,9 +7,9 @@ parameters:
   default_tox_version:
     type: string
     default: "3.14.3"
-    cache_version:
-      type: string
-      default: "v1"
+  cache_version:
+    type: string
+    default: "v1"
 
 commands:
   unittest_tox:
