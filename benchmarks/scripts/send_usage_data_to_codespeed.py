@@ -84,8 +84,8 @@ METRICS_GAUGES = {
     "cpu_threads": Metric(name="app.threads", _type=None),
     # Memory usage related metrics
     "memory_usage_rss": Metric(name="app.mem.bytes", _type="resident"),
-    "memory_usage_rss_shared": Metric(name="app.mem.bytes", _type="resident"),
-    "memory_usage_rss_private": Metric(name="app.mem.bytes", _type="resident"),
+    "memory_usage_rss_shared": Metric(name="app.mem.bytes", _type="resident_shared"),
+    "memory_usage_rss_private": Metric(name="app.mem.bytes", _type="resident_private"),
     "memory_usage_vms": Metric(name="app.mem.bytes", _type="vmsize"),
     # IO related metrics
     "io_open_fds": Metric(name="app.io.fds", _type="open"),
