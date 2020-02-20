@@ -82,11 +82,7 @@ def test_rpm_agent(request):
         skip_if_exists=skip_image_build
     )
 
-    return
-
     rpm_distr_builder.build()
-
-
 
     environment = dict(
         (env_name, os.environ[env_name])
