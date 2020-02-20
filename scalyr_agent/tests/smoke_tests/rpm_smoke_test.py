@@ -55,8 +55,17 @@ def test_rpm_agent(request):
     docker_client = docker.from_env()
 
     python_version = request.config.getoption("--package-python-version")
-    build_package_builder_image("scalyr_test_agent_package_builder", docker_client=docker_client)
-    build_rpm_builder_image("scalyr_test_agent_rpm_builder", docker_client=docker_client)
+    skip_image_build = request.config.getoption("--package-skip-image-build")
+    build_package_builder_image(
+        "scalyr_test_agent_package_builder",
+        docker_client=docker_client,
+        skip_if_exists=skip_image_build
+    )
+    build_rpm_builder_image(
+        "scalyr_test_agent_rpm_builder",
+        docker_client=docker_client,
+        skip_if_exists=skip_image_build
+    )
 
     rpm_agent_image_tag = "scalyr_test_agent_rpm_image_{}".format(python_version)
     build_rpm_agent_image(rpm_agent_image_tag, python_version, docker_client=docker_client)

@@ -21,12 +21,12 @@ RUN gem install --no-document fpm
     """
 
 
-def build_package_builder_image(image_tag, docker_client=None):
+def build_package_builder_image(image_tag, docker_client=None, skip_if_exists=False):
     docker_client = docker_client or docker.DockerClient()
 
-    # if docker_client.images.list(name=image_tag):
-    #     if not recreate_on_exists:
-    #         return
+    if skip_if_exists:
+        if docker_client.images.list(name=image_tag):
+            return
 
     build_context_path = create_temp_dir_with_constant_name(".scalyr_agent_test")
 

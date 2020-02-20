@@ -170,13 +170,19 @@ commands:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
             export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
-            tox -e<< parameters.tox_target >>
+            tox -e<< parameters.tox_target >> -- --package-skip-image-build true
 
       - run:
           name: Save images to caches.
           command: |
-            docker save scalyr_test_agent_package_builder > ~/smoke-package_bulder/package_builder.tar
-            docker save scalyr_test_agent_rpm_builder > ~/smoke-rpm_image/agent_base_image.tar
+            if [[ ! -f ~/smoke-package_bulder/package_builder.tar ]]; then
+                echo "Agent base image file is saved."
+                docker save scalyr_test_agent_package_builder > ~/smoke-package_bulder/package_builder.tar
+            fi
+            if [[ ! -f ~/smoke-rpm_image/agent_base_image.tar ]]; then
+                echo "Backage builder image file is saved."
+                docker save scalyr_test_agent_rpm_builder > ~/smoke-rpm_image/agent_base_image.tar
+            fi
 
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
