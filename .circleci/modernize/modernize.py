@@ -23,6 +23,15 @@
 #   -j --processes <jobs count> run concurrently.
 # Note: This is only python3 script.
 
+if False:
+    # NOTE: This is a workaround for old Python versions where typing module is not available
+    # We should eventually improve that once we start producing distributions with Python
+    # interpreter and dependencies bundled in.
+    # Adding conditional "typing" dependency would require too much boiler plate code at this point
+
+    from typing import Dict
+    from typing import Any
+
 import re
 import os
 import io
@@ -285,7 +294,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     expected_source = """
 from __future__ import absolute_import
@@ -300,7 +309,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print("Not to modernize") 
+print("Not to modernize")
 """
 
     new_source = modernize_source_string(orig_source)
@@ -317,7 +326,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -338,7 +347,7 @@ for _ in d.items():
     pass
 # [end of 2->TOD0]
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -357,7 +366,7 @@ d = dict()
 for _ in d.items():
     pass
 
-print "Not to modernize" 
+print "Not to modernize"
 """
     try:
         modernize_source_string(orig_source)
@@ -384,6 +393,13 @@ if __name__ == "__main__":
         help="Write modified files.",
     )
     parser.add_argument(
+        "files",
+        metavar="FILES",
+        type=str,
+        nargs="*",
+        help="File paths to run the script on. If not specified it runs on all the files.",
+    )
+    parser.add_argument(
         "-j", "--processes", default=1, type=int, help="Run modernize concurrently."
     )
 
@@ -399,7 +415,7 @@ if __name__ == "__main__":
 
     # do not modernize third_party libraries.
     third_party_files = set(
-        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
+        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True),
     )
 
     # do not process modernize files.
@@ -410,13 +426,21 @@ if __name__ == "__main__":
     other_files_to_exclude = {
         os.path.join(source_root, "compat.py"),
         os.path.join(root, "build_package.py"),
+        os.path.join(root, ".circleci/coverage_report.py"),
     }
 
+    if not args.files:
+        # files without third party libraries.
+        files_to_process = set(all_files)
+    else:
+        files_to_process = set([os.path.abspath(file_path) for file_path in args.files])
+
+    # exclude 3rd party libraries, etc
     smoke_test_files = set(glob.glob("{0}/tests/**/*.py".format(root), recursive=True))
 
     # files without third party libraries.
     files_to_process = (
-        all_files
+        files_to_process
         - third_party_files
         - venv_files
         - modernize_files
@@ -425,7 +449,7 @@ if __name__ == "__main__":
     )
 
     # Create collection with additional modernize parameters for each file.
-    files_modernize_params = collections.defaultdict(dict)
+    files_modernize_params = collections.defaultdict(dict)  # type: Dict[str, Any]
 
     # __scalyr__.py can not have "six" as dependency, because third_party libraries are not imported yet,
     # so modernize should not add import of "six" in it.
@@ -444,11 +468,11 @@ if __name__ == "__main__":
 
     current_file_number = 1
 
-    def progress_message():
+    def progress_message(file_path):
         global current_file_number
         print(
-            "Processing {} of {}.".format(
-                current_file_number, total_files_count, flush=True
+            "Processing {} ({}) of {}.".format(
+                current_file_number, file_path, total_files_count
             )
         )
         current_file_number += 1
@@ -464,26 +488,26 @@ if __name__ == "__main__":
                 **files_modernize_params[file_path]
             )
             if not is_concurrent:
-                progress_message()
+                progress_message(file_path)
 
             diffs[file_path] = diff
 
-        except TODOParseError as e:
+        except TODOParseError:
             print("Can not modernize file: {}".format(file_path))
             raise
     if is_concurrent:
         for file_path, future in list(diffs.items()):
             try:
                 diffs[file_path] = future.result()
-                progress_message()
-            except TODOParseError as e:
+                progress_message(file_path)
+            except TODOParseError:
                 print("Can not modernize file: {}".format(file_path))
                 raise
     print("\n\n=======================================\n")
     sys.stdout.flush()
     time.sleep(0.1)
 
-    diffs = [diff for diff in list(diffs.values()) if diff]
+    diffs = [diff for diff in list(diffs.values()) if diff]  # type: ignore
 
     if diffs:
         if args.write:

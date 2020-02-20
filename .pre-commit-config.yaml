@@ -1,28 +1,52 @@
-#default_language_version:
-#  python: python3.7
+default_language_version:
+  python: python3.6
+
 exclude: '(third_party.*|third_party_tls.*)'
 repos:
-  - repo: https://github.com/psf/black
-    rev: 19.10b0
+  - repo: local
     hooks:
-      - id: black
-#        language_version: python3.7
-
+    - id: black
+      name: black
+      # NOTE: We don't use --check flag because we want pre-commit hook to auto format the files
+      # and not just performed the check like we do on the CI
+      entry: .tox/lint/bin/black --config pyproject.toml
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
+    - id: modernize
+      name: modernize
+      entry: .tox/lint/bin/python .circleci/modernize/modernize.py --write
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
+    - id: flake8
+      name: flake8
+      entry: .tox/lint/bin/flake8 --config lint-configs/python/.flake8
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
+    - id: pylint
+      name: pylint
+      entry: .tox/lint/bin/pylint -E --rcfile=./lint-configs/python/.pylintrc
+      language: script
+      types: [file, python]
+  - repo: local
+    hooks:
+    - id: mypy
+      name: mypy
+      # NOTE: We intentionally want to run in incremental mode to speed this check up
+      # (which is not the case for tox -elint target and CI where we want to avoid using
+      # MyPy cache)
+      entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
+      language: script
+      types: [file, python]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.4.0
+    rev: v2.5.0  # Use the ref you want to point at
     hooks:
-    - id: end-of-file-fixer
     - id: trailing-whitespace
-#    - id: check-yaml # Disabled: Fails on some files in this repo.
-
-# MyPy for use later
-#- repo: https://github.com/pre-commit/mirrors-mypy
-#  rev: v0.740
-#  hooks:
-#  - id: mypy
-
-# pylint for use later after resolving the warnings
-#  - repo: https://github.com/pre-commit/mirrors-pylint
-#    rev: v2.4.4
-#    hooks:
-#    - id: pylint
+    - id: check-yaml
+      # NOTE: We exclude some Kubernetes yaml files
+      exclude: (^k8s/|^performance/kops_cluster_setup)
