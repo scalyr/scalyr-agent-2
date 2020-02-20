@@ -61,12 +61,12 @@ class Builder(object):
     def circleci_build(self, path):  # type: (Path) -> None
         image_file_path = path / self.image_tag
         if not image_file_path.exists():
-            print("Image file '{}' does not exist. Build it.".format(self.image_tag))
+            print("Image file '{}' does not exist. Build it.".format(image_file_path))
             self.build()
-            print("Save image file to '{}'.".format(self.image_tag))
+            print("Save image file to '{}'.".format(image_file_path))
             self.save(image_file_path)
         else:
-            print("Image file '{}' exists. Use it and skip the build.".format(self.image_tag))
+            print("Image file '{}' exists. Use it and skip the build.".format(image_file_path))
             self.load(image_file_path)
 
     def load(self, path):  # type: (Path) -> None
