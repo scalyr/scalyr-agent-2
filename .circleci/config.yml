@@ -154,7 +154,7 @@ commands:
             pip install "tox==<< parameters.tox_version >>"
 
       - run:
-          name: Install Dependencies
+          name: Restore images from caches.
           command: |
             if [[ -f "~/smoke-rpm_image/agent_base_image.tar" ]]; then
                 docker load -i ~/smoke-rpm_image/agent_base_image.tar
@@ -167,6 +167,13 @@ commands:
           command: |
             export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
+
+      - run:
+          name: Save images to caches.
+          command: |
+            docker save scalyr_test_agent_package_builder > ~/smoke-package_bulder/package_builder.tar
+            docker save scalyr_test_agent_rpm_builder > ~/smoke-rpm_image/agent_base_image.tar
+
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-smoke-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
