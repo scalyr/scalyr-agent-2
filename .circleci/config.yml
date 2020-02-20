@@ -7,6 +7,9 @@ parameters:
   default_tox_version:
     type: string
     default: "3.14.3"
+    cache_version:
+      type: string
+      default: "v1"
 
 commands:
   unittest_tox:
@@ -114,94 +117,6 @@ commands:
           paths:
             - "~/.cache/pip."
 
-  smoke-package-tox:
-    description: "A base command for all tox based smoke test jobs"
-    parameters:
-      python_version:
-        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)."
-        type: string
-      tox_version:
-        description: "tox package version to use."
-        type: string
-        default: "3.14.3"
-      apt_dependencies:
-        description: "Any optional apt dependencies which should be installed."
-        type: string
-        default: ""
-      tox_target:
-        description: "Tox target to run."
-        type: string
-      store_coverage:
-        description: "True to persist / store coverage data."
-        type: boolean
-        default: false
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-      - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
-      - restore_cache:
-          key: smoke-rpm_image-{{ .Branch }}-<< parameters.python_version >>-{{ checksum "dev-requirements.txt" }}
-      - restore_cache:
-          key: smoke-package_bulder-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
-      - when:
-          condition: << parameters.apt_dependencies >>
-          steps:
-            - run:
-                name: Install APT Dependencies
-                command: |
-                  apt-get update -y
-                  apt-get install -y << parameters.apt_dependencies >>
-      - run:
-          name: Install Dependencies
-          command: |
-            pip install "tox==<< parameters.tox_version >>"
-
-      - run:
-          name: Restore images from caches.
-          command: |
-            mkdir -p ~/smoke-rpm_image
-            mkdir -p ~/smoke-package_bulder
-            if [[ -f ~/smoke-rpm_image/agent_base_image.tar ]]; then
-                echo "Agent base image file is found."
-                docker load -i ~/smoke-rpm_image/agent_base_image.tar
-            fi
-            if [[ -f ~/smoke-package_bulder/package_builder.tar ]]; then
-                echo "Backage builder image file is found."
-                docker load -i ~/smoke-package_bulder/package_builder.tar
-            fi
-      - run:
-          name: Run Unit Tests under Python << parameters.python_version >>
-          command: |
-            export AGENT_HOST_NAME=agent-standalone-smoke-${CIRCLE_BUILD_NUM}
-            tox -e<< parameters.tox_target >> -- --package-skip-image-build true
-
-      - run:
-          name: Save images to caches.
-          command: |
-            if [[ ! -f ~/smoke-package_bulder/package_builder.tar ]]; then
-                echo "Agent base image file is saved."
-                docker save scalyr_test_agent_package_builder > ~/smoke-package_bulder/package_builder.tar
-            fi
-            if [[ ! -f ~/smoke-rpm_image/agent_base_image.tar ]]; then
-                echo "Backage builder image file is saved."
-                docker save scalyr_test_agent_rpm_builder > ~/smoke-rpm_image/agent_base_image.tar
-            fi
-
-      - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/.cache/pip."
-      - save_cache:
-          key: smoke-rpm_image-{{ .Branch }}-<< parameters.python_version >>-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/smoke-rpm_image"
-      - save_cache:
-          key: smoke-package_bulder-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
-          paths:
-            - "~/smoke-package_bulder"
-
   build-rpm-image-new:
     parameters:
       python_version:
@@ -228,7 +143,7 @@ commands:
             cat ~/Dockerfile
 
       - restore_cache:
-          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: ""
@@ -236,7 +151,7 @@ commands:
             python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
 
       - restore_cache:
-          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -708,7 +623,7 @@ jobs:
             python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
 
       - restore_cache:
-          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: ""
@@ -721,7 +636,7 @@ jobs:
             - "~/.cache/pip."
 
       - save_cache:
-          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/distribution-package-builder"
 
@@ -747,7 +662,7 @@ jobs:
             python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --dockerfile > ~/Dockerfile
 
       - restore_cache:
-          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: ""
@@ -760,7 +675,7 @@ jobs:
             - "~/.cache/pip."
 
       - save_cache:
-          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
+          key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/rpm-base-distribution-image"
 
