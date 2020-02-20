@@ -158,11 +158,11 @@ commands:
           command: |
             mkdir -p ~/smoke-rpm_image
             mkdir -p ~/smoke-package_bulder
-            if [[ -f "~/smoke-rpm_image/agent_base_image.tar" ]]; then
+            if [[ -f ~/smoke-rpm_image/agent_base_image.tar ]]; then
                 echo "Agent base image file is found."
                 docker load -i ~/smoke-rpm_image/agent_base_image.tar
             fi
-            if [[ -f "~/smoke-package_bulder/package_builder.tar" ]]; then
+            if [[ -f ~/smoke-package_bulder/package_builder.tar ]]; then
                 echo "Backage builder image file is found."
                 docker load -i ~/smoke-package_bulder/package_builder.tar
             fi
