@@ -243,6 +243,7 @@ commands:
           command: |
             python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder
             python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --circleci-build ~/rpm-base-distribution-image
+            docker image ls
             export AGENT_HOST_NAME=agent-rpm-smoke-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >> -- --package-skip-if-images-exist true
 
