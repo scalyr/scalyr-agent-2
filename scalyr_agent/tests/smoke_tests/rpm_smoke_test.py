@@ -82,7 +82,7 @@ def test_rpm_agent(request):
     )
     rpm_distr_builder.build()
 
-    raise
+    return
 
     environment = dict(
         (env_name, os.environ[env_name])
