@@ -91,7 +91,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -110,7 +110,7 @@ commands:
             export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
@@ -213,7 +213,7 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
 
       - run:
           name: Install Dependencies
@@ -245,7 +245,7 @@ commands:
             tox -e<< parameters.tox_target >> -- --circleci-build ~/rpm-base-distribution-image
 
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
@@ -692,7 +692,7 @@ jobs:
       - setup_remote_docker:
             docker_layer_caching: false
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
 
       - run:
           name: Install Dependencies
@@ -702,11 +702,11 @@ jobs:
       - run:
           name: ""
           command: |
-            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile.base
+            python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --dockerfile > ~/Dockerfile
             cat ~/Dockerfile.base
 
       - restore_cache:
-          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
 
       - run:
           name: ""
@@ -714,12 +714,12 @@ jobs:
             python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder
 
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
       - save_cache:
-          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile.base" }}
+          key: smoke-distribution-package-builder-{{ .Branch }}-{{ checksum "~/Dockerfile" }}
           paths:
             - "~/distribution-package-builder"
 
@@ -732,7 +732,7 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: false
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
 
       - run:
           name: Install Dependencies
@@ -753,7 +753,7 @@ jobs:
             python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --circleci-build ~/rpm-base-distribution-image
 
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 

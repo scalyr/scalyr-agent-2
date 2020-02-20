@@ -80,9 +80,12 @@ def test_rpm_agent(request):
         docker_client=docker_client,
         skip_if_exists=skip_image_build
     )
-    rpm_distr_builder.build()
 
     return
+
+    rpm_distr_builder.build()
+
+
 
     environment = dict(
         (env_name, os.environ[env_name])
