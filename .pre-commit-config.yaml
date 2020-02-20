@@ -16,7 +16,7 @@ repos:
     hooks:
     - id: modernize
       name: modernize
-      entry: .tox/lint/bin/python .circleci/modernize/modernize.py -j 2 --write
+      entry: .tox/lint/bin/python .circleci/modernize/modernize.py --write
       language: script
       types: [file, python]
   - repo: local
@@ -43,3 +43,10 @@ repos:
       entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
       language: script
       types: [file, python]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.5.0  # Use the ref you want to point at
+    hooks:
+    - id: trailing-whitespace
+    - id: check-yaml
+      # NOTE: We exclude some Kubernetes yaml files
+      exclude: (^k8s/|^performance/kops_cluster_setup)

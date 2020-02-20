@@ -415,7 +415,7 @@ if __name__ == "__main__":
 
     # do not modernize third_party libraries.
     third_party_files = set(
-        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True)
+        glob.glob("{0}/third_party*/**/*.py".format(source_root), recursive=True),
     )
 
     # do not process modernize files.
@@ -426,6 +426,7 @@ if __name__ == "__main__":
     other_files_to_exclude = {
         os.path.join(source_root, "compat.py"),
         os.path.join(root, "build_package.py"),
+        os.path.join(root, ".circleci/coverage_report.py"),
     }
 
     if not args.files:

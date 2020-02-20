@@ -1,0 +1,8 @@
+{
+  logs: [
+      {path: "/tmp/random.log"}
+  ],
+
+  monitors: [
+  ]
+}
