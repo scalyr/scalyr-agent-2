@@ -79,7 +79,7 @@ class Builder(object):
             if not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("wb") as f:
-                for chunk in image[0].save():
+                for chunk in image[0].save(named=self.image_tag):
                     f.write(chunk)
 
             print("Image '{}' saved.".format(self.image_tag))
