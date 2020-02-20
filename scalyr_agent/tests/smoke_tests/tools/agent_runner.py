@@ -180,6 +180,7 @@ class AgentRunner(object):
         :return: dict with configuration.
         """
         return {
+            "verify_server_certificate": "false",
             "server_attributes": {
                 "serverHost": self._server_host,
             },
