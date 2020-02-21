@@ -1,5 +1,5 @@
 # Python requirements file which is used for Python 2.6 unit test tox target (py2,6-unit-test)
-# This is needed because we need to use older versions of various libraries we use (py.test, 
+# This is needed because we need to use older versions of various libraries we use (py.test,
 # etc.), because new versions don't support Python 2.6 anymore
 # NOTE: importlib is needed only under Python 2.6
 importlib==1.0.4

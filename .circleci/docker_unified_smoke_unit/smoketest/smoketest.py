@@ -271,7 +271,9 @@ class SmokeTestActor(object):
 
         # only if no log regex is provided do we then add an exact logfile match
         if not override_log_regex:
-            filter_dict["$logfile"] = override_log or self._logfile
+            filter_dict["$logfile"] = (
+                override_log or self._logfile  # pylint: disable=no-member
+            )
 
         filter_frags = []
         for k, v in filter_dict.items():
@@ -457,7 +459,7 @@ class StandaloneSmokeTestActor(SmokeTestActor):
 
             if resp.ok:
                 data = json.loads(resp.content)
-                if not "matches" in data:
+                if "matches" not in data:
                     return False
                 matches = data["matches"]
                 if len(matches) == 0:
@@ -533,7 +535,7 @@ class DockerSmokeTestActor(SmokeTestActor):
     def _make_log_line(self, count, stream):
         return self._serialize_row(
             {
-                "verifier_type": self.VERIFIER_TYPE,
+                "verifier_type": self.VERIFIER_TYPE,  # pylint: disable=no-member
                 "count": count,
                 "line_stream": self._get_stream_name_from_stream(stream),
                 # No need hostname in logline. The agent_container_id & remote-container-logfile name uniquely identify the
@@ -580,7 +582,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                 )
                 if resp.ok:
                     data = json.loads(resp.content)
-                    if not "matches" in data:
+                    if "matches" not in data:
                         return False
                     matches = data["matches"]
                     if len(matches) == 0:
@@ -647,7 +649,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                         ),
                         message=self._serialize_row(
                             {
-                                "verifier_type": self.VERIFIER_TYPE,
+                                "verifier_type": self.VERIFIER_TYPE,  # pylint: disable=no-member
                                 "count": self._lines_to_upload,
                                 "line_stream": stream_name,
                             }
@@ -656,7 +658,7 @@ class DockerSmokeTestActor(SmokeTestActor):
                 )
                 if resp.ok:
                     data = json.loads(resp.content)
-                    if not "matches" in data:
+                    if "matches" not in data:
                         return False
                     matches = data["matches"]
                     if len(matches) == 0:
@@ -940,7 +942,7 @@ if __name__ == "__main__":
     if "read_api_key" in args_copy:
         args_copy["read_api_key"] = args_copy["read_api_key"][:4] + "xxxxxxxxx"
     _pretty_print("smoketest.py command line args", str(args_copy))
-    actor = klass(**vars(args))
+    actor = klass(**vars(args))  # type: ignore
 
     # Optionally start upload in a separate thread.  Verifiers should not upload.
     uploader_thread = None
