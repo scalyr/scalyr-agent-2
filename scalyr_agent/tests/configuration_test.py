@@ -1931,6 +1931,7 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         expected_msg = (
             'Got invalid value "invalid" for field "foo". Valid values are: bar, baz'
         )
+
         self.assertRaisesRegexp(
             BadConfiguration,
             expected_msg,
