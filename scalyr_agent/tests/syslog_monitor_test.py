@@ -261,6 +261,8 @@ class TestSyslogMonitor(SyslogMonitor):
         Provides ability to suspend test thread until written lines are handled by 'increment_counter' method.
         """
 
+    __test__ = False
+
     def __init__(self, *args, **kwargs):
         super(TestSyslogMonitor, self).__init__(*args, **kwargs)
         # wakes up the main test thread when new line added, and line counter incremented.

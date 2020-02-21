@@ -1338,6 +1338,8 @@ class TestableCopyingManager(CopyingManager):
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
 
+    __test__ = False
+
     # The different points at which the CopyingManager can be stopped.  See below.
     SLEEPING = "SLEEPING"
     SENDING = "SENDING"
