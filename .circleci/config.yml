@@ -212,7 +212,7 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
@@ -228,10 +228,10 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
+            #export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
@@ -246,7 +246,7 @@ commands:
       - setup_remote_docker:
           docker_layer_caching: false
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
 
       - run:
           name: Install Dependencies
@@ -272,16 +272,19 @@ commands:
           key: rpm-base-distribution-image-{{ .Branch }}-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
 
       - run:
-          name: Run Unit Tests under Python << parameters.python_version >>
+          name:
           command: |
             python -m scalyr_agent.tests.smoke_tests.tools.package.distribution_package_builder.build_image --circleci-build ~/distribution-package-builder
             python -m scalyr_agent.tests.smoke_tests.tools.package.rpm.build_image --circleci-build ~/rpm-base-distribution-image
-            docker image ls
+
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
             export AGENT_HOST_NAME=agent-rpm-smoke-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >> -- --package-skip-if-images-exist true
 
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "extra-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip."
 
