@@ -1564,7 +1564,13 @@ class ScalyrAgent(object):
         return result
 
     def __report_status_to_file(self):
-        """Handles the signal sent to request this process write its current detailed status out."""
+        # type: () -> str
+        """
+        Handles the signal sent to request this process write its current detailed status out.
+
+        :return: File path status data has been written to.
+        :rtype: ``str``
+        """
         # First determine the format user request. If no file with the requested format, we assume
         # text format is used (this way it's backward compatible and works correctly on upgraded)
         status_format = "text"
@@ -1595,7 +1601,7 @@ class ScalyrAgent(object):
 
             agent_status = self.__generate_status()
 
-            if status_format == "text":
+            if not status_format or status_format == "text":
                 report_status(tmp_file, self.__generate_status(), time.time())
             elif status_format == "json":
                 status_data = agent_status.to_dict()
@@ -1612,6 +1618,8 @@ class ScalyrAgent(object):
             )
             if tmp_file is not None:
                 tmp_file.close()
+
+        return final_file_path
 
 
 class WorkerThread(object):

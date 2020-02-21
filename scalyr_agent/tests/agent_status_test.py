@@ -17,13 +17,22 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from io import open
 
 __author__ = "czerwin@scalyr.com"
 
 import io
 import os
 import json
+import tempfile
 
+import mock
+import six
+
+from scalyr_agent.agent_main import ScalyrAgent
+from scalyr_agent.agent_main import STATUS_FORMAT_FILE
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent.agent_status import (
     OverallStats,
     AgentStatus,
@@ -41,7 +50,7 @@ from scalyr_agent.agent_status import (
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.compat import os_environ_unicode
 
-import six
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestOverallStats(ScalyrTestCase):
@@ -479,3 +488,79 @@ Failed monitors:
         # Verify dict contains only simple types - JSON.dumps would fail if it doesn't
         result_json = json.dumps(result)
         self.assertEqual(json.loads(result_json), result)
+
+
+class AgentMainStatusHandlerTestCase(ScalyrTestCase):
+    def setUp(self):
+        super(AgentMainStatusHandlerTestCase, self).setUp()
+
+        self.data_path = tempfile.mkdtemp(suffix="agent-data-path")
+        self.status_format_file = os.path.join(self.data_path, STATUS_FORMAT_FILE)
+
+        default_paths = mock.Mock()
+        default_paths.agent_data_path = self.data_path
+        default_paths.agent_log_path = "agent.log"
+
+        config_file = os.path.join(BASE_DIR, "fixtures/configs/agent1.json")
+        config = Configuration(config_file, default_paths, None)
+        config.parse()
+
+        self.agent = ScalyrAgent(PlatformController())
+        self.agent._ScalyrAgent__config = config
+
+    def test_report_status_to_file_no_format_specified(self):
+        # No format is provided, should default to "text"
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_text_format_specified(self):
+        # "text" format is explicitly provided
+        self._write_status_format_file("text")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_invalid_format_specified(self):
+        # invalid format is explicitly provided, should fall back to text
+        self._write_status_format_file("invalid")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_json_format_specified(self):
+        # "json" format is explicitly provided
+        self._write_status_format_file("json")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertFalse("Current time:" in content)
+        self.assertFalse("ServerHost:" in content)
+        self.assertFalse("Agent configuration:" in content)
+
+        parsed = json.loads(content)
+        self.assertTrue("config_status" in parsed)
+        self.assertTrue("user" in parsed)
+        self.assertTrue("scalyr_server" in parsed)
+
+    def _write_status_format_file(self, status_format):
+        with open(self.status_format_file, "w") as fp:
+            fp.write(status_format.strip())
+
+    def _read_status_file(self, status_file_path):
+        with open(status_file_path, "r") as fp:
+            content = fp.read()
+
+        return content
