@@ -231,8 +231,9 @@ def main(
     branch,
     commit_id,
     commit_date=None,
+    dry_run=False,
 ):
-    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime]) -> None
+    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime], bool) -> None
     """
     Main entry point / run loop for the script.
     """
@@ -289,6 +290,11 @@ def main(
         result[metric_name] = {"value": metric_value}
 
     logger.debug("Captured data: %s" % (str(result)))
+
+    if dry_run:
+        logger.info("Dry run, not submitting metrics to CodeSpeed...")
+        return
+
     logger.info("Capture complete, submitting metrics to CodeSpeed...")
     send_data_to_codespeed(
         codespeed_url=codespeed_url,
@@ -337,6 +343,12 @@ if __name__ == "__main__":
             "(in seconds)."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("Just capture metrics, but don't submit them to CodeSpeed."),
+    )
 
     args = parser.parse_args()
 
@@ -354,4 +366,5 @@ if __name__ == "__main__":
         branch=args.branch,
         commit_id=args.commit_id,
         commit_date=commit_date,
+        dry_run=args.dry_run,
     )
