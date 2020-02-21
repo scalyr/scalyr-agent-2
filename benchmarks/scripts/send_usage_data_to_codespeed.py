@@ -62,6 +62,7 @@ from datetime import datetime
 from collections import defaultdict
 
 import numpy as np
+import psutil
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "../../")))
@@ -83,6 +84,8 @@ METRICS_GAUGES = {
     "cpu_threads": Metric(name="app.threads", _type=None),
     # Memory usage related metrics
     "memory_usage_rss": Metric(name="app.mem.bytes", _type="resident"),
+    "memory_usage_rss_shared": Metric(name="app.mem.bytes", _type="resident_shared"),
+    "memory_usage_rss_private": Metric(name="app.mem.bytes", _type="resident_private"),
     "memory_usage_vms": Metric(name="app.mem.bytes", _type="vmsize"),
     # IO related metrics
     "io_open_fds": Metric(name="app.io.fds", _type="open"),
@@ -113,6 +116,8 @@ def bytes_to_megabytes(value):
 METRIC_FORMAT_FUNCTIONS = {
     "memory_usage_rss": bytes_to_megabytes,
     "memory_usage_vms": bytes_to_megabytes,
+    "memory_usage_rss_shared": bytes_to_megabytes,
+    "memory_usage_rss_private": bytes_to_megabytes,
 }
 
 
@@ -163,8 +168,8 @@ def send_data_to_codespeed(
     )
 
 
-def capture_metrics(tracker, metrics, values):
-    # type: (ProcessTracker, Dict[str, Metric], dict) -> dict
+def capture_metrics(tracker, process, metrics, values):
+    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], dict) -> dict
     """
     Capture gauge metric types and store them in the provided dictionary.
     """
@@ -176,12 +181,44 @@ def capture_metrics(tracker, metrics, values):
 
     process_metrics = tracker.collect()
 
+    # Add in metrics we capture via psutil
+    psutil_metrics = get_additional_psutil_metrics(process=process)
+    process_metrics.update(psutil_metrics)
+
+    metric_values = {}
     for metric_name, metric_obj in metrics.items():
         value = process_metrics[metric_obj]
         format_func = METRIC_FORMAT_FUNCTIONS.get(metric_name, lambda val: val)
-        values[metric_name].append(format_func(value))
+        value = format_func(value)
+        metric_values[metric_name] = value
+        values[metric_name].append(value)
+
+    logger.debug("Captured metrics: %s" % (str(metric_values)))
 
     return values
+
+
+def get_additional_psutil_metrics(process):
+    # type: (psutil.Process) -> Dict[Metric, T_metric_value]
+    """
+    Capture any additional metrics which are currently not exposed via Linux Process Metric tracker
+    using psutil.
+    """
+    # Capture and calculate shared and private memory usage
+    metric_shared = Metric(name="app.mem.bytes", _type="resident_shared")
+    metric_private = Metric(name="app.mem.bytes", _type="resident_private")
+
+    result = {
+        metric_shared: 0,
+        metric_private: 0,
+    }  # type: Dict[Metric, T_metric_value]
+
+    memory_maps = process.memory_maps()
+    for memory_map in memory_maps:
+        result[metric_shared] += memory_map.shared_clean + memory_map.shared_dirty
+        result[metric_private] += memory_map.private_clean + memory_map.private_dirty
+
+    return result
 
 
 def main(
@@ -194,13 +231,15 @@ def main(
     branch,
     commit_id,
     commit_date=None,
+    dry_run=False,
 ):
-    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime]) -> None
+    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime], bool) -> None
     """
     Main entry point / run loop for the script.
     """
     logger.info('Monitoring process with pid "%s" for metrics' % (pid))
     tracker = ProcessTracker(pid=pid, logger=logger)
+    process = psutil.Process(pid)
 
     end_time = int(time.time() + args.capture_time)
 
@@ -210,12 +249,22 @@ def main(
 
     while time.time() <= end_time:
         logger.debug("Capturing gauge metrics...")
-        capture_metrics(tracker=tracker, metrics=METRICS_GAUGES, values=captured_values)
+        capture_metrics(
+            tracker=tracker,
+            process=process,
+            metrics=METRICS_GAUGES,
+            values=captured_values,
+        )
         time.sleep(args.capture_interval)
 
     # Capture counter metrics
     logger.debug("Capturing counter metrics...")
-    capture_metrics(tracker=tracker, metrics=METRICS_COUNTERS, values=captured_values)
+    capture_metrics(
+        tracker=tracker,
+        process=process,
+        metrics=METRICS_COUNTERS,
+        values=captured_values,
+    )
 
     # Generate final result object and calculate derivatives for gauge metrics
     result = {}  # type: Dict[str, Dict[str, T_metric_value]]
@@ -241,6 +290,11 @@ def main(
         result[metric_name] = {"value": metric_value}
 
     logger.debug("Captured data: %s" % (str(result)))
+
+    if dry_run:
+        logger.info("Dry run, not submitting metrics to CodeSpeed...")
+        return
+
     logger.info("Capture complete, submitting metrics to CodeSpeed...")
     send_data_to_codespeed(
         codespeed_url=codespeed_url,
@@ -289,6 +343,12 @@ if __name__ == "__main__":
             "(in seconds)."
         ),
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help=("Just capture metrics, but don't submit them to CodeSpeed."),
+    )
 
     args = parser.parse_args()
 
@@ -306,4 +366,5 @@ if __name__ == "__main__":
         branch=args.branch,
         commit_id=args.commit_id,
         commit_date=commit_date,
+        dry_run=args.dry_run,
     )
