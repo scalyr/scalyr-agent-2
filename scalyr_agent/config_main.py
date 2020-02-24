@@ -37,7 +37,6 @@ import tempfile
 import traceback
 from io import open
 
-import six
 from distutils import spawn
 from optparse import OptionParser
 
@@ -59,6 +58,7 @@ scalyr_init()
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
+import six
 from six.moves import input
 import six.moves.urllib.request
 import six.moves.urllib.parse
