@@ -26,6 +26,7 @@ __author__ = "imron@scalyr.com"
 if False:
     from typing import Optional
     from typing import Dict
+    from typing import List
     from typing import Any
 
 import os
@@ -47,6 +48,7 @@ try:
 
     from pympler import summary
     from pympler import muppy
+    from pympler import tracker
 except ImportError:
     pympler = None
 
@@ -87,7 +89,11 @@ class BaseProfiler(object):
         # type: (Configuration) -> None
         self._profile_start = 0
         self._profile_end = 0
+
+        # Indicates if this profiler is available (aka underlying library is installed)
         self._is_available = False
+
+        # Indicates if this profiler is enabled in the configuration
         self._is_enabled = False
 
     def update(self, config, current_time=None):
@@ -160,7 +166,6 @@ class BaseProfiler(object):
         self._profile_start = self._get_random_start_time(
             current_time, config.max_profile_interval_minutes
         )
-        self._profile_start = int(current_time)
         self._profile_end = self._profile_start + (config.profile_duration_minutes * 60)
 
         start_in_seconds = self._profile_start - current_time
@@ -282,6 +287,7 @@ class PeriodicMemorySummaryCaptureThread(Thread):
     """
 
     def __init__(self, capture_interval=10, *args, **kwargs):
+        # type: (int, Any, Any) -> None
         """
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
@@ -292,7 +298,9 @@ class PeriodicMemorySummaryCaptureThread(Thread):
 
         self._running = False
         self._sleep_interval = 5
-        self._profiling_data = []
+        self._profiling_data = []  # type: List[Dict[str, Any]]
+
+        self._tracker = tracker.SummaryTracker()
 
     def run(self):
         # type: () -> None
@@ -315,7 +323,7 @@ class PeriodicMemorySummaryCaptureThread(Thread):
         self._running = False
 
     def get_profiling_data(self):
-        # type: () -> Dict[str, Any]
+        # type: () -> List[Dict[str, Any]]
         return self._profiling_data
 
     def _capture_snapshot(self):
@@ -323,11 +331,27 @@ class PeriodicMemorySummaryCaptureThread(Thread):
         """
         Capture memory usage snapshot.
         """
+        capture_time = int(time.time())
+
+        # 1. Capture aggregate values
         all_objects = muppy.get_objects()
         sum1 = summary.summarize(all_objects)
-        data = summary.format_(sum1, limit=30)
+        data = summary.format_(sum1, limit=50)
 
-        item = {"timestamp": int(time.time()), "data": list(data)}
+        item = {
+            "timestamp": capture_time,
+            "data": list(data),
+            "type": "aggregated",
+        }
+        self._profiling_data.append(item)
+
+        # 2. Capture diff since the last capture
+        data = self._tracker.format_diff()
+        item = {
+            "timestamp": capture_time,
+            "data": list(data),
+            "type": "diff",
+        }
         self._profiling_data.append(item)
 
 
@@ -400,10 +424,22 @@ class MemoryProfiler(BaseProfiler):
         # Write captured data to log file
         with open(self._data_file_path, "w") as fp:
             for item in profiling_data:
-                fp.write(
-                    "timestamp: %s, total lines: %s\n%s\n\n"
-                    % (item["timestamp"], len(item["data"]), "\n".join(item["data"]))
+                if item["type"] == "aggregated":
+                    type_string = "(aggregated values)"
+                    pass
+                elif item["type"] == "diff":
+                    type_string = "(diff since the last capture)"
+                else:
+                    raise ValueError("Invalid type: %s" % (item["type"]))
+
+                line = "timestamp: %s, total lines: %s %s\n%s\n\n" % (
+                    item["timestamp"],
+                    len(item["data"]),
+                    type_string,
+                    "\n".join(item["data"]),
                 )
+
+                fp.write(line)
 
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_0,
