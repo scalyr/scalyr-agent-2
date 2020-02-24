@@ -78,7 +78,7 @@ two types of metrics:
 * Counters - those represent values which monotonically increase during the agent run time (think
   total number of disk write requests).
 
-Each benchmark can also have a "less is better" flag is associated with it. This flag represents a
+Each benchmark can also have a "less is better" flag associated with it. This flag represents a
 benchmark where smaller value is better (think duration or memory usage). On the other hand, there
 are benchmarks where larger value is better (think throughput).
 
