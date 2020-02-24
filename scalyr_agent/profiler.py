@@ -14,16 +14,26 @@
 # ------------------------------------------------------------------------
 # author:  Imron Alston <imron@scalyr.com>
 
+"""
+Module which contains classes and abstractions for CPU and memory profiling.
+"""
+
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
 __author__ = "imron@scalyr.com"
+
+if False:
+    from typing import Optional
+    from typing import Dict
+    from typing import Any
 
 import os
 import random
 import time
 import traceback
 from io import open
+from threading import Thread
 
 import six
 
@@ -32,29 +42,157 @@ try:
 except ImportError:
     yappi = None
 
+try:
+    import pympler
+
+    from pympler import summary
+    from pympler import muppy
+except ImportError:
+    pympler = None
+
+from scalyr_agent.configuration import Configuration
 import scalyr_agent.scalyr_logging as scalyr_logging
+
+__all__ = ["ScalyrProfiler"]
 
 global_log = scalyr_logging.getLogger(__name__)
 
 
-class Profiler(object):
+class ScalyrProfiler(object):
     """
-        Profiles the agent
+    Profiler class for CPU and memory profiling.
     """
 
     def __init__(self, config):
+        # type: (Configuration) -> None
+        self.__cpu_profiler = CPUProfiler(config=config)
+        self.__memory_profiler = MemoryProfiler(config=config)
 
-        enable_profiling = config.enable_profiling
+    def update(self, config, current_time=None):
+        # type: (Configuration, Optional[float]) -> None
+        """
+        Updates the state of the profiler - either enabling or disabling it, based on
+        the current time and whether or not the current profiling interval has started/stopped
+        """
+        self.__cpu_profiler.update(config=config, current_time=current_time)
+        self.__memory_profiler.update(config=config, current_time=current_time)
 
-        if enable_profiling:
-            if yappi is None:
-                global_log.warning(
-                    "Profiling is enabled, but the `yappi` module couldn't be loaded. "
-                    "You need to install `yappi` in order to use profiling.  This can be done "
-                    "via pip:  pip install yappi"
-                )
 
+class BaseProfiler(object):
+    """
+    Base class for various profilers.
+    """
+
+    def __init__(self, config):
+        # type: (Configuration) -> None
+        self._profile_start = 0
+        self._profile_end = 0
+        self._is_available = False
         self._is_enabled = False
+
+    def update(self, config, current_time=None):
+        # type: (Configuration, Optional[float]) -> None
+        """
+        Updates the state of the profiler - either enabling or disabling it, based on the current
+        time and whether or not the current profiling interval has started/stopped.
+        """
+        if not self._is_available:
+            return
+
+        current_time = current_time or time.time()
+
+        try:
+            # check if profiling is enabled in the config and turn it on/off if necessary
+            if config.enable_profiling:
+                if not self._is_enabled:
+                    self._update_start_interval(config, current_time)
+                    self._is_enabled = True
+            else:
+                if self._is_running():
+                    self._stop(config, current_time)
+                self._is_enabled = False
+
+            # only do profiling if we are still enabled
+            if not self._is_enabled:
+                return
+
+            # check if the current profiling interval needs to start or stop
+            if self._is_running():
+                if current_time > self._profile_end:
+                    self._stop(config, current_time)
+                    self._update_start_interval(config, current_time)
+            else:
+                if current_time >= self._profile_start:
+                    self._start(config, current_time)
+        except Exception as e:
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_0,
+                "Failed to update profiler: %s, %s"
+                % (six.text_type(e), traceback.format_exc()),
+                limit_once_per_x_secs=300,
+                limit_key="profiler-update",
+            )
+
+    def _start(self, config, current_time):
+        # type: (Configuration, float) -> None
+        raise NotImplementedError("_start not implemented")
+
+    def _stop(self, config, current_time):
+        # type: (Configuration, float) -> None
+        raise NotImplementedError("_stop not implemented")
+
+    def _is_running(self):
+        # type: () -> bool
+        """
+        Return true if this profiler is running, False otherwise.
+        """
+        raise NotImplementedError("_is_running not implemented")
+
+    def _get_random_start_time(self, current_time, maximum_interval_minutes):
+        # type: (float, int) -> int
+        if maximum_interval_minutes < 1:
+            maximum_interval_minutes = 1
+        r = random.randint(1, maximum_interval_minutes) * 60
+        return int(current_time) + r
+
+    def _update_start_interval(self, config, current_time):
+        # type: (Configuration, float) -> None
+        self._profile_start = self._get_random_start_time(
+            current_time, config.max_profile_interval_minutes
+        )
+        self._profile_start = int(current_time)
+        self._profile_end = self._profile_start + (config.profile_duration_minutes * 60)
+
+        start_in_seconds = self._profile_start - current_time
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "Updating start time to %s (starting profiler in %s seconds)",
+            int(self._profile_start),
+            int(start_in_seconds),
+        )
+
+
+class CPUProfiler(BaseProfiler):
+    """
+    CPU profiler based on the yappi package.
+    """
+
+    def __init__(self, config):
+        super(CPUProfiler, self).__init__(config=config)
+
+        if config.enable_profiling and not yappi:
+            global_log.warning(
+                "Profiling is enabled, but the `yappi` module couldn't be loaded. "
+                "You need to install `yappi` in order to use profiling.  This can be done "
+                "via pip:  pip install yappi"
+            )
+            self._is_available = False
+        else:
+            self._is_available = True
+
+        self._data_file_path = os.path.join(
+            config.agent_log_path, config.profile_log_name
+        )
         self._allowed_clocks = ["wall", "cpu", "random"]
         self._profile_clock = self._get_clock_type(
             config.profile_clock, self._allowed_clocks, config.profile_clock
@@ -65,8 +203,8 @@ class Profiler(object):
         # random clocks can still be manually overridden in the agent.json
         self._allowed_clocks = self._allowed_clocks[:2]
 
-        self._profile_start = 0
-        self._profile_end = 0
+    def _is_running(self):
+        return yappi.is_running()
 
     def _get_clock_type(self, clock_type, allowed, default_value):
         """
@@ -83,20 +221,7 @@ class Profiler(object):
 
         return result
 
-    def _get_random_start_time(self, current_time, maximum_interval_minutes):
-        if maximum_interval_minutes < 1:
-            maximum_interval_minutes = 1
-        r = random.randint(1, maximum_interval_minutes) * 60
-        return current_time + r
-
-    def _update_start_interval(self, config, current_time):
-        self._profile_start = self._get_random_start_time(
-            current_time, config.max_profile_interval_minutes
-        )
-        self._profile_end = self._profile_start + (config.profile_duration_minutes * 60)
-
     def _start(self, config, current_time):
-
         yappi.clear_stats()
         clock = self._get_clock_type(
             config.profile_clock, self._allowed_clocks, self._profile_clock
@@ -106,26 +231,25 @@ class Profiler(object):
             yappi.set_clock_type(self._profile_clock)
         global_log.log(
             scalyr_logging.DEBUG_LEVEL_0,
-            "Starting profiling using '%s' clock. Duration: %d seconds"
+            "Starting CPU profiling using '%s' clock. Duration: %d seconds"
             % (self._profile_clock, self._profile_end - self._profile_start),
         )
         yappi.start()
 
     def _stop(self, config, current_time):
         yappi.stop()
-        global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Stopping profiling")
+        global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Stopping CPU profiling")
         stats = yappi.get_func_stats()
-        path = os.path.join(config.agent_log_path, config.profile_log_name)
-        if os.path.exists(path):
-            os.remove(path)
+        if os.path.exists(self._data_file_path):
+            os.remove(self._data_file_path)
 
         # pylint bug https://github.com/PyCQA/pylint/labels/topic-inference
-        stats.save(path, "callgrind")  # pylint: disable=no-member
+        stats.save(self._data_file_path, "callgrind")  # pylint: disable=no-member
 
         lines = 0
 
         # count the lines
-        f = open(path)
+        f = open(self._data_file_path)
         try:
             for line in f:
                 lines += 1
@@ -133,11 +257,11 @@ class Profiler(object):
             f.close()
 
         # write a status message to make it easy to find the end of each profile session
-        f = open(path, "a")
+        f = open(self._data_file_path, "a")
         try:
             f.write(
                 "\n# %s, %s clock, total lines: %d\n"
-                % (path, self._profile_clock, lines)
+                % (self._data_file_path, self._profile_clock, lines)
             )
         finally:
             f.close()
@@ -145,47 +269,146 @@ class Profiler(object):
         yappi.clear_stats()
         del stats
 
-    def update(self, config, current_time=None):
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "CPU profiling data written to %s",
+            self._data_file_path,
+        )
+
+
+class PeriodicMemorySummaryCaptureThread(Thread):
+    """
+    Thread which periodically captures memory summary using pympler package.
+    """
+
+    def __init__(self, capture_interval=10, *args, **kwargs):
         """
-            Updates the state of the profiler - either enabling or disabling it, based on
-            the current time and whether or not the current profiling interval has started/stopped
+        :param capture_interval: How often to capture memory usage snapshot.
+        :type capture_interval: ``int``
         """
-        # no profiling if the profiler isn't available
-        if yappi is None:
+        super(PeriodicMemorySummaryCaptureThread, self).__init__(*args, **kwargs)
+
+        self._capture_interval = capture_interval
+
+        self._running = False
+        self._sleep_interval = 5
+        self._profiling_data = []
+
+    def run(self):
+        # type: () -> None
+        self._running = True
+
+        last_capture_time = 0
+        while self._running:
+            if (time.time() - self._capture_interval) >= last_capture_time:
+                global_log.log(
+                    scalyr_logging.DEBUG_LEVEL_5,
+                    "Performing periodic memory usage capture",
+                )
+                self._capture_snapshot()
+                last_capture_time = int(time.time())
+
+            time.sleep(self._sleep_interval)
+
+    def stop(self):
+        # type: () -> None
+        self._running = False
+
+    def get_profiling_data(self):
+        # type: () -> Dict[str, Any]
+        return self._profiling_data
+
+    def _capture_snapshot(self):
+        # type: () -> None
+        """
+        Capture memory usage snapshot.
+        """
+        all_objects = muppy.get_objects()
+        sum1 = summary.summarize(all_objects)
+        data = summary.format_(sum1, limit=30)
+
+        item = {"timestamp": int(time.time()), "data": list(data)}
+        self._profiling_data.append(item)
+
+
+class MemoryProfiler(BaseProfiler):
+    """
+    Class for profiling agent memory usage.
+
+    It relies on the "pympler" package. It works by starting a background thread which periodically
+    captures memory usage summary.
+    """
+
+    def __init__(self, config):
+        super(MemoryProfiler, self).__init__(config=config)
+
+        if config.enable_profiling and not pympler:
+            global_log.warning(
+                "Profiling is enabled, but the `pympler` module couldn't be loaded. "
+                "You need to install `pympler` in order to use profiling.  This can be done "
+                "via pip:  pip install pympler"
+            )
+            self._is_available = False
+        else:
+            self._is_available = True
+
+        self._data_file_path = os.path.join(
+            config.agent_log_path, config.memory_profile_log_name
+        )
+        self._capture_interval = 10
+
+        self._running = False
+
+    def _is_running(self):
+        return self._running
+
+    def _start(self, config, current_time):
+        if self._running:
             return
 
-        if current_time is None:
-            current_time = time.time()
+        self._running = True
 
-        try:
-            # check if profiling is enabled in the config and turn it on/off if necessary
-            if config.enable_profiling:
-                if not self._is_enabled:
-                    self._update_start_interval(config, current_time)
-                    self._is_enabled = True
-            else:
-                if yappi.is_running():
-                    self._stop(config, current_time)
-                self._is_enabled = False
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "Starting memory profiling. Capture interval: %d seconds, duration: %d seconds"
+            % (self._capture_interval, self._profile_end - self._profile_start),
+        )
 
-            # only do profiling if we are still enabled
-            if not self._is_enabled:
-                return
+        self._periodic_thread = PeriodicMemorySummaryCaptureThread(
+            capture_interval=self._capture_interval, name="MemoryCaptureThread"
+        )
+        self._periodic_thread.setDaemon(True)
+        self._periodic_thread.start()
 
-            # check if the current profiling interval needs to start or stop
-            if yappi.is_running():
-                if current_time > self._profile_end:
-                    self._stop(config, current_time)
-                    self._update_start_interval(config, current_time)
+    def _stop(self, config, current_time):
+        if not self._running:
+            return
 
-            else:
-                if current_time > self._profile_start:
-                    self._start(config, current_time)
-        except Exception as e:
-            global_log.log(
-                scalyr_logging.DEBUG_LEVEL_0,
-                "Failed to update profiler: %s, %s"
-                % (six.text_type(e), traceback.format_exc()),
-                limit_once_per_x_secs=300,
-                limit_key="profiler-update",
-            )
+        self._running = False
+
+        global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Stopping memory profiling")
+
+        profiling_data = self._periodic_thread.get_profiling_data()
+
+        # Stop the periodic capture thread
+        self._periodic_thread.stop()
+        self._periodic_thread = None
+
+        if os.path.exists(self._data_file_path):
+            os.remove(self._data_file_path)
+
+        # Write captured data to log file
+        with open(self._data_file_path, "w") as fp:
+            for item in profiling_data:
+                fp.write(
+                    "timestamp: %s, total lines: %s\n%s\n\n"
+                    % (item["timestamp"], len(item["data"]), "\n".join(item["data"]))
+                )
+
+        global_log.log(
+            scalyr_logging.DEBUG_LEVEL_0,
+            "Memory profiling data written to %s",
+            self._data_file_path,
+        )
+
+        del profiling_data
