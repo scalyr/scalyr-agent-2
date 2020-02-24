@@ -1,0 +1,15 @@
+{
+  // We want to consume whole file from the beginning so we set max offset to 100 MB
+  max_log_offset_size: 104857600,
+
+  logs: [
+     {
+         path: "/tmp/access_log_50_mb.log",
+         attributes: { parser: "accessLog" },
+         copy_from_start: true
+     }
+  ],
+
+  monitors: [
+  ]
+}
