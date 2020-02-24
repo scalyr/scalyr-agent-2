@@ -49,7 +49,17 @@ import six
 import scalyr_agent.util as util
 from scalyr_agent.util import RateLimiter
 
-_METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
+if six.PY2:
+    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type, six.binary_type)
+    _METRIC_VALUE_SUPPORTED_TYPES = (
+        six.text_type,
+        six.binary_type,
+        bool,
+        float,
+    ) + six.integer_types
+else:
+    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type,)
+    _METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
 
 # The debugging levels supported on the debugger logger.  The higher the debug level, the
 # more verbose the output.
@@ -351,13 +361,13 @@ class AgentLogger(logging.Logger):
             )
 
         string_buffer = io.StringIO()
-        if type(metric_name) is not six.text_type:
+        if not isinstance(metric_name, _METRIC_NAME_SUPPORTED_TYPES):
             raise UnsupportedValueType(metric_name=metric_name)
         metric_name = self.force_valid_metric_or_field_name(
             metric_name, is_metric=True, logger=self
         )
 
-        if type(metric_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
+        if not isinstance(metric_value, _METRIC_VALUE_SUPPORTED_TYPES):
             raise UnsupportedValueType(
                 metric_name=metric_name, metric_value=metric_value
             )
@@ -366,11 +376,11 @@ class AgentLogger(logging.Logger):
 
         if extra_fields is not None:
             for field_name in extra_fields:
-                if type(field_name) is not six.text_type:
+                if not isinstance(field_name, _METRIC_NAME_SUPPORTED_TYPES):
                     raise UnsupportedValueType(field_name=field_name)
 
                 field_value = extra_fields[field_name]
-                if type(field_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
+                if not isinstance(field_value, _METRIC_VALUE_SUPPORTED_TYPES):
                     raise UnsupportedValueType(
                         field_name=field_name, field_value=field_value
                     )
@@ -1641,19 +1651,19 @@ class UnsupportedValueType(Exception):
 
         if metric_name is not __NOT_GIVEN__ and metric_value is __NOT_GIVEN__:
             message = (
-                "An unsupported type for a metric name was given.  It must be either str or unicode, but was"
+                "An unsupported type for a metric name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for metric "%s"'
                 % (six.text_type(type(metric_name)), six.text_type(metric_name))
             )
         elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
             message = (
-                "An unsupported type for a field name was given.  It must be either str or unicode, but was"
+                "An unsupported type for a field name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for field "%s"'
                 % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
             message = (
-                'Unsupported metric value type of "%s" with value "%s" for metric="%s".'
+                'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
                 "Only int, long, float, and str are supported."
                 % (
                     six.text_type(type(metric_value)),
@@ -1663,7 +1673,7 @@ class UnsupportedValueType(Exception):
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (
-                'Unsupported field value type of "%s" with value "%s" for field="%s".'
+                'Unsupported field value type of "%s" with value "%s" for field="%s". '
                 "Only int, long, float, and str are supported."
                 % (
                     six.text_type(type(field_value)),
