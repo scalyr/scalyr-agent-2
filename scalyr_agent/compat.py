@@ -122,9 +122,9 @@ else:
 # 2->TODO struct.pack|unpack, does not accept unicode as format string.
 # see more: https://python-future.org/stdlib_incompatibilities.html#struct-pack
 # to avoid conversion of format string on every struct.pack call, we can monkey patch it here.
-if sys.version_info[:2] == (2, 6):
+if sys.version_info[:3] < (2, 7, 7):
 
-    def python2_6_unicode_pack_unpack_wrapper(f):
+    def python_unicode_pack_unpack_wrapper(f):
         def _pack_unpack(format_str, *args):
             """wrapper for struct.pack function that converts unicode format string to 'str'"""
             binary_format_str = six.ensure_binary(format_str)
@@ -132,8 +132,8 @@ if sys.version_info[:2] == (2, 6):
 
         return _pack_unpack
 
-    struct_pack_unicode = python2_6_unicode_pack_unpack_wrapper(struct.pack)
-    struct_unpack_unicode = python2_6_unicode_pack_unpack_wrapper(struct.unpack)
+    struct_pack_unicode = python_unicode_pack_unpack_wrapper(struct.pack)
+    struct_unpack_unicode = python_unicode_pack_unpack_wrapper(struct.unpack)
 else:
     struct_pack_unicode = struct.pack
     struct_unpack_unicode = struct.unpack
