@@ -34,7 +34,6 @@ import random
 import time
 import traceback
 from io import open
-from threading import Thread
 
 import six
 
@@ -54,6 +53,7 @@ except ImportError:
 
 from scalyr_agent.configuration import Configuration
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.util import StoppableThread
 
 __all__ = ["ScalyrProfiler"]
 
@@ -281,7 +281,7 @@ class CPUProfiler(BaseProfiler):
         )
 
 
-class PeriodicMemorySummaryCaptureThread(Thread):
+class PeriodicMemorySummaryCaptureThread(StoppableThread):
     """
     Thread which periodically captures memory summary using pympler package.
     """
@@ -292,35 +292,24 @@ class PeriodicMemorySummaryCaptureThread(Thread):
         :param capture_interval: How often to capture memory usage snapshot.
         :type capture_interval: ``int``
         """
-        super(PeriodicMemorySummaryCaptureThread, self).__init__(*args, **kwargs)
+        super(PeriodicMemorySummaryCaptureThread, self).__init__(
+            name="PeriodicMemorySummaryCaptureThread"
+        )
 
         self._capture_interval = capture_interval
 
-        self._running = False
-        self._sleep_interval = 5
         self._profiling_data = []  # type: List[Dict[str, Any]]
-
         self._tracker = tracker.SummaryTracker()
 
-    def run(self):
+    def run_and_propagate(self):
         # type: () -> None
-        self._running = True
-
-        last_capture_time = 0
-        while self._running:
-            if (time.time() - self._capture_interval) >= last_capture_time:
-                global_log.log(
-                    scalyr_logging.DEBUG_LEVEL_5,
-                    "Performing periodic memory usage capture",
-                )
-                self._capture_snapshot()
-                last_capture_time = int(time.time())
-
-            time.sleep(self._sleep_interval)
-
-    def stop(self):
-        # type: () -> None
-        self._running = False
+        while self._run_state.is_running():
+            global_log.log(
+                scalyr_logging.DEBUG_LEVEL_5,
+                "Performing periodic memory usage capture",
+            )
+            self._capture_snapshot()
+            self._run_state.sleep_but_awaken_if_stopped(timeout=self._capture_interval)
 
     def get_profiling_data(self):
         # type: () -> List[Dict[str, Any]]
