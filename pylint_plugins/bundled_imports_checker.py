@@ -16,23 +16,29 @@
 pylint checker plugin which verifies that any import for a 3rd party bundled module (modules in
 scalyr_agent/third_party* directory) comes after "scalyr_init()" function call.
 
-This is important, because if module is imported before "scalyr_init()" function call it means it
-may use system version of that module instead of bundled version.
+This is important, because if module is imported before "scalyr_init()" function call, it means it
+may use system version of that module instead of the bundled version.
 
 NOTE: Currently this plugin is limited to only checking main entry point files since it doesn't
-implement cross file tracking (e.g. file A calls scalyr_init() and imports file B which then imports
-some bundled module).
+implement cross module / file tracking (e.g. file A calls scalyr_init() and imports file B which
+then imports some bundled module).
 """
 
 from __future__ import absolute_import
+from __future__ import print_function
 
 if False:
     from typing import List
+    from typing import Dict
+    from typing import Set
+    from typing import Any
 
 import os
 
 from collections import defaultdict
 
+from astroid import node_classes
+from astroid import scoped_nodes
 from pylint.checkers import BaseChecker
 from pylint.interfaces import IAstroidChecker
 
@@ -71,19 +77,23 @@ class ThirdPartyBundledImportOrderChecker(BaseChecker):
     priority = -1
 
     def __init__(self, linter):
+        # type: (Any) -> None
         super(ThirdPartyBundledImportOrderChecker, self).__init__(linter)
 
         self._third_party_module_names = get_third_party_package_module_names()
 
-        # Stores reference to the node where scalyr_init is called
+        # Stores reference to the node where scalyr_init() function is called
         # Maps file_path -> node
-        self._scalyr_init_nodes = {}
+        self._scalyr_init_nodes = {}  # type: Dict[str, node_classes.Call]
 
         # Stores references to imoort nodes which refer to 3rd party modules
         # Maps file_path -> nodes
-        self._third_party_import_nodes = defaultdict(set)
+        self._third_party_import_nodes = defaultdict(
+            set
+        )  # type: Dict[str, Set[node_classes.Import]]
 
     def visit_call(self, node):
+        # type: (node_classes.Call) -> None
         if getattr(node.func, "name", None) == "scalyr_init":
             # TODO: Handle case where there are multiple scalyr_init calls - just store reference
             # to the earliest one (aka one with lowest line number)
@@ -92,6 +102,7 @@ class ThirdPartyBundledImportOrderChecker(BaseChecker):
             self._scalyr_init_nodes[node_file_path] = node
 
     def visit_import(self, node):
+        # type: (node_classes.Import) -> None
         name = node.names[0][0]
 
         if name in self._third_party_module_names:
@@ -100,19 +111,23 @@ class ThirdPartyBundledImportOrderChecker(BaseChecker):
             self._third_party_import_nodes[node_file_path].add(node)
 
     def visit_importfrom(self, node):
+        # type: (node_classes.Import) -> None
         if node.modname in self._third_party_module_names:
             node.name = node.modname
             node_file_path = self._get_file_path_for_node(node=node)
             self._third_party_import_nodes[node_file_path].add(node)
 
     def leave_module(self, node):
+        # type: (scoped_nodes.Module) -> None
         """
         We perform the actual check just before we leave the module since that's when the file has
         been fully processed.
         """
         node_file_path = self._get_file_path_for_node(node=node)
 
-        third_party_nodes = self._third_party_import_nodes.get(node_file_path, [])
+        third_party_nodes = list(
+            self._third_party_import_nodes.get(node_file_path, [])
+        )  # type: List[node_classes.Import]
         scalyr_init_node = self._scalyr_init_nodes.get(node_file_path, None)
 
         for import_node in third_party_nodes:
@@ -167,16 +182,19 @@ def get_third_party_package_module_names():
             init_file_path = os.path.join(file_path, "__init__.py")
 
             if os.path.isdir(file_path) and os.path.isfile(init_file_path):
+                # Package
                 result.append(file_name)
             elif (
                 os.path.isfile(file_path)
                 and file_path.endswith(".py")
                 and file_name != "__init__.py"
             ):
+                # Single file module (e.g. six.py)
                 result.append(file_name.replace(".py", ""))
 
     return result
 
 
 def register(linter):
+    # type: (Any) -> None
     linter.register_checker(ThirdPartyBundledImportOrderChecker(linter))
