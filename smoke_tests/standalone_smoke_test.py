@@ -13,8 +13,10 @@ import six
 import pytest
 
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
-from scalyr_agent.tests.smoke_tests.tools.agent_runner import AgentRunner
-from scalyr_agent.tests.smoke_tests.tools.request import ScalyrRequest, RequestSender
+from smoke_tests.tools.agent_runner import AgentRunner
+from smoke_tests.tools.request import ScalyrRequest, RequestSender
+from scalyr_agent import compat
+from six.moves import range
 
 TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z"
 LEVEL_PATTERN = r"INFO|WARNING|ERROR|DEBUG"
@@ -25,18 +27,13 @@ BASE_LINE_PATTERN = r"\s*(?P<timestamp>{})\s+(?P<level>{})\s+\[(?P<logger>{})\]\
 
 
 def make_agent_log_line_pattern(
-        timestamp=TIMESTAMP_PATTERN,
-        level=LEVEL_PATTERN,
-        logger_name=LOGGER_NAME_PATTERN,
-        file_name=FILE_NAME_PATTERN,
-        message=None
+    timestamp=TIMESTAMP_PATTERN,
+    level=LEVEL_PATTERN,
+    logger_name=LOGGER_NAME_PATTERN,
+    file_name=FILE_NAME_PATTERN,
+    message=None,
 ):
-    base_pattern = BASE_LINE_PATTERN.format(
-        timestamp,
-        level,
-        logger_name,
-        file_name,
-    )
+    base_pattern = BASE_LINE_PATTERN.format(timestamp, level, logger_name, file_name,)
     if message:
         pattern_str = "{}{}".format(base_pattern, message)
     else:
@@ -57,7 +54,9 @@ class AgentVerifier(object):
     TIME_LIMIT = 300
     RETRY_DELAY = 5
 
-    def __init__(self, runner, request_sender):  # type: (AgentRunner, RequestSender) ->None
+    def __init__(
+        self, runner, request_sender
+    ):  # type: (AgentRunner, RequestSender) ->None
         self._runner = runner
         self._request_sender = request_sender
 
@@ -74,7 +73,9 @@ class AgentVerifier(object):
                 if self._verify():
                     return True
                 if time.time() - start_time >= type(self).TIME_LIMIT:
-                    raise IOError("Verifier - '{}' reached timeout.".format(type(self).NAME))
+                    raise IOError(
+                        "Verifier - '{}' reached timeout.".format(type(self).NAME)
+                    )
                 time.sleep(type(self).RETRY_DELAY)
         else:
             return self._verify()
@@ -88,13 +89,13 @@ class AgentLogVerifier(AgentVerifier):
         super(AgentLogVerifier, self).__init__(runner, request_sender)
         self.agent_log_file_path = runner.agent_log_file_path
         self._start_time = time.time()
-        self._agent_host_name = os.environ["AGENT_HOST_NAME"]
+        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
         # create request to fetch agent.log file data.
         request = ScalyrRequest(
-            read_api_key=os.environ["READ_API_KEY"],
+            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
             max_count=5000,
-            start_time=self._start_time
+            start_time=self._start_time,
         )
 
         request.add_filter("$serverHost=='{}'".format(self._agent_host_name))
@@ -106,7 +107,9 @@ class AgentLogVerifier(AgentVerifier):
         self._request = request
 
     def _verify(self):
-        local_agent_log_data = self._runner.read_file_content(self._runner.agent_log_file_path)
+        local_agent_log_data = self._runner.read_file_content(
+            self._runner.agent_log_file_path
+        )
 
         if not local_agent_log_data:
             return
@@ -119,7 +122,12 @@ class AgentLogVerifier(AgentVerifier):
 
         collector_line_pattern = re.compile(collector_line_pattern_str)
 
-        found_collectors = set([m.group("collector") for m in collector_line_pattern.finditer(local_agent_log_data)])
+        found_collectors = set(
+            [
+                m.group("collector")
+                for m in collector_line_pattern.finditer(local_agent_log_data)
+            ]
+        )
 
         if len(found_collectors) != 5:
             return
@@ -127,7 +135,12 @@ class AgentLogVerifier(AgentVerifier):
         response_data = self._request_sender.send_request(self._request)
         response_log = "\n".join([msg["message"] for msg in response_data["matches"]])
 
-        found_collectors_remote = set([m.group("collector") for m in collector_line_pattern.finditer(response_log)])
+        found_collectors_remote = set(
+            [
+                m.group("collector")
+                for m in collector_line_pattern.finditer(response_log)
+            ]
+        )
 
         if len(found_collectors_remote) != 5:
             return
@@ -139,15 +152,17 @@ class DataJsonVerifier(AgentVerifier):
     def __init__(self, runner, request_sender):
         super(DataJsonVerifier, self).__init__(runner, request_sender)
 
-        self._data_json_log_path = self._runner.add_log_file(self._runner.agent_logs_dir_path / "data.log")
+        self._data_json_log_path = self._runner.add_log_file(
+            self._runner.agent_logs_dir_path / "data.log"
+        )
         self._timestamp = datetime.datetime.now().isoformat()
         self._start_time = time.time()
-        self._agent_host_name = os.environ["AGENT_HOST_NAME"]
+        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
         request = ScalyrRequest(
-            read_api_key=os.environ["READ_API_KEY"],
+            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
             max_count=5000,
-            start_time=self._start_time
+            start_time=self._start_time,
         )
 
         request.add_filter("$serverHost=='{}'".format(self._agent_host_name))
@@ -162,13 +177,8 @@ class DataJsonVerifier(AgentVerifier):
 
     def prepare(self):
         for i in range(1000):
-            json_data = json.dumps({
-                "count": i, "stream_id": self._timestamp
-            })
-            self._runner.write_line(
-                self._data_json_log_path,
-                json_data
-            )
+            json_data = json.dumps({"count": i, "stream_id": self._timestamp})
+            self._runner.write_line(self._data_json_log_path, json_data)
         return
 
     def _verify(self):
@@ -189,9 +199,7 @@ def test_uploaded_data(agent_settings, request):
         installation_type = DEV_INSTALL
     runner = AgentRunner(installation_type)
 
-    request_sender = RequestSender(
-        server_address=agent_settings["SCALYR_SERVER"],
-    )
+    request_sender = RequestSender(server_address=agent_settings["SCALYR_SERVER"],)
 
     agent_log_verifier = AgentLogVerifier(runner, request_sender)
     data_json_verifier = DataJsonVerifier(runner, request_sender)

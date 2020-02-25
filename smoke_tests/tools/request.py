@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 from __future__ import print_function
+from __future__ import absolute_import
 import time
 
 import requests
@@ -37,7 +38,9 @@ class ScalyrRequest:
 
 
 class RequestSender:
-    def __init__(self, server_address, ):
+    def __init__(
+        self, server_address,
+    ):
         self._server_address = server_address
 
     def send_request(self, request):
@@ -46,9 +49,7 @@ class RequestSender:
         protocol = "https://" if not self._server_address.startswith("http") else ""
 
         full_query = "{}{}/api/query?queryType=log&{}".format(
-            protocol,
-            self._server_address,
-            request_query
+            protocol, self._server_address, request_query
         )
         print(full_query)
 

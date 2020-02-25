@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import tempfile
 import shutil
 import os
@@ -7,16 +8,14 @@ from .compat import Path
 from scalyr_agent.__scalyr__ import get_package_root
 
 import six
+from scalyr_agent import compat
+
 
 def get_env(name):
     try:
-        return os.environ[name]
+        return compat.os_environ_unicode[name]
     except KeyError:
         raise KeyError("Environment variable: '{}' not set.".format(name))
-
-
-def create_temp_dir(prefix="scalyr_agent_testing"):
-    return tempfile.TemporaryDirectory(prefix=prefix)
 
 
 def create_temp_dir_with_constant_name(name):
@@ -34,10 +33,6 @@ def create_temp_dir_with_constant_name(name):
     return tmp_dir_path
 
 
-def create_temp_named_file(mode, prefix="scalyr_test_"):
-    return tempfile.NamedTemporaryFile(mode, prefix="scalyr_test_", suffix=".file")
-
-
 def copy_agent_source(dest_path):
     root_path = Path(get_package_root()).parent
     shutil.copytree(
@@ -51,6 +46,6 @@ def copy_agent_source(dest_path):
             ".pytest*",
             ".mypy*",
             ".idea",
-            ".git"
+            ".git",
         ),
     )

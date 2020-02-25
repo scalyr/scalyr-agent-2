@@ -12,6 +12,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 
+from __future__ import absolute_import
 import subprocess
 import os
 import shutil
@@ -41,7 +42,7 @@ def set_root_user_for_docker_jobs(path):
         yaml.dump(config, f)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     circleci_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(os.path.dirname(circleci_dir))
     config_path = os.path.join(circleci_dir, "config.yml")
@@ -61,8 +62,7 @@ if __name__ == '__main__':
         # call circleci to create new 2.0 compatible config file.
         with open(new_local_config_path, "wb") as f:
             output = subprocess.check_call(
-                ["circleci", "config", "process", config_path],
-                stdout=f
+                ["circleci", "config", "process", config_path], stdout=f
             )
 
         # set root user for all job with "setup_remote_docker"
@@ -73,12 +73,11 @@ if __name__ == '__main__':
 
         # call circleci with command line argument. It will get new compatible config, so it should work well.
         process = subprocess.Popen(
-            ["circleci"] + sys.argv[1:],
-            stdout=sys.stdout,
-            stderr=sys.stderr
+            ["circleci"] + sys.argv[1:], stdout=sys.stdout, stderr=sys.stderr
         )
         process.communicate()
     finally:
         # restore original config from backup.
         shutil.copy(backup_file_path, config_path)
         os.remove(backup_file_path)
+        os.remove(new_local_config_path)

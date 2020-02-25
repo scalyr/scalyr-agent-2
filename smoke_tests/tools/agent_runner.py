@@ -1,25 +1,21 @@
 from __future__ import unicode_literals
 
+from __future__ import absolute_import
 import shutil
 import os
 from typing import Dict, Optional, Mapping, Any, List, Callable
 
-try:
-    from pathlib import Path
-except ImportError:
-    from pathlib2 import Path
 import json
-import tempfile
 import subprocess
+
 
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent.platform_controller import PlatformController
 
-from .utils import get_env
+from smoke_tests.tools.compat import Path
+from smoke_tests.tools.utils import get_env
 
 import six
-
-AGENT_TEST_DIRECTORY_PATH = Path(tempfile.gettempdir()) / ".scalyr_agent_testing"
 
 
 def _make_or_clear_directory(path):  # type: (Path) -> None
@@ -29,27 +25,6 @@ def _make_or_clear_directory(path):  # type: (Path) -> None
     if path.exists():
         shutil.rmtree(six.text_type(path), ignore_errors=True)
     path.mkdir(exist_ok=True, parents=True)
-
-
-def map_path_to_another_path(path1, path2):  # type: (Path, Path) -> Path
-    """
-    Replace the root of the second path with first path.
-    Example:
-    path1 = /home/user/data
-    path2 = /etc/hosts.txt
-    result = /home/user/data/etc/hosts.txt
-    """
-    result = path1 / path2.relative_to(path2.parts[0])
-    return result
-
-
-def get_mapped_default_paths(path):  # type: (Path) -> Dict[six.text_type, Path]
-
-    default_paths = _get_default_paths()
-    for name, value in list(default_paths.items()):
-        default_paths[name] = map_path_to_another_path(path, Path(value))
-
-    return default_paths
 
 
 def _path_or_text(fn):
@@ -94,17 +69,16 @@ class AgentRunner(object):
         return path
 
     @_path_or_text
-    def add_log_file(self, path, attributes=None):  # type: (Path, Optional[Dict[six.text_type, Any]]) -> Path
+    def add_log_file(
+        self, path, attributes=None
+    ):  # type: (Path, Optional[Dict[six.text_type, Any]]) -> Path
         path = self.add_file(path)
 
         if attributes is None:
             attributes = {"parser": "json"}
 
         path_text = six.text_type(path)
-        self._log_files[path_text] = {
-            "path": path_text,
-            "attributes": attributes
-        }
+        self._log_files[path_text] = {"path": path_text, "attributes": attributes}
 
         return path
 
@@ -136,17 +110,11 @@ class AgentRunner(object):
         _make_or_clear_directory(self._agent_data_dir_path)
 
         _make_or_clear_directory(self.agent_logs_dir_path)
-        # self._create_file(self.agent_log_file_path)
-
-        # self._create_file(self._agent_config_path, content=self._agent_config)
 
         for file_path in self._files.values():
             self._create_file(file_path)
 
-        self.write_to_file(
-            self._agent_config_path,
-            json.dumps(self._agent_config)
-        )
+        self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
     def _start(self):
         if self._installation_type == PACKAGE_INSTALL:
@@ -156,7 +124,7 @@ class AgentRunner(object):
         else:
             self._agent_process = subprocess.Popen(
                 "python -m scalyr_agent.agent_main --no-fork --no-change-user start",
-                shell=True
+                shell=True,
             )
         return
 
@@ -181,10 +149,8 @@ class AgentRunner(object):
         """
         return {
             "verify_server_certificate": "false",
-            "server_attributes": {
-                "serverHost": self._server_host,
-            },
-            "logs": list(self._log_files.values())
+            "server_attributes": {"serverHost": self._server_host},
+            "logs": list(self._log_files.values()),
         }
 
     @staticmethod

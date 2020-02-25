@@ -53,6 +53,7 @@ except ImportError:
 scalyr_init()
 
 import six
+from six.moves import map
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -1597,7 +1598,7 @@ class WorkerThread(object):
             self.__scalyr_client.close()
 
 
-def main():
+if __name__ == "__main__":
     my_controller = PlatformController.new_platform()
     parser = OptionParser(
         usage="Usage: scalyr-agent-2 [options] (start|stop|status|restart|condrestart|version)",
@@ -1691,7 +1692,3 @@ def main():
 
     # We do this outside of the try block above because sys.exit raises an exception itself.
     sys.exit(main_rc)
-
-
-if __name__ == "__main__":
-    main()
