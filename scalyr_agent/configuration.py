@@ -571,6 +571,14 @@ class Configuration(object):
         return self.__get_config().get_float("config_change_check_interval")
 
     @property
+    def overall_stats_log_interval(self):
+        return self.__get_config().get_float("overall_stats_log_interval")
+
+    @property
+    def bandwidth_stats_log_interval(self):
+        return self.__get_config().get_float("bandwidth_stats_log_interval")
+
+    @property
     def user_agent_refresh_interval(self):
         return self.__get_config().get_float("user_agent_refresh_interval")
 
@@ -1576,6 +1584,7 @@ class Configuration(object):
                 "debug_level",
                 "badDebugLevel",
             )
+
         self.__verify_or_set_optional_float(
             config,
             "request_deadline",
@@ -2002,6 +2011,26 @@ class Configuration(object):
             config,
             "config_change_check_interval",
             30,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # How often to capture and log overall agent stats (in seconds).
+        # NOTE: This values must be >= config_change_check_interval.
+        self.__verify_or_set_optional_float(
+            config,
+            "overall_stats_log_interval",
+            600,
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        # How often to capture and log bandwidth related stats (in seconds).
+        # NOTE: This values must be >= config_change_check_interval.
+        self.__verify_or_set_optional_float(
+            config,
+            "bandwidth_stats_log_interval",
+            60,
             description,
             apply_defaults,
             env_aware=True,
@@ -2452,6 +2481,7 @@ class Configuration(object):
         apply_defaults=True,
         env_aware=False,
         env_name=None,
+        valid_values=None,
     ):
         """Verifies that the specified field in config_object is a string if present, otherwise sets default.
 
@@ -2467,6 +2497,7 @@ class Configuration(object):
         @param env_aware: If True and not defined in config file, look for presence of environment variable.
         @param env_name: If provided, will use this name to lookup the environment variable.  Otherwise, use
             scalyr_<field> as the environment variable name.
+        @param valid_values: Optional list with valid values for this string.
         """
         try:
             value = self.__get_config_or_environment_val(
@@ -2484,6 +2515,14 @@ class Configuration(object):
                 % (field, config_description),
                 field,
                 "notString",
+            )
+
+        if value is not None and valid_values and value not in valid_values:
+            raise BadConfiguration(
+                'Got invalid value "%s" for field "%s". Valid values are: %s'
+                % (value, field, ", ".join(valid_values)),
+                field,
+                "invalidValue",
             )
 
     def __verify_or_set_optional_int(

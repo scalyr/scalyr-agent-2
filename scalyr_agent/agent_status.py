@@ -32,6 +32,7 @@ from __future__ import print_function
 __author__ = "czerwin@scalyr.com"
 
 import os
+import copy
 
 import scalyr_agent.util as scalyr_util
 from scalyr_agent import compat
@@ -39,7 +40,40 @@ from scalyr_agent import compat
 import six
 
 
-class AgentStatus(object):
+class BaseAgentStatus(object):
+    """
+    Base agent status class which implements "to_dict()" method.
+    """
+
+    def to_dict(self):
+        # type: () -> dict
+        """
+        Return dictionary version of the status object. This dictionary contains only simple /
+        native values and is JSON serializable.
+        """
+        result = copy.deepcopy(self.__dict__)
+
+        # Recursively convert nested objects to dicts
+        for key, value in result.items():
+            if isinstance(value, (list, tuple)):
+                items = []
+                for item in value:
+                    if hasattr(item, "to_dict"):
+                        item = item.to_dict()
+                    items.append(item)
+                result[key] = items
+            elif isinstance(value, dict):
+                for item_key, item_value in value.items():
+                    if hasattr(item_value, "to_dict"):
+                        item_value = item_value.to_dict()
+                    result[key][item_key] = item_value
+            elif hasattr(value, "to_dict"):
+                result[key] = value.to_dict()
+
+        return result
+
+
+class AgentStatus(BaseAgentStatus):
     """The main status container object, holding references to all other status elements.
     """
 
@@ -67,7 +101,7 @@ class AgentStatus(object):
         self.monitor_manager_status = None
 
 
-class OverallStats(object):
+class OverallStats(AgentStatus):
     """Used to track stats that are calculated over the lifetime of the agent.
     """
 
@@ -174,7 +208,7 @@ class OverallStats(object):
         return result
 
 
-class ConfigStatus(object):
+class ConfigStatus(BaseAgentStatus):
     """The status pertaining to parsing of the configuration file."""
 
     def __init__(self):
@@ -193,8 +227,11 @@ class ConfigStatus(object):
         # The last time the agent checked to see if the configuration file has changed.
         self.last_check_time = None
 
+    def to_dict(self):
+        return self.__dict__
 
-class CopyingManagerStatus(object):
+
+class CopyingManagerStatus(BaseAgentStatus):
     """The status object containing information about the agent's copying components."""
 
     def __init__(self):
@@ -217,7 +254,7 @@ class CopyingManagerStatus(object):
         self.log_matchers = []
 
 
-class LogMatcherStatus(object):
+class LogMatcherStatus(BaseAgentStatus):
     """The status object containing information about all of the copying being performed for a particular
     log path including globbing."""
 
@@ -232,7 +269,7 @@ class LogMatcherStatus(object):
         self.log_processors_status = []
 
 
-class LogProcessorStatus(object):
+class LogProcessorStatus(BaseAgentStatus):
     """The status object containing information about the progress of the bytes being copied for a particular
     file."""
 
@@ -259,7 +296,7 @@ class LogProcessorStatus(object):
         self.total_redactions = 0
 
 
-class MonitorManagerStatus(object):
+class MonitorManagerStatus(BaseAgentStatus):
     """The status object containing information about all of the running monitors."""
 
     def __init__(self):
@@ -269,7 +306,7 @@ class MonitorManagerStatus(object):
         self.monitors_status = []
 
 
-class MonitorStatus(object):
+class MonitorStatus(BaseAgentStatus):
     """The status object for a specific instance of a ScalyrMonitor."""
 
     def __init__(self):

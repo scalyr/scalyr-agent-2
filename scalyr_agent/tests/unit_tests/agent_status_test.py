@@ -17,12 +17,22 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+from io import open
 
 __author__ = "czerwin@scalyr.com"
 
 import io
 import os
+import json
+import tempfile
 
+import mock
+import six
+
+from scalyr_agent.agent_main import ScalyrAgent
+from scalyr_agent.agent_main import STATUS_FORMAT_FILE
+from scalyr_agent.configuration import Configuration
+from scalyr_agent.platform_controller import PlatformController
 from scalyr_agent.agent_status import (
     OverallStats,
     AgentStatus,
@@ -40,11 +50,11 @@ from scalyr_agent.agent_status import (
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.compat import os_environ_unicode
 
-import six
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 
 
 class TestOverallStats(ScalyrTestCase):
-    def test_read_file_as_json(self):
+    def test___add___method(self):
         a = OverallStats()
         b = OverallStats()
 
@@ -444,3 +454,113 @@ Failed monitors:
   bad_monitor() 20 lines emitted, 40 errors
 """
         self.assertEquals(expected_output, output.getvalue())
+
+    def test_status_to_dict(self):
+        result = self.status.to_dict()
+
+        # Simple value on the OverallStats object
+        self.assertEqual(result["user"], "root")
+        self.assertEqual(result["version"], "2.0.0.beta.7")
+
+        # Verify nested status objects are recursively serialized to simple native types
+        config_status = result["config_status"]
+        self.assertEqual(config_status["status"], "Good")
+        self.assertEqual(config_status["last_error"], None)
+        self.assertEqual(config_status["last_check_time"], 1409958853)
+
+        copying_manager_status = result["copying_manager_status"]
+        self.assertEqual(copying_manager_status["last_attempt_size"], 10000)
+        self.assertEqual(copying_manager_status["log_matchers"][0]["is_glob"], False)
+        self.assertEqual(
+            copying_manager_status["log_matchers"][0]["log_path"],
+            "/var/logs/tomcat6/access.log",
+        )
+
+        monitor_manager_status = result["monitor_manager_status"]
+        self.assertEqual(monitor_manager_status["total_alive_monitors"], 2)
+        self.assertEqual(monitor_manager_status["monitors_status"][0]["errors"], 2)
+        self.assertEqual(monitor_manager_status["monitors_status"][0]["is_alive"], True)
+        self.assertEqual(
+            monitor_manager_status["monitors_status"][0]["monitor_name"],
+            "linux_process_metrics(agent)",
+        )
+
+        # Verify dict contains only simple types - JSON.dumps would fail if it doesn't
+        result_json = json.dumps(result)
+        self.assertEqual(json.loads(result_json), result)
+
+
+class AgentMainStatusHandlerTestCase(ScalyrTestCase):
+    def setUp(self):
+        super(AgentMainStatusHandlerTestCase, self).setUp()
+
+        self.data_path = tempfile.mkdtemp(suffix="agent-data-path")
+        self.status_format_file = os.path.join(self.data_path, STATUS_FORMAT_FILE)
+
+        default_paths = mock.Mock()
+        default_paths.agent_data_path = self.data_path
+        default_paths.agent_log_path = "agent.log"
+
+        config_file = os.path.join(BASE_DIR, "fixtures/configs/agent1.json")
+        config = Configuration(config_file, default_paths, None)
+        config.parse()
+
+        self.agent = ScalyrAgent(PlatformController())
+        self.agent._ScalyrAgent__config = config
+
+    def test_report_status_to_file_no_format_specified(self):
+        # No format is provided, should default to "text"
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_text_format_specified(self):
+        # "text" format is explicitly provided
+        self._write_status_format_file("text")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_invalid_format_specified(self):
+        # invalid format is explicitly provided, should fall back to text
+        self._write_status_format_file("invalid")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertTrue("Current time:" in content)
+        self.assertTrue("ServerHost:" in content)
+        self.assertTrue("Agent configuration:" in content)
+
+    def test_report_status_to_file_json_format_specified(self):
+        # "json" format is explicitly provided
+        self._write_status_format_file("json")
+
+        status_file = self.agent._ScalyrAgent__report_status_to_file()
+        content = self._read_status_file(status_file)
+
+        self.assertFalse("Current time:" in content)
+        self.assertFalse("ServerHost:" in content)
+        self.assertFalse("Agent configuration:" in content)
+
+        parsed = json.loads(content)
+        self.assertTrue("config_status" in parsed)
+        self.assertTrue("user" in parsed)
+        self.assertTrue("scalyr_server" in parsed)
+
+    def _write_status_format_file(self, status_format):
+        with open(self.status_format_file, "w") as fp:
+            fp.write(status_format.strip())
+
+    def _read_status_file(self, status_file_path):
+        with open(status_file_path, "r") as fp:
+            content = fp.read()
+
+        return content

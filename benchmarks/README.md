@@ -74,11 +74,11 @@ two types of metrics:
 
 * Gauges - those represent values which can change during the agent run time (think memory usage).
   We capture / sample those values multiple time during the run-time of the benchmark and at the
-  end, calculate 101.9 percentile and send that value as long as min, max and std_dev to CodeSpeed.
+  end, calculate 99.9 percentile and send that value as long as min, max and std_dev to CodeSpeed.
 * Counters - those represent values which monotonically increase during the agent run time (think
   total number of disk write requests).
 
-Each benchmark can also has "less is better" flag is associated with it. This flag represents a
+Each benchmark can also have a "less is better" flag associated with it. This flag represents a
 benchmark where smaller value is better (think duration or memory usage). On the other hand, there
 are benchmarks where larger value is better (think throughput).
 
@@ -91,6 +91,8 @@ are benchmarks where larger value is better (think throughput).
 
 * ``cpu_threads`` (counter) - Number of threads spawned during the agent process run time.
 * ``memory_usage_rss`` (counter) - Resident memory usage in MB.
+* ``memory_usage_rss_shared`` (counter) - Shared part of the resident memory usage in MB.
+* ``memory_usage_rss_private`` (counter) - Private part of the resident memory usage in MB.
 * ``memory_usage_vss`` (counter) - Virtual memory usage in MB.
 * ``io_open_fds`` (counter) - Number of open file descriptors.
 
