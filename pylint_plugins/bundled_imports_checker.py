@@ -29,9 +29,11 @@ from __future__ import print_function
 
 if False:
     from typing import List
+    from typing import Tuple
     from typing import Dict
     from typing import Set
     from typing import Any
+    from typing import Optional
 
 import os
 
@@ -103,17 +105,17 @@ class ThirdPartyBundledImportOrderChecker(BaseChecker):
 
     def visit_import(self, node):
         # type: (node_classes.Import) -> None
-        name = node.names[0][0]
-
-        if name in self._third_party_module_names:
-            node.name = name
+        module_name = node.names[0][0]
+        if module_name in self._third_party_module_names:
+            node.name = module_name
             node_file_path = self._get_file_path_for_node(node=node)
             self._third_party_import_nodes[node_file_path].add(node)
 
     def visit_importfrom(self, node):
         # type: (node_classes.Import) -> None
-        if node.modname in self._third_party_module_names:
-            node.name = node.modname
+        module_name = node.modname
+        if module_name in self._third_party_module_names:
+            node.name = module_name
             node_file_path = self._get_file_path_for_node(node=node)
             self._third_party_import_nodes[node_file_path].add(node)
 
@@ -173,24 +175,51 @@ def get_third_party_package_module_names():
     """
     Return a list of bundled 3rd party package and module names.
     """
-    result = []
+    result = []  # type: List[str]
+
+    def is_python_package(directory_path, file_path):
+        # type: (str, str) -> Tuple[bool, Optional[str]]
+        """
+        Return package name if the provided file path is a Python package, None otherwise.
+        """
+        file_name = os.path.basename(file_path)
+        init_file_path = os.path.join(file_path, "__init__.py")
+
+        if os.path.isdir(file_path) and os.path.isfile(init_file_path):
+            # Package
+            return (True, file_name)
+
+        return (False, None)
+
+    def is_python_module(directory_path, file_path):
+        # type: (str, str) -> Tuple[bool, Optional[str]]
+        """
+        Return package name if the provided file path is a Python package, None otherwise.
+        """
+        if (
+            os.path.isfile(file_path)
+            and file_path.endswith(".py")
+            and file_name != "__init__.py"
+        ):
+            # Single file module (e.g. six.py)
+            module_name = file_name.replace(".py", "")
+            return (True, module_name)
+
+        return (False, None)
+
     for directory_path in THIRD_PARTY_DIRECTORIES:
         file_names = os.listdir(directory_path)
 
         for file_name in file_names:
             file_path = os.path.join(directory_path, file_name)
-            init_file_path = os.path.join(file_path, "__init__.py")
 
-            if os.path.isdir(file_path) and os.path.isfile(init_file_path):
-                # Package
-                result.append(file_name)
-            elif (
-                os.path.isfile(file_path)
-                and file_path.endswith(".py")
-                and file_name != "__init__.py"
-            ):
-                # Single file module (e.g. six.py)
-                result.append(file_name.replace(".py", ""))
+            python_package, package_name = is_python_package(directory_path, file_path)
+            python_module, module_name = is_python_module(directory_path, file_path)
+
+            if python_package and package_name:
+                result.append(package_name)
+            elif python_module and module_name:
+                result.append(module_name)
 
     return result
 
