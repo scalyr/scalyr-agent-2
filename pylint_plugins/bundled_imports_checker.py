@@ -194,7 +194,7 @@ def get_third_party_package_module_names():
     def is_python_module(directory_path, file_path):
         # type: (str, str) -> Tuple[bool, Optional[str]]
         """
-        Return package name if the provided file path is a Python package, None otherwise.
+        Return module name if the provided file path is a Python module, None otherwise.
         """
         if (
             os.path.isfile(file_path)
