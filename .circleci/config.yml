@@ -228,7 +228,7 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            #export AGENT_HOST_NAME=agent-rpm-smoke-${CIRCLE_BUILD_NUM}
+            export AGENT_HOST_NAME=agent-smoke-standalone-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
@@ -270,8 +270,7 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            export AGENT_HOST_NAME=agent-rpm-smoke-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
-            #export AGENT_HOST_NAME=${AGENT_HOST_NAME}
+            export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image_cache-path ~/agent_image
 
       - save_cache:
@@ -910,6 +909,8 @@ workflows:
     jobs:
       - smoke-rpm-package-py3-new
       - smoke-rpm-package-py2-new
+      - smoke-deb-package-py3-new
+      - smoke-deb-package-py2-new
       - smoke-standalone-38-new
       - smoke-standalone-37-new
       - smoke-standalone-36-new
