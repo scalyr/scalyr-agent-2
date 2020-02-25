@@ -1407,7 +1407,7 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 self.__channel.write(
                     compat.struct_pack_unicode("i", code) + encoded_content
                 )
@@ -1567,7 +1567,7 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 code = compat.struct_unpack_unicode("i", self.__channel.read(4))[
                     0
                 ]  # Read str length
