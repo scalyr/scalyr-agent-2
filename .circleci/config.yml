@@ -7,8 +7,6 @@ master_only: &master_only
     branches:
       only:
         - master
-        - performance_tracking
-        - release_performance_tracking
 
 version: 2.1
 commands:
