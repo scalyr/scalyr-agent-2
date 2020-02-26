@@ -89,9 +89,8 @@ class AgentRunner(object):
         return path
 
     @_path_or_text
-    def add_log_file(
-        self, path, attributes=None
-    ):  # type: (Path, Optional[Dict[six.text_type, Any]]) -> Path
+    def add_log_file(self, path, attributes=None):
+        # type: (Path, Optional[Dict[six.text_type, Any]]) -> Path
         path = self.add_file(path)
 
         if attributes is None:
@@ -214,13 +213,14 @@ class AgentRunner(object):
         # type: (Path, six.text_type) -> None
         """
         Write data to the file located in 'path'
-        :return:
         """
+        data = six.ensure_text(data)
         with path.open("a") as f:
             f.write(data)
             f.flush()
 
     def write_line(self, path, data):
-        # type: (Path, Any[six.text_type, six.binary_type]) -> None
-        final_data = data + type(data)("\n")
-        self.write_to_file(path, final_data)
+        # type: (Path, six.text_type) -> None
+        data = six.ensure_text(data)
+        data = "{0}\n".format(data)
+        self.write_to_file(path, data)
