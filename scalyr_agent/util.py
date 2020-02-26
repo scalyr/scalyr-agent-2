@@ -1039,7 +1039,9 @@ class StoppableThread(threading.Thread):
                 name = "%s%s" % (name_prefix, name)
             else:
                 name = name_prefix
-        threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        # NOTE: We explicitly don't pass target= argument to the parent constructor since this
+        # creates a cycle and a memory leak
+        threading.Thread.__init__(self, name=name)
         if is_daemon:
             self.setDaemon(True)
         self.__target = target
