@@ -435,16 +435,12 @@ if __name__ == "__main__":
     else:
         files_to_process = set([os.path.abspath(file_path) for file_path in args.files])
 
-    # exclude 3rd party libraries, etc
-    smoke_test_files = set(glob.glob("{0}/tests/**/*.py".format(root), recursive=True))
-
     # files without third party libraries.
     files_to_process = (
         files_to_process
         - third_party_files
         - venv_files
         - modernize_files
-        - smoke_test_files
         - other_files_to_exclude
     )
 

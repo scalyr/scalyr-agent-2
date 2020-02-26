@@ -23,6 +23,7 @@ import six
 import yaml
 
 from smoke_tests.tools.compat import Path
+from scalyr_agent import compat
 
 
 def pytest_addoption(parser):
@@ -81,7 +82,7 @@ def agent_environment(test_config, agent_env_settings_fields):
     """
     agent_settings = test_config.get("agent_settings", dict())
     for name in agent_env_settings_fields:
-        value = os.environ.get(name, agent_settings.get(name))
+        value = compat.os_environ_unicode.get(name, agent_settings.get(name))
 
         if not value:
             raise NameError("'{0}' environment variable must be specified.".format(name))
