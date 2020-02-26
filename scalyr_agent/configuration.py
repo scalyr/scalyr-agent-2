@@ -2905,95 +2905,110 @@ class Configuration(object):
         @param source_config:  The configuration to rewrite, represented as key/value pairs.
         @type source_config: JsonObject
         """
-
-        def import_shell_variables():
-            """Creates a dict mapping variables listed in the `import_vars` field of `source_config` to their
-            values from the environment.
-            """
-            result = dict()
-            if "import_vars" in source_config:
-                for entry in source_config.get_json_array("import_vars"):
-                    # Allow for an entry of the form { var: "foo", default: "bar"}
-                    if isinstance(entry, JsonObject):
-                        var_name = entry["var"]
-                        default_value = entry["default"]
-                    else:
-                        var_name = entry
-                        default_value = ""
-
-                    # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
-                    var_value = os_environ_unicode.get(var_name)
-                    if var_value:
-                        result[var_name] = var_value
-                    else:
-                        result[var_name] = default_value
-            return result
-
-        def perform_generic_substitution(value):
-            """Takes a given JSON value and performs the appropriate substitution.
-
-            This method will return a non-None value if the value has to be replaced with the returned value.
-            Otherwise, this will attempt to perform in-place substitutions.
-
-            For str, unicode, it substitutes the variables and returns the result.  For
-            container objects, it does the recursive substitution.
-
-            @param value: The JSON value
-            @type value: Any valid element of a JsonObject
-            @return: The value that should replace the original, if any.  If no replacement is necessary, returns None
-            """
-            result = None
-            value_type = type(value)
-
-            if value_type is six.text_type and "$" in value:
-                result = perform_str_substitution(value)
-            elif isinstance(value, JsonObject):
-                perform_object_substitution(value)
-            elif isinstance(value, JsonArray):
-                perform_array_substitution(value)
-            return result
-
-        def perform_object_substitution(object_value):
-            """Performs the in-place substitution for a JsonObject.
-
-            @param object_value: The object to perform substitutions on.
-            @type object_value: JsonObject
-            """
-            # We collect the new values and apply them later to avoid messing up the iteration.
-            new_values = {}
-            for (key, value) in six.iteritems(object_value):
-                replace_value = perform_generic_substitution(value)
-                if replace_value is not None:
-                    new_values[key] = replace_value
-
-            for (key, value) in six.iteritems(new_values):
-                object_value[key] = value
-
-        def perform_str_substitution(str_value):
-            """Performs substitutions on the given string.
-
-            @param str_value: The input string.
-            @type str_value: str or unicode
-            @return: The resulting value after substitution.
-            @rtype: str or unicode
-            """
-            result = str_value
-            for (var_name, value) in six.iteritems(substitutions):
-                result = result.replace("$%s" % var_name, value)
-            return result
-
-        def perform_array_substitution(array_value):
-            """Perform substitutions on the JsonArray.
-
-            @param array_value: The array
-            @type array_value: JsonArray
-            """
-            for i in range(len(array_value)):
-                replace_value = perform_generic_substitution(array_value[i])
-                if replace_value is not None:
-                    array_value[i] = replace_value
-
-        # Actually do the work.
-        substitutions = import_shell_variables()
+        substitutions = import_shell_variables(source_config=source_config)
         if len(substitutions) > 0:
-            perform_object_substitution(source_config)
+            perform_object_substitution(
+                object_value=source_config, substitutions=substitutions
+            )
+
+
+"""
+Utility functions related to shell variable handling and substition.
+
+NOTE: Those functions are intentionally not defined inside "__perform_substitutions" to avoid memory
+leaks.
+"""
+
+
+def import_shell_variables(source_config):
+    """Creates a dict mapping variables listed in the `import_vars` field of `source_config` to their
+    values from the environment.
+    """
+    result = dict()
+    if "import_vars" in source_config:
+        for entry in source_config.get_json_array("import_vars"):
+            # Allow for an entry of the form { var: "foo", default: "bar"}
+            if isinstance(entry, JsonObject):
+                var_name = entry["var"]
+                default_value = entry["default"]
+            else:
+                var_name = entry
+                default_value = ""
+
+            # 2->TODO in python2 os.environ returns 'str' type. Convert it to unicode.
+            var_value = os_environ_unicode.get(var_name)
+            if var_value:
+                result[var_name] = var_value
+            else:
+                result[var_name] = default_value
+    return result
+
+
+def perform_generic_substitution(value, substitutions):
+    """Takes a given JSON value and performs the appropriate substitution.
+
+    This method will return a non-None value if the value has to be replaced with the returned value.
+    Otherwise, this will attempt to perform in-place substitutions.
+
+    For str, unicode, it substitutes the variables and returns the result.  For
+    container objects, it does the recursive substitution.
+
+    @param value: The JSON value
+    @type value: Any valid element of a JsonObject
+    @return: The value that should replace the original, if any.  If no replacement is necessary, returns None
+    """
+    result = None
+    value_type = type(value)
+
+    if value_type is six.text_type and "$" in value:
+        result = perform_str_substitution(value, substitutions=substitutions)
+    elif isinstance(value, JsonObject):
+        perform_object_substitution(value, substitutions=substitutions)
+    elif isinstance(value, JsonArray):
+        perform_array_substitution(value, substitutions=substitutions)
+    return result
+
+
+def perform_object_substitution(object_value, substitutions):
+    """Performs the in-place substitution for a JsonObject.
+
+    @param object_value: The object to perform substitutions on.
+    @type object_value: JsonObject
+    """
+    # We collect the new values and apply them later to avoid messing up the iteration.
+    new_values = {}
+    for (key, value) in six.iteritems(object_value):
+        replace_value = perform_generic_substitution(value, substitutions=substitutions)
+        if replace_value is not None:
+            new_values[key] = replace_value
+
+    for (key, value) in six.iteritems(new_values):
+        object_value[key] = value
+
+
+def perform_str_substitution(str_value, substitutions):
+    """Performs substitutions on the given string.
+
+    @param str_value: The input string.
+    @type str_value: str or unicode
+    @return: The resulting value after substitution.
+    @rtype: str or unicode
+    """
+    result = str_value
+    for (var_name, value) in six.iteritems(substitutions):
+        result = result.replace("$%s" % var_name, value)
+    return result
+
+
+def perform_array_substitution(array_value, substitutions):
+    """Perform substitutions on the JsonArray.
+
+    @param array_value: The array
+    @type array_value: JsonArray
+    """
+    for i in range(len(array_value)):
+        replace_value = perform_generic_substitution(
+            array_value[i], substitutions=substitutions
+        )
+        if replace_value is not None:
+            array_value[i] = replace_value
