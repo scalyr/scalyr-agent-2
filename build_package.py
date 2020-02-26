@@ -736,7 +736,6 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --maintainer czerwin@scalyr.com "
         "  --provides scalyr-agent-2 "
         '  --description "%s" '
-        '  --depends "python >= 2.4" '
         '  --depends "bash >= 3.2" '
         "  --url https://www.scalyr.com "
         "  --deb-user root "
@@ -1233,6 +1232,31 @@ def create_scriptlets():
     fp = open("preinstall.sh", "w")
     fp.write(
         r"""#!/bin/bash
+
+echo "Check for python."
+# look for 'python' by '/usr/bin/env', exit with error if it is not found.
+/usr/bin/env python --version >/dev/null 2>&1 || \
+{ echo -e >&2 "\e[31mThe suitable python interpreter is not found. Aborting.\e[0m"; \
+echo -e >&2 "The command - '/usr/bin/env python' has to point to the python interpreter with version \e[31m>=2.6 or >=3.5\e[0m."; exit 1; }
+
+# get first two digits from python version.
+version_string=$(/usr/bin/env python --version 2>&1 | grep -Po "\d.\d")
+
+echo "Check python version."
+
+if [[ "$version_string" < "2.6" ]]; then
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        exit 1
+fi
+
+if [[ "$version_string" > "3.0" ]]; then
+    if [[ "$version_string" < "3.5" ]]; then
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        exit 1
+    fi
+fi
+
+echo -e "\e[36mPython interpreter found. Version: ${version_string}\e[0m"
 
 # Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.
