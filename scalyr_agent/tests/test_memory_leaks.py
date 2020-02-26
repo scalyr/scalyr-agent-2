@@ -24,7 +24,6 @@ import os
 import gc
 import unittest
 
-import six
 import pytest
 
 from scalyr_agent.configuration import Configuration
@@ -39,8 +38,7 @@ __all__ = ["MemoryLeaksTestCase"]
 
 # By default all the tests run inside a single process so we mark this test and run it separately
 # since we don't want other tests to affect behavior of this test.
-@pytest.mark.memory_leak_test
-@unittest.skipIf(six.PY2, "Skipping tests under Python 2")
+@pytest.mark.memory_leak
 class MemoryLeaksTestCase(unittest.TestCase):
     def setUp(self):
         super(MemoryLeaksTestCase, self).setUp()
