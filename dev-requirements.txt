@@ -7,6 +7,7 @@ tox==3.14.3
 mock==3.0.5
 pytest==4.6.9
 pytest-coverage
+pytest-timeout==1.3.4
 coverage==4.5.4
 codecov==2.0.15
 PyYAML==5.3
@@ -15,7 +16,6 @@ docker==4.1.0
 # the version of 'requests' library that 'docker' uses as a dependency is higher than we use in agent,
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.15.1
-pytest-timeout==1.3.4
 ujson==1.35
 
 pathlib2==2.3.5; python_version <= '2.7'

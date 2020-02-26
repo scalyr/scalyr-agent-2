@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-# This script is convenient to run circlici job on lical macine.
+# This script is convenient to run circlici job on local machine.
 # What this script does:
 # - converts config to 2.0 version because CircleCi CLI does not support config version higher than 2.0.
 # - set root user for all jobs with 'setup_remote_docker',
-#   because 'circleci' does not have permisions to run docker commands.
+#   because 'circleci' user does not have permissions to run docker commands in local mode.
 #
 # usage: circleci_cli.py <any available options that circleci accepts>
 #
@@ -18,6 +18,7 @@ import os
 import shutil
 import sys
 from io import open
+
 import yaml
 
 

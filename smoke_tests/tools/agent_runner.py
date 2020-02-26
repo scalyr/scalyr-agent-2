@@ -55,7 +55,7 @@ class AgentRunner(object):
        Agent runner provides ability to launch Scalyr agent with needed configuration settings.
        """
 
-    def __init__(self, installation_type=DEV_INSTALL):  # type: (six.text_type) -> None
+    def __init__(self, installation_type=DEV_INSTALL):  # type: (int) -> None
 
         # agent data directory path.
         self._agent_data_dir_path = None  # type: Optional[Path]
@@ -69,9 +69,6 @@ class AgentRunner(object):
 
         # all files processed by the agent
         self._files = dict()  # type: Dict[six.text_type, Path]
-
-        # opened file objects for all files.
-        self._file_objects = dict()
 
         # all files considered as a log files.
         self._log_files = dict()  # type: Dict[six.text_type, Dict[six.text_type, Any]]
@@ -93,7 +90,7 @@ class AgentRunner(object):
 
     @_path_or_text
     def add_log_file(
-            self, path, attributes=None
+        self, path, attributes=None
     ):  # type: (Path, Optional[Dict[six.text_type, Any]]) -> Path
         path = self.add_file(path)
 
@@ -214,19 +211,14 @@ class AgentRunner(object):
         return path.read_text()
 
     def write_to_file(self, path, data):
-        # type: (Path, Any[six.text_type, six.binary_type]) -> None
+        # type: (Path, six.text_type) -> None
         """
         Write data to the file located in 'path'
         :return:
         """
-        data = six.ensure_text(data)
-
-        file_object = self._file_objects.get(six.text_type(path))
-        if file_object is None:
-            file_object = path.open("w+")
-            self._file_objects[six.text_type(path)] = file_object
-        file_object.write(data)
-        file_object.flush()
+        with path.open("a") as f:
+            f.write(data)
+            f.flush()
 
     def write_line(self, path, data):
         # type: (Path, Any[six.text_type, six.binary_type]) -> None

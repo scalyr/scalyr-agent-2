@@ -16,7 +16,7 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-import pytest
+import pytest  # type: ignore
 import docker
 
 from smoke_tests.tools.compat import Path
@@ -47,10 +47,11 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
 
     docker_client = docker.from_env()
 
-    print("Get docker image for '{0}' and '{1}'".format(
-        package_distribution,
-        package_python_version
-    ))
+    print(
+        "Get docker image for '{0}' and '{1}'".format(
+            package_distribution, package_python_version
+        )
+    )
     distribution_builder_class = get_agent_distribution_builder(
         package_distribution, package_python_version
     )
@@ -65,8 +66,7 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
 
     # clear containers with the same name.
     found_containers = docker_client.containers.list(
-        all=True,
-        filters={"name": distribution_builder_class.IMAGE_TAG}
+        all=True, filters={"name": distribution_builder_class.IMAGE_TAG}
     )
     if found_containers:
         for cont in found_containers:
@@ -90,13 +90,13 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
         detach=True,
         stdout=True,
         command="python -m pytest smoke_tests/standalone_smoke_test.py "
-                "-s -vv --config config.yml --runner-type PACKAGE",
+        "-s -vv --config config.yml --runner-type PACKAGE",
     )
 
     stream = container.logs(stream=True)
 
     for line in stream:
-        print(line.decode(), end='')
+        print(line.decode(), end="")
 
     exit_code = container.wait()
 

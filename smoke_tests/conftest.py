@@ -18,7 +18,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 import os
 
-import pytest
+import pytest  # type: ignore
 import six
 import yaml
 
@@ -85,7 +85,9 @@ def agent_environment(test_config, agent_env_settings_fields):
         value = compat.os_environ_unicode.get(name, agent_settings.get(name))
 
         if not value:
-            raise NameError("'{0}' environment variable must be specified.".format(name))
+            raise NameError(
+                "'{0}' environment variable must be specified.".format(name)
+            )
         os.environ[name] = value
 
     yield

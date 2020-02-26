@@ -16,16 +16,12 @@ from __future__ import absolute_import
 from __future__ import unicode_literals
 from __future__ import print_function
 
-if False:
-    from typing import Optional
-
 import datetime
 import time
 import json
 import re
-import os
 
-import pytest
+import pytest  # type: ignore
 
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent import compat
@@ -45,13 +41,18 @@ _AGENT_LOG_LINE_BASE_PATTERN = r"\s*(?P<timestamp>{0})\s+(?P<level>{1})\s+\[(?P<
 
 
 def _make_agent_log_line_pattern(
-        timestamp=_TIMESTAMP_PATTERN,
-        level=_LEVEL_PATTERN,
-        logger_name=_LOGGER_NAME_PATTERN,
-        file_name=_FILE_NAME_PATTERN,
-        message=None,
+    timestamp=_TIMESTAMP_PATTERN,
+    level=_LEVEL_PATTERN,
+    logger_name=_LOGGER_NAME_PATTERN,
+    file_name=_FILE_NAME_PATTERN,
+    message=None,
 ):
-    base_pattern = _AGENT_LOG_LINE_BASE_PATTERN.format(timestamp, level, logger_name, file_name)
+    """
+    Build regex pattern for 'agent.log' log lines.
+    """
+    base_pattern = _AGENT_LOG_LINE_BASE_PATTERN.format(
+        timestamp, level, logger_name, file_name
+    )
     if message:
         pattern_str = "{0}{1}".format(base_pattern, message)
     else:
@@ -61,21 +62,27 @@ def _make_agent_log_line_pattern(
     return pattern
 
 
-NORMAL = 0
-ITERATIVE = 1
-
-
 class AgentVerifier(object):
-    NAME = None  # type: Optional[six.text_type]
-    DESCRIPTION = None  # type: Optional[six.text_type]
-    TYPE = ITERATIVE
+    """
+    Base abstraction for agent log files verification.
+    """
+
     RETRY_DELAY = 5
 
     def __init__(
-            self, runner, server_address
+        self, runner, server_address
     ):  # type: (AgentRunner, six.text_type) ->None
         self._runner = runner
         self._server_address = server_address
+        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
+        self._start_time = time.time()
+
+        self._request = ScalyrRequest(
+            server_address=self._server_address,
+            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
+            max_count=5000,
+            start_time=self._start_time,
+        )
 
     def prepare(self):
         pass
@@ -84,45 +91,28 @@ class AgentVerifier(object):
         pass
 
     def verify(self):
-        if type(self).TYPE == ITERATIVE:
-            retry_delay = type(self).RETRY_DELAY
-            while True:
-                print("========================================================")
-                if self._verify():
-                    print("Success.")
-                    return True
-                print("Retry in {0} sec.".format(retry_delay))
-                print("========================================================")
-                time.sleep(retry_delay)
-        else:
-            return self._verify()
+        retry_delay = type(self).RETRY_DELAY
+        while True:
+            print("========================================================")
+            if self._verify():
+                print("Success.")
+                return True
+            print("Retry in {0} sec.".format(retry_delay))
+            print("========================================================")
+            time.sleep(retry_delay)
 
 
 class AgentLogVerifier(AgentVerifier):
-    NAME = "Agent.log"
-    DESCRIPTION = "Verify 'agent.log' file."
-
     def __init__(self, runner, server_address):
         super(AgentLogVerifier, self).__init__(runner, server_address)
         self.agent_log_file_path = runner.agent_log_file_path
-        self._start_time = time.time()
-        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
-        # create request to fetch agent.log file data.
-        request = ScalyrRequest(
-            server_address=self._server_address,
-            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
-            max_count=5000,
-            start_time=self._start_time,
-        )
-
-        request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
-        request.add_filter(
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
             "$logfile=='{0}'".format(
                 self._runner.get_file_path_text(self.agent_log_file_path)
             )
         )
-        self._request = request
 
     def _verify(self):
         local_agent_log_data = self._runner.read_file_content(
@@ -178,6 +168,11 @@ class AgentLogVerifier(AgentVerifier):
 
 
 class DataJsonVerifier(AgentVerifier):
+    """
+    Simple verifier that writes 1000 lines into the 'data.json' log file
+    and then waits those lines from the Scalyr server.
+    """
+
     def __init__(self, runner, server_address):
         super(DataJsonVerifier, self).__init__(runner, server_address)
 
@@ -185,25 +180,14 @@ class DataJsonVerifier(AgentVerifier):
             self._runner.agent_logs_dir_path / "data.log"
         )
         self._timestamp = datetime.datetime.now().isoformat()
-        self._start_time = time.time()
-        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
-        request = ScalyrRequest(
-            server_address=self._server_address,
-            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
-            max_count=5000,
-            start_time=self._start_time,
-        )
-
-        request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
-        request.add_filter(
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
             "$logfile=='{0}'".format(
                 self._runner.get_file_path_text(self._data_json_log_path)
             )
         )
-        request.add_filter("$stream_id=='{0}'".format(self._timestamp))
-
-        self._request = request
+        self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
     def prepare(self):
         print("Write test data to log file '{0}'".format(self._data_json_log_path))
@@ -227,30 +211,23 @@ class DataJsonVerifier(AgentVerifier):
 
 
 class SystemMetricsVerifier(AgentVerifier):
+    """
+    Verifier that checks that linux_system_metrics.log file was uploaded to the Scalyr server.
+    """
+
     def __init__(self, runner, server_address):
         super(SystemMetricsVerifier, self).__init__(runner, server_address)
 
         self._system_metrics_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "linux_system_metrics.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
-        self._start_time = time.time()
-        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
-        request = ScalyrRequest(
-            server_address=self._server_address,
-            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
-            max_count=5000,
-            start_time=self._start_time,
-        )
-
-        request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
-        request.add_filter(
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
             "$logfile=='{0}'".format(
                 self._runner.get_file_path_text(self._system_metrics_log_path)
             )
         )
-        self._request = request
 
     def _verify(self):
         try:
@@ -267,30 +244,23 @@ class SystemMetricsVerifier(AgentVerifier):
 
 
 class ProcessMetricsVerifier(AgentVerifier):
+    """
+    Verifier that checks that linux_process_metrics.log file was uploaded to the Scalyr server.
+    """
+
     def __init__(self, runner, server_address):
         super(ProcessMetricsVerifier, self).__init__(runner, server_address)
 
         self._process_metrics_log_path = self._runner.add_log_file(
             self._runner.agent_logs_dir_path / "linux_process_metrics.log"
         )
-        self._timestamp = datetime.datetime.now().isoformat()
-        self._start_time = time.time()
-        self._agent_host_name = compat.os_environ_unicode["AGENT_HOST_NAME"]
 
-        request = ScalyrRequest(
-            server_address=self._server_address,
-            read_api_key=compat.os_environ_unicode["READ_API_KEY"],
-            max_count=5000,
-            start_time=self._start_time,
-        )
-
-        request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
-        request.add_filter(
+        self._request.add_filter("$serverHost=='{0}'".format(self._agent_host_name))
+        self._request.add_filter(
             "$logfile=='{0}'".format(
                 self._runner.get_file_path_text(self._process_metrics_log_path)
             )
         )
-        self._request = request
 
     def _verify(self):
         try:
@@ -323,18 +293,30 @@ def test_standalone_smoke(request):
         installation_type = DEV_INSTALL
     runner = AgentRunner(installation_type)
 
-    agent_log_verifier = AgentLogVerifier(runner, compat.os_environ_unicode["SCALYR_SERVER"])
-    data_json_verifier = DataJsonVerifier(runner, compat.os_environ_unicode["SCALYR_SERVER"])
-    system_metrics_verifier = SystemMetricsVerifier(runner, compat.os_environ_unicode["SCALYR_SERVER"])
-    process_metrics_verifier = ProcessMetricsVerifier(runner, compat.os_environ_unicode["SCALYR_SERVER"])
+    agent_log_verifier = AgentLogVerifier(
+        runner, compat.os_environ_unicode["SCALYR_SERVER"]
+    )
+    data_json_verifier = DataJsonVerifier(
+        runner, compat.os_environ_unicode["SCALYR_SERVER"]
+    )
+    system_metrics_verifier = SystemMetricsVerifier(
+        runner, compat.os_environ_unicode["SCALYR_SERVER"]
+    )
+    process_metrics_verifier = ProcessMetricsVerifier(
+        runner, compat.os_environ_unicode["SCALYR_SERVER"]
+    )
 
     runner.start()
     print("Verify 'agent.log'")
     assert agent_log_verifier.verify(), "Verification of the file: 'agent.log' failed"
     print("Verify 'linux_system_metrics.log'")
-    assert system_metrics_verifier.verify(), "Verification of the file: 'linux_system_metrics.log' failed"
+    assert (
+        system_metrics_verifier.verify()
+    ), "Verification of the file: 'linux_system_metrics.log' failed"
     print("Verify 'linux_process_metrics.log'")
-    assert process_metrics_verifier.verify(), "Verification of the file: 'linux_process_metrics.log' failed"
+    assert (
+        process_metrics_verifier.verify()
+    ), "Verification of the file: 'linux_process_metrics.log' failed"
 
     data_json_verifier.prepare()
     assert data_json_verifier.verify(), "Verification of the file: 'data.json' failed"

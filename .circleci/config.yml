@@ -228,21 +228,25 @@ commands:
           command: |
             export AGENT_HOST_NAME=agent-smoke-standalone-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
+            mkdir -p ~/artifacts
+            cp ~/scalyr-agent-dev/log/agent.log ~/artifacts/agent.log
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
+            - "~/.cache/pip"
 
-      - run:
-          name: "Show agent.log"
-          command: |
-            cat ~/scalyr-agent-dev/log/agent.log
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/artifacts
 
   smoke-package:
+    description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
     parameters:
       distribution:
+        description: "The name of the distribution where the agent will be installed."
         type: string
       python_version:
+        description: "The version of the python interpreter to install in distribution."
         type: string
     steps:
       - checkout
@@ -254,7 +258,6 @@ commands:
       - run:
           name: Install Dependencies
           command: |
-            #pip install -r dev-requirements.txt
             pip install "tox==<< pipeline.parameters.default_tox_version >>"
 
       - run:
@@ -275,6 +278,8 @@ commands:
           command: |
             export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            mkdir -p ~/artifacts
+            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent.log ~/artifacts/agent.log
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
@@ -287,11 +292,9 @@ commands:
           paths:
             - "~/.cache/pip."
 
-      - run:
-          name: "Show agent.log"
-          command: |
-            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent.log agent.log
-            cat agent.log
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/artifacts
 
 jobs:
   unittest-38:
@@ -862,10 +865,6 @@ workflows:
       - unittest-35
       - unittest-27
       - unittest-26
-      - smoke-rpm-package-py3
-      - smoke-rpm-package-py2
-      - smoke-deb-package-py3
-      - smoke-deb-package-py2
       - smoke-standalone-38
       - smoke-standalone-37
       - smoke-standalone-36
@@ -884,7 +883,24 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
-
+  package-smoke-tests:
+    jobs:
+      - smoke-rpm-package-py3:
+          filters:
+            branches:
+              only: master
+      - smoke-rpm-package-py2:
+          filters:
+            branches:
+              only: master
+      - smoke-deb-package-py3:
+          filters:
+            branches:
+              only: master
+      - smoke-deb-package-py2:
+          filters:
+            branches:
+              only: master
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
