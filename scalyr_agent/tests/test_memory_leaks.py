@@ -20,6 +20,10 @@ are not present anymore.
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+if False:
+    from typing import Any
+    from typing import Set
+
 import os
 import gc
 import unittest
@@ -29,6 +33,7 @@ import pytest
 from scalyr_agent.configuration import Configuration
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.util import StoppableThread
+from scalyr_agent.json_lib import JsonObject
 from six.moves import range
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
@@ -84,7 +89,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
             new_garbage = garbage.difference(self.base_gargage)
             self.assertEqual(len(new_garbage), 0)
 
-    def test_stopptable_thread_init_memory_leaks(self):
+    def test_stopptable_thread_init_memory_leak(self):
         # There was a bug with StoppableThread constructor having a cycle
         for index in range(0, 100):
             thread = StoppableThread(name="test1")
@@ -95,8 +100,38 @@ class MemoryLeaksTestCase(unittest.TestCase):
             new_garbage = garbage.difference(self.base_gargage)
             self.assertEqual(len(new_garbage), 0)
 
+    def test_json_object_to_dict_memory_leak(self):
+        content = {"foo": "bar", "a": 2, "b": [1, 2, 3]}
+
+        # New object
+        for index in range(0, 100):
+            json_object = JsonObject(content=content)
+            dict_value = json_object.to_dict()
+            self.assertEqual(content, dict_value)
+
+            gc.collect()
+            garbage = self._garbage_to_set(gc.garbage)
+            new_garbage = garbage.difference(self.base_gargage)
+            self.assertEqual(len(new_garbage), 0)
+
+        # Existing object
+        json_object = JsonObject(content=content)
+
+        for index in range(0, 100):
+            dict_value = json_object.to_dict()
+            self.assertEqual(content, dict_value)
+
+            gc.collect()
+            garbage = self._garbage_to_set(gc.garbage)
+            new_garbage = garbage.difference(self.base_gargage)
+            self.assertEqual(len(new_garbage), 0)
+
     def _garbage_to_set(self, garbage):
+        # type: (Any) -> Set[str]
         """
         Return set with serializable gargage data.
+
+        By default garbage object contains various types (e.g. cell) which are not serializable so
+        we use simple string representation which is sufficient for our use case.
         """
         return set([str(obj) for obj in garbage])
