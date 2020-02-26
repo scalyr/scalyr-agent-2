@@ -386,11 +386,15 @@ def create_uuid3(namespace, name):
     :param namespace: The namespace
     :param name: The string
     :type namespace: uuid.UUID
-    :type name: six.text | six.binary
+    :type name: six.text
     :return:
     :rtype: uuid.UUID
     """
-    return uuid.uuid3(namespace, six.ensure_binary(name))
+    if six.PY2:
+        return uuid.uuid3(namespace, six.ensure_binary(name))
+    else:
+        # noinspection PyTypeChecker
+        return uuid.uuid3(namespace, six.ensure_text(name))
 
 
 def md5_hexdigest(data):
