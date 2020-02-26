@@ -1245,13 +1245,13 @@ version_string=$(/usr/bin/env python --version 2>&1 | grep -Po "\d.\d")
 echo "Check python version."
 
 if [[ "$version_string" < "2.6" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
         exit 1
 fi
 
 if [[ "$version_string" > "3.0" ]]; then
     if [[ "$version_string" < "3.5" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
         exit 1
     fi
 fi
