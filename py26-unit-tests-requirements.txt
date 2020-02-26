@@ -13,3 +13,4 @@ oscrypto==0.19.1
 docker-py==1.10.6
 requests==2.18.0
 pathlib2==2.3.5
+PyYAML==4.2b4
