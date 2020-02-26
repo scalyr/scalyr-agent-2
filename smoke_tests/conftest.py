@@ -59,6 +59,10 @@ def agent_env_settings_fields():
 
 @pytest.fixture(scope="session")
 def test_config(request, agent_env_settings_fields):
+    """
+    load config file as dict if it is located in project root and its path specified in pytest command line.
+    If it is not specified, return empty dict.
+    """
     config_path = request.config.getoption("--config")
     if config_path and Path(config_path).exists():
         config_path = Path(config_path)
@@ -68,11 +72,6 @@ def test_config(request, agent_env_settings_fields):
         config = dict()
 
     return config
-
-
-@pytest.fixture(scope="session")
-def agent_settings(test_config):
-    return test_config["agent_settings"]
 
 
 @pytest.fixture()

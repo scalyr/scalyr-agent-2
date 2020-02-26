@@ -23,6 +23,7 @@ import datetime
 import time
 import json
 import re
+import os
 
 import pytest
 
@@ -307,12 +308,12 @@ class ProcessMetricsVerifier(AgentVerifier):
 
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
-def test_standalone_smoke(agent_settings, request):
+def test_standalone_smoke(request):
     """
     Agent standalone test to run within the same machine.
     """
     print("")
-    print("Agent host name: {0}".format(agent_settings["AGENT_HOST_NAME"]))
+    print("Agent host name: {0}".format(os.environ["AGENT_HOST_NAME"]))
 
     # configure DEV_INSTALL or PACKAGE_INSTALL installation type from command line.
     runner_type = request.config.getoption("--runner-type")
@@ -322,10 +323,10 @@ def test_standalone_smoke(agent_settings, request):
         installation_type = DEV_INSTALL
     runner = AgentRunner(installation_type)
 
-    agent_log_verifier = AgentLogVerifier(runner, agent_settings["SCALYR_SERVER"])
-    data_json_verifier = DataJsonVerifier(runner, agent_settings["SCALYR_SERVER"])
-    system_metrics_verifier = SystemMetricsVerifier(runner, agent_settings["SCALYR_SERVER"])
-    process_metrics_verifier = ProcessMetricsVerifier(runner, agent_settings["SCALYR_SERVER"])
+    agent_log_verifier = AgentLogVerifier(runner, os.environ["SCALYR_SERVER"])
+    data_json_verifier = DataJsonVerifier(runner, os.environ["SCALYR_SERVER"])
+    system_metrics_verifier = SystemMetricsVerifier(runner, os.environ["SCALYR_SERVER"])
+    process_metrics_verifier = ProcessMetricsVerifier(runner, os.environ["SCALYR_SERVER"])
 
     runner.start()
     print("Verify 'agent.log'")
