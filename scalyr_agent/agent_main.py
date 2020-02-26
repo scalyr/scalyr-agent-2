@@ -53,6 +53,7 @@ except ImportError:
 scalyr_init()
 
 import six
+from six.moves import map
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
@@ -888,14 +889,17 @@ class ScalyrAgent(object):
                     logs_initial_positions = None
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
+
+                python_version_str = ".".join(map(six.text_type, sys.version_info[:3]))
+
                 log.info(
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version)
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str)
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version),
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
                 )
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)

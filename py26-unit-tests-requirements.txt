@@ -12,3 +12,4 @@ asn1crypto==0.24.0
 oscrypto==0.19.1
 docker-py==1.10.6
 requests==2.18.0
+pathlib2==2.3.5

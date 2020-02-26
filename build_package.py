@@ -736,7 +736,7 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --maintainer czerwin@scalyr.com "
         "  --provides scalyr-agent-2 "
         '  --description "%s" '
-        '  --depends "python >= 2.4" '
+        '  --depends "python >= 2.6" '
         '  --depends "bash >= 3.2" '
         "  --url https://www.scalyr.com "
         "  --deb-user root "

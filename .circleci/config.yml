@@ -9,6 +9,14 @@ master_only: &master_only
         - master
 
 version: 2.1
+parameters:
+  default_tox_version:
+    type: string
+    default: "3.14.3"
+  cache_version:
+    type: string
+    default: "v3"
+
 commands:
   unittest_tox:
     description: "A base command for all tox based unit test jobs"
@@ -34,15 +42,15 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
             - run:
                 name: Install APT Dependencies
                 command: |
-                    apt-get update -y
-                    apt-get install -y << parameters.apt_dependencies >>
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
       - run:
           name: Install Dependencies
           command: |
@@ -52,7 +60,7 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
             - "~/.cache/pip"
       - when:
@@ -61,12 +69,12 @@ commands:
             - run:
                 name: Move Coverage Data
                 command: |
-                    mkdir -p coverage-unittest-<< parameters.python_version >>
-                    mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
+                  mkdir -p coverage-unittest-<< parameters.python_version >>
+                  mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
             - persist_to_workspace:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
-                    .coverage.unittest-<< parameters.python_version >>
+                  .coverage.unittest-<< parameters.python_version >>
   codespeed_agent_process_benchmark:
     description: "A base command which runs CodeSpeed agent process level benchmarks"
     parameters:
@@ -177,6 +185,113 @@ commands:
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
+
+  smoke-standalone-tox:
+    description: "A base command for all tox based smoke test jobs"
+    parameters:
+      python_version:
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)."
+        type: string
+      tox_version:
+        description: "tox package version to use."
+        type: string
+        default: "3.14.3"
+      apt_dependencies:
+        description: "Any optional apt dependencies which should be installed."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target to run."
+        type: string
+      store_coverage:
+        description: "True to persist / store coverage data."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+      - when:
+          condition: << parameters.apt_dependencies >>
+          steps:
+            - run:
+                name: Install APT Dependencies
+                command: |
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< parameters.tox_version >>"
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            export AGENT_HOST_NAME=agent-smoke-standalone-${CIRCLE_BUILD_NUM}
+            tox -e<< parameters.tox_target >>
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+
+      - run:
+          name: "Show agent.log"
+          command: |
+            cat ~/scalyr-agent-dev/log/agent.log
+
+  smoke-package-new:
+    parameters:
+      distribution:
+        type: string
+      python_version:
+        type: string
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            #pip install -r dev-requirements.txt
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+
+      - run:
+          name: "Get Dockerfile for current agent image."
+          command: |
+            # Add agent source code to PYTHONPATH to be able to import its components.
+            export PYTHONPATH=.:${PYTHONPATH}
+            # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
+            python smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
+            cat ~/Dockerfile
+
+      - restore_cache:
+          # here the 'tar' file of the docker image is stored. Use it to restore agent image without building it.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+            tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+
+      - save_cache:
+          # save agent image to 'tar' file here, if this file is not found previously.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/agent_image"
+
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip."
+
+      - run:
+          name: "Show agent.log"
+          command: |
+            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent.log agent.log
+            cat agent.log
 
 jobs:
   unittest-38:
@@ -666,6 +781,100 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
+  smoke-standalone-38-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.8"
+          tox_target: "py3.8-smoke-tests"
+
+  smoke-standalone-37-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.7"
+          tox_target: "py3.7-smoke-tests"
+
+  smoke-standalone-36-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.6"
+          tox_target: "py3.6-smoke-tests"
+
+  smoke-standalone-35-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.5"
+          tox_target: "py3.5-smoke-tests"
+
+  smoke-standalone-27-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.7"
+          tox_target: "py2.7-smoke-tests"
+
+
+  smoke-standalone-26-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image:  dockershelf/python:2.6-dev
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.6"
+          tox_version: "2.9.1"
+          tox_target: "py2.6-smoke-tests"
+          apt_dependencies: "procps"
+
+
+  smoke-rpm-package-py3-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package-new:
+          distribution: "amazonlinux"
+          python_version: "python3"
+
+  smoke-rpm-package-py2-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package-new:
+          distribution: "amazonlinux"
+          python_version: "python2"
+
+  smoke-deb-package-py3-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package-new:
+          distribution: "ubuntu"
+          python_version: "python3"
+
+  smoke-deb-package-py2-new:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package-new:
+          distribution: "ubuntu"
+          python_version: "python2"
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -692,11 +901,6 @@ workflows:
       - unittest-35
       - unittest-27
       - unittest-26
-      - smoke-standalone-37
-      - smoke-standalone-27
-      - smoke-standalone-26
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
@@ -706,6 +910,20 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
+
+  smoketests:
+    jobs:
+      - smoke-rpm-package-py3-new
+      - smoke-rpm-package-py2-new
+      - smoke-deb-package-py3-new
+      - smoke-deb-package-py2-new
+      - smoke-standalone-38-new
+      - smoke-standalone-37-new
+      - smoke-standalone-36-new
+      - smoke-standalone-35-new
+      - smoke-standalone-27-new
+      - smoke-standalone-26-new
+
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
