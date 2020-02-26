@@ -53,7 +53,6 @@ except ImportError:
 scalyr_init()
 
 import six
-from six.moves import map
 
 import scalyr_agent.scalyr_logging as scalyr_logging
 import scalyr_agent.util as scalyr_util
