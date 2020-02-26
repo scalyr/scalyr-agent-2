@@ -10,7 +10,7 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.
+# limitations under the License.K
 
 from __future__ import absolute_import
 from __future__ import unicode_literals
@@ -35,22 +35,22 @@ from smoke_tests.tools.request import ScalyrRequest
 from six.moves import range
 import six
 
-TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z"
-LEVEL_PATTERN = r"INFO|WARNING|ERROR|DEBUG"
-LOGGER_NAME_PATTERN = r"[^\]]*"
-FILE_NAME_PATTERN = r"[^\]:]*"
+_TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z"
+_LEVEL_PATTERN = r"INFO|WARNING|ERROR|DEBUG"
+_LOGGER_NAME_PATTERN = r"[^\]]*"
+_FILE_NAME_PATTERN = r"[^\]:]*"
 
-BASE_LINE_PATTERN = r"\s*(?P<timestamp>{0})\s+(?P<level>{1})\s+\[(?P<logger>{2})\]\s+\[(?P<file>{3}):\d+\]\s+"
+_AGENT_LOG_LINE_BASE_PATTERN = r"\s*(?P<timestamp>{0})\s+(?P<level>{1})\s+\[(?P<logger>{2})\]\s+\[(?P<file>{3}):\d+\]\s+"
 
 
-def make_agent_log_line_pattern(
-        timestamp=TIMESTAMP_PATTERN,
-        level=LEVEL_PATTERN,
-        logger_name=LOGGER_NAME_PATTERN,
-        file_name=FILE_NAME_PATTERN,
+def _make_agent_log_line_pattern(
+        timestamp=_TIMESTAMP_PATTERN,
+        level=_LEVEL_PATTERN,
+        logger_name=_LOGGER_NAME_PATTERN,
+        file_name=_FILE_NAME_PATTERN,
         message=None,
 ):
-    base_pattern = BASE_LINE_PATTERN.format(timestamp, level, logger_name, file_name)
+    base_pattern = _AGENT_LOG_LINE_BASE_PATTERN.format(timestamp, level, logger_name, file_name)
     if message:
         pattern_str = "{0}{1}".format(base_pattern, message)
     else:
@@ -133,7 +133,7 @@ class AgentLogVerifier(AgentVerifier):
             return
 
         print("Check that all collectors were found.")
-        collector_line_pattern_str = make_agent_log_line_pattern(
+        collector_line_pattern_str = _make_agent_log_line_pattern(
             level="INFO",
             logger_name=r"monitor:linux_system_metrics\(\)",
             message=r"spawned\s+(?P<collector>[^\.]+)\.py\s+\(pid=\d+\)",
@@ -308,8 +308,13 @@ class ProcessMetricsVerifier(AgentVerifier):
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 def test_standalone_smoke(agent_settings, request):
+    """
+    Agent standalone test to run within the same machine.
+    """
     print("")
     print("Agent host name: {0}".format(agent_settings["AGENT_HOST_NAME"]))
+
+    # configure DEV_INSTALL or PACKAGE_INSTALL installation type from command line.
     runner_type = request.config.getoption("--runner-type")
     if runner_type == "PACKAGE":
         installation_type = PACKAGE_INSTALL

@@ -24,7 +24,7 @@ var/
 .installed.cfg
 *.egg
 scalyr-agent-2-*/
-config.ini
+config.yml
 
 # Installer logs
 pip-log.txt

@@ -1,15 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
-
-from smoke_tests.tools.package.base_builder import AgentImageBuilder
-from smoke_tests.tools.package.distributions.fpm_package_builder import (
-    fpm_package_builder_dockerfile,
-)
-
-import six
-
-amazonlinux_dockerfile = """
 {fpm_package_builder_dockerfile}
 ADD ./agent_source /agent_source
 WORKDIR /package
@@ -32,16 +20,3 @@ RUN rpm -i scalyr-agent.rpm
 RUN ln -s -f /usr/bin/{python_version} /usr/bin/python
 WORKDIR /agent_source
 ENV PYTHONPATH=.:${{PYTHONPATH}}
-    """
-
-
-class AmazonLinuxSmokeImageBuilder(AgentImageBuilder):
-    COPY_AGENT_SOURCE = True
-    PYTHON_VERSION = ""  # type: six.text_type
-
-    @classmethod
-    def get_dockerfile_content(cls):  # type: () -> six.text_type
-        return amazonlinux_dockerfile.format(
-            fpm_package_builder_dockerfile=fpm_package_builder_dockerfile,
-            python_version=cls.PYTHON_VERSION,
-        )

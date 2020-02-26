@@ -38,6 +38,10 @@ def pytest_generate_tests(metafunc):
 
 @pytest.mark.usefixtures("agent_environment")
 def test_agent_package_smoke(package_distribution, package_python_version, request):
+    """
+    Prepare docker container with needed distribution
+    and run regular standalone test inside it (smoke_tests/standalone_smoke_test.py).
+    """
     print("")
     image_cache_path = request.config.getoption("--package-image-cache-path")
 
@@ -86,7 +90,7 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
         detach=True,
         stdout=True,
         command="python -m pytest smoke_tests/standalone_smoke_test.py "
-                "-s -vv --config config.ini --runner-type PACKAGE",
+                "-s -vv --config config.yml --runner-type PACKAGE",
     )
 
     stream = container.logs(stream=True)

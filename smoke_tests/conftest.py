@@ -20,10 +20,9 @@ import os
 
 import pytest
 import six
-from six.moves import configparser
+import yaml
 
 from smoke_tests.tools.compat import Path
-from scalyr_agent import compat
 
 
 def pytest_addoption(parser):
@@ -37,29 +36,15 @@ def pytest_addoption(parser):
         "--package-distribution",
         action="append",
         default=[],
-        help="list of stringinputs to pass to test functions",
+        help="list of distribution names for package smoke tests.",
     )
 
     parser.addoption(
         "--package-python-version",
         action="append",
         default=[],
-        help="list of stringinputs to pass to test functions",
+        help="list of python version for package smoke tests.",
     )
-
-
-def _get_config_value(parser, name, default=None):
-    try:
-        return parser[name]
-    except KeyError:
-        return default
-
-
-def _get_env_or_config_value(env_name, parser, config_name=None):
-    env_value = compat.os_getenv_unicode(env_name)
-    if env_value:
-        return env_value
-    return _get_config_value(parser, config_name or env_name)
 
 
 @pytest.fixture(scope="session")
@@ -76,22 +61,13 @@ def agent_env_settings_fields():
 def test_config(request, agent_env_settings_fields):
     config_path = request.config.getoption("--config")
     if config_path and Path(config_path).exists():
-        config = configparser.ConfigParser()
-        config.read(config_path)
+        config_path = Path(config_path)
+        with config_path.open("r") as f:
+            config = yaml.safe_load(f)
     else:
         config = dict()
 
-    result_config = dict()
-
-    parser_agent_settings = _get_config_value(config, "agent_settings", default=dict())
-
-    agent_settings = dict()
-    for name in agent_env_settings_fields:
-        agent_settings[name] = _get_env_or_config_value(name, parser_agent_settings)
-
-    result_config["agent_settings"] = agent_settings
-
-    return result_config
+    return config
 
 
 @pytest.fixture(scope="session")
@@ -101,12 +77,16 @@ def agent_settings(test_config):
 
 @pytest.fixture()
 def agent_environment(test_config, agent_env_settings_fields):
-    agent_settings = test_config["agent_settings"]
+    """
+    Set essential environment variables for each test function and unset the after.
+    """
+    agent_settings = test_config.get("agent_settings", dict())
     for name in agent_env_settings_fields:
-        env_var_value = agent_settings[name]
-        if not env_var_value:
+        value = os.environ.get(name, agent_settings.get(name))
+
+        if not value:
             raise NameError("'{0}' environment variable must be specified.".format(name))
-        os.environ[name] = env_var_value
+        os.environ[name] = value
 
     yield
 

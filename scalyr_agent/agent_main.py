@@ -890,7 +890,7 @@ class ScalyrAgent(object):
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
 
-                python_version_str = ".".join(map(six.text_type, sys.version_info[:3]))
+                python_version_str = sys.version.replace("\n", "")
 
                 log.info(
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
