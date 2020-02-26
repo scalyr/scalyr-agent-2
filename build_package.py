@@ -1245,18 +1245,18 @@ version_string=$(/usr/bin/env python --version 2>&1 | grep -Po "\d.\d")
 echo "Check python version."
 
 if [[ "$version_string" < "2.6" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
         exit 1
 fi
 
 if [[ "$version_string" > "3.0" ]]; then
     if [[ "$version_string" < "3.5" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}.\e[0m"
+        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
         exit 1
     fi
 fi
 
-echo -e "\e[36mPython interpreter found. Version: ${version_string}\e[0m"
+echo -e "\e[36mPython interpreter is found. Version: ${version_string}\e[0m"
 
 # Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
 # preuninstall.sh script.
