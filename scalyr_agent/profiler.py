@@ -324,6 +324,7 @@ class PeriodicMemorySummaryCaptureThread(StoppableThread):
 
         # 1. Capture aggregate values
         all_objects = muppy.get_objects()
+        all_objects = self._filter_muppy_objects(all_objects)
         sum1 = summary.summarize(all_objects)
         data = summary.format_(sum1, limit=50)
 
@@ -342,6 +343,22 @@ class PeriodicMemorySummaryCaptureThread(StoppableThread):
             "type": "diff",
         }
         self._profiling_data.append(item)
+
+    def _filter_muppy_objects(self, all_objects):
+        """
+        Remove and filter out objects from the muppy all objects list which we don't want to include
+        in the memory profiling data.
+
+        Currently we exclude ourselves to reduce the "observer effect".
+        """
+        result = []
+        for item in all_objects:
+            if isinstance(item, dict) and "_profiling_data" in item:
+                continue
+            elif isinstance(item, PeriodicMemorySummaryCaptureThread):
+                continue
+            result.append(item)
+        return result
 
 
 class MemoryProfiler(BaseProfiler):
