@@ -66,65 +66,81 @@ class MemoryLeaksTestCase(unittest.TestCase):
         )
 
         # New config object is created
-        for index in range(0, 100):
+        for index in range(0, 50):
             config = Configuration(
                 file_path=config_path, default_paths=default_paths, logger=None
             )
             config.parse()
-
-            gc.collect()
-            garbage = self._garbage_to_set(gc.garbage)
-            new_garbage = garbage.difference(self.base_gargage)
-            self.assertEqual(len(new_garbage), 0)
+            self.assertNoNewGarbage()
 
         # Existing config object is reused
         config = Configuration(
             file_path=config_path, default_paths=default_paths, logger=None
         )
-        for index in range(0, 100):
+        for index in range(0, 50):
             config.parse()
-
-            gc.collect()
-            garbage = self._garbage_to_set(gc.garbage)
-            new_garbage = garbage.difference(self.base_gargage)
-            self.assertEqual(len(new_garbage), 0)
+            self.assertNoNewGarbage()
 
     def test_stopptable_thread_init_memory_leak(self):
         # There was a bug with StoppableThread constructor having a cycle
-        for index in range(0, 100):
+        for index in range(0, 50):
             thread = StoppableThread(name="test1")
             self.assertTrue(thread)
-
-            gc.collect()
-            garbage = self._garbage_to_set(gc.garbage)
-            new_garbage = garbage.difference(self.base_gargage)
-            self.assertEqual(len(new_garbage), 0)
+            self.assertNoNewGarbage()
 
     def test_json_object_to_dict_memory_leak(self):
         content = {"foo": "bar", "a": 2, "b": [1, 2, 3]}
 
         # New object
-        for index in range(0, 100):
+        for index in range(0, 50):
             json_object = JsonObject(content=content)
             dict_value = json_object.to_dict()
             self.assertEqual(content, dict_value)
 
-            gc.collect()
-            garbage = self._garbage_to_set(gc.garbage)
-            new_garbage = garbage.difference(self.base_gargage)
-            self.assertEqual(len(new_garbage), 0)
+            self.assertNoNewGarbage()
 
         # Existing object
         json_object = JsonObject(content=content)
 
-        for index in range(0, 100):
+        for index in range(0, 50):
             dict_value = json_object.to_dict()
             self.assertEqual(content, dict_value)
+            self.assertNoNewGarbage()
 
-            gc.collect()
-            garbage = self._garbage_to_set(gc.garbage)
-            new_garbage = garbage.difference(self.base_gargage)
-            self.assertEqual(len(new_garbage), 0)
+    def test_assertion_methods_work_correctly(self):
+        class Object1(object):
+            pass
+
+        # 1. Collectable object
+        obj1 = Object1()
+        del obj1
+
+        gc.collect()
+        garbage = self._garbage_to_set(gc.garbage)
+        new_garbage = garbage.difference(self.base_gargage)
+        self.assertNoNewGarbage()
+
+        # 2. Cyclic reference
+        obj1 = Object1()
+        obj1.self = obj1
+        del obj1
+
+        gc.collect()
+        garbage = self._garbage_to_set(gc.garbage)
+        new_garbage = garbage.difference(self.base_gargage)
+        self.assertEqual(len(new_garbage), 2)
+        self.assertRaises(AssertionError, self.assertNoNewGarbage)
+
+    def assertNoNewGarbage(self):
+        """
+        Perform garbage collection and assert no new uncollectable or unreferenced garbage has been
+        generated.
+        """
+        gc.collect()
+
+        garbage = self._garbage_to_set(gc.garbage)
+        new_garbage = garbage.difference(self.base_gargage)
+        self.assertEqual(len(new_garbage), 0, "Expected no new garbage")
 
     def _garbage_to_set(self, garbage):
         # type: (Any) -> Set[str]
