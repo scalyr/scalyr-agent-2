@@ -101,6 +101,22 @@ class AgentStatus(BaseAgentStatus):
         self.monitor_manager_status = None
 
 
+class GCStatus(BaseAgentStatus):
+    """
+    Class which holds garbage collection statistics.
+
+    Those stats are disabled by default because they have an impact on memory usage so they must
+    be explicitly enabled.
+    """
+
+    def __init__(self):
+        # This metric indicates number of objects which are unreachable but can't be freed.
+        self.garbage = 0
+
+    def to_dict(self):
+        return self.__dict__
+
+
 class OverallStats(AgentStatus):
     """Used to track stats that are calculated over the lifetime of the agent.
     """
