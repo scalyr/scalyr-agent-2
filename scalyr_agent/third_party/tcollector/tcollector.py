@@ -240,6 +240,8 @@ class Collector(object):
             if time < cut_off:
                 del self.values[key]
 
+        del keys
+
 
 class StdinCollector(Collector):
     """A StdinCollector simply reads from STDIN and provides the
