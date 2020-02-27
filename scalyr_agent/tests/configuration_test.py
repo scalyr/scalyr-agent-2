@@ -1392,7 +1392,11 @@ class TestConfiguration(TestConfigurationBase):
                         separator.join([x for x in fake_field_val])
                     ).lower()
                 elif isinstance(fake_field_val, JsonObject):
-                    result = six.text_type(fake_field_val).replace("'", '"')
+                    result = (
+                        six.text_type(fake_field_val)
+                        .replace("'", '"')
+                        .replace('u"', '"')
+                    )
                 else:
                     result = six.text_type(fake_field_val).lower()
                 return result
