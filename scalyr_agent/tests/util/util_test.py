@@ -31,6 +31,7 @@ import datetime
 import os
 import tempfile
 import threading
+import uuid
 from mock import patch, MagicMock
 import six
 
@@ -308,6 +309,13 @@ class TestUtil(ScalyrTestCase):
         self.assertTrue(len(first) > 0)
         self.assertTrue(len(second) > 0)
         self.assertNotEqual(first, second)
+
+    def test_create_uuid3(self):
+        namespace = uuid.UUID("{aaaaffff-22c7-4d50-92c1-123456781234}")
+        self.assertEqual(
+            scalyr_util.create_uuid3(namespace, "test-string"),
+            uuid.UUID("{72a49a0a-d92e-383c-a88b-2060e372e1af}"),
+        )
 
     def test_remove_newlines_and_truncate(self):
         self.assertEquals(scalyr_util.remove_newlines_and_truncate("hi", 1000), "hi")
