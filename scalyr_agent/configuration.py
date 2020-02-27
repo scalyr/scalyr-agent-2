@@ -244,7 +244,7 @@ class Configuration(object):
                     parser="scalyrAgentProfiling",
                 )
                 self.__verify_log_entry_and_set_defaults(
-                    profile_config, description="profile log config"
+                    profile_config, description="CPU profile log config"
                 )
                 self.__log_configs.append(profile_config)
 
@@ -489,6 +489,10 @@ class Configuration(object):
     @property
     def profile_log_name(self):
         return self.__get_config().get_string("profile_log_name")
+
+    @property
+    def memory_profile_log_name(self):
+        return self.__get_config().get_string("memory_profile_log_name")
 
     @property
     def disable_logfile_addevents_format(self):
@@ -1926,6 +1930,14 @@ class Configuration(object):
             config,
             "profile_log_name",
             "agent.callgrind",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "memory_profile_log_name",
+            "agent.meminfo",
             description,
             apply_defaults,
             env_aware=True,

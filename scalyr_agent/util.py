@@ -1121,6 +1121,13 @@ class StoppableThread(threading.Thread):
         """
         pass
 
+    def is_running(self):
+        # type: () -> bool
+        """
+        Return True if this thread is running.
+        """
+        return self._run_state.is_running()
+
     def stop(self, wait_on_join=True, join_timeout=5):
         """Stops the thread from running.
 
