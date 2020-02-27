@@ -66,7 +66,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
         )
 
         # New config object is created
-        for index in range(0, 100):
+        for index in range(0, 50):
             config = Configuration(
                 file_path=config_path, default_paths=default_paths, logger=None
             )
@@ -77,13 +77,13 @@ class MemoryLeaksTestCase(unittest.TestCase):
         config = Configuration(
             file_path=config_path, default_paths=default_paths, logger=None
         )
-        for index in range(0, 100):
+        for index in range(0, 50):
             config.parse()
             self.assertNoNewGarbage()
 
     def test_stopptable_thread_init_memory_leak(self):
         # There was a bug with StoppableThread constructor having a cycle
-        for index in range(0, 100):
+        for index in range(0, 50):
             thread = StoppableThread(name="test1")
             self.assertTrue(thread)
             self.assertNoNewGarbage()
@@ -92,7 +92,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
         content = {"foo": "bar", "a": 2, "b": [1, 2, 3]}
 
         # New object
-        for index in range(0, 100):
+        for index in range(0, 50):
             json_object = JsonObject(content=content)
             dict_value = json_object.to_dict()
             self.assertEqual(content, dict_value)
@@ -102,7 +102,7 @@ class MemoryLeaksTestCase(unittest.TestCase):
         # Existing object
         json_object = JsonObject(content=content)
 
-        for index in range(0, 100):
+        for index in range(0, 50):
             dict_value = json_object.to_dict()
             self.assertEqual(content, dict_value)
             self.assertNoNewGarbage()
