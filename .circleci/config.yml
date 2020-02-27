@@ -136,7 +136,7 @@ commands:
             RUN_TIME: << parameters.run_time >>
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
-            SCALYR_SERVER_ATTRIBUTES="{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
+            SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
