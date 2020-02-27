@@ -390,11 +390,7 @@ def create_uuid3(namespace, name):
     :return:
     :rtype: uuid.UUID
     """
-    if six.PY2:
-        return uuid.uuid3(namespace, six.ensure_binary(name))
-    else:
-        # noinspection PyTypeChecker
-        return uuid.uuid3(namespace, six.ensure_text(name))
+    return uuid.uuid3(namespace, six.ensure_str(name))
 
 
 def md5_hexdigest(data):
