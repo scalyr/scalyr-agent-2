@@ -380,6 +380,19 @@ def create_unique_id():
     return base64_id.decode("utf-8")
 
 
+def create_uuid3(namespace, name):
+    """
+    Return new UUID based on a hash of a UUID namespace and a string.
+    :param namespace: The namespace
+    :param name: The string
+    :type namespace: uuid.UUID
+    :type name: six.text
+    :return:
+    :rtype: uuid.UUID
+    """
+    return uuid.uuid3(namespace, six.ensure_str(name))
+
+
 def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
