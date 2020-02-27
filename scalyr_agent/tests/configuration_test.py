@@ -1680,6 +1680,29 @@ class TestGetConfigFromEnv(TestConfigurationBase):
         del os.environ["SCALYR_K8S_API_URL"]
         self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=six.text_type))
 
+    def test_get_empty_json_object(self):
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = ""
+        self.assertEqual(
+            JsonObject(content={}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = '{"serverHost": "foo1.example.com"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ[
+            "SCALYR_SERVER_ATTRIBUTES"
+        ] = '{"serverHost": "foo1.example.com", "tier": "foo"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com", "tier": "foo"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        del os.environ["SCALYR_SERVER_ATTRIBUTES"]
+
 
 class FakeLogWatcher:
     def add_log_config(self, a, b):
