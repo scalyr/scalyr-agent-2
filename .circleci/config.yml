@@ -564,11 +564,10 @@ jobs:
             tox -e lint
       - run:
           name: Run Shell Scripts Lint Checks
+          environment:
+            IGNORE_BINARY_DOESNT_EXIST: "0"
           command: |
-            # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
-            # the severity to warning
-            shellcheck -S error $(find . -name "*.sh" |grep -v .tox)
-            shellcheck -S error benchmarks/scripts/*.sh
+            ./scripts/shell-scripts-lint.sh
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
