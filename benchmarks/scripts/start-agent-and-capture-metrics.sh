@@ -107,5 +107,5 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
     --debug"
 
-echo "Starting the metrics capture script..."
+echo "Starting the metrics capture script (ADDITIONAL_CAPTURE_SCRIPT_FLAGS=${ADDITIONAL_CAPTURE_SCRIPT_FLAGS})..."
 eval ${CAPTURE_SCRIPT_COMMAND}
