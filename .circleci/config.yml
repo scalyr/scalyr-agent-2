@@ -550,13 +550,25 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
+          name: Install APT dependencies
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y shellcheck
+      - run:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
       - run:
-          name: Run Lint Checks
+          name: Run Python Lint Checks
           command: |
             tox -e lint
+      - run:
+          name: Run Shell Scripts Lint Checks
+          command: |
+            # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
+            # the severity to warning
+            shellcheck -S error $(find . -name "*.sh" |grep -v .tox)
+            shellcheck -S error benchmarks/scripts/*.sh
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
