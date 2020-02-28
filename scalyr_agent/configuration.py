@@ -1203,7 +1203,7 @@ class Configuration(object):
             config, "compression_level", 9, description, apply_defaults, env_aware=True
         )
         self.__verify_or_set_optional_attributes(
-            config, "server_attributes", description, apply_defaults
+            config, "server_attributes", description, apply_defaults, env_aware=True,
         )
         self.__verify_or_set_optional_string(
             config,
