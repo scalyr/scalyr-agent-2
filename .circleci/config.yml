@@ -552,6 +552,8 @@ jobs:
       - run:
           name: Install APT dependencies
           command: |
+            # We add unstable repo to make sure latest version of shellchcek (>=
+            # 0.7.0 is installed)
             sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
             sudo apt-get update -y
             sudo apt-get install -y shellcheck
