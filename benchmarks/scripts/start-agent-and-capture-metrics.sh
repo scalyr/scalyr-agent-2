@@ -54,6 +54,14 @@ RUN_TIME=${RUN_TIME-"60"}
 # How often to capture metrics during the capture run time (in seconds)
 CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
 
+CAPTURE_AGENT_STATUS_METRICS=${CAPTURE_AGENT_STATUS_METRICS:-"0"}
+
+if [ "${CAPTURE_AGENT_STATUS_METRICS}" -eq "true" ]; then
+    ADDITIONAL_SCRIPT_FLAGS="--capture-agent-status-metrics"
+else
+    ADDITIONAL_SCRIPT_FLAGS=""
+fi
+
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
 echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
 
@@ -90,6 +98,7 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --branch=\"${CODESPEED_BRANCH}\" \
     --commit-date=\"${COMMIT_DATE}\" \
     --commit-id=\"${COMMIT_HASH}\" \
+    ${ADDITIONAL_SCRIPT_FLAGS} \
     --debug"
 
 echo "Starting the metrics capture script..."
