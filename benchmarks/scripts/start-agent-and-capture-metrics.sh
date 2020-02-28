@@ -61,7 +61,7 @@ echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
 echo "Starting agent process..."
 echo "Using command line options: ${AGENT_START_COMMAND}"
 
-${AGENT_START_COMMAND} &>/dev/null &
+${AGENT_START_COMMAND} 2>&1 &
 AGENT_PROCESS_PID=$!
 
 # NOTE: We use a trap to ensure this function is always executed, even if some command in this

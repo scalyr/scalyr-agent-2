@@ -1,13 +1,8 @@
 {
   // api_key: "",  // specified via environment variable
   // NOTE: The key defined as Circle CI env variable is available in qatesting
-  scalyr_server: "app-qatesting.scalyr.com",
+  scalyr_server: "agent.scalyr.com",
   // Circle CI doesn't have access to CA bundle file so we disable certificate verification
   verify_server_certificate: false,
   debug_level: "5",
-
-  server_attributes: {
-     serverHost: "ci-codespeed-benchmarks",
-     tier: "benchmarks"
-  }
 }
