@@ -141,7 +141,7 @@ commands:
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
             SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
-            CAPTURE_AGENT_STATUS_METRICS: << parameters.capture_agent_status_metrics >>
+            CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
             DRY_RUN: "true"
           command: |
             # Create directories which are needed by the agent process

@@ -323,6 +323,9 @@ def main(
 
     # Calculate derivatives for gauge metrics
     for metric_name in METRICS_GAUGES.keys():
+        if metric_name not in captured_values:
+            continue
+
         values = captured_values[metric_name]
 
         percentile_999 = np.percentile(values, 99.9)
