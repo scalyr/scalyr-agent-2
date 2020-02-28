@@ -64,6 +64,7 @@ import argparse
 from datetime import datetime
 from collections import defaultdict
 
+import six
 import numpy as np
 import psutil
 
@@ -246,7 +247,7 @@ def get_agent_status_metrics(process):
     agent_data_path = os.path.expanduser("~/scalyr-agent-dev/data")
     status_format_file = os.path.join(agent_data_path, "status_format")
     with open(status_format_file, "w") as fp:
-        fp.write("json")
+        fp.write(six.text_type("json"))
 
     # Ask agent to dump metrics
     os.kill(process.pid, signal.SIGUSR1)
