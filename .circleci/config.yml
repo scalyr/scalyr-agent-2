@@ -552,6 +552,7 @@ jobs:
       - run:
           name: Install APT dependencies
           command: |
+            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
             sudo apt-get update -y
             sudo apt-get install -y shellcheck
       - run:
