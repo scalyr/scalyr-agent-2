@@ -18,6 +18,19 @@
 
 set -e
 
+IGNORE_BINARY_DOESNT_EXIST=${IGNORE_BINARY_DOESNT_EXIST:-"1"}
+
+if ! which shellcheck > /dev/null 2>&1; then
+    echo "shellcheck binary doesn't exist"
+
+    if [ "${IGNORE_BINARY_DOESNT_EXIST}" -ne "0" ]; then
+        echo "Skipping checks..."
+        exit 0
+    else
+        exit 1
+    fi
+fi
+
 # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
 # the severity to warning
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv)
