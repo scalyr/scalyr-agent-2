@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #----------------------------------------------------------------------------------------
 # Runs agent smoketest for docker:
 #    - Assumes that the current scalyr-agent-2 root directory contains the test branch and that

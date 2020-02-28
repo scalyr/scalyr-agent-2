@@ -16,10 +16,11 @@
 # Script which sends line count for log messages for a particular log level to CodeSpeed
 set -e
 
-SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
+SCRIPT_DIR=$(readlink -f "$(dirname ${BASH_SOURCE[0]})")
+# shellcheck disable=SC1090
 source "${SCRIPT_DIR}/common.sh"
 
-SEND_VALUE_SCRPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_value_to_codespeed.py"))
+SEND_VALUE_SCRPT_PATH=$(realpath "$(echo "${SCRIPT_DIR}/send_value_to_codespeed.py")")
 
 AGENT_LOG_FILE_PATH="${HOME}/scalyr-agent-dev/log/agent.log"
 AGENT_DEBUG_LOG_FILE_PATH="${HOME}/scalyr-agent-dev/log/agent_debug.log"
