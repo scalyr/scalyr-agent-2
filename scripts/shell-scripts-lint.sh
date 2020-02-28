@@ -31,6 +31,9 @@ if ! which shellcheck > /dev/null 2>&1; then
     fi
 fi
 
+SHELLCHECK_VERSION=$(shellcheck --version)
+echo "Using shellcheck: ${SHELLCHECK_VERSION}"
+
 # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
 # the severity to warning
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv)
