@@ -1225,137 +1225,16 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
 
 
 def create_scriptlets():
-    """Creates three scriptlets required by the RPM and Debian package in the current working directory.
+    """Copy three scriptlets required by the RPM and Debian package to the current working directory.
 
     These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
     """
-    fp = open("preinstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
 
-echo "Check for python."
-# look for 'python' by '/usr/bin/env', exit with error if it is not found.
-/usr/bin/env python --version >/dev/null 2>&1 || \
-{ echo -e >&2 "\e[31mThe suitable python interpreter is not found. Aborting.\e[0m"; \
-echo -e >&2 "The command - '/usr/bin/env python' has to point to the python interpreter with version \e[31m>=2.6 or >=3.5\e[0m."; exit 1; }
+    scripts_path = os.path.join(__source_root__, "installer", "scripts")
 
-# get first two digits from python version.
-version_string=$(/usr/bin/env python --version 2>&1 | grep -Po "\d.\d")
-
-echo "Check python version."
-
-if [[ "$version_string" < "2.6" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
-        exit 1
-fi
-
-if [[ "$version_string" > "3.0" ]]; then
-    if [[ "$version_string" < "3.5" ]]; then
-        echo -e >&2 "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${version_string}. Aborting.\e[0m"
-        exit 1
-    fi
-fi
-
-echo -e "\e[36mPython interpreter is found. Version: ${version_string}\e[0m"
-
-# Always remove the .pyc files and __pycache__ directories.  This covers problems for old packages that didn't have the remove in the
-# preuninstall.sh script.
-if [ -d /usr/share/scalyr-agent-2 ]; then
-  find /usr/share/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
-fi
-
-exit 0;
-"""
-    )
-    fp.close()
-
-    fp = open("preuninstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
-
-# We only need to tweak the rc config if this is an uninstall of the package
-# (rather than just removing this version because we are upgrading to
-# a new one).  An uninstall is indicated by $1 == 0 for
-# RPM and $1 == "remove" for Debian.
-if [ "$1" == "0" -o "$1" == "remove" ]; then
-  # Stop the service since we are about to completely remove it.
-  service scalyr-agent-2 stop > /dev/null 2>&1
-
-  # Remove the symlinks from the /etc/rcX.d directories.
-  if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
-    # For RPM-based systems.
-    chkconfig --del scalyr-agent-2;
-  elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
-    # For Debian-based systems.
-    update-rc.d -f scalyr-agent-2 remove;
-  else
-    # All others.
-    for x in 0 1 6; do
-      rm /etc/rc$x.d/K02scalyr-agent-2;
-    done
-
-    for x in 2 3 4 5; do
-      rm /etc/rc$x.d/S98scalyr-agent-2;
-    done
-  fi
-fi
-
-# Always remove the .pyc files and __pycache__ directories
-find /usr/share/scalyr-agent-2 -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -exec rm -r {} \;
-
-exit 0;
-"""
-    )
-    fp.close()
-
-    # Create the postinstall.sh script.
-    fp = open("postinstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
-
-config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
-script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
-
-# Determine if the agent had been previously configured to run as a
-# different user than root.  We can determine this if agentConfig.json
-# has a different user.  If so, then make sure the newly installed files
-# (like agent.sh) are changed to the correct owners.
-if [ "$config_owner" != "$script_owner" ]; then
-  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user $config_owner > /dev/null 2>&1;
-fi
-
-# Add in the symlinks in the appropriate /etc/rcX.d/ directories
-# to stop and start the service at boot time.
-if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
-  # For Redhat-based systems, use chkconfig to create links.
-  chkconfig --add scalyr-agent-2;
-elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
-  # For Debian-based systems, update-rc.d does the job.
-  update-rc.d scalyr-agent-2 defaults 98 02;
-else
-  # Otherwise just fall back to creating them manually.
-  for x in 0 1 6; do
-    ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/K02scalyr-agent-2;
-  done
-
-  for x in 2 3 4 5; do
-    ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/S98scalyr-agent-2;
-  done
-fi
-
-# Do a restart of the service if we are either installing/upgrading the
-# package, instead of removing it.  For an RPM, a remove is indicated by
-# a zero being passed into $1 (instead of 1 or higher).  For Debian, a
-# remove is indicated something other than "configure" being passed into $1.
-if [[ "$1" =~ ^[0-9]+$ && $1 -gt 0 ]] || [ "$1" == "configure" ]; then
-  service scalyr-agent-2 condrestart --quiet;
-  exit $?;
-else
-  exit 0;
-fi
-"""
-    )
-    fp.close()
+    shutil.copy(os.path.join(scripts_path, "preinstall.sh"), "preinstall.sh")
+    shutil.copy(os.path.join(scripts_path, "preuninstall.sh"), "preuninstall.sh")
+    shutil.copy(os.path.join(scripts_path, "postinstall.sh"), "postinstall.sh")
 
 
 def create_change_logs():
