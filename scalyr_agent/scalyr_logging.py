@@ -264,9 +264,6 @@ class AgentLogger(logging.Logger):
         """
         self.__logger_name = name
 
-        self.__stdout_handler = None
-        self.__stderr_handler = None
-
         # Look for the monitor id, which is at the end surrounded by brackets.
         m = re.match(r"([^\[]*)(\(.*\))", name)
         if m:
@@ -321,12 +318,6 @@ class AgentLogger(logging.Logger):
         # Be sure to add this to the manager's list of logger instances.  This will also set the log level to the
         # right level.
         __log_manager__.add_logger_instance(self)
-
-    def set_stdout_handler(self, handler):
-        self.__stdout_handler = handler
-
-    def set_stderr_handler(self, handler):
-        self.__stderr_handler = handler
 
     def emit_value(
         self,
@@ -486,6 +477,8 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_error_code_seen = error_code
         __thread_local__.last_metric_log_for_monitor = metric_log_for_monitor
         __thread_local__.last_monitor_id_override = monitor_id_override
+        __thread_local__.last_force_stdout = force_stdout
+        __thread_local__.last_force_stderr = force_stderr
 
         # Only associate an monitor with the error if it is in fact an error.
         if level >= logging.ERROR:
@@ -495,14 +488,6 @@ class AgentLogger(logging.Logger):
                 __thread_local__.last_error_for_monitor = self.__monitor
         else:
             __thread_local__.last_error_for_monitor = None
-
-        stdout_handler = self.__stdout_handler
-        stderr_handler = self.__stderr_handler
-
-        if force_stdout and stdout_handler:
-            logging.Logger.addHandler(self, stdout_handler)
-        if force_stderr and stderr_handler:
-            logging.Logger.addHandler(self, stderr_handler)
 
         # pylint: disable=assignment-from-no-return
         if extra is not None:
@@ -515,11 +500,8 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_metric_log_for_monitor = None
         __thread_local__.last_error_for_monitor = None
         __thread_local__.last_monitor_id_override = None
-
-        if force_stdout and stdout_handler:
-            logging.Logger.removeHandler(self, stdout_handler)
-        if force_stderr and stderr_handler:
-            logging.Logger.removeHandler(self, stderr_handler)
+        __thread_local__.last_force_stdout = None
+        __thread_local__.last_force_stderr = None
 
         return result
 
@@ -556,6 +538,8 @@ class AgentLogger(logging.Logger):
         result.error_code = __thread_local__.last_error_code_seen
         result.metric_log_for_monitor = __thread_local__.last_metric_log_for_monitor
         result.error_for_monitor = __thread_local__.last_error_for_monitor
+        result.force_stdout = __thread_local__.last_force_stdout
+        result.force_stderr = __thread_local__.last_force_stderr
 
         result.component = self.component
         result.monitor_name = self.monitor_name
@@ -1013,6 +997,46 @@ class RateLimiterLogFilter(object):
             return False
 
 
+class ForceStdoutFilter(object):
+    """A filter that includes any record if it has `force_stdout` as True
+    """
+
+    def __init__(self):
+        """Initializes the filter.
+        """
+
+    def filter(self, record):
+        """Performs the filtering.
+
+        @param record: The record to filter.
+        @type record: logging.LogRecord
+
+        @return:  True if the record should be logged by this handler.
+        @rtype: bool
+        """
+        return hasattr(record, "force_stdout") and record.force_stdout
+
+
+class ForceStderrFilter(object):
+    """A filter that includes any record if it has `force_stderr` as True
+    """
+
+    def __init__(self):
+        """Initializes the filter.
+        """
+
+    def filter(self, record):
+        """Performs the filtering.
+
+        @param record: The record to filter.
+        @type record: logging.LogRecord
+
+        @return:  True if the record should be logged by this handler.
+        @rtype: bool
+        """
+        return hasattr(record, "force_stderr") and record.force_stderr
+
+
 class MetricLogHandler(object):
     """The LogHandler to use for recording metric values emitted by Scalyr agent monitors.
 
@@ -1363,7 +1387,7 @@ class AgentLogManager(object):
         self.__debug_log_handler = None
 
         # logging.Handler objects for use when logging with `force_stdout` or `force_stderr` enabled.
-        # These handlers get added and removed to/from the logger within its own `_log` method.
+        # These handlers have a filter on them to only log when the relevant parameter is True.
         self.__force_stdout_handler = None
         self.__force_stderr_handler = None
 
@@ -1450,8 +1474,6 @@ class AgentLogManager(object):
         try:
             self.__loggers.append(new_instance)
             new_instance.setLevel(self.__log_level)
-            new_instance.set_stdout_handler(self.__force_stdout_handler)
-            new_instance.set_stderr_handler(self.__force_stderr_handler)
         finally:
             self.__lock.release()
 
@@ -1480,6 +1502,8 @@ class AgentLogManager(object):
             # handler, we need to recreate it.  We also need to hold the lock while we do this since it will
             # read the value of __is_debug_on.
             self.__recreate_debug_handler()
+            self.__recreate_force_stdout_handler()
+            self.__recreate_force_stderr_handler()
             self.__reset_root_logger()
         finally:
             self.__lock.release()
@@ -1570,10 +1594,14 @@ class AgentLogManager(object):
             return None
 
         # Create the right type of handler.
-        if self.__use_stdout or is_force_stdout:
+        if is_force_stdout:
             handler = logging.StreamHandler(sys.stdout)
+            handler.addFilter(ForceStdoutFilter())
         elif is_force_stderr:
             handler = logging.StreamHandler(sys.stderr)
+            handler.addFilter(ForceStderrFilter())
+        elif self.__use_stdout:
+            handler = logging.StreamHandler(sys.stdout)
         else:
             handler = logging.handlers.RotatingFileHandler(
                 file_path,
@@ -1612,12 +1640,11 @@ class AgentLogManager(object):
             handler.close()
 
         root_logger.addHandler(self.__main_log_handler)
+        if self.__force_stdout_handler:
+            root_logger.addHandler(self.__force_stdout_handler)
+        root_logger.addHandler(self.__force_stderr_handler)
         if self.__debug_log_handler is not None:
             root_logger.addHandler(self.__debug_log_handler)
-
-        for logger_instance in self.__loggers:
-            logger_instance.set_stdout_handler(self.__force_stdout_handler)
-            logger_instance.set_stderr_handler(self.__force_stderr_handler)
 
     def __create_main_log_path(self, agent_log_file_path, logs_directory):
         """Creates and returns the file name to use for the main log.
