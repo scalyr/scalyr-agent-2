@@ -21,7 +21,7 @@ script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 # has a different user.  If so, then make sure the newly installed files
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
-  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user $config_owner > /dev/null 2>&1;
+  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
 fi
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
