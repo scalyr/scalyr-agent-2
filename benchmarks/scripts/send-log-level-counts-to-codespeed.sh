@@ -46,7 +46,7 @@ COMMON_COMMAND_LINE_ARGS="--codespeed-url=\"${CODESPEED_URL}\" \
     --commit-date=\"${COMMIT_DATE}\" \
     --commit-id=\"${COMMIT_HASH}\""
 
-echo "Using COMMIT_DATE=${COMMIT_DATE}, COMMIT_ID=${COMMIT_HASH}, BRANCH=${BRANCH}"
+echo "Using COMMIT_DATE=${COMMIT_DATE}, COMMIT_ID=${COMMIT_HASH}, BRANCH=${CODESPEED_BRANCH}"
 
 # shellcheck disable=SC2086
 eval python ${SEND_VALUE_SCRPT_PATH} ${COMMON_COMMAND_LINE_ARGS} \
