@@ -56,7 +56,7 @@ RUN_TIME=${RUN_TIME-"60"}
 CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
-echo "Using COMMIT_DATE=${COMMIT_DATE}, COMMIT_ID=${COMMIT_HASH}, BRANCH=${CODESPEED_BRANCH}"
+print_common_env_variables
 
 # 1. Start the agent
 echo "Starting agent process..."
