@@ -237,6 +237,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
 
+        self.assertEquals(config.enable_gc_stats, False)
+
         self.assertEquals(config.max_line_size, 9900)
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
         self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
@@ -361,6 +363,8 @@ class TestConfiguration(TestConfigurationBase):
             debug_init: true,
             pidfile_advanced_reuse_guard: true,
 
+            enable_gc_stats: true,
+
             max_new_log_detection_time: 120,
 
             copying_thread_profile_interval: 2,
@@ -416,6 +420,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.internal_parse_max_line_size, 4013)
         self.assertEquals(config.copy_staleness_threshold, 4 * 60)
         self.assertEquals(config.log_deletion_delay, 5 * 60)
+
+        self.assertEquals(config.enable_gc_stats, True)
 
         self.assertEquals(config.copying_thread_profile_interval, 2)
         self.assertEquals(
@@ -1257,13 +1263,17 @@ class TestConfiguration(TestConfigurationBase):
         original_verify_or_set_optional_array_of_strings = (
             config._Configuration__verify_or_set_optional_array_of_strings
         )
+        original_verify_or_set_optional_attributes = (
+            config._Configuration__verify_or_set_optional_attributes
+        )
 
         @patch.object(config, "_Configuration__verify_or_set_optional_bool")
         @patch.object(config, "_Configuration__verify_or_set_optional_int")
         @patch.object(config, "_Configuration__verify_or_set_optional_float")
         @patch.object(config, "_Configuration__verify_or_set_optional_string")
         @patch.object(config, "_Configuration__verify_or_set_optional_array_of_strings")
-        def patch_and_start_test(p4, p3, p2, p1, p0):
+        @patch.object(config, "_Configuration__verify_or_set_optional_attributes")
+        def patch_and_start_test(p5, p4, p3, p2, p1, p0):
             # Decorate the Configuration.__verify_or_set_optional_xxx methods as follows:
             # 1) capture fields that are environment-aware
             # 2) allow setting of the corresponding environment variable
@@ -1294,6 +1304,10 @@ class TestConfiguration(TestConfigurationBase):
                         return original_verify_or_set_optional_array_of_strings(
                             *args, **kwargs
                         )
+                    elif field_type == JsonObject:
+                        return original_verify_or_set_optional_attributes(
+                            *args, **kwargs
+                        )
 
                 return wrapper
 
@@ -1302,6 +1316,7 @@ class TestConfiguration(TestConfigurationBase):
             p2.side_effect = capture_aware_field(float)
             p3.side_effect = capture_aware_field(six.text_type)
             p4.side_effect = capture_aware_field(ArrayOfStrings)
+            p5.side_effect = capture_aware_field(JsonObject)
 
             # Build the Configuration object tree, also populating the field_types lookup in the process
             # This first iteration does not set any environment variables
@@ -1323,6 +1338,7 @@ class TestConfiguration(TestConfigurationBase):
             FAKE_FLOAT = 1234567.89
             FAKE_STRING = six.text_type(FAKE_INT)
             FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(["s1", "s2", "s3"])
+            FAKE_OBJECT = JsonObject(**{"serverHost": "foo-bar-baz.com"})
 
             for field in expected_aware_fields:
                 field_type = field_types[field]
@@ -1362,6 +1378,12 @@ class TestConfiguration(TestConfigurationBase):
                         config_obj.get_json_array(field, none_if_missing=True),
                     )
                     fake_env[field] = FAKE_ARRAY_OF_STRINGS
+                elif field_type == JsonObject:
+                    self.assertNotEquals(
+                        FAKE_OBJECT,
+                        config_obj.get_json_object(field, none_if_missing=True),
+                    )
+                    fake_env[field] = FAKE_OBJECT
 
             def fake_environment_value(field):
                 if field not in fake_env:
@@ -1375,6 +1397,12 @@ class TestConfiguration(TestConfigurationBase):
                     result = six.text_type(
                         separator.join([x for x in fake_field_val])
                     ).lower()
+                elif isinstance(fake_field_val, JsonObject):
+                    result = (
+                        six.text_type(fake_field_val)
+                        .replace("'", '"')
+                        .replace('u"', '"')
+                    )
                 else:
                     result = six.text_type(fake_field_val).lower()
                 return result
@@ -1395,6 +1423,8 @@ class TestConfiguration(TestConfigurationBase):
                     value = config._Configuration__get_config().get_string(field)
                 elif field_type == ArrayOfStrings:
                     value = config._Configuration__get_config().get_json_array(field)
+                elif field_type == JsonObject:
+                    value = config._Configuration__get_config().get_json_object(field)
 
                 config_file_value = config_file_dict.get(field)
                 if field in config_file_dict:
@@ -1660,6 +1690,41 @@ class TestGetConfigFromEnv(TestConfigurationBase):
         del os.environ["SCALYR_K8S_API_URL"]
         self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=six.text_type))
 
+    def test_get_empty_json_object(self):
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = ""
+        self.assertEqual(
+            JsonObject(content={}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        del os.environ["SCALYR_SERVER_ATTRIBUTES"]
+        self.assertEqual(
+            None, get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = '{"serverHost": "foo1.example.com"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ[
+            "SCALYR_SERVER_ATTRIBUTES"
+        ] = '{"serverHost": "foo1.example.com", "tier": "foo"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com", "tier": "foo"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ[
+            "SCALYR_SERVER_ATTRIBUTES"
+        ] = '{"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}'
+        self.assertEqual(
+            JsonObject(
+                content={"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}
+            ),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
 
 class FakeLogWatcher:
     def add_log_config(self, a, b):
@@ -1911,3 +1976,34 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
         expected_path = os.path.join(self._log_dir, "journald_monitor.log",)
         with open(expected_path) as f:
             self.assertTrue("Other thing" in f.read())
+
+    def test___verify_or_set_optional_string_with_valid_values(self):
+        config = self._create_test_configuration_instance()
+
+        # 1. Valid value
+        config_object = JsonObject(content={"foo": "bar"})
+        config._Configuration__verify_or_set_optional_string(
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            valid_values=["bar", "baz"],
+        )
+        self.assertEqual(config_object["foo"], "bar")
+
+        # 2. Not a valid value
+        config_object = JsonObject(content={"foo": "invalid"})
+        expected_msg = (
+            'Got invalid value "invalid" for field "foo". Valid values are: bar, baz'
+        )
+
+        self.assertRaisesRegexp(
+            BadConfiguration,
+            expected_msg,
+            config._Configuration__verify_or_set_optional_string,
+            config_object=config_object,
+            field="foo",
+            default_value=None,
+            config_description=None,
+            valid_values=["bar", "baz"],
+        )

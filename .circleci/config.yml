@@ -1,7 +1,13 @@
 # Python CircleCI 2.1 configuration file
 #
-# Check https://circleci.com/docs/2.0/language-python/ for more details
-#
+# Check https://circleci.com/docs/2.2/language-python/ for more details
+
+master_only: &master_only
+  filters:
+    branches:
+      only:
+        - master
+
 version: 2.1
 commands:
   unittest_tox:
@@ -48,7 +54,7 @@ commands:
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
+            - "~/.cache/pip"
       - when:
           condition: << parameters.store_coverage >>
           steps:
@@ -61,6 +67,133 @@ commands:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
                     .coverage.unittest-<< parameters.python_version >>
+  codespeed_agent_process_benchmark:
+    description: "A base command which runs CodeSpeed agent process level benchmarks"
+    parameters:
+      codespeed_executable:
+        description: "CodeSpeed executable name."
+        type: string
+      codespeed_environment:
+        description: "CodeSpeed environment name."
+        type: string
+        default: "Circle CI Docker Executor Medium Size"
+      agent_config:
+        description: "Path to the agent config file to use."
+        type: string
+      run_time:
+        description: "How long to run the capture for (in seconds)."
+        type: integer
+        default: 120
+      capture_interval:
+        description: "How often to capture agent process level metrics during the process run time (in seconds)."
+        type: integer
+        default: 5
+      agent_pre_run_command:
+        description: "Optional bash command / script to run before starting the agent and the metrics capture script."
+        type: string
+        default: ""
+      agent_post_run_command:
+        description: "Optional bash command / script to run after starting the agent and the metrics capture script."
+        type: string
+        default: ""
+      agent_server_host:
+        description: "Value for the server_attributes.serverHost agent configuration option."
+        type: string
+        default: "ci-codespeed-benchmarks"
+      capture_agent_status_metrics:
+        description: "True to capture additional metrics exposed via agent status command."
+        type: boolean
+        default: false
+      capture_line_counts:
+        description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
+      dry_run:
+        description: "True to enable dry run which runs the benchmarks without submitting data to CodeSpeed."
+        type: boolean
+        default: false
+      cache_key_name:
+        description: "Circle CI cache key name"
+        type: string
+        default: "Circle CI cache key name"
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install --user -r benchmarks/scripts/requirements.txt
+            # Workaround for issue with cffi library on the system using
+            # different version than the one which is bundled with the agent
+            pip install --user "cffi==1.12.3"
+            # TODO: Add another benchmark with ujson
+            # pip install --user "ujson==1.35"
+      - run:
+          name: Run Agent And Capture Resource Utilization
+          # NOTE: The following variables are specified in the Circle CI WebUI
+          # and are handles as secrets: CODESPEED_AUTH
+          environment:
+            CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
+            CODESPEED_PROJECT: "scalyr-agent-2"
+            CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
+            CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
+            CODESPEED_BRANCH: "${CIRCLE_BRANCH}"
+            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
+            # monitor for the agent process) should stabilize in a couple of minutes so it makes
+            # no sense to run that benchmark longer.
+            RUN_TIME: << parameters.run_time >>
+            CAPTURE_INTERVAL: << parameters.capture_interval >>
+            AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
+            SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
+            CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
+            DRY_RUN: "<< parameters.dry_run >>"
+          command: |
+            # Create directories which are needed by the agent process
+            mkdir -p ~/scalyr-agent-dev/{log,config,data}
+
+            # NOTE: We explicitly specify a commit date to avoid CodeSpeed from
+            # late setting the actual date once it fetches all the commits for a
+            # branch / revision
+            export TZ=UTC
+            export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
+
+            # Run any pre agent run script (if defined)
+            if [ ! -z "<< parameters.agent_pre_run_command >>" ]; then
+                echo "Running agent pre run command..."
+                << parameters.agent_pre_run_command >>
+            fi
+
+            # Run the agent process and capture the metrics
+            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}" &> /tmp/capture_script.log &
+            CAPTURE_SCRIPT_PID=$!
+
+            # Run any post agent run script (if defined)
+            # NOTE: We intentionally sleep for a bit to give agent time to fully
+            # start up
+            if [ ! -z "<< parameters.agent_post_run_command >>" ]; then
+                echo "Running agent post run command..."
+                sleep 2
+                << parameters.agent_post_run_command >>
+            fi
+
+            # Wait for capture script to finish
+            set +e
+            sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
+            wait ${CAPTURE_SCRIPT_PID} || true
+            set -e
+
+            # Send line count values for various log levels (if enabled)
+            if [ "<< parameters.capture_line_counts >>" = "true" ]; then
+                ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
+            fi
+      - save_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/scalyr-agent-dev/log
 
 jobs:
   unittest-38:
@@ -429,17 +562,164 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
+          name: Install APT dependencies
+          command: |
+            # We add unstable repo to make sure latest version of shellchcek (>=
+            # 0.7.0 is installed)
+            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
+            sudo apt-get update -y
+            sudo apt-get install -y shellcheck
+      - run:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
       - run:
-          name: Run Lint Checks
+          name: Run Python Lint Checks
           command: |
             tox -e lint
+      - run:
+          name: Run Shell Scripts Lint Checks
+          environment:
+            IGNORE_BINARY_DOESNT_EXIST: "0"
+          command: |
+            ./scripts/shell-scripts-lint.sh
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
+            - "~/.cache/pip"
+
+  benchmarks-idle-agent-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - idle conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-1"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-27"
+
+  benchmarks-idle-agent-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - idle conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-1"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-35"
+
+  benchmarks-idle-agent-no-monitors-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-27"
+
+  benchmarks-idle-agent-no-monitors-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-35"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1"
+          run_time: 140
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-1"
+          run_time: 140
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf gc"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file_gc_metrics.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1-gc-stats"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27"
+
+  # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
+  # which is being written to during the benchmark must existing before the
+  # agent process is started.
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-27"
+
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -454,7 +734,7 @@ jobs:
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
                 --workflow=unittest --status=success --branch=all --limit=5 \
-                --email=tomaz@scalyr.com
+                --email=cloudtech-builds@scalyr.com
 
 workflows:
   version: 2
@@ -481,6 +761,27 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
+  benchmarks:
+    jobs:
+      - benchmarks-idle-agent-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-py-35:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
+          <<: *master_only
+
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

@@ -62,7 +62,7 @@ class TestInt32RequestParser(ScalyrTestCase):
 
     def run_test_case(self, input_string, length_to_send, truncate_size=None):
         input_buffer = io.BytesIO()
-        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
         input_buffer.write(compat.struct_pack_unicode("!I", length_to_send))
         input_buffer.write(input_string)
         if truncate_size is not None:

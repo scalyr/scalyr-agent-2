@@ -380,6 +380,19 @@ def create_unique_id():
     return base64_id.decode("utf-8")
 
 
+def create_uuid3(namespace, name):
+    """
+    Return new UUID based on a hash of a UUID namespace and a string.
+    :param namespace: The namespace
+    :param name: The string
+    :type namespace: uuid.UUID
+    :type name: six.text
+    :return:
+    :rtype: uuid.UUID
+    """
+    return uuid.uuid3(namespace, six.ensure_str(name))
+
+
 def md5_hexdigest(data):
     """
     Returns the md5 digest of the input data
@@ -1039,7 +1052,10 @@ class StoppableThread(threading.Thread):
                 name = "%s%s" % (name_prefix, name)
             else:
                 name = name_prefix
-        threading.Thread.__init__(self, name=name, target=self.__run_impl)
+        # NOTE: We explicitly don't pass target= argument to the parent constructor since this
+        # creates a cycle and a memory leak
+        threading.Thread.__init__(self, name=name)
+
         if is_daemon:
             self.setDaemon(True)
         self.__target = target
@@ -1072,6 +1088,15 @@ class StoppableThread(threading.Thread):
         finally:
             StoppableThread.__name_lock.release()
 
+    def run(self):
+        """
+        NOTE: This is a workaround for using threading.Thread constructor target argument which
+        results in a cycle and a memory leak.
+
+        See https://bugs.python.org/issue704180 for details.
+        """
+        return self.__run_impl()
+
     def __run_impl(self):
         """Internal run implementation.
         """
@@ -1095,6 +1120,13 @@ class StoppableThread(threading.Thread):
         This allows for the base class to catch any raised exceptions and propagate them during the join call.
         """
         pass
+
+    def is_running(self):
+        # type: () -> bool
+        """
+        Return True if this thread is running.
+        """
+        return self._run_state.is_running()
 
     def stop(self, wait_on_join=True, join_timeout=5):
         """Stops the thread from running.
@@ -1407,7 +1439,7 @@ class RedirectorServer(object):
         self.__channel_lock.acquire()
         try:
             if self.__channel_lock is not None:
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 self.__channel.write(
                     compat.struct_pack_unicode("i", code) + encoded_content
                 )
@@ -1567,7 +1599,7 @@ class RedirectorClient(StoppableThread):
                 # Read one integer which should contain both the number of bytes of content that are being sent
                 # and which stream it should be written to.  The stream id is in the lower bit, and the number of
                 # bytes is shifted over by one.
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 code = compat.struct_unpack_unicode("i", self.__channel.read(4))[
                     0
                 ]  # Read str length

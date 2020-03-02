@@ -171,23 +171,7 @@ class JsonObject(object):
         :return: The dict version of this JSON object.
         :rtype: dict
         """
-
-        def _convert_to_builtin_type(value):
-            value_type = type(value)
-            if value_type == JsonObject or value_type == dict:
-                result = dict()
-                for key, value in six.iteritems(value):
-                    result[key] = _convert_to_builtin_type(value)
-                return result
-            elif value_type == JsonArray or value_type == list:
-                result = []
-                for x in value:
-                    result.append(_convert_to_builtin_type(x))
-                return result
-            else:
-                return value
-
-        return _convert_to_builtin_type(self)
+        return convert_to_builtin_type(self)
 
     def get(self, field, default_value=None, none_if_missing=False):
         """Returns the specified field without any conversion.
@@ -700,3 +684,22 @@ class ArrayOfStrings(JsonArray):
 
 class SpaceAndCommaSeparatedArrayOfStrings(ArrayOfStrings):
     separators = [None, ","]  # type: List[Any]
+
+
+def convert_to_builtin_type(value):
+    """
+    Convert the provided JSON value for the native / builtin Python type.
+    """
+    value_type = type(value)
+    if value_type == JsonObject or value_type == dict:
+        result = dict()
+        for key, value in six.iteritems(value):
+            result[key] = convert_to_builtin_type(value)
+        return result
+    elif value_type == JsonArray or value_type == list:
+        result = []
+        for x in value:
+            result.append(convert_to_builtin_type(x))
+        return result
+    else:
+        return value

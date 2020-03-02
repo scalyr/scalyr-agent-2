@@ -48,6 +48,7 @@ from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.scalyr_client import AddEventsRequest
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
+from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
 import scalyr_agent.util as scalyr_util
 import scalyr_agent.test_util as test_util
 
@@ -733,13 +734,14 @@ def _write_bad_checkpoint_file(path):
     fp.close()
 
 
-class CopyingManagerEnd2EndTest(ScalyrTestCase):
+class CopyingManagerEnd2EndTest(BaseScalyrLogCaptureTestCase):
     def setUp(self):
         super(CopyingManagerEnd2EndTest, self).setUp()
         self._controller = None
         self._config = None
 
     def tearDown(self):
+        super(CopyingManagerEnd2EndTest, self).tearDown()
         if self._controller is not None:
             self._controller.stop()
 
@@ -1201,6 +1203,43 @@ class CopyingManagerEnd2EndTest(ScalyrTestCase):
 
         self.assertEquals(["5", "6", "7", "8", "9"], lines)
 
+    def test_whole_response_is_logged_on_non_success(self):
+        statuses = ["discardBuffer", "requestTooLarge", "parseResponseFailed"]
+
+        for status in statuses:
+            # Initially this long line shouldn't be present
+            expected_body = (
+                'Received server response with status="%s" and body: fake' % (status)
+            )
+            self.assertLogFileDoesntContainsRegex(
+                expected_body, file_path=self.agent_debug_log_path
+            )
+
+            try:
+                controller = self.__create_test_instance()
+
+                self.__append_log_lines("First line", "Second line")
+                (request, responder_callback) = controller.wait_for_rpc()
+
+                lines = self.__extract_lines(request)
+                self.assertEquals(2, len(lines))
+                self.assertEquals("First line", lines[0])
+                self.assertEquals("Second line", lines[1])
+
+                responder_callback(status)
+
+                # But after response is received, it should be present
+                expected_body = (
+                    'Received server response with status="%s" and body: fake'
+                    % (status)
+                )
+                self.assertLogFileContainsRegex(
+                    expected_body, file_path=self.agent_debug_log_path
+                )
+            finally:
+                if controller:
+                    controller.stop()
+
     def __extract_lines(self, request):
         parsed_request = test_util.parse_scalyr_request(request.get_payload())
 
@@ -1298,6 +1337,8 @@ class TestableCopyingManager(CopyingManager):
 
     To actually control the copying manager, use the TestController object returned by ``controller``.
     """
+
+    __test__ = False
 
     # The different points at which the CopyingManager can be stopped.  See below.
     SLEEPING = "SLEEPING"

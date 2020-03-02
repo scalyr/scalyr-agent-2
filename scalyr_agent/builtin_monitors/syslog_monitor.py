@@ -318,7 +318,7 @@ def _get_default_gateway():
             fields = line.strip().split()
             if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
-            # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+            # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
             result = socket.inet_ntoa(
                 compat.struct_pack_unicode("<L", int(fields[2], 16))
             )

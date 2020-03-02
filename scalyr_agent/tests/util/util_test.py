@@ -31,6 +31,7 @@ import datetime
 import os
 import tempfile
 import threading
+import uuid
 from mock import patch, MagicMock
 import six
 
@@ -308,6 +309,13 @@ class TestUtil(ScalyrTestCase):
         self.assertTrue(len(first) > 0)
         self.assertTrue(len(second) > 0)
         self.assertNotEqual(first, second)
+
+    def test_create_uuid3(self):
+        namespace = uuid.UUID("{aaaaffff-22c7-4d50-92c1-123456781234}")
+        self.assertEqual(
+            scalyr_util.create_uuid3(namespace, "test-string"),
+            uuid.UUID("{72a49a0a-d92e-383c-a88b-2060e372e1af}"),
+        )
 
     def test_remove_newlines_and_truncate(self):
         self.assertEquals(scalyr_util.remove_newlines_and_truncate("hi", 1000), "hi")
@@ -684,7 +692,7 @@ class TestRedirectorServer(ScalyrTestCase):
         @rtype: (int,six.text_type)
         """
         prefix_code = content[0:4]
-        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
         code = compat.struct_unpack_unicode("i", prefix_code)[0]
         stream_id = code % 2
         num_bytes = code >> 1
@@ -780,7 +788,7 @@ class TestRedirectorClient(ScalyrTestCase):
         else:
             encoded_content = content
         code = len(encoded_content) * 2 + stream_id
-        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
         self._client_channel.simulate_server_write(
             compat.struct_pack_unicode("i", code) + encoded_content
         )
