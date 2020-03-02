@@ -123,7 +123,8 @@ commands:
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
-            pip install --user "ujson==1.35"
+            # TODO: Add another benchmark with ujson
+            # pip install --user "ujson==1.35"
       - run:
           name: Run Agent And Capture Resource Utilization
           # NOTE: The following variables are specified in the Circle CI WebUI
