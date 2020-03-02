@@ -143,12 +143,14 @@ commands:
             # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
             # monitor for the agent process) should stabilize in a couple of minutes so it makes
             # no sense to run that benchmark longer.
-            RUN_TIME: << parameters.run_time >>
+            #RUN_TIME: << parameters.run_time >>
+            RUN_TIME: "15"
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
             SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
             CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
-            DRY_RUN: "<< parameters.dry_run >>"
+            DRY_RUN: "1"
+            #DRY_RUN: "<< parameters.dry_run >>"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
@@ -182,7 +184,9 @@ commands:
             set +e
             sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
             wait ${CAPTURE_SCRIPT_PID} || true
-            set -e
+
+            ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
+            exit 2
 
             # Send line count values for various log levels (if enabled)
             if [ "<< parameters.capture_line_counts >>" = "true" ]; then
@@ -739,48 +743,9 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
-    jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-37
-      - smoke-standalone-27
-      - smoke-standalone-26
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-py-35:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
