@@ -7,7 +7,6 @@ master_only: &master_only
     branches:
       only:
         - master
-        - shell_scripts_lint
 
 version: 2.1
 commands:
@@ -143,14 +142,12 @@ commands:
             # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
             # monitor for the agent process) should stabilize in a couple of minutes so it makes
             # no sense to run that benchmark longer.
-            #RUN_TIME: << parameters.run_time >>
-            RUN_TIME: "15"
+            RUN_TIME: << parameters.run_time >>
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
             SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
             CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
-            DRY_RUN: "1"
-            #DRY_RUN: "<< parameters.dry_run >>"
+            DRY_RUN: "<< parameters.dry_run >>"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
