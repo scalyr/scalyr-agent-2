@@ -38,3 +38,4 @@ echo "Using shellcheck: ${SHELLCHECK_VERSION}"
 # the severity to warning
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv)
 shellcheck -S warning benchmarks/scripts/*.sh
+shellcheck -S warning installer/scripts/*.sh
