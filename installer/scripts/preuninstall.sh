@@ -17,15 +17,15 @@
 # (rather than just removing this version because we are upgrading to
 # a new one).  An uninstall is indicated by $1 == 0 for
 # RPM and $1 == "remove" for Debian.
-if [ "$1" == "0" -o "$1" == "remove" ]; then
+if [ "$1" == "0" ] || [ "$1" == "remove" ]; then
   # Stop the service since we are about to completely remove it.
   service scalyr-agent-2 stop > /dev/null 2>&1
 
   # Remove the symlinks from the /etc/rcX.d directories.
-  if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
+  if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
     # For RPM-based systems.
     chkconfig --del scalyr-agent-2;
-  elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
+  elif [ -f /usr/sbin/update-rc.d ] || [ -f /sbin/update-rc.d ]; then
     # For Debian-based systems.
     update-rc.d -f scalyr-agent-2 remove;
   else

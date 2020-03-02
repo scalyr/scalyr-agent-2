@@ -26,10 +26,10 @@ fi
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
 # to stop and start the service at boot time.
-if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
+if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
   # For Redhat-based systems, use chkconfig to create links.
   chkconfig --add scalyr-agent-2;
-elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
+elif [ -f /usr/sbin/update-rc.d ] || [ -f /sbin/update-rc.d ]; then
   # For Debian-based systems, update-rc.d does the job.
   update-rc.d scalyr-agent-2 defaults 98 02;
 else
