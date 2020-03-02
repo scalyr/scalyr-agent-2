@@ -32,10 +32,12 @@ if [ $# -lt 1 ]; then
     exit 2
 fi
 
-LINES_COUNT_INFO_LEVEL=$(grep -c -a -P '^.*\s+INFO \[.*\].*$' "${AGENT_LOG_FILE_PATH}")
-LINES_COUNT_WARNING_LEVEL=$(grep -c -a -P '^.*\s+WARNING \[.*\].*$' "${AGENT_LOG_FILE_PATH}")
-LINES_COUNT_ERROR_LEVEL=$(grep -c -a -P '^.*\s+ERROR \[.*\].*$' "${AGENT_LOG_FILE_PATH}")
-LINES_COUNT_DEBUG_LEVEL=$(grep -c -a -P '^.*\s+DEBUG \[.*\].*$' "${AGENT_DEBUG_LOG_FILE_PATH}")
+# NOTE: We have "set -e" mode set which means we need to ignore grep errors if
+# no matches are found otherwise script will exit with non-zero
+LINES_COUNT_INFO_LEVEL=$(grep -c -a -P '^.*\s+INFO \[.*\].*$' "${AGENT_LOG_FILE_PATH}" || true)
+LINES_COUNT_WARNING_LEVEL=$(grep -c -a -P '^.*\s+WARNING \[.*\].*$' "${AGENT_LOG_FILE_PATH}" || true)
+LINES_COUNT_ERROR_LEVEL=$(grep -c -a -P '^.*\s+ERROR \[.*\].*$' "${AGENT_LOG_FILE_PATH}" || true)
+LINES_COUNT_DEBUG_LEVEL=$(grep -c -a -P '^.*\s+DEBUG \[.*\].*$' "${AGENT_DEBUG_LOG_FILE_PATH}" || true)
 
 COMMON_COMMAND_LINE_ARGS="--codespeed-url=\"${CODESPEED_URL}\" \
     --codespeed-auth=\"${CODESPEED_AUTH}\" \
