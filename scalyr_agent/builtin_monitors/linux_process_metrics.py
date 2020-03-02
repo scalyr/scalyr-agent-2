@@ -156,7 +156,6 @@ define_metric(
     "app.disk.requests",
     "Total disk read requests.",
     extra_fields={"type": "read"},
-    unit="bytes",
     cumulative=True,
 )
 
@@ -174,7 +173,6 @@ define_metric(
     "app.disk.requests",
     "Total disk write requests.",
     extra_fields={"type": "write"},
-    unit="bytes",
     cumulative=True,
 )
 
@@ -244,6 +242,9 @@ class Metric(object):
             "app.disk.bytes",
             "app.disk.requests",
         )
+
+    def __repr__(self):
+        return "<Metric name=%s,type=%s>" % (self.name, self.type)
 
 
 class MetricPrinter:
@@ -867,6 +868,9 @@ class ProcessTracker(object):
                     repr(ex),
                 )
         return collector
+
+    def __repr__(self):
+        return "<ProcessTracker pid=%s,monitor_id=%s>" % (self.pid, self.monitor_id)
 
 
 class ProcessList(object):

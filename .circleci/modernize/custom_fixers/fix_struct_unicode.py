@@ -1,6 +1,4 @@
 from lib2to3.fixer_base import BaseFix
-from lib2to3.pgen2 import token
-from lib2to3.fixer_util import Name, Node, Leaf, LParen, RParen, Dot, Newline
 import libmodernize
 
 

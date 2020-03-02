@@ -25,10 +25,12 @@
 # Usage: python coverage_report.py
 
 
+from __future__ import absolute_import
 import os
 import shutil
-import ConfigParser
+import six.moves.configparser
 import argparse
+from io import open
 
 
 parser = argparse.ArgumentParser()
@@ -57,19 +59,19 @@ else:
 # This is important because html report needs source code to generate results
 # Paths in .coverage and in local project can be different,
 # so we need to specify local project path, so coverage tool can access to source code to generate html.
-parser = ConfigParser.ConfigParser()
+parser = six.moves.configparser.ConfigParser()  # type: ignore
 with open(".coveragerc", "r") as f:
-    parser.readfp(f)
+    parser.readfp(f)  # type: ignore
 
 # add current path to 'paths' section.
-paths = parser.get("paths", "source").split("\n")
+paths = parser.get("paths", "source").split("\n")  # type: ignore
 cwd = os.getcwd()
 if cwd not in paths:
     paths = ["\n%s" % os.getcwd()] + paths
-parser.set("paths", "source", "\n".join(paths))
+parser.set("paths", "source", "\n".join(paths))  # type: ignore
 
 with open(".coveragerc", "w") as f:
-    parser.write(f)
+    parser.write(f)  # type: ignore
 
 os.system("coverage combine")
 

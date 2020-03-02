@@ -802,6 +802,17 @@ class CopyingManager(StoppableThread, LogWatcher):
                                 result,
                             )
 
+                            if result != "success":
+                                # Log the whole response body in case server returns non-success
+                                # response so we can troubleshoot the error (aka is it bug in the
+                                # agent code or similar)
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    'Received server response with status="%s" and body: %s',
+                                    result,
+                                    full_response,
+                                )
+
                             if (
                                 result == "success"
                                 or "discardBuffer" in result

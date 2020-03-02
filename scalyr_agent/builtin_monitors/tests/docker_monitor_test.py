@@ -23,6 +23,7 @@ __author__ = "echee@scalyr.com"
 
 import os
 import threading
+import time
 from io import open
 
 
@@ -250,6 +251,12 @@ class DockerMonitorTest(ScalyrTestCase):
                 m1.assert_called()
                 m2.assert_called()
                 m3.assert_called()
+
+                manager.stop_manager(wait_on_join=False)
+                fake_clock.advance_time(increment_by=manager_poll_interval)
+
+                time.sleep(1)
+
                 self.assertEquals(fragment_polls.count(), 40)
                 self.assertEquals(counter["callback_invocations"], 4)
                 self.assertEquals(
@@ -261,8 +268,5 @@ class DockerMonitorTest(ScalyrTestCase):
                         "docker=18.09.2|docker_api|api",
                     ],
                 )
-
-                manager.stop_manager(wait_on_join=False)
-                fake_clock.advance_time(increment_by=manager_poll_interval)
 
             start_test()  # pylint: disable=no-value-for-parameter

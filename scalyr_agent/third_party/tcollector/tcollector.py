@@ -232,10 +232,15 @@ class Collector(object):
           cut_off: A UNIX timestamp.  Any value that's older than this will be
             removed from the cache.
         """
-        for key in self.values.keys():
+        # NOTE: It's important we create copy of keys because otherwise we will be changing
+        # dictionary during iteration which throws under Python 3
+        keys = list(self.values.keys())
+        for key in keys:
             time = self.values[key][3]
             if time < cut_off:
                 del self.values[key]
+
+        del keys
 
 
 class StdinCollector(Collector):
@@ -323,7 +328,11 @@ class ReaderThread(threading.Thread):
             if now - lastevict_time > self.evictinterval:
                 lastevict_time = now
                 now -= self.evictinterval
-                for col in all_collectors():
+
+                # NOTE: It's important we create copy of keys because otherwise we will be changing
+                # dictionary during iteration which throws under Python 3
+                all_collectors_ = list(all_collectors())
+                for col in all_collectors_:
                     col.evict_old_keys(now)
 
             # and here is the loop that we really should get rid of, this

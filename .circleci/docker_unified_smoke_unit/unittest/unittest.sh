@@ -1,4 +1,4 @@
-#!/usr/bin/env /bin/bash
+#!/usr/bin/env bash
 
 # This script expects 2 environment variables
 # 1) Two-digit PYTHON_VERSION (e.g. 2.4, 2.5, 2.6, 2.7)
