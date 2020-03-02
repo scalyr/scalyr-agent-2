@@ -55,6 +55,20 @@ RUN_TIME=${RUN_TIME-"60"}
 # How often to capture metrics during the capture run time (in seconds)
 CAPTURE_INTERVAL=${CAPTURE_INTERVAL-"10"}
 
+DRY_RUN=${DRY_RUN:-"0"}
+
+CAPTURE_AGENT_STATUS_METRICS=${CAPTURE_AGENT_STATUS_METRICS:-"0"}
+
+if [ "${CAPTURE_AGENT_STATUS_METRICS}" = "true" ] || [ "${CAPTURE_AGENT_STATUS_METRICS}" = "1" ]; then
+    ADDITIONAL_CAPTURE_SCRIPT_FLAGS="--capture-agent-status-metrics "
+else
+    ADDITIONAL_CAPTURE_SCRIPT_FLAGS=""
+fi
+
+if [ "${DRY_RUN}" = "true" ] || [ "${DRY_RUN}" = "1" ]; then
+    ADDITIONAL_CAPTURE_SCRIPT_FLAGS+="--dry-run "
+fi
+
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
 print_common_env_variables
 
@@ -91,8 +105,9 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --branch=\"${CODESPEED_BRANCH}\" \
     --commit-date=\"${COMMIT_DATE}\" \
     --commit-id=\"${COMMIT_HASH}\" \
+    ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
     --debug"
 
-echo "Starting the metrics capture script..."
+echo "Starting the metrics capture script (ADDITIONAL_CAPTURE_SCRIPT_FLAGS=${ADDITIONAL_CAPTURE_SCRIPT_FLAGS})..."
 # shellcheck disable=SC2086
 eval ${CAPTURE_SCRIPT_COMMAND}

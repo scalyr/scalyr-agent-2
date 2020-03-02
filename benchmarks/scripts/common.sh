@@ -37,7 +37,7 @@ function verify_mandatory_common_env_variables_are_set() {
 function print_common_env_variables() {
     print_environment_variables CODESPEED_URL CODESPEED_PROJECT \
         CODESPEED_EXECUTABLE CODESPEED_ENVIRONMENT CODESPEED_BRANCH \
-        COMMIT_DATE COMMIT_HASH DRY_RUN
+        COMMIT_DATE COMMIT_HASH DRY_RUN CAPTURE_AGENT_STATUS_METRICS
 }
 
 # Function which prints values of the provided environment variables
