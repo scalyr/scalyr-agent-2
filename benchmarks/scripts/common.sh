@@ -30,3 +30,25 @@ function verify_mandatory_common_env_variables_are_set() {
         fi
     done
 }
+
+# Function which prints common configuration environment variables making
+# sure we don't print private ones
+function print_common_env_variables() {
+    print_environment_variables CODESPEED_URL CODESPEED_PROJECT \
+        CODESPEED_EXECUTABLE CODESPEED_ENVIRONMENT CODESPEED_BRANCH \
+        COMMIT_DATE COMMIT_HASH DRY_RUN CAPTURE_AGENT_STATUS_METRICS
+}
+
+# Function which prints values of the provided environment variables
+function print_environment_variables() {
+    env_variables=("$@")
+
+    echo "Using environment settings:"
+    echo ""
+
+    for var_name in "${env_variables[@]}"; do
+        echo "${var_name}=${!var_name}"
+    done
+
+    echo ""
+}

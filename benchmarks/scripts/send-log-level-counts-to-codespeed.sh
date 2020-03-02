@@ -46,6 +46,7 @@ COMMON_COMMAND_LINE_ARGS="--codespeed-url=\"${CODESPEED_URL}\" \
     --commit-id=\"${COMMIT_HASH}\""
 
 echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
+print_common_env_variables
 
 eval python ${SEND_VALUE_SCRPT_PATH} ${COMMON_COMMAND_LINE_ARGS} \
     --codespeed-benchmark="log_lines_info" \

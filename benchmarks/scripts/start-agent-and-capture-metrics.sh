@@ -69,7 +69,7 @@ if [ "${DRY_RUN}" = "true" ]; then
 fi
 
 echo "Starting the agent process and metrics capture for ${RUN_TIME} seconds"
-echo "Using COMMIT_DATE=${COMMIT_DATE} and COMMIT_ID=${COMMIT_HASH}"
+print_common_env_variables
 
 # 1. Start the agent
 echo "Starting agent process..."
