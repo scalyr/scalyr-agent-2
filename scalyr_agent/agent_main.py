@@ -80,6 +80,7 @@ from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
+from scalyr_agent.agent_status import GCStatus
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import (
     PlatformController,
@@ -1069,6 +1070,22 @@ class ScalyrAgent(object):
                             gc.collect()
                             last_gc_time = current_time
 
+                        if self.__config.enable_gc_stats:
+                            # If GC stats are enabled, enable tracking uncollectable objects
+                            if gc.get_debug() == 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Enabling GC debug mode",
+                                )
+                                gc.set_debug(gc.DEBUG_SAVEALL)
+                        else:
+                            if gc.get_debug() != 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Disabling GC debug mode",
+                                )
+                                gc.set_debug(0)
+
                         if _check_disabled(
                             current_time,
                             disable_config_equivalence_check_until,
@@ -1397,6 +1414,12 @@ class ScalyrAgent(object):
             result.copying_manager_status = self.__copying_manager.generate_status()
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
+
+        # Include GC stats (if enabled)
+        if self.__config.enable_gc_stats:
+            gc_stats = GCStatus()
+            gc_stats.garbage = len(gc.garbage)
+            result.gc_stats = gc_stats
 
         return result
 

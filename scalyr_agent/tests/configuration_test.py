@@ -237,6 +237,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.debug_level, 0)
         self.assertEquals(config.request_deadline, 60.0)
 
+        self.assertEquals(config.enable_gc_stats, False)
+
         self.assertEquals(config.max_line_size, 9900)
         self.assertEquals(config.max_log_offset_size, 5 * 1024 * 1024)
         self.assertEquals(config.max_existing_log_offset_size, 100 * 1024 * 1024)
@@ -361,6 +363,8 @@ class TestConfiguration(TestConfigurationBase):
             debug_init: true,
             pidfile_advanced_reuse_guard: true,
 
+            enable_gc_stats: true,
+
             max_new_log_detection_time: 120,
 
             copying_thread_profile_interval: 2,
@@ -416,6 +420,8 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.internal_parse_max_line_size, 4013)
         self.assertEquals(config.copy_staleness_threshold, 4 * 60)
         self.assertEquals(config.log_deletion_delay, 5 * 60)
+
+        self.assertEquals(config.enable_gc_stats, True)
 
         self.assertEquals(config.copying_thread_profile_interval, 2)
         self.assertEquals(

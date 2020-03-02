@@ -100,8 +100,16 @@ commands:
         description: "Value for the server_attributes.serverHost agent configuration option."
         type: string
         default: "ci-codespeed-benchmarks"
+      capture_agent_status_metrics:
+        description: "True to capture additional metrics exposed via agent status command."
+        type: boolean
+        default: false
       capture_line_counts:
         description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
+      dry_run:
+        description: "True to enable dry run which runs the benchmarks without submitting data to CodeSpeed."
         type: boolean
         default: false
       cache_key_name:
@@ -119,6 +127,9 @@ commands:
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
+            pip install --user "ujson==1.35"
+            # TODO: Add another benchmark with ujson
+            # pip install --user "ujson==1.35"
       - run:
           name: Run Agent And Capture Resource Utilization
           # NOTE: The following variables are specified in the Circle CI WebUI
@@ -136,6 +147,8 @@ commands:
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
             SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
+            CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
+            DRY_RUN: "<< parameters.dry_run >>"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
@@ -644,6 +657,22 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
 
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf gc"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file_gc_metrics.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1-gc-stats"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27"
+
   # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
   # which is being written to during the benchmark must existing before the
   # agent process is started.
@@ -736,6 +765,8 @@ workflows:
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
           <<: *master_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
