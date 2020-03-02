@@ -1257,13 +1257,17 @@ class TestConfiguration(TestConfigurationBase):
         original_verify_or_set_optional_array_of_strings = (
             config._Configuration__verify_or_set_optional_array_of_strings
         )
+        original_verify_or_set_optional_attributes = (
+            config._Configuration__verify_or_set_optional_attributes
+        )
 
         @patch.object(config, "_Configuration__verify_or_set_optional_bool")
         @patch.object(config, "_Configuration__verify_or_set_optional_int")
         @patch.object(config, "_Configuration__verify_or_set_optional_float")
         @patch.object(config, "_Configuration__verify_or_set_optional_string")
         @patch.object(config, "_Configuration__verify_or_set_optional_array_of_strings")
-        def patch_and_start_test(p4, p3, p2, p1, p0):
+        @patch.object(config, "_Configuration__verify_or_set_optional_attributes")
+        def patch_and_start_test(p5, p4, p3, p2, p1, p0):
             # Decorate the Configuration.__verify_or_set_optional_xxx methods as follows:
             # 1) capture fields that are environment-aware
             # 2) allow setting of the corresponding environment variable
@@ -1294,6 +1298,10 @@ class TestConfiguration(TestConfigurationBase):
                         return original_verify_or_set_optional_array_of_strings(
                             *args, **kwargs
                         )
+                    elif field_type == JsonObject:
+                        return original_verify_or_set_optional_attributes(
+                            *args, **kwargs
+                        )
 
                 return wrapper
 
@@ -1302,6 +1310,7 @@ class TestConfiguration(TestConfigurationBase):
             p2.side_effect = capture_aware_field(float)
             p3.side_effect = capture_aware_field(six.text_type)
             p4.side_effect = capture_aware_field(ArrayOfStrings)
+            p5.side_effect = capture_aware_field(JsonObject)
 
             # Build the Configuration object tree, also populating the field_types lookup in the process
             # This first iteration does not set any environment variables
@@ -1323,6 +1332,7 @@ class TestConfiguration(TestConfigurationBase):
             FAKE_FLOAT = 1234567.89
             FAKE_STRING = six.text_type(FAKE_INT)
             FAKE_ARRAY_OF_STRINGS = ArrayOfStrings(["s1", "s2", "s3"])
+            FAKE_OBJECT = JsonObject(**{"serverHost": "foo-bar-baz.com"})
 
             for field in expected_aware_fields:
                 field_type = field_types[field]
@@ -1362,6 +1372,12 @@ class TestConfiguration(TestConfigurationBase):
                         config_obj.get_json_array(field, none_if_missing=True),
                     )
                     fake_env[field] = FAKE_ARRAY_OF_STRINGS
+                elif field_type == JsonObject:
+                    self.assertNotEquals(
+                        FAKE_OBJECT,
+                        config_obj.get_json_object(field, none_if_missing=True),
+                    )
+                    fake_env[field] = FAKE_OBJECT
 
             def fake_environment_value(field):
                 if field not in fake_env:
@@ -1375,6 +1391,12 @@ class TestConfiguration(TestConfigurationBase):
                     result = six.text_type(
                         separator.join([x for x in fake_field_val])
                     ).lower()
+                elif isinstance(fake_field_val, JsonObject):
+                    result = (
+                        six.text_type(fake_field_val)
+                        .replace("'", '"')
+                        .replace('u"', '"')
+                    )
                 else:
                     result = six.text_type(fake_field_val).lower()
                 return result
@@ -1395,6 +1417,8 @@ class TestConfiguration(TestConfigurationBase):
                     value = config._Configuration__get_config().get_string(field)
                 elif field_type == ArrayOfStrings:
                     value = config._Configuration__get_config().get_json_array(field)
+                elif field_type == JsonObject:
+                    value = config._Configuration__get_config().get_json_object(field)
 
                 config_file_value = config_file_dict.get(field)
                 if field in config_file_dict:
@@ -1659,6 +1683,41 @@ class TestGetConfigFromEnv(TestConfigurationBase):
 
         del os.environ["SCALYR_K8S_API_URL"]
         self.assertIsNone(get_config_from_env("k8s_api_url", convert_to=six.text_type))
+
+    def test_get_empty_json_object(self):
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = ""
+        self.assertEqual(
+            JsonObject(content={}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        del os.environ["SCALYR_SERVER_ATTRIBUTES"]
+        self.assertEqual(
+            None, get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+        os.environ["SCALYR_SERVER_ATTRIBUTES"] = '{"serverHost": "foo1.example.com"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ[
+            "SCALYR_SERVER_ATTRIBUTES"
+        ] = '{"serverHost": "foo1.example.com", "tier": "foo"}'
+        self.assertEqual(
+            JsonObject(content={"serverHost": "foo1.example.com", "tier": "foo"}),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
+
+        os.environ[
+            "SCALYR_SERVER_ATTRIBUTES"
+        ] = '{"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}'
+        self.assertEqual(
+            JsonObject(
+                content={"serverHost": "foo1.example.com", "tier": "foo", "bar": "baz"}
+            ),
+            get_config_from_env("server_attributes", convert_to=JsonObject),
+        )
 
 
 class FakeLogWatcher:

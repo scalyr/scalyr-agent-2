@@ -196,6 +196,9 @@ def convert_config_param(field_name, value, convert_to, is_environment_variable=
 
         elif convert_to in (JsonArray, JsonObject):
             try:
+                # Special case for empty objects
+                if convert_to == JsonObject and not value:
+                    return JsonObject()
                 # Needs to be json_lib.parse since it is parsing configuration.
                 return scalyr_util.json_scalyr_config_decode(value)
             except JsonParseException:
