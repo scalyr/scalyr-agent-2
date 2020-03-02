@@ -736,7 +736,21 @@ workflows:
             - smoke-k8s
   benchmarks:
     jobs:
+      - benchmarks-idle-agent-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-py-35:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *master_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
