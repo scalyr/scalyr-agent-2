@@ -45,11 +45,13 @@ echo "Check python version."
 
 current_version=$(/usr/bin/env python --version 2>&1 | grep -o "[0-9].[0-9].")
 
+# shellcheck disable=SC2072
 if [[ "$current_version" < "2.6" ]]; then
   echo -e "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${current_version}. Aborting.\e[0m" >&2
   exit 1
 fi
 
+# shellcheck disable=SC2072
 if [[ "$current_version" > "3.0" ]]; then
   if [[ "$current_version" < "3.5" ]]; then
     echo -e "\e[31mThe python interpreter with version '>=2.6 or >=3.5' is required. Current version: ${current_version}. Aborting.\e[0m" >&2

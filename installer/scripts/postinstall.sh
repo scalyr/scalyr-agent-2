@@ -21,15 +21,15 @@ script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 # has a different user.  If so, then make sure the newly installed files
 # (like agent.sh) are changed to the correct owners.
 if [ "$config_owner" != "$script_owner" ]; then
-  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user $config_owner > /dev/null 2>&1;
+  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user "$config_owner" > /dev/null 2>&1;
 fi
 
 # Add in the symlinks in the appropriate /etc/rcX.d/ directories
 # to stop and start the service at boot time.
-if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
+if [ -f /sbin/chkconfig ] || [ -f /usr/sbin/chkconfig ]; then
   # For Redhat-based systems, use chkconfig to create links.
   chkconfig --add scalyr-agent-2;
-elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
+elif [ -f /usr/sbin/update-rc.d ] || [ -f /sbin/update-rc.d ]; then
   # For Debian-based systems, update-rc.d does the job.
   update-rc.d scalyr-agent-2 defaults 98 02;
 else

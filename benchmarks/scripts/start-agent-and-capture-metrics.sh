@@ -26,7 +26,8 @@
 # Every command failure (aka non zero exit) in the script should be treated as a fatal error
 set -e
 
-SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
+SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+# shellcheck disable=SC1090
 source "${SCRIPT_DIR}/common.sh"
 
 verify_mandatory_common_env_variables_are_set
@@ -41,12 +42,12 @@ if [ $# -lt 1 ]; then
     exit 2
 fi
 
-AGENT_ENTRY_POINT=$(realpath $(echo "${SCRIPT_DIR}/../../scalyr_agent/agent_main.py"))
-AGENT_CONFIG_FILE=$(realpath $(echo "${SCRIPT_DIR}/../../${AGENT_CONFIG_FILE}"))
+AGENT_ENTRY_POINT=$(realpath "${SCRIPT_DIR}/../../scalyr_agent/agent_main.py")
+AGENT_CONFIG_FILE=$(realpath "${SCRIPT_DIR}/../../${AGENT_CONFIG_FILE}")
 
 AGENT_START_COMMAND="python ${AGENT_ENTRY_POINT} start --no-fork --no-change-user --config=${AGENT_CONFIG_FILE}"
 
-CAPTURE_METRICS_SCRIPT_PATH=$(realpath $(echo "${SCRIPT_DIR}/send_usage_data_to_codespeed.py"))
+CAPTURE_METRICS_SCRIPT_PATH=$(realpath "${SCRIPT_DIR}/send_usage_data_to_codespeed.py")
 
 # How long to run the agent process and capture the metrics for (in seconds)
 RUN_TIME=${RUN_TIME-"60"}
@@ -108,4 +109,5 @@ CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
     --debug"
 
 echo "Starting the metrics capture script (ADDITIONAL_CAPTURE_SCRIPT_FLAGS=${ADDITIONAL_CAPTURE_SCRIPT_FLAGS})..."
+# shellcheck disable=SC2086
 eval ${CAPTURE_SCRIPT_COMMAND}

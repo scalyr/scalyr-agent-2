@@ -127,7 +127,6 @@ commands:
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
-            pip install --user "ujson==1.35"
             # TODO: Add another benchmark with ujson
             # pip install --user "ujson==1.35"
       - run:
@@ -563,13 +562,27 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
+          name: Install APT dependencies
+          command: |
+            # We add unstable repo to make sure latest version of shellchcek (>=
+            # 0.7.0 is installed)
+            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
+            sudo apt-get update -y
+            sudo apt-get install -y shellcheck
+      - run:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
       - run:
-          name: Run Lint Checks
+          name: Run Python Lint Checks
           command: |
             tox -e lint
+      - run:
+          name: Run Shell Scripts Lint Checks
+          environment:
+            IGNORE_BINARY_DOESNT_EXIST: "0"
+          command: |
+            ./scripts/shell-scripts-lint.sh
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
