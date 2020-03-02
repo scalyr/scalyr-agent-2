@@ -37,5 +37,5 @@ echo "Using shellcheck: ${SHELLCHECK_VERSION}"
 # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
 # the severity to warning
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv | grep -v benchmarks | grep -v installer)
-shellcheck -S warning benchmarks/scripts/*.sh
+shellcheck -S info benchmarks/scripts/*.sh
 shellcheck -S info installer/scripts/*.sh
