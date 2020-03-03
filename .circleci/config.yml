@@ -370,7 +370,7 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
-          apt_dependencies: "procps git"
+          apt_dependencies: "procps build-essential"
 
 
   smoke-standalone-27-tls12:
@@ -826,7 +826,7 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-smoke-tests"
-          apt_dependencies: "procps git"
+          apt_dependencies: "procps build-essential"
 
 
   smoke-rpm-package-py3:
