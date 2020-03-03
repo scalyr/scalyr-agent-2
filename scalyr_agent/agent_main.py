@@ -45,9 +45,17 @@ import time
 from io import open
 
 try:
-    from __scalyr__ import SCALYR_VERSION, scalyr_init
+    from __scalyr__ import SCALYR_VERSION
+    from __scalyr__ import scalyr_init
+    from __scalyr__ import INSTALL_TYPE
+    from __scalyr__ import DEV_INSTALL
+    from __scalyr__ import MSI_INSTALL
 except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION, scalyr_init
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+    from scalyr_agent.__scalyr__ import scalyr_init
+    from scalyr_agent.__scalyr__ import INSTALL_TYPE
+    from scalyr_agent.__scalyr__ import DEV_INSTALL
+    from scalyr_agent.__scalyr__ import MSI_INSTALL
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -1257,18 +1265,25 @@ class ScalyrAgent(object):
         @rtype: ScalyrClientSession
         """
         if self.__config.verify_server_certificate:
+            is_dev_install = INSTALL_TYPE == DEV_INSTALL
+            is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
+
             ca_file = self.__config.ca_cert_path
             intermediate_certs_file = self.__config.intermediate_certs_path
 
             # Validate provided CA cert file and intermediate cert file exists. If they don't
             # exist, throw and fail early and loudly
-            if not os.path.isfile(ca_file):
+            if not is_dev_install and not os.path.isfile(ca_file):
                 raise ValueError(
                     'Invalid path "%s" specified for the "ca_cert_path" config '
                     "option: file does not exist" % (ca_file)
                 )
 
-            if not os.path.isfile(intermediate_certs_file):
+            # NOTE: We don't include intermediate certs in the Windows binary so we skip taht chek
+            # in MSI install
+            if not is_dev_or_msi_install and not os.path.isfile(
+                intermediate_certs_file
+            ):
                 raise ValueError(
                     'Invalid path "%s" specified for the '
                     '"intermediate_certs_path" config '
