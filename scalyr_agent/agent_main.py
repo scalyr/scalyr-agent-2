@@ -1077,7 +1077,7 @@ class ScalyrAgent(object):
                                     scalyr_logging.DEBUG_LEVEL_5,
                                     "Enabling GC debug mode",
                                 )
-                                gc.set_debug(gc.DEBUG_SAVEALL)
+                                gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
                         else:
                             if gc.get_debug() != 0:
                                 log.log(
