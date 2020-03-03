@@ -420,6 +420,21 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             sys.stderr.write = stderr_bkp
             self.ran_std_output = False
 
+    def test_output_to_file_without_stdout_stderr(self):
+        self.ran_std_output = False
+        stdout_bkp = sys.stdout.write
+        sys.stdout.write = types.MethodType(self.fake_std_write, sys.stdout)
+        stderr_bkp = sys.stderr.write
+        sys.stderr.write = types.MethodType(self.fake_std_write, sys.stderr)
+        try:
+            self.__logger.info("Hello world")
+            self.assertLogFileContainsLineRegex(expression="Hello world")
+            self.assertFalse(self.ran_std_output)
+        finally:
+            sys.stdout.write = stdout_bkp
+            sys.stderr.write = stderr_bkp
+            self.ran_std_output = False
+
     class FakeMonitor(object):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""
 

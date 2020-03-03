@@ -813,10 +813,7 @@ class BaseFormatter(logging.Formatter):
             return getattr(record, self.__cache_key)
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
-        if (
-            hasattr(record, "rate_limited_dropped_records")
-            and record.rate_limited_dropped_records > 0
-        ):
+        if getattr(record, "rate_limited_dropped_records", 0) > 0:
             result = (
                 ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
                 % (
@@ -943,8 +940,7 @@ class AgentLogFilter(object):
             return False
 
         return (
-            hasattr(record, "agent_logger")
-            and record.agent_logger
+            getattr(record, "agent_logger", False)
             and record.metric_log_for_monitor is None
         )
 
@@ -1014,7 +1010,7 @@ class ForceStdoutFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
-        return hasattr(record, "force_stdout") and record.force_stdout
+        return getattr(record, "force_stdout", False)
 
 
 class ForceStderrFilter(object):
@@ -1034,7 +1030,7 @@ class ForceStderrFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
-        return hasattr(record, "force_stderr") and record.force_stderr
+        return getattr(record, "force_stderr", False)
 
 
 class MetricLogHandler(object):
@@ -1075,8 +1071,7 @@ class MetricLogHandler(object):
 
             def filter(self, record):
                 return (
-                    hasattr(record, "metric_log_for_monitor")
-                    and record.metric_log_for_monitor in self.__monitors
+                    getattr(record, "metric_log_for_monitor", None) in self.__monitors
                 )
 
         # Add the filter and our formatter to this handler.
