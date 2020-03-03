@@ -255,7 +255,9 @@ class DockerMonitorTest(ScalyrTestCase):
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
 
-                time.sleep(1)
+                # We use sleep to avoid potential race
+                # NOTE: This is not 100% robust and deterministic, but good enough for now
+                time.sleep(2)
 
                 self.assertEquals(fragment_polls.count(), 40)
                 self.assertEquals(counter["callback_invocations"], 4)
