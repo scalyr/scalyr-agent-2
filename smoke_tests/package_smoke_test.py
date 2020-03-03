@@ -89,8 +89,9 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
         ),
         detach=True,
         stdout=True,
+        # run regular standalone smoke test inside the container.
         command="python -m pytest smoke_tests/standalone_smoke_test.py "
-        "-s -vv --config config.yml --runner-type PACKAGE",
+        "-s -vv --agent-installation-type PACKAGE_INSTALL",
     )
 
     stream = container.logs(stream=True)

@@ -226,8 +226,15 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
-            export AGENT_HOST_NAME=agent-smoke-standalone-${CIRCLE_BUILD_NUM}
+            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+
+            export AGENT_HOST_NAME=agent-smoke-standalone-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e<< parameters.tox_target >>
+
+            # copy log files to artifacts directory.
             mkdir -p ~/artifacts
             cp ~/scalyr-agent-dev/log/agent.log ~/artifacts/agent.log
       - save_cache:
@@ -276,8 +283,14 @@ commands:
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
           command: |
+            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+
             export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
             tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            # copy log files to artifacts directory.
             mkdir -p ~/artifacts
             docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent.log ~/artifacts/agent.log
 
@@ -352,7 +365,7 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
-          apt_dependencies: "procps"
+          apt_dependencies: "procps git"
 
 
   smoke-standalone-27-tls12:
@@ -800,7 +813,7 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-smoke-tests"
-          apt_dependencies: "procps"
+          apt_dependencies: "procps git"
 
 
   smoke-rpm-package-py3:

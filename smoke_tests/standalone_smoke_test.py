@@ -20,10 +20,10 @@ import datetime
 import time
 import json
 import re
+import abc
 
 import pytest  # type: ignore
 
-from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent import compat
 
 from smoke_tests.tools.agent_runner import AgentRunner
@@ -62,6 +62,7 @@ def _make_agent_log_line_pattern(
     return pattern
 
 
+@six.add_metaclass(abc.ABCMeta)
 class AgentVerifier(object):
     """
     Base abstraction for agent log files verification.
@@ -85,12 +86,20 @@ class AgentVerifier(object):
         )
 
     def prepare(self):
+        """
+        Optional method, it can be overridden in subclass and called before verification.
+        """
         pass
 
+    @abc.abstractmethod
     def _verify(self):
+        """
+        This method must be overridden in subclass and it must contain the actual verification logic.
+        """
         pass
 
     def verify(self):
+        self.prepare()
         retry_delay = type(self).RETRY_DELAY
         while True:
             print("========================================================")
@@ -103,6 +112,10 @@ class AgentVerifier(object):
 
 
 class AgentLogVerifier(AgentVerifier):
+    """
+    The verifier for the 'agent.log' file.
+    """
+
     def __init__(self, runner, server_address):
         super(AgentLogVerifier, self).__init__(runner, server_address)
         self.agent_log_file_path = runner.agent_log_file_path
@@ -203,8 +216,19 @@ class DataJsonVerifier(AgentVerifier):
             print("Query failed.")
             return
 
-        if len(response["matches"]) != 1000:
+        matches = response["matches"]
+        if len(matches) != 1000:
             print("Not all log lines were found.")
+            return
+
+        matches = [json.loads(m["message"]) for m in matches]
+
+        if not all([m["stream_id"] == self._timestamp for m in matches]):
+            print("Some of the fetched lines have wrong 'stream_id'")
+            return
+
+        # response matches must contain count values from 0 to 999
+        if set(m["count"] for m in matches) != set(range(1000)):
             return
 
         return True
@@ -278,20 +302,14 @@ class ProcessMetricsVerifier(AgentVerifier):
 
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
-def test_standalone_smoke(request):
+def test_standalone_smoke(agent_installation_type):
     """
     Agent standalone test to run within the same machine.
     """
     print("")
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
-    # configure DEV_INSTALL or PACKAGE_INSTALL installation type from command line.
-    runner_type = request.config.getoption("--runner-type")
-    if runner_type == "PACKAGE":
-        installation_type = PACKAGE_INSTALL
-    else:
-        installation_type = DEV_INSTALL
-    runner = AgentRunner(installation_type)
+    runner = AgentRunner(agent_installation_type)
 
     agent_log_verifier = AgentLogVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]
@@ -307,6 +325,9 @@ def test_standalone_smoke(request):
     )
 
     runner.start()
+
+    time.sleep(1)
+
     print("Verify 'agent.log'")
     assert agent_log_verifier.verify(), "Verification of the file: 'agent.log' failed"
     print("Verify 'linux_system_metrics.log'")
@@ -318,7 +339,6 @@ def test_standalone_smoke(request):
         process_metrics_verifier.verify()
     ), "Verification of the file: 'linux_process_metrics.log' failed"
 
-    data_json_verifier.prepare()
     assert data_json_verifier.verify(), "Verification of the file: 'data.json' failed"
 
     runner.stop()

@@ -19,33 +19,68 @@ from __future__ import absolute_import
 import os
 
 import pytest  # type: ignore
-import six
 import yaml
+import six
 
+from scalyr_agent.__scalyr__ import DEV_INSTALL, PACKAGE_INSTALL
 from smoke_tests.tools.compat import Path
 from scalyr_agent import compat
 
+AGENT_INSTALLATION_TYPES_MAP = {
+    "PACKAGE_INSTALL": PACKAGE_INSTALL,
+    "DEV_INSTALL": DEV_INSTALL,
+}
+
 
 def pytest_addoption(parser):
-    parser.addoption("--config", action="store")
-    parser.addoption("--runner-type", action="store", default="STANDALONE")
     parser.addoption(
-        "--package-image-cache-path", action="store", default=None, type=six.text_type
+        "--test-config",
+        action="store",
+        default=Path(__file__).parent / "config.yml",
+        help="Path to yaml file with essential agent settings and another test related settings. "
+        "Fields from this config file will be set as environment variables.",
     )
 
+    parser.addoption(
+        "--agent-installation-type",
+        action="store",
+        default="DEV_INSTALL",
+        choices=list(AGENT_INSTALLATION_TYPES_MAP.keys()),
+        help="The mode in which the agent should start, as package or as dev.",
+    )
+
+    # region Agent package smoke tests related options.
+    parser.addoption(
+        "--package-image-cache-path",
+        action="store",
+        default=None,
+        type=six.text_type,
+        help="Path to a directory that will be used as a cache for docker image. "
+        "if docker image file does not exist, image builder will save it here, and will import it next time.",
+    )
+
+    # the next two options can be set multiple times
+    # and every pair represents one pair of fixtures (package_distribution, package_python_version)
+    # that will be passed to 'test_agent_package_smoke' test case. One pair = one test case to run.
     parser.addoption(
         "--package-distribution",
         action="append",
         default=[],
         help="list of distribution names for package smoke tests.",
     )
-
     parser.addoption(
         "--package-python-version",
         action="append",
         default=[],
         help="list of python version for package smoke tests.",
     )
+    # endregion
+
+
+@pytest.fixture(scope="session")
+def agent_installation_type(request):
+    name = request.config.getoption("--agent-installation-type")
+    return AGENT_INSTALLATION_TYPES_MAP[name]
 
 
 @pytest.fixture(scope="session")
@@ -64,7 +99,7 @@ def test_config(request, agent_env_settings_fields):
     load config file as dict if it is located in project root and its path specified in pytest command line.
     If it is not specified, return empty dict.
     """
-    config_path = request.config.getoption("--config")
+    config_path = request.config.getoption("--test-config")
     if config_path and Path(config_path).exists():
         config_path = Path(config_path)
         with config_path.open("r") as f:
@@ -78,7 +113,7 @@ def test_config(request, agent_env_settings_fields):
 @pytest.fixture()
 def agent_environment(test_config, agent_env_settings_fields):
     """
-    Set essential environment variables for each test function and unset the after.
+    Set essential environment variables for test function and unset the after.
     """
     agent_settings = test_config.get("agent_settings", dict())
     for name in agent_env_settings_fields:

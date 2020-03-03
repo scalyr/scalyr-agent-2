@@ -18,8 +18,12 @@ import os
 import shutil
 import sys
 from io import open
+import argparse
+import time
 
 import yaml
+
+_script_abs_path = os.path.abspath(__file__)
 
 
 def set_root_user_for_docker_jobs(path):
@@ -43,8 +47,67 @@ def set_root_user_for_docker_jobs(path):
         yaml.dump(config, f)
 
 
+def is_smoke_test():  # type: () -> bool
+    """
+    Return True if  command is - 'local execute --job <name>', and <name> starts with 'smoke'.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command")
+
+    sub_parsers = parser.add_subparsers()
+    command_parser = sub_parsers.add_parser("execute")
+    command_parser.add_argument("--job", required=True)
+
+    try:
+        args, _ = parser.parse_known_args()
+    except:
+        return False
+
+    if not args.job.startswith("smoke"):
+        return False
+
+    return True
+
+
+def set_smoke_env_variables_from_config():
+    """
+    Smoke tests require some environment variables to be able to interact with Scalyr servers.
+    Smoke tests provide ability to create 'config.yml' file with agent settings for local testing.
+    This function gets those settings and add them as "-e <VAR_NAME>=<VAR_VALUE> to the current circleci command."
+    """
+    test_config_path = os.path.join(
+        os.path.dirname(os.path.dirname(_script_abs_path)), "smoke_tests", "config.yml"
+    )
+
+    if not os.path.exists(test_config_path):
+        print("Can not find smoke test config file.")
+        return
+
+    with open(test_config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    agent_settings = config.get("agent_settings", dict())
+
+    # since 'CIRCLE_BUILD_NUM' env. variable is not set in local builds,
+    # add timestamp to 'AGENT_HOST_NAME' env. variable. This variable will be used instead of 'CIRCLE_BUILD_NUM.
+    agent_settings["AGENT_HOST_NAME"] = "{0}-{1}".format(
+        agent_settings["AGENT_HOST_NAME"], int(time.time())
+    )
+
+    # add new '-e <VAR_NAME>=<VAR_VALUE' options to the current command line arguments.
+    for k, v in agent_settings.items():
+        sys.argv.append("-e")
+        sys.argv.append("{0}={1}".format(k, v))
+
+
 if __name__ == "__main__":
-    circleci_dir = os.path.dirname(os.path.abspath(__file__))
+
+    if is_smoke_test():
+        # if smoke test is specified, set env. variables from smoke tests config file.
+        # this provides ability to keep only one config file for all kinds of tests(pytest, tox).
+        set_smoke_env_variables_from_config()
+
+    circleci_dir = os.path.dirname(_script_abs_path)
     os.chdir(os.path.dirname(circleci_dir))
     config_path = os.path.join(circleci_dir, "config.yml")
     backup_file_path = os.path.join(circleci_dir, "config.yml.backup")
