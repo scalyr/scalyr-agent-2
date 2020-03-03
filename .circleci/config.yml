@@ -7,6 +7,7 @@ master_only: &master_only
     branches:
       only:
         - master
+        - longer_running_benchmark
 
 version: 2.1
 commands:
@@ -739,7 +740,7 @@ jobs:
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-108-py-27"
-          dry_run: "true"
+          dry_run: true
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -758,50 +759,9 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
-    jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-37
-      - smoke-standalone-27
-      - smoke-standalone-26
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
   benchmarks:
     jobs:
-      - benchmarks-idle-agent-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-py-35:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_only
       - benchmarks-loaded-agent-single-growing-log-file-108mb-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
