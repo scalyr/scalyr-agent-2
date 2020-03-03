@@ -209,7 +209,7 @@ class CPUProfiler(BaseProfiler):
         self._allowed_clocks = self._allowed_clocks[:2]
 
     def _is_running(self):
-        return yappi.is_running()
+        return yappi and yappi.is_running()
 
     def _get_clock_type(self, clock_type, allowed, default_value):
         """

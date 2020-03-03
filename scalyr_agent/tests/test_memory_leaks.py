@@ -47,7 +47,7 @@ __all__ = ["MemoryLeaksTestCase"]
 class MemoryLeaksTestCase(unittest.TestCase):
     def setUp(self):
         super(MemoryLeaksTestCase, self).setUp()
-        gc.set_debug(gc.DEBUG_SAVEALL)
+        gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
 
         os.environ["TEST_VAR"] = "foobar"
 
@@ -111,25 +111,16 @@ class MemoryLeaksTestCase(unittest.TestCase):
         class Object1(object):
             pass
 
+        class Object2(object):
+            def __del__(self):
+                self.obj = self
+                self.self = self
+
         # 1. Collectable object
         obj1 = Object1()
         del obj1
 
-        gc.collect()
-        garbage = self._garbage_to_set(gc.garbage)
-        new_garbage = garbage.difference(self.base_gargage)
         self.assertNoNewGarbage()
-
-        # 2. Cyclic reference
-        obj1 = Object1()
-        obj1.self = obj1
-        del obj1
-
-        gc.collect()
-        garbage = self._garbage_to_set(gc.garbage)
-        new_garbage = garbage.difference(self.base_gargage)
-        self.assertEqual(len(new_garbage), 2)
-        self.assertRaises(AssertionError, self.assertNoNewGarbage)
 
     def assertNoNewGarbage(self):
         """
