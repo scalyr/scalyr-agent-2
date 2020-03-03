@@ -1,42 +1,22 @@
-# Copyright 2014-2020 Scalyr Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.K
-
 from __future__ import absolute_import
-from __future__ import unicode_literals
 from __future__ import print_function
-
+import abc
 import datetime
-import time
 import json
 import re
-import abc
+import time
 
-import pytest  # type: ignore
+import six
 
 from scalyr_agent import compat
-
 from smoke_tests.tools.agent_runner import AgentRunner
 from smoke_tests.tools.request import ScalyrRequest
-
 from six.moves import range
-import six
 
 _TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z"
 _LEVEL_PATTERN = r"INFO|WARNING|ERROR|DEBUG"
 _LOGGER_NAME_PATTERN = r"[^\]]*"
 _FILE_NAME_PATTERN = r"[^\]:]*"
-
 _AGENT_LOG_LINE_BASE_PATTERN = r"\s*(?P<timestamp>{0})\s+(?P<level>{1})\s+\[(?P<logger>{2})\]\s+\[(?P<file>{3}):\d+\]\s+"
 
 
@@ -106,7 +86,7 @@ class AgentVerifier(object):
             if self._verify():
                 print("Success.")
                 return True
-            print("Retry in {0} sec.".format(retry_delay))
+            print(("Retry in {0} sec.".format(retry_delay)))
             print("========================================================")
             time.sleep(retry_delay)
 
@@ -133,7 +113,7 @@ class AgentLogVerifier(AgentVerifier):
         )
 
         if not local_agent_log_data:
-            print("No data from '{0}'.".format(self._runner.agent_log_file_path))
+            print(("No data from '{0}'.".format(self._runner.agent_log_file_path)))
             return
 
         print("Check that all collectors were found.")
@@ -153,7 +133,9 @@ class AgentLogVerifier(AgentVerifier):
         )
 
         if len(found_collectors) != 5:
-            print("Not all collectors were found. '{0}'".format(len(found_collectors)))
+            print(
+                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+            )
             return
 
         print("Send query to Scalyr server.")
@@ -174,7 +156,9 @@ class AgentLogVerifier(AgentVerifier):
         )
         print("Check that all collectors were found in the log from Scalyr server.")
         if len(found_collectors_remote) != 5:
-            print("Not all collectors were found. '{0}'".format(len(found_collectors)))
+            print(
+                ("Not all collectors were found. '{0}'".format(len(found_collectors)))
+            )
             return
 
         return True
@@ -203,7 +187,7 @@ class DataJsonVerifier(AgentVerifier):
         self._request.add_filter("$stream_id=='{0}'".format(self._timestamp))
 
     def prepare(self):
-        print("Write test data to log file '{0}'".format(self._data_json_log_path))
+        print(("Write test data to log file '{0}'".format(self._data_json_log_path)))
         for i in range(1000):
             json_data = json.dumps({"count": i, "stream_id": self._timestamp})
             self._runner.write_line(self._data_json_log_path, json_data)
@@ -298,47 +282,3 @@ class ProcessMetricsVerifier(AgentVerifier):
             return
 
         return True
-
-
-@pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
-def test_standalone_smoke(agent_installation_type):
-    """
-    Agent standalone test to run within the same machine.
-    """
-    print("")
-    print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
-
-    runner = AgentRunner(agent_installation_type)
-
-    agent_log_verifier = AgentLogVerifier(
-        runner, compat.os_environ_unicode["SCALYR_SERVER"]
-    )
-    data_json_verifier = DataJsonVerifier(
-        runner, compat.os_environ_unicode["SCALYR_SERVER"]
-    )
-    system_metrics_verifier = SystemMetricsVerifier(
-        runner, compat.os_environ_unicode["SCALYR_SERVER"]
-    )
-    process_metrics_verifier = ProcessMetricsVerifier(
-        runner, compat.os_environ_unicode["SCALYR_SERVER"]
-    )
-
-    runner.start()
-
-    time.sleep(1)
-
-    print("Verify 'agent.log'")
-    assert agent_log_verifier.verify(), "Verification of the file: 'agent.log' failed"
-    print("Verify 'linux_system_metrics.log'")
-    assert (
-        system_metrics_verifier.verify()
-    ), "Verification of the file: 'linux_system_metrics.log' failed"
-    print("Verify 'linux_process_metrics.log'")
-    assert (
-        process_metrics_verifier.verify()
-    ), "Verification of the file: 'linux_process_metrics.log' failed"
-
-    assert data_json_verifier.verify(), "Verification of the file: 'data.json' failed"
-
-    runner.stop()
