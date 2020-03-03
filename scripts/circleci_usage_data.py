@@ -33,6 +33,7 @@ if False:
 import sys
 import argparse
 import datetime
+import json
 
 from io import StringIO
 
@@ -128,7 +129,17 @@ def get_usage_data_for_branch(
     if response.status_code == 404:
         raise ValueError("Invalid CIRCLE_CI_API_TOKEN or project_slug")
 
-    items = response.json().get("items", [])
+    try:
+        data = response.json()
+    except json.decoder.JSONDecodeError as e:
+        # This likely indicates issue with Circle CI returning invalid response
+        print(
+            "Failed to parse Circle CI response as json: %s. Got response: %s"
+            % (str(e), str(response.text))
+        )
+        sys.exit(1)
+
+    items = data.get("items", [])
     items = [item for item in items if (status == "all" or item["status"] == status)]
 
     if not items:

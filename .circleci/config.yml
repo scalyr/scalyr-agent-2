@@ -104,6 +104,10 @@ commands:
         description: "Optional bash command / script to run after starting the agent and the metrics capture script."
         type: string
         default: ""
+      agent_server_host:
+        description: "Value for the server_attributes.serverHost agent configuration option."
+        type: string
+        default: "ci-codespeed-benchmarks"
       capture_line_counts:
         description: "True to submit log line counts for each log level to CodeSpeed."
         type: boolean
@@ -139,6 +143,7 @@ commands:
             RUN_TIME: << parameters.run_time >>
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
+            SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
@@ -658,6 +663,7 @@ jobs:
           codespeed_executable: "Python 2.7.17 - idle conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-1"
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-27"
 
@@ -670,6 +676,7 @@ jobs:
           codespeed_executable: "Python 3.5.9 - idle conf 1"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-1"
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-35"
 
@@ -682,6 +689,7 @@ jobs:
           codespeed_executable: "Python 2.7.17 - idle conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-2"
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-agent-no-monitors-py-27"
 
@@ -694,6 +702,7 @@ jobs:
           codespeed_executable: "Python 3.5.9 - idle conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-2"
           capture_line_counts: true
           cache_key_name: "benchmarks-idle-agent-no-monitors-py-35"
 
@@ -707,6 +716,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1"
           run_time: 140
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
@@ -721,6 +731,7 @@ jobs:
           codespeed_environment: "Circle CI Docker Executor Medium Size"
           agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-1"
           run_time: 140
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
@@ -740,6 +751,7 @@ jobs:
           run_time: 140
           agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-2"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-27"
 
@@ -755,6 +767,7 @@ jobs:
           run_time: 140
           agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-2"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 

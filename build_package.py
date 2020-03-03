@@ -51,6 +51,8 @@ from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_ini
 
 scalyr_init()
 
+import scalyr_agent.util as scalyr_util
+
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
@@ -317,10 +319,10 @@ def build_win32_installer_package(variant, version):
         variant = "main"
 
     # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
-    product_code = uuid.uuid3(_scalyr_guid_, "ProductID:%s:%s" % (variant, version))
+    product_code = create_scalyr_uuid3("ProductID:%s:%s" % (variant, version))
     # The upgrade code identifies all families of versions that can be upgraded from one to the other.  So, this
     # should be a single number for all Scalyr produced ones.
-    upgrade_code = uuid.uuid3(_scalyr_guid_, "UpgradeCode:%s" % variant)
+    upgrade_code = create_scalyr_uuid3("UpgradeCode:%s" % variant)
 
     # For prereleases, we use weird version numbers like 4.0.4.pre5.1 .  That does not work for Windows which
     # requires X.X.X.X.  So, we convert if necessary.
@@ -385,7 +387,7 @@ def create_wxs_file(template_path, dist_path, destination_path):
         entry = {
             "BASE": base_file,
             "FILE_ID": file_id,
-            "COMPONENT_GUID": str(uuid.uuid3(_scalyr_guid_, "DistComp%s" % base_file)),
+            "COMPONENT_GUID": str(create_scalyr_uuid3("DistComp%s" % base_file)),
             "COMPONENT_ID": "%s_comp" % file_id,
             "FILE_SOURCE": dist_file_path,
         }
@@ -416,6 +418,18 @@ def create_wxs_file(template_path, dist_path, destination_path):
             f.write(line)
     finally:
         f.close()
+
+
+def create_scalyr_uuid3(name):
+    """
+    Create a UUID based on the Scalyr UUID namespace and a hash of `name`.
+
+    :param name: The name
+    :type name: six.text
+    :return: The UUID
+    :rtype: uuid.UUID
+    """
+    return scalyr_util.create_uuid3(_scalyr_guid_, name)
 
 
 def expand_template(input_lines, dist_files):
