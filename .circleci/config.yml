@@ -721,6 +721,26 @@ jobs:
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
 
+  benchmarks-loaded-agent-single-growing-log-file-108mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 3"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          run_time: 360
+          agent_pre_run_command: "touch /tmp/random.log"
+          # NOTE: We write a chunk every 1 seconds for a total of 10 minutes.
+          # Each chunk is 0.2 MB in size which means we write a total of 108 MB of data
+          # (360 / 1 * 0.3)
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 300K 360 100 1  &> /tmp/write_lines_script.log &"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-108-py-27"
+          dry_run: "true"
+
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
     working_directory: ~/scalyr-agent-2
@@ -778,6 +798,8 @@ workflows:
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
           <<: *master_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-108mb-py-27:
           <<: *master_only
       - benchmarks-loaded-agent-single-50mb-log-file-with-parser-gc-stats-py-27:
           <<: *master_only
