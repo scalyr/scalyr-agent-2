@@ -14,14 +14,17 @@
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
+
 import shutil
 import os
+import time
 
 if False:
     from typing import Dict, Optional, Any
 
 import json
 import subprocess
+import psutil
 
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent.platform_controller import PlatformController
@@ -30,6 +33,21 @@ from smoke_tests.tools.compat import Path
 from smoke_tests.tools.utils import get_env
 
 import six
+
+_STANDALONE_COMMAND = [
+    "python",
+    "-m",
+    "scalyr_agent.agent_main",
+    "--no-fork",
+    "--no-change-user",
+    "start",
+]
+_PACKAGE_COMMAND = [
+    "/usr/sbin/scalyr-agent-2",
+    "--no-fork",
+    "--no-change-user",
+    "start",
+]
 
 
 def _make_or_clear_directory(path):  # type: (Path) -> None
@@ -148,22 +166,45 @@ class AgentRunner(object):
         self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
     def start(self):
+
+        self.stop_agent_if_running()
+
         # important to call this function before agent was started.
         self._create_agent_files()
 
         if self._installation_type == PACKAGE_INSTALL:
-            self._agent_process = subprocess.Popen(
-                ["/usr/sbin/scalyr-agent-2", "--no-fork", "--no-change-user", "start"],
-            )
+            self._agent_process = subprocess.Popen(_PACKAGE_COMMAND,)
         else:
-            self._agent_process = subprocess.Popen(
-                "python -m scalyr_agent.agent_main --no-fork --no-change-user start",
-                shell=True,
-            )
+            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND,)
+
+    @staticmethod
+    def stop_agent_if_running():
+        def find_running_processes():
+            """find running processes from previous agent execution if they exist."""
+            return [
+                p
+                for p in psutil.process_iter(attrs=["cmdline"])
+                if p.info["cmdline"] in (_STANDALONE_COMMAND, _PACKAGE_COMMAND)
+            ]
+
+        # find all agent related running processes.
+        running_processes = find_running_processes()
+        if running_processes:
+            # terminate them.
+            for process in find_running_processes():
+                process.terminate()
+            time.sleep(1)
+
+            # kill if some of them survived.
+            for process in find_running_processes():
+                process.kill()
 
     def stop(self):
-        if self._agent_process.returncode is None:
-            self._agent_process.terminate()
+        self.stop_agent_if_running()
+
+    def __del__(self):
+        """Not necessary, just for more confidence that agent will be stopped for sure."""
+        self.stop()
 
     @property
     def _server_host(self):  # type: () -> six.text_type

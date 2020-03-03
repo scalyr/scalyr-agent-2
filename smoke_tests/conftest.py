@@ -20,12 +20,13 @@ import os
 
 import pytest  # type: ignore
 import yaml
-import six
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL, PACKAGE_INSTALL
-from smoke_tests.tools.compat import Path
 from scalyr_agent import compat
+from smoke_tests.tools.compat import Path
 
+# mapping of PlatformController 'install_type' constants
+# to possible values of the '--agent-installation-type' command line options.
 AGENT_INSTALLATION_TYPES_MAP = {
     "PACKAGE_INSTALL": PACKAGE_INSTALL,
     "DEV_INSTALL": DEV_INSTALL,
@@ -40,47 +41,6 @@ def pytest_addoption(parser):
         help="Path to yaml file with essential agent settings and another test related settings. "
         "Fields from this config file will be set as environment variables.",
     )
-
-    parser.addoption(
-        "--agent-installation-type",
-        action="store",
-        default="DEV_INSTALL",
-        choices=list(AGENT_INSTALLATION_TYPES_MAP.keys()),
-        help="The mode in which the agent should start, as package or as dev.",
-    )
-
-    # region Agent package smoke tests related options.
-    parser.addoption(
-        "--package-image-cache-path",
-        action="store",
-        default=None,
-        type=six.text_type,
-        help="Path to a directory that will be used as a cache for docker image. "
-        "if docker image file does not exist, image builder will save it here, and will import it next time.",
-    )
-
-    # the next two options can be set multiple times
-    # and every pair represents one pair of fixtures (package_distribution, package_python_version)
-    # that will be passed to 'test_agent_package_smoke' test case. One pair = one test case to run.
-    parser.addoption(
-        "--package-distribution",
-        action="append",
-        default=[],
-        help="list of distribution names for package smoke tests.",
-    )
-    parser.addoption(
-        "--package-python-version",
-        action="append",
-        default=[],
-        help="list of python version for package smoke tests.",
-    )
-    # endregion
-
-
-@pytest.fixture(scope="session")
-def agent_installation_type(request):
-    name = request.config.getoption("--agent-installation-type")
-    return AGENT_INSTALLATION_TYPES_MAP[name]
 
 
 @pytest.fixture(scope="session")

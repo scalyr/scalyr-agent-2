@@ -51,18 +51,24 @@ def is_smoke_test():  # type: () -> bool
     """
     Return True if  command is - 'local execute --job <name>', and <name> starts with 'smoke'.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("command")
+    parser = argparse.ArgumentParser(add_help=False)
+    # parser.add_argument("command")
 
     sub_parsers = parser.add_subparsers()
-    command_parser = sub_parsers.add_parser("execute")
-    command_parser.add_argument("--job", required=True)
+    command_parser = sub_parsers.add_parser("local")
+    command_sub_parsers = command_parser.add_subparsers()
+    execute_parser = command_sub_parsers.add_parser("execute")
+    execute_parser.add_argument("--job", default="")
 
     try:
         args, _ = parser.parse_known_args()
     except:
         return False
 
+    if not hasattr(args, "job"):
+        return False
+
+    # if there is a --job and its starts with 'smoke' we assume that this is smoke test.
     if not args.job.startswith("smoke"):
         return False
 
