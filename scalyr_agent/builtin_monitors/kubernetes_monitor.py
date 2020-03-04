@@ -390,6 +390,15 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "k8s_kubelet_api_url_template",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API",
+    convert_to=six.text_type,
+    default="https://${host_ip}:10250",
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "k8s_sidecar_mode",
     "Optional, (defaults to False). If true, then logs will only be collected for containers "
     "running in the same Pod as the agent. This is used in situations requiring very high throughput.",
@@ -2012,6 +2021,7 @@ class CRIEnumerator(ContainerEnumerator):
         k8s_api_url,
         query_filesystem,
         kubelet_api_host_ip,
+        kubelet_api_url_template,
         is_sidecar_mode=False,
     ):
         """
@@ -2027,7 +2037,11 @@ class CRIEnumerator(ContainerEnumerator):
         """
         super(CRIEnumerator, self).__init__(agent_pod, is_sidecar_mode=is_sidecar_mode)
         k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi(k8s, host_ip=kubelet_api_host_ip)
+        self._kubelet = KubeletApi(
+            k8s,
+            host_ip=kubelet_api_host_ip,
+            kubelet_url_template=Template(kubelet_api_url_template),
+        )
         self._query_filesystem = query_filesystem
 
         self._log_base = "/var/log/containers"
@@ -2582,6 +2596,7 @@ class ContainerChecker(object):
                     k8s_api_url,
                     query_fs,
                     self._config.get("k8s_kubelet_host_ip"),
+                    self._config.get("k8s_kubelet_api_url_template"),
                     is_sidecar_mode=self.__sidecar_mode,
                 )
 
@@ -4043,6 +4058,7 @@ class KubernetesMonitor(ScalyrMonitor):
             "SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR",
             "SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY",
             "SCALYR_K8S_SIDECAR_MODE",
+            "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
         ]
         for envar in envars_to_log:
             self._logger.info(
@@ -4087,7 +4103,11 @@ class KubernetesMonitor(ScalyrMonitor):
                     self._global_config, k8s_api_url=self.__k8s_api_url
                 )
                 self.__kubelet_api = KubeletApi(
-                    k8s, host_ip=self._config.get("k8s_kubelet_host_ip")
+                    k8s,
+                    host_ip=self._config.get("k8s_kubelet_host_ip"),
+                    kubelet_url_template=Template(
+                        self._config.get("k8s_kubelet_api_url_template")
+                    ),
                 )
         except Exception as e:
             self._logger.error(
