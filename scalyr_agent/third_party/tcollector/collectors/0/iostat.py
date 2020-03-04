@@ -139,8 +139,14 @@ def main():
             # Sometimes there can be a slash in the device name, see bug #8.
             # TODO(tsuna): Remove the substitution once TSD allows `/' in tags.
             device = values[2].replace("/", "_")
-            if len(values) == 14:
+            # For now we simply ignore values which were added in newer versions of kernel
+            if len(values) >= 14:
                 # full stats line
+                # 14 fields - up to kernel 4.18
+                # 18 fields - kernel >= 4.18 - 5.5
+                # 20 fields - kernel >= 5.5
+                # See https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats for
+                # details
                 for i in range(11):
                     print(
                         "%s%s %d %s dev=%s"
