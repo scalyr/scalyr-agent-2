@@ -179,7 +179,4 @@ def is_file_path_empty(file_path):
     """
     Return true if the provided file path is empty.
     """
-    with open(file_path, "r") as fp:
-        content = fp.read()
-
-    return len(content) == 0
+    return os.path.getsize(file_path) == 0
