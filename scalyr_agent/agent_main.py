@@ -1279,8 +1279,8 @@ class ScalyrAgent(object):
                     "option: file does not exist" % (ca_file)
                 )
 
-            # NOTE: We don't include intermediate certs in the Windows binary so we skip taht chek
-            # in MSI install
+            # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+            # under the MSI / Windows install
             if not is_dev_or_msi_install and not os.path.isfile(
                 intermediate_certs_file
             ):
