@@ -89,24 +89,25 @@ except ValueError:
 
 # Docs come from the Linux kernel's Documentation/iostats.txt
 FIELDS_DISK = (
-    "read_requests",        # Total number of reads completed successfully.
-    "read_merged",          # Adjacent read requests merged in a single req.
-    "read_sectors",         # Total number of sectors read successfully.
-    "msec_read",            # Total number of ms spent by all reads.
-    "write_requests",       # total number of writes completed successfully.
-    "write_merged",         # Adjacent write requests merged in a single req.
-    "write_sectors",        # total number of sectors written successfully.
-    "msec_write",           # Total number of ms spent by all writes.
-    "ios_in_progress",      # Number of actual I/O requests currently in flight.
-    "msec_total",           # Amount of time during which ios_in_progress >= 1.
+    "read_requests",  # Total number of reads completed successfully.
+    "read_merged",  # Adjacent read requests merged in a single req.
+    "read_sectors",  # Total number of sectors read successfully.
+    "msec_read",  # Total number of ms spent by all reads.
+    "write_requests",  # total number of writes completed successfully.
+    "write_merged",  # Adjacent write requests merged in a single req.
+    "write_sectors",  # total number of sectors written successfully.
+    "msec_write",  # Total number of ms spent by all writes.
+    "ios_in_progress",  # Number of actual I/O requests currently in flight.
+    "msec_total",  # Amount of time during which ios_in_progress >= 1.
     "msec_weighted_total",  # Measure of recent I/O completion time and backlog.
-    )
+)
 
-FIELDS_PART = ("read_issued",
-               "read_sectors",
-               "write_issued",
-               "write_sectors",
-              )
+FIELDS_PART = (
+    "read_issued",
+    "read_sectors",
+    "write_issued",
+    "write_sectors",
+)
 
 
 def main():
@@ -144,14 +145,14 @@ def main():
                 for i in range(11):
                     print(
                         "%s%s %d %s dev=%s"
-                        % (metric, FIELDS_DISK[i], ts, values[i+3], device)
+                        % (metric, FIELDS_DISK[i], ts, values[i + 3], device)
                     )
             elif len(values) == 7:
                 # partial stats line
                 for i in range(4):
                     print(
                         "%s%s %d %s dev=%s"
-                        % (metric, FIELDS_PART[i], ts, values[i+3], device)
+                        % (metric, FIELDS_PART[i], ts, values[i + 3], device)
                     )
             else:
                 print("Cannot parse /proc/diskstats line: ", line, file=sys.stderr)
@@ -161,7 +162,5 @@ def main():
         time.sleep(COLLECTION_INTERVAL)
 
 
-
 if __name__ == "__main__":
     main()
-

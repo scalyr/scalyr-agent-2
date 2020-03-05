@@ -44,7 +44,7 @@ def open_sysfs_numa_stats():
     except OSError as error:
         (errno, msg) = error.args
         if errno == 2:  # No such file or directory
-            return []   # We don't have NUMA stats.
+            return []  # We don't have NUMA stats.
         raise
 
     nodes = [node for node in nodes if node.startswith("node")]
@@ -64,14 +64,15 @@ def print_numa_stats(numafiles):
     """From a list of opened files, extracts and prints NUMA stats."""
     for numafile in numafiles:
         numafile.seek(0)
-        node_id = int(numafile.name[numafile.name.find("/node/node")+10:-9])
+        node_id = int(numafile.name[numafile.name.find("/node/node") + 10 : -9])
         ts = int(time.time())
         stats = dict(line.split() for line in numafile.read().splitlines())
-        for stat, tag in (# hit: process wanted memory from this node and got it
-                          ("numa_hit", "hit"),
-                          # miss: process wanted another node and got it from
-                          # this one instead.
-                          ("numa_miss", "miss")):
+        for stat, tag in (  # hit: process wanted memory from this node and got it
+            ("numa_hit", "hit"),
+            # miss: process wanted another node and got it from
+            # this one instead.
+            ("numa_miss", "miss"),
+        ):
             print(
                 "sys.numa.zoneallocs %d %s node=%d type=%s"
                 % (ts, stats[stat], node_id, tag)
@@ -87,10 +88,7 @@ def print_numa_stats(numafiles):
         )
         # When is memory allocated to a node that's local or remote to where
         # the process is running.
-        for stat, tag in (
-                ("local_node", "local"),
-                ("other_node", "remote")
-        ):
+        for stat, tag in (("local_node", "local"), ("other_node", "remote")):
             print(
                 "sys.numa.allocation %d %s node=%d type=%s"
                 % (ts, stats[stat], node_id, tag)
@@ -100,6 +98,7 @@ def print_numa_stats(numafiles):
             "sys.numa.interleave %d %s node=%d type=hit"
             % (ts, stats["interleave_hit"], node_id)
         )
+
 
 # Scalyr - print number of cpus
 def print_cpu_stats():
@@ -112,6 +111,7 @@ def print_cpu_stats():
             print("sys.cpu.count %d %s" % (ts, fields[0]))
     else:
         print("nproc --all returned %r" % nproc.returncode, file=sys.stderr)
+
 
 def main():
     """procstats main loop"""
@@ -144,10 +144,7 @@ def main():
         for line in f_meminfo:
             m = re.match("(\w+):\s+(\d+)", line)
             if m:
-                print(
-                    "proc.meminfo.%s %d %s"
-                    % (m.group(1).lower(), ts, m.group(2))
-                )
+                print("proc.meminfo.%s %d %s" % (m.group(1).lower(), ts, m.group(2)))
 
         # proc.vmstat
         f_vmstat.seek(0)
@@ -156,8 +153,14 @@ def main():
             m = re.match("(\w+)\s+(\d+)", line)
             if not m:
                 continue
-            if m.group(1) in ("pgpgin", "pgpgout", "pswpin",
-                              "pswpout", "pgfault", "pgmajfault"):
+            if m.group(1) in (
+                "pgpgin",
+                "pgpgout",
+                "pswpin",
+                "pswpout",
+                "pgfault",
+                "pgmajfault",
+            ):
                 print("proc.vmstat.%s %d %s" % (m.group(1), ts, m.group(2)))
 
         # proc.stat
@@ -178,18 +181,12 @@ def main():
                 print("proc.stat.cpu %d %s type=softirq" % (ts, fields[6]))
                 # really old kernels don't have this field
                 if len(fields) > 7:
-                    print(
-                        "proc.stat.cpu %d %s type=steal" % (ts, fields[7])
-                    )
+                    print("proc.stat.cpu %d %s type=steal" % (ts, fields[7]))
                     # old kernels don't have this field
                     if len(fields) > 8:
-                        print(
-                            "proc.stat.cpu %d %s type=guest" % (ts, fields[8])
-                        )
+                        print("proc.stat.cpu %d %s type=guest" % (ts, fields[8]))
             elif m.group(1) == "intr":
-                print(
-                    "proc.stat.intr %d %s" % (ts, m.group(2).split()[0])
-                )
+                print("proc.stat.intr %d %s" % (ts, m.group(2).split()[0]))
             elif m.group(1) == "ctxt":
                 print("proc.stat.ctxt %d %s" % (ts, m.group(2)))
             elif m.group(1) == "processes":
@@ -221,6 +218,6 @@ def main():
         sys.stdout.flush()
         time.sleep(COLLECTION_INTERVAL)
 
+
 if __name__ == "__main__":
     main()
-
