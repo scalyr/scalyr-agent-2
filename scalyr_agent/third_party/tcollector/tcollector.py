@@ -47,6 +47,7 @@ from six.moves.queue import Full
 
 import six
 from six.moves import range
+from six.moves import reload_module
 
 
 # global variables.
@@ -1050,7 +1051,7 @@ def load_config_module(name, options, tags):
         # Strip the trailing .py
         module = __import__(name[:-3], d, d)
     else:
-        module = reload(name)
+        module = reload_module(name)
     onload = module.__dict__.get("onload")
     if callable(onload):
         try:
