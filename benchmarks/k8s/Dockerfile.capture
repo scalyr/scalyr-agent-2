@@ -1,0 +1,7 @@
+FROM python:3.6
+
+ADD . /agent_source
+
+WORKDIR /agent_source
+
+CMD /agent_source/benchmarks/scripts/start-capture-metrics.sh

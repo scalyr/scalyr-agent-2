@@ -15,4 +15,4 @@ RUN git checkout ${BRANCH}
 
 RUN /bin/bash -c "mkdir -p ~/scalyr-agent-dev/{log,config,data}"
 
-CMD python scalyr_agent/agent_main.py start --no-fork --no-change-user --config=/config.json
+CMD python scalyr_agent/agent_main.py start --no-fork --no-change-user --config=/config/config.json

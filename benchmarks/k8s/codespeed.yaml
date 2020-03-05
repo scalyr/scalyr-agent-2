@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: agent-k8s-codespeed
+spec:
+  containers:
+  - name: agent
+    image: agent_k8s
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        memory: "200Mi"
+      requests:
+        memory: "100Mi"
+    volumeMounts:
+      - mountPath: /config
+        name: config
+      - mountPath: /root/scalyr-agent-dev
+        name: agent-data
+    env:
+    - name: SCALYR_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: agent-secret
+          key: SCALYR_API_KEY
+    - name: SCALYR_SERVER_ATTRIBUTES
+      value: "{\"serverHost\": \"ARTHUR_TEST_k8s\"}"
+  - name: metric-capture
+    image: agent_metrics_capture
+    imagePullPolicy: IfNotPresent
+    resources:
+      limits:
+        memory: "200Mi"
+      requests:
+        memory: "100Mi"
+    volumeMounts:
+      - mountPath: /scalyr-data
+        name: agent-data
+  volumes:
+    - name: config
+      configMap:
+        name: codespeed-config
+        items:
+          - key: agent_no_monitored_logs.json
+            path: config.json
+    - name: agent-data
+      emptyDir: {}
+
