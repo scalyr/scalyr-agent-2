@@ -20,7 +20,6 @@ from __future__ import unicode_literals
 import os
 import sys
 import time
-import socket
 import subprocess
 import re
 from io import open
@@ -133,7 +132,7 @@ def main():
         f_uptime.seek(0)
         ts = int(time.time())
         for line in f_uptime:
-            m = re.match("(\S+)\s+(\S+)", line)
+            m = re.match(r"(\S+)\s+(\S+)", line)
             if m:
                 print("proc.uptime.total %d %s" % (ts, m.group(1)))
                 print("proc.uptime.now %d %s" % (ts, m.group(2)))
@@ -142,7 +141,7 @@ def main():
         f_meminfo.seek(0)
         ts = int(time.time())
         for line in f_meminfo:
-            m = re.match("(\w+):\s+(\d+)", line)
+            m = re.match(r"(\w+):\s+(\d+)", line)
             if m:
                 print("proc.meminfo.%s %d %s" % (m.group(1).lower(), ts, m.group(2)))
 
@@ -150,7 +149,7 @@ def main():
         f_vmstat.seek(0)
         ts = int(time.time())
         for line in f_vmstat:
-            m = re.match("(\w+)\s+(\d+)", line)
+            m = re.match(r"(\w+)\s+(\d+)", line)
             if not m:
                 continue
             if m.group(1) in (
@@ -167,7 +166,7 @@ def main():
         f_stat.seek(0)
         ts = int(time.time())
         for line in f_stat:
-            m = re.match("(\w+)\s+(.*)", line)
+            m = re.match(r"(\w+)\s+(.*)", line)
             if not m:
                 continue
             if m.group(1) == "cpu":
@@ -197,7 +196,7 @@ def main():
         f_loadavg.seek(0)
         ts = int(time.time())
         for line in f_loadavg:
-            m = re.match("(\S+)\s+(\S+)\s+(\S+)\s+(\d+)/(\d+)\s+", line)
+            m = re.match(r"(\S+)\s+(\S+)\s+(\S+)\s+(\d+)/(\d+)\s+", line)
             if not m:
                 continue
             print("proc.loadavg.1min %d %s" % (ts, m.group(1)))

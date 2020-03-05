@@ -36,7 +36,6 @@ import subprocess
 import sys
 import threading
 import time
-import io
 from logging.handlers import RotatingFileHandler
 from optparse import OptionParser
 from io import open
@@ -361,10 +360,10 @@ class ReaderThread(threading.Thread):
             col.lines_invalid += 1
             return
         parsed = re.match(
-            "^([-_./a-zA-Z0-9]+)\s+"  # Metric name.
-            "(\d+)\s+"  # Timestamp.
-            "(\S+?)"  # Value (int or float).
-            "((?:\s+[-_./a-zA-Z0-9]+=[-~_./a-zA-Z0-9]+)*)$",  # Tags
+            r"^([-_./a-zA-Z0-9]+)\s+"  # Metric name.
+            r"(\d+)\s+"  # Timestamp.
+            r"(\S+?)"  # Value (int or float).
+            r"((?:\s+[-_./a-zA-Z0-9]+=[-~_./a-zA-Z0-9]+)*)$",  # Tags
             line,
         )
         if parsed is None:
@@ -508,7 +507,7 @@ class SenderThread(threading.Thread):
                 EnvironmentError,
                 LookupError,
                 ValueError,
-            ) as e:
+            ):
                 errors += 1
                 if errors > MAX_UNCAUGHT_EXCEPTIONS:
                     shutdown()
@@ -536,7 +535,7 @@ class SenderThread(threading.Thread):
         LOG.debug("verifying our TSD connection is alive")
         try:
             self.tsd.sendall("version\n")
-        except socket.error as msg:
+        except socket.error:
             self.tsd = None
             return False
 
@@ -547,7 +546,7 @@ class SenderThread(threading.Thread):
             # connection
             try:
                 buf = self.tsd.recv(bufsize)
-            except socket.error as msg:
+            except socket.error:
                 self.tsd = None
                 return False
 
@@ -864,7 +863,7 @@ def main(argv):
     # validate everything
     tags = {}
     for tag in options.tags:
-        if re.match("^[-_.a-z0-9]+=\S+$", tag, re.IGNORECASE) is None:
+        if re.match(r"^[-_.a-z0-9]+=\S+$", tag, re.IGNORECASE) is None:
             assert False, 'Tag string "%s" is invalid.' % tag
         k, v = tag.split("=", 1)
         if k in tags:
@@ -880,7 +879,7 @@ def main(argv):
     # tsdb does not require a host tag, but we do.  we are always running on a
     # host.  FIXME: we should make it so that collectors may request to set
     # their own host tag, or not set one.
-    if not "host" in tags and not options.stdin:
+    if "host" not in tags and not options.stdin:
         tags["host"] = socket.gethostname()
         LOG.warning('Tag "host" not specified, defaulting to %s.', tags["host"])
 
@@ -1058,7 +1057,7 @@ def load_config_module(name, options, tags):
             onload(options, tags)
         except:
             # Scalyr edit:  Add this line to disable the fatal log.
-            if not "no_fatal_on_error" in options:
+            if "no_fatal_on_error" not in options:
                 LOG.fatal("Exception while loading %s", name)
             raise
     return module
@@ -1104,7 +1103,7 @@ def reload_changed_config_modules(modules, options, sender, tags):
             changed = True
 
     # Scalyr edit:  Added and not sender is None
-    if changed and not sender is None:
+    if changed and sender is not None:
         sender.tagstr = " ".join("%s=%s" % (k, v) for k, v in six.iteritems(tags))
         sender.tagstr = " " + sender.tagstr.strip()
     return changed

@@ -20,7 +20,6 @@ from __future__ import unicode_literals
 import os
 import sys
 import time
-import socket
 import re
 from io import open
 
@@ -63,7 +62,7 @@ except ValueError:
     pass
 
 # Scalyr edit:  Check environment variable for for additional network interface suffix.
-NETWORK_INTERFACE_SUFFIX = "\d+"
+NETWORK_INTERFACE_SUFFIX = r"\d+"
 try:
     if "TCOLLECTOR_INTERFACE_SUFFIX" in os.environ:
         NETWORK_INTERFACE_SUFFIX = os.environ["TCOLLECTOR_INTERFACE_SUFFIX"]
@@ -99,7 +98,7 @@ def main():
             for interface in network_interface_prefixes:
                 # 2->TODO is it important to expect at least one space character?
                 m = re.match(
-                    "\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line
+                    r"\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line
                 )
                 if m:
                     break

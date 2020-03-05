@@ -117,18 +117,18 @@ def main():
     # more confusing than anything else and it's not well documented
     # what type of sockets are or aren't included in this count.
     regexp = re.compile(
-        "sockets: used \d+\n"
-        "TCP: inuse (?P<tcp_inuse>\d+) orphan (?P<orphans>\d+)"
-        " tw (?P<tw_count>\d+) alloc (?P<tcp_sockets>\d+)"
-        " mem (?P<tcp_pages>\d+)\n"
-        "UDP: inuse (?P<udp_inuse>\d+)"
+        r"sockets: used \d+\n"
+        r"TCP: inuse (?P<tcp_inuse>\d+) orphan (?P<orphans>\d+)"
+        r" tw (?P<tw_count>\d+) alloc (?P<tcp_sockets>\d+)"
+        r" mem (?P<tcp_pages>\d+)\n"
+        r"UDP: inuse (?P<udp_inuse>\d+)"
         # UDP memory accounting was added in v2.6.25-rc1
-        "(?: mem (?P<udp_pages>\d+))?\n"
+        r"(?: mem (?P<udp_pages>\d+))?\n"
         # UDP-Lite (RFC 3828) was added in v2.6.20-rc2
-        "(?:UDPLITE: inuse (?P<udplite_inuse>\d+)\n)?"
-        "RAW: inuse (?P<raw_inuse>\d+)\n"
-        "FRAG: inuse (?P<ip_frag_nqueues>\d+)"
-        " memory (?P<ip_frag_mem>\d+)\n"
+        r"(?:UDPLITE: inuse (?P<udplite_inuse>\d+)\n)?"
+        r"RAW: inuse (?P<raw_inuse>\d+)\n"
+        r"FRAG: inuse (?P<ip_frag_nqueues>\d+)"
+        r" memory (?P<ip_frag_mem>\d+)\n"
     )
 
     def print_sockstat(metric, value, tags=""):  # Note: tags must start with ' '
