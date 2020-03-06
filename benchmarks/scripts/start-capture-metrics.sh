@@ -29,25 +29,23 @@ set -e
 # 2. Start the capture script - note this script will wait and block until
 # RUN_TIME seconds have passed
 
-AGENT_PID_FILE_PATH="/scalyr-data"
+AGENT_PID_FILE_PATH="/scalyr-logs"
 
-AGENT_PROCESS_PID=$(cat "${AGENT_PID_FILE_PATH}/log/agent.pid")
+SCRIPTS_PATH=$(dirname "${BASH_SOURCE[0]}")
 
-CAPTURE_SCRIPT_COMMAND="${CAPTURE_METRICS_SCRIPT_PATH} \
-    --pid=${AGENT_PROCESS_PID} \
-    --capture-time=${RUN_TIME} \
-    --capture-interval=${CAPTURE_INTERVAL} \
-    --codespeed-url=\"${CODESPEED_URL}\" \
-    --codespeed-auth=\"${CODESPEED_AUTH}\" \
-    --codespeed-project=\"${CODESPEED_PROJECT}\" \
-    --codespeed-executable=\"${CODESPEED_EXECUTABLE}\" \
-    --codespeed-environment=\"${CODESPEED_ENVIRONMENT}\" \
-    --branch=\"${CODESPEED_BRANCH}\" \
-    --commit-date=\"${COMMIT_DATE}\" \
-    --commit-id=\"${COMMIT_HASH}\" \
-    ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
-    --debug"
+AGENT_PROCESS_PID=$(cat "${AGENT_PID_FILE_PATH}/agent.pid")
 
-echo "Starting the metrics capture script (ADDITIONAL_CAPTURE_SCRIPT_FLAGS=${ADDITIONAL_CAPTURE_SCRIPT_FLAGS})..."
-# shellcheck disable=SC2086
-eval ${CAPTURE_SCRIPT_COMMAND}
+python "${SCRIPTS_PATH}/send_usage_data_to_codespeed.py" \
+  --pid=${AGENT_PROCESS_PID} \
+  --capture-time=${RUN_TIME} \
+  --capture-interval=${CAPTURE_INTERVAL} \
+  --codespeed-url="${CODESPEED_URL}" \
+  --codespeed-auth="${CODESPEED_AUTH}" \
+  --codespeed-project="${CODESPEED_PROJECT}" \
+  --codespeed-executable="${CODESPEED_EXECUTABLE}" \
+  --codespeed-environment="${CODESPEED_ENVIRONMENT}" \
+  --branch="${CODESPEED_BRANCH}" \
+  --commit-date="${COMMIT_DATE}" \
+  --commit-id="${COMMIT_HASH}" \
+  ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
+  --debug

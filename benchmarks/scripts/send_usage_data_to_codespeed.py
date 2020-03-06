@@ -38,6 +38,7 @@ Dependencies:
 
 from __future__ import absolute_import
 from __future__ import print_function
+
 from io import open
 
 if False:
@@ -64,7 +65,6 @@ import argparse
 from datetime import datetime
 from collections import defaultdict
 
-import six
 import numpy as np
 import psutil
 
@@ -74,6 +74,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "../../")))
 from scalyr_agent.builtin_monitors.linux_process_metrics import ProcessTracker
 from scalyr_agent.builtin_monitors.linux_process_metrics import Metric
 
+import six
+
 from utils import initialize_logging
 from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
@@ -81,7 +83,6 @@ from utils import parse_commit_date
 from utils import send_payload_to_codespeed
 
 logger = logging.getLogger(__name__)
-
 
 METRICS_GAUGES = {
     # CPU usage related metrics
@@ -174,10 +175,8 @@ def send_data_to_codespeed(
     )
 
 
-def capture_metrics(
-    tracker, process, metrics, values, capture_agent_status_metrics=False
-):
-    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], dict, bool) -> dict
+def capture_metrics(tracker, process, metrics, capture_agent_status_metrics=False):
+    # type: (ProcessTracker, psutil.Process, Dict[str, Metric], bool) -> dict
     """
     Capture gauge metric types and store them in the provided dictionary.
     """
@@ -198,6 +197,7 @@ def capture_metrics(
         agent_status_metrics = get_agent_status_metrics(process=process)
         process_metrics.update(agent_status_metrics)
 
+    result = {}
     metric_values = {}
     for metric_name, metric_obj in metrics.items():
         if metric_obj not in process_metrics:
@@ -206,11 +206,11 @@ def capture_metrics(
         format_func = METRIC_FORMAT_FUNCTIONS.get(metric_name, lambda val: val)
         value = format_func(value)
         metric_values[metric_name] = value
-        values[metric_name].append(value)
+        result[metric_name] = value
 
     logger.debug("Captured metrics: %s" % (str(metric_values)))
 
-    return values
+    return result
 
 
 def get_additional_psutil_metrics(process):
@@ -286,11 +286,21 @@ def main(
     """
     Main entry point / run loop for the script.
     """
-    logger.info('Monitoring process with pid "%s" for metrics' % (pid))
+
+    with open("backup", "r") as f:
+        header = json.loads(f.readline())
+    end_time = header.get("end_time")
+    if end_time is not None:
+        logger.debug("Get end time from backup. The end time: {0}".format(end_time))
+    else:
+        end_time = int(time.time() + args.capture_time)
+
+    logger.info(
+        'Monitoring process with pid "%s" for metrics. The end time: %s'
+        % (pid, end_time)
+    )
     tracker = ProcessTracker(pid=pid, logger=logger)
     process = psutil.Process(pid)
-
-    end_time = int(time.time() + args.capture_time)
 
     # Dictionary where captured metrics are saved
     # It maps metric name to a dictionary with the results
@@ -299,25 +309,33 @@ def main(
     # Give it some time for the process to start and initialize before first capture
     time.sleep(5)
 
-    while time.time() <= end_time:
-        logger.debug("Capturing gauge metrics...")
-        capture_metrics(
-            tracker=tracker,
-            process=process,
-            metrics=METRICS_GAUGES,
-            values=captured_values,
-            capture_agent_status_metrics=capture_agent_status_metrics,
-        )
-        time.sleep(args.capture_interval)
+    with open("backup", "a", buffering=0) as backup:
+        while time.time() <= end_time:
+            captured_values = dict()
+            logger.debug("Capturing gauge metrics...")
+            captured = capture_metrics(
+                tracker=tracker,
+                process=process,
+                metrics=METRICS_GAUGES,
+                capture_agent_status_metrics=capture_agent_status_metrics,
+            )
+            backup.write("{0}\n".format(json.dumps(captured)))
+            time.sleep(args.capture_interval)
 
-    # Capture counter metrics
-    logger.debug("Capturing counter metrics...")
-    capture_metrics(
-        tracker=tracker,
-        process=process,
-        metrics=METRICS_COUNTERS,
-        values=captured_values,
-    )
+        # Capture counter metrics
+        logger.debug("Capturing counter metrics...")
+        captured = capture_metrics(
+            tracker=tracker, process=process, metrics=METRICS_COUNTERS,
+        )
+        backup.write("{0}\n".format(json.dumps(captured)))
+
+    with open("backup", "r") as buffer:
+        # skip header
+        buffer.readline()
+        for line in buffer:
+            line_metrics = json.loads(line)
+            for name, value in line_metrics.items():
+                captured_values[name].append(value)
 
     # Generate final result object and calculate derivatives for gauge metrics
     result = {}  # type: Dict[str, Dict[str, T_metric_value]]
