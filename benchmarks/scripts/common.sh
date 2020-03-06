@@ -53,3 +53,4 @@ function print_environment_variables() {
 
     echo ""
 }
+

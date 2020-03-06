@@ -59,6 +59,7 @@ import time
 import logging
 import signal
 import json
+
 import argparse
 
 from datetime import datetime
@@ -202,6 +203,7 @@ def capture_metrics(
     for metric_name, metric_obj in metrics.items():
         if metric_obj not in process_metrics:
             continue
+
         value = process_metrics[metric_obj]
         format_func = METRIC_FORMAT_FUNCTIONS.get(metric_name, lambda val: val)
         value = format_func(value)
