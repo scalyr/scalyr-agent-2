@@ -3,7 +3,7 @@ Scalyr Agent Python 3 support: Beta release
 
 ## Python 3 support
 
-Scalyr is the final stages of preparing the 2.1 release of the Scalyr Agent.
+Scalyr is in the final stages of preparing the 2.1 release of the Scalyr Agent.
 This will be a significant update of the Scalyr Agent code base that
 adds in support for running under Python 3.
 
@@ -70,7 +70,7 @@ For apt based systems:
 
 Good news, there are no breaking changes from the previous versions of the
 Scalyr Agent.  You can use the same configuration and get the same
-functionality as you have.
+functionality as you have in the past.
 
 ## Known issues
 
@@ -86,5 +86,5 @@ There is one currently known issue we are still investigating:
 
 ## Reporting problems
 
-As always, if you have any difficults, please contact `support@scalyr.com` and
+As always, if you have any difficulties, please contact `support@scalyr.com` and
 clearly mention that you are using the beta release of the Scalyr Agent.
