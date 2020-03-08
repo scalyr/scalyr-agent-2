@@ -1349,22 +1349,19 @@ class ScalyrAgent(object):
             os.makedirs(config.agent_data_path, exist_ok=True)
 
         if not os.path.isdir(config.agent_log_path):
-            if self.__controller.install_type != DEV_INSTALL:
-                raise Exception(
-                    "The agent log directory '%s' does not exist."
-                    % config.agent_log_path
-                )
+            raise Exception(
+                "The agent log directory '%s' does not exist." % config.agent_log_path
+            )
+
         if not os.access(config.agent_log_path, os.W_OK):
             raise Exception(
                 "User cannot write to agent log directory '%s'." % config.agent_log_path
             )
 
         if not os.path.isdir(config.agent_data_path):
-            if self.__controller.install_type != DEV_INSTALL:
-                raise Exception(
-                    "The agent data directory '%s' does not exist."
-                    % config.agent_data_path
-                )
+            raise Exception(
+                "The agent data directory '%s' does not exist." % config.agent_data_path
+            )
 
         if not os.access(config.agent_data_path, os.W_OK):
             raise Exception(
