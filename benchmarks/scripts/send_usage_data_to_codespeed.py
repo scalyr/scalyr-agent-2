@@ -62,7 +62,7 @@ import signal
 import json
 import argparse
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 
 import numpy as np
@@ -81,6 +81,7 @@ from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
 from utils import parse_commit_date
 from utils import send_payload_to_codespeed
+from utils import parse_capture_time
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,9 @@ METRICS_COUNTERS = {
     "io_read_count_bytes": Metric(name="app.disk.bytes", _type="read"),
     "io_write_count_bytes": Metric(name="app.disk.bytes", _type="write"),
 }  # type: Dict[str, Metric]
+
+
+BACKUP_PATH = "/capture/backup.txt"
 
 
 def bytes_to_megabytes(value):
@@ -270,7 +274,7 @@ def get_agent_status_metrics(process):
 
 
 def main(
-    pid,
+    pid_file_path,
     codespeed_url,
     codespeed_auth,
     codespeed_project,
@@ -278,29 +282,48 @@ def main(
     codespeed_environment,
     branch,
     commit_id,
+    capture_time,
     commit_date=None,
     capture_agent_status_metrics=False,
     dry_run=False,
 ):
-    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, Optional[datetime], bool, bool) -> None
+    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, int, Optional[datetime], bool, bool) -> None
     """
     Main entry point / run loop for the script.
     """
 
-    with open("backup", "r") as f:
-        header = json.loads(f.readline())
-    end_time = header.get("end_time")
+    end_time = None
+    if os.path.exists(BACKUP_PATH):
+        with open(BACKUP_PATH, "r") as f:
+            header = json.loads(f.readline())
+        end_time = header.get("end_time")
     if end_time is not None:
-        logger.debug("Get end time from backup. The end time: {0}".format(end_time))
+        logger.debug(
+            "Get end time from backup. The end time: {0}".format(
+                datetime.fromtimestamp(end_time)
+            )
+        )
     else:
-        end_time = int(time.time() + args.capture_time)
+        end_time = time.time() + capture_time
+        with open(BACKUP_PATH, "w") as f:
+            f.write("{0}\n".format(json.dumps({"end_time": end_time})))
+
+    attempts = 0
+    while not os.path.exists(pid_file_path):
+        if attempts > 3:
+            raise RuntimeError("Agent pid file did not appear.")
+        time.sleep(1)
+
+    with open(pid_file_path, "r") as f:
+        pid = int(f.readline())
 
     logger.info(
         'Monitoring process with pid "%s" for metrics. The end time: %s'
-        % (pid, end_time)
+        % (pid, datetime.fromtimestamp(end_time))
     )
-    tracker = ProcessTracker(pid=pid, logger=logger)
+
     process = psutil.Process(pid)
+    tracker = ProcessTracker(pid=pid, logger=logger)
 
     # Dictionary where captured metrics are saved
     # It maps metric name to a dictionary with the results
@@ -309,9 +332,10 @@ def main(
     # Give it some time for the process to start and initialize before first capture
     time.sleep(5)
 
-    with open("backup", "a", buffering=0) as backup:
-        while time.time() <= end_time:
-            captured_values = dict()
+    with open(BACKUP_PATH, "a") as backup:
+        current_time = time.time()
+        while current_time <= end_time:
+            current_time = time.time()
             logger.debug("Capturing gauge metrics...")
             captured = capture_metrics(
                 tracker=tracker,
@@ -320,6 +344,9 @@ def main(
                 capture_agent_status_metrics=capture_agent_status_metrics,
             )
             backup.write("{0}\n".format(json.dumps(captured)))
+            backup.flush()
+            time_remaining = timedelta(seconds=end_time - current_time)
+            logger.debug("Time remaining: {0}".format(str(time_remaining)))
             time.sleep(args.capture_interval)
 
         # Capture counter metrics
@@ -328,11 +355,12 @@ def main(
             tracker=tracker, process=process, metrics=METRICS_COUNTERS,
         )
         backup.write("{0}\n".format(json.dumps(captured)))
+        backup.flush()
 
-    with open("backup", "r") as buffer:
+    with open(BACKUP_PATH, "r") as backub:
         # skip header
-        buffer.readline()
-        for line in buffer:
+        backub.readline()
+        for line in backub:
             line_metrics = json.loads(line)
             for name, value in line_metrics.items():
                 captured_values[name].append(value)
@@ -382,6 +410,8 @@ def main(
         commit_date=commit_date,
     )
 
+    os.kill(pid, signal.SIGTERM)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -395,16 +425,16 @@ if __name__ == "__main__":
 
     # Add arguments which are specific to this script
     parser.add_argument(
-        "--pid",
-        type=int,
+        "--pid-file-path",
+        type=six.text_type,
         required=True,
         help=("ID of a process to capture metrics for."),
     )
     parser.add_argument(
         "--capture-time",
-        type=int,
+        type=six.text_type,
         required=True,
-        default=10,
+        default="10s",
         help=("How long capture metrics for (in seconds)."),
     )
     parser.add_argument(
@@ -434,10 +464,11 @@ if __name__ == "__main__":
 
     codespeed_auth = parse_auth_credentials(args.codespeed_auth)
     commit_date = parse_commit_date(args.commit_date)
+    capture_time = parse_capture_time(args.capture_time)
 
     initialize_logging(debug=args.debug)
     main(
-        pid=args.pid,
+        pid_file_path=args.pid_file_path,
         codespeed_url=args.codespeed_url,
         codespeed_auth=codespeed_auth,
         codespeed_project=args.codespeed_project,
@@ -446,6 +477,7 @@ if __name__ == "__main__":
         branch=args.branch,
         commit_id=args.commit_id,
         commit_date=commit_date,
+        capture_time=capture_time,
         capture_agent_status_metrics=args.capture_agent_status_metrics,
         dry_run=args.dry_run,
     )

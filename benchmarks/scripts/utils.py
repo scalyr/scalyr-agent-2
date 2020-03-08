@@ -18,8 +18,9 @@ This module contains various utility functions for sending data to CodeSpeed.
 
 from __future__ import absolute_import
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from argparse import ArgumentParser  # NOQA
+import re
 
 if False:
     from typing import List
@@ -198,3 +199,23 @@ def parse_commit_date(value):
         raise ValueError(msg)
 
     return commit_date
+
+
+def parse_capture_time(value):
+    m = re.match(r"(\d+)([smhd])", value)
+    if not m:
+        raise ValueError(
+            "Got invalid run time: %s, Run time must be in the following format: %s"
+            % (value, "<number><s|m|h|d>, example: 1h - 1 hour")
+        )
+
+    number, time_unit = m.group()
+    if time_unit == "s":
+        time_unit = "seconds"
+    elif time_unit == "m":
+        time_unit = "minutes"
+    elif time_unit == "h":
+        time_unit = "hours"
+    elif time_unit == "d":
+        time_unit = "days"
+    return timedelta(**{time_unit: int(number)}).total_seconds()

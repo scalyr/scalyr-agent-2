@@ -36,7 +36,7 @@ SCRIPTS_PATH=$(dirname "${BASH_SOURCE[0]}")
 AGENT_PROCESS_PID=$(cat "${AGENT_PID_FILE_PATH}/agent.pid")
 
 python "${SCRIPTS_PATH}/send_usage_data_to_codespeed.py" \
-  --pid=${AGENT_PROCESS_PID} \
+  --pid-file=${AGENT_PROCESS_PID} \
   --capture-time=${RUN_TIME} \
   --capture-interval=${CAPTURE_INTERVAL} \
   --codespeed-url="${CODESPEED_URL}" \

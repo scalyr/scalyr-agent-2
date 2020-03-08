@@ -1,76 +1,99 @@
-apiVersion: v1
-kind: Pod
+apiVersion: batch/v1
+kind: Job
 metadata:
   name: agent-k8s-codespeed
 spec:
-  shareProcessNamespace: true
-  containers:
-    - name: agent
-      image: agent_k8s
-      imagePullPolicy: IfNotPresent
-      resources:
-        limits:
-          memory: "200Mi"
-        requests:
-          memory: "100Mi"
-      volumeMounts:
+  template:
+    spec:
+      shareProcessNamespace: true
+      restartPolicy: OnFailure
+      containers:
+        - name: metric-capture
+          image: agent_metrics_capture
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "200Mi"
+            requests:
+              memory: "100Mi"
+          volumeMounts:
+            - mountPath: /scalyr-data
+              name: agent-data
+            - mountPath: /capture
+              name: captured-metrics-backup
+          command:
+            - python
+            - benchmarks/scripts/send_usage_data_to_codespeed.py
+            - --pid-file-path=/scalyr-data/log/agent.pid
+            - --capture-time=$(RUN_TIME)
+            - --capture-interval=$(CAPTURE_INTERVAL)
+            - --codespeed-url=$(CODESPEED_URL)
+            - --codespeed-auth=$(CODESPEED_AUTH)
+            - --codespeed-project=$(CODESPEED_PROJECT)
+            - --codespeed-executable=$(CODESPEED_EXECUTABLE)
+            - --codespeed-environment=$(CODESPEED_ENVIRONMENT)
+            - --branch=$(CODESPEED_BRANCH)
+            - --commit-date=$(COMMIT_DATE)
+            - --commit-id=$(COMMIT_HASH)
+            - --debug
+          env:
+            - name: AGENT_PROCESS_PID_FILE
+              value: ""
+            - name: RUN_TIME
+              value: "5h"
+            - name: CAPTURE_INTERVAL
+              value: "5.0"
+            - name: CODESPEED_URL
+              value: "https://scalyr-agent-codespeed.herokuapp.com/"
+            - name: CODESPEED_PROJECT
+              value: "scalyr-agent-2"
+            - name: CODESPEED_EXECUTABLE
+              value: "Python 2.7 - Kubernetes"
+            - name: CODESPEED_ENVIRONMENT
+              value: "Kubernetes Medium Size"
+            - name: CODESPEED_BRANCH
+              value: "master"
+            - name: COMMIT_DATE
+              value: "2020-03-05 02:01:00"
+            - name: COMMIT_HASH
+              value: "fc1fb152da5c7d38dcba3094e7da1a24639743ef"
+            - name: CODESPEED_AUTH
+              value: "circle_ci_api:Guejuasoogutaeng8eifienoiv7eex9eeHu1ieng"
+        - name: agent
+          image: agent_k8s
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "200Mi"
+            requests:
+              memory: "100Mi"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+#            - name: agent-logs
+#              mountPath: /root/scalyr-agent-dev/log
+            - name: agent-data
+              mountPath: /root/scalyr-agent-dev
+          env:
+            - name: SCALYR_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secret
+                  key: SCALYR_API_KEY
+            - name: SCALYR_SERVER_ATTRIBUTES
+              value: "{\"serverHost\": \"ARTHUR_TEST_k8s\"}"
+      volumes:
         - name: config
-          mountPath: /config
-        - name: agent-logs
-          mountPath: /root/scalyr-agent-dev/log
+          configMap:
+            name: codespeed-config
+            items:
+              - key: agent_no_monitored_logs.json
+                path: config.json
         - name: agent-data
-          mountPath: /root/scalyr-agent-dev/data
-      env:
-        - name: SCALYR_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: agent-secret
-              key: SCALYR_API_KEY
-        - name: SCALYR_SERVER_ATTRIBUTES
-          value: "{\"serverHost\": \"ARTHUR_TEST_k8s\"}"
-    - name: metric-capture
-      image: agent_metrics_capture
-      imagePullPolicy: IfNotPresent
-      resources:
-        limits:
-          memory: "200Mi"
-        requests:
-          memory: "100Mi"
-      volumeMounts:
-        - mountPath: /scalyr-logs
-          name: agent-logs
-      env:
-        - name: RUN_TIME
-          value: "-1"
-        - name: CAPTURE_INTERVAL
-          value: "5"
-        - name: CODESPEED_URL
-          value: "https://scalyr-agent-codespeed.herokuapp.com/"
-        - name: CODESPEED_PROJECT
-          value: "scalyr-agent-2"
-        - name: CODESPEED_EXECUTABLE
-          value: "Python 2.7 - Kubernetes"
-        - name: CODESPEED_ENVIRONMENT
-          value: "Kubernetes Medium Size"
-        - name: CODESPEED_BRANCH
-          value: "master"
-        - name: COMMIT_DATE
-          value: "2020-03-05 02:01:00"
-        - name: COMMIT_HASH
-          value: "fc1fb152da5c7d38dcba3094e7da1a24639743ef"
-        - name: CODESPEED_AUTH
-          value: "circle_ci_api:Guejuasoogutaeng8eifienoiv7eex9eeHu1ieng"
-  volumes:
-    - name: config
-      configMap:
-        name: codespeed-config
-        items:
-          - key: agent_no_monitored_logs.json
-            path: config.json
-    - name: agent-data
-      emptyDir: {}
-    - name: agent-logs
-      emptyDir: {}
-    - name: captured-metrics-backup
-      emptyDir: {}
+          emptyDir: {}
+#        - name: agent-logs
+#          emptyDir: {}
+        - name: captured-metrics-backup
+          emptyDir: {}
+
 
