@@ -17,7 +17,8 @@
 # It takes occasional codecov API failures into account and tries to retry
 # upload.
 
-MAX_ATTEMPTS=5
+MAX_ATTEMPTS=${MAX_ATTEMPTS:-5}
+RETRY_DELAY=${RETRY_DELAY:-5}
 
 # Work around for temporary codecov API timing out
 for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
@@ -28,8 +29,8 @@ for (( i=0; i<$MAX_ATTEMPTS; ++i)); do
         break
     fi
 
-    echo "Command exited with non-zero, retrying in ${MAX_ATTEMPTS} seconds..."
-    sleep 5
+    echo "Command exited with non-zero, retrying in ${RETRY_DELAY} seconds..."
+    sleep "${RETRY_DELAY}"
 done
 
 if [ "${EXIT_CODE}" -ne 0 ]; then
