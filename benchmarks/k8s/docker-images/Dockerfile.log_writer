@@ -1,0 +1,9 @@
+FROM python:3.6
+
+ADD . /agent_source
+
+WORKDIR /agent_source
+
+RUN python -m pip install -r benchmarks/scripts/requirements.txt
+
+CMD python benchmarks/scripts/write-log-lines.py

@@ -21,6 +21,9 @@ from __future__ import absolute_import
 from datetime import datetime, timedelta
 from argparse import ArgumentParser  # NOQA
 import re
+import os
+import time
+from io import open
 
 if False:
     from typing import List
@@ -202,6 +205,7 @@ def parse_commit_date(value):
 
 
 def parse_capture_time(value):
+    logger.info(value)
     m = re.match(r"(\d+)([smhd])", value)
     if not m:
         raise ValueError(
@@ -209,7 +213,7 @@ def parse_capture_time(value):
             % (value, "<number><s|m|h|d>, example: 1h - 1 hour")
         )
 
-    number, time_unit = m.group()
+    number, time_unit = m.groups()
     if time_unit == "s":
         time_unit = "seconds"
     elif time_unit == "m":
@@ -219,3 +223,14 @@ def parse_capture_time(value):
     elif time_unit == "d":
         time_unit = "days"
     return timedelta(**{time_unit: int(number)}).total_seconds()
+
+
+def wait_for_agent_start_and_get_pid(pid_file_path):
+    attempts = 0
+    while not os.path.exists(pid_file_path):
+        if attempts > 10:
+            raise RuntimeError("Agent pid file did not appear.")
+        time.sleep(1)
+
+    with open(pid_file_path, "r") as f:
+        return int(f.readline())

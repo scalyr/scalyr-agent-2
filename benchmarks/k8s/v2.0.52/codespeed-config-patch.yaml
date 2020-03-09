@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: codespeed-config
+data:
+  commit_sha1: "32fa647708bcb9bc6f46b09eea879b17696fb6cb"
+  commit_date: "2019-09-16 23:50:57"
+  server_host: "agent-benchmark-k8s-2.7-v2.0.52"
+  codespeed_executable: "Python 2.7 - Kubernetes"

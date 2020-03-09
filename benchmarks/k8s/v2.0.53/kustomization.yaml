@@ -1,0 +1,8 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../base
+nameSuffix: -v2.0.53
+images:
+  - name: agent
+    newName: agent-k8s-2.7

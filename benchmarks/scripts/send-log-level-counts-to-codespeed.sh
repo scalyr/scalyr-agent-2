@@ -22,15 +22,10 @@ source "${SCRIPT_DIR}/common.sh"
 
 SEND_VALUE_SCRPT_PATH=$(realpath "${SCRIPT_DIR}/send_value_to_codespeed.py")
 
-AGENT_LOG_FILE_PATH="${HOME}/scalyr-agent-dev/log/agent.log"
-AGENT_DEBUG_LOG_FILE_PATH="${HOME}/scalyr-agent-dev/log/agent_debug.log"
+AGENT_LOG_FILE_PATH="${AGENT_DATA_PATH}/log/agent.log"
+AGENT_DEBUG_LOG_FILE_PATH="${AGENT_DATA_PATH}/log/agent_debug.log"
 
 verify_mandatory_common_env_variables_are_set
-
-if [ $# -lt 1 ]; then
-    echo "Usage: ${0} <commit hash>"
-    exit 2
-fi
 
 # NOTE: We have "set -e" mode set which means we need to ignore grep errors if
 # no matches are found otherwise script will exit with non-zero

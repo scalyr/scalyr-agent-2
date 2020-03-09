@@ -13,32 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script which starts the agent in the foreground with the provided configuration file, runs it for
-# X minutes, captures relevant agent process level metrics and submits them to CodeSpeed.
-
-# NOTE: This script intentionally runs the agent directly inside the main Circle CI job command
-# container to avoid additional container overhead.
-# Eventually we will want to run those benchmarks / metrics captures on dedicated hosts to ensure
-# consistent behavior and performance across runs.
-# In the mean time, if the performance on Circle CI is too unpredictable, we will need to do multiple
-# run and use a computed percentile value or similar.
-
-# Every command failure (aka non zero exit) in the script should be treated as a fatal error
 set -e
 
-# 2. Start the capture script - note this script will wait and block until
-# RUN_TIME seconds have passed
+SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/common.sh"
 
-AGENT_PID_FILE_PATH="/scalyr-logs"
+CAPTURE_METRICS_SCRIPT_PATH=$(realpath "${SCRIPT_DIR}/send_usage_data_to_codespeed.py")
 
-SCRIPTS_PATH=$(dirname "${BASH_SOURCE[0]}")
+verify_mandatory_common_env_variables_are_set
 
-AGENT_PROCESS_PID=$(cat "${AGENT_PID_FILE_PATH}/agent.pid")
+if [ $# -lt 1 ]; then
+    echo "Usage: ${0} <commit hash>"
+    exit 2
+fi
 
-python "${SCRIPTS_PATH}/send_usage_data_to_codespeed.py" \
-  --pid-file=${AGENT_PROCESS_PID} \
-  --capture-time=${RUN_TIME} \
-  --capture-interval=${CAPTURE_INTERVAL} \
+python "${CAPTURE_METRICS_SCRIPT_PATH}" \
+  --agent-data-path="${AGENT_DATA_PATH}" \
+  --capture-time="${CAPTURE_TIME}" \
+  --capture-interval="${CAPTURE_INTERVAL}" \
   --codespeed-url="${CODESPEED_URL}" \
   --codespeed-auth="${CODESPEED_AUTH}" \
   --codespeed-project="${CODESPEED_PROJECT}" \
@@ -46,6 +39,6 @@ python "${SCRIPTS_PATH}/send_usage_data_to_codespeed.py" \
   --codespeed-environment="${CODESPEED_ENVIRONMENT}" \
   --branch="${CODESPEED_BRANCH}" \
   --commit-date="${COMMIT_DATE}" \
-  --commit-id="${COMMIT_HASH}" \
+  --commit-id="${COMMIT_SHA1}" \
+  --debug \
   ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
-  --debug

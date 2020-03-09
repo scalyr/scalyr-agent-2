@@ -82,6 +82,7 @@ from utils import parse_auth_credentials
 from utils import parse_commit_date
 from utils import send_payload_to_codespeed
 from utils import parse_capture_time
+from utils import wait_for_agent_start_and_get_pid
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,7 @@ def get_agent_status_metrics(process):
 
 
 def main(
-    pid_file_path,
+    agent_data_path,
     codespeed_url,
     codespeed_auth,
     codespeed_project,
@@ -308,14 +309,8 @@ def main(
         with open(BACKUP_PATH, "w") as f:
             f.write("{0}\n".format(json.dumps({"end_time": end_time})))
 
-    attempts = 0
-    while not os.path.exists(pid_file_path):
-        if attempts > 3:
-            raise RuntimeError("Agent pid file did not appear.")
-        time.sleep(1)
-
-    with open(pid_file_path, "r") as f:
-        pid = int(f.readline())
+    pid_file_path = os.path.join(agent_data_path, "log", "agent.pid")
+    pid = wait_for_agent_start_and_get_pid(pid_file_path)
 
     logger.info(
         'Monitoring process with pid "%s" for metrics. The end time: %s'
@@ -412,8 +407,11 @@ def main(
 
     os.kill(pid, signal.SIGTERM)
 
+    os.system("killall5 -9")
+
 
 if __name__ == "__main__":
+    logger.debug(sys.argv)
     parser = argparse.ArgumentParser(
         description=(
             "Capture process level metric data and submit it " "to CodeSpeed instance"
@@ -425,7 +423,7 @@ if __name__ == "__main__":
 
     # Add arguments which are specific to this script
     parser.add_argument(
-        "--pid-file-path",
+        "--agent-data-path",
         type=six.text_type,
         required=True,
         help=("ID of a process to capture metrics for."),
@@ -468,7 +466,7 @@ if __name__ == "__main__":
 
     initialize_logging(debug=args.debug)
     main(
-        pid_file_path=args.pid_file_path,
+        agent_data_path=args.agent_data_path,
         codespeed_url=args.codespeed_url,
         codespeed_auth=codespeed_auth,
         codespeed_project=args.codespeed_project,

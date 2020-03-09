@@ -1,6 +1,0 @@
-configMapGenerator:
-- name: codespeed-config
-  files:
-  - agent_no_monitored_logs.json
-resources:
-  - codespeed.yaml
