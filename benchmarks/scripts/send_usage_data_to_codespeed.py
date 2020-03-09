@@ -288,7 +288,7 @@ def main(
     capture_agent_status_metrics=False,
     dry_run=False,
 ):
-    # type: (int, str, Optional[Tuple[str, str]], str, str, str, str, str, int, Optional[datetime], bool, bool) -> None
+    # type: (str, str, Optional[Tuple[str, str]], str, str, str, str, str, float, Optional[datetime], bool, bool) -> None
     """
     Main entry point / run loop for the script.
     """
@@ -296,6 +296,7 @@ def main(
     end_time = None
     if os.path.exists(BACKUP_PATH):
         with open(BACKUP_PATH, "r") as f:
+            # the first line of the backup file is a header with end time.
             header = json.loads(f.readline())
         end_time = header.get("end_time")
     if end_time is not None:
@@ -305,10 +306,12 @@ def main(
             )
         )
     else:
+        # no end_time that was saved in backup file, set new one and save it.
         end_time = time.time() + capture_time
         with open(BACKUP_PATH, "w") as f:
             f.write("{0}\n".format(json.dumps({"end_time": end_time})))
 
+    # get agent.pid file. It should be located in the the shared volume.
     pid_file_path = os.path.join(agent_data_path, "log", "agent.pid")
     pid = wait_for_agent_start_and_get_pid(pid_file_path)
 
@@ -338,6 +341,7 @@ def main(
                 metrics=METRICS_GAUGES,
                 capture_agent_status_metrics=capture_agent_status_metrics,
             )
+            # write captured metrics to backup file.
             backup.write("{0}\n".format(json.dumps(captured)))
             backup.flush()
             time_remaining = timedelta(seconds=end_time - current_time)
@@ -352,6 +356,7 @@ def main(
         backup.write("{0}\n".format(json.dumps(captured)))
         backup.flush()
 
+    # get all captured values from backup file.
     with open(BACKUP_PATH, "r") as backub:
         # skip header
         backub.readline()
@@ -406,8 +411,6 @@ def main(
     )
 
     os.kill(pid, signal.SIGTERM)
-
-    os.system("killall5 -9")
 
 
 if __name__ == "__main__":

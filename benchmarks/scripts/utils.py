@@ -205,6 +205,7 @@ def parse_commit_date(value):
 
 
 def parse_capture_time(value):
+    # type: (str) -> float
     logger.info(value)
     m = re.match(r"(\d+)([smhd])", value)
     if not m:
@@ -226,6 +227,8 @@ def parse_capture_time(value):
 
 
 def wait_for_agent_start_and_get_pid(pid_file_path):
+    # type: (str) -> int
+    """IF file 'pid_file_path' exists, we assume that the agent is started. Returns 'pid' of the agent process."""
     attempts = 0
     while not os.path.exists(pid_file_path):
         if attempts > 10:
