@@ -1342,6 +1342,14 @@ class ScalyrAgent(object):
         @param config: The configuration
         @type config: Configuration
         """
+
+        if self.__controller.install_type == DEV_INSTALL:
+            # The agent is running from source, make sure that its directories exist.
+            if not os.path.exists(config.agent_log_path):
+                os.makedirs(config.agent_log_path)
+            if not os.path.exists(config.agent_data_path):
+                os.makedirs(config.agent_data_path)
+
         if not os.path.isdir(config.agent_log_path):
             raise Exception(
                 "The agent log directory '%s' does not exist." % config.agent_log_path
