@@ -233,6 +233,8 @@ class UrlMonitor(ScalyrMonitor):
             self._record_error(e, "unknown_error")
             return
 
+        response_body = six.ensure_text(response_body)
+
         if self.extractor is not None:
             match = self.extractor.search(response_body)
             if match is not None:
