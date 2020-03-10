@@ -714,7 +714,7 @@ jobs:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 3"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
           # NOTE: We set agent run time slightly longer than the insert script time run so we give a chance for memory and
           # other metrics to stabilize.
           run_time: 390
