@@ -36,7 +36,6 @@ from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
 import os
-import socket
 import subprocess
 import sys
 import time
@@ -53,7 +52,7 @@ try:
     if "TCOLLECTOR_SAMPLE_INTERVAL" in os.environ:
         COLLECTION_INTERVAL = float(os.environ["TCOLLECTOR_SAMPLE_INTERVAL"])
     if "TCOLLECTOR_LOCAL_DISKS_ONLY" in os.environ:
-        LOCAL_DISKS_ONLY = os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"].lower() == 'true'
+        LOCAL_DISKS_ONLY = os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"].lower() == "true"
 except ValueError:
     pass
 
@@ -68,11 +67,11 @@ def main():
 
         # Scalyr edit: conditional options on whether to restrict to local disks only or not.
         if LOCAL_DISKS_ONLY:
-            df_options = '-PlTk'
-            df_inodes_options = '-PlTi'
+            df_options = "-PlTk"
+            df_inodes_options = "-PlTi"
         else:
-            df_options = '-PTk'
-            df_inodes_options = '-PTi'
+            df_options = "-PTk"
+            df_inodes_options = "-PTi"
 
         ts = int(time.time())
         # 1kblocks
@@ -82,7 +81,7 @@ def main():
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
             # To prevent duplicte timestamp warnings, we keep track of which mount points we've reported.
             reported_mounts = {}
-            for line in stdout.decode("utf-8").split("\n"): # pylint: disable=E1103
+            for line in stdout.decode("utf-8").split("\n"):  # pylint: disable=E1103
                 fields = line.split()
                 # skip header/blank lines
                 if not line or not fields[2].isdigit():
@@ -97,7 +96,7 @@ def main():
                 if fields[6] == "/dev":
                     continue
                 # /dev/shm, /lib/init_rw, /lib/modules, etc
-                #if fields[6].startswith(("/lib/", "/dev/")):  # python2.5+
+                # if fields[6].startswith(("/lib/", "/dev/")):  # python2.5+
                 if fields[6].startswith("/lib/"):
                     continue
                 if fields[6].startswith("/dev/"):
@@ -123,7 +122,9 @@ def main():
                     % (ts, fields[4], mount, fields[1])
                 )
         else:
-            print("df %s returned %r" % (df_options, df_proc.returncode), file=sys.stderr)
+            print(
+                "df %s returned %r" % (df_options, df_proc.returncode), file=sys.stderr
+            )
 
         ts = int(time.time())
         # inodes
@@ -133,7 +134,7 @@ def main():
             # Scalyr edit.  We've found some systems list the same mount point multiple times in the df output.
             # To prevent duplicte timestamp warnings, we keep track of which mount points we've reported.
             reported_mounts = {}
-            for line in stdout.decode("utf-8").split("\n"): # pylint: disable=E1103
+            for line in stdout.decode("utf-8").split("\n"):  # pylint: disable=E1103
                 fields = line.split()
                 if not line or not fields[2].isdigit():
                     continue
@@ -158,10 +159,14 @@ def main():
                     % (ts, fields[4], mount, fields[1])
                 )
         else:
-            print("df %s returned %r" % (df_inodes_options, df_proc.returncode), file=sys.stderr)
+            print(
+                "df %s returned %r" % (df_inodes_options, df_proc.returncode),
+                file=sys.stderr,
+            )
 
         sys.stdout.flush()
         time.sleep(COLLECTION_INTERVAL)
+
 
 if __name__ == "__main__":
     main()
