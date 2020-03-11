@@ -1,0 +1,10 @@
+namespace: scalyr
+resources:
+- scalyr-agent-2-configmap.yaml
+- scalyr-service-account.yaml
+- scalyr-agent-2.yaml
+
+# Uncomment the below it you want to disable writing of checkpoints to the host filesystem
+
+# patchesStrategicMerge:
+# - disable-persistent-checkpoints.yaml
