@@ -1,0 +1,21 @@
+{
+  // We want to consume whole file from the beginning so we set max offset to 100 MB
+  max_log_offset_size: 104857600,
+
+  // Enable GC stats capture and decrease main loop interval to better capture any potential
+  // object leaks
+  config_change_check_interval: 5,
+  enable_gc_stats: true,
+  garbage_collect_interval: 5
+
+  logs: [
+     {
+         path: "/tmp/access_log_50_mb.log",
+         attributes: { parser: "accessLog" },
+         copy_from_start: true
+     }
+  ],
+
+  monitors: [
+  ]
+}

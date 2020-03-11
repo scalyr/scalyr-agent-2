@@ -23,7 +23,6 @@ __author__ = "echee@scalyr.com"
 
 import os
 import threading
-import time
 from io import open
 
 
@@ -245,7 +244,7 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.start_manager()
                 fragment_polls.sleep_until_count_or_maxwait(
-                    40, manager_poll_interval, maxwait=1
+                    40, manager_poll_interval, maxwait=2
                 )
 
                 m1.assert_called()
@@ -254,8 +253,6 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.stop_manager(wait_on_join=False)
                 fake_clock.advance_time(increment_by=manager_poll_interval)
-
-                time.sleep(1)
 
                 self.assertEquals(fragment_polls.count(), 40)
                 self.assertEquals(counter["callback_invocations"], 4)

@@ -45,9 +45,17 @@ import time
 from io import open
 
 try:
-    from __scalyr__ import SCALYR_VERSION, scalyr_init
+    from __scalyr__ import SCALYR_VERSION
+    from __scalyr__ import scalyr_init
+    from __scalyr__ import INSTALL_TYPE
+    from __scalyr__ import DEV_INSTALL
+    from __scalyr__ import MSI_INSTALL
 except ImportError:
-    from scalyr_agent.__scalyr__ import SCALYR_VERSION, scalyr_init
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+    from scalyr_agent.__scalyr__ import scalyr_init
+    from scalyr_agent.__scalyr__ import INSTALL_TYPE
+    from scalyr_agent.__scalyr__ import DEV_INSTALL
+    from scalyr_agent.__scalyr__ import MSI_INSTALL
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -80,6 +88,7 @@ from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
+from scalyr_agent.agent_status import GCStatus
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import (
     PlatformController,
@@ -1072,6 +1081,22 @@ class ScalyrAgent(object):
                             gc.collect()
                             last_gc_time = current_time
 
+                        if self.__config.enable_gc_stats:
+                            # If GC stats are enabled, enable tracking uncollectable objects
+                            if gc.get_debug() == 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Enabling GC debug mode",
+                                )
+                                gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
+                        else:
+                            if gc.get_debug() != 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Disabling GC debug mode",
+                                )
+                                gc.set_debug(0)
+
                         if _check_disabled(
                             current_time,
                             disable_config_equivalence_check_until,
@@ -1243,18 +1268,25 @@ class ScalyrAgent(object):
         @rtype: ScalyrClientSession
         """
         if self.__config.verify_server_certificate:
+            is_dev_install = INSTALL_TYPE == DEV_INSTALL
+            is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
+
             ca_file = self.__config.ca_cert_path
             intermediate_certs_file = self.__config.intermediate_certs_path
 
             # Validate provided CA cert file and intermediate cert file exists. If they don't
             # exist, throw and fail early and loudly
-            if not os.path.isfile(ca_file):
+            if not is_dev_install and not os.path.isfile(ca_file):
                 raise ValueError(
                     'Invalid path "%s" specified for the "ca_cert_path" config '
                     "option: file does not exist" % (ca_file)
                 )
 
-            if not os.path.isfile(intermediate_certs_file):
+            # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+            # under the MSI / Windows install
+            if not is_dev_or_msi_install and not os.path.isfile(
+                intermediate_certs_file
+            ):
                 raise ValueError(
                     'Invalid path "%s" specified for the '
                     '"intermediate_certs_path" config '
@@ -1313,6 +1345,14 @@ class ScalyrAgent(object):
         @param config: The configuration
         @type config: Configuration
         """
+
+        if self.__controller.install_type == DEV_INSTALL:
+            # The agent is running from source, make sure that its directories exist.
+            if not os.path.exists(config.agent_log_path):
+                os.makedirs(config.agent_log_path)
+            if not os.path.exists(config.agent_data_path):
+                os.makedirs(config.agent_data_path)
+
         if not os.path.isdir(config.agent_log_path):
             raise Exception(
                 "The agent log directory '%s' does not exist." % config.agent_log_path
@@ -1400,6 +1440,12 @@ class ScalyrAgent(object):
             result.copying_manager_status = self.__copying_manager.generate_status()
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
+
+        # Include GC stats (if enabled)
+        if self.__config.enable_gc_stats:
+            gc_stats = GCStatus()
+            gc_stats.garbage = len(gc.garbage)
+            result.gc_stats = gc_stats
 
         return result
 

@@ -541,6 +541,10 @@ class Configuration(object):
         return self.__get_config().get_bool("disable_leak_update_debug_log_level")
 
     @property
+    def enable_gc_stats(self):
+        return self.__get_config().get_bool("enable_gc_stats")
+
+    @property
     def disable_all_config_updates(self):
         return self.__get_config().get_int(
             "disable_leak_all_config_updates", none_if_missing=True
@@ -1994,7 +1998,9 @@ class Configuration(object):
             description,
             apply_defaults,
         )
-
+        self.__verify_or_set_optional_bool(
+            config, "enable_gc_stats", False, description, apply_defaults
+        )
         self.__verify_or_set_optional_int(
             config, "disable_leak_all_config_updates", None, description, apply_defaults
         )

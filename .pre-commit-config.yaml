@@ -43,6 +43,16 @@ repos:
       entry: .tox/lint/bin/mypy --pretty --config-file ./lint-configs/python/mypy.ini
       language: script
       types: [file, python]
+  - repo: local
+    hooks:
+    - id: shellcheck
+      name: shellcheck
+      # NOTE: We intentionally want to run in incremental mode to speed this check up
+      # (which is not the case for tox -elint target and CI where we want to avoid using
+      # MyPy cache)
+      entry: ./scripts/shell-scripts-lint.sh
+      language: script
+      types: [file, shell]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v2.5.0  # Use the ref you want to point at
     hooks:

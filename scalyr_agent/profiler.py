@@ -209,7 +209,7 @@ class CPUProfiler(BaseProfiler):
         self._allowed_clocks = self._allowed_clocks[:2]
 
     def _is_running(self):
-        return yappi.is_running()
+        return yappi and yappi.is_running()
 
     def _get_clock_type(self, clock_type, allowed, default_value):
         """
@@ -388,6 +388,7 @@ class MemoryProfiler(BaseProfiler):
         self._capture_interval = 10
 
         self._running = False
+        self._periodic_thread = None
 
     def _is_running(self):
         return self._running
@@ -417,6 +418,9 @@ class MemoryProfiler(BaseProfiler):
         self._running = False
 
         global_log.log(scalyr_logging.DEBUG_LEVEL_0, "Stopping memory profiling")
+
+        if not self._periodic_thread:
+            return
 
         profiling_data = self._periodic_thread.get_profiling_data()
 

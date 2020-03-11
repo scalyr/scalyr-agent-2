@@ -108,8 +108,16 @@ commands:
         description: "Value for the server_attributes.serverHost agent configuration option."
         type: string
         default: "ci-codespeed-benchmarks"
+      capture_agent_status_metrics:
+        description: "True to capture additional metrics exposed via agent status command."
+        type: boolean
+        default: false
       capture_line_counts:
         description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
+      dry_run:
+        description: "True to enable dry run which runs the benchmarks without submitting data to CodeSpeed."
         type: boolean
         default: false
       cache_key_name:
@@ -127,6 +135,8 @@ commands:
             # Workaround for issue with cffi library on the system using
             # different version than the one which is bundled with the agent
             pip install --user "cffi==1.12.3"
+            # TODO: Add another benchmark with ujson
+            # pip install --user "ujson==1.35"
       - run:
           name: Run Agent And Capture Resource Utilization
           # NOTE: The following variables are specified in the Circle CI WebUI
@@ -144,6 +154,8 @@ commands:
             CAPTURE_INTERVAL: << parameters.capture_interval >>
             AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
             SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
+            CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
+            DRY_RUN: "<< parameters.dry_run >>"
           command: |
             # Create directories which are needed by the agent process
             mkdir -p ~/scalyr-agent-dev/{log,config,data}
@@ -642,13 +654,27 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
+          name: Install APT dependencies
+          command: |
+            # We add unstable repo to make sure latest version of shellchcek (>=
+            # 0.7.0 is installed)
+            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
+            sudo apt-get update -y
+            sudo apt-get install -y shellcheck
+      - run:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
       - run:
-          name: Run Lint Checks
+          name: Run Python Lint Checks
           command: |
             tox -e lint
+      - run:
+          name: Run Shell Scripts Lint Checks
+          environment:
+            IGNORE_BINARY_DOESNT_EXIST: "0"
+          command: |
+            ./scripts/shell-scripts-lint.sh
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
@@ -718,6 +744,7 @@ jobs:
           agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
           agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1"
           run_time: 140
+          capture_agent_status_metrics: true
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
 
@@ -770,6 +797,27 @@ jobs:
           agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-2"
           capture_line_counts: true
           cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
+
+  benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 3"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          # NOTE: We set agent run time slightly longer than the insert script time run so we give a chance for memory and
+          # other metrics to stabilize.
+          run_time: 390
+          agent_pre_run_command: "touch /tmp/random.log"
+          # NOTE: We write a chunk every 1 seconds for a total of 6 minutes.
+          # Each chunk is 0.5 MB in size which means we write a total of 360 * 1
+          # / 0.5 MB of data
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 500K 360 100 1 &> /tmp/write_lines_script.log &"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
 
   smoke-standalone-38:
     working_directory: ~/scalyr-agent-2
@@ -877,7 +925,7 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflow=unittest --status=success --branch=all --limit=5 \
+                --workflows=unittest,benchmarks,package-smoke-tests --status=success --branch=all --limit=5 \
                 --email=cloudtech-builds@scalyr.com
 
 workflows:
@@ -944,6 +992,8 @@ workflows:
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
           <<: *master_only
       - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
