@@ -1,0 +1,13 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../../base/base-job
+  - ../../base/agent-configurations/one-log-for-half-time
+  - ../../base/vc-versions/head
+nameSuffix: -one-log-for-half-time-head
+
+images:
+  - name: agent
+    newName: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+
+

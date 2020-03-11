@@ -1,0 +1,19 @@
+configMapGenerator:
+- name: codespeed-config
+  files:
+  - agent_config.json
+  literals:
+    - codespeed_url=https://scalyr-agent-codespeed.herokuapp.com/
+    - codespeed_project=scalyr-agent-2
+    - codespeed_environment=Kubernetes Cluster (4x t3.medium worker nodes)
+
+    - capture_time=18h
+    - capture_interval=60
+    - agent_git_url=https://github.com/scalyr/scalyr-agent-2.git
+    - branch=master
+
+    - scalyr_server=https://agent.scalyr.com
+    - agent_data_path=/root/scalyr-agent-dev
+
+resources:
+  - codespeed.yaml

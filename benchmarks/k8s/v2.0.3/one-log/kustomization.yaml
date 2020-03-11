@@ -1,0 +1,13 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../../base/base-job
+  - ../../base/agent-configurations/one-log
+  - ../../base/vc-versions/v2.0.3
+nameSuffix: -one-log-v2.0.3
+
+images:
+  - name: agent
+    newName: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+
+

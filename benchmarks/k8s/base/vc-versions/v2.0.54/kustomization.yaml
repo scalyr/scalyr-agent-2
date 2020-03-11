@@ -1,0 +1,8 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../base
+nameSuffix: -v2.0.54
+images:
+  - name: agent
+    newName: agent-common-2.7.17

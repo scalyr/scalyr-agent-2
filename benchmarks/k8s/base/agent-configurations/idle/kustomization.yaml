@@ -1,0 +1,7 @@
+configMapGenerator:
+  - name: codespeed-config-agent-settings
+    files:
+      - agent-config-additional-fields
+    literals:
+      - codespeed_executable=2.7.17-Kubernetes-idle
+      - LOG_WRITER_ADDITIONAL_ARGS=

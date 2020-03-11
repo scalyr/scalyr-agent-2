@@ -1,9 +1,9 @@
 FROM python:3.6
 
+ADD ./benchmarks/scripts/requirements.txt /requirements.txt
+
+RUN python -m pip install -r /requirements.txt
+
 ADD . /agent_source
 
 WORKDIR /agent_source
-
-RUN python -m pip install -r benchmarks/scripts/requirements.txt
-
-CMD /agent_source/benchmarks/scripts/start-capture-metrics.sh

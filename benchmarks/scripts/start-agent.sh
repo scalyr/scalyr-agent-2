@@ -13,25 +13,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-
+AGENT_SOURCE_PATH="/agent-source"
+mkdir -p "${AGENT_SOURCE_PATH}"
+echo "Clone agent repository."
+git clone "${AGENT_GIT_URL}" "${AGENT_SOURCE_PATH}"
+cd "${AGENT_SOURCE_PATH}"
 if [[ "${COMMIT_SHA1}" ]]; then
-  AGENT_SOURCE_PATH="/agent-source"
-  mkdir -p "${AGENT_SOURCE_PATH}"
-  echo "Clone agent repository."
-  git clone "${AGENT_GIT_URL}" "${AGENT_SOURCE_PATH}"
-  cd "${AGENT_SOURCE_PATH}"
-  echo "Checkout to target commit."
+  echo "Checkout to target commit. ${COMMIT_SHA1}"
   git checkout "${COMMIT_SHA1}"
 else
-  AGENT_SOURCE_PATH=$(realpath "${SCRIPT_DIR}/../..")
+  echo "Stay on master."
 fi
 
 cp /config/config.json /config.json
-
-sed -i "s/{API_KEY}/\"${SCALYR_API_KEY}\"/g" /config.json
-sed -i "s/{SCALYR_SERVER}/\"${SCALYR_SERVER}\"/g" /config.json
-sed -i "s/{SERVER_HOST}/\"${SERVER_HOST}\"/g" /config.json
+echo "api_key: \"${SCALYR_API_KEY}\"", >> /config.json
+echo "scalyr_server: \"${SCALYR_SERVER}\"", >> /config.json
+echo "server_attributes: {serverHost: \"${SERVER_HOST}\"}", >> /config.json
+echo "${AGENT_CONFIG_ADDITIONAL_FIELDS}" >> /config.json
+echo "}" >> /config.json
 
 cat /config.json
 mkdir -p ~/scalyr-agent-dev/{log,config,data}

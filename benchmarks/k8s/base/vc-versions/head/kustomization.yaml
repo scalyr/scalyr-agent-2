@@ -1,0 +1,5 @@
+configMapGenerator:
+  - name: codespeed-config-version
+    literals:
+      - commit_sha1=4302cd0aeef98acb034c1640e61afff0d2f96db5
+      - commit_date=2020-03-08 19:23:32

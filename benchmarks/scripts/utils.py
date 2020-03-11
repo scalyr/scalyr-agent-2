@@ -204,9 +204,8 @@ def parse_commit_date(value):
     return commit_date
 
 
-def parse_capture_time(value):
+def parse_duration(value):
     # type: (str) -> float
-    logger.info(value)
     m = re.match(r"(\d+)([smhd])", value)
     if not m:
         raise ValueError(
@@ -233,7 +232,7 @@ def wait_for_agent_start_and_get_pid(pid_file_path):
     while not os.path.exists(pid_file_path):
         if attempts > 10:
             raise RuntimeError("Agent pid file did not appear.")
-        time.sleep(1)
+        time.sleep(10)
 
     with open(pid_file_path, "r") as f:
         return int(f.readline())

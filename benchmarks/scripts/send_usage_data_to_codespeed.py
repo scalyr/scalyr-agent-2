@@ -40,6 +40,7 @@ from __future__ import absolute_import
 from __future__ import print_function
 
 from io import open
+import shelve
 
 if False:
     # NOTE: This is a workaround for old Python versions where typing module is not available
@@ -51,6 +52,8 @@ if False:
     from typing import List
     from typing import Union
     from typing import Optional
+    from typing import IO
+    from typing import Any
 
     T_metric_value = Union[int, float]
 
@@ -81,7 +84,7 @@ from utils import add_common_parser_arguments
 from utils import parse_auth_credentials
 from utils import parse_commit_date
 from utils import send_payload_to_codespeed
-from utils import parse_capture_time
+from utils import parse_duration
 from utils import wait_for_agent_start_and_get_pid
 
 logger = logging.getLogger(__name__)
@@ -293,12 +296,22 @@ def main(
     Main entry point / run loop for the script.
     """
 
+    shv = None
+    metrics_backup = None  # type: Any[None, IO]
+    metrics_backup_path = os.path.join(args.metrics_backup_path, "metrics.txt")
+
+    if args.metrics_backup_path:
+        # use shelve if backup enabled.
+        shelve_path = os.path.join(args.metrics_backup_path, "shelve")
+        shv = shelve.open(shelve_path)
+        # open file to store metrics
+        metrics_backup = open(metrics_backup_path, "w")
+
     end_time = None
-    if os.path.exists(BACKUP_PATH):
-        with open(BACKUP_PATH, "r") as f:
-            # the first line of the backup file is a header with end time.
-            header = json.loads(f.readline())
-        end_time = header.get("end_time")
+    if shv is not None:
+        # restore end time from shelve.
+        end_time = shv.get("end_time")
+
     if end_time is not None:
         logger.debug(
             "Get end time from backup. The end time: {0}".format(
@@ -308,8 +321,8 @@ def main(
     else:
         # no end_time that was saved in backup file, set new one and save it.
         end_time = time.time() + capture_time
-        with open(BACKUP_PATH, "w") as f:
-            f.write("{0}\n".format(json.dumps({"end_time": end_time})))
+        if shv is not None:
+            shv["end_time"] = end_time
 
     # get agent.pid file. It should be located in the the shared volume.
     pid_file_path = os.path.join(agent_data_path, "log", "agent.pid")
@@ -330,40 +343,47 @@ def main(
     # Give it some time for the process to start and initialize before first capture
     time.sleep(5)
 
-    with open(BACKUP_PATH, "a") as backup:
-        current_time = time.time()
-        while current_time <= end_time:
-            current_time = time.time()
-            logger.debug("Capturing gauge metrics...")
-            captured = capture_metrics(
-                tracker=tracker,
-                process=process,
-                metrics=METRICS_GAUGES,
-                capture_agent_status_metrics=capture_agent_status_metrics,
-            )
-            # write captured metrics to backup file.
-            backup.write("{0}\n".format(json.dumps(captured)))
-            backup.flush()
-            time_remaining = timedelta(seconds=end_time - current_time)
-            logger.debug("Time remaining: {0}".format(str(time_remaining)))
-            time.sleep(args.capture_interval)
-
-        # Capture counter metrics
-        logger.debug("Capturing counter metrics...")
-        captured = capture_metrics(
-            tracker=tracker, process=process, metrics=METRICS_COUNTERS,
-        )
-        backup.write("{0}\n".format(json.dumps(captured)))
-        backup.flush()
-
-    # get all captured values from backup file.
-    with open(BACKUP_PATH, "r") as backub:
-        # skip header
-        backub.readline()
-        for line in backub:
-            line_metrics = json.loads(line)
-            for name, value in line_metrics.items():
+    def _store_metrics():
+        # write to backup if it is enabled.
+        if metrics_backup is not None:
+            metrics_backup.write(json.dumps(captured) + "\n")
+            metrics_backup.flush()
+        else:
+            # or directly store it memory.
+            for name, value in captured:
                 captured_values[name].append(value)
+
+    current_time = time.time()
+    while current_time <= end_time:
+        current_time = time.time()
+        logger.debug("Capturing gauge metrics...")
+        captured = capture_metrics(
+            tracker=tracker,
+            process=process,
+            metrics=METRICS_GAUGES,
+            capture_agent_status_metrics=capture_agent_status_metrics,
+        )
+        _store_metrics()
+        time_remaining = timedelta(seconds=end_time - current_time)
+        logger.debug("Time remaining: {0}".format(str(time_remaining)))
+        time.sleep(args.capture_interval)
+
+    # Capture counter metrics
+    logger.debug("Capturing counter metrics...")
+    captured = capture_metrics(
+        tracker=tracker, process=process, metrics=METRICS_COUNTERS,
+    )
+    _store_metrics()
+
+    if args.metrics_backup_path:
+        # close write file handler
+        metrics_backup.close()
+        # get all captured values from backup file.
+        with open(metrics_backup_path, "r") as metrics_backup:
+            for line in metrics_backup:
+                line_metrics = json.loads(line)
+                for name, value in line_metrics.items():
+                    captured_values[name].append(value)
 
     # Generate final result object and calculate derivatives for gauge metrics
     result = {}  # type: Dict[str, Dict[str, T_metric_value]]
@@ -429,14 +449,16 @@ if __name__ == "__main__":
         "--agent-data-path",
         type=six.text_type,
         required=True,
-        help=("ID of a process to capture metrics for."),
+        help=("Path to the agent data directory."),
     )
     parser.add_argument(
         "--capture-time",
         type=six.text_type,
         required=True,
         default="10s",
-        help=("How long capture metrics for (in seconds)."),
+        help=(
+            "The duration of the script running. Format: <number><s|m|h|d>. Example: 3h."
+        ),
     )
     parser.add_argument(
         "--capture-interval",
@@ -461,11 +483,18 @@ if __name__ == "__main__":
         help=("Just capture metrics, but don't submit them to CodeSpeed."),
     )
 
+    parser.add_argument(
+        "--metrics-backup-path",
+        type=str,
+        default="",
+        help="Path to file to write captured metrics into to avoid data loss.",
+    )
+
     args = parser.parse_args()
 
     codespeed_auth = parse_auth_credentials(args.codespeed_auth)
     commit_date = parse_commit_date(args.commit_date)
-    capture_time = parse_capture_time(args.capture_time)
+    capture_time = parse_duration(args.capture_time)
 
     initialize_logging(debug=args.debug)
     main(

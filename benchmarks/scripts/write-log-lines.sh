@@ -13,37 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#set -e
-
-if [ $# -lt 1 ]; then
-    echo "Usage: ${0} <commit hash>"
-    exit 2
-fi
-
-
-
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
-# shellcheck disable=SC1090
-source "${SCRIPT_DIR}/common.sh"
 
-CAPTURE_METRICS_SCRIPT_PATH=$(realpath "${SCRIPT_DIR}/send_usage_data_to_codespeed.py")
-
-#verify_mandatory_common_env_variables_are_set
+CAPTURE_METRICS_SCRIPT_PATH=$(realpath "${SCRIPT_DIR}/write-log-lines.py")
 
 
 
 python "${CAPTURE_METRICS_SCRIPT_PATH}" \
   --agent-data-path="${AGENT_DATA_PATH}" \
-  --capture-time="${CAPTURE_TIME}" \
-  --capture-interval="${CAPTURE_INTERVAL}" \
-  --codespeed-url="${CODESPEED_URL}" \
-  --codespeed-auth="${CODESPEED_AUTH}" \
-  --codespeed-project="${CODESPEED_PROJECT}" \
-  --codespeed-executable="${CODESPEED_EXECUTABLE}" \
-  --codespeed-environment="${CODESPEED_ENVIRONMENT}" \
-  --branch="${CODESPEED_BRANCH}" \
-  --commit-date="${COMMIT_DATE}" \
-  --commit-id="${COMMIT_SHA1}" \
   --debug \
-  ${ADDITIONAL_CAPTURE_SCRIPT_FLAGS} \
+  ${LOG_WRITER_ADDITIONAL_ARGS}
 
