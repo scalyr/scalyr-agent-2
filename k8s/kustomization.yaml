@@ -1,6 +1,5 @@
 namespace: scalyr
 resources:
-- scalyr-agent-2-configmap.yaml
 - scalyr-service-account.yaml
 - scalyr-agent-2.yaml
 

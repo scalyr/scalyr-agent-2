@@ -59,4 +59,4 @@ repos:
     - id: trailing-whitespace
     - id: check-yaml
       # NOTE: We exclude some Kubernetes yaml files
-      exclude: (^k8s/|^performance/kops_cluster_setup)
+      exclude: (^k8s/|^k8s.old/|^performance/kops_cluster_setup)

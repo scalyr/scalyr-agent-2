@@ -1,0 +1,92 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: scalyr-agent-2
+spec:
+  template:
+    metadata:
+      labels:
+        app: scalyr-agent-2
+    spec:
+      serviceAccountName: scalyr-service-account
+      containers:
+      - name: scalyr-agent
+        image: scalyr/scalyr-k8s-agent:2.0.59
+        imagePullPolicy: Always
+        env:
+          - name: SCALYR_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: scalyr-api-key
+                key: scalyr-api-key
+          - name: SCALYR_K8S_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          - name: SCALYR_K8S_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: SCALYR_K8S_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: SCALYR_K8S_POD_UID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.uid
+          - name: SCALYR_K8S_KUBELET_HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          - name: SCALYR_K8S_CLUSTER_NAME
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: k8s_cluster
+                 optional: true
+          - name: SCALYR_SERVER
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: scalyr_server
+                 optional: true
+          - name: SCALYR_K8S_EVENTS_DISABLE
+            valueFrom:
+              configMapKeyRef:
+                 name: scalyr-config
+                 key: k8s_events_disable
+                 optional: true
+        resources:
+          limits:
+            memory: 500Mi
+        volumeMounts:
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        - name: varlogpods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: varlogcontainers
+          mountPath: /var/log/containers
+          readOnly: true
+        - name: dockersock
+          mountPath: /var/scalyr/docker.sock
+      volumes:
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+      - name: varlogcontainers
+        hostPath:
+          path: /var/log/containers
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+      # comment this section if you do not want to run on the master
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
