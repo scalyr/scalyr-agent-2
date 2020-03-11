@@ -293,7 +293,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         test_manager.set_user_agent_augment_callback(augment_user_agent_2)
 
         self.assertTrue(
-            fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 1)
+            fragment_polls.sleep_until_count_or_maxwait(20, poll_interval, 2)
         )
         self.assertEquals(counter["callback_invocations"], 10)
 
