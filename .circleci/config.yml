@@ -942,7 +942,11 @@ workflows:
     jobs:
       - smoke-rpm-package-py2:
           <<: *master_only
+      - smoke-rpm-package-py3:
+          <<: *master_only
       - smoke-deb-package-py2:
+          <<: *master_only
+      - smoke-deb-package-py3:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
