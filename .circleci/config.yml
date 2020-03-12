@@ -551,7 +551,7 @@ jobs:
           command: |
             source ../venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
+            ./../scripts/submit-codecov-data.sh
 
   lint-checks:
     working_directory: ~/scalyr-agent-2
