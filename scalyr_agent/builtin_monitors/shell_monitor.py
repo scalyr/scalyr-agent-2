@@ -21,6 +21,8 @@ import sys
 
 from subprocess import PIPE, Popen
 
+import six
+
 from scalyr_agent import ScalyrMonitor, define_config_option, define_log_field
 
 __monitor__ = __name__
@@ -138,6 +140,8 @@ class ShellMonitor(ScalyrMonitor):
         if len(stderr_text) > 0 and len(stdout_text) > 0:
             output += "\n"
         output += stdout_text
+
+        output = six.ensure_text(output)
 
         # Apply any extraction pattern
         if self.extractor is not None:
