@@ -7,6 +7,7 @@ master_only: &master_only
     branches:
       only:
         - master
+        - smoketest_updates
 
 version: 2.1
 parameters:
@@ -247,13 +248,9 @@ commands:
             # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-
             export AGENT_HOST_NAME=agent-smoke-standalone-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
-            tox -e<< parameters.tox_target >>
 
-            # copy log files to artifacts directory.
-            mkdir -p ~/artifacts
-            cp ~/scalyr-agent-dev/log/agent.log ~/artifacts/agent.log
+            tox -e<< parameters.tox_target >>
       - save_cache:
           key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
@@ -261,7 +258,7 @@ commands:
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
-          path: ~/artifacts
+          path: ~/scalyr-agent-dev/log
 
   smoke-package:
     description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
@@ -304,12 +301,23 @@ commands:
             # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-
             export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+
+            # NOTE: We don't want the build to immediately fail if tox command fails because we
+            # want to preserve the build logs as artifacts to aid with debugging
+            set +e
             tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            EXIT_CODE=$?
+            set -e
+
             # copy log files to artifacts directory.
             mkdir -p ~/artifacts
-            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent.log ~/artifacts/agent.log
+            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent*.log ~/artifacts/
+
+            if [ "${EXIT_CODE}" -ne 0 ]; then
+                echo "tox target failed"
+                exit 1
+            fi
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
@@ -320,7 +328,7 @@ commands:
       - save_cache:
           key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
+            - "~/.cache/pip"
 
       # NOTE: We store the logs to ease with troubleshooting / debugging
       - store_artifacts:
@@ -960,21 +968,13 @@ workflows:
   package-smoke-tests:
     jobs:
       - smoke-rpm-package-py3:
-          filters:
-            branches:
-              only: master
+          <<: *master_only
       - smoke-rpm-package-py2:
-          filters:
-            branches:
-              only: master
+          <<: *master_only
       - smoke-deb-package-py3:
-          filters:
-            branches:
-              only: master
+          <<: *master_only
       - smoke-deb-package-py2:
-          filters:
-            branches:
-              only: master
+          <<: *master_only
   benchmarks:
     jobs:
       - benchmarks-idle-agent-py-27:
