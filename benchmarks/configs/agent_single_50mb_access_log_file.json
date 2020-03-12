@@ -7,6 +7,10 @@
          path: "/tmp/access_log_50_mb.log",
          attributes: { parser: "accessLog" },
          copy_from_start: true
+         sampling_rules: [
+            { match_expression: "POST .*", sampling_rate: 0.9 },
+            { match_expression: "GET .*", sampling_rate: 0.9 }
+         ]
      }
   ],
 
