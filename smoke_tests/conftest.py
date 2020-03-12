@@ -87,5 +87,9 @@ def agent_environment(test_config, agent_env_settings_fields):
 
     yield
 
-    for name in agent_env_settings_fields:
-        del os.environ[name]
+    # NOTE: We don't need environment variables at the end since setup runs before
+    # each test which means environment would only be correctly set up for a single test
+    # In our case each tox invocation results in multiple tests since we use
+    # pytest_generate_tests functionality.
+    # for name in agent_env_settings_fields:
+    #     del os.environ[name]
