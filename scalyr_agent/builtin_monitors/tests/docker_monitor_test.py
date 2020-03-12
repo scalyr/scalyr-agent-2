@@ -244,7 +244,7 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.start_manager()
                 fragment_polls.sleep_until_count_or_maxwait(
-                    40, manager_poll_interval, maxwait=2
+                    40, manager_poll_interval, maxwait=2.5
                 )
 
                 m1.assert_called()

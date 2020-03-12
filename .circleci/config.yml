@@ -643,7 +643,7 @@ jobs:
           command: |
             source ../venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
+            ./../scripts/submit-codecov-data.sh
 
   lint-checks:
     working_directory: ~/scalyr-agent-2
@@ -774,7 +774,7 @@ jobs:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 2.7.17 - loaded conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
           run_time: 140
           agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
@@ -790,7 +790,7 @@ jobs:
       - codespeed_agent_process_benchmark:
           codespeed_executable: "Python 3.5.9 - loaded conf 2"
           codespeed_environment: "Circle CI Docker Executor Medium Size"
-          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
           run_time: 140
           agent_pre_run_command: "touch /tmp/random.log"
           agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
