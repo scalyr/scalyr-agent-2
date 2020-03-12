@@ -51,6 +51,7 @@ def copy_agent_source(dest_path):
     shutil.copytree(
         six.text_type(root_path),
         six.text_type(dest_path),
+        # TODO: We should probably juse use .gitignore values here
         ignore=shutil.ignore_patterns(
             "*.pyc",
             "__pycache__",
@@ -60,5 +61,6 @@ def copy_agent_source(dest_path):
             ".mypy*",
             ".idea",
             ".git",
+            ".virtualenv*",
         ),
     )
