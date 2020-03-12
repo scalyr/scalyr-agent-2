@@ -302,11 +302,12 @@ commands:
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
             export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+            export SCALYR_API_KEY=test
 
             # NOTE: We don't want the build to immediately fail if tox command fails because we
             # want to preserve the build logs as artifacts to aid with debugging
             set +e
-            tox -e agent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
             EXIT_CODE=$?
             set -e
 
@@ -938,62 +939,11 @@ jobs:
 
 workflows:
   version: 2
-  unittest:
-    jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
-      - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
   package-smoke-tests:
     jobs:
-      - smoke-rpm-package-py3:
-          <<: *master_only
       - smoke-rpm-package-py2:
           <<: *master_only
-      - smoke-deb-package-py3:
-          <<: *master_only
       - smoke-deb-package-py2:
-          <<: *master_only
-  benchmarks:
-    jobs:
-      - benchmarks-idle-agent-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-py-35:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-27:
-          <<: *master_only
-      - benchmarks-idle-agent-no-monitors-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
-          <<: *master_only
-      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
           <<: *master_only
 
   weekly-circle-ci-usage-report:
