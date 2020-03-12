@@ -30,7 +30,7 @@ import sys
 from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
 
-class PlatformController:
+class PlatformController(object):
     def __init__(self):
         """Initializes a platform instance.
         """

@@ -435,7 +435,7 @@ if __name__ == "__main__":
     else:
         files_to_process = set([os.path.abspath(file_path) for file_path in args.files])
 
-    # exclude 3rd party libraries, etc
+    # files without third party libraries.
     files_to_process = (
         files_to_process
         - third_party_files
