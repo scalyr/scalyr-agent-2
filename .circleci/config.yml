@@ -312,9 +312,9 @@ commands:
 
             # copy log files to artifacts directory.
             mkdir -p ~/artifacts
-            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2/agent*.log ~/artifacts/
+            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2 ~/artifacts/
 
-            if [ "${EXIT_CODE}" -ne 0 ]; then
+            if [ "${EXIT_CODE}" -ne "0" ]; then
                 echo "tox target failed"
                 exit 1
             fi
