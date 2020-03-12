@@ -22,6 +22,7 @@ Bugs
 * Updated Kubernetes manifest file to use `apps/v1` for DaemonSet API version instead of beta version.
 * Update scalyr client code to log raw uncompressed body under debug log level to aid with troubleshooting.
 * Metric type for ``app.disk.requests.{read,write}`` metrics has been fixed.
+* Fix ``iostat`` monitor so it also works with newer versions of Linux kernel.
 
 Minor updates
 * Update of embedded ecsda library to 0.13.3
