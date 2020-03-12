@@ -20,7 +20,7 @@ set -e
 
 IGNORE_BINARY_DOESNT_EXIST=${IGNORE_BINARY_DOESNT_EXIST:-"1"}
 
-if ! which shellcheck > /dev/null 2>&1; then
+if ! command -v shellcheck > /dev/null 2>&1; then
     echo "shellcheck binary doesn't exist"
 
     if [ "${IGNORE_BINARY_DOESNT_EXIST}" -ne "0" ]; then
@@ -36,6 +36,8 @@ echo "Using shellcheck: ${SHELLCHECK_VERSION}"
 
 # TODO: Fix various warnings in scripts in .circleci/ directory and then bump up
 # the severity to warning
+# shellcheck disable=SC2046
 shellcheck -S error $(find . -name "*.sh" | grep -v .tox | grep -v virtualenv | grep -v benchmarks | grep -v installer)
 shellcheck -S info benchmarks/scripts/*.sh
 shellcheck -S info installer/scripts/*.sh
+shellcheck -S info scripts/*.sh
