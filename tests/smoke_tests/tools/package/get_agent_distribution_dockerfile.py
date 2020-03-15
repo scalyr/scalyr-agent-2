@@ -18,7 +18,7 @@ from __future__ import absolute_import
 
 import argparse
 
-from smoke_tests.tools.package import (
+from tests.smoke_tests.tools.package import (
     ALL_DISTRIBUTION_NAMES,
     get_agent_distribution_builder,
 )

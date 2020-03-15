@@ -19,8 +19,8 @@ from __future__ import absolute_import
 import pytest  # type: ignore
 import docker
 
-from smoke_tests.tools.compat import Path
-from smoke_tests.tools.package import get_agent_distribution_builder
+from tests.smoke_tests.tools.compat import Path
+from tests.smoke_tests.tools.package import get_agent_distribution_builder
 from scalyr_agent import compat
 
 
@@ -40,7 +40,7 @@ def pytest_generate_tests(metafunc):
 def test_agent_package_smoke(package_distribution, package_python_version, request):
     """
     Prepare docker container with needed distribution
-    and run regular standalone test inside it (smoke_tests/standalone_smoke_test.py).
+    and run regular standalone test inside it (tests/smoke_tests/standalone_smoke_test.py).
     """
     print("")
     image_cache_path = request.config.getoption("--package-image-cache-path")
@@ -90,7 +90,7 @@ def test_agent_package_smoke(package_distribution, package_python_version, reque
         detach=True,
         stdout=True,
         # run regular standalone smoke test inside the container.
-        command="python -m pytest smoke_tests/standalone_smoke_tests/standalone_smoke_test.py "
+        command="python -m pytest tests/smoke_tests/standalone_smoke_tests/standalone_smoke_test.py "
         "-s -vv --agent-installation-type PACKAGE_INSTALL",
     )
 

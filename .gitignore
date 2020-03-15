@@ -24,7 +24,7 @@ var/
 .installed.cfg
 *.egg
 scalyr-agent-2-*/
-/smoke_tests/config.yml
+/tests/smoke_tests/config.yml
 
 # Installer logs
 pip-log.txt

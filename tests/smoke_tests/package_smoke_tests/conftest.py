@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from smoke_tests.tools.package import ALL_DISTRIBUTION_NAMES
+from tests.smoke_tests.tools.package import ALL_DISTRIBUTION_NAMES
 
 
 def pytest_addoption(parser):
@@ -18,7 +18,8 @@ def pytest_addoption(parser):
     parser.addoption(
         "--package-distribution",
         action="append",
-        default=ALL_DISTRIBUTION_NAMES,
+        default=[],
+        choices=ALL_DISTRIBUTION_NAMES,
         help="list of distribution names for package smoke tests.",
     )
     parser.addoption(

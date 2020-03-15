@@ -23,11 +23,11 @@ from abc import ABCMeta, abstractmethod
 
 import six
 
-from smoke_tests.tools.utils import (
+from tests.smoke_tests.tools.utils import (
     create_temp_dir_with_constant_name,
     copy_agent_source as copy_source,
 )
-from smoke_tests.tools.compat import Path
+from tests.smoke_tests.tools.compat import Path
 
 
 @six.add_metaclass(ABCMeta)

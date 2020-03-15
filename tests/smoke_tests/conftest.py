@@ -23,7 +23,7 @@ import yaml
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL, PACKAGE_INSTALL
 from scalyr_agent import compat
-from smoke_tests.tools.compat import Path
+from tests.smoke_tests.tools.compat import Path
 
 # mapping of PlatformController 'install_type' constants
 # to possible values of the '--agent-installation-type' command line options.

@@ -286,7 +286,7 @@ commands:
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
             # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
-            python smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
+            python tests/smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
             cat ~/Dockerfile
 
       - restore_cache:

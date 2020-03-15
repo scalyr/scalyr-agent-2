@@ -82,7 +82,10 @@ def set_smoke_env_variables_from_config():
     This function gets those settings and add them as "-e <VAR_NAME>=<VAR_VALUE> to the current circleci command."
     """
     test_config_path = os.path.join(
-        os.path.dirname(os.path.dirname(_script_abs_path)), "smoke_tests", "config.yml"
+        os.path.dirname(os.path.dirname(_script_abs_path)),
+        "tests",
+        "smoke_tests",
+        "config.yml",
     )
 
     if not os.path.exists(test_config_path):

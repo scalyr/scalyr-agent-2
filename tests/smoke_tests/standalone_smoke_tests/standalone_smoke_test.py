@@ -21,14 +21,14 @@ import time
 import pytest  # type: ignore
 
 from scalyr_agent import compat
-from smoke_tests.standalone_smoke_tests.verifier import (
+from tests.smoke_tests.standalone_smoke_tests.verifier import (
     AgentLogVerifier,
     DataJsonVerifier,
     SystemMetricsVerifier,
     ProcessMetricsVerifier,
 )
 
-from smoke_tests.tools.agent_runner import AgentRunner
+from tests.smoke_tests.tools.agent_runner import AgentRunner
 
 
 @pytest.mark.usefixtures("agent_environment")

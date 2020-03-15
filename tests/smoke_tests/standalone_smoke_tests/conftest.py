@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 import pytest
 
-from smoke_tests.conftest import AGENT_INSTALLATION_TYPES_MAP
+from tests.smoke_tests.conftest import AGENT_INSTALLATION_TYPES_MAP
 
 
 def pytest_addoption(parser):

@@ -29,8 +29,8 @@ import psutil
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent.platform_controller import PlatformController
 
-from smoke_tests.tools.compat import Path
-from smoke_tests.tools.utils import get_env
+from tests.smoke_tests.tools.compat import Path
+from tests.smoke_tests.tools.utils import get_env
 
 import six
 
