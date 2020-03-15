@@ -1,0 +1,13 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../../base/base-job
+  - ../../base/agent-configurations/idle-no-monitors-5sec-config-update
+  - ../../base/vc-versions/v2.0.35
+nameSuffix: -idle-no-monitors-5sec-config-update-v2.0.35
+
+images:
+  - name: agent
+    newName: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+
+

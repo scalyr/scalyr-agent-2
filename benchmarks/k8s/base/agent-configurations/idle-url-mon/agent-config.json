@@ -1,0 +1,11 @@
+{
+  "verify_server_certificate": false,
+  "debug_level": "5",
+  monitors: [
+    {
+      module: "scalyr_agent.builtin_monitors.url_monitor",
+      id: "nginx container",
+      url: "http://127.0.0.1:80",
+      sample_interval: 5
+    }
+  ],

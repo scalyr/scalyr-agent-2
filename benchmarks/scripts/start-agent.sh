@@ -29,7 +29,6 @@ cp /config/config.json /config.json
 echo "api_key: \"${SCALYR_API_KEY}\"", >> /config.json
 echo "scalyr_server: \"${SCALYR_SERVER}\"", >> /config.json
 echo "server_attributes: {serverHost: \"${SERVER_HOST}\"}", >> /config.json
-echo "${AGENT_CONFIG_ADDITIONAL_FIELDS}" >> /config.json
 echo "}" >> /config.json
 
 cat /config.json

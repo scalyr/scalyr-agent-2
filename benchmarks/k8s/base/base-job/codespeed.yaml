@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: agent-k8s-codespeed
+  namespace: agent-benchmark
 spec:
   template:
     spec:
@@ -123,11 +124,6 @@ spec:
                 configMapKeyRef:
                   name: codespeed-config
                   key: branch
-            - name: AGENT_CONFIG_ADDITIONAL_FIELDS
-              valueFrom:
-                configMapKeyRef:
-                  name: codespeed-config-agent-settings
-                  key: agent-config-additional-fields
         - name: log-writer
           image: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/log-writer:latest
           imagePullPolicy: Always
@@ -155,9 +151,9 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: codespeed-config
+            name: codespeed-config-agent-settings
             items:
-              - key: agent_config.json
+              - key: agent-config.json
                 path: config.json
         - name: agent-data
           emptyDir: {}

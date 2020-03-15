@@ -1,7 +1,8 @@
 configMapGenerator:
   - name: codespeed-config-agent-settings
+    namespace: agent-benchmark
     files:
-      - agent-config-additional-fields
+      - agent-config.json
     literals:
       - codespeed_executable=2.7.17-Kub-idle-no-mon-conf5s
       - LOG_WRITER_ADDITIONAL_ARGS=

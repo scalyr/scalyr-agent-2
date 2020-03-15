@@ -1,0 +1,23 @@
+{
+  "verify_server_certificate": false,
+  "debug_level": "5",
+    monitors: [
+        {
+            module:  "scalyr_agent.builtin_monitors.shell_monitor",
+            id:       "kernel-version",
+            command: "uname -r",
+            sample_interval: 15
+        },
+        {
+            module:  "scalyr_agent.builtin_monitors.shell_monitor",
+            id:       "free_m",
+            command: "free -m",
+            sample_interval: 15
+        },
+        {
+            module:  "scalyr_agent.builtin_monitors.shell_monitor",
+            id:       "df_h",
+            command: "df -g",
+            sample_interval: 15
+        },
+      ],

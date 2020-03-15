@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: codespeed-config
-data:
-  server_host: "agent-benchmark-k8s-2.7-idle-no-monitors-v2.0.3"

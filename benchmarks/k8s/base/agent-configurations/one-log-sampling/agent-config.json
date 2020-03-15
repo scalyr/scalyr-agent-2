@@ -1,0 +1,12 @@
+{
+  "verify_server_certificate": false,
+  "debug_level": "5",
+  "logs": [
+     {
+         "path": "/root/scalyr-agent-dev/log/test_log*.log",
+         "attributes": { "parser": "accessLog" },
+         "sampling_rules": [
+            { match_expression: "dummy", sampling_rate: 0.1 },
+        ]
+     }
+  ],

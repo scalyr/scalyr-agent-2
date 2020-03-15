@@ -10,6 +10,6 @@ docker tag agent-benchmark/agent:2.7.17 137797084791.dkr.ecr.us-east-1.amazonaws
 docker tag agent-benchmark/log-writer:latest 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/log-writer:latest
 docker tag agent-benchmark/metrics-capture:latest 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/metrics-capture:latest
 
-docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
-docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/log-writer:latest
-docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/metrics-capture:latest
+#docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+#docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/log-writer:latest
+#docker push 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/metrics-capture:latest

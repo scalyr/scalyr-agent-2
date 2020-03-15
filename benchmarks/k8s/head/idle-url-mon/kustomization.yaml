@@ -1,0 +1,12 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../../base/agent-configurations/idle-url-mon
+  - ../../base/vc-versions/head
+nameSuffix: -idle-url-mon-head
+
+images:
+  - name: agent
+    newName: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+
+

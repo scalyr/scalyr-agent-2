@@ -2,5 +2,5 @@ configMapGenerator:
   - name: codespeed-config-version
     namespace: agent-benchmark
     literals:
-      - commit_sha1=4302cd0aeef98acb034c1640e61afff0d2f96db5
-      - commit_date=2020-03-08 19:23:32
+      - commit_sha1=99e0d136d79ac504fee63b8132714d395e3ac312
+      - commit_date=2018-09-19 19:57:19

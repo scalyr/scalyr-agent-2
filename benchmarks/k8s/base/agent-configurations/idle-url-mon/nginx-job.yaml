@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agent-k8s-codespeed
+  namespace: agent-benchmark
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+          env:
+          - name: CAPTURE_TIME
+            valueFrom:
+              configMapKeyRef:
+                name: codespeed-config
+                key: capture_time
+          command: ["timeout", "--preserve-status", "--signal=15", "$(CAPTURE_TIME)", "nginx", "-g", "daemon off;"]

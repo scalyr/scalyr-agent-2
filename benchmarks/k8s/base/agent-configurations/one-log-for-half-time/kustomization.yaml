@@ -1,7 +1,8 @@
 configMapGenerator:
   - name: codespeed-config-agent-settings
+    namespace: agent-benchmark
     files:
-      - agent-config-additional-fields
+      - agent-config.json
     literals:
-      - LOG_WRITER_ADDITIONAL_ARGS=--add-log=name=log1,interval=1,duration=18h,start_delay=9h
-      - codespeed_executable=2.7.17-Kubernetes-one-log-1/2
+      - LOG_WRITER_ADDITIONAL_ARGS=--add-log=name=log1,interval=0.01,duration=4d,start_delay=3d
+      - codespeed_executable=2.7.17-Kub-one-log-1/2

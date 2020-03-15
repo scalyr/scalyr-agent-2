@@ -1,0 +1,12 @@
+patchesStrategicMerge:
+  - codespeed-config-patch.yaml
+bases:
+  - ../../base/agent-configurations/idle-shell-mon
+  - ../../base/vc-versions/v2.0.35
+nameSuffix: -idle-shell-mon-v2.0.35
+
+images:
+  - name: agent
+    newName: 137797084791.dkr.ecr.us-east-1.amazonaws.com/agent-benchmark/agent:2.7.17
+
+
