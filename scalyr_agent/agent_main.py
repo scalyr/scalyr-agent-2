@@ -179,6 +179,9 @@ class ScalyrAgent(object):
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
 
+        # True if the log messages should be printed to stdout in addition to the log file
+        self.__log_to_stdout = False
+
     @staticmethod
     def agent_run_method(controller, config_file_path, perform_config_check=False):
         """Begins executing the agent service on the current thread.
@@ -208,6 +211,7 @@ class ScalyrAgent(object):
         my_options.quiet = True
         my_options.verbose = False
         my_options.status_format = "text"
+        my_options.log_to_stdout = False
         my_options.no_fork = True
         my_options.no_change_user = True
         my_options.no_check_remote = False
@@ -238,8 +242,11 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         status_format = command_options.status_format
+        log_to_stdout = command_options.log_to_stdout
         no_fork = command_options.no_fork
         no_check_remote = False
+
+        self.__log_to_stdout = log_to_stdout
 
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == "version":
@@ -459,6 +466,7 @@ class ScalyrAgent(object):
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
         scalyr_logging.set_log_destination(
             use_disk=True,
+            use_stdout=self.__log_to_stdout,
             max_bytes=self.__config.log_rotation_max_bytes,
             backup_count=self.__config.log_rotation_backup_count,
             logs_directory=self.__config.agent_log_path,
@@ -878,6 +886,7 @@ class ScalyrAgent(object):
                 )
                 scalyr_logging.set_log_destination(
                     use_disk=True,
+                    use_stdout=self.__log_to_stdout,
                     max_bytes=self.__config.log_rotation_max_bytes,
                     backup_count=self.__config.log_rotation_backup_count,
                     logs_directory=self.__config.agent_log_path,
@@ -1742,6 +1751,14 @@ if __name__ == "__main__":
         help="Format to use (text / json) for the agent status command.",
     )
 
+    parser.add_option(
+        "",
+        "--log-to-stdout",
+        action="store_true",
+        dest="log_to_stdout",
+        default=False,
+        help="Log all the log messages to stdout in addition to the log files.",
+    )
     parser.add_option(
         "",
         "--no-fork",

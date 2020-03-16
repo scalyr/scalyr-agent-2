@@ -1429,11 +1429,8 @@ class AgentLogManager(object):
         max_write_burst=100000,
     ):
         """For documentation, see the scalyr_logging.set_log_destination method."""
-        if use_stdout and use_disk:
-            raise Exception("You cannot specify both use_disk and use_stdout")
-        elif not use_stdout and not use_disk:
-            raise Exception("You must specify at least one of use_stdout or use_diskk.")
-
+        # NOTE: use_stdout and use_disk are not mutually exclusive since changes in
+        # https://github.com/scalyr/scalyr-agent-2/pull/415
         self.__use_stdout = use_stdout
         self.__rotation_max_bytes = max_bytes
         self.__rotation_backup_count = backup_count
