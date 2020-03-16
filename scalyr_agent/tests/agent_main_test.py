@@ -24,7 +24,6 @@ import mock
 from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.__scalyr__ import MSI_INSTALL
 from scalyr_agent.test_base import ScalyrTestCase
-from scalyr_agent import compat
 
 __all__ = ["AgentMainTestCase", "ScalyrAgentProcessTestCase"]
 
@@ -158,7 +157,7 @@ class ScalyrAgentProcessTestCase(ScalyrTestCase):
             "--no-fork",
         ]
 
-        env = compat.os_environ_unicode.copy()
+        env = {}
         env["SCALYR_API_KEY"] = "test"
         process = subprocess.Popen(
             base_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
@@ -172,7 +171,7 @@ class ScalyrAgentProcessTestCase(ScalyrTestCase):
 
         # log to stdout flag is provided
         args = base_args + ["--log-to-stdout"]
-        env = compat.os_environ_unicode.copy()
+        env = {}
         env["SCALYR_API_KEY"] = "test"
         process = subprocess.Popen(
             args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
