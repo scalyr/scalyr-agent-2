@@ -48,7 +48,7 @@ class MetricInformationTestCase(ScalyrTestCase):
         )
         metrics = monitor_info.metrics
 
-        self.assertEqual(len(metrics), 14)
+        self.assertEqual(len(metrics), 16)
         disk_requests_metrics = [
             m for m in metrics if m.metric_name == "app.disk.requests"
         ]
