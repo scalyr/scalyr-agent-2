@@ -246,8 +246,6 @@ class ScalyrAgent(object):
         no_fork = command_options.no_fork
         no_check_remote = False
 
-        self.__log_to_stdout = log_to_stdout
-
         # We process for the 'version' command early since we do not need the configuration file for it.
         if command == "version":
             print("The Scalyr Agent 2 version is %s" % SCALYR_VERSION)
@@ -256,6 +254,14 @@ class ScalyrAgent(object):
         # Read the configuration file.  Fail if we can't read it, unless the command is stop or status.
         if config_file_path is None:
             config_file_path = self.__default_paths.config_file_path
+
+        self.__log_to_stdout = log_to_stdout
+
+        if log_to_stdout and not no_fork:
+            # --log-to-stdout makes no sense without --no-fork argument
+            raise ValueError(
+                "When --log-to-stdout argument is used, --no-fork needs to be used as well"
+            )
 
         self.__config_file_path = config_file_path
 
