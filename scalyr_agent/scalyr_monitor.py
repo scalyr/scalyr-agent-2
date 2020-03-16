@@ -164,7 +164,10 @@ class ScalyrMonitor(StoppableThread):
         )
 
         # List of metrics name which shouldn't be logged and sent to Scalyr
-        self._metric_name_blacklist = self._global_config.metric_name_blacklist
+        if global_config:
+            self._metric_name_blacklist = self._global_config.metric_name_blacklist
+        else:
+            self._metric_name_blacklist = []
 
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
         # than sleeping the full sample_interval_secs time.

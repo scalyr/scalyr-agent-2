@@ -372,7 +372,7 @@ class AgentLogger(logging.Logger):
                 metric_name=metric_name, metric_value=metric_value
             )
 
-        if metric_name in monitor._metric_name_blacklist:
+        if metric_name in getattr(monitor, "_metric_name_blacklist", []):
             monitor._logger.info(
                 'Metric "%s" is blacklisted so the value wont be reported to Scalyr.'
                 % (metric_name),
