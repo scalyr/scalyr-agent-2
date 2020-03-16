@@ -29,6 +29,7 @@ Minor updates
 * Docker support now requires the docker 4.1 client library
 * Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
 * When running in foreground mode (``--no-fork`` flag), SIGINT signal (aka CTRL+C) now starts the graceful shutdown procedure.
+* Add new ``--log-to-stdout`` CLI flag which can be used in combination with ``--no-fork`` flag. When this flag is used, agent will output all the log messaged to stdout in addition to the log files.
 
 Testing updates
 * Numerous changes to improve testing and coverage reporting
