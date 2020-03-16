@@ -179,7 +179,7 @@ class ScalyrAgent(object):
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
 
-        # True if the log messages should be printed to stdout in addition to the log file
+        # True if the log messages should be logged to stdout instead of log files
         self.__log_to_stdout = False
 
     @staticmethod
@@ -1756,14 +1756,13 @@ if __name__ == "__main__":
         default="text",
         help="Format to use (text / json) for the agent status command.",
     )
-
     parser.add_option(
         "",
         "--log-to-stdout",
         action="store_true",
         dest="log_to_stdout",
         default=False,
-        help="Log all the log messages to stdout in addition to the log files.",
+        help="Log all the log messages to stdout instead of log files.",
     )
     parser.add_option(
         "",
