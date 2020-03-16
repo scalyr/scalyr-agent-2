@@ -14,13 +14,28 @@
 
 from __future__ import absolute_import
 
+import os
+import sys
+import time
+import subprocess
+
 import mock
 
 from scalyr_agent.__scalyr__ import DEV_INSTALL
 from scalyr_agent.__scalyr__ import MSI_INSTALL
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent import compat
 
-__all__ = ["AgentMainTestCase"]
+__all__ = ["AgentMainTestCase", "ScalyrAgentProcessTestCase"]
+
+
+BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.abspath(os.path.join(BASE_DIR, "../../"))
+
+AGENT_MAIN_FILE_PATH = os.path.join(BASE_DIR, "scalyr_agent/agent_main.py")
+CONFIG_FILE_PATH = os.path.join(
+    BASE_DIR, "benchmarks/configs/agent_no_monitored_logs.json"
+)
 
 
 class AgentMainTestCase(ScalyrTestCase):
@@ -131,3 +146,40 @@ class AgentMainTestCase(ScalyrTestCase):
         config.intermediate_certs_path = "/tmp/doesnt.exist"
 
         self.assertTrue(agent._ScalyrAgent__create_client())
+
+
+class ScalyrAgentProcessTestCase(ScalyrTestCase):
+    def test_log_to_stdout(self):
+        base_args = [
+            sys.executable,
+            AGENT_MAIN_FILE_PATH,
+            "start",
+            "--config-file=%s" % (CONFIG_FILE_PATH),
+            "--no-fork",
+        ]
+
+        env = compat.os_environ_unicode.copy()
+        env["SCALYR_API_KEY"] = "test"
+        process = subprocess.Popen(
+            base_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+        )
+        time.sleep(2)
+        process.kill()
+        stdout = process.stdout.read()
+
+        self.assertFalse(b"Starting scalyr agent.." in stdout)
+        self.assertFalse(b"linux_system_metrics()" in stdout)
+
+        # log to stdout flag is provided
+        args = base_args + ["--log-to-stdout"]
+        env = compat.os_environ_unicode.copy()
+        env["SCALYR_API_KEY"] = "test"
+        process = subprocess.Popen(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+        )
+        time.sleep(2)
+        process.kill()
+        stdout = process.stdout.read()
+
+        self.assertTrue(b"Starting scalyr agent.." in stdout)
+        self.assertTrue(b"linux_system_metrics()" in stdout)
