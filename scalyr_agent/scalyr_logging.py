@@ -360,9 +360,9 @@ class AgentLogger(logging.Logger):
                 "Cannot report metric values until metric log file is opened."
             )
 
-        string_buffer = io.StringIO()
         if not isinstance(metric_name, _METRIC_NAME_SUPPORTED_TYPES):
             raise UnsupportedValueType(metric_name=metric_name)
+
         metric_name = self.force_valid_metric_or_field_name(
             metric_name, is_metric=True, logger=self
         )
@@ -372,6 +372,16 @@ class AgentLogger(logging.Logger):
                 metric_name=metric_name, metric_value=metric_value
             )
 
+        if metric_name in monitor._metric_name_blacklist:
+            monitor._logger.info(
+                'Metric "%s" is blacklisted so the value wont be reported to Scalyr.'
+                % (metric_name),
+                limit_once_per_x_secs=86400,
+                limit_key="blacklistedMetricName",
+            )
+            return
+
+        string_buffer = io.StringIO()
         string_buffer.write("%s %s" % (metric_name, util.json_encode(metric_value)))
 
         if extra_fields is not None:

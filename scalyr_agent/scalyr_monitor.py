@@ -163,6 +163,9 @@ class ScalyrMonitor(StoppableThread):
             "monitor_log_flush_delay", convert_to=float, default=0.0, min_value=0
         )
 
+        # List of metrics name which shouldn't be logged and sent to Scalyr
+        self._metric_name_blacklist = self._global_config.metric_name_blacklist
+
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
         # than sleeping the full sample_interval_secs time.
         self._adjust_sleep_by_gather_time = False
