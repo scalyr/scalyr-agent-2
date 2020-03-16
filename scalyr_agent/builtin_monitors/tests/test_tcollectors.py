@@ -23,7 +23,7 @@ from scalyr_agent.__scalyr__ import scalyr_init
 
 scalyr_init()
 
-from tcollector import tcollector
+from tcollector import tcollector  # pylint: disable=import-error
 
 
 class TcollectorCollectorsTestCase(unittest.TestCase):
