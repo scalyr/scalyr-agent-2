@@ -143,7 +143,10 @@ define_metric(
 )
 
 define_metric(
-    __monitor__, "app.mem.majflt", "The number of page faults requiring physical I/O.",
+    __monitor__,
+    "app.mem.majflt",
+    "The number of page faults requiring physical I/O.",
+    cumulative=True,
 )
 
 define_metric(
@@ -253,6 +256,7 @@ class Metric(object):
             "app.uptime",
             "app.disk.bytes",
             "app.disk.requests",
+            "app.mem.majflt",
             "app.io.wait",
         )
 
