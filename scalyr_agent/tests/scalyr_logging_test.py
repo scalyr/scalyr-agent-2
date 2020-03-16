@@ -18,6 +18,9 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
+import sys
+import types
+
 __author__ = "czerwin@scalyr.com"
 
 import os
@@ -370,6 +373,67 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         name2 = "abc123"
         fixed_name2 = scalyr_logging.AgentLogger.force_valid_metric_or_field_name(name2)
         self.assertEqual(fixed_name2, name2)
+
+    def fake_std_write(self, a, b):
+        self.ran_std_output = True
+
+    def test_output_to_file_with_stdout(self):
+        self.ran_std_output = False
+        stdout_bkp = sys.stdout.write
+        sys.stdout.write = types.MethodType(self.fake_std_write, sys.stdout)
+        try:
+            self.__logger.info("Hello world", force_stdout=True)
+            self.assertLogFileContainsLineRegex(expression="Hello world")
+            self.assertTrue(self.ran_std_output)
+        finally:
+            sys.stdout.write = stdout_bkp
+            self.ran_std_output = False
+
+    def test_output_to_file_with_stderr(self):
+        self.ran_std_output = False
+        stderr_bkp = sys.stderr.write
+        sys.stderr.write = types.MethodType(self.fake_std_write, sys.stderr)
+        try:
+            self.__logger.info("Hello world", force_stderr=True)
+            self.assertLogFileContainsLineRegex(expression="Hello world")
+            self.assertTrue(self.ran_std_output)
+        finally:
+            sys.stderr.write = stderr_bkp
+            self.ran_std_output = False
+
+    def test_output_to_file_with_stdout_stderr(self):
+        self.ran_std_output = False
+        stdout_bkp = sys.stdout.write
+        sys.stdout.write = types.MethodType(self.fake_std_write, sys.stdout)
+        stderr_bkp = sys.stderr.write
+        sys.stderr.write = types.MethodType(self.fake_std_write, sys.stderr)
+        try:
+            self.__logger.info("Hello world", force_stdout=True)
+            self.assertLogFileContainsLineRegex(expression="Hello world")
+            self.assertTrue(self.ran_std_output)
+            self.ran_std_output = False
+            self.__logger.info("Hello world again", force_stderr=True)
+            self.assertLogFileContainsLineRegex(expression="Hello world again")
+            self.assertTrue(self.ran_std_output)
+        finally:
+            sys.stdout.write = stdout_bkp
+            sys.stderr.write = stderr_bkp
+            self.ran_std_output = False
+
+    def test_output_to_file_without_stdout_stderr(self):
+        self.ran_std_output = False
+        stdout_bkp = sys.stdout.write
+        sys.stdout.write = types.MethodType(self.fake_std_write, sys.stdout)
+        stderr_bkp = sys.stderr.write
+        sys.stderr.write = types.MethodType(self.fake_std_write, sys.stderr)
+        try:
+            self.__logger.info("Hello world")
+            self.assertLogFileContainsLineRegex(expression="Hello world")
+            self.assertFalse(self.ran_std_output)
+        finally:
+            sys.stdout.write = stdout_bkp
+            sys.stderr.write = stderr_bkp
+            self.ran_std_output = False
 
     class FakeMonitor(object):
         """Just a simple class that we use in place of actual Monitor objects when reporting metrics."""

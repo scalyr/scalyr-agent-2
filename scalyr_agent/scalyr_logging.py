@@ -49,7 +49,17 @@ import six
 import scalyr_agent.util as util
 from scalyr_agent.util import RateLimiter
 
-_METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
+if six.PY2:
+    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type, six.binary_type)
+    _METRIC_VALUE_SUPPORTED_TYPES = (
+        six.text_type,
+        six.binary_type,
+        bool,
+        float,
+    ) + six.integer_types
+else:
+    _METRIC_NAME_SUPPORTED_TYPES = (six.text_type,)
+    _METRIC_VALUE_SUPPORTED_TYPES = (six.text_type, bool, float) + six.integer_types
 
 # The debugging levels supported on the debugger logger.  The higher the debug level, the
 # more verbose the output.
@@ -351,13 +361,13 @@ class AgentLogger(logging.Logger):
             )
 
         string_buffer = io.StringIO()
-        if type(metric_name) is not six.text_type:
+        if not isinstance(metric_name, _METRIC_NAME_SUPPORTED_TYPES):
             raise UnsupportedValueType(metric_name=metric_name)
         metric_name = self.force_valid_metric_or_field_name(
             metric_name, is_metric=True, logger=self
         )
 
-        if type(metric_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
+        if not isinstance(metric_value, _METRIC_VALUE_SUPPORTED_TYPES):
             raise UnsupportedValueType(
                 metric_name=metric_name, metric_value=metric_value
             )
@@ -366,11 +376,11 @@ class AgentLogger(logging.Logger):
 
         if extra_fields is not None:
             for field_name in extra_fields:
-                if type(field_name) is not six.text_type:
+                if not isinstance(field_name, _METRIC_NAME_SUPPORTED_TYPES):
                     raise UnsupportedValueType(field_name=field_name)
 
                 field_value = extra_fields[field_name]
-                if type(field_value) not in _METRIC_VALUE_SUPPORTED_TYPES:
+                if not isinstance(field_value, _METRIC_VALUE_SUPPORTED_TYPES):
                     raise UnsupportedValueType(
                         field_name=field_name, field_value=field_value
                     )
@@ -405,6 +415,8 @@ class AgentLogger(logging.Logger):
         current_time=None,
         emit_to_metric_log=False,
         monitor_id_override=None,
+        force_stdout=False,
+        force_stderr=False,
     ):
         """The central log method.  All 'info', 'warn', etc methods funnel into this method.
 
@@ -428,6 +440,9 @@ class AgentLogger(logging.Logger):
             This must only be used if this logger was assigned to a specific monitor.
         @param monitor_id_override:  Used to change the reported monitor id for this metric just for the purposes
             of reporting this one value.  The base monitor name will remain unchanged.
+        @param force_stdout: If True, will write the log to stdout as well as the configured log file, no effect if
+            the log already goes to stdout.
+        @param force_stderr: If True, will write the log to stderr as well as the configured log file.
         """
         if current_time is None:
             current_time = time.time()
@@ -462,6 +477,8 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_error_code_seen = error_code
         __thread_local__.last_metric_log_for_monitor = metric_log_for_monitor
         __thread_local__.last_monitor_id_override = monitor_id_override
+        __thread_local__.last_force_stdout = force_stdout
+        __thread_local__.last_force_stderr = force_stderr
 
         # Only associate an monitor with the error if it is in fact an error.
         if level >= logging.ERROR:
@@ -483,6 +500,8 @@ class AgentLogger(logging.Logger):
         __thread_local__.last_metric_log_for_monitor = None
         __thread_local__.last_error_for_monitor = None
         __thread_local__.last_monitor_id_override = None
+        __thread_local__.last_force_stdout = None
+        __thread_local__.last_force_stderr = None
 
         return result
 
@@ -519,6 +538,8 @@ class AgentLogger(logging.Logger):
         result.error_code = __thread_local__.last_error_code_seen
         result.metric_log_for_monitor = __thread_local__.last_metric_log_for_monitor
         result.error_for_monitor = __thread_local__.last_error_for_monitor
+        result.force_stdout = __thread_local__.last_force_stdout
+        result.force_stderr = __thread_local__.last_force_stderr
 
         result.component = self.component
         result.monitor_name = self.monitor_name
@@ -792,10 +813,7 @@ class BaseFormatter(logging.Formatter):
             return getattr(record, self.__cache_key)
 
         # Otherwise, build the format.  Prepend a warning if we had to skip lines.
-        if (
-            hasattr(record, "rate_limited_dropped_records")
-            and record.rate_limited_dropped_records > 0
-        ):
+        if getattr(record, "rate_limited_dropped_records", 0) > 0:
             result = (
                 ".... Warning, skipped writing %ld log lines due to limit set by `%s` option...\n%s"
                 % (
@@ -922,8 +940,7 @@ class AgentLogFilter(object):
             return False
 
         return (
-            hasattr(record, "agent_logger")
-            and record.agent_logger
+            getattr(record, "agent_logger", False)
             and record.metric_log_for_monitor is None
         )
 
@@ -976,6 +993,46 @@ class RateLimiterLogFilter(object):
             return False
 
 
+class ForceStdoutFilter(object):
+    """A filter that includes any record if it has `force_stdout` as True
+    """
+
+    def __init__(self):
+        """Initializes the filter.
+        """
+
+    def filter(self, record):
+        """Performs the filtering.
+
+        @param record: The record to filter.
+        @type record: logging.LogRecord
+
+        @return:  True if the record should be logged by this handler.
+        @rtype: bool
+        """
+        return getattr(record, "force_stdout", False)
+
+
+class ForceStderrFilter(object):
+    """A filter that includes any record if it has `force_stderr` as True
+    """
+
+    def __init__(self):
+        """Initializes the filter.
+        """
+
+    def filter(self, record):
+        """Performs the filtering.
+
+        @param record: The record to filter.
+        @type record: logging.LogRecord
+
+        @return:  True if the record should be logged by this handler.
+        @rtype: bool
+        """
+        return getattr(record, "force_stderr", False)
+
+
 class MetricLogHandler(object):
     """The LogHandler to use for recording metric values emitted by Scalyr agent monitors.
 
@@ -1014,8 +1071,7 @@ class MetricLogHandler(object):
 
             def filter(self, record):
                 return (
-                    hasattr(record, "metric_log_for_monitor")
-                    and record.metric_log_for_monitor in self.__monitors
+                    getattr(record, "metric_log_for_monitor", None) in self.__monitors
                 )
 
         # Add the filter and our formatter to this handler.
@@ -1325,6 +1381,11 @@ class AgentLogManager(object):
         self.__main_log_handler = None
         self.__debug_log_handler = None
 
+        # logging.Handler objects for use when logging with `force_stdout` or `force_stderr` enabled.
+        # These handlers have a filter on them to only log when the relevant parameter is True.
+        self.__force_stdout_handler = None
+        self.__force_stderr_handler = None
+
         # If True, then logging will be sent to stdout rather than the file names mentioned above.
         self.__use_stdout = True
 
@@ -1390,6 +1451,8 @@ class AgentLogManager(object):
 
         self.__recreate_main_handler()
         self.__recreate_debug_handler()
+        self.__recreate_force_stdout_handler()
+        self.__recreate_force_stderr_handler()
         self.__reset_root_logger()
         MetricLogHandler.set_use_stdout(use_stdout)
 
@@ -1434,6 +1497,8 @@ class AgentLogManager(object):
             # handler, we need to recreate it.  We also need to hold the lock while we do this since it will
             # read the value of __is_debug_on.
             self.__recreate_debug_handler()
+            self.__recreate_force_stdout_handler()
+            self.__recreate_force_stderr_handler()
             self.__reset_root_logger()
         finally:
             self.__lock.release()
@@ -1482,8 +1547,31 @@ class AgentLogManager(object):
             self.__debug_log_fn, is_debug=True
         )
 
-    def __recreate_handler(self, file_path, is_debug=False):
-        """Creates and returns an appropriate handler for either the main or debug log.
+    def __recreate_force_stdout_handler(self):
+        """Recreates the stdout log handler according to the variables set on this instance.
+
+        If self.__stdout is set, then the handler will be set to `None` to avoid duplicate logs to stdout, otherwise
+        it will be the same logger as a main handler with self.__stdout set to True.
+
+        You must invoke `__reset_root_logger` at some point after this call for it to take effect.
+        """
+        self.__force_stdout_handler = self.__recreate_handler(
+            self.__main_log_fn, is_force_stdout=True
+        )
+
+    def __recreate_force_stderr_handler(self):
+        """Recreates the stderr log handler according to the variables set on this instance.
+
+        You must invoke `__reset_root_logger` at some point after this call for it to take effect.
+        """
+        self.__force_stderr_handler = self.__recreate_handler(
+            self.__main_log_fn, is_force_stderr=True
+        )
+
+    def __recreate_handler(
+        self, file_path, is_debug=False, is_force_stdout=False, is_force_stderr=False
+    ):
+        """Creates and returns an appropriate handler for either the main, debug, forced stdout, or force stderr log.
 
         @param file_path: The file name for the log file.  This is only used if the logger should not be writing to
             stdout (as determined by self.__use_stdout).
@@ -1497,9 +1585,17 @@ class AgentLogManager(object):
         """
         if is_debug and not self.__is_debug_on:
             return None
+        if self.__use_stdout and is_force_stdout:
+            return None
 
         # Create the right type of handler.
-        if self.__use_stdout:
+        if is_force_stdout:
+            handler = logging.StreamHandler(sys.stdout)
+            handler.addFilter(ForceStdoutFilter())
+        elif is_force_stderr:
+            handler = logging.StreamHandler(sys.stderr)
+            handler.addFilter(ForceStderrFilter())
+        elif self.__use_stdout:
             handler = logging.StreamHandler(sys.stdout)
         else:
             handler = logging.handlers.RotatingFileHandler(
@@ -1526,7 +1622,8 @@ class AgentLogManager(object):
     def __reset_root_logger(self):
         """Reset the handlers on the root logger to be only the handlers we want.
 
-        This must be invoked whenever you rebuild either the `__main_log_handler` or `__debug_log_handler`.
+        This must be invoked whenever you rebuild either the `__main_log_handler`, `__debug_log_handler`,
+        `__force_stdout_handler`, or `__force_stderr_handler`.
         """
         # Because we gather logs from all modules, we add our handlers to the top most Logger.  The records will
         # propagate up there and then we will write them to disk or stdout.
@@ -1538,6 +1635,9 @@ class AgentLogManager(object):
             handler.close()
 
         root_logger.addHandler(self.__main_log_handler)
+        if self.__force_stdout_handler:
+            root_logger.addHandler(self.__force_stdout_handler)
+        root_logger.addHandler(self.__force_stderr_handler)
         if self.__debug_log_handler is not None:
             root_logger.addHandler(self.__debug_log_handler)
 
@@ -1641,19 +1741,19 @@ class UnsupportedValueType(Exception):
 
         if metric_name is not __NOT_GIVEN__ and metric_value is __NOT_GIVEN__:
             message = (
-                "An unsupported type for a metric name was given.  It must be either str or unicode, but was"
+                "An unsupported type for a metric name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for metric "%s"'
                 % (six.text_type(type(metric_name)), six.text_type(metric_name))
             )
         elif field_name is not __NOT_GIVEN__ and field_value is __NOT_GIVEN__:
             message = (
-                "An unsupported type for a field name was given.  It must be either str or unicode, but was"
+                "An unsupported type for a field name was given.  It must be either str or unicode, but was "
                 '"%s".  This was for field "%s"'
                 % (six.text_type(type(field_name)), six.text_type(field_name))
             )
         elif metric_name is not __NOT_GIVEN__ and metric_value is not __NOT_GIVEN__:
             message = (
-                'Unsupported metric value type of "%s" with value "%s" for metric="%s".'
+                'Unsupported metric value type of "%s" with value "%s" for metric="%s". '
                 "Only int, long, float, and str are supported."
                 % (
                     six.text_type(type(metric_value)),
@@ -1663,7 +1763,7 @@ class UnsupportedValueType(Exception):
             )
         elif field_name is not __NOT_GIVEN__ and field_value is not __NOT_GIVEN__:
             message = (
-                'Unsupported field value type of "%s" with value "%s" for field="%s".'
+                'Unsupported field value type of "%s" with value "%s" for field="%s". '
                 "Only int, long, float, and str are supported."
                 % (
                     six.text_type(type(field_value)),

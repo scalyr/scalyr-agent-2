@@ -51,6 +51,8 @@ from scalyr_agent.__scalyr__ import get_install_root, SCALYR_VERSION, scalyr_ini
 
 scalyr_init()
 
+import scalyr_agent.util as scalyr_util
+
 # [start of 2->TODO]
 # Check for suitability.
 # Important. Import six as any other dependency from "third_party" libraries after "__scalyr__.scalyr_init"
@@ -317,10 +319,10 @@ def build_win32_installer_package(variant, version):
         variant = "main"
 
     # Generate a unique identifier used to identify this version of the Scalyr Agent to windows.
-    product_code = uuid.uuid3(_scalyr_guid_, "ProductID:%s:%s" % (variant, version))
+    product_code = create_scalyr_uuid3("ProductID:%s:%s" % (variant, version))
     # The upgrade code identifies all families of versions that can be upgraded from one to the other.  So, this
     # should be a single number for all Scalyr produced ones.
-    upgrade_code = uuid.uuid3(_scalyr_guid_, "UpgradeCode:%s" % variant)
+    upgrade_code = create_scalyr_uuid3("UpgradeCode:%s" % variant)
 
     # For prereleases, we use weird version numbers like 4.0.4.pre5.1 .  That does not work for Windows which
     # requires X.X.X.X.  So, we convert if necessary.
@@ -385,7 +387,7 @@ def create_wxs_file(template_path, dist_path, destination_path):
         entry = {
             "BASE": base_file,
             "FILE_ID": file_id,
-            "COMPONENT_GUID": str(uuid.uuid3(_scalyr_guid_, "DistComp%s" % base_file)),
+            "COMPONENT_GUID": str(create_scalyr_uuid3("DistComp%s" % base_file)),
             "COMPONENT_ID": "%s_comp" % file_id,
             "FILE_SOURCE": dist_file_path,
         }
@@ -416,6 +418,18 @@ def create_wxs_file(template_path, dist_path, destination_path):
             f.write(line)
     finally:
         f.close()
+
+
+def create_scalyr_uuid3(name):
+    """
+    Create a UUID based on the Scalyr UUID namespace and a hash of `name`.
+
+    :param name: The name
+    :type name: six.text
+    :return: The UUID
+    :rtype: uuid.UUID
+    """
+    return scalyr_util.create_uuid3(_scalyr_guid_, name)
 
 
 def expand_template(input_lines, dist_files):
@@ -569,6 +583,11 @@ def build_container_builder(
     agent_source_root = __source_root__
     # Make a copy of the right Dockerfile to embed in the script.
     shutil.copy(make_path(agent_source_root, dockerfile), "Dockerfile")
+    # copy requirements file with dependencies for docker builds.
+    shutil.copy(
+        make_path(agent_source_root, os.path.join("docker", "requirements.txt")),
+        "requirements.txt",
+    )
 
     if variant is None:
         version_string = version
@@ -612,7 +631,7 @@ def build_container_builder(
         new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage==4.5.4", data)
         new_dockerfile_source = re.sub(
             r"CMD .*\n",
-            'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
+            'CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
             '"--no-fork", "--no-change-user", "start"]',
             new_dockerfile_source,
         )
@@ -621,6 +640,7 @@ def build_container_builder(
             file.write(new_dockerfile_source)
 
     tar.add("Dockerfile")
+    tar.add("requirements.txt")
     tar.add(source_tarball)
     tar.close()
 
@@ -730,7 +750,6 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --maintainer czerwin@scalyr.com "
         "  --provides scalyr-agent-2 "
         '  --description "%s" '
-        '  --depends "python >= 2.4" '
         '  --depends "bash >= 3.2" '
         "  --url https://www.scalyr.com "
         "  --deb-user root "
@@ -1220,112 +1239,16 @@ def run_command(command_str, exit_on_fail=True, fail_quietly=False, command_name
 
 
 def create_scriptlets():
-    """Creates three scriptlets required by the RPM and Debian package in the current working directory.
+    """Copy three scriptlets required by the RPM and Debian package to the current working directory.
 
     These are the preinstall.sh, preuninstall.sh, and postuninstall.sh scripts.
     """
-    fp = open("preinstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
 
-# Always remove the .pyc files.  This covers problems for old packages that didn't have the remove in the
-# preuninstall.sh script.
-if [ -d /usr/share/scalyr-agent-2 ]; then
-  find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
-fi
+    scripts_path = os.path.join(__source_root__, "installer", "scripts")
 
-exit 0;
-"""
-    )
-    fp.close()
-
-    fp = open("preuninstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
-
-# We only need to tweak the rc config if this is an uninstall of the package
-# (rather than just removing this version because we are upgrading to
-# a new one).  An uninstall is indicated by $1 == 0 for
-# RPM and $1 == "remove" for Debian.
-if [ "$1" == "0" -o "$1" == "remove" ]; then
-  # Stop the service since we are about to completely remove it.
-  service scalyr-agent-2 stop > /dev/null 2>&1
-
-  # Remove the symlinks from the /etc/rcX.d directories.
-  if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
-    # For RPM-based systems.
-    chkconfig --del scalyr-agent-2;
-  elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
-    # For Debian-based systems.
-    update-rc.d -f scalyr-agent-2 remove;
-  else
-    # All others.
-    for x in 0 1 6; do
-      rm /etc/rc$x.d/K02scalyr-agent-2;
-    done
-
-    for x in 2 3 4 5; do
-      rm /etc/rc$x.d/S98scalyr-agent-2;
-    done
-  fi
-fi
-
-# Always remove the .pyc files
-find /usr/share/scalyr-agent-2 -name '*.pyc' -type f -exec rm {} \;
-
-exit 0;
-"""
-    )
-    fp.close()
-
-    # Create the postinstall.sh script.
-    fp = open("postinstall.sh", "w")
-    fp.write(
-        r"""#!/bin/bash
-
-config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
-script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
-
-# Determine if the agent had been previously configured to run as a
-# different user than root.  We can determine this if agentConfig.json
-# has a different user.  If so, then make sure the newly installed files
-# (like agent.sh) are changed to the correct owners.
-if [ "$config_owner" != "$script_owner" ]; then
-  /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set_user $config_owner > /dev/null 2>&1;
-fi
-
-# Add in the symlinks in the appropriate /etc/rcX.d/ directories
-# to stop and start the service at boot time.
-if [ -f /sbin/chkconfig -o -f /usr/sbin/chkconfig ]; then
-  # For Redhat-based systems, use chkconfig to create links.
-  chkconfig --add scalyr-agent-2;
-elif [ -f /usr/sbin/update-rc.d -o -f /sbin/update-rc.d ]; then
-  # For Debian-based systems, update-rc.d does the job.
-  update-rc.d scalyr-agent-2 defaults 98 02;
-else
-  # Otherwise just fall back to creating them manually.
-  for x in 0 1 6; do
-    ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/K02scalyr-agent-2;
-  done
-
-  for x in 2 3 4 5; do
-    ln -s /etc/init.d/scalyr-agent-2 /etc/rc$x.d/S98scalyr-agent-2;
-  done
-fi
-
-# Do a restart of the service if we are either installing/upgrading the
-# package, instead of removing it.  For an RPM, a remove is indicated by
-# a zero being passed into $1 (instead of 1 or higher).  For Debian, a
-# remove is indicated something other than "configure" being passed into $1.
-if [[ "$1" =~ ^[0-9]+$ && $1 -gt 0 ]] || [ "$1" == "configure" ]; then
-  service scalyr-agent-2 condrestart --quiet;
-  exit $?;
-else
-  exit 0;
-fi
-"""
-    )
-    fp.close()
+    shutil.copy(os.path.join(scripts_path, "preinstall.sh"), "preinstall.sh")
+    shutil.copy(os.path.join(scripts_path, "preuninstall.sh"), "preuninstall.sh")
+    shutil.copy(os.path.join(scripts_path, "postinstall.sh"), "postinstall.sh")
 
 
 def create_change_logs():

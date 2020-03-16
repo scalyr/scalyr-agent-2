@@ -1,6 +1,52 @@
 Scalyr Agent 2 Changes By Release
 =================================
 
+## 2.1.1 "Millenium Falcon" - Mar 15, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 15, 2020 10:30 -0800
+--->
+
+Note, this release is still under development.  Actual release date TBD
+
+Features
+* Major update of code base to support running under Python 2 and 3
+* Agent now supports Python 2.6, 2.7 and >= 3.5
+* Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
+* RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verifed at package install time.
+* Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+
+Bugs
+* Fix authentication issue in `kubernetes_monitor` when accessing kublet API.
+* Better error messages issued when missing required certificate files.
+* Updated Kubernetes manifest file to use `apps/v1` for DaemonSet API version instead of beta version.
+* Update scalyr client code to log raw uncompressed body under debug log level to aid with troubleshooting.
+* Metric type for ``app.disk.requests.{read,write}`` metrics has been fixed.
+* Fix ``iostat`` monitor so it also works with newer versions of Linux kernel.
+
+Minor updates
+* Update of embedded ecsda library to 0.13.3
+* Docker support now requires the docker 4.1 client library
+* Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
+* When running in foreground mode (``--no-fork`` flag), SIGINT signal (aka CTRL+C) now starts the graceful shutdown procedure.
+
+Testing updates
+* Numerous changes to improve testing and coverage reporting
+
+## 2.0.59 "Lady MacBeth" - Feb 13, 2020
+
+<!---
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Feb 13, 2020 10:30 -0800
+--->
+
+Feature
+* Improved support for handling long log lines captured by `kubernetes_monitor` and `docker_monitor`.  When parsing docker logs, the serialized JSON objects can now be up to `internal_parse_max_line_size` bytes (defaults to 64KB).  This replaces the requirement they be less than `max_line_size`.  The `log` field extracted from the JSON object is still subjected to the `max_line_size` limit.
+* Improved handling when `kubernetes_monitor` fails due to an uninitialized K8s cache.  If a `kubernetes_monitor` becomes stuck for 2 minutes and cannot initialize, the agent will terminate its container to allow for K8s to restart it.
+
+Bugs
+* Add additional diagnostic information to help customers troubleshoot issues in the `kubernetes_monitor` due to failures in K8s cache initialization.
+* Fix bug due to protected access in the `journald_monitor`.
+
 ## 2.0.58 "Karrajor" - Jan 23, 2020
 
 Packaged by Steven Czerwinski <czerwin@scalyr.com> on Jan 23, 2020 10:30 -0800

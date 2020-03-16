@@ -254,7 +254,7 @@ class Int32RequestParser(object):
             # Make sure we have 4 bytes so that we can at least read the length prefix, and then try to read
             # the complete data payload.
             if num_bytes > self.__prefix_length:
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 (length,) = compat.struct_unpack_unicode(
                     six.ensure_str(self.__format),
                     input_buffer.read(self.__prefix_length),

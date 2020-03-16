@@ -32,6 +32,7 @@ from scalyr_agent.scalyr_client import (
     EventSequencer,
     Event,
     ScalyrClientSession,
+    MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT,
 )
 
 from scalyr_agent.test_base import ScalyrTestCase
@@ -964,3 +965,33 @@ class ClientSessionTest(BaseScalyrLogCaptureTestCase):
         # Verify that the compression was indeed enabled since that's the scenario we are testing
         call_kwargs = session._ScalyrClientSession__connection.post.call_args_list[0][1]
         self.assertEqual(call_kwargs["body"], "compressed")
+
+    @mock.patch("scalyr_agent.scalyr_client.time.time", mock.Mock(return_value=0))
+    def test_send_request_body_is_logged_raw_uncompressed_long_body_is_truncated(self):
+        # Verify that very large bodies are truncated to avoid increased memory usage issues under
+        # Python 2.7
+        session = ScalyrClientSession(
+            "https://dummserver.com", "DUMMY API KEY", SCALYR_VERSION
+        )
+
+        session._ScalyrClientSession__connection = mock.Mock()
+        session._ScalyrClientSession__receive_response = mock.Mock()
+        session._ScalyrClientSession__compress = mock.Mock(return_value="compressed")
+
+        add_events_request = AddEventsRequest({"bar": "baz"})
+        event1 = Event(thread_id="foo4", attrs={"parser": "bar2"}).set_message(
+            "a" * (MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT + 1)
+        )
+
+        add_events_request.add_event(event=event1, timestamp=1)
+
+        session.send(add_events_request=add_events_request)
+
+        # Should log raw (uncompressed) request body / payload
+        expected_body = (
+            r'Sending POST /addEvents with body "{"bar":"baz".*\.\.\. \[body truncated to %s chars\] \.\.\.'
+            % (MAX_REQUEST_BODY_SIZE_LOG_MSG_LIMIT)
+        )
+        self.assertLogFileContainsRegex(
+            expected_body, file_path=self.agent_debug_log_path
+        )

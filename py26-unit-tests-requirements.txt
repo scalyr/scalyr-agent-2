@@ -1,14 +1,17 @@
 # Python requirements file which is used for Python 2.6 unit test tox target (py2,6-unit-test)
-# This is needed because we need to use older versions of various libraries we use (py.test, 
+# This is needed because we need to use older versions of various libraries we use (py.test,
 # etc.), because new versions don't support Python 2.6 anymore
 # NOTE: importlib is needed only under Python 2.6
 importlib==1.0.4
 mock==0.8.0
 pytest==3.2.5
 tlslite-ng==0.7.5
-ecdsa==0.13.2
+ecdsa==0.13.3
 certvalidator==0.11.1
 asn1crypto==0.24.0
 oscrypto==0.19.1
 docker-py==1.10.6
 requests==2.18.0
+pathlib2==2.3.5
+PyYAML==4.2b4
+psutil==5.7.0

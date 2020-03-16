@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # This file is part of tcollector.
 # Copyright (C) 2010  StumbleUpon, Inc.
 #
@@ -20,7 +20,6 @@ from __future__ import unicode_literals
 import os
 import sys
 import time
-import socket
 import re
 from io import open
 
@@ -32,8 +31,16 @@ from io import open
 # we tag each metric with direction=in or =out
 # and iface=
 
-FIELDS = ("bytes", "packets", "errs", "dropped",
-           None, None, None, None,)
+FIELDS = (
+    "bytes",
+    "packets",
+    "errs",
+    "dropped",
+    None,
+    None,
+    None,
+    None,
+)
 
 COLLECTION_INTERVAL = 30  # seconds
 
@@ -55,19 +62,20 @@ except ValueError:
     pass
 
 # Scalyr edit:  Check environment variable for for additional network interface suffix.
-NETWORK_INTERFACE_SUFFIX = '\d+'
+NETWORK_INTERFACE_SUFFIX = r"\d+"
 try:
     if "TCOLLECTOR_INTERFACE_SUFFIX" in os.environ:
         NETWORK_INTERFACE_SUFFIX = os.environ["TCOLLECTOR_INTERFACE_SUFFIX"]
 except ValueError:
     pass
 
+
 def main():
     """ifstat main loop"""
     interval = COLLECTION_INTERVAL
 
     # Scalyr edit:
-    network_interface_prefixes = NETWORK_INTERFACE_PREFIX.split(',')
+    network_interface_prefixes = NETWORK_INTERFACE_PREFIX.split(",")
     for i in range(len(network_interface_prefixes)):
         network_interface_prefixes[i] = network_interface_prefixes[i].strip()
 
@@ -89,7 +97,9 @@ def main():
             m = None
             for interface in network_interface_prefixes:
                 # 2->TODO is it important to expect at least one space character?
-                m = re.match("\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line)
+                m = re.match(
+                    r"\s*(%s%s):(.*)" % (interface, NETWORK_INTERFACE_SUFFIX), line
+                )
                 if m:
                     break
             if not m:
@@ -103,12 +113,12 @@ def main():
                     )
                     print(
                         "proc.net.%s %d %s iface=%s direction=out"
-                        % (FIELDS[i], ts, stats[i+8], m.group(1))
+                        % (FIELDS[i], ts, stats[i + 8], m.group(1))
                     )
 
         sys.stdout.flush()
         time.sleep(interval)
 
+
 if __name__ == "__main__":
     main()
-

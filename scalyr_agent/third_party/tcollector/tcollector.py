@@ -36,7 +36,6 @@ import subprocess
 import sys
 import threading
 import time
-import io
 from logging.handlers import RotatingFileHandler
 from optparse import OptionParser
 from io import open
@@ -47,18 +46,20 @@ from six.moves.queue import Full
 
 import six
 from six.moves import range
+from six.moves import reload_module
 
 
 # global variables.
 COLLECTORS = {}
 GENERATION = 0
-DEFAULT_LOG = '/var/log/tcollector.log'
-LOG = logging.getLogger('tcollector')
+DEFAULT_LOG = "/var/log/tcollector.log"
+LOG = logging.getLogger("tcollector")
 ALIVE = True
 # If the SenderThread catches more than this many consecutive uncaught
 # exceptions, something is not right and tcollector will shutdown.
 # Hopefully some kind of supervising daemon will then restart it.
 MAX_UNCAUGHT_EXCEPTIONS = 100
+
 
 def register_collector(collector):
     """Register a collector with the COLLECTORS global"""
@@ -69,8 +70,11 @@ def register_collector(collector):
     if collector.name in COLLECTORS:
         col = COLLECTORS[collector.name]
         if col.proc is not None:
-            LOG.error('%s still has a process (pid=%d) and is being reset,'
-                      ' terminating', col.name, col.proc.pid)
+            LOG.error(
+                "%s still has a process (pid=%d) and is being reset," " terminating",
+                col.name,
+                col.proc.pid,
+            )
             col.shutdown()
 
     COLLECTORS[collector.name] = collector
@@ -138,16 +142,15 @@ class Collector(object):
         try:
             out = self.proc.stderr.read()
             if out:
-                LOG.debug('reading %s got %d bytes on stderr',
-                          self.name, len(out))
+                LOG.debug("reading %s got %d bytes on stderr", self.name, len(out))
                 for line in out.splitlines():
-                    LOG.warning('%s: %s', self.name, line)
+                    LOG.warning("%s: %s", self.name, line)
         except IOError as error:
             (err, msg) = error.args
             if err != errno.EAGAIN:
                 raise
         except:
-            LOG.exception('uncaught exception in stderr read')
+            LOG.exception("uncaught exception in stderr read")
 
         # we have to use a buffer because sometimes the collectors will write
         # out a bunch of data points at one time and we get some weird sized
@@ -157,8 +160,9 @@ class Collector(object):
             if stdout_data:
                 self.buffer += stdout_data.decode("utf-8")
             if len(self.buffer):
-                LOG.debug('reading %s, buffer now %d bytes',
-                          self.name, len(self.buffer))
+                LOG.debug(
+                    "reading %s, buffer now %d bytes", self.name, len(self.buffer)
+                )
         except IOError as error:
             (err, msg) = error.args
             if err != errno.EAGAIN:
@@ -166,12 +170,12 @@ class Collector(object):
         except:
             # sometimes the process goes away in another thread and we don't
             # have it anymore, so log an error and bail
-            LOG.exception('uncaught exception in stdout read')
+            LOG.exception("uncaught exception in stdout read")
             return
 
         # iterate for each line we have
         while self.buffer:
-            idx = self.buffer.find('\n')
+            idx = self.buffer.find("\n")
             if idx == -1:
                 break
 
@@ -179,7 +183,7 @@ class Collector(object):
             line = self.buffer[0:idx].strip()
             if line:
                 self.datalines.append(line)
-            self.buffer = self.buffer[idx+1:]
+            self.buffer = self.buffer[idx + 1 :]
 
     def collect(self):
         """Reads input from the collector and returns the lines up to whomever
@@ -216,14 +220,16 @@ class Collector(object):
                 for attempt in range(5):
                     if self.proc.poll() is not None:
                         return
-                    LOG.info('Waiting %ds for PID %d to exit...'
-                             % (5 - attempt, self.proc.pid))
+                    LOG.info(
+                        "Waiting %ds for PID %d to exit..."
+                        % (5 - attempt, self.proc.pid)
+                    )
                     time.sleep(1)
                 kill(self.proc, signal.SIGKILL)
                 self.proc.wait()
         except:
             # we really don't want to die as we're trying to exit gracefully
-            LOG.exception('ignoring uncaught exception while shutting down')
+            LOG.exception("ignoring uncaught exception while shutting down")
 
     def evict_old_keys(self, cut_off):
         """Remove old entries from the cache used to detect duplicate values.
@@ -232,10 +238,15 @@ class Collector(object):
           cut_off: A UNIX timestamp.  Any value that's older than this will be
             removed from the cache.
         """
-        for key in self.values.keys():
+        # NOTE: It's important we create copy of keys because otherwise we will be changing
+        # dictionary during iteration which throws under Python 3
+        keys = list(self.values.keys())
+        for key in keys:
             time = self.values[key][3]
             if time < cut_off:
                 del self.values[key]
+
+        del keys
 
 
 class StdinCollector(Collector):
@@ -245,7 +256,7 @@ class StdinCollector(Collector):
        will be blocking."""
 
     def __init__(self):
-        super(StdinCollector, self).__init__('stdin', 0, '<stdin>')
+        super(StdinCollector, self).__init__("stdin", 0, "<stdin>")
 
         # hack to make this work.  nobody else will rely on self.proc
         # except as a test in the stdin mode.
@@ -263,7 +274,6 @@ class StdinCollector(Collector):
             self.datalines.append(line.rstrip())
         else:
             ALIVE = False
-
 
     def shutdown(self):
 
@@ -292,8 +302,10 @@ class ReaderThread(threading.Thread):
               run_state: A RunState instance that is used to signal when this
                 thread should be stopped.
         """
-        assert evictinterval > dedupinterval, "%r <= %r" % (evictinterval,
-                                                            dedupinterval)
+        assert evictinterval > dedupinterval, "%r <= %r" % (
+            evictinterval,
+            dedupinterval,
+        )
         super(ReaderThread, self).__init__()
 
         self.readerq = ReaderQueue(100000)
@@ -314,7 +326,9 @@ class ReaderThread(threading.Thread):
         # select or other thing to wait for input on our children,
         # while breaking out every once in a while to setup selects
         # on new children.
-        while (self.run_state is None and ALIVE) or (self.run_state is not None and self.run_state.is_running()):
+        while (self.run_state is None and ALIVE) or (
+            self.run_state is not None and self.run_state.is_running()
+        ):
             for col in all_living_collectors():
                 for line in col.collect():
                     self.process_line(col, line)
@@ -323,7 +337,11 @@ class ReaderThread(threading.Thread):
             if now - lastevict_time > self.evictinterval:
                 lastevict_time = now
                 now -= self.evictinterval
-                for col in all_collectors():
+
+                # NOTE: It's important we create copy of keys because otherwise we will be changing
+                # dictionary during iteration which throws under Python 3
+                all_collectors_ = list(all_collectors())
+                for col in all_collectors_:
                     col.evict_old_keys(now)
 
             # and here is the loop that we really should get rid of, this
@@ -338,16 +356,18 @@ class ReaderThread(threading.Thread):
 
         col.lines_received += 1
         if len(line) >= 1024:  # Limit in net.opentsdb.tsd.PipelineFactory
-            LOG.warning('%s line too long: %s', col.name, line)
+            LOG.warning("%s line too long: %s", col.name, line)
             col.lines_invalid += 1
             return
-        parsed = re.match('^([-_./a-zA-Z0-9]+)\s+' # Metric name.
-                          '(\d+)\s+'               # Timestamp.
-                          '(\S+?)'                 # Value (int or float).
-                          '((?:\s+[-_./a-zA-Z0-9]+=[-~_./a-zA-Z0-9]+)*)$', # Tags
-                          line)
+        parsed = re.match(
+            r"^([-_./a-zA-Z0-9]+)\s+"  # Metric name.
+            r"(\d+)\s+"  # Timestamp.
+            r"(\S+?)"  # Value (int or float).
+            r"((?:\s+[-_./a-zA-Z0-9]+=[-~_./a-zA-Z0-9]+)*)$",  # Tags
+            line,
+        )
         if parsed is None:
-            LOG.warning('%s sent invalid data: %s', col.name, line)
+            LOG.warning("%s sent invalid data: %s", col.name, line)
             col.lines_invalid += 1
             return
         metric, timestamp, value, tags = parsed.groups()
@@ -366,10 +386,17 @@ class ReaderThread(threading.Thread):
         if key in col.values:
             # if the timestamp isn't > than the previous one, ignore this value
             if timestamp <= col.values[key][3]:
-                LOG.error("Timestamp out of order: metric=%s%s,"
-                          " old_ts=%d >= new_ts=%d - ignoring data point"
-                          " (value=%r, collector=%s)", metric, tags,
-                          col.values[key][3], timestamp, value, col.name)
+                LOG.error(
+                    "Timestamp out of order: metric=%s%s,"
+                    " old_ts=%d >= new_ts=%d - ignoring data point"
+                    " (value=%r, collector=%s)",
+                    metric,
+                    tags,
+                    col.values[key][3],
+                    timestamp,
+                    value,
+                    col.name,
+                )
                 col.lines_invalid += 1
                 return
 
@@ -378,8 +405,9 @@ class ReaderThread(threading.Thread):
             # we send the timestamp when this metric first became the current
             # value instead of the last.  Fall through if we reach
             # the dedup interval so we can print the value.
-            if (col.values[key][0] == value and
-                (timestamp - col.values[key][3] < self.dedupinterval)):
+            if col.values[key][0] == value and (
+                timestamp - col.values[key][3] < self.dedupinterval
+            ):
                 col.values[key] = (value, True, line, col.values[key][3])
                 return
 
@@ -388,10 +416,14 @@ class ReaderThread(threading.Thread):
             # replay the last value we skipped (if changed) so the jumps in
             # our graph are accurate,
             # Scalyr edit:  Added the dedupinterval > 0 term.
-            if ((self.dedupinterval > 0) and
-                    (col.values[key][1] or
-                    (timestamp - col.values[key][3] >= self.dedupinterval)) and
-                    (col.values[key][0] != value)):
+            if (
+                (self.dedupinterval > 0)
+                and (
+                    col.values[key][1]
+                    or (timestamp - col.values[key][3] >= self.dedupinterval)
+                )
+                and (col.values[key][0] != value)
+            ):
                 col.lines_sent += 1
                 if not self.readerq.nput(col.values[key][2]):
                     self.lines_dropped += 1
@@ -469,17 +501,22 @@ class SenderThread(threading.Thread):
 
                 self.send_data()
                 errors = 0  # We managed to do a successful iteration.
-            except (ArithmeticError, EOFError, EnvironmentError, LookupError,
-                    ValueError) as e:
+            except (
+                ArithmeticError,
+                EOFError,
+                EnvironmentError,
+                LookupError,
+                ValueError,
+            ):
                 errors += 1
                 if errors > MAX_UNCAUGHT_EXCEPTIONS:
                     shutdown()
                     raise
-                LOG.exception('Uncaught exception in SenderThread, ignoring')
+                LOG.exception("Uncaught exception in SenderThread, ignoring")
                 time.sleep(1)
                 continue
             except:
-                LOG.exception('Uncaught exception in SenderThread, going to exit')
+                LOG.exception("Uncaught exception in SenderThread, going to exit")
                 shutdown()
                 raise
 
@@ -495,10 +532,10 @@ class SenderThread(threading.Thread):
 
         # we use the version command as it is very low effort for the TSD
         # to respond
-        LOG.debug('verifying our TSD connection is alive')
+        LOG.debug("verifying our TSD connection is alive")
         try:
-            self.tsd.sendall('version\n')
-        except socket.error as msg:
+            self.tsd.sendall("version\n")
+        except socket.error:
             self.tsd = None
             return False
 
@@ -509,7 +546,7 @@ class SenderThread(threading.Thread):
             # connection
             try:
                 buf = self.tsd.recv(bufsize)
-            except socket.error as msg:
+            except socket.error:
                 self.tsd = None
                 return False
 
@@ -528,29 +565,37 @@ class SenderThread(threading.Thread):
             # helps to see what is going on with the tcollector.
             if self.self_report_stats:
                 strs = [
-                        ('reader.lines_collected',
-                         '', self.reader.lines_collected),
-                        ('reader.lines_dropped',
-                         '', self.reader.lines_dropped)
-                       ]
+                    ("reader.lines_collected", "", self.reader.lines_collected),
+                    ("reader.lines_dropped", "", self.reader.lines_dropped),
+                ]
 
                 for col in all_living_collectors():
-                    strs.append((
-                        'collector.lines_sent',
-                        'collector=' + col.name, col.lines_sent
-                    ))
-                    strs.append((
-                        'collector.lines_received',
-                        'collector=' + col.name, col.lines_received
-                    ))
-                    strs.append((
-                        'collector.lines_invalid',
-                        'collector=' + col.name, col.lines_invalid
-                    ))
+                    strs.append(
+                        (
+                            "collector.lines_sent",
+                            "collector=" + col.name,
+                            col.lines_sent,
+                        )
+                    )
+                    strs.append(
+                        (
+                            "collector.lines_received",
+                            "collector=" + col.name,
+                            col.lines_received,
+                        )
+                    )
+                    strs.append(
+                        (
+                            "collector.lines_invalid",
+                            "collector=" + col.name,
+                            col.lines_invalid,
+                        )
+                    )
 
                 ts = int(time.time())
-                strout = ["tcollector.%s %d %d %s"
-                          % (x[0], ts, x[2], x[1]) for x in strs]
+                strout = [
+                    "tcollector.%s %d %d %s" % (x[0], ts, x[2], x[1]) for x in strs
+                ]
                 for string in strout:
                     self.sendq.append(string)
 
@@ -582,12 +627,13 @@ class SenderThread(threading.Thread):
             try_delay *= 1 + random.random()
             if try_delay > 600:
                 try_delay *= 0.5
-            LOG.debug('SenderThread blocking %0.2f seconds', try_delay)
+            LOG.debug("SenderThread blocking %0.2f seconds", try_delay)
             time.sleep(try_delay)
 
             # Now actually try the connection.
-            adresses = socket.getaddrinfo(self.host, self.port, socket.AF_UNSPEC,
-                                          socket.SOCK_STREAM, 0)
+            adresses = socket.getaddrinfo(
+                self.host, self.port, socket.AF_UNSPEC, socket.SOCK_STREAM, 0
+            )
             for family, socktype, proto, canonname, sockaddr in adresses:
                 try:
                     self.tsd = socket.socket(family, socktype, proto)
@@ -596,25 +642,29 @@ class SenderThread(threading.Thread):
                     # if we get here it connected
                     break
                 except socket.error as msg:
-                    LOG.warning('Connection attempt failed to %s:%d: %s',
-                                self.host, self.port, msg)
+                    LOG.warning(
+                        "Connection attempt failed to %s:%d: %s",
+                        self.host,
+                        self.port,
+                        msg,
+                    )
                 self.tsd.close()
                 self.tsd = None
             if not self.tsd:
-                LOG.error('Failed to connect to %s:%d', self.host, self.port)
+                LOG.error("Failed to connect to %s:%d", self.host, self.port)
 
     def send_data(self):
         """Sends outstanding data in self.sendq to the TSD in one operation."""
 
         # construct the output string
-        out = ''
+        out = ""
         for line in self.sendq:
-            line = 'put ' + line + self.tagstr
-            out += line + '\n'
-            LOG.debug('SENDING: %s', line)
+            line = "put " + line + self.tagstr
+            out += line + "\n"
+            LOG.debug("SENDING: %s", line)
 
         if not out:
-            LOG.debug('send_data no data?')
+            LOG.debug("send_data no data?")
             return
 
         # try sending our data.  if an exception occurs, just error and
@@ -626,7 +676,7 @@ class SenderThread(threading.Thread):
                 self.tsd.sendall(out)
             self.sendq = []
         except socket.error as msg:
-            LOG.error('failed to send data: %s', msg)
+            LOG.error("failed to send data: %s", msg)
             try:
                 self.tsd.close()
             except socket.error:
@@ -644,80 +694,155 @@ def setup_logging(logfile=DEFAULT_LOG, max_bytes=None, backup_count=None):
     if backup_count is not None and max_bytes is not None:
         assert backup_count > 0
         assert max_bytes > 0
-        ch = RotatingFileHandler(logfile, 'a', max_bytes, backup_count)
+        ch = RotatingFileHandler(logfile, "a", max_bytes, backup_count)
     else:  # Setup stream handler.
         ch = logging.StreamHandler(sys.stdout)
 
-    ch.setFormatter(logging.Formatter('%(asctime)s %(name)s[%(process)d] '
-                                      '%(levelname)s: %(message)s'))
+    ch.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(name)s[%(process)d] " "%(levelname)s: %(message)s"
+        )
+    )
     LOG.addHandler(ch)
+
 
 # Scalyr edit: Added this override
 def override_logging(logger):
     global LOG
     LOG = logger
 
+
 def parse_cmdline(argv):
     """Parses the command-line."""
 
     # get arguments
-    default_cdir = os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])),
-                                'collectors')
-    parser = OptionParser(description='Manages collectors which gather '
-                                       'data and report back.')
-    parser.add_option('-c', '--collector-dir', dest='cdir', metavar='DIR',
-                      default=default_cdir,
-                      help='Directory where the collectors are located.')
-    parser.add_option('-d', '--dry-run', dest='dryrun', action='store_true',
-                      default=False,
-                      help='Don\'t actually send anything to the TSD, '
-                           'just print the datapoints.')
-    parser.add_option('-H', '--host', dest='host', default='localhost',
-                      metavar='HOST',
-                      help='Hostname to use to connect to the TSD.')
-    parser.add_option('--no-tcollector-stats', dest='no_tcollector_stats',
-                      default=False, action='store_true',
-                      help='Prevent tcollector from reporting its own stats to TSD')
-    parser.add_option('-s', '--stdin', dest='stdin', action='store_true',
-                      default=False,
-                      help='Run once, read and dedup data points from stdin.')
-    parser.add_option('-p', '--port', dest='port', type='int',
-                      default=4242, metavar='PORT',
-                      help='Port to connect to the TSD instance on. '
-                           'default=%default')
-    parser.add_option('-v', dest='verbose', action='store_true', default=False,
-                      help='Verbose mode (log debug messages).')
-    parser.add_option('-t', '--tag', dest='tags', action='append',
-                      default=[], metavar='TAG',
-                      help='Tags to append to all timeseries we send, '
-                           'e.g.: -t TAG=VALUE -t TAG2=VALUE')
-    parser.add_option('-P', '--pidfile', dest='pidfile',
-                      default='/var/run/tcollector.pid',
-                      metavar='FILE', help='Write our pidfile')
-    parser.add_option('--dedup-interval', dest='dedupinterval', type='int',
-                      default=300, metavar='DEDUPINTERVAL',
-                      help='Number of seconds in which successive duplicate '
-                           'datapoints are suppressed before sending to the TSD. '
-                           'default=%default')
-    parser.add_option('--evict-interval', dest='evictinterval', type='int',
-                      default=6000, metavar='EVICTINTERVAL',
-                      help='Number of seconds after which to remove cached '
-                           'values of old data points to save memory. '
-                           'default=%default')
-    parser.add_option('--max-bytes', dest='max_bytes', type='int',
-                      default=64 * 1024 * 1024,
-                      help='Maximum bytes per a logfile.')
-    parser.add_option('--backup-count', dest='backup_count', type='int',
-                      default=0, help='Maximum number of logfiles to backup.')
-    parser.add_option('--logfile', dest='logfile', type='str',
-                      default=DEFAULT_LOG,
-                      help='Filename where logs are written to.')
+    default_cdir = os.path.join(
+        os.path.dirname(os.path.realpath(sys.argv[0])), "collectors"
+    )
+    parser = OptionParser(
+        description="Manages collectors which gather " "data and report back."
+    )
+    parser.add_option(
+        "-c",
+        "--collector-dir",
+        dest="cdir",
+        metavar="DIR",
+        default=default_cdir,
+        help="Directory where the collectors are located.",
+    )
+    parser.add_option(
+        "-d",
+        "--dry-run",
+        dest="dryrun",
+        action="store_true",
+        default=False,
+        help="Don't actually send anything to the TSD, " "just print the datapoints.",
+    )
+    parser.add_option(
+        "-H",
+        "--host",
+        dest="host",
+        default="localhost",
+        metavar="HOST",
+        help="Hostname to use to connect to the TSD.",
+    )
+    parser.add_option(
+        "--no-tcollector-stats",
+        dest="no_tcollector_stats",
+        default=False,
+        action="store_true",
+        help="Prevent tcollector from reporting its own stats to TSD",
+    )
+    parser.add_option(
+        "-s",
+        "--stdin",
+        dest="stdin",
+        action="store_true",
+        default=False,
+        help="Run once, read and dedup data points from stdin.",
+    )
+    parser.add_option(
+        "-p",
+        "--port",
+        dest="port",
+        type="int",
+        default=4242,
+        metavar="PORT",
+        help="Port to connect to the TSD instance on. " "default=%default",
+    )
+    parser.add_option(
+        "-v",
+        dest="verbose",
+        action="store_true",
+        default=False,
+        help="Verbose mode (log debug messages).",
+    )
+    parser.add_option(
+        "-t",
+        "--tag",
+        dest="tags",
+        action="append",
+        default=[],
+        metavar="TAG",
+        help="Tags to append to all timeseries we send, "
+        "e.g.: -t TAG=VALUE -t TAG2=VALUE",
+    )
+    parser.add_option(
+        "-P",
+        "--pidfile",
+        dest="pidfile",
+        default="/var/run/tcollector.pid",
+        metavar="FILE",
+        help="Write our pidfile",
+    )
+    parser.add_option(
+        "--dedup-interval",
+        dest="dedupinterval",
+        type="int",
+        default=300,
+        metavar="DEDUPINTERVAL",
+        help="Number of seconds in which successive duplicate "
+        "datapoints are suppressed before sending to the TSD. "
+        "default=%default",
+    )
+    parser.add_option(
+        "--evict-interval",
+        dest="evictinterval",
+        type="int",
+        default=6000,
+        metavar="EVICTINTERVAL",
+        help="Number of seconds after which to remove cached "
+        "values of old data points to save memory. "
+        "default=%default",
+    )
+    parser.add_option(
+        "--max-bytes",
+        dest="max_bytes",
+        type="int",
+        default=64 * 1024 * 1024,
+        help="Maximum bytes per a logfile.",
+    )
+    parser.add_option(
+        "--backup-count",
+        dest="backup_count",
+        type="int",
+        default=0,
+        help="Maximum number of logfiles to backup.",
+    )
+    parser.add_option(
+        "--logfile",
+        dest="logfile",
+        type="str",
+        default=DEFAULT_LOG,
+        help="Filename where logs are written to.",
+    )
     (options, args) = parser.parse_args(args=argv[1:])
     if options.dedupinterval < 2:
-      parser.error('--dedup-interval must be at least 2 seconds')
+        parser.error("--dedup-interval must be at least 2 seconds")
     if options.evictinterval <= options.dedupinterval:
-      parser.error('--evict-interval must be strictly greater than '
-                   '--dedup-interval')
+        parser.error(
+            "--evict-interval must be strictly greater than " "--dedup-interval"
+        )
     return (options, args)
 
 
@@ -725,8 +850,9 @@ def main(argv):
     """The main tcollector entry point and loop."""
 
     options, args = parse_cmdline(argv)
-    setup_logging(options.logfile, options.max_bytes or None,
-                  options.backup_count or None)
+    setup_logging(
+        options.logfile, options.max_bytes or None, options.backup_count or None
+    )
 
     if options.verbose:
         LOG.setLevel(logging.DEBUG)  # up our level
@@ -737,31 +863,31 @@ def main(argv):
     # validate everything
     tags = {}
     for tag in options.tags:
-        if re.match('^[-_.a-z0-9]+=\S+$', tag, re.IGNORECASE) is None:
+        if re.match(r"^[-_.a-z0-9]+=\S+$", tag, re.IGNORECASE) is None:
             assert False, 'Tag string "%s" is invalid.' % tag
-        k, v = tag.split('=', 1)
+        k, v = tag.split("=", 1)
         if k in tags:
             assert False, 'Tag "%s" already declared.' % k
         tags[k] = v
 
     options.cdir = os.path.realpath(options.cdir)
     if not os.path.isdir(options.cdir):
-        LOG.fatal('No such directory: %s', options.cdir)
+        LOG.fatal("No such directory: %s", options.cdir)
         return 1
     modules = load_etc_dir(options, tags)
 
     # tsdb does not require a host tag, but we do.  we are always running on a
     # host.  FIXME: we should make it so that collectors may request to set
     # their own host tag, or not set one.
-    if not 'host' in tags and not options.stdin:
-        tags['host'] = socket.gethostname()
-        LOG.warning('Tag "host" not specified, defaulting to %s.', tags['host'])
+    if "host" not in tags and not options.stdin:
+        tags["host"] = socket.gethostname()
+        LOG.warning('Tag "host" not specified, defaulting to %s.', tags["host"])
 
     # prebuild the tag string from our tags dict
-    tagstr = ''
+    tagstr = ""
     if tags:
-        tagstr = ' '.join('%s=%s' % (k, v) for k, v in six.iteritems(tags))
-        tagstr = ' ' + tagstr.strip()
+        tagstr = " ".join("%s=%s" % (k, v) for k, v in six.iteritems(tags))
+        tagstr = " " + tagstr.strip()
 
     # gracefully handle death for normal termination paths and abnormal
     atexit.register(shutdown)
@@ -774,10 +900,16 @@ def main(argv):
     reader.start()
 
     # and setup the sender to start writing out to the tsd
-    sender = SenderThread(reader, options.dryrun, options.host, options.port,
-                          not options.no_tcollector_stats, tagstr)
+    sender = SenderThread(
+        reader,
+        options.dryrun,
+        options.host,
+        options.port,
+        not options.no_tcollector_stats,
+        tagstr,
+    )
     sender.start()
-    LOG.info('SenderThread startup complete')
+    LOG.info("SenderThread startup complete")
 
     # if we're in stdin mode, build a stdin collector and just join on the
     # reader thread since there's nothing else for us to do here
@@ -787,10 +919,11 @@ def main(argv):
     else:
         sys.stdin.close()
         main_loop(options, modules, sender, tags)
-    LOG.debug('Shutting down -- joining the reader thread.')
+    LOG.debug("Shutting down -- joining the reader thread.")
     reader.join()
-    LOG.debug('Shutting down -- joining the sender thread.')
+    LOG.debug("Shutting down -- joining the sender thread.")
     sender.join()
+
 
 def stdin_loop(options, modules, sender, tags):
     """The main loop of the program that runs when we are in stdin mode."""
@@ -802,8 +935,10 @@ def stdin_loop(options, modules, sender, tags):
         reload_changed_config_modules(modules, options, sender, tags)
         now = int(time.time())
         if now >= next_heartbeat:
-            LOG.info('Heartbeat (%d collectors running)'
-                     % sum(1 for col in all_living_collectors()))
+            LOG.info(
+                "Heartbeat (%d collectors running)"
+                % sum(1 for col in all_living_collectors())
+            )
             next_heartbeat = now + 600
 
 
@@ -819,7 +954,15 @@ def reset_for_new_run():
 
 
 # Scalyr edit:  Added last three arguments.
-def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=None, sample_interval_secs=30.0):
+def main_loop(
+    options,
+    modules,
+    sender,
+    tags,
+    output_heartbeats=True,
+    run_state=None,
+    sample_interval_secs=30.0,
+):
     """The main loop of the program that runs when we're not in stdin mode.
 
     The last argument is a function that if invoked will return true if the collector has been terminated.
@@ -830,7 +973,9 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
     # This relies on the individual collectors checking this variable.
     os.environ["TCOLLECTOR_SAMPLE_INTERVAL"] = six.text_type(sample_interval_secs)
     # Scalyr edit: Set the environment variable used by ifstat.py to determine different network interface names.
-    os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(options.network_interface_prefixes)
+    os.environ["TCOLLECTOR_INTERFACE_PREFIX"] = ",".join(
+        options.network_interface_prefixes
+    )
     os.environ["TCOLLECTOR_INTERFACE_SUFFIX"] = options.network_interface_suffix
     # Scalyr edit: Set the environment variable for dfstat.py
     os.environ["TCOLLECTOR_LOCAL_DISKS_ONLY"] = six.text_type(options.local_disks_only)
@@ -847,8 +992,10 @@ def main_loop(options, modules, sender, tags, output_heartbeats=True, run_state=
             time.sleep(15)
         now = int(time.time())
         if output_heartbeats and now >= next_heartbeat:
-            LOG.info('Heartbeat (%d collectors running)'
-                     % sum(1 for col in all_living_collectors()))
+            LOG.info(
+                "Heartbeat (%d collectors running)"
+                % sum(1 for col in all_living_collectors())
+            )
             next_heartbeat = now + 600
 
 
@@ -856,9 +1003,11 @@ def list_config_modules(etcdir):
     """Returns an iterator that yields the name of all the config modules."""
     if not os.path.isdir(etcdir):
         return iter(())  # Empty iterator.
-    return (name for name in os.listdir(etcdir)
-            if (name.endswith('.py')
-                and os.path.isfile(os.path.join(etcdir, name))))
+    return (
+        name
+        for name in os.listdir(etcdir)
+        if (name.endswith(".py") and os.path.isfile(os.path.join(etcdir, name)))
+    )
 
 
 def load_etc_dir(options, tags):
@@ -867,7 +1016,7 @@ def load_etc_dir(options, tags):
     Returns: A dict of path -> (module, timestamp).
     """
 
-    etcdir = os.path.join(options.cdir, 'etc')
+    etcdir = os.path.join(options.cdir, "etc")
     # Save the path so we can restore it later.
     original_path = sys.path
     sys.path = list(original_path)
@@ -896,20 +1045,20 @@ def load_config_module(name, options, tags):
     """
 
     if isinstance(name, six.text_type):
-      LOG.info('Loading %s', name)
-      d = {}
-      # Strip the trailing .py
-      module = __import__(name[:-3], d, d)
+        LOG.info("Loading %s", name)
+        d = {}
+        # Strip the trailing .py
+        module = __import__(name[:-3], d, d)
     else:
-      module = reload(name)
-    onload = module.__dict__.get('onload')
+        module = reload_module(name)
+    onload = module.__dict__.get("onload")
     if callable(onload):
         try:
             onload(options, tags)
         except:
             # Scalyr edit:  Add this line to disable the fatal log.
-            if not 'no_fatal_on_error' in options:
-                LOG.fatal('Exception while loading %s', name)
+            if "no_fatal_on_error" not in options:
+                LOG.fatal("Exception while loading %s", name)
             raise
     return module
 
@@ -923,10 +1072,9 @@ def reload_changed_config_modules(modules, options, sender, tags):
     Returns: whether or not anything has changed.
     """
 
-    etcdir = os.path.join(options.cdir, 'etc')
+    etcdir = os.path.join(options.cdir, "etc")
     current_modules = set(list_config_modules(etcdir))
-    current_paths = set(os.path.join(etcdir, name)
-                        for name in current_modules)
+    current_paths = set(os.path.join(etcdir, name) for name in current_modules)
     changed = False
 
     # Reload any module that has changed.
@@ -935,14 +1083,14 @@ def reload_changed_config_modules(modules, options, sender, tags):
             continue
         mtime = os.path.getmtime(path)
         if mtime > timestamp:
-            LOG.info('Reloading %s, file has changed', path)
+            LOG.info("Reloading %s, file has changed", path)
             module = load_config_module(module, options, tags)
             modules[path] = (module, mtime)
             changed = True
 
     # Remove any module that has been removed.
     for path in set(modules).difference(current_paths):
-        LOG.info('%s has been removed, tcollector should be restarted', path)
+        LOG.info("%s has been removed, tcollector should be restarted", path)
         del modules[path]
         changed = True
 
@@ -955,10 +1103,9 @@ def reload_changed_config_modules(modules, options, sender, tags):
             changed = True
 
     # Scalyr edit:  Added and not sender is None
-    if changed and not sender is None:
-        sender.tagstr = ' '.join('%s=%s' % (k, v)
-                                 for k, v in six.iteritems(tags))
-        sender.tagstr = ' ' + sender.tagstr.strip()
+    if changed and sender is not None:
+        sender.tagstr = " ".join("%s=%s" % (k, v) for k, v in six.iteritems(tags))
+        sender.tagstr = " " + sender.tagstr.strip()
     return changed
 
 
@@ -1006,7 +1153,7 @@ def shutdown_signal(signum, frame):
 
 
 def kill(proc, signum=signal.SIGTERM):
-  os.kill(proc.pid, signum)
+    os.kill(proc.pid, signum)
 
 
 # Scalyr edit.  Added invoke_exit argument and the pre-die routine.
@@ -1021,7 +1168,7 @@ def shutdown(invoke_exit=True):
     # notify threads of program termination
     ALIVE = False
 
-    LOG.info('shutting down children')
+    LOG.info("shutting down children")
 
     # to help more quickly kill all collectors, do a pass where we tell them to die
     # but do not wait for termination.
@@ -1033,7 +1180,7 @@ def shutdown(invoke_exit=True):
         col.shutdown()
 
     if invoke_exit:
-        LOG.info('exiting')
+        LOG.info("exiting")
         sys.exit(1)
 
 
@@ -1055,17 +1202,23 @@ def reap_children():
         # is used to indicate that we don't want to restart this collector.
         # any other status code is an error and is logged.
         if status == 13:
-            LOG.info('removing %s from the list of collectors (by request)',
-                      col.name)
+            LOG.info("removing %s from the list of collectors (by request)", col.name)
             col.dead = True
         elif status != 0:
-            LOG.warning('collector %s terminated after %d seconds with '
-                        'status code %d, marking dead',
-                        col.name, now - col.lastspawn, status)
+            LOG.warning(
+                "collector %s terminated after %d seconds with "
+                "status code %d, marking dead",
+                col.name,
+                now - col.lastspawn,
+                status,
+            )
             col.dead = True
         else:
-            register_collector(Collector(col.name, col.interval, col.filename,
-                                         col.mtime, col.lastspawn))
+            register_collector(
+                Collector(
+                    col.name, col.interval, col.filename, col.mtime, col.lastspawn
+                )
+            )
 
 
 def set_nonblocking(fd):
@@ -1077,17 +1230,18 @@ def set_nonblocking(fd):
 def spawn_collector(col):
     """Takes a Collector object and creates a process for it."""
 
-    LOG.info('%s (interval=%d) needs to be spawned', col.name, col.interval)
+    LOG.info("%s (interval=%d) needs to be spawned", col.name, col.interval)
 
     # FIXME: do custom integration of Python scripts into memory/threads
     # if re.search('\.py$', col.name) is not None:
     #     ... load the py module directly instead of using a subprocess ...
     try:
         # Scalyr edit:  Add in close_fds=True
-        col.proc = subprocess.Popen(col.filename, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE, close_fds=True)
+        col.proc = subprocess.Popen(
+            col.filename, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
+        )
     except OSError as e:
-        LOG.error('Failed to spawn collector %s: %s' % (col.filename, e))
+        LOG.error("Failed to spawn collector %s: %s" % (col.filename, e))
         return
     # The following line needs to move below this line because it is used in
     # other logic and it makes no sense to update the last spawn time if the
@@ -1097,10 +1251,10 @@ def spawn_collector(col):
     set_nonblocking(col.proc.stderr.fileno())
     if col.proc.pid > 0:
         col.dead = False
-        LOG.info('spawned %s (pid=%d)', col.name, col.proc.pid)
+        LOG.info("spawned %s (pid=%d)", col.name, col.proc.pid)
         return
     # FIXME: handle errors better
-    LOG.error('failed to spawn collector: %s', col.filename)
+    LOG.error("failed to spawn collector: %s", col.filename)
 
 
 def spawn_children():
@@ -1125,23 +1279,34 @@ def spawn_children():
             if col.nextkill > now:
                 continue
             if col.killstate == 0:
-                LOG.warning('warning: %s (interval=%d, pid=%d) overstayed '
-                            'its welcome, SIGTERM sent',
-                            col.name, col.interval, col.proc.pid)
+                LOG.warning(
+                    "warning: %s (interval=%d, pid=%d) overstayed "
+                    "its welcome, SIGTERM sent",
+                    col.name,
+                    col.interval,
+                    col.proc.pid,
+                )
                 kill(col.proc)
                 col.nextkill = now + 5
                 col.killstate = 1
             elif col.killstate == 1:
-                LOG.error('error: %s (interval=%d, pid=%d) still not dead, '
-                           'SIGKILL sent',
-                           col.name, col.interval, col.proc.pid)
+                LOG.error(
+                    "error: %s (interval=%d, pid=%d) still not dead, " "SIGKILL sent",
+                    col.name,
+                    col.interval,
+                    col.proc.pid,
+                )
                 kill(col.proc, signal.SIGKILL)
                 col.nextkill = now + 5
                 col.killstate = 2
             else:
-                LOG.error('error: %s (interval=%d, pid=%d) needs manual '
-                           'intervention to kill it',
-                           col.name, col.interval, col.proc.pid)
+                LOG.error(
+                    "error: %s (interval=%d, pid=%d) needs manual "
+                    "intervention to kill it",
+                    col.name,
+                    col.interval,
+                    col.proc.pid,
+                )
                 col.nextkill = now + 300
 
 
@@ -1162,11 +1327,11 @@ def populate_collectors(coldir):
             continue
         interval = int(interval)
 
-        for colname in os.listdir('%s/%d' % (coldir, interval)):
-            if colname.startswith('.'):
+        for colname in os.listdir("%s/%d" % (coldir, interval)):
+            if colname.startswith("."):
                 continue
 
-            filename = '%s/%d/%s' % (coldir, interval, colname)
+            filename = "%s/%d/%s" % (coldir, interval, colname)
             if os.path.isfile(filename):
                 mtime = os.path.getmtime(filename)
 
@@ -1181,37 +1346,40 @@ def populate_collectors(coldir):
                     # add now.  there is probably a more robust way of doing
                     # this...
                     if col.interval != interval:
-                        LOG.error('two collectors with the same name %s and '
-                                   'different intervals %d and %d',
-                                   colname, interval, col.interval)
+                        LOG.error(
+                            "two collectors with the same name %s and "
+                            "different intervals %d and %d",
+                            colname,
+                            interval,
+                            col.interval,
+                        )
                         continue
 
                     # we have to increase the generation or we will kill
                     # this script again
                     col.generation = GENERATION
                     if col.mtime < mtime:
-                        LOG.info('%s has been updated on disk', col.name)
+                        LOG.info("%s has been updated on disk", col.name)
                         col.mtime = mtime
                         if not col.interval:
                             col.shutdown()
-                            LOG.info('Respawning %s', col.name)
-                            register_collector(Collector(colname, interval,
-                                                         filename, mtime))
+                            LOG.info("Respawning %s", col.name)
+                            register_collector(
+                                Collector(colname, interval, filename, mtime)
+                            )
                 else:
-                    register_collector(Collector(colname, interval, filename,
-                                                 mtime))
+                    register_collector(Collector(colname, interval, filename, mtime))
 
     # now iterate over everybody and look for old generations
     to_delete = []
     for col in all_collectors():
         if col.generation < GENERATION:
-            LOG.info('collector %s removed from the filesystem, forgetting',
-                      col.name)
+            LOG.info("collector %s removed from the filesystem, forgetting", col.name)
             col.shutdown()
             to_delete.append(col.name)
     for name in to_delete:
         del COLLECTORS[name]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv))

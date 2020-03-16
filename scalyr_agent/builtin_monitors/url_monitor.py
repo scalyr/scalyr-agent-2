@@ -21,7 +21,9 @@ from __future__ import absolute_import
 import re
 
 import six
-import six.moves.urllib.request, six.moves.urllib.error, six.moves.urllib.parse
+import six.moves.urllib.request
+import six.moves.urllib.error
+import six.moves.urllib.parse
 import six.moves.http_cookiejar
 import six.moves.http_client
 
@@ -230,6 +232,8 @@ class UrlMonitor(ScalyrMonitor):
         except Exception as e:
             self._record_error(e, "unknown_error")
             return
+
+        response_body = six.ensure_text(response_body)
 
         if self.extractor is not None:
             match = self.extractor.search(response_body)

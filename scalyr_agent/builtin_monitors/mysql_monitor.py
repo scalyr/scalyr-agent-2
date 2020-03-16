@@ -438,14 +438,14 @@ class MysqlDB(object):
     def _gather_db_information(self):
         try:
             r = self._query("SELECT VERSION()")
-            if r == None or len(r) == 0:
+            if r is None or len(r) == 0:
                 self._version = "unknown"
             else:
                 self._version = r[0][0]
             version = self._version.split(".")
             self._major = int(version[0])
             self._medium = int(version[1])
-        except (ValueError, IndexError) as e:
+        except (ValueError, IndexError):
             self._major = self._medium = 0
             self._version = "unknown"
         except:
@@ -540,14 +540,14 @@ class MysqlDB(object):
 
         innodb_queries = [
             {
-                "regex": "OS WAIT ARRAY INFO: reservation count (\d+), signal count (\d+)",
+                "regex": r"OS WAIT ARRAY INFO: reservation count (\d+), signal count (\d+)",
                 "fields": [
                     {"label": "innodb.oswait_array.reservation_count", "group": 1},
                     {"label": "innodb.oswait_array.signal_count", "group": 2},
                 ],
             },
             {
-                "regex": "Mutex spin waits (\d+), rounds (\d+), OS waits (\d+)",
+                "regex": r"Mutex spin waits (\d+), rounds (\d+), OS waits (\d+)",
                 "fields": [
                     {
                         "label": "innodb.locks.spin_waits",
@@ -567,7 +567,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "RW-shared spins (\d+), OS waits (\d+); RW-excl spins (\d+), OS waits (\d+)",
+                "regex": r"RW-shared spins (\d+), OS waits (\d+); RW-excl spins (\d+), OS waits (\d+)",
                 "fields": [
                     {
                         "label": "innodb.locks.spin_waits",
@@ -592,7 +592,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "Ibuf: size (\d+), free list len (\d+), seg size (\d+),",
+                "regex": r"Ibuf: size (\d+), free list len (\d+), seg size (\d+),",
                 "fields": [
                     {"label": "innodb.ibuf.size", "group": 1},
                     {"label": "innodb.ibuf.free_list_len", "group": 2},
@@ -600,7 +600,7 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "(\d+) inserts, (\d+) merged recs, (\d+) merges",
+                "regex": r"(\d+) inserts, (\d+) merged recs, (\d+) merges",
                 "fields": [
                     {"label": "innodb.ibuf.inserts", "group": 1},
                     {"label": "innodb.ibuf.merged_recs", "group": 2},
@@ -608,15 +608,15 @@ class MysqlDB(object):
                 ],
             },
             {
-                "regex": "\d+ queries inside InnoDB, (\d+) queries in queue",
+                "regex": r"\d+ queries inside InnoDB, (\d+) queries in queue",
                 "fields": [{"label": "innodb.queries_queued", "group": 1}],
             },
             {
-                "regex": "(\d+) read views open inside InnoDB",
+                "regex": r"(\d+) read views open inside InnoDB",
                 "fields": [{"label": "innodb.opened_read_views", "group": 1}],
             },
             {
-                "regex": "History list length (\d+)",
+                "regex": r"History list length (\d+)",
                 "fields": [{"label": "innodb.history_list_length", "group": 1}],
             },
         ]
@@ -645,7 +645,7 @@ class MysqlDB(object):
             master_host = slave_status["master_host"]
         else:
             master_host = None
-        if master_host and master_host is not "None":
+        if master_host and master_host != "None":
             result = []
             sbm = slave_status.get("seconds_behind_master")
             if isinstance(sbm, six.integer_types):

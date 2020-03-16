@@ -76,7 +76,6 @@ import re
 import datetime
 import time
 
-import itertools
 from operator import methodcaller, attrgetter
 from collections import namedtuple
 
@@ -128,7 +127,7 @@ CONFIG_OPTIONS = [
 _ = [
     define_config_option(__monitor__, **option) for option in CONFIG_OPTIONS  # type: ignore
 ]
-## End Monitor Configuration
+# End Monitor Configuration
 # #########################################################################################
 
 
@@ -154,7 +153,9 @@ def _gather_metric(method, attribute=None, transform=None):
 
     doc = "Extract the {} attribute from the given process object".format
     if attribute:
-        doc = "Extract the {}().{} attribute from the given process object".format
+        doc = (  # NOQA
+            "Extract the {}().{} attribute from the given process object".format
+        )
 
     def gather_metric(process):
         """Dynamically Generated """
@@ -211,7 +212,7 @@ GATHER_METRIC = _gather_metric
 # ============================    Process CPU    ==================================
 # =================================================================================
 _PROCESS_CPU_METRICS = [
-    METRIC(  ## ------------------ User-mode CPU ----------------------------
+    METRIC(  # ------------------ User-mode CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.cpu",
             description="The number of seconds the CPU has spent executing instructions in user space.",
@@ -222,7 +223,7 @@ _PROCESS_CPU_METRICS = [
         ),
         GATHER_METRIC("cpu_times", "user"),
     ),
-    METRIC(  ## ------------------ Kernel-mode CPU ----------------------------
+    METRIC(  # ------------------ Kernel-mode CPU ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.cpu",
             description="The number of seconds the CPU has spent executing instructions in kernel space.",
@@ -243,7 +244,7 @@ _PROCESS_CPU_METRICS = [
 # ========================    Process Attributes    ===============================
 # =================================================================================
 _PROCESS_ATTRIBUTE_METRICS = [
-    METRIC(  ## ------------------  Process Uptime   ----------------------------
+    METRIC(  # ------------------  Process Uptime   ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.uptime",
             description="The number of seconds since the process was created.",
@@ -254,7 +255,7 @@ _PROCESS_ATTRIBUTE_METRICS = [
         ),
         GATHER_METRIC("create_time", transform=uptime_from_start_time),
     ),
-    METRIC(  ## ------------------  Process Threads   ----------------------------
+    METRIC(  # ------------------  Process Threads   ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.threads",
             description="The number of threads being used by the process.",
@@ -278,7 +279,7 @@ _PROCESS_ATTRIBUTE_METRICS = [
 # ========================    Process Memory    ===================================
 # =================================================================================
 _PROCESS_MEMORY_METRICS = [
-    METRIC(  ## ------------------ Working Set ----------------------------
+    METRIC(  # ------------------ Working Set ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The number of bytes of physical memory used by the process's working set.  This "
@@ -289,7 +290,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "wset"),
     ),
-    METRIC(  ## ------------------ Peak Working Set ----------------------------
+    METRIC(  # ------------------ Peak Working Set ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The peak working set size for the process since creation time, in bytes.",
@@ -299,7 +300,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "peak_wset"),
     ),
-    METRIC(  ## ------------------ Paged Pool ----------------------------
+    METRIC(  # ------------------ Paged Pool ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The paged-pool usage, in bytes.  This is the amount of bytes of swappable memory in use.",
@@ -309,7 +310,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "paged_pool"),
     ),
-    METRIC(  ## ------------------ Peak Paged Pool ----------------------------
+    METRIC(  # ------------------ Peak Paged Pool ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The peak paged-pool usage, in bytes.",
@@ -319,7 +320,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "peak_paged_pool"),
     ),
-    METRIC(  ## ------------------ NonPaged Pool ----------------------------
+    METRIC(  # ------------------ NonPaged Pool ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The nonpaged pool usage, in bytes.  This is the amount of memory in use that cannot be "
@@ -330,7 +331,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "nonpaged_pool"),
     ),
-    METRIC(  ## ------------------ Peak NonPaged Pool ----------------------------
+    METRIC(  # ------------------ Peak NonPaged Pool ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The peak nonpaged pool usage, in bytes.",
@@ -340,7 +341,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "peak_nonpaged_pool"),
     ),
-    METRIC(  ## ------------------ Pagefile ----------------------------
+    METRIC(  # ------------------ Pagefile ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The current pagefile usage, in bytes.  The is the total number of bytes the system has "
@@ -351,7 +352,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "pagefile"),
     ),
-    METRIC(  ## ------------------ Peak Pagefile ----------------------------
+    METRIC(  # ------------------ Peak Pagefile ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The peak pagefile usage, in bytes.",
@@ -361,7 +362,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info_ex", "peak_pagefile"),
     ),
-    METRIC(  ## ------------------ Resident size ----------------------------
+    METRIC(  # ------------------ Resident size ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The current resident size in bytes.  This should be the same as the working set.",
@@ -371,7 +372,7 @@ _PROCESS_MEMORY_METRICS = [
         ),
         GATHER_METRIC("memory_info", "rss"),
     ),
-    METRIC(  ## ------------------ Virtual memory size ----------------------------
+    METRIC(  # ------------------ Virtual memory size ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.mem.bytes",
             description="The current virtual memory size in bytes.  This does not include shared pages.",
@@ -390,7 +391,7 @@ _PROCESS_MEMORY_METRICS = [
 # =============================    DISK IO    =====================================
 # =================================================================================
 _PROCESS_DISK_IO_METRICS = [
-    METRIC(  ## ------------------ Disk Read Operations ----------------------------
+    METRIC(  # ------------------ Disk Read Operations ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.disk.ops",
             description="The number of disk read requests issued by the process since creation time.",
@@ -401,7 +402,7 @@ _PROCESS_DISK_IO_METRICS = [
         ),
         GATHER_METRIC("io_counters", "read_count"),
     ),
-    METRIC(  ## ------------------ Disk Write Operations ----------------------------
+    METRIC(  # ------------------ Disk Write Operations ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.disk.ops",
             description="The number of disk write requests issued by the process since creation time.",
@@ -412,7 +413,7 @@ _PROCESS_DISK_IO_METRICS = [
         ),
         GATHER_METRIC("io_counters", "write_count"),
     ),
-    METRIC(  ## ------------------ Disk Read Bytes ----------------------------
+    METRIC(  # ------------------ Disk Read Bytes ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.disk.bytes",
             description="The number of bytes read from disk by the process.",
@@ -423,7 +424,7 @@ _PROCESS_DISK_IO_METRICS = [
         ),
         GATHER_METRIC("io_counters", "read_bytes"),
     ),
-    METRIC(  ## ------------------ Disk Read Bytes ----------------------------
+    METRIC(  # ------------------ Disk Read Bytes ----------------------------
         METRIC_CONFIG(
             metric_name="winproc.disk.bytes",
             description="The number of bytes written to disk by the process.",

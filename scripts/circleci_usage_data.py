@@ -33,6 +33,7 @@ if False:
 import sys
 import argparse
 import datetime
+import json
 
 from io import StringIO
 
@@ -102,7 +103,7 @@ def get_all_branches_for_repo(project_slug):
     return branches
 
 
-def get_usage_data_for_branch(
+def get_usage_data_for_branch_and_workflow(
     buff, project_slug, workflow, status="success", branch="master", limit=10
 ):
     # type: (StringIO, str, str, str, str, int) -> None
@@ -128,16 +129,27 @@ def get_usage_data_for_branch(
     if response.status_code == 404:
         raise ValueError("Invalid CIRCLE_CI_API_TOKEN or project_slug")
 
-    items = response.json().get("items", [])
-    items = [item for item in items if (status == "all" or item["status"] == status)]
+    try:
+        data = response.json()
+    except json.decoder.JSONDecodeError as e:
+        # This likely indicates issue with Circle CI returning invalid response
+        print(
+            "Failed to parse Circle CI response as json: %s. Got response: %s"
+            % (str(e), str(response.text))
+        )
+        sys.exit(1)
 
-    if not items:
-        return
+    items = data.get("items", [])
+    items = [item for item in items if (status == "all" or item["status"] == status)]
 
     buff.write(
         u'Usage data for recent workflow runs for workflow "%s" with status="%s" and branch "%s"\n\n'
         % (workflow, status, branch)
     )
+
+    if not items:
+        buff.write(u"No recent runs which match this criteria.\n\n")
+        return
 
     count = 0
     for item in items:
@@ -159,9 +171,9 @@ def get_usage_data_for_branch(
 
 
 def print_usage_data(
-    project_slug, workflow, status="success", branch="master", limit=10, emails=None
+    project_slug, workflows, status="success", branch="master", limit=10, emails=None
 ):
-    # type: (str, str, str, str, int, Optional[List[str]]) -> None
+    # type: (str, List[str], str, str, int, Optional[List[str]]) -> None
     if branch == "all":
         branches = get_all_branches_for_repo(
             project_slug=project_slug.replace("gh/", "")
@@ -180,14 +192,15 @@ def print_usage_data(
     )
 
     for branch in branches:
-        get_usage_data_for_branch(
-            buff=buff,
-            project_slug=project_slug,
-            workflow=workflow,
-            status=status,
-            branch=branch,
-            limit=limit,
-        )
+        for workflow in workflows:
+            get_usage_data_for_branch_and_workflow(
+                buff=buff,
+                project_slug=project_slug,
+                workflow=workflow,
+                status=status,
+                branch=branch,
+                limit=limit,
+            )
 
     value = buff.getvalue()
 
@@ -239,8 +252,8 @@ if __name__ == "__main__":
         default="gh/scalyr/scalyr-agent-2",
     )
     parser.add_argument(
-        "--workflow",
-        help="Name of the workflow to print the usage data for.",
+        "--workflows",
+        help="Name of the workflows to print the usage data for (e.g. unittest,benchmarks,e2e).",
         default="unittest",
     )
     parser.add_argument(
@@ -257,7 +270,7 @@ if __name__ == "__main__":
         "--limit",
         help="Maximum number of workflow runs per branch to print data for.",
         type=int,
-        default=10,
+        default=5,
     )
     parser.add_argument(
         "--emails",
@@ -279,9 +292,11 @@ if __name__ == "__main__":
     if emails and not MAILGUN_API_TOKEN:
         raise ValueError("MAILGUN_API_TOKEN environment variable is not set")
 
+    workflows = args.workflows.split(",")
+
     print_usage_data(
         project_slug=args.project_slug,
-        workflow=args.workflow,
+        workflows=workflows,
         status=args.status,
         branch=args.branch,
         limit=args.limit,

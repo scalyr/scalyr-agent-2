@@ -160,7 +160,6 @@ define_metric(
     "app.disk.requests",
     "Total disk read requests.",
     extra_fields={"type": "read"},
-    unit="bytes",
     cumulative=True,
 )
 
@@ -178,7 +177,6 @@ define_metric(
     "app.disk.requests",
     "Total disk write requests.",
     extra_fields={"type": "write"},
-    unit="bytes",
     cumulative=True,
 )
 
@@ -577,7 +575,7 @@ class StatusReader(BaseReader):
             # Tag: Value
             #
             # We parse out all lines looking like that and match the stats we care about.
-            m = re.search("^(\w+):\s*(\d+)", line)
+            m = re.search(r"^(\w+):\s*(\d+)", line)
             if m is None:
                 continue
 
@@ -775,7 +773,7 @@ class SockStatReader(BaseReader):
         for line in stat_file:
             # We just look for the different "inuse" lines and output their
             # socket type along with the count.
-            m = re.search("(\w+): inuse (\d+)", line)
+            m = re.search(r"(\w+): inuse (\d+)", line)
             if m is not None:
                 collector.update(
                     {

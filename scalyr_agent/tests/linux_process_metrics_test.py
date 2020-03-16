@@ -31,11 +31,30 @@ from scalyr_agent.builtin_monitors.linux_process_metrics import (
 )
 from scalyr_agent.test_base import ScalyrTestCase
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.scalyr_monitor import MonitorInformation
 
 from six.moves import range
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.abspath(__file__)))
 FIXTURES_DIR = os.path.join(BASE_DIR, "fixtures")
+
+
+class MetricInformationTestCase(ScalyrTestCase):
+    def test_define_metric_metric_units(self):
+        # Verify all the metrics have the correct type defined
+        monitor_info = MonitorInformation.get_monitor_info(
+            "scalyr_agent.builtin_monitors.linux_process_metrics"
+        )
+        metrics = monitor_info.metrics
+
+        self.assertEqual(len(metrics), 14)
+        disk_requests_metrics = [
+            m for m in metrics if m.metric_name == "app.disk.requests"
+        ]
+
+        self.assertEqual(len(disk_requests_metrics), 2)
+        self.assertEqual(disk_requests_metrics[0].unit, None)
+        self.assertEqual(disk_requests_metrics[1].unit, None)
 
 
 class TestMetricClass(ScalyrTestCase):

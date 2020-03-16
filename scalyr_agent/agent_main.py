@@ -44,7 +44,18 @@ import sys
 import time
 from io import open
 
-from __scalyr__ import SCALYR_VERSION, scalyr_init
+try:
+    from __scalyr__ import SCALYR_VERSION
+    from __scalyr__ import scalyr_init
+    from __scalyr__ import INSTALL_TYPE
+    from __scalyr__ import DEV_INSTALL
+    from __scalyr__ import MSI_INSTALL
+except ImportError:
+    from scalyr_agent.__scalyr__ import SCALYR_VERSION
+    from scalyr_agent.__scalyr__ import scalyr_init
+    from scalyr_agent.__scalyr__ import INSTALL_TYPE
+    from scalyr_agent.__scalyr__ import DEV_INSTALL
+    from scalyr_agent.__scalyr__ import MSI_INSTALL
 
 # We must invoke this since we are an executable script.
 scalyr_init()
@@ -69,7 +80,7 @@ scalyr_logging.set_log_destination(use_stdout=True)
 
 from optparse import OptionParser
 
-from scalyr_agent.profiler import Profiler
+from scalyr_agent.profiler import ScalyrProfiler
 from scalyr_agent.scalyr_client import ScalyrClientSession
 from scalyr_agent.copying_manager import CopyingManager
 from scalyr_agent.configuration import Configuration
@@ -77,6 +88,7 @@ from scalyr_agent.util import RunState, ScriptEscalator
 from scalyr_agent.agent_status import AgentStatus
 from scalyr_agent.agent_status import ConfigStatus
 from scalyr_agent.agent_status import OverallStats
+from scalyr_agent.agent_status import GCStatus
 from scalyr_agent.agent_status import report_status
 from scalyr_agent.platform_controller import (
     PlatformController,
@@ -87,6 +99,9 @@ from scalyr_agent.platform_controller import AgentNotRunning
 
 
 STATUS_FILE = "last_status"
+STATUS_FORMAT_FILE = "status_format"
+
+VALID_STATUS_FORMATS = ["text", "json"]
 
 
 def _update_disabled_until(config_value, current_time):
@@ -152,6 +167,9 @@ class ScalyrAgent(object):
         # possible.
         self.__run_state = None
 
+        # Store references to the last value of the OverallStats instance
+        self.__overall_stats = OverallStats()
+
         # Whether or not the unsafe debugging mode is running (meaning the RemoteShell is accepting connections
         # on the local host port and the memory profiler is turned on).  Note, this mode is very unsafe since
         # arbitrary python commands can be executed by any user on the system as the user running the agent.
@@ -189,6 +207,7 @@ class ScalyrAgent(object):
         my_options = Options()
         my_options.quiet = True
         my_options.verbose = False
+        my_options.status_format = "text"
         my_options.no_fork = True
         my_options.no_change_user = True
         my_options.no_check_remote = False
@@ -218,6 +237,7 @@ class ScalyrAgent(object):
         """
         quiet = command_options.quiet
         verbose = command_options.verbose
+        status_format = command_options.status_format
         no_fork = command_options.no_fork
         no_check_remote = False
 
@@ -292,7 +312,9 @@ class ScalyrAgent(object):
                         "Assuming agent data path is '%s'" % agent_data_path,
                         file=sys.stderr,
                     )
-                return self.__detailed_status(agent_data_path)
+                return self.__detailed_status(
+                    agent_data_path, status_format=status_format
+                )
             elif command == "restart":
                 return self.__restart(quiet, no_fork, no_check_remote)
             elif command == "condrestart":
@@ -567,7 +589,7 @@ class ScalyrAgent(object):
             log.info("Received signal to shutdown, attempt to shutdown cleanly.")
             self.__run_state.stop()
 
-    def __detailed_status(self, data_directory):
+    def __detailed_status(self, data_directory, status_format="text"):
         """Execute the status -v command.
 
         This will request the current agent to dump its detailed status to a file in the data directory, which
@@ -579,6 +601,13 @@ class ScalyrAgent(object):
         @return:  An exit status code for the status command indicating success or failure.
         @rtype: int
         """
+        if status_format not in VALID_STATUS_FORMATS:
+            print(
+                "Invalid status format: %s. Valid formats are: %s"
+                % (status_format, ", ".join(VALID_STATUS_FORMATS))
+            )
+            return 1
+
         # First, see if we have to change the user that is executing this script to match the owner of the config.
         if self.__escalator.is_user_change_required():
             try:
@@ -608,6 +637,7 @@ class ScalyrAgent(object):
             return 1
 
         status_file = os.path.join(data_directory, STATUS_FILE)
+        status_format_file = os.path.join(data_directory, STATUS_FORMAT_FILE)
 
         # This users needs to zero out the current status file (if it exists), so they need write access to it.
         # When we do create the status file, we give everyone read/write access, so it should not be an issue.
@@ -624,6 +654,11 @@ class ScalyrAgent(object):
             f = open(status_file, "w")
             f.truncate(0)
             f.close()
+
+        # Write the file with the format we need to use
+        with open(status_format_file, "w") as fp:
+            status_format = six.text_type(status_format)
+            fp.write(status_format)
 
         # Signal to the running process.  This should cause that process to write to the status file
         result = self.__controller.request_agent_status()
@@ -862,14 +897,17 @@ class ScalyrAgent(object):
                     logs_initial_positions = None
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
+
+                python_version_str = sys.version.replace("\n", "")
+
                 log.info(
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version)
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str)
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version),
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
                 )
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
@@ -935,12 +973,11 @@ class ScalyrAgent(object):
 
                 prev_server = scalyr_server
 
-                profiler = Profiler(self.__config)
+                profiler = ScalyrProfiler(self.__config)
 
                 while not self.__run_state.sleep_but_awaken_if_stopped(
                     config_change_check_interval
                 ):
-
                     current_time = time.time()
                     self.__last_config_check_time = current_time
 
@@ -949,11 +986,16 @@ class ScalyrAgent(object):
                     if self.__config.disable_overall_stats:
                         log.log(scalyr_logging.DEBUG_LEVEL_0, "overall stats disabled")
                     else:
-                        # Log the overall stats once every 10 mins.
-                        if current_time > last_overall_stats_report_time + 600:
-                            self.__log_overall_stats(
-                                self.__calculate_overall_stats(base_overall_stats)
+                        # Log the overall stats once every 10 mins (by default)
+                        log_stats_delta = self.__config.overall_stats_log_interval
+                        if (
+                            current_time
+                            > last_overall_stats_report_time + log_stats_delta
+                        ):
+                            self.__overall_stats = self.__calculate_overall_stats(
+                                base_overall_stats
                             )
+                            self.__log_overall_stats(self.__overall_stats)
                             last_overall_stats_report_time = current_time
 
                     if self.__config.disable_bandwidth_stats:
@@ -962,9 +1004,14 @@ class ScalyrAgent(object):
                         )
                     else:
                         # Log the bandwidth-related stats once every minute:
-                        if current_time > last_bw_stats_report_time + 60:
+                        log_stats_delta = self.__config.bandwidth_stats_log_interval
+                        if current_time > last_bw_stats_report_time + log_stats_delta:
+                            self.___overall_stats = self.__calculate_overall_stats(
+                                base_overall_stats
+                            )
+
                             self.__log_bandwidth_stats(
-                                self.__calculate_overall_stats(base_overall_stats)
+                                self.__calculate_overall_stats(self.__overall_stats)
                             )
                             last_bw_stats_report_time = current_time
 
@@ -1033,6 +1080,22 @@ class ScalyrAgent(object):
                         ):
                             gc.collect()
                             last_gc_time = current_time
+
+                        if self.__config.enable_gc_stats:
+                            # If GC stats are enabled, enable tracking uncollectable objects
+                            if gc.get_debug() == 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Enabling GC debug mode",
+                                )
+                                gc.set_debug(gc.DEBUG_UNCOLLECTABLE)
+                        else:
+                            if gc.get_debug() != 0:
+                                log.log(
+                                    scalyr_logging.DEBUG_LEVEL_5,
+                                    "Disabling GC debug mode",
+                                )
+                                gc.set_debug(0)
 
                         if _check_disabled(
                             current_time,
@@ -1205,8 +1268,30 @@ class ScalyrAgent(object):
         @rtype: ScalyrClientSession
         """
         if self.__config.verify_server_certificate:
+            is_dev_install = INSTALL_TYPE == DEV_INSTALL
+            is_dev_or_msi_install = INSTALL_TYPE in [DEV_INSTALL, MSI_INSTALL]
+
             ca_file = self.__config.ca_cert_path
             intermediate_certs_file = self.__config.intermediate_certs_path
+
+            # Validate provided CA cert file and intermediate cert file exists. If they don't
+            # exist, throw and fail early and loudly
+            if not is_dev_install and not os.path.isfile(ca_file):
+                raise ValueError(
+                    'Invalid path "%s" specified for the "ca_cert_path" config '
+                    "option: file does not exist" % (ca_file)
+                )
+
+            # NOTE: We don't include intermediate certs in the Windows binary so we skip that check
+            # under the MSI / Windows install
+            if not is_dev_or_msi_install and not os.path.isfile(
+                intermediate_certs_file
+            ):
+                raise ValueError(
+                    'Invalid path "%s" specified for the '
+                    '"intermediate_certs_path" config '
+                    "option: file does not exist" % (intermediate_certs_file)
+                )
         else:
             ca_file = None
             intermediate_certs_file = None
@@ -1260,6 +1345,14 @@ class ScalyrAgent(object):
         @param config: The configuration
         @type config: Configuration
         """
+
+        if self.__controller.install_type == DEV_INSTALL:
+            # The agent is running from source, make sure that its directories exist.
+            if not os.path.exists(config.agent_log_path):
+                os.makedirs(config.agent_log_path)
+            if not os.path.exists(config.agent_data_path):
+                os.makedirs(config.agent_data_path)
+
         if not os.path.isdir(config.agent_log_path):
             raise Exception(
                 "The agent log directory '%s' does not exist." % config.agent_log_path
@@ -1347,6 +1440,12 @@ class ScalyrAgent(object):
             result.copying_manager_status = self.__copying_manager.generate_status()
         if self.__monitors_manager is not None:
             result.monitor_manager_status = self.__monitors_manager.generate_status()
+
+        # Include GC stats (if enabled)
+        if self.__config.enable_gc_stats:
+            gc_stats = GCStatus()
+            gc_stats.garbage = len(gc.garbage)
+            result.gc_stats = gc_stats
 
         return result
 
@@ -1514,7 +1613,27 @@ class ScalyrAgent(object):
         return result
 
     def __report_status_to_file(self):
-        """Handles the signal sent to request this process write its current detailed status out."""
+        # type: () -> str
+        """
+        Handles the signal sent to request this process write its current detailed status out.
+
+        :return: File path status data has been written to.
+        :rtype: ``str``
+        """
+        # First determine the format user request. If no file with the requested format, we assume
+        # text format is used (this way it's backward compatible and works correctly on upgraded)
+        status_format = "text"
+
+        status_format_file = os.path.join(
+            self.__config.agent_data_path, STATUS_FORMAT_FILE
+        )
+        if os.path.isfile(status_format_file):
+            with open(status_format_file, "r") as fp:
+                status_format = fp.read().strip()
+
+        if not status_format or status_format not in VALID_STATUS_FORMATS:
+            status_format = "text"
+
         tmp_file = None
         try:
             # We do a little dance to write the status.  We write it to a temporary file first, and then
@@ -1528,7 +1647,16 @@ class ScalyrAgent(object):
             if os.path.isfile(final_file_path):
                 os.remove(final_file_path)
             tmp_file = open(tmp_file_path, "w")
-            report_status(tmp_file, self.__generate_status(), time.time())
+
+            agent_status = self.__generate_status()
+
+            if not status_format or status_format == "text":
+                report_status(tmp_file, self.__generate_status(), time.time())
+            elif status_format == "json":
+                status_data = agent_status.to_dict()
+                status_data["overall_stats"] = self.__overall_stats.to_dict()
+                tmp_file.write(scalyr_util.json_encode(status_data))
+
             tmp_file.close()
             tmp_file = None
 
@@ -1539,6 +1667,8 @@ class ScalyrAgent(object):
             )
             if tmp_file is not None:
                 tmp_file.close()
+
+        return final_file_path
 
 
 class WorkerThread(object):
@@ -1605,6 +1735,13 @@ if __name__ == "__main__":
         default=False,
         help="For status command, prints detailed information about running agent.",
     )
+    parser.add_option(
+        "--format",
+        dest="status_format",
+        default="text",
+        help="Format to use (text / json) for the agent status command.",
+    )
+
     parser.add_option(
         "",
         "--no-fork",

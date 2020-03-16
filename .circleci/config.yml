@@ -1,8 +1,22 @@
 # Python CircleCI 2.1 configuration file
 #
-# Check https://circleci.com/docs/2.0/language-python/ for more details
-#
+# Check https://circleci.com/docs/2.2/language-python/ for more details
+
+master_only: &master_only
+  filters:
+    branches:
+      only:
+        - master
+
 version: 2.1
+parameters:
+  default_tox_version:
+    type: string
+    default: "3.14.3"
+  cache_version:
+    type: string
+    default: "v3"
+
 commands:
   unittest_tox:
     description: "A base command for all tox based unit test jobs"
@@ -28,15 +42,15 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
       - when:
           condition: << parameters.apt_dependencies >>
           steps:
             - run:
                 name: Install APT Dependencies
                 command: |
-                    apt-get update -y
-                    apt-get install -y << parameters.apt_dependencies >>
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
       - run:
           name: Install Dependencies
           command: |
@@ -46,22 +60,278 @@ commands:
           command: |
             tox -e<< parameters.tox_target >>
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-<< parameters.python_version >>-unit-tests-venv-{{ checksum "dev-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
-            - ".tox"
+            - "~/.cache/pip"
       - when:
           condition: << parameters.store_coverage >>
           steps:
             - run:
                 name: Move Coverage Data
                 command: |
-                    mkdir -p coverage-unittest-<< parameters.python_version >>
-                    mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
+                  mkdir -p coverage-unittest-<< parameters.python_version >>
+                  mv .coverage coverage-unittest-<< parameters.python_version >>/.coverage.unittest-<< parameters.python_version >>
             - persist_to_workspace:
                 root: coverage-unittest-<< parameters.python_version >>
                 paths:
-                    .coverage.unittest-<< parameters.python_version >>
+                  .coverage.unittest-<< parameters.python_version >>
+  codespeed_agent_process_benchmark:
+    description: "A base command which runs CodeSpeed agent process level benchmarks"
+    parameters:
+      codespeed_executable:
+        description: "CodeSpeed executable name."
+        type: string
+      codespeed_environment:
+        description: "CodeSpeed environment name."
+        type: string
+        default: "Circle CI Docker Executor Medium Size"
+      agent_config:
+        description: "Path to the agent config file to use."
+        type: string
+      run_time:
+        description: "How long to run the capture for (in seconds)."
+        type: integer
+        default: 120
+      capture_interval:
+        description: "How often to capture agent process level metrics during the process run time (in seconds)."
+        type: integer
+        default: 5
+      agent_pre_run_command:
+        description: "Optional bash command / script to run before starting the agent and the metrics capture script."
+        type: string
+        default: ""
+      agent_post_run_command:
+        description: "Optional bash command / script to run after starting the agent and the metrics capture script."
+        type: string
+        default: ""
+      agent_server_host:
+        description: "Value for the server_attributes.serverHost agent configuration option."
+        type: string
+        default: "ci-codespeed-benchmarks"
+      capture_agent_status_metrics:
+        description: "True to capture additional metrics exposed via agent status command."
+        type: boolean
+        default: false
+      capture_line_counts:
+        description: "True to submit log line counts for each log level to CodeSpeed."
+        type: boolean
+        default: false
+      dry_run:
+        description: "True to enable dry run which runs the benchmarks without submitting data to CodeSpeed."
+        type: boolean
+        default: false
+      cache_key_name:
+        description: "Circle CI cache key name"
+        type: string
+        default: "Circle CI cache key name"
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install --user -r benchmarks/scripts/requirements.txt
+            # Workaround for issue with cffi library on the system using
+            # different version than the one which is bundled with the agent
+            pip install --user "cffi==1.12.3"
+            # TODO: Add another benchmark with ujson
+            # pip install --user "ujson==1.35"
+      - run:
+          name: Run Agent And Capture Resource Utilization
+          # NOTE: The following variables are specified in the Circle CI WebUI
+          # and are handles as secrets: CODESPEED_AUTH
+          environment:
+            CODESPEED_URL: "https://scalyr-agent-codespeed.herokuapp.com/"
+            CODESPEED_PROJECT: "scalyr-agent-2"
+            CODESPEED_EXECUTABLE: "<< parameters.codespeed_executable >>"
+            CODESPEED_ENVIRONMENT: "<< parameters.codespeed_environment >>"
+            CODESPEED_BRANCH: "${CIRCLE_BRANCH}"
+            # NOTE: "idle" agent process (which monitors no logs but just runs the linux process
+            # monitor for the agent process) should stabilize in a couple of minutes so it makes
+            # no sense to run that benchmark longer.
+            RUN_TIME: << parameters.run_time >>
+            CAPTURE_INTERVAL: << parameters.capture_interval >>
+            AGENT_CONFIG_FILE: "<< parameters.agent_config >>"
+            SCALYR_SERVER_ATTRIBUTES: "{\"serverHost\": \"<< parameters.agent_server_host>>\"}"
+            CAPTURE_AGENT_STATUS_METRICS: "<< parameters.capture_agent_status_metrics >>"
+            DRY_RUN: "<< parameters.dry_run >>"
+          command: |
+            # Create directories which are needed by the agent process
+            mkdir -p ~/scalyr-agent-dev/{log,config,data}
+
+            # NOTE: We explicitly specify a commit date to avoid CodeSpeed from
+            # late setting the actual date once it fetches all the commits for a
+            # branch / revision
+            export TZ=UTC
+            export COMMIT_DATE=$(git show --quiet --date='format-local:%Y-%m-%d %H:%M:%S' --format="%cd" ${CIRCLE_SHA1})
+
+            # Run any pre agent run script (if defined)
+            if [ ! -z "<< parameters.agent_pre_run_command >>" ]; then
+                echo "Running agent pre run command..."
+                << parameters.agent_pre_run_command >>
+            fi
+
+            # Run the agent process and capture the metrics
+            ./benchmarks/scripts/start-agent-and-capture-metrics.sh "${CIRCLE_SHA1}" &> /tmp/capture_script.log &
+            CAPTURE_SCRIPT_PID=$!
+
+            # Run any post agent run script (if defined)
+            # NOTE: We intentionally sleep for a bit to give agent time to fully
+            # start up
+            if [ ! -z "<< parameters.agent_post_run_command >>" ]; then
+                echo "Running agent post run command..."
+                sleep 2
+                << parameters.agent_post_run_command >>
+            fi
+
+            # Wait for capture script to finish
+            set +e
+            sh -c 'tail -n +0 -F /tmp/capture_script.log | { sed "/Run completed, stopping the agent process./ q" && kill $$ ;}'
+            wait ${CAPTURE_SCRIPT_PID} || true
+            set -e
+
+            # Send line count values for various log levels (if enabled)
+            if [ "<< parameters.capture_line_counts >>" = "true" ]; then
+                ./benchmarks/scripts/send-log-level-counts-to-codespeed.sh "${CIRCLE_SHA1}"
+            fi
+      - save_cache:
+          key: deps1-{{ .Branch }}-<< parameters.cache_key_name >>-venv-{{ checksum "benchmarks/scripts/requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/scalyr-agent-dev/log
+
+  smoke-standalone-tox:
+    description: "A base command for all tox based smoke test jobs"
+    parameters:
+      python_version:
+        description: "Python version to use (e.g. 3.5, 3.6, 3.7, 3.8, etc.)."
+        type: string
+      tox_version:
+        description: "tox package version to use."
+        type: string
+        default: "3.14.3"
+      apt_dependencies:
+        description: "Any optional apt dependencies which should be installed."
+        type: string
+        default: ""
+      tox_target:
+        description: "Tox target to run."
+        type: string
+      store_coverage:
+        description: "True to persist / store coverage data."
+        type: boolean
+        default: false
+    steps:
+      - checkout
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+      - when:
+          condition: << parameters.apt_dependencies >>
+          steps:
+            - run:
+                name: Install APT Dependencies
+                command: |
+                  apt-get update -y
+                  apt-get install -y << parameters.apt_dependencies >>
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< parameters.tox_version >>"
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+            export AGENT_HOST_NAME=agent-smoke-standalone-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+
+            tox -e<< parameters.tox_target >>
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-<< parameters.python_version >>-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/scalyr-agent-dev/log
+
+  smoke-package:
+    description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
+    parameters:
+      distribution:
+        description: "The name of the distribution where the agent will be installed."
+        type: string
+      python_version:
+        description: "The version of the python interpreter to install in distribution."
+        type: string
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: false
+      - restore_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+
+      - run:
+          name: Install Dependencies
+          command: |
+            pip install "tox==<< pipeline.parameters.default_tox_version >>"
+
+      - run:
+          name: "Get Dockerfile for current agent image."
+          command: |
+            # Add agent source code to PYTHONPATH to be able to import its components.
+            export PYTHONPATH=.:${PYTHONPATH}
+            # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
+            python smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
+            cat ~/Dockerfile
+
+      - restore_cache:
+          # here the 'tar' file of the docker image is stored. Use it to restore agent image without building it.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+
+      - run:
+          name: Run Unit Tests under Python << parameters.python_version >>
+          command: |
+            # Concatenate 'CIRCLE_BUILD_NUM' and 'AGENT_HOST_NAME' env. variables.
+            # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
+            # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
+            export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
+            export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+
+            # NOTE: We don't want the build to immediately fail if tox command fails because we
+            # want to preserve the build logs as artifacts to aid with debugging
+            set +e
+            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            EXIT_CODE=$?
+            set -e
+
+            # copy log files to artifacts directory.
+            mkdir -p ~/artifacts
+            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2 ~/artifacts/
+
+            if [ "${EXIT_CODE}" -ne "0" ]; then
+                echo "tox target failed"
+                exit 1
+            fi
+
+      - save_cache:
+          # save agent image to 'tar' file here, if this file is not found previously.
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          paths:
+            - "~/agent_image"
+
+      - save_cache:
+          key: deps2-tox-{{ .Branch }}-3.6-venv-{{ checksum "dev-requirements.txt" }}
+          paths:
+            - "~/.cache/pip"
+
+      # NOTE: We store the logs to ease with troubleshooting / debugging
+      - store_artifacts:
+          path: ~/artifacts
 
 jobs:
   unittest-38:
@@ -119,48 +389,9 @@ jobs:
           python_version: "2.6"
           tox_version: "2.9.1"
           tox_target: "py2.6-unit-tests"
-          apt_dependencies: "procps"
+          apt_dependencies: "procps build-essential"
 
-  smoke-standalone-37:
-    docker:
-      - image: circleci/python:3.6-jessie
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-      - run:
-          command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=3.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
 
-  smoke-standalone-27:
-    docker:
-      - image: circleci/python:2.7-jessie
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-      - run:
-          command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.7 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
-  smoke-standalone-26:
-    docker:
-      - image: circleci/python:2.7-jessie
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: false
-      - run:
-          command: |
-            docker container create --name dummy -v shared_vol:/app alpine && \
-            docker cp $(pwd)/.circleci/smoketest_standalone.sh dummy:/app/ && \
-            docker run -it -v shared_vol:/app -e TEST_BRANCH=${CIRCLE_BRANCH} -e MAX_WAIT=300 -e PYTHON_VERSION=2.6 -e SCALYR_API_KEY=${SCALYR_API_KEY} -e READ_API_KEY=${READ_API_KEY} -e SCALYR_SERVER=${SCALYR_SERVER} -e CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM} scalyr/scalyr-agent-ci-unittest:4 /app/smoketest_standalone.sh && \
-            docker rm dummy;
   smoke-standalone-27-tls12:
     docker:
       - image: circleci/python:2.7-jessie
@@ -196,14 +427,14 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
       - run:
@@ -225,14 +456,14 @@ jobs:
           docker_layer_caching: false
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
       - run:
           command: |
             virtualenv venv
             source venv/bin/activate
             pip install -r dev-requirements.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-docker-json-{{ checksum "dev-requirements.txt" }}
           paths:
             - "venv"
       - run:
@@ -376,7 +607,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
+          key: deps2-{{ .Branch }}-{{ checksum "dev-requirements.txt" }}
       - run:
           name: Install dependencies
           command: |
@@ -419,7 +650,7 @@ jobs:
           command: |
             source ../venv/bin/activate
             coverage xml --rcfile=.coveragerc -i -o coverage.xml
-            codecov --root=/home/circleci/scalyr-agent-2/ --disable gcov --file coverage.xml
+            ./../scripts/submit-codecov-data.sh
 
   lint-checks:
     working_directory: ~/scalyr-agent-2
@@ -428,20 +659,266 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
+      - run:
+          name: Install APT dependencies
+          command: |
+            # We add unstable repo to make sure latest version of shellchcek (>=
+            # 0.7.0 is installed)
+            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
+            sudo apt-get update -y
+            sudo apt-get install -y shellcheck
       - run:
           name: Install Python dependencies
           command: |
             sudo pip install "tox==3.14.3"
       - run:
-          name: Run Lint Checks
+          name: Run Python Lint Checks
           command: |
             tox -e lint
+      - run:
+          name: Run Shell Scripts Lint Checks
+          environment:
+            IGNORE_BINARY_DOESNT_EXIST: "0"
+          command: |
+            ./scripts/shell-scripts-lint.sh
       - save_cache:
-          key: deps1-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
+          key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:
-            - "~/.cache/pip."
-            - ".tox"
+            - "~/.cache/pip"
+
+  benchmarks-idle-agent-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - idle conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-1"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-27"
+
+  benchmarks-idle-agent-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - idle conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-1"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-35"
+
+  benchmarks-idle-agent-no-monitors-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py27-idle-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-27"
+
+  benchmarks-idle-agent-no-monitors-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - idle conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_no_monitored_logs_no_monitors.json"
+          agent_server_host: "ci-codespeed-benchmarks-py35-idle-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-idle-agent-no-monitors-py-35"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-1"
+          run_time: 140
+          capture_agent_status_metrics: true
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27"
+
+  benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 1"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_50mb_access_log_file.json"
+          agent_pre_run_command: "wget --directory-prefix=/tmp https://github.com/scalyr/codespeed-agent-fixtures/raw/master/fixtures/logs/access_log_50_mb.log"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-1"
+          run_time: 140
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35"
+
+  # NOTE: For the benchmarks below to work correctly "/tmp/random.log" file
+  # which is being written to during the benchmark must existing before the
+  # agent process is started.
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-27"
+
+  benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5.9
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 3.5.9 - loaded conf 2"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file_with_shell_and_url_monitor.json"
+          run_time: 140
+          agent_pre_run_command: "touch /tmp/random.log"
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 2M 10 100 1"
+          agent_server_host: "ci-codespeed-benchmarks-py35-loaded-conf-2"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-py-35"
+
+  benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7.17
+    steps:
+      - codespeed_agent_process_benchmark:
+          codespeed_executable: "Python 2.7.17 - loaded conf 3"
+          codespeed_environment: "Circle CI Docker Executor Medium Size"
+          agent_config: "benchmarks/configs/agent_single_growing_log_file.json"
+          # NOTE: We set agent run time slightly longer than the insert script time run so we give a chance for memory and
+          # other metrics to stabilize.
+          run_time: 390
+          agent_pre_run_command: "touch /tmp/random.log"
+          # NOTE: We write a chunk every 1 seconds for a total of 6 minutes.
+          # Each chunk is 0.5 MB in size which means we write a total of 360 * 1
+          # / 0.5 MB of data
+          agent_post_run_command: "benchmarks/scripts/write-random-lines.sh /tmp/random.log 500K 360 100 1 &> /tmp/write_lines_script.log &"
+          agent_server_host: "ci-codespeed-benchmarks-py27-loaded-conf-3"
+          capture_line_counts: true
+          cache_key_name: "benchmarks-loaded-agent-growing-log-file-180-py-27"
+
+  smoke-standalone-38:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.8"
+          tox_target: "py3.8-smoke-tests"
+
+  smoke-standalone-37:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.7"
+          tox_target: "py3.7-smoke-tests"
+
+  smoke-standalone-36:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.6"
+          tox_target: "py3.6-smoke-tests"
+
+  smoke-standalone-35:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.5
+    steps:
+      - smoke-standalone-tox:
+          python_version: "3.5"
+          tox_target: "py3.5-smoke-tests"
+
+  smoke-standalone-27:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:2.7
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.7"
+          tox_target: "py2.7-smoke-tests"
+
+
+  smoke-standalone-26:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image:  dockershelf/python:2.6-dev
+    steps:
+      - smoke-standalone-tox:
+          python_version: "2.6"
+          tox_version: "2.9.1"
+          tox_target: "py2.6-smoke-tests"
+          apt_dependencies: "procps build-essential"
+
+
+  smoke-rpm-package-py3:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "amazonlinux"
+          python_version: "python3"
+
+  smoke-rpm-package-py2:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "amazonlinux"
+          python_version: "python2"
+
+  smoke-deb-package-py3:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "ubuntu"
+          python_version: "python3"
+
+  smoke-deb-package-py2:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "ubuntu"
+          python_version: "python2"
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -455,8 +932,8 @@ jobs:
           command: |
             export PYTHONPATH=.
             python scripts/circleci_usage_data.py --project_slug=gh/scalyr/scalyr-agent-2 \
-                --workflow=unittest --status=success --branch=all --limit=5 \
-                --email=tomaz@scalyr.com
+                --workflows=unittest,benchmarks,package-smoke-tests --status=success --branch=all --limit=5 \
+                --email=cloudtech-builds@scalyr.com
 
 workflows:
   version: 2
@@ -469,20 +946,54 @@ workflows:
       - unittest-35
       - unittest-27
       - unittest-26
+      - smoke-standalone-38
       - smoke-standalone-37
+      - smoke-standalone-36
+      - smoke-standalone-35
       - smoke-standalone-27
       - smoke-standalone-26
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
+      # smoke test jobs above are still uses old smoke tests.
       - smoke-docker-json
       - smoke-docker-syslog
       - smoke-k8s
+      - smoke-standalone-27-tls12
+      - smoke-standalone-26-tls12
       - coverage:
           requires:
             - unittest-27
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
+  package-smoke-tests:
+    jobs:
+      - smoke-rpm-package-py2:
+          <<: *master_only
+      - smoke-rpm-package-py3:
+          <<: *master_only
+      - smoke-deb-package-py2:
+          <<: *master_only
+      - smoke-deb-package-py3:
+          <<: *master_only
+  benchmarks:
+    jobs:
+      - benchmarks-idle-agent-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-py-35:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-27:
+          <<: *master_only
+      - benchmarks-idle-agent-no-monitors-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-50mb-log-file-with-parser-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-27:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-20mb-py-35:
+          <<: *master_only
+      - benchmarks-loaded-agent-single-growing-log-file-180mb-py-27:
+          <<: *master_only
   weekly-circle-ci-usage-report:
     triggers:
       - schedule:

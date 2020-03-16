@@ -39,6 +39,6 @@ def serialize_as_length_prefixed_string(value, output_buffer):
         to_serialize = value.encode("utf-8")
     else:
         to_serialize = value
-    # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+    # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
     output_buffer.write(compat.struct_pack_unicode(">i", len(to_serialize)))
     output_buffer.write(to_serialize)

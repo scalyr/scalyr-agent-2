@@ -390,6 +390,15 @@ define_config_option(
 
 define_config_option(
     __monitor__,
+    "k8s_kubelet_api_url_template",
+    "Optional (defaults to https://${host_ip}:10250). Defines the port and protocol to use when talking to the kubelet API",
+    convert_to=six.text_type,
+    default="https://${host_ip}:10250",
+    env_aware=True,
+)
+
+define_config_option(
+    __monitor__,
     "k8s_sidecar_mode",
     "Optional, (defaults to False). If true, then logs will only be collected for containers "
     "running in the same Pod as the agent. This is used in situations requiring very high throughput.",
@@ -861,7 +870,7 @@ class WrappedMultiplexedStreamResponse(object):
             yield item
 
 
-class DockerClient(docker.Client):  # pylint: disable=no-member
+class DockerClient(docker.APIClient):  # pylint: disable=no-member
     """ Wrapper for docker.Client to return 'wrapped' versions of streamed responses
         so that we can have access to the response object, which allows us to get the
         socket in use, and shutdown the blocked socket from another thread (e.g. upon
@@ -1071,7 +1080,7 @@ class ControlledCacheWarmer(StoppableThread):
         # has already been warmed.
         self.__lock.acquire()
         try:
-            if not container_id in self.__active_pods:
+            if container_id not in self.__active_pods:
                 self.__active_pods[container_id] = ControlledCacheWarmer.WarmingEntry(
                     pod_namespace, pod_name
                 )
@@ -1140,7 +1149,6 @@ class ControlledCacheWarmer(StoppableThread):
         @rtype: dict  (int, int)
         """
         self.__lock.acquire()
-        result = {}
         try:
             return self.__gather_report_stats()
         finally:
@@ -1680,8 +1688,8 @@ def _get_containers(
 
                     if glob_list:
                         add_container = False
-                        for glob in glob_list:
-                            if fnmatch.fnmatch(name, glob):
+                        for glob_pattern in glob_list:
+                            if fnmatch.fnmatch(name, glob_pattern):
                                 add_container = True
                                 break
 
@@ -2013,6 +2021,7 @@ class CRIEnumerator(ContainerEnumerator):
         k8s_api_url,
         query_filesystem,
         kubelet_api_host_ip,
+        kubelet_api_url_template,
         is_sidecar_mode=False,
     ):
         """
@@ -2028,15 +2037,19 @@ class CRIEnumerator(ContainerEnumerator):
         """
         super(CRIEnumerator, self).__init__(agent_pod, is_sidecar_mode=is_sidecar_mode)
         k8s = KubernetesApi.create_instance(global_config, k8s_api_url=k8s_api_url)
-        self._kubelet = KubeletApi(k8s, host_ip=kubelet_api_host_ip)
+        self._kubelet = KubeletApi(
+            k8s,
+            host_ip=kubelet_api_host_ip,
+            kubelet_url_template=Template(kubelet_api_url_template),
+        )
         self._query_filesystem = query_filesystem
 
         self._log_base = "/var/log/containers"
         self._pod_base = "/var/log/pods"
         self._container_glob = "%s/*.log" % self._log_base
-        self._pod_re = re.compile("^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
+        self._pod_re = re.compile(r"^%s/([^/]+)/([^/]+)/.*\.log$" % self._pod_base)
         self._info_re = re.compile(
-            "^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
+            r"^%s/([^_]+)_([^_]+)_([^_]+)-([^_]+).log$" % self._log_base
         )
 
     def _get_containers(
@@ -2076,8 +2089,8 @@ class CRIEnumerator(ContainerEnumerator):
                 add_container = True
                 if glob_list:
                     add_container = False
-                    for glob in glob_list:
-                        if fnmatch.fnmatch(cname, glob):
+                    for glob_pattern in glob_list:
+                        if fnmatch.fnmatch(cname, glob_pattern):
                             add_container = True
                             break
 
@@ -2229,7 +2242,6 @@ class CRIEnumerator(ContainerEnumerator):
                 metadata = pod.get("metadata", {})
                 pod_name = metadata.get("name", "")
                 pod_namespace = metadata.get("namespace", "")
-                pod_uid = metadata.get("uid", "")
 
                 # ignore anything that is in an excluded namespace
                 if pod_namespace in k8s_namespaces_to_exclude:
@@ -2310,7 +2322,7 @@ class CRIEnumerator(ContainerEnumerator):
                 limit_key="kubelet-api-connect",
             )
             self._query_filesystem = True
-        except Exception as e:
+        except Exception:
             global_log.exception(
                 "Error querying kubelet API for running pods and containers",
                 limit_once_per_x_secs=300,
@@ -2495,7 +2507,7 @@ class ContainerChecker(object):
 
         try:
             k8s_api_url = self._global_config.k8s_api_url
-            k8s_verify_api_queries = self._config.get("k8s_verify_api_queries")
+            self._config.get("k8s_verify_api_queries")
 
             # create the k8s cache
             self.k8s_cache = k8s_utils.cache(self._global_config)
@@ -2584,6 +2596,7 @@ class ContainerChecker(object):
                     k8s_api_url,
                     query_fs,
                     self._config.get("k8s_kubelet_host_ip"),
+                    self._config.get("k8s_kubelet_api_url_template"),
                     is_sidecar_mode=self.__sidecar_mode,
                 )
 
@@ -2732,15 +2745,15 @@ class ContainerChecker(object):
                 for cid, info in six.iteritems(running_containers):
                     pod = None
                     if "k8s_info" in info:
-                        pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
-                        pod_namespace = info["k8s_info"].get(
-                            "pod_namespace", "invalid_namespace"
-                        )
                         pod = info["k8s_info"].get("pod_info", None)
 
                         if not pod:
                             pass
                             # Don't log any warnings here for now
+                            # pod_name = info["k8s_info"].get("pod_name", "invalid_pod")
+                            # pod_namespace = info["k8s_info"].get(
+                            #     "pod_namespace", "invalid_namespace"
+                            # )
                             # self._logger.warning( "No pod info for container %s.  pod: '%s/%s'" % (_get_short_cid( cid ), pod_namespace, pod_name),
                             #                      limit_once_per_x_secs=300,
                             #                      limit_key='check-container-pod-info-%s' % cid)
@@ -2914,7 +2927,7 @@ class ContainerChecker(object):
             if self.__host_hostname:
                 attributes["serverHost"] = self.__host_hostname
 
-        except Exception as e:
+        except Exception:
             self._logger.error("Error setting monitor attribute in KubernetesMonitor")
             raise
 
@@ -3163,8 +3176,6 @@ class ContainerChecker(object):
 
         attributes = self.__get_base_attributes()
 
-        prefix = self.__log_prefix + "-"
-
         for cid, info in six.iteritems(containers):
             log_config = self.__get_log_config_for_container(
                 cid, info, k8s_cache, attributes
@@ -3366,7 +3377,6 @@ class KubernetesMonitor(ScalyrMonitor):
 
     def _initialize(self):
         """This method gets called every 30 seconds regardless"""
-        data_path = ""
         log_path = ""
         host_hostname = ""
 
@@ -3385,7 +3395,6 @@ class KubernetesMonitor(ScalyrMonitor):
         )
 
         if self._global_config:
-            data_path = self._global_config.agent_data_path
             log_path = self._global_config.agent_log_path
 
             if self._global_config.server_attributes:
@@ -4010,7 +4019,7 @@ class KubernetesMonitor(ScalyrMonitor):
         # workaround a multithread initialization problem with time.strptime
         # see: http://code-trick.com/python-bug-attribute-error-_strptime/
         # we can ignore the result
-        tm = time.strptime("2016-08-29", "%Y-%m-%d")
+        time.strptime("2016-08-29", "%Y-%m-%d")
 
         if self.__container_checker:
             self.__container_checker.start()
@@ -4049,6 +4058,7 @@ class KubernetesMonitor(ScalyrMonitor):
             "SCALYR_K8S_RATELIMIT_BACKOFF_FACTOR",
             "SCALYR_K8S_RATELIMIT_MAX_CONCURRENCY",
             "SCALYR_K8S_SIDECAR_MODE",
+            "SCALYR_K8S_KUBELET_API_URL_TEMPLATE",
         ]
         for envar in envars_to_log:
             self._logger.info(
@@ -4093,7 +4103,11 @@ class KubernetesMonitor(ScalyrMonitor):
                     self._global_config, k8s_api_url=self.__k8s_api_url
                 )
                 self.__kubelet_api = KubeletApi(
-                    k8s, host_ip=self._config.get("k8s_kubelet_host_ip")
+                    k8s,
+                    host_ip=self._config.get("k8s_kubelet_host_ip"),
+                    kubelet_url_template=Template(
+                        self._config.get("k8s_kubelet_api_url_template")
+                    ),
                 )
         except Exception as e:
             self._logger.error(

@@ -244,12 +244,16 @@ class DockerMonitorTest(ScalyrTestCase):
 
                 manager.start_manager()
                 fragment_polls.sleep_until_count_or_maxwait(
-                    40, manager_poll_interval, maxwait=1
+                    40, manager_poll_interval, maxwait=2.5
                 )
 
                 m1.assert_called()
                 m2.assert_called()
                 m3.assert_called()
+
+                manager.stop_manager(wait_on_join=False)
+                fake_clock.advance_time(increment_by=manager_poll_interval)
+
                 self.assertEquals(fragment_polls.count(), 40)
                 self.assertEquals(counter["callback_invocations"], 4)
                 self.assertEquals(
@@ -261,8 +265,5 @@ class DockerMonitorTest(ScalyrTestCase):
                         "docker=18.09.2|docker_api|api",
                     ],
                 )
-
-                manager.stop_manager(wait_on_join=False)
-                fake_clock.advance_time(increment_by=manager_poll_interval)
 
             start_test()  # pylint: disable=no-value-for-parameter

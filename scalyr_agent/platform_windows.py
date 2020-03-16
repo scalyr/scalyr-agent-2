@@ -784,7 +784,7 @@ class PipeRedirectorServer(RedirectorServer):
             """Closes the channel to the client.
             """
             try:
-                # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+                # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
                 win32file.WriteFile(
                     self.__pipe_handle, compat.struct_pack_unicode("I", 0)
                 )

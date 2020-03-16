@@ -29,7 +29,6 @@ import os.path
 import re
 from socket import error as socket_error
 import socket
-import struct
 import threading
 import time
 import traceback
@@ -183,7 +182,7 @@ define_config_option(
     "only has the container id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
     convert_to=six.text_type,
-    default="^.*([a-z0-9]{12})\[\d+\]: ?",
+    default=r"^.*([a-z0-9]{12})\[\d+\]: ?",
 )
 
 define_config_option(
@@ -193,7 +192,7 @@ define_config_option(
     "included both the container name and id.  If a message matches this regex then everything *after* "
     "the full matching expression will be logged to a file called docker-<container-name>.log",
     convert_to=six.text_type,
-    default="^.*([^/]+)/([^[]+)\[\d+\]: ?",
+    default=r"^.*([^/]+)/([^[]+)\[\d+\]: ?",
 )
 
 define_config_option(
@@ -319,7 +318,7 @@ def _get_default_gateway():
             fields = line.strip().split()
             if fields[1] != "00000000" or not int(fields[3], 16) & 2:
                 continue
-            # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+            # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
             result = socket.inet_ntoa(
                 compat.struct_pack_unicode("<L", int(fields[2], 16))
             )
@@ -909,7 +908,7 @@ class SyslogHandler(object):
             if self.__server_host:
                 attributes["serverHost"] = self.__server_host
 
-        except Exception as e:
+        except Exception:
             global_log.error("Error setting docker logger attribute in SyslogMonitor")
             raise
 
@@ -1180,7 +1179,7 @@ class SyslogServer(object):
         server = None
 
         accept_ips = config.get("docker_accept_ips")
-        if accept_ips == None:
+        if accept_ips is None:
             accept_ips = []
             gateway_ip = _get_default_gateway()
             if gateway_ip:
@@ -1412,7 +1411,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         try:
             attributes = JsonObject({"monitor": "agentSyslog"})
             self.log_config["attributes"] = attributes
-        except Exception as e:
+        except Exception:
             global_log.error("Error setting monitor attribute in SyslogMonitor")
 
         (
@@ -1451,7 +1450,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
         server_list = []
 
         # regular expression matching protocol:port
-        port_re = re.compile("^(tcp|udp):(\d+)$")
+        port_re = re.compile(r"^(tcp|udp):(\d+)$")
         for p in protocol_list:
 
             # protocol defaults to the full p for when match fails
@@ -1608,7 +1607,7 @@ running. You can find this log file in the [Overview](/logStart) page. By defaul
             # start the main server
             self.__server.start(self._run_state)
 
-        except Exception as e:
+        except Exception:
             global_log.exception(
                 "Monitor died due to exception:", error_code="failedMonitor"
             )

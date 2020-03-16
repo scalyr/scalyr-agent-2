@@ -183,7 +183,7 @@ def parse_scalyr_request(payload):
         # First add in the bytes between the last processed and the start of this match.
         rewritten_payload += payload[last_processed_index + 1 : x.start(0)]
         # Read the 4 bytes that describe the length, which is stored in regex group 1.
-        # 2->TODO struct.pack|unpack in python2.6 does not allow unicode format string.
+        # 2->TODO struct.pack|unpack in python < 2.7.7 does not allow unicode format string.
         length = compat.struct_unpack_unicode(">i", x.group(1))[0]
         # Grab the string content as raw bytes.
         raw_string = payload[x.end(1) : x.end(1) + length]
