@@ -669,7 +669,9 @@ jobs:
             sudo apt-get update -y
             sudo apt-get install -y shellcheck
             # Needed for generate-monitor-docs-script
-            sudo apt-get install -y python3-systemd
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 648ACFD622F3D138
+            sudo apt-get update -y
+            sudo apt-get install -y build-essential libsystemd-dev
       - run:
           name: Install Python dependencies
           command: |
