@@ -75,43 +75,4 @@ the Application, Security and System sources:
       }
     ]
 
-
-## Configuration Reference
-
-Here is the list of all configuration options you may use to config the Windows Event Log monitor:
-
-|||# Option                        ||| Usage
-|||# ``module``                    ||| Always ``scalyr_agent.builtin_monitors.windows_event_log_monitor``
-|||# ``sources``                   ||| Optional (defaults to ``Application, Security, System``). A comma separated \
-                                       list of event sources. You can use this to specify which event sources you are \
-                                       interested in listening to. (Not valid for Vista and later.  Please use the \
-                                       "channels" parameter instead.)
-|||# ``event_types``               ||| Optional (defaults to ``All``). A comma separated list of event types to \
-                                       log. Valid values are: All, Error, Warning, Information, AuditSuccess and \
-                                       AuditFailure (Not valid for Vista and later.  Please use the "channels" \
-                                       parameter instead.)
-|||# ``channels``                  ||| Optional (defaults to ``[ {"channel" : ["Application", "Security", "System"], "query": "*"}]`` \
-                                       A list of dict objects specifying a list of channels and an XPath query for \
-                                       those channels. (Only available on Windows Vista and later.)
-|||# ``maximum_records_per_source``||| Optional (defaults to ``10000``). The maximum number of records to read from \
-                                       the end of each log sourceper gather_sample.
-|||# ``error_repeat_interval``     ||| Optional (defaults to ``300``). The number of seconds to wait before logging \
-                                       similar errors in the event log.
-|||# ``server_name``               ||| Optional (defaults to ``localhost``). The remote server where the event log is \
-                                       to be opened.
-
-
-## Log reference:
-
-Each event recorded by this plugin will have the following fields:
-
-|||# Field             ||| Meaning
-|||# ``monitor``       ||| Always ``windows_event_log_monitor``.
-|||#``Source``         ||| The event source name, taken from the Windows field ``event.SourceName``.
-|||#``RecordNumber``   ||| The event record number, taken from the Windows field ``event.RecordNumber``.
-|||#``TimeGenerated``  ||| The time the event was generated.
-|||#``TimeWritten``    ||| The time the event was written to the event log.
-|||#``Type``           ||| The event type.
-|||#``EventId``        ||| The event id, taken from the Windows field ``event.EventID``.
-|||#``Category``       ||| The event category, taken from the Windows field ``event.EventCategory``.
-|||#``EventMsg``       ||| The contents of the event message from the Windows Event Log.
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->

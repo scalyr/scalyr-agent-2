@@ -53,37 +53,6 @@ include ones that originate from the ssh service
       }
     ]
 
-## Configuration Reference
-
-Here is the list of all configuration options in addition to the default options for each monitor that you may use to
-config the journald monitor:
-
-|||# Option                        ||| Usage
-|||# ``module``                    ||| Always ``scalyr_agent.builtin_monitors.journald_monitor``
-|||# ``journal_path``              ||| Optional (defaults to ``/var/log/journal``). Location on the filesystem of the journald logs. If this is the empty string, resolves to the current (boot) journal.
-|||# ``journal_poll_interval``      ||| Optional (defaults to ``5``). The number of seconds to wait for data while polling \
-                                       the journal file. Fractional values are supported.
-|||# ``journal_fields``            ||| Optional dict containing journal fields to upload with each message, \
-                                       as well as a field name to map them to on the Scalyr website. \
-                                       Note: Not all fields need to exist in every message and only fields that exist will be included. \
-                                       Defaults to ``{ "_SYSTEMD_UNIT": "unit", "_PID": "pid", "_MACHINE_ID": "machine_id", "_BOOT_ID": "boot_id", "_SOURCE_REALTIME_TIMESTAMP": timestamp" }``
-|||# ``journal_matches``           ||| Optional list containing 'match' strings for filtering entries. \
-                                       A match string follows the pattern  "FIELD=value" where FIELD is a field of \
-                                       the journal entry e.g. _SYSTEMD_UNIT, _HOSTNAME, _GID and "value" is the value \
-                                       to filter that field on, so a match string equal to "_SYSTEMD_UNIT=ssh.service" \
-                                       would filter query results to make sure that all entries entries originated from \
-                                       the ``ssh.service`` system unit. \
-                                       The journald monitor calls the journal reader method ``add_match`` for each string in this list. \
-                                       See the journald documentation for details on how the filtering works: \
-                                       https://www.freedesktop.org/software/systemd/python-systemd/journal.html#systemd.journal.Reader.add_match \
-                                       If this config item is empty or None then no filtering occurs.
-|||# ``id``                        ||| Optional id used to differentiate between multiple journald monitors in the same agent.json configuration file. \
-                                       This is useful for configurations that define multiple journald monitors and that want to save unique checkpoints for each \
-                                       monitor.  If specified, the id is also sent to the server along with other attributes under the ``monitor_id`` field'.
-|||# ``staleness_threshold_secs``  ||| Optional, defaults = ``600``.  When loading the journal events from a \
-                                       checkpoint, if the logs are older than this threshold, then the monitor skips to \
-                                       the end of the journal and only logs new entries.
-
 ## Polling the Journal File
 
 The journald monitor polls the journal file every ``journal_poll_interval`` seconds to check for new logs.  It does this by
@@ -91,3 +60,5 @@ creating a polling object (https://docs.python.org/2/library/select.html#poll-ob
 of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
+
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->

@@ -12,7 +12,6 @@ into Scalyr.
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-
 ## Sample Configuration
 
 Here is a simple configuration fragment showing use of the url_monitor plugin. This sample will record
@@ -44,29 +43,4 @@ The [View Logs](/help/view) page describes the tools you can use to view and ana
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
 
-
-## Configuration Reference
-
-|||# Option                   ||| Usage
-|||# ``module``               ||| Always ``scalyr_agent.builtin_monitors.graphite_monitor ``
-|||# ``only_accept_local``    ||| Optional (defaults to true). If true, then the plugin only accepts connections \
-                                  from localhost. If false, all network connections are accepted.
-|||# ``accept_plaintext``     ||| Optional (defaults to true). If true, then the plugin accepts connections in \
-                                  Graphite's "plain text" procotol.
-|||# ``accept_pickle``        ||| Optional (defaults to true). If true, then the plugin accepts connections in \
-                                  Graphite's "pickle" procotol.
-|||# ``plaintext_port``       ||| Optional (defaults to 2003). The port number on which the plugin listens for \
-                                  plain text connections. Unused if ``accept_plaintext`` is false.
-|||# ``pickle_port``          ||| Optional (defaults to 2004). The port number on which the plugin listens for \
-                                  pickle connections. Unused if ``accept_pickle `` is false.
-
-
-## Log Reference
-
-Each event recorded by this plugin will have the following fields:
-
-|||# Field                    ||| Meaning
-|||# ``monitor``              ||| Always ``graphite_monitor``
-|||# ``metric``               ||| The Graphite metric name
-|||# ``value``                ||| The Graphite metric value
-|||# ``orig_time``            ||| The Graphite timestamp
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->

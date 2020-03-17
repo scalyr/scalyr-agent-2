@@ -78,28 +78,4 @@ specifies TCP.
 Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
 running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
 
-
-## Configuration Reference
-
-|||# Option                       ||| Usage
-|||# ``module``                   ||| Always ``scalyr_agent.builtin_monitors.syslog_monitor``
-|||# ``protocols``                ||| Optional (defaults to ``tcp:601``). Lists the protocols and ports on which the \
-                                      agent will accept messages. You can include one or more entries, separated by \
-                                      commas. Each entry must be of the form ``tcp:NNN`` or ``udp:NNN``. Port \
-                                      numbers are optional, defaulting to 601 for TCP and 514 for UDP.
-|||# ``accept_remote_connections``||| Optional (defaults to false). If true, the plugin will accept network \
-                                      connections from any host; otherwise, it will only accept connections from localhost.
-|||# ``message_log``              ||| Optional (defaults to ``agent_syslog.log``). Specifies the file name under which \
-                                      syslog messages are stored. The file will be placed in the default Scalyr log \
-                                      directory, unless it is an absolute path.
-|||# ``parser``                   ||| Optional (defaults to ``agentSyslog``). Defines the parser name associated with \
-                                      the log file.
-|||# ``max_log_size``             ||| Optional (defaults to 50 MB). How large the log file will grow before it is rotated. \
-                                      Set to zero for infinite size. Note that rotation is not visible in Scalyr; it is \
-                                      only relevant for managing disk space on the host running the agent. However, a \
-                                      very small limit could cause logs to be dropped if there is a temporary network \
-                                      outage and the log overflows before it can be sent to Scalyr.
-|||# ``max_log_rotations``        ||| Optional (defaults to 2). The maximum number of log rotations before older log \
-                                      files are deleted. Set to zero for infinite rotations.
-|||# ``log_flush_delay``          ||| Optional (defaults to 1.0). The time to wait in seconds between flushing the log \
-                                      file containing the syslog messages.
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->

@@ -114,24 +114,4 @@ running the nginx plugin. Use the {{menuRef:ServerHost}} dropdown to show data f
 
 See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
 
-
-## Log reference
-
-Each event recorded by this plugin will have the following fields:
-
-|||# Field        ||| Meaning
-|||# ``monitor``  ||| Always ``nginx_monitor``.
-|||# ``instance`` ||| The ``id`` value from the monitor configuration.
-|||# ``metric``   ||| The metric name.  See the metric tables for more information.
-|||# ``value``    ||| The value of the metric.
-
-
-## Metric reference
-
-The table below describes the metrics recorded by the nginx monitor.
-
-|||# Metric                        ||| Description
-|||# ``nginx.connections.active``  ||| The number of connections currently open on the server.
-|||# ``nginx.connections.reading`` ||| The number of connections currently reading request data.
-|||# ``nginx.connections.writing`` ||| The number of connections currently writing response data.
-|||# ``nginx.connections.waiting`` ||| The number of connections currently idle / sending keepalives.
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
