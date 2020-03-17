@@ -76,3 +76,41 @@ the Application, Security and System sources:
     ]
 
 <!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
+## Configuration Reference
+
+|||# Option                        ||| Usage
+|||# ``module``                    ||| Always ``scalyr_agent.builtin_monitors.windows_event_log_monitor``
+|||# ``sources``                   ||| Optional (defaults to ``Application, Security, System``). A comma separated \
+                                       list of event sources.
+You can use this to specify which event sources you are \
+                                       interested in listening to.(Vista and later) Cannot be used.  Please use the \
+                                       "channels" parameter instead.
+|||# ``event_types``               ||| Optional (defaults to ``All``). A comma separated list of event types to \
+                                       log.
+Valid values are: All, Error, Warning, Information, AuditSuccess and \
+                                       AuditFailure(Vista and later) Cannot be used.  Please use the "channels" \
+                                       parameter instead.
+|||# ``channels``                  ||| A list of dict objects specifying a list of channels and an XPath query for \
+                                       those channels.
+Only available on Windows Vista and later.
+Optional (defaults \
+                                       to ``[ {"channel" : ["Application", "Security", "System"], "query": "*"}]
+
+|||# ``maximum_records_per_source``||| Optional (defaults to ``10000``). The maximum number of records to read from \
+                                       the end of each log sourceper gather_sample.
+
+|||# ``error_repeat_interval``     ||| Optional (defaults to ``300``). The number of seconds to wait before logging \
+                                       similar errors in the event log.
+
+|||# ``server_name``               ||| Optional (defaults to ``localhost``). The remote server where the event log is \
+                                       to be opened
+
+|||# ``remote_user``               ||| Optional (defaults to ``None``). The username to use for authentication on the \
+                                       remote server.  This option is only valid on Windows Vista and above
+
+|||# ``remote_password``           ||| Optional (defaults to ``None``). The password to use for authentication on the \
+                                       remote server.  This option is only valid on Windows Vista and above
+
+|||# ``remote_domain``             ||| Optional (defaults to ``None``). The domain to which the remote user account \
+                                       belongs.  This option is only valid on Windows Vista and above
