@@ -12,16 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 set -e
 
-for FILE in scalyr_agent/builtin_monitors/*.py; do
+for FILE in scalyr_agent/builtin_monitors/*monitor*.py; do
     MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
-    MONITOR_NAME=$(basename "${FILE}" | sed "s/\.py//")
-
-    if [ "${MONITOR_NAME}" = "__init__" ]; then
-        continue
-    fi
 
     echo "Generating docs for module: ${MONITOR_MODULE}"
     # TODO: Also write those values to the generated files. Right now our docs files consist of
