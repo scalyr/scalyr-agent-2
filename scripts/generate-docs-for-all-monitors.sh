@@ -14,13 +14,32 @@
 # limitations under the License.
 set -e
 
-for FILE in scalyr_agent/builtin_monitors/*monitor*.py; do
-    MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
+AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->"
 
-    echo "Generating docs for module: ${MONITOR_MODULE}"
-    # TODO: Also write those values to the generated files. Right now our docs files consist of
-    # manual + auto generated changes. We should better organize those so auto generated sections
-    # can be kept up to date automatically.
-    # python print_monitor_doc.py "${MONITOR_MODULE}" > "docs/monitors/${MONITOR_NAME}.md"
-    python print_monitor_doc.py "${MONITOR_MODULE}"
+for FILE in scalyr_agent/builtin_monitors/*_monitor*.py; do
+    MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
+    MONITOR_NAME=$(basename "${FILE}" | sed "s/\.py//")
+    DOC_FILE="docs/monitors/${MONITOR_NAME}.md"
+
+    echo "Generating docs for module: ${MONITOR_MODULE} -> ${DOC_FILE}"
+
+    if [ ! -f "${DOC_FILE}" ]; then
+        echo "File ${DOC_FILE} doesn't exist, skipping..."
+        continue
+    fi
+
+    # Skip file without the marker
+    set +e
+    grep "${AUTO_GENERATED_SECTION_MARKER}" "${DOC_FILE}" > /dev/null
+    EXIT_CODE=$?
+    set +e
+
+    if [ "${EXIT_CODE}" -eq 1 ]; then
+        continue
+    fi
+
+    AUTO_GENERATED_CONTENT=$(python print_monitor_doc.py "${MONITOR_MODULE}" --no-warning --include-sections='configuration_reference,log_reference,metrics')
+    CONTENT_WITHOUT_AUTO_GENERATED_PART=$(perl -0777 -p -e 's/(.*'"${AUTO_GENERATED_SECTION_MARKER}"').*/$1/s' "${DOC_FILE}")
+    NEW_CONTENT=$(echo -e "${CONTENT_WITHOUT_AUTO_GENERATED_PART}\n\n${AUTO_GENERATED_CONTENT}")
+    echo -e "${NEW_CONTENT}" > "${DOC_FILE}"
 done
