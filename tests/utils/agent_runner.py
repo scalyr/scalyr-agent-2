@@ -29,8 +29,8 @@ import psutil
 from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
 from scalyr_agent.platform_controller import PlatformController
 
-from tests.smoke_tests.tools.compat import Path
-from tests.smoke_tests.tools.utils import get_env
+from tests.utils.compat import Path
+from tests.utils.common import get_env
 
 import six
 
@@ -38,14 +38,14 @@ _STANDALONE_COMMAND = [
     "python",
     "-m",
     "scalyr_agent.agent_main",
-    "--no-fork",
+    #"--no-fork",
     "--no-change-user",
     "start",
 ]
 _PACKAGE_COMMAND = [
     "/usr/sbin/scalyr-agent-2",
-    "--no-fork",
-    "--no-change-user",
+    #"--no-fork",
+    #"--no-change-user",
     "start",
 ]
 
@@ -166,16 +166,52 @@ class AgentRunner(object):
         self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
     def start(self):
-
+        print("Starting agent.")
         self.stop_agent_if_running()
 
         # important to call this function before agent was started.
         self._create_agent_files()
 
         if self._installation_type == PACKAGE_INSTALL:
-            self._agent_process = subprocess.Popen(_PACKAGE_COMMAND,)
+            self._agent_process = subprocess.Popen(_PACKAGE_COMMAND, )
         else:
-            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND,)
+            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+
+    def status(self):
+        if self._installation_type == PACKAGE_INSTALL:
+            process = subprocess.check_output([
+                "/usr/sbin/scalyr-agent-2",
+                "status",
+                "-v"
+            ])
+
+            return process
+
+        else:
+            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+
+    def status_json(self):
+        if self._installation_type == PACKAGE_INSTALL:
+            result = subprocess.check_output([
+                "/usr/sbin/scalyr-agent-2",
+                "status",
+                "-v",
+                "--format=json"
+            ])
+
+            return result
+
+        else:
+            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+
+    def switch_version(self, version):
+        if self._installation_type == PACKAGE_INSTALL:
+            subprocess.check_call([
+                "/usr/sbin/scalyr-agent-2-config",
+                "--set-python",
+                version
+            ])
+
 
     @staticmethod
     def stop_agent_if_running():
@@ -200,6 +236,7 @@ class AgentRunner(object):
                 process.kill()
 
     def stop(self):
+        print("Stopping agent.")
         self.stop_agent_if_running()
 
     def __del__(self):
@@ -218,6 +255,7 @@ class AgentRunner(object):
         :return: dict with configuration.
         """
         return {
+            "api_key": os.environ["SCALYR_API_KEY"],
             "verify_server_certificate": "false",
             "server_attributes": {"serverHost": self._server_host},
             "logs": list(self._log_files.values()),

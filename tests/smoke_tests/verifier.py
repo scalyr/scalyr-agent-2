@@ -9,8 +9,8 @@ import time
 import six
 
 from scalyr_agent import compat
-from tests.smoke_tests.tools.agent_runner import AgentRunner
-from tests.smoke_tests.tools.request import ScalyrRequest
+from tests.utils.agent_runner import AgentRunner
+from tests.smoke_tests.request import ScalyrRequest
 from six.moves import range
 
 _TIMESTAMP_PATTERN = r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}.\d+Z"

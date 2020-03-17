@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if ! /usr/bin/env python2 --version >/dev/null; then
+  echo "Python2 was not found."
+  /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
+fi
+
+
 config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
 script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 

@@ -831,6 +831,18 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     return output_name
 
 
+def replace_shebang(path, new_path, new_shebang):
+    with open(path, "r") as f:
+        with open(new_path, "w") as newf:
+            #skip shebang
+            f.readline()
+            newf.write(new_shebang)
+            newf.write("\n")
+            for line in f:
+                newf.write(line)
+                newf.write("\n")
+
+
 def build_base_files(base_configs="config"):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
@@ -879,6 +891,26 @@ def build_base_files(base_configs="config"):
     shutil.copy(
         make_path(agent_source_root, "VERSION"), os.path.join("scalyr_agent", "VERSION")
     )
+
+    # create copy of the agent_main.py with python3 shebang.
+    agent_main_path = os.path.join(agent_source_root, "scalyr_agent", "agent_main.py")
+    agent_main_py3_path = os.path.join("scalyr_agent", "agent_main_py3.py")
+    replace_shebang(
+        agent_main_path,
+        agent_main_py3_path,
+        "#!/usr/bin/env python3"
+    )
+
+    # create copy of the config_main.py with python3 shebang.
+    config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
+    replace_shebang(
+        config_main_path,
+        os.path.join("scalyr_agent", "config_main_py3.py"),
+        "#!/usr/bin/env python3"
+    )
+
+    os.chmod(agent_main_py3_path, stat.S_IREAD | stat.S_IEXEC)
+
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
     #
@@ -930,6 +962,15 @@ def build_base_files(base_configs="config"):
 
     make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
     make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
+    # add switch python version script.
+    shutil.copy(
+        os.path.join(agent_source_root, "installer", "scripts", "scalyr-switch-python.sh"),
+        "scalyr-switch-python"
+    )
+
+
+
+
 
     os.chdir("..")
 
