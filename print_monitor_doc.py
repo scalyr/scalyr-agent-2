@@ -77,22 +77,26 @@ def print_monitor_documentation(
         print("")
         print(info.description)
 
-    if "configuration_reference" in include_sections:
+    if "configuration_reference" in include_sections and len(info.config_options) > 0:
         print("## Configuration Reference")
         print("")
         print_options(info.config_options, column_size)
         print("")
 
-    if "log_reference" in include_sections:
+    if "log_reference" in include_sections and len(info.log_fields) > 0:
         print("## Log reference")
+        print("")
+        print("Each event recorded by this plugin will have the following fields:")
         print("")
         print_log_fields(info.log_fields, column_size)
         print("")
 
-    if "metrics" not in include_sections:
+    if "metrics" not in include_sections or len(info.metrics) == 0:
         return
 
     print("## Metrics")
+    print("")
+    print("The table below describes the metrics recorded by the monitor.")
     print("")
 
     # Have to break the metrics up into their categories if they have them.
@@ -114,7 +118,8 @@ def print_monitor_documentation(
     print("")
 
     for category in categories:
-        print("%s metrics" % category)
+        print("### %s metrics" % category)
+        print("")
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
         print("")
 
