@@ -25,6 +25,7 @@ import os
 import re
 import socket
 import time
+import logging
 
 import six
 import six.moves.urllib.parse
@@ -825,6 +826,11 @@ class Configuration(object):
         return self.__get_config().get_int("debug_level")
 
     @property
+    def stdout_severity(self):
+        """Returns the configuration value for 'stdout_severity'."""
+        return self.__get_config().get_string("stdout_severity", default_value="WARN")
+
+    @property
     def ca_cert_path(self):
         """Returns the configuration value for 'ca_cert_path'."""
         return self.__get_config().get_string("ca_cert_path")
@@ -1591,6 +1597,22 @@ class Configuration(object):
                 "The debug level must be between 0 and 5 inclusive",
                 "debug_level",
                 "badDebugLevel",
+            )
+
+        self.__verify_or_set_optional_string(
+            config,
+            "stdout_severity",
+            "WARN",
+            description,
+            apply_defaults,
+            env_aware=True,
+        )
+        stdout_severity = config.get_string("stdout_severity", apply_defaults)
+        if not getattr(logging, stdout_severity, False):
+            raise BadConfiguration(
+                "The stdout severity must be a valid logging level name",
+                "stdout_severity",
+                "badStdoutSeverity",
             )
 
         self.__verify_or_set_optional_float(

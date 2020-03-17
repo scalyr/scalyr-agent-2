@@ -99,6 +99,8 @@ __log_manager__ = None
 def set_log_destination(
     use_stdout=False,
     use_disk=False,
+    no_fork=False,
+    stdout_severity="WARN",
     logs_directory=None,
     agent_log_file_path="agent.log",
     agent_debug_log_file_suffix="_debug",
@@ -134,6 +136,8 @@ def set_log_destination(
 
     @param use_stdout: True if the logs should be sent to standard out.  If this is False, then use_disk must be true.
     @param use_disk:  True if the logs should be sent to disk.  If this is False, then use_stdout must be true.
+    @param no_fork:  True if we are running in --no-fork mode, logs above a configured severity threshold will be
+    written to stdout.
     @param logs_directory:  The path of the directory to, by default, write log files.
     @param agent_log_file_path: If not None, then the file path where the main agent log file should be written
         using a RotatingLogHandler scheme, with parameters specified by max_bytes and backup_count.  If the path is
@@ -153,6 +157,8 @@ def set_log_destination(
     __log_manager__.set_log_destination(
         use_stdout=use_stdout,
         use_disk=use_disk,
+        no_fork=no_fork,
+        stdout_severity=stdout_severity,
         logs_directory=logs_directory,
         agent_log_file_path=agent_log_file_path,
         agent_debug_log_file_suffix=agent_debug_log_file_suffix,
@@ -997,9 +1003,11 @@ class ForceStdoutFilter(object):
     """A filter that includes any record if it has `force_stdout` as True
     """
 
-    def __init__(self):
+    def __init__(self, no_fork, stdout_severity):
         """Initializes the filter.
         """
+        self.__no_fork = no_fork
+        self.__stdout_severity = stdout_severity
 
     def filter(self, record):
         """Performs the filtering.
@@ -1010,7 +1018,10 @@ class ForceStdoutFilter(object):
         @return:  True if the record should be logged by this handler.
         @rtype: bool
         """
-        return getattr(record, "force_stdout", False)
+        return getattr(record, "force_stdout", False) or (
+            self.__no_fork
+            and record.levelno >= getattr(logging, self.__stdout_severity, "WARN")
+        )
 
 
 class ForceStderrFilter(object):
@@ -1389,6 +1400,8 @@ class AgentLogManager(object):
         # If True, then logging will be sent to stdout rather than the file names mentioned above.
         self.__use_stdout = True
 
+        self.__no_fork = False
+
         # If using a rotating log, this is the maximum number of bytes that can be written before it is rotated.
         self.__rotation_max_bytes = 20 * 1024 * 1024
         # The number of previous logs that will be kept from the rotation.
@@ -1420,6 +1433,8 @@ class AgentLogManager(object):
         self,
         use_stdout=False,
         use_disk=False,
+        no_fork=False,
+        stdout_severity="WARN",
         logs_directory=None,
         agent_log_file_path="agent.log",
         agent_debug_log_file_suffix="_debug",
@@ -1435,6 +1450,8 @@ class AgentLogManager(object):
             raise Exception("You must specify at least one of use_stdout or use_diskk.")
 
         self.__use_stdout = use_stdout
+        self.__no_fork = no_fork
+        self.__stdout_severity = stdout_severity
         self.__rotation_max_bytes = max_bytes
         self.__rotation_backup_count = backup_count
         self.__log_write_rate = log_write_rate
@@ -1591,7 +1608,7 @@ class AgentLogManager(object):
         # Create the right type of handler.
         if is_force_stdout:
             handler = logging.StreamHandler(sys.stdout)
-            handler.addFilter(ForceStdoutFilter())
+            handler.addFilter(ForceStdoutFilter(self.__no_fork, self.__stdout_severity))
         elif is_force_stderr:
             handler = logging.StreamHandler(sys.stderr)
             handler.addFilter(ForceStderrFilter())

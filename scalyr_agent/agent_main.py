@@ -179,6 +179,8 @@ class ScalyrAgent(object):
         # Used below for a small cache for a slight optimization.
         self.__last_verify_config = None
 
+        self.__no_fork = False
+
     @staticmethod
     def agent_run_method(controller, config_file_path, perform_config_check=False):
         """Begins executing the agent service on the current thread.
@@ -238,7 +240,7 @@ class ScalyrAgent(object):
         quiet = command_options.quiet
         verbose = command_options.verbose
         status_format = command_options.status_format
-        no_fork = command_options.no_fork
+        self.__no_fork = command_options.no_fork
         no_check_remote = False
 
         # We process for the 'version' command early since we do not need the configuration file for it.
@@ -293,7 +295,7 @@ class ScalyrAgent(object):
         try:
             # Execute the command.
             if command == "start":
-                return self.__start(quiet, no_fork, no_check_remote)
+                return self.__start(quiet, self.__no_fork, no_check_remote)
             elif command == "inner_run_with_checks":
                 self.__perform_config_checks(no_check_remote)
                 return self.__run(self.__controller)
@@ -316,9 +318,9 @@ class ScalyrAgent(object):
                     agent_data_path, status_format=status_format
                 )
             elif command == "restart":
-                return self.__restart(quiet, no_fork, no_check_remote)
+                return self.__restart(quiet, self.__no_fork, no_check_remote)
             elif command == "condrestart":
-                return self.__condrestart(quiet, no_fork, no_check_remote)
+                return self.__condrestart(quiet, self.__no_fork, no_check_remote)
             else:
                 print('Unknown command given: "%s".' % command, file=sys.stderr)
                 return 1
@@ -459,6 +461,8 @@ class ScalyrAgent(object):
         # Begin writing to the log once we confirm we are able to, so we can log any connection errors
         scalyr_logging.set_log_destination(
             use_disk=True,
+            no_fork=self.__no_fork,
+            stdout_severity=self.__config.stdout_severity,
             max_bytes=self.__config.log_rotation_max_bytes,
             backup_count=self.__config.log_rotation_backup_count,
             logs_directory=self.__config.agent_log_path,
@@ -878,6 +882,8 @@ class ScalyrAgent(object):
                 )
                 scalyr_logging.set_log_destination(
                     use_disk=True,
+                    no_fork=self.__no_fork,
+                    stdout_severity=self.__config.stdout_severity,
                     max_bytes=self.__config.log_rotation_max_bytes,
                     backup_count=self.__config.log_rotation_backup_count,
                     logs_directory=self.__config.agent_log_path,
@@ -909,6 +915,8 @@ class ScalyrAgent(object):
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
                     % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
                 )
+
+                log.info(self.__config.stdout_severity)
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
