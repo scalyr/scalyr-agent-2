@@ -18,8 +18,8 @@
 #
 # It writes generated documentation files to docs/monitors/<monitor name>.md
 
-set -e
-
+# Marker in the Markdown file which marks the line after which automatically generated content
+# should be appended
 AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->"
 
 set +e
