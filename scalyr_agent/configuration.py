@@ -334,10 +334,6 @@ class Configuration(object):
 
         return monitor_config
 
-    @property
-    def metric_name_blacklist(self):
-        return self.__get_config().get_json_array("metric_name_blacklist")
-
     # k8s cache options
     @property
     def k8s_ignore_namespaces(self):
@@ -1638,16 +1634,6 @@ class Configuration(object):
         )
         self.__verify_or_set_optional_string(
             config, "https_proxy", None, description, apply_defaults, env_aware=True
-        )
-        # Blacklist for metric names which should be excluded from being sent to Scalyr
-        self.__verify_or_set_optional_array_of_strings(
-            config,
-            "metric_name_blacklist",
-            [],
-            description,
-            apply_defaults,
-            separators=[None, ","],
-            env_aware=True,
         )
         self.__verify_or_set_optional_array_of_strings(
             config,

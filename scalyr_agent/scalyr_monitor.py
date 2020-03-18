@@ -38,6 +38,7 @@ from threading import Lock
 import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 
 from scalyr_agent.config_util import (
     convert_config_param,
@@ -164,10 +165,9 @@ class ScalyrMonitor(StoppableThread):
         )
 
         # List of metrics name which shouldn't be logged and sent to Scalyr
-        if global_config:
-            self._metric_name_blacklist = self._global_config.metric_name_blacklist
-        else:
-            self._metric_name_blacklist = []
+        self._metric_name_blacklist = self._config.get(
+            "metric_name_blacklist", convert_to=ArrayOfStrings, default=[]
+        )
 
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
         # than sleeping the full sample_interval_secs time.
