@@ -1,17 +1,21 @@
+from __future__ import absolute_import
+from __future__ import print_function
+
 import docker
 import pytest
 from pathlib2 import Path
+from scalyr_agent import compat
 
 
 def dockerized_case(builder_cls, file_path):
     """Decorator that makes decorated test case run inside docker container."""
+
     def dockerized_real(f):
         root = Path(__file__).parent.parent.parent
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
         command = "python -u -m pytest {0}::{1} -s --no-dockerize".format(
-            rel_path,
-            f.__name__
+            rel_path, f.__name__
         )
 
         def wrapper(*args, **kwargs):
@@ -28,13 +32,13 @@ def dockerized_case(builder_cls, file_path):
             container = docker_client.containers.run(
                 builder.image_tag,
                 detach=True,
-                command=command
+                command=command,
+                environment=compat.os_environ_unicode.copy(),
             )
 
             exit_code = container.wait()["StatusCode"]
 
-            logs = container.logs(
-            )
+            logs = container.logs()
             print(logs)
             if exit_code:
                 raise AssertionError("Test case inside container failed.")
