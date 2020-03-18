@@ -154,6 +154,7 @@ class LinuxPlatformController(PosixPlatformController):
         return (
             monitor_config["module"]
             == "scalyr_agent.builtin_monitors.linux_system_metrics"
+            and monitor_config.get("id", None, True) is None  # type: ignore
         )
 
     def _is_built_in_process_metrics_monitor(self, config, monitor_config):

@@ -20,8 +20,8 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-
 import re
+import copy
 
 import scalyr_agent.util as scalyr_util
 
@@ -313,7 +313,7 @@ class MonitorsManagerTest(ScalyrTestCase):
         """
         platform_controller = PlatformController.new_platform()
 
-        monitor_configs = MONITOR_CONFIGS.copy()
+        monitor_configs = copy.copy(MONITOR_CONFIGS)
         monitor_configs[0]["builtin_monitor"] = True
         monitor_configs[1]["builtin_monitor"] = True
 
