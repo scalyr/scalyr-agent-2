@@ -373,11 +373,13 @@ class AgentLogger(logging.Logger):
             )
 
         if metric_name in getattr(monitor, "_metric_name_blacklist", []):
+            # NOTE: If there there tons of blacklisted metrics, this could cause log object to grow
+            # because we need to store emit time for each limit key. So something to keep in mind.
             monitor._logger.info(
                 'Metric "%s" is blacklisted so the value wont be reported to Scalyr.'
                 % (metric_name),
                 limit_once_per_x_secs=86400,
-                limit_key="blacklistedMetricName",
+                limit_key="blacklisted-metric-name-%s" % (metric_name),
             )
             return
 
