@@ -27,6 +27,7 @@ from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
 from scalyr_agent.configuration import Configuration
+from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 from scalyr_agent.__scalyr__ import (
     get_install_root,
@@ -113,6 +114,9 @@ class LinuxPlatformController(PosixPlatformController):
             result.append(
                 JsonObject(
                     module="scalyr_agent.builtin_monitors.linux_system_metrics",
+                    sample_interval=system_metrics_monitor_config.get(
+                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
+                    ),
                     metric_name_blacklist=system_metrics_monitor_config.get(
                         "metric_name_blacklist", []
                     ),
@@ -128,6 +132,9 @@ class LinuxPlatformController(PosixPlatformController):
                     module="scalyr_agent.builtin_monitors.linux_process_metrics",
                     pid="$$",
                     id="agent",
+                    sample_interval=process_metrics_monitor_config.get(
+                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
+                    ),
                     metric_name_blacklist=process_metrics_monitor_config.get(
                         "metric_name_blacklist", []
                     ),
@@ -144,17 +151,13 @@ class LinuxPlatformController(PosixPlatformController):
         """
         monitor_configs = config.monitor_configs
 
-        config_dicts = [
-            item
-            for item in monitor_configs
-            if item["module"] == "scalyr_agent.builtin_monitors.linux_system_metrics"
-        ]
-
         # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
         # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
         # one instance running.
-        if len(config_dicts) >= 1:
-            return config_dicts[0]
+        for item in monitor_configs:
+            if item["module"] == "scalyr_agent.builtin_monitors.linux_system_metrics":
+                item["is_default"] = True
+                return item
 
         return {}
 
@@ -168,18 +171,16 @@ class LinuxPlatformController(PosixPlatformController):
         """
         monitor_configs = config.monitor_configs
 
-        config_dicts = [
-            item
-            for item in monitor_configs
-            if item["module"] == "scalyr_agent.builtin_monitors.linux_process_metrics"
-            and item["id"] == "agent"
-            and item["pid"] == "$$"
-        ]
-
         # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
         # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
         # one instance running.
-        if len(config_dicts) >= 1:
-            return config_dicts[0]
+        for item in monitor_configs:
+            if (
+                item["module"] == "scalyr_agent.builtin_monitors.linux_process_metrics"
+                and item["id"] == "agent"
+                and item["pid"] == "$$"
+            ):
+                item["is_default"] = True
+                return item
 
         return {}

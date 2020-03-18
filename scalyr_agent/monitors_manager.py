@@ -255,6 +255,8 @@ class MonitorsManager(StoppableThread):
         all_monitors = []
         default_monitors = []
 
+        # NOTE: It's important that "get_default_monitors" is called first because that function
+        # also marks config entries for the default built-in monitors
         for monitor in platform_controller.get_default_monitors(configuration):
             default_monitors.append(
                 configuration.parse_monitor_config(
@@ -267,7 +269,8 @@ class MonitorsManager(StoppableThread):
         for monitor in configuration.monitor_configs:
             # We skip adding implicit default monitors. This way we prevent duplicate monitors, but
             # we still allow users to configure default built-in monitors via agent config.
-            if monitor in default_monitors:
+            is_default = monitor.get("is_default", False)
+            if is_default:
                 continue
 
             all_monitors.append(monitor.copy())
