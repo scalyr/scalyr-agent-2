@@ -251,9 +251,7 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-            # TODO: Is a good idea to call this on each Configuration object instantiation? We could
-            # probably use a single global singleton instance
-            platform_controller = PlatformController.new_platform()
+            platform_controller = PlatformController.existing_platform()
 
             # We add in special marker for monitor configuration objects which refer to built-in
             # monitors so we can handle those differently inside the MonitorManager
