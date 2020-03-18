@@ -360,11 +360,44 @@ class WindowsPlatformController(PlatformController):
             )
         return result
 
+    def _is_built_in_system_metrics_monitor(self, config, monitor_config):
+        # type: (Configuration, dict) -> bool
+        """
+        Return True if the provided monitor config object refers to the implicit built-in monitor.
+
+        :param config: Global config object instance.
+        :param monitor_config: Monitor configuration.
+        """
+        if not config.implicit_metric_monitor or not monitor_config:
+            return False
+
+        return (
+            monitor_config["module"]
+            == "scalyr_agent.builtin_monitors.windows_system_metrics"
+        )
+
+    def _is_built_in_process_metrics_monitor(self, config, monitor_config):
+        # type: (Configuration, dict) -> bool
+        """
+        Return True if the provided monitor config object refers to the implicit built-in monitor.
+
+        :param config: Global config object instance.
+        :param monitor_config: Monitor configuration.
+        """
+        if not config.implicit_agent_process_metrics_monitor or not monitor_config:
+            return False
+
+        return (
+            monitor_config["module"]
+            == "scalyr_agent.builtin_monitors.windows_process_metrics"
+            and monitor_config["id"] == "agent"
+            and monitor_config["pid"] == "$$"
+        )
+
     def _get_config_for_built_in_system_metrics_monitor(self, config):
         # type: (Configuration) -> dict
         """
-        Retrieve monitor configuration for the default built-in implicit Windows system metrics
-        monitor.
+        Retrieve monitor configuration for the default built-in implicit system metrics monitor.
 
         :rtype: ``dict``
         """
@@ -373,32 +406,29 @@ class WindowsPlatformController(PlatformController):
         # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
         # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
         # one instance running.
-        for item in monitor_configs:
-            if item["module"] == "scalyr_agent.builtin_monitors.windows_system_metrics":
-                item["is_default"] = True
-                return item
+        for monitor_config in monitor_configs:
+            if self._is_built_in_system_metrics_monitor(
+                config=config, monitor_config=monitor_config
+            ):
+                return monitor_config
 
         return {}
 
     def _get_config_for_built_in_agent_process_metrics_monitor(self, config):
         # type: (Configuration) -> dict
         """
-        Retrieve monitor configuration for the default built-in implicit agent Windows process
-        metrics monitor.
+        Retrieve monitor configuration for the default built-in implicit agent process metrics
+        monitor.
 
         :rtype: ``dict``
         """
         monitor_configs = config.monitor_configs
 
-        for item in monitor_configs:
-            if (
-                item["module"]
-                == "scalyr_agent.builtin_monitors.windows_process_metrics"
-                and item["id"] == "agent"
-                and item["pid"] == "$$"
+        for monitor_config in monitor_configs:
+            if self._is_built_in_process_metrics_monitor(
+                config=config, monitor_config=monitor_config
             ):
-                item["is_default"] = True
-                return item
+                return monitor_config
 
         return {}
 

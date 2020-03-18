@@ -269,8 +269,8 @@ class MonitorsManager(StoppableThread):
         for monitor in configuration.monitor_configs:
             # We skip adding implicit default monitors. This way we prevent duplicate monitors, but
             # we still allow users to configure default built-in monitors via agent config.
-            is_default = monitor.get("is_default", False)
-            if is_default:
+            is_builtin_monitor = monitor.get("builtin_monitor", False)
+            if is_builtin_monitor:
                 continue
 
             all_monitors.append(monitor.copy())

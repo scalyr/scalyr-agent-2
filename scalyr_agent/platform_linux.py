@@ -103,9 +103,6 @@ class LinuxPlatformController(PosixPlatformController):
         """
         result = []
 
-        # Special case for configuring built in monitors.
-        # We always add in special "metric_name_blacklist" configuration option so we can correctly
-        # map configuration options to default monitors
         if config.implicit_metric_monitor:
             system_metrics_monitor_config = self._get_config_for_built_in_system_metrics_monitor(
                 config=config
@@ -122,6 +119,7 @@ class LinuxPlatformController(PosixPlatformController):
                     ),
                 )
             )
+
         if config.implicit_agent_process_metrics_monitor:
             process_metrics_monitor_config = self._get_config_for_built_in_agent_process_metrics_monitor(
                 config=config
@@ -142,6 +140,40 @@ class LinuxPlatformController(PosixPlatformController):
             )
         return result
 
+    def _is_built_in_system_metrics_monitor(self, config, monitor_config):
+        # type: (Configuration, dict) -> bool
+        """
+        Return True if the provided monitor config object refers to the implicit built-in monitor.
+
+        :param config: Global config object instance.
+        :param monitor_config: Monitor configuration.
+        """
+        if not config.implicit_metric_monitor or not monitor_config:
+            return False
+
+        return (
+            monitor_config["module"]
+            == "scalyr_agent.builtin_monitors.linux_system_metrics"
+        )
+
+    def _is_built_in_process_metrics_monitor(self, config, monitor_config):
+        # type: (Configuration, dict) -> bool
+        """
+        Return True if the provided monitor config object refers to the implicit built-in monitor.
+
+        :param config: Global config object instance.
+        :param monitor_config: Monitor configuration.
+        """
+        if not config.implicit_agent_process_metrics_monitor or not monitor_config:
+            return False
+
+        return (
+            monitor_config["module"]
+            == "scalyr_agent.builtin_monitors.linux_process_metrics"
+            and monitor_config["id"] == "agent"
+            and monitor_config["pid"] == "$$"
+        )
+
     def _get_config_for_built_in_system_metrics_monitor(self, config):
         # type: (Configuration) -> dict
         """
@@ -154,10 +186,11 @@ class LinuxPlatformController(PosixPlatformController):
         # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
         # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
         # one instance running.
-        for item in monitor_configs:
-            if item["module"] == "scalyr_agent.builtin_monitors.linux_system_metrics":
-                item["is_default"] = True
-                return item
+        for monitor_config in monitor_configs:
+            if self._is_built_in_system_metrics_monitor(
+                config=config, monitor_config=monitor_config
+            ):
+                return monitor_config
 
         return {}
 
@@ -171,16 +204,10 @@ class LinuxPlatformController(PosixPlatformController):
         """
         monitor_configs = config.monitor_configs
 
-        # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
-        # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
-        # one instance running.
-        for item in monitor_configs:
-            if (
-                item["module"] == "scalyr_agent.builtin_monitors.linux_process_metrics"
-                and item["id"] == "agent"
-                and item["pid"] == "$$"
+        for monitor_config in monitor_configs:
+            if self._is_built_in_process_metrics_monitor(
+                config=config, monitor_config=monitor_config
             ):
-                item["is_default"] = True
-                return item
+                return monitor_config
 
         return {}
