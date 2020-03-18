@@ -28,8 +28,12 @@ import scalyr_agent.util as scalyr_util
 from scalyr_agent.test_base import ScalyrTestCase
 from scalyr_agent.test_util import ScalyrTestUtils
 from scalyr_agent.util import FakeClockCounter
+from scalyr_agent.platform_controller import PlatformController
+from scalyr_agent.monitors_manager import MonitorsManager
+from scalyr_agent.tests.configuration_test import MONITOR_CONFIGS
 
 import six
+import mock
 
 
 class MonitorsManagerTest(ScalyrTestCase):
@@ -300,3 +304,26 @@ class MonitorsManagerTest(ScalyrTestCase):
         # set_daemon=True obviates the following (saves a few seconds in cleanup):
         test_manager.stop_manager(wait_on_join=False)
         fake_clock.advance_time(increment_by=poll_interval)
+
+    def test_get_all_monitor_configs_handling_of_builtin_monitors(self):
+        """
+        Test case which verifies that "_get_all_monitor_configs" method correctly handles
+        configuration for built-in monitors and makes sure we don't start multiple instances of
+        built in monitors.
+        """
+        platform_controller = PlatformController.new_platform()
+
+        monitor_configs = MONITOR_CONFIGS.copy()
+        monitor_configs[0]["builtin_monitor"] = True
+        monitor_configs[1]["builtin_monitor"] = True
+
+        configuration = mock.Mock()
+        configuration.implicit_metric_monitor = False
+        configuration.implicit_agent_process_metrics_monitor = False
+        configuration.monitor_configs = monitor_configs
+
+        result = MonitorsManager._get_all_monitor_configs(
+            configuration, platform_controller
+        )
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0].get("builtin_monitor", False))
