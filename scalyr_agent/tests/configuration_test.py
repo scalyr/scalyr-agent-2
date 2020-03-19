@@ -1370,10 +1370,15 @@ class TestConfiguration(TestConfigurationBase):
                     fake_env[field] = FAKE_FLOAT
 
                 elif field_type == six.text_type:
-                    self.assertNotEquals(
-                        FAKE_STRING, config_obj.get_string(field, none_if_missing=True)
-                    )
-                    fake_env[field] = FAKE_STRING
+                    # special case : stdout_severity cannot be arbitrary.
+                    if field == "stdout_severity":
+                        fake_env[field] = "WARN"
+                    else:
+                        self.assertNotEquals(
+                            FAKE_STRING,
+                            config_obj.get_string(field, none_if_missing=True),
+                        )
+                        fake_env[field] = FAKE_STRING
 
                 elif field_type == ArrayOfStrings:
                     self.assertNotEquals(
@@ -1407,7 +1412,7 @@ class TestConfiguration(TestConfigurationBase):
                         .replace('u"', '"')
                     )
                 else:
-                    result = six.text_type(fake_field_val).lower()
+                    result = six.text_type(fake_field_val)
                 return result
 
             function_lookup = {"get_environment": fake_environment_value}
