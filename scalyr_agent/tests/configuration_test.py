@@ -235,6 +235,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.failure_request_spacing_adjustment, 1.5)
         self.assertEquals(config.request_too_large_adjustment, 0.5)
         self.assertEquals(config.debug_level, 0)
+        self.assertEquals(config.stdout_severity, "NOTSET")
         self.assertEquals(config.request_deadline, 60.0)
 
         self.assertEquals(config.enable_gc_stats, False)
@@ -345,6 +346,7 @@ class TestConfiguration(TestConfigurationBase):
             failure_request_spacing_adjustment: 2.0,
             request_too_large_adjustment: 0.75,
             debug_level: 1,
+            stdout_severity: "WARN",
             request_deadline: 30.0,
             server_attributes: { region: "us-east" },
             ca_cert_path: "/var/lib/foo.pem",
@@ -436,6 +438,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.failure_request_spacing_adjustment, 2.0)
         self.assertEquals(config.request_too_large_adjustment, 0.75)
         self.assertEquals(config.debug_level, 1)
+        self.assertEquals(config.stdout_severity, "WARN")
         self.assertEquals(config.request_deadline, 30.0)
         self.assertPathEquals(config.ca_cert_path, "/var/lib/foo.pem")
         self.assertFalse(config.verify_server_certificate)

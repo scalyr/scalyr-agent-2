@@ -100,7 +100,7 @@ def set_log_destination(
     use_stdout=False,
     use_disk=False,
     no_fork=False,
-    stdout_severity="WARN",
+    stdout_severity="NOTSET",
     logs_directory=None,
     agent_log_file_path="agent.log",
     agent_debug_log_file_suffix="_debug",
@@ -138,6 +138,7 @@ def set_log_destination(
     @param use_disk:  True if the logs should be sent to disk.  If this is False, then use_stdout must be true.
     @param no_fork:  True if we are running in --no-fork mode, logs above a configured severity threshold will be
     written to stdout.
+    @param stdout_severity: Logs at or above this severity level will be written to stdout if no_fork is true.
     @param logs_directory:  The path of the directory to, by default, write log files.
     @param agent_log_file_path: If not None, then the file path where the main agent log file should be written
         using a RotatingLogHandler scheme, with parameters specified by max_bytes and backup_count.  If the path is
@@ -1007,7 +1008,7 @@ class ForceStdoutFilter(object):
         """Initializes the filter.
         """
         self.__no_fork = no_fork
-        self.__stdout_severity = stdout_severity
+        self.__stdout_severity = getattr(logging, stdout_severity, 0)
 
     def filter(self, record):
         """Performs the filtering.
@@ -1019,8 +1020,7 @@ class ForceStdoutFilter(object):
         @rtype: bool
         """
         return getattr(record, "force_stdout", False) or (
-            self.__no_fork
-            and record.levelno >= getattr(logging, self.__stdout_severity, "WARN")
+            self.__no_fork and record.levelno >= self.__stdout_severity
         )
 
 
@@ -1400,7 +1400,10 @@ class AgentLogManager(object):
         # If True, then logging will be sent to stdout rather than the file names mentioned above.
         self.__use_stdout = True
 
+        # If True we are running unforked and should log things to stdout as well as the log file, messages with
+        # severity greater than or equal to `self.__stdout_severity` will be logged to stdout.
         self.__no_fork = False
+        self.__stdout_severity = "NOTSET"
 
         # If using a rotating log, this is the maximum number of bytes that can be written before it is rotated.
         self.__rotation_max_bytes = 20 * 1024 * 1024
@@ -1434,7 +1437,7 @@ class AgentLogManager(object):
         use_stdout=False,
         use_disk=False,
         no_fork=False,
-        stdout_severity="WARN",
+        stdout_severity="NOTSET",
         logs_directory=None,
         agent_log_file_path="agent.log",
         agent_debug_log_file_suffix="_debug",

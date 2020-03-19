@@ -828,7 +828,7 @@ class Configuration(object):
     @property
     def stdout_severity(self):
         """Returns the configuration value for 'stdout_severity'."""
-        return self.__get_config().get_string("stdout_severity", default_value="WARN")
+        return self.__get_config().get_string("stdout_severity", default_value="NOTSET")
 
     @property
     def ca_cert_path(self):
@@ -1602,13 +1602,13 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config,
             "stdout_severity",
-            "WARN",
+            "NOTSET",
             description,
             apply_defaults,
             env_aware=True,
         )
-        stdout_severity = config.get_string("stdout_severity", apply_defaults)
-        if not getattr(logging, stdout_severity, False):
+        stdout_severity = config.get_string("stdout_severity", default_value="NOTSET")
+        if not hasattr(logging, stdout_severity):
             raise BadConfiguration(
                 "The stdout severity must be a valid logging level name",
                 "stdout_severity",

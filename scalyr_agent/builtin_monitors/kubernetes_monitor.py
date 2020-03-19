@@ -4124,6 +4124,14 @@ class KubernetesMonitor(ScalyrMonitor):
                 self.__report_container_metrics,
             )
         )
+
+        server_link = self._global_config.scalyr_server
+        if server_link == "https://agent.scalyr.com":
+            server_link = "https://app.scalyr.com"
+        elif server_link == "https://upload.eu.scalyr.com":
+            server_link = "https://app.eu.scalyr.com"
+        global_log.info("To see your logs go to %s" % server_link, force_stdout=True)
+
         ScalyrMonitor.run(self)
 
     def stop(self, wait_on_join=True, join_timeout=5):

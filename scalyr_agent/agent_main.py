@@ -916,8 +916,6 @@ class ScalyrAgent(object):
                     % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
                 )
 
-                log.info(self.__config.stdout_severity)
-
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
