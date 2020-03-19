@@ -1,0 +1,38 @@
+{
+  logs: [
+      {path: "/tmp/random.log"}
+  ],
+
+  monitors: [
+    {
+        module:  "scalyr_agent.builtin_monitors.shell_monitor",
+        id:       "kernel-version",
+        command: "uname -r",
+        sample_interval: 15
+    },
+    {
+        module:  "scalyr_agent.builtin_monitors.shell_monitor",
+        id:       "free_m",
+        command: "free -m",
+        sample_interval: 15
+    },
+    {
+        module:  "scalyr_agent.builtin_monitors.shell_monitor",
+        id:       "df_h",
+        command: "df -g",
+        sample_interval: 15
+    },
+    {
+         module:  "scalyr_agent.builtin_monitors.url_monitor",
+         id:      "google-com",
+         url:     "https://www.google.com",
+         sample_interval: 15
+    },
+    {
+         module:  "scalyr_agent.builtin_monitors.url_monitor",
+         id:      "scalyr-com",
+         url:     "https://www.scalyr.com",
+         sample_interval: 15
+    }
+  ]
+}
