@@ -1,8 +1,11 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: scalyr-agent-2
 spec:
+  selector:
+    matchLabels:
+      app: scalyr-agent-2
   template:
     metadata:
       labels:
