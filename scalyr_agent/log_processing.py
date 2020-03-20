@@ -730,7 +730,7 @@ class LogFileIterator(object):
 
                 if original_timestamp:
                     timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                        timestamp
+                        original_timestamp
                     )
 
                     if "raw_timestamp" not in attrs:
