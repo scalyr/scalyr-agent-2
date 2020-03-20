@@ -149,6 +149,9 @@ class LogLine(object):
     current time.time() will be used), and 'attrs' which are optional attributes for the line.
     """
 
+    # We explicitly define slots for faster attribute access and reduced memory usage
+    __slots__ = ("line", "timestamp", "attrs", "raw_line_len")
+
     def __init__(self, line):
         # line is a string
         self.line = line
