@@ -34,17 +34,9 @@ import six
 try:
     from systemd import journal
 except ImportError:
-    # monitor plugins are loaded dynamically so this exception will only be raised
-    # during monitor creation if the user has configured the agent to use this plugin
-    raise Exception(
-        "Python systemd library not installed.\n\nYou must install the systemd python library in order "
-        "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
-        "  apt-get install python-systemd  (debian/ubuntu)\n"
-        "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
-        "or installed from source using pip e.g.\n\n"
-        "  pip install systemd-python\n\n"
-        "See here for more info: https://github.com/systemd/python-systemd/\n"
-    )
+    # We throw exception later during run time. This way we can still use print_monitor_docs.py
+    # script without systemd dependency being installed
+    journal = None
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -150,6 +142,22 @@ _global_lock = threading.Lock()
 _global_checkpoints = {}  # type: Dict[str, Checkpoint]
 
 
+def verify_systemd_library_is_available():
+    """
+    Throw an exception if systemd library is not available.
+    """
+    if not journal:
+        raise ImportError(
+            "Python systemd library not installed.\n\nYou must install the systemd python library in order "
+            "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
+            "  apt-get install python-systemd  (debian/ubuntu)\n"
+            "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
+            "or installed from source using pip e.g.\n\n"
+            "  pip install systemd-python\n\n"
+            "See here for more info: https://github.com/systemd/python-systemd/\n"
+        )
+
+
 def load_checkpoints(filename):
     """
     Atomically loads checkpoints from a file.  The checkpoints are only ever loaded from disk once,
@@ -253,6 +261,8 @@ class JournaldMonitor(ScalyrMonitor):
     "Read logs from journalctl and emit to scalyr"
 
     def _initialize(self):
+        verify_systemd_library_is_available()
+
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")
