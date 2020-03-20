@@ -18,5 +18,6 @@ docker==4.1.0
 # to prevent versions conflict, install the appropriate version of 'requests', to force 'docker' to reuse it.
 requests==2.15.1
 ujson==1.35
+orjson==2.6.1
 
 pathlib2==2.3.5; python_version <= '2.7'
