@@ -377,7 +377,7 @@ class MonitorsManager(StoppableThread):
     def _get_all_monitor_configs(configuration, platform_controller):
         # type: (Configuration, PlatformController) -> List[dict]
         """
-        Return monitor config dictionaries for all the monitors excluding the built-in ones.
+        Return monitor config dictionaries for all the monitors, including the built it ones.
         """
         # Get all the monitors we will be running.  This is determined by the config file and the platform's default
         # monitors.  This is a just of json objects containing the configuration.  We get json objects because we
@@ -385,14 +385,6 @@ class MonitorsManager(StoppableThread):
         all_monitors = []
 
         for monitor in configuration.monitor_configs:
-            # We skip adding implicit default monitors. This way we prevent duplicate monitors, but
-            # we still allow users to configure default built-in monitors via agent config (e.g.
-            # user can change sample interval for a built-in monitor or specify a metric name
-            # blacklist)
-            is_builtin_monitor = monitor.get("builtin_monitor", False)
-            if is_builtin_monitor:
-                continue
-
             all_monitors.append(monitor.copy())
 
         for monitor in platform_controller.get_default_monitors(configuration):

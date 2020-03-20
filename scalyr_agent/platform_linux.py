@@ -26,8 +26,6 @@ from sys import platform as _platform
 from scalyr_agent.json_lib import JsonObject
 from scalyr_agent.platform_posix import PosixPlatformController
 from scalyr_agent.platform_controller import DefaultPaths
-from scalyr_agent.configuration import Configuration
-from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 from scalyr_agent.__scalyr__ import (
     get_install_root,
@@ -104,111 +102,16 @@ class LinuxPlatformController(PosixPlatformController):
         result = []
 
         if config.implicit_metric_monitor:
-            system_metrics_monitor_config = self._get_config_for_built_in_system_metrics_monitor(
-                config=config
-            )
-
             result.append(
-                JsonObject(
-                    module="scalyr_agent.builtin_monitors.linux_system_metrics",
-                    sample_interval=system_metrics_monitor_config.get(
-                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
-                    ),
-                    metric_name_blacklist=system_metrics_monitor_config.get(
-                        "metric_name_blacklist", []
-                    ),
-                )
+                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics",)
             )
 
         if config.implicit_agent_process_metrics_monitor:
-            process_metrics_monitor_config = self._get_config_for_built_in_agent_process_metrics_monitor(
-                config=config
-            )
-
             result.append(
                 JsonObject(
                     module="scalyr_agent.builtin_monitors.linux_process_metrics",
                     pid="$$",
                     id="agent",
-                    sample_interval=process_metrics_monitor_config.get(
-                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
-                    ),
-                    metric_name_blacklist=process_metrics_monitor_config.get(
-                        "metric_name_blacklist", []
-                    ),
                 )
             )
         return result
-
-    def _is_built_in_system_metrics_monitor(self, config, monitor_config):
-        # type: (Configuration, dict) -> bool
-        """
-        Return True if the provided monitor config object refers to the implicit built-in monitor.
-
-        :param config: Global config object instance.
-        :param monitor_config: Monitor configuration.
-        """
-        if not config.implicit_metric_monitor or not monitor_config:
-            return False
-
-        return (
-            monitor_config["module"]
-            == "scalyr_agent.builtin_monitors.linux_system_metrics"
-            and monitor_config.get("id", None, True) is None  # type: ignore
-        )
-
-    def _is_built_in_process_metrics_monitor(self, config, monitor_config):
-        # type: (Configuration, dict) -> bool
-        """
-        Return True if the provided monitor config object refers to the implicit built-in monitor.
-
-        :param config: Global config object instance.
-        :param monitor_config: Monitor configuration.
-        """
-        if not config.implicit_agent_process_metrics_monitor or not monitor_config:
-            return False
-
-        return (
-            monitor_config["module"]
-            == "scalyr_agent.builtin_monitors.linux_process_metrics"
-            and monitor_config["id"] == "agent"
-            and monitor_config["pid"] == "$$"
-        )
-
-    def _get_config_for_built_in_system_metrics_monitor(self, config):
-        # type: (Configuration) -> dict
-        """
-        Retrieve monitor configuration for the default built-in implicit system metrics monitor.
-
-        :rtype: ``dict``
-        """
-        monitor_configs = config.monitor_configs
-
-        # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
-        # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
-        # one instance running.
-        for monitor_config in monitor_configs:
-            if self._is_built_in_system_metrics_monitor(
-                config=config, monitor_config=monitor_config
-            ):
-                return monitor_config
-
-        return {}
-
-    def _get_config_for_built_in_agent_process_metrics_monitor(self, config):
-        # type: (Configuration) -> dict
-        """
-        Retrieve monitor configuration for the default built-in implicit agent linux process metrics
-        monitor.
-
-        :rtype: ``dict``
-        """
-        monitor_configs = config.monitor_configs
-
-        for monitor_config in monitor_configs:
-            if self._is_built_in_process_metrics_monitor(
-                config=config, monitor_config=monitor_config
-            ):
-                return monitor_config
-
-        return {}

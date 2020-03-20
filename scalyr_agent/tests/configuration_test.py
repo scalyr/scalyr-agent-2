@@ -21,7 +21,6 @@ __author__ = "czerwin@scalyr.com"
 
 import os
 import tempfile
-import json
 from io import open
 
 from scalyr_agent.configuration import Configuration, BadConfiguration
@@ -49,30 +48,6 @@ from scalyr_agent.compat import os_environ_unicode
 import six
 from six.moves import range
 from mock import patch, Mock
-
-
-MONITOR_CONFIGS = [
-    # Refers to the built-in monitor
-    {
-        "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
-        "id": "agent",
-        "pid": "$$",
-        "metric_name_blacklist": ["metric1"],
-        "sample_interval": 10,
-    },
-    # Refers to the built-in monitor
-    {
-        "module": "scalyr_agent.builtin_monitors.linux_system_metrics",
-        "metric_name_blacklist": ["metric2"],
-    },
-    # Refers to a user defined monitor
-    {
-        "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
-        "id": "my-process",
-        "commandline": ".*my-process.*",
-        "metric_name_blacklist": ["metric3"],
-    },
-]
 
 
 class TestConfigurationBase(ScalyrTestCase):
@@ -2032,72 +2007,3 @@ class TestJournaldLogConfigManager(TestConfigurationBase):
             config_description=None,
             valid_values=["bar", "baz"],
         )
-
-    def test_built_in_monitor_handling(self):
-        config_obj = {
-            "api_key": "foo",
-            "monitors": MONITOR_CONFIGS,
-            "implicit_metric_monitor": False,
-            "implicit_agent_process_metrics_monitor": False,
-        }
-
-        self._write_file_with_separator_conversion(json.dumps(config_obj))
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        # Implicit monitors are disabled, no monitor configuration should be marked as built in on
-        self.assertEqual(len(config.monitor_configs), 3)
-        self.assertFalse(config.monitor_configs[0].get("builtin_monitor", False))
-        self.assertFalse(config.monitor_configs[1].get("builtin_monitor", False))
-        self.assertFalse(config.monitor_configs[2].get("builtin_monitor", False))
-
-        # Both implicit monitors are enabled
-        config_obj = {
-            "api_key": "foo",
-            "monitors": MONITOR_CONFIGS,
-        }
-
-        self._write_file_with_separator_conversion(json.dumps(config_obj))
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        self.assertEqual(len(config.monitor_configs), 3)
-        self.assertTrue(config.monitor_configs[0]["builtin_monitor"])
-        self.assertTrue(config.monitor_configs[1]["builtin_monitor"])
-        self.assertFalse(config.monitor_configs[2].get("builtin_monitor", False))
-
-        # System metrics monitor is enabled
-        config_obj = {
-            "api_key": "foo",
-            "monitors": MONITOR_CONFIGS,
-            "implicit_metric_monitor": True,
-            "implicit_agent_process_metrics_monitor": False,
-        }
-
-        self._write_file_with_separator_conversion(json.dumps(config_obj))
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        # Implicit monitors are disabled, no monitor configuration should be marked as built in on
-        self.assertEqual(len(config.monitor_configs), 3)
-        self.assertFalse(config.monitor_configs[0].get("builtin_monitor", False))
-        self.assertTrue(config.monitor_configs[1]["builtin_monitor"])
-        self.assertFalse(config.monitor_configs[2].get("builtin_monitor", False))
-
-        # Process metrics monitor is enabled
-        config_obj = {
-            "api_key": "foo",
-            "monitors": MONITOR_CONFIGS,
-            "implicit_metric_monitor": False,
-            "implicit_agent_process_metrics_monitor": True,
-        }
-
-        self._write_file_with_separator_conversion(json.dumps(config_obj))
-        config = self._create_test_configuration_instance()
-        config.parse()
-
-        # Implicit monitors are disabled, no monitor configuration should be marked as built in on
-        self.assertEqual(len(config.monitor_configs), 3)
-        self.assertTrue(config.monitor_configs[0]["builtin_monitor"])
-        self.assertFalse(config.monitor_configs[1].get("builtin_monitor", False))
-        self.assertFalse(config.monitor_configs[2].get("builtin_monitor", False))

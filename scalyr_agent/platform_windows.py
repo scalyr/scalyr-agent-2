@@ -22,8 +22,6 @@ import atexit
 import errno
 
 from scalyr_agent import compat
-from scalyr_agent.configuration import Configuration
-from scalyr_agent.scalyr_monitor import ScalyrMonitor
 
 __author__ = "guy.hoozdis@gmail.com"
 
@@ -325,113 +323,20 @@ class WindowsPlatformController(PlatformController):
         """
         result = []
         if config.implicit_metric_monitor:
-            system_metrics_monitor_config = self._get_config_for_built_in_system_metrics_monitor(
-                config=config
-            )
-
             result.append(
                 JsonObject(
                     module="scalyr_agent.builtin_monitors.windows_system_metrics",
-                    sample_interval=system_metrics_monitor_config.get(
-                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
-                    ),
-                    metric_name_blacklist=system_metrics_monitor_config.get(
-                        "metric_name_blacklist", []
-                    ),
                 )
             )
         if config.implicit_agent_process_metrics_monitor:
-            process_metrics_monitor_config = self._get_config_for_built_in_agent_process_metrics_monitor(
-                config=config
-            )
-
             result.append(
                 JsonObject(
                     module="scalyr_agent.builtin_monitors.windows_process_metrics",
                     pid="$$",
                     id="agent",
-                    sample_interval=process_metrics_monitor_config.get(
-                        "sample_interval", ScalyrMonitor.DEFAULT_SAMPLE_INTERVAL_SECS
-                    ),
-                    metric_name_blacklist=process_metrics_monitor_config.get(
-                        "metric_name_blacklist", []
-                    ),
                 )
             )
         return result
-
-    def _is_built_in_system_metrics_monitor(self, config, monitor_config):
-        # type: (Configuration, dict) -> bool
-        """
-        Return True if the provided monitor config object refers to the implicit built-in monitor.
-
-        :param config: Global config object instance.
-        :param monitor_config: Monitor configuration.
-        """
-        if not config.implicit_metric_monitor or not monitor_config:
-            return False
-
-        return (
-            monitor_config["module"]
-            == "scalyr_agent.builtin_monitors.windows_system_metrics"
-            and monitor_config.get("id", None, True) is None  # type: ignore
-        )
-
-    def _is_built_in_process_metrics_monitor(self, config, monitor_config):
-        # type: (Configuration, dict) -> bool
-        """
-        Return True if the provided monitor config object refers to the implicit built-in monitor.
-
-        :param config: Global config object instance.
-        :param monitor_config: Monitor configuration.
-        """
-        if not config.implicit_agent_process_metrics_monitor or not monitor_config:
-            return False
-
-        return (
-            monitor_config["module"]
-            == "scalyr_agent.builtin_monitors.windows_process_metrics"
-            and monitor_config["id"] == "agent"
-            and monitor_config["pid"] == "$$"
-        )
-
-    def _get_config_for_built_in_system_metrics_monitor(self, config):
-        # type: (Configuration) -> dict
-        """
-        Retrieve monitor configuration for the default built-in implicit system metrics monitor.
-
-        :rtype: ``dict``
-        """
-        monitor_configs = config.monitor_configs
-
-        # NOTE: If there are multiple entries, we assume first one refers to the built in monitor.
-        # In fact, system metrics one should be a singleton anyway and there shouldn't be more than
-        # one instance running.
-        for monitor_config in monitor_configs:
-            if self._is_built_in_system_metrics_monitor(
-                config=config, monitor_config=monitor_config
-            ):
-                return monitor_config
-
-        return {}
-
-    def _get_config_for_built_in_agent_process_metrics_monitor(self, config):
-        # type: (Configuration) -> dict
-        """
-        Retrieve monitor configuration for the default built-in implicit agent process metrics
-        monitor.
-
-        :rtype: ``dict``
-        """
-        monitor_configs = config.monitor_configs
-
-        for monitor_config in monitor_configs:
-            if self._is_built_in_process_metrics_monitor(
-                config=config, monitor_config=monitor_config
-            ):
-                return monitor_config
-
-        return {}
 
     def get_file_owner(self, file_path):
         """Returns the user name of the owner of the specified file.

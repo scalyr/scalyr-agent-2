@@ -42,7 +42,6 @@ from scalyr_agent.json_lib.objects import (
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
-from scalyr_agent.platform_controller import PlatformController
 
 from scalyr_agent.__scalyr__ import get_install_root
 from scalyr_agent.compat import os_environ_unicode
@@ -251,19 +250,6 @@ class Configuration(object):
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
 
-            platform_controller = PlatformController.existing_platform()
-
-            # We add in special marker for monitor configuration objects which refer to built-in
-            # monitors so we can handle those differently inside the MonitorManager
-            for monitor_config in self.__monitor_configs:
-                if platform_controller._is_built_in_system_metrics_monitor(
-                    config=self, monitor_config=monitor_config
-                ):
-                    monitor_config["builtin_monitor"] = True
-                if platform_controller._is_built_in_process_metrics_monitor(
-                    config=self, monitor_config=monitor_config
-                ):
-                    monitor_config["builtin_monitor"] = True
         except BadConfiguration as e:
             self.__last_error = e
             raise e

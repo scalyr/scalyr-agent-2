@@ -90,7 +90,7 @@ class PlatformController(object):
         """
         Return an existing instance of the previously registered platform class.
 
-        The instance is instantiatd on first call to the this method. On subsequent calls, existing
+        The instance is instantiated on first call to the this method. On subsequent calls, existing
         cached instance is returned.
         """
         global PLATFORM_INSTANCE
