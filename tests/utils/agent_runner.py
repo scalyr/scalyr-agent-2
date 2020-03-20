@@ -18,7 +18,6 @@ from __future__ import absolute_import
 
 import shutil
 import os
-import sys
 
 if False:
     from typing import Dict, Optional, Any
@@ -37,31 +36,6 @@ import six
 
 _AGENT_MAIN_PATH = Path(get_package_root(), "agent_main.py")
 _CONFIG_MAIN_PATH = Path(get_package_root(), "config_main.py")
-
-_STANDALONE_BASE_COMMAND = [
-    sys.executable,
-    "-m",
-    "scalyr_agent.agent_main",
-]
-_STANDALONE_COMMAND = [
-    sys.executable,
-    "-m",
-    "scalyr_agent.agent_main",
-    "--no-fork",
-    "--no-change-user",
-    "start",
-]
-
-_PACKAGE_BASE_COMMAND = [
-    "/usr/sbin/scalyr-agent-2",
-]
-
-_PACKAGE_COMMAND = [
-    "/usr/sbin/scalyr-agent-2",
-    "--no-fork",
-    "--no-change-user",
-    "start",
-]
 
 
 def _make_or_clear_directory(path):  # type: (Path) -> None

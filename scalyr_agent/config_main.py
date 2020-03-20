@@ -1175,6 +1175,10 @@ def set_python_version(version):
     make_symlink(config_main_source, scalyr_agent_2_config_target)
 
     print("Switched agent to python {0}".format(version))
+    print(
+        "If you have an existing instance of scalyr-agent-2 process running, "
+        "you need to restart it for this change to take an affect."
+    )
 
 
 if __name__ == "__main__":
@@ -1298,7 +1302,7 @@ if __name__ == "__main__":
         "--set-python",
         dest="set_python",
         choices=[PYTHON2, PYTHON3],
-        help="Switch current python interpreter. Can be selected from python2 and python3."
+        help="Switch current python interpreter. Can be selected from python2 and python3.",
     )
 
     # TODO: These options are only available on Windows platforms
@@ -1487,6 +1491,7 @@ if __name__ == "__main__":
     if options.set_python is not None:
         set_python_version(options.set_python)
         print("Agent switched to {0}.".format(options.set_python))
+        sys.exit(0)
 
     if "win32" == sys.platform and options.upgrade_windows:
         sys.exit(

@@ -32,23 +32,23 @@ from tests.common import install_deb, install_next_version_deb
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__)
-def test_deb_python3():
+def test_deb_python3(request):
     common_test_python3(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__)
-def test_deb_python2():
+def test_deb_python2(request):
     common_test_python2(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__)
-def test_deb_python2to3():
+def test_deb_python2to3(request):
     common_test_python2to3(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(UbuntuBuilder, __file__)
-def test_deb_python3_upgrade():
+def test_deb_python3_upgrade(request):
     common_test_python3_upgrade(install_deb, install_next_version_deb)

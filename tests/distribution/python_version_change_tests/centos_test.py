@@ -32,23 +32,23 @@ from tests.common import install_rpm, install_next_version_rpm
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__)
-def test_centos_python3():
+def test_centos_python3(request):
     common_test_python3(install_rpm)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__)
-def test_centos_python2():
+def test_centos_python2(request):
     common_test_python2(install_rpm)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__)
-def test_centos_python2to3():
+def test_centos_python2to3(request):
     common_test_python2to3(install_rpm)
 
 
 @pytest.mark.usefixtures("agent_environment")
 @dockerized_case(CentOSBuilder, __file__)
-def test_centos_python3_upgrade():
+def test_centos_python3_upgrade(request):
     common_test_python3_upgrade(install_rpm, install_next_version_rpm)

@@ -838,15 +838,14 @@ def build_tarball_package(variant, version, no_versioned_file_name):
 
 
 def replace_shebang(path, new_path, new_shebang):
+    # type: (six.text_type, six.text_type, six.text_type) ->None
     with open(path, "r") as f:
         with open(new_path, "w") as newf:
             # skip shebang
             f.readline()
             newf.write(new_shebang)
             newf.write("\n")
-            for line in f:
-                newf.write(line)
-                newf.write("\n")
+            newf.write(f.read())
 
 
 def build_base_files(base_configs="config"):
@@ -904,18 +903,19 @@ def build_base_files(base_configs="config"):
     agent_main_py3_path = os.path.join("scalyr_agent", "agent_main_py3.py")
     replace_shebang(agent_main_path, agent_main_py2_path, "#!/usr/bin/env python2")
     replace_shebang(agent_main_path, agent_main_py3_path, "#!/usr/bin/env python3")
-    os.chmod(agent_main_py2_path, stat.S_IREAD | stat.S_IEXEC)
-    os.chmod(agent_main_py3_path, stat.S_IREAD | stat.S_IEXEC)
+    main_permissions = os.stat(agent_main_path).st_mode
+    os.chmod(agent_main_py2_path, main_permissions)
+    os.chmod(agent_main_py3_path, main_permissions)
 
     # create copies of the config_main.py with python2 and python3 shebang.
     config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
-    os.chmod(config_main_path, stat.S_IREAD | stat.S_IEXEC)
     config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
     config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
     replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
     replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
-    os.chmod(config_main_py2_path, stat.S_IREAD | stat.S_IEXEC)
-    os.chmod(config_main_py3_path, stat.S_IREAD | stat.S_IEXEC)
+    config_permissions = os.stat(config_main_path).st_mode
+    os.chmod(config_main_py2_path, config_permissions)
+    os.chmod(config_main_py3_path, config_permissions)
 
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
