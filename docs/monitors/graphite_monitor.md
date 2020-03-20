@@ -3,6 +3,8 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
 # Graphite Monitor
 
 This agent monitor plugin acts as a Graphite server, allowing you to import data from Graphite-compatible tools
@@ -28,7 +30,6 @@ the "plain text" protocol, and 2004 for "pickle" protocol). For security, it wil
 from localhost (i.e. from processes running on the same server). Set the configuration option ``only_accept_local``
 to false to allow connections from other servers. You can also specify custom ports; see Configuration Reference.
 
-
 ## Viewing Data
 
 After adding this plugin to the agent configuration file, wait one minute for the agent to open the Graphite
@@ -42,9 +43,6 @@ search to specific servers and monitors.
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option                      ||| Usage

@@ -3,6 +3,8 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
 # MySQL Monitor
 
 This agent monitor plugin records performance and usage data from a MySQL server.
@@ -14,7 +16,6 @@ to monitor MySQL from a machine running an older version of Python, [let us know
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
-
 
 ## Sample Configuration
 
@@ -39,7 +40,6 @@ This configuration assumes that MySQL is running on the same server as the Scaly
 MySQL socket. If not, you will need to specify the server's socket file, or hostname (or IP address) and port number;
 see Configuration Reference.
 
-
 ## Viewing Data
 
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
@@ -56,9 +56,6 @@ dropdown to narrow your search to specific servers and monitors.
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option               ||| Usage

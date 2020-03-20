@@ -3,6 +3,8 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
 # Apache Monitor
 
 This agent monitor plugin records performance and usage data from an Apache server.
@@ -10,7 +12,6 @@ This agent monitor plugin records performance and usage data from an Apache serv
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
-
 
 ## Configuring Apache
 
@@ -34,7 +35,6 @@ Here are some links:
 - [CentOS 5/RHEL 5](https://www.centos.org/docs/5/html/5.1/Deployment_Guide/s1-apache-addmods.html)
 - [Ubuntu 14.04](https://help.ubuntu.com/14.04/serverguide/httpd.html)
 - [Windows](http://httpd.apache.org/docs/2.0/platform/windows.html#cust)
-
 
 Next, you must enable the status module, usually by updating the ``VirtualHost`` configuration section of your
 Apache server. On Linux, this is typically found in the ``/etc/apache2/sites-available`` directory, in the file
@@ -63,7 +63,6 @@ To verify that the status module is working properly, you can view it manually. 
     curl http://localhost:80/server-status
 
 If you have any difficulty enabling the status module, drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
-
 
 ## Sample Configuration
 
@@ -99,7 +98,6 @@ For most Linux systems, the access log is saved in ``/var/log/apache2/access.log
 
 Edit the ``path`` field as appropriate for your system setup.
 
-
 ## Viewing Data
 
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
@@ -108,9 +106,6 @@ the agent begins sending Apache data.) You will see an overview of Apache data a
 running the Apache plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.
 
 See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option            ||| Usage

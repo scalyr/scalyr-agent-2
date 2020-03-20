@@ -3,6 +3,8 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
 # Syslog Monitor
 
 The Syslog monitor allows the Scalyr Agent to act as a syslog server, proxying logs from any application or device
@@ -45,8 +47,8 @@ stanzas in your configuration file. Specify a different ``message_log`` for each
 different port number. Then configure each device to send to the appropriate port.
 
 syslog_monitor logs use a parser named ``agentSyslog``. To set up parsing for your syslog messages, go to the
-[Parser Setup Page](/parsers) and click one of the action buttons for the agentSyslog parser, such as
-{{menuRef:Ask us to create for you}}. If you are using multiple syslog_monitor stanzas, you can specify a different
+[Parser Setup Page](/parsers?parser=agentSyslog) and click {{menuRef:Leave it to Us}} or
+{{menuRef:Build Parser By Hand}}. If you are using multiple syslog_monitor stanzas, you can specify a different
 parser for each one, using the ``parser`` option.
 
 
@@ -77,9 +79,6 @@ specifies TCP.
 
 Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
 running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option                               ||| Usage

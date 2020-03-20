@@ -3,6 +3,8 @@
 /// DECLARE section=help
 /// DECLARE subsection=monitors
 
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
+
 # Shell Monitor
 
 This agent monitor plugin periodically executes a specified shell command, and records the output.
@@ -12,7 +14,6 @@ are run from the Scalyr Agent, and execute as the same user as the agent.
 @class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
-
 
 ## Sample Configuration
 
@@ -29,7 +30,6 @@ the version of the Linux kernel in use on the machine where the agent is running
 
 To record output from more than one command, use several copies of the shell_monitor plugin in your configuration.
 
-
 ## Viewing Data
 
 After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then go to
@@ -40,9 +40,6 @@ dropdown to narrow your search to specific servers and monitors.
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option            ||| Usage

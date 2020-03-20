@@ -1,3 +1,4 @@
+<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
 
 # Journald Monitor
 
@@ -60,9 +61,6 @@ creating a polling object (https://docs.python.org/2/library/select.html#poll-ob
 of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
-
-<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->
-
 ## Configuration Reference
 
 |||# Option                      ||| Usage
