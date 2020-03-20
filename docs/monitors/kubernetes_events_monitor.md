@@ -96,6 +96,7 @@
        ```
        kubectl create -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/scalyr-agent-2.yaml
        ```
+
 ## Configuration Reference
 
 |||# Option                   ||| Usage

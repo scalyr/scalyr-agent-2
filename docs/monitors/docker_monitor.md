@@ -127,6 +127,7 @@ Monitor plugin for docker containers
     If you wish to use labels and label configuration when using the syslog monitor to upload docker logs, you must still specify a docker monitor in your agent config, and set the docker label options in the docker monitor configuration.  These will then be used by the syslog monitor.
 
     TODO:  Back fill the instructions here.
+
 ## Configuration Reference
 
 |||# Option                       ||| Usage

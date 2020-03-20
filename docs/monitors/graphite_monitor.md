@@ -43,6 +43,7 @@ search to specific servers and monitors.
 The [View Logs](/help/view) page describes the tools you can use to view and analyze log data.
 [Query Language](/help/query-language) lists the operators you can use to select specific metrics and values.
 You can also use this data in [Dashboards](/help/dashboards) and [Alerts](/help/alerts).
+
 ## Configuration Reference
 
 |||# Option                      ||| Usage

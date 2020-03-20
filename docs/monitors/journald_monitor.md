@@ -61,6 +61,7 @@ creating a polling object (https://docs.python.org/2/library/select.html#poll-ob
 of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
 After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
 seconds and then polls again.
+
 ## Configuration Reference
 
 |||# Option                      ||| Usage

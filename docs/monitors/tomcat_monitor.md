@@ -61,6 +61,7 @@ file.  A typical fragment resembles:
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
 instance.
+
 ## Configuration Reference
 
 |||# Option              ||| Usage

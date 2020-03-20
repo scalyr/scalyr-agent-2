@@ -74,6 +74,7 @@ specifies TCP.
 
 Messages uploaded by the Syslog Monitor will appear as an independent log file on the host where the agent is
 running. You can find this log file in the [Overview](/logStart) page. By default, the file is named "agentSyslog.log".
+
 ## Configuration Reference
 
 |||# Option                               ||| Usage

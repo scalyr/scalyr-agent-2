@@ -106,6 +106,7 @@ the agent begins sending Apache data.) You will see an overview of Apache data a
 running the Apache plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.
 
 See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
+
 ## Configuration Reference
 
 |||# Option            ||| Usage

@@ -70,6 +70,7 @@ and System sources:
         event_types:             "Error, Warning",
       }
     ]
+
 ## Configuration Reference
 
 |||# Option                        ||| Usage

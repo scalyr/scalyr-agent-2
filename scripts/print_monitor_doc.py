@@ -82,6 +82,7 @@ def print_monitor_documentation(
             print("")
 
         print(info.description)
+        print("")
 
     if "configuration_reference" in include_sections and len(info.config_options) > 0:
         print("## Configuration Reference")

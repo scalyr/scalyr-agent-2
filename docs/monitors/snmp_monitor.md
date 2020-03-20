@@ -126,6 +126,7 @@ The SNMP Monitor polls SNMP-enabled devices on the network to collect values spe
                                         //included with the scalyr-agent as it uses native code.
 
             }
+
 ## Configuration Reference
 
 |||# Option                   ||| Usage

@@ -35,6 +35,7 @@ along with dumping up to 20 objects of the types 'list' and 'dict'.
         max_object_dump: 20
       }
     ]
+
 ## Configuration Reference
 
 |||# Option                                    ||| Usage

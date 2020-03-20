@@ -122,6 +122,7 @@
     container is still running, there is currently no way to dynamically start/stop logging of that
     container using annotations without updating the config yaml, and applying the updated config to the
     cluster.
+
 ## Configuration Reference
 
 |||# Option                               ||| Usage
