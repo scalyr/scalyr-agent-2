@@ -719,25 +719,22 @@ class LogFileIterator(object):
         elif self.__parse_format == "json":
             try:
                 # 2->TODO decode line to parse it.
-                json = scalyr_util.json_decode(result.line.decode("utf-8"))
+                # TODO: optimize
+                attrs = scalyr_util.json_decode(result.line.decode("utf-8"))
 
-                line = None
-                attrs = {}
-                timestamp = None
-                # go over all json key/values, adding non-message values to a attr dict
-                # and the message value to the line variable
-                for key, value in six.iteritems(json):
-                    if key == self.__json_log_key:
-                        line = value
-                    elif key == self.__json_timestamp_key:
-                        # TODO: need to add support for multiple timestamp formats
-                        timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
-                            value
-                        )
-                        if "raw_timestamp" not in attrs:
-                            attrs["raw_timestamp"] = value
-                    else:
-                        attrs[key] = value
+                # NOTE: To speed things up we avoid iterating over the whole object but manipulate
+                # parsed object in place. That can be up to 10x faster, but it depends on the object
+                # size (aka number of keys - the more keys the object has the larger the difference)
+                line = attrs.pop(self.__json_log_key, None)
+                timestamp = attrs.pop(self.__json_timestamp_key, None)
+
+                if timestamp:
+                    timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
+                        timestamp
+                    )
+
+                if "raw_timestamp" not in attrs:
+                    attrs["raw_timestamp"] = timestamp
 
                 # if we didn't find a valid line key/value pair
                 # throw a warning and treat it as a normal line
