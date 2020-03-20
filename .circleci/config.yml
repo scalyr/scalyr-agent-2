@@ -955,7 +955,6 @@ workflows:
       - smoke-k8s
       - smoke-standalone-27-tls12
       - smoke-standalone-26-tls12
-      - smoke-rpm-package-py2
       - coverage:
           requires:
             - unittest-27

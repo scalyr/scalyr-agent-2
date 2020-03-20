@@ -29,10 +29,10 @@ if [[ ${1} == "--help" || ${1} == "-h" ]]; then
   exit 0
 fi
 
-if [  ${1} != "python2" ] && [ ${1} != "python3" ]; then
+if [  "${1}" != "python2" ] && [ "${1}" != "python3" ]; then
   echo "Invalid value: ${1}."
   exit 2
 fi
 
 EXECUTABLE_NAME=${1}
-/usr/bin/env ${EXECUTABLE_NAME} /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set-python=${EXECUTABLE_NAME}
+/usr/bin/env "${EXECUTABLE_NAME}" /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config --set-python="${EXECUTABLE_NAME}"
