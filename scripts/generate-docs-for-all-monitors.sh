@@ -18,26 +18,11 @@
 #
 # It writes generated documentation files to docs/monitors/<monitor name>.md
 
+set -e
+
 # Marker in the Markdown file which marks the line after which automatically generated content
 # should be appended
 AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->"
-
-set +e
-
-# Verify systemd dependency is available
-python -c "import systemd" 2> /dev/null
-EXIT_CODE=$?
-
-if [ "${EXIT_CODE}" -ne 0 ]; then
-    echo "\"systemd\" Python package / dependency is not available."
-    echo "You can install it using pip: pip install systemd"
-    echo "Additional dependencies you need to install that Python dependnecy:"
-    echo "Ubuntu / Debian: apt-get install build-essential libsystemd-dev"
-    echo "RHEL: yum install gcc systemd-devel"
-    exit 1
-fi
-
-set -e
 
 for FILE in scalyr_agent/builtin_monitors/*_monitor*.py; do
     MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
