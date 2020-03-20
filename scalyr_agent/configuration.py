@@ -827,7 +827,9 @@ class Configuration(object):
 
     @property
     def stdout_severity(self):
-        """Returns the configuration value for 'stdout_severity'."""
+        """Returns the configuration value for 'stdout_severity'.
+        Only used when running in no-fork mode.
+        """
         return self.__get_config().get_string("stdout_severity", default_value="NOTSET")
 
     @property

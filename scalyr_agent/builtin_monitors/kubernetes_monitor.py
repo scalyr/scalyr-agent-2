@@ -4125,12 +4125,14 @@ class KubernetesMonitor(ScalyrMonitor):
             )
         )
 
-        server_link = self._global_config.scalyr_server
-        if server_link == "https://agent.scalyr.com":
-            server_link = "https://app.scalyr.com"
-        elif server_link == "https://upload.eu.scalyr.com":
-            server_link = "https://app.eu.scalyr.com"
-        global_log.info("To see your logs go to %s" % server_link, force_stdout=True)
+        server = self._global_config.scalyr_server
+        server = server.replace("https://agent.", "https://www.")
+        server = server.replace("https://log.", "https://www.")
+        global_log.info(
+            "View data from this agent at: %s/events?filter=$serverHost%%3D%%27%s%%27"
+            % (server, self._global_config.server_attributes["serverHost"],),
+            force_stdout=True,
+        )
 
         ScalyrMonitor.run(self)
 
