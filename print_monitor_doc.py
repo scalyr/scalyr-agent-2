@@ -73,8 +73,14 @@ def print_monitor_documentation(
     info = load_monitor_class(monitor_module, additional_module_paths)[1]
 
     if "description" in include_sections:
-        print("## Description")
-        print("")
+        # NOTE: We only include monitor name header if the section doesn't already contain one
+        if "# " not in info.description:
+            # This turns scalyr_agent.builtin_monitors.redis_monitor -> Redis Monitor
+            monitor_module = info.monitor_module.split(".")[-1]
+            monitor_name = monitor_module.replace("_", "").capitalize()
+            print("# %s" % (monitor_name))
+            print("")
+
         print(info.description)
 
     if "configuration_reference" in include_sections and len(info.config_options) > 0:
