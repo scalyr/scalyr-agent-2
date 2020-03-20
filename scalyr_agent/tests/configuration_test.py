@@ -1235,6 +1235,7 @@ class TestConfiguration(TestConfigurationBase):
             "logs": [{"path": "/var/log/tomcat6/$DIR_VAR.log"}],
             "api_key": "abcd1234",
             "use_unsafe_debugging": False,
+            "json_library": "auto",
         }
         self._write_file_with_separator_conversion(
             scalyr_util.json_encode(config_file_dict)
