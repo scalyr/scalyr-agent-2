@@ -18,5 +18,5 @@ from __future__ import unicode_literals
 
 from tests.distribution_builders.amazonlinux import AmazonlinuxBuilder
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     AmazonlinuxBuilder.handle_command_line()

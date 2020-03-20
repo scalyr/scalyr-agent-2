@@ -52,7 +52,7 @@ from __scalyr__ import (
     TARBALL_INSTALL,
     MSI_INSTALL,
     SCALYR_VERSION,
-    PACKAGE_INSTALL
+    PACKAGE_INSTALL,
 )
 
 scalyr_init()
@@ -1146,7 +1146,9 @@ def set_python_version(version):
         raise Exception("Not a package.")
 
     binary_path = os.path.join("/", "usr", "share", "scalyr-agent-2", "bin")
-    source_path = os.path.join("/", "usr", "share", "scalyr-agent-2", "py", "scalyr_agent")
+    source_path = os.path.join(
+        "/", "usr", "share", "scalyr-agent-2", "py", "scalyr_agent"
+    )
 
     if version == PYTHON3:
         agent_main_filename = "agent_main_py3.py"
@@ -1173,8 +1175,6 @@ def set_python_version(version):
     make_symlink(config_main_source, scalyr_agent_2_config_target)
 
     print("Switched agent to python {0}".format(version))
-
-
 
 
 if __name__ == "__main__":
@@ -1297,7 +1297,8 @@ if __name__ == "__main__":
         "",
         "--set-python",
         dest="set_python",
-        choices=[PYTHON2, PYTHON3]
+        choices=[PYTHON2, PYTHON3],
+        help="Switch current python interpreter. Can be selected from python2 and python3."
     )
 
     # TODO: These options are only available on Windows platforms

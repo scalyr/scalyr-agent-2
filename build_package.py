@@ -840,7 +840,7 @@ def build_tarball_package(variant, version, no_versioned_file_name):
 def replace_shebang(path, new_path, new_shebang):
     with open(path, "r") as f:
         with open(new_path, "w") as newf:
-            #skip shebang
+            # skip shebang
             f.readline()
             newf.write(new_shebang)
             newf.write("\n")
@@ -971,8 +971,10 @@ def build_base_files(base_configs="config"):
 
     # add switch python version script.
     shutil.copy(
-        os.path.join(agent_source_root, "installer", "scripts", "scalyr-switch-python.sh"),
-        "scalyr-switch-python"
+        os.path.join(
+            agent_source_root, "installer", "scripts", "scalyr-switch-python.sh"
+        ),
+        "scalyr-switch-python",
     )
 
     os.chdir("..")

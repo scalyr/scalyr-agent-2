@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
 from tests.utils.compat import Path
 
 from tests.utils.image_builder import AgentImageBuilder
+
+import six
 
 dockerfile = Path(Path(__file__).parent, "Dockerfile")
 
@@ -25,6 +28,4 @@ class BaseDistributionBuilder(AgentImageBuilder):
     @classmethod
     def get_dockerfile_content(cls):  # type: () -> six.text_type
         content = super(BaseDistributionBuilder, cls).get_dockerfile_content()
-        return content.format(
-            fpm_package_builder_dockerfile=dockerfile.read_text()
-        )
+        return content.format(fpm_package_builder_dockerfile=dockerfile.read_text())

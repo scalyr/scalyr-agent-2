@@ -28,9 +28,7 @@ from abc import ABCMeta, abstractmethod
 import six
 
 from scalyr_agent.__scalyr__ import get_package_root
-from tests.utils.common import (
-    create_tmp_directory,
-)
+from tests.utils.common import create_tmp_directory
 from tests.utils.compat import Path
 
 
@@ -45,9 +43,7 @@ def _copy_agent_source(dest_path):
     shutil.copytree(
         six.text_type(root_path),
         six.text_type(dest_path),
-        ignore=shutil.ignore_patterns(
-            *patterns
-        )
+        ignore=shutil.ignore_patterns(*patterns),
     )
     # test_config_path = Path(root_path, "test", "config.yml")
     # if test_config_path.exists():
@@ -104,7 +100,9 @@ class AgentImageBuilder(object):
             return
 
         print("Build image: '{0}'".format(self.image_tag))
-        build_context_path = create_tmp_directory(suffix="{0}-build-context".format(self.image_tag))
+        build_context_path = create_tmp_directory(
+            suffix="{0}-build-context".format(self.image_tag)
+        )
 
         dockerfile_path = build_context_path / "Dockerfile"
         dockerfile_path.write_text(self.get_dockerfile_content())
@@ -172,7 +170,7 @@ class AgentImageBuilder(object):
         parser.add_argument(
             "--dockerfile",
             action="store_true",
-            help="Print dockerfile content of the image."
+            help="Print dockerfile content of the image.",
         )
 
         args = parser.parse_args()

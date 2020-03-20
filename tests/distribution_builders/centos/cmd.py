@@ -18,5 +18,5 @@ from __future__ import unicode_literals
 
 from tests.distribution_builders.centos import CentOSBuilder
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     CentOSBuilder.handle_command_line()

@@ -317,7 +317,7 @@ commands:
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/agent_image"
 

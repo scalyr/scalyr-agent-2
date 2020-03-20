@@ -7,7 +7,12 @@ import time
 
 from scalyr_agent import compat
 from scalyr_agent.__scalyr__ import DEV_INSTALL, get_package_root
-from tests.smoke_tests.verifier import AgentLogVerifier, DataJsonVerifier, SystemMetricsVerifier, ProcessMetricsVerifier
+from tests.smoke_tests.verifier import (
+    AgentLogVerifier,
+    DataJsonVerifier,
+    SystemMetricsVerifier,
+    ProcessMetricsVerifier,
+)
 from tests.utils.agent_runner import AgentRunner
 
 

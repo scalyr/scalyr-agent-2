@@ -10,7 +10,7 @@ import pytest
 
 from tests.utils.compat import Path
 
-import six
+from scalyr_agent import compat
 
 
 def dockerized_case(builder_cls, file_path):
@@ -21,18 +21,21 @@ def dockerized_case(builder_cls, file_path):
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
         command = "python3 -u -m pytest {0}::{1} -s --no-dockerize".format(
-            rel_path,
-            f.__name__
+            rel_path, f.__name__
         )
 
         def wrapper(*args, **kwargs):
-            no_dockerize = pytest.config.getoption("--no-dockerize")
+            no_dockerize = pytest.config.getoption(  # pylint: disable=no-member
+                "--no-dockerize"
+            )  # pylint: disable=no-member
             if no_dockerize:
                 result = f(*args, **kwargs)
                 return result
 
             builder = builder_cls()
-            use_cache_path = pytest.config.getoption("--image-cache-path", None)
+            use_cache_path = pytest.config.getoption(
+                "--image-cache-path", None
+            )  # pylint: disable=no-member
 
             builder.build(image_cache_path=use_cache_path)
 
@@ -44,12 +47,7 @@ def dockerized_case(builder_cls, file_path):
                 command=command,
                 stdout=True,
                 stderr=True,
-                environment={
-                    "SCALYR_API_KEY": os.environ["SCALYR_API_KEY"],
-                    "READ_API_KEY": os.environ["READ_API_KEY"],
-                    "SCALYR_SERVER": os.environ["SCALYR_SERVER"],
-                    "AGENT_HOST_NAME": os.environ["AGENT_HOST_NAME"]
-                }
+                environment=compat.os_environ_unicode.copy(),
             )
 
             exit_code = container.wait()["StatusCode"]
@@ -58,11 +56,15 @@ def dockerized_case(builder_cls, file_path):
             print(logs)
 
             # save logs if artifacts path is specified.
-            artifacts_path = pytest.config.getoption("--artifacts-path", None)
+            artifacts_path = pytest.config.getoption(
+                "--artifacts-path", None
+            )  # pylint: disable=no-member
             if artifacts_path is not None:
                 artifacts_path = Path(artifacts_path)
                 if artifacts_path.exists():
-                    stream, _ = container.get_archive("/var/log/scalyr-agent-2/agent.log")
+                    stream, _ = container.get_archive(
+                        "/var/log/scalyr-agent-2/agent.log"
+                    )
                     agent_log_tar_path = artifacts_path / "agent.tar"
                     with agent_log_tar_path.open("wb") as agent_file:
                         for b in stream:

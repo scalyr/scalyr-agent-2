@@ -18,5 +18,5 @@ from __future__ import unicode_literals
 
 from tests.distribution_builders.ubuntu import UbuntuBuilder
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     UbuntuBuilder.handle_command_line()

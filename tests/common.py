@@ -21,12 +21,10 @@ import subprocess
 
 def _install_rpm(file_path, upgrade=False):
     subprocess.check_call(
-        "rpm -{0} {1}".format(
-            "U" if upgrade else "i",
-            file_path
-        ),
+        "rpm -{0} {1}".format("U" if upgrade else "i", file_path),
         shell=True,
-        stdin=subprocess.PIPE)
+        stdin=subprocess.PIPE,
+    )
 
 
 def _install_deb(file_path):

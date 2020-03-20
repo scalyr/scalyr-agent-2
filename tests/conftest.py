@@ -44,27 +44,27 @@ def pytest_addoption(parser):
         action="store",
         default=Path(__file__).parent / "config.yml",
         help="Path to yaml file with essential agent settings and another test related settings. "
-             "Fields from this config file will be set as environment variables.",
+        "Fields from this config file will be set as environment variables.",
     )
 
     parser.addoption(
         "--no-dockerize",
         action="store_true",
         help="Make test cases that were decorated by 'utils.dockerized_case' run on that machine, "
-             "not inside docker container. "
-             "Also used by 'utils.dockerized_case' when test case is already in container "
-             "to run actual test case and to prevent another container creation."
+        "not inside docker container. "
+        "Also used by 'utils.dockerized_case' when test case is already in container "
+        "to run actual test case and to prevent another container creation.",
     )
 
     parser.addoption(
         "--image-cache-path",
         help="Path to cache. If specified, "
-             "image builders look for cached image .tar files inside it and load them and skip the build process."
+        "image builders look for cached image .tar files inside it and load them and skip the build process.",
     )
 
     parser.addoption(
         "--artifacts-path",
-        help="Path to directory where tests cases can store their results and artifacts."
+        help="Path to directory where tests cases can store their results and artifacts.",
     )
 
 

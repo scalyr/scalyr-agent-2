@@ -25,5 +25,5 @@ class CentOSBuilder(BaseDistributionBuilder):
     DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     CentOSBuilder.handle_command_line()

@@ -103,7 +103,7 @@ if six.PY2:
             )
 
         def copy(self):
-            return self.itervalues.copy()
+            return self.items().copy()
 
         def __iter__(self):
             return self.iterkeys()

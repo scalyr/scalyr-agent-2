@@ -58,3 +58,9 @@ To run test use following command:
 ```
 py.test tests/smoke_tests/package_test.py
 ```
+
+### Python interpreter switching test.
+
+```
+tests/distribution/python_version_change_tests
+```
