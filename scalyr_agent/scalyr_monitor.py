@@ -111,6 +111,13 @@ class ScalyrMonitor(StoppableThread):
         self._logger = logger
         self.monitor_name = monitor_config["module"]
 
+        # Holds raw monitor name without the part which are specific to monitor instances
+        if "." in monitor_config["module"]:
+            split = monitor_config["module"].split(".")
+            self.raw_monitor_name = split[-1]
+        else:
+            self.raw_monitor_name = monitor_config["module"]
+
         # save the global config
         self._global_config = global_config
 
