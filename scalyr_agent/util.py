@@ -68,6 +68,8 @@ except ImportError:
 
 
 def get_json_implementation(lib_name):
+    if lib_name not in ["json", "ujson", "orjson"]:
+        raise ValueError("Unsupported json library %s" % lib_name)
 
     if lib_name == "ujson":
         import ujson  # pylint: disable=import-error
@@ -96,6 +98,11 @@ def get_json_implementation(lib_name):
                 return ujson.dumps(obj, sort_keys=True)
 
         return lib_name, ujson_dumps_custom, ujson.loads
+
+    elif lib_name == "orjson":
+        import orjson  # pylint: disable=import-error
+
+        return lib_name, orjson.dumps, orjson.loads
 
     else:
         if lib_name != "json":
@@ -139,17 +146,17 @@ _json_encode = None
 _json_decode = None
 
 
-def _set_json_lib(lib_name):
+def set_json_lib(lib_name):
     # This function is not meant to be invoked at runtime.  It exists primarily for testing.
     global _json_lib, _json_encode, _json_decode
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
 try:
-    _set_json_lib("ujson")
+    set_json_lib("ujson")
 except ImportError:
     try:
-        _set_json_lib("json")
+        set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
         print(

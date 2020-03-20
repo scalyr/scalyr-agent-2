@@ -41,6 +41,8 @@ from scalyr_agent.json_lib.objects import (
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
+from scalyr_agent.util import set_json_lib
+from scalyr_agent.util import get_json_lib
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -249,6 +251,14 @@ class Configuration(object):
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
+
+            # Set json library based on the config value. If "auto" is provided this means we use
+            # default behavior which is try to use ujson and if that's not available fall back to
+            # stdlib json
+            json_library = self.__config.get_string("json_library")
+            current_json_library = get_json_lib()
+            if json_library != "auto" and json_library != current_json_library:
+                set_json_lib(json_library)
 
         except BadConfiguration as e:
             self.__last_error = e
@@ -1236,6 +1246,15 @@ class Configuration(object):
             description,
             apply_defaults,
             env_aware=True,
+        )
+        self.__verify_or_set_optional_string(
+            config,
+            "json_library",
+            "auto",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            apply_defaults,
+            env_aware=True,
+            valid_values=["auto", "json", "ujson", "orjson"],
         )
         self.__verify_or_set_optional_bool(
             config,

@@ -30,6 +30,7 @@ import six
 
 JSON = 1
 UJSON = 2
+ORJSON = 3
 
 
 class EncodeDecodeTest(ScalyrTestCase):
@@ -37,13 +38,17 @@ class EncodeDecodeTest(ScalyrTestCase):
 
     def _setlib(self, library):
         if library == JSON:
-            util._set_json_lib("json")
+            util.set_json_lib("json")
+        elif library == UJSON:
+            util.set_json_lib("ujson")
+        elif library == ORJSON:
+            util.set_json_lib("orjson")
         else:
-            util._set_json_lib("ujson")
+            raise ValueError("Invalid library name: %s" % (library))
 
     def test_invalid_lib(self):
         self.assertRaises(
-            ValueError, lambda: util._set_json_lib("BAD JSON LIBRARY NAME")
+            ValueError, lambda: util.set_json_lib("BAD JSON LIBRARY NAME")
         )
 
     def test_dict(self):
@@ -97,12 +102,13 @@ class EncodeDecodeTest(ScalyrTestCase):
                 obj3 = util.json_decode(text)
                 self.assertEquals(obj3, obj)
             finally:
-                util._set_json_lib(original_lib)
+                util.set_json_lib(original_lib)
 
         if sys.version_info[:2] > (2, 4) and sys.version_info[:2] != (2, 6):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
+            __runtest(ORJSON)
 
         # do the same check but now with binary string.
         if isinstance(text, six.text_type):
