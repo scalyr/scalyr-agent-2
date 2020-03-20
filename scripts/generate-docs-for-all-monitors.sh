@@ -24,6 +24,8 @@ set -e
 # should be appended
 AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit manually, but run tox -egenerate-monitor-docs command instead -->"
 
+SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
+
 for FILE in scalyr_agent/builtin_monitors/*_monitor*.py; do
     MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
     MONITOR_NAME=$(basename "${FILE}" | sed "s/\.py//")
@@ -46,7 +48,7 @@ for FILE in scalyr_agent/builtin_monitors/*_monitor*.py; do
         continue
     fi
 
-    AUTO_GENERATED_CONTENT=$(python print_monitor_doc.py "${MONITOR_MODULE}" --no-warning --include-sections='description,configuration_reference,log_reference,metrics')
+    AUTO_GENERATED_CONTENT=$(python "${SCRIPT_DIR}/print_monitor_doc.py" "${MONITOR_MODULE}" --no-warning --include-sections='description,configuration_reference,log_reference,metrics')
     CONTENT_WITHOUT_AUTO_GENERATED_PART=$(perl -0777 -p -e 's/(.*'"${AUTO_GENERATED_SECTION_MARKER}"').*/$1/s' "${DOC_FILE}")
     NEW_CONTENT=$(echo -e "${CONTENT_WITHOUT_AUTO_GENERATED_PART}\n\n${AUTO_GENERATED_CONTENT}")
     echo -e "${NEW_CONTENT}" > "${DOC_FILE}"
