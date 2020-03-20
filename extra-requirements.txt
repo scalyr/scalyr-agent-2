@@ -1,7 +1,7 @@
 # faster json library. NOTE: requires python headers.
 ujson==1.35
-orjson==2.6.1; python_version == '2.6' or python_version == '2.7' or python_version >= '3.6'
-orjson==2.0.11; python_version == '3.5'
+orjson==2.6.1; python_version >= '3.6'
+orjson==2.0.11; python_version == '2.6' or python_version == '2.7' or python_version == '3.5'
 
 # this library is needed to start agent with docker monitor in standalone mode(not inside docker container).
 docker==4.1.0
