@@ -102,6 +102,9 @@ if six.PY2:
                 self._iterable_elements_to_unicode_generator(os.environ.values())
             )
 
+        def copy(self):
+            return self.itervalues.copy()
+
         def __iter__(self):
             return self.iterkeys()
 
