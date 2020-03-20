@@ -445,7 +445,7 @@ def load_monitor_class(module_name, additional_python_paths):
                 continue
             if "ScalyrMonitor" in six.text_type(value.__bases__):
                 MonitorInformation.set_monitor_info(
-                    module_name, description=value.__doc__
+                    module_name, description=value.__doc__.strip()
                 )
                 return value, MonitorInformation.get_monitor_info(module_name)
 
