@@ -233,7 +233,7 @@ def print_metrics(metric_list, column_size):
         metric_name_column.append("``%s``" % metric.metric_name)
 
         # Create the description
-        description_column.append(metric.description)
+        description_column.append(metric.description.strip())
 
         # Create the extra fields cell for this row.
         cell = []

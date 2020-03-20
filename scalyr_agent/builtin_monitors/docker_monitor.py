@@ -107,7 +107,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_log_prefix",
-    "Optional (defaults to docker). Prefix added to the start of all docker logs. ",
+    "Optional (defaults to docker). Prefix added to the start of all docker logs.",
     convert_to=six.text_type,
     default="docker",
     env_aware=True,
@@ -217,7 +217,7 @@ define_config_option(
     "Optional (defaults to ['*']). If `labels_as_attributes` is True then this option is a list of glob strings used to "
     "include labels that should be uploaded as log attributes.  The docker monitor first gets all container labels that "
     "match any glob in this list and then filters out any labels that match any glob in `label_exclude_globs`, and the final list is then "
-    "uploaded as log attributes. ",
+    "uploaded as log attributes.",
     convert_to=ArrayOfStrings,
     default=["*"],
     env_aware=True,
@@ -248,7 +248,7 @@ define_config_option(
     __monitor__,
     "label_prefix",
     'Optional (defaults to ""). If `labels_as_attributes` is true, then append this prefix to the start of each label before '
-    "adding it to the log attributes ",
+    "adding it to the log attributes",
     convert_to=six.text_type,
     default="",
     env_aware=True,

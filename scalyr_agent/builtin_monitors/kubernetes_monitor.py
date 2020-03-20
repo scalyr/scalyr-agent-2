@@ -125,7 +125,7 @@ define_config_option(
 define_config_option(
     __monitor__,
     "docker_log_prefix",
-    "Optional (defaults to docker). Prefix added to the start of all docker logs. ",
+    "Optional (defaults to docker). Prefix added to the start of all docker logs.",
     convert_to=six.text_type,
     default="docker",
 )
@@ -144,7 +144,7 @@ define_config_option(
     __monitor__,
     "docker_percpu_metrics",
     "Optional (defaults to False). When `True`, emits cpu usage stats per core.  Note: This is disabled by "
-    "default because it can result in an excessive amount of metric data on cpus with a large number of cores ",
+    "default because it can result in an excessive amount of metric data on cpus with a large number of cores",
     convert_to=bool,
     default=False,
     env_aware=True,
