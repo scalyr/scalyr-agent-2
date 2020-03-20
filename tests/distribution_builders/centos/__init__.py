@@ -16,36 +16,14 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import subprocess
+from tests.utils.compat import Path
+from tests.distribution_builders.base import BaseDistributionBuilder
 
 
-def _install_rpm(file_path, upgrade=False):
-    subprocess.check_call(
-        "rpm -{0} {1}".format(
-            "U" if upgrade else "i",
-            file_path
-        ),
-        shell=True,
-        stdin=subprocess.PIPE)
+class CentOSBuilder(BaseDistributionBuilder):
+    IMAGE_TAG = "scalyr-agent-testings-centos"
+    DOCKERFILE = Path(__file__).parent / "Dockerfile"
 
 
-def _install_deb(file_path):
-    subprocess.check_call(
-        "apt install -y -f {0}".format(file_path), shell=True, stdin=subprocess.PIPE
-    )
-
-
-def install_rpm():
-    _install_rpm("/scalyr-agent.rpm")
-
-
-def install_deb():
-    _install_deb("/scalyr-agent.deb")
-
-
-def install_next_version_rpm():
-    _install_rpm("/scalyr-agent-second.rpm", upgrade=True)
-
-
-def install_next_version_deb():
-    _install_deb("/scalyr-agent-second.deb")
+if __name__ == '__main__':
+    CentOSBuilder.handle_command_line()

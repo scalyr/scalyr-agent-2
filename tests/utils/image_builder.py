@@ -17,6 +17,8 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 import shutil
+import docker
+import argparse
 
 if False:
     from typing import Optional
@@ -47,6 +49,11 @@ def _copy_agent_source(dest_path):
             *patterns
         )
     )
+    # test_config_path = Path(root_path, "test", "config.yml")
+    # if test_config_path.exists():
+    #     config_dest = Path(dest_path, "tests", "config.yml")
+    #     shutil.copy(test_config_path, config_dest)
+
 
 @six.add_metaclass(ABCMeta)
 class AgentImageBuilder(object):
@@ -66,8 +73,6 @@ class AgentImageBuilder(object):
     @property
     def _docker_client(self):
         if self._docker is None:
-            import docker
-
             self._docker = docker.from_env()
 
         return self._docker
@@ -88,10 +93,16 @@ class AgentImageBuilder(object):
         """
         return cls.DOCKERFILE.read_text()
 
-    def build(self):
+    def build(self, image_cache_path=None):
         """
         Build docker image.
+        :param image_cache_path: import image from .tar files located in this directory, if exist.
         """
+
+        if image_cache_path is not None:
+            self.build_with_cache(Path(image_cache_path))
+            return
+
         print("Build image: '{0}'".format(self.image_tag))
         build_context_path = create_tmp_directory(suffix="{0}-build-context".format(self.image_tag))
 
@@ -110,8 +121,6 @@ class AgentImageBuilder(object):
 
         for chunk in output_gen:
             print(chunk.get("stream", ""), end="")
-
-        return
 
     def build_with_cache(self, dir_path):  # type: (Path) -> None
         """
@@ -156,3 +165,17 @@ class AgentImageBuilder(object):
                     f.write(chunk)
 
             print("Image '{0}' saved.".format(self.image_tag))
+
+    @classmethod
+    def handle_command_line(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--dockerfile",
+            action="store_true",
+            help="Print dockerfile content of the image."
+        )
+
+        args = parser.parse_args()
+
+        if args.dockerfile is not None:
+            print(cls.get_dockerfile_content())

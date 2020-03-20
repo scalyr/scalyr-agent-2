@@ -16,36 +16,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import unicode_literals
 
-import subprocess
+from tests.distribution_builders.amazonlinux import AmazonlinuxBuilder
 
-
-def _install_rpm(file_path, upgrade=False):
-    subprocess.check_call(
-        "rpm -{0} {1}".format(
-            "U" if upgrade else "i",
-            file_path
-        ),
-        shell=True,
-        stdin=subprocess.PIPE)
-
-
-def _install_deb(file_path):
-    subprocess.check_call(
-        "apt install -y -f {0}".format(file_path), shell=True, stdin=subprocess.PIPE
-    )
-
-
-def install_rpm():
-    _install_rpm("/scalyr-agent.rpm")
-
-
-def install_deb():
-    _install_deb("/scalyr-agent.deb")
-
-
-def install_next_version_rpm():
-    _install_rpm("/scalyr-agent-second.rpm", upgrade=True)
-
-
-def install_next_version_deb():
-    _install_deb("/scalyr-agent-second.deb")
+if __name__ == '__main__':
+    AmazonlinuxBuilder.handle_command_line()

@@ -1,3 +1,21 @@
+# Copyright 2014-2020 Scalyr Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import unicode_literals
+
 import os
 import shutil
 import tempfile
@@ -20,8 +38,6 @@ def clear_tmp():
                 os.remove(str(child))
 
 
-
-
 def pytest_addoption(parser):
     parser.addoption(
         "--test-config",
@@ -34,7 +50,21 @@ def pytest_addoption(parser):
     parser.addoption(
         "--no-dockerize",
         action="store_true",
-        help="run slow tests"
+        help="Make test cases that were decorated by 'utils.dockerized_case' run on that machine, "
+             "not inside docker container. "
+             "Also used by 'utils.dockerized_case' when test case is already in container "
+             "to run actual test case and to prevent another container creation."
+    )
+
+    parser.addoption(
+        "--image-cache-path",
+        help="Path to cache. If specified, "
+             "image builders look for cached image .tar files inside it and load them and skip the build process."
+    )
+
+    parser.addoption(
+        "--artifacts-path",
+        help="Path to directory where tests cases can store their results and artifacts."
     )
 
 

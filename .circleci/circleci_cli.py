@@ -75,7 +75,7 @@ def is_smoke_test():  # type: () -> bool
     return True
 
 
-def set_smoke_env_variables_from_config():
+def set_env_variables_from_config():
     """
     Smoke tests require some environment variables to be able to interact with Scalyr servers.
     Smoke tests provide ability to create 'config.yml' file with agent settings for local testing.
@@ -84,7 +84,6 @@ def set_smoke_env_variables_from_config():
     test_config_path = os.path.join(
         os.path.dirname(os.path.dirname(_script_abs_path)),
         "tests",
-        "smoke_tests",
         "config.yml",
     )
 
@@ -111,10 +110,7 @@ def set_smoke_env_variables_from_config():
 
 if __name__ == "__main__":
 
-    if is_smoke_test():
-        # if smoke test is specified, set env. variables from smoke tests config file.
-        # this provides ability to keep only one config file for all kinds of tests(pytest, tox).
-        set_smoke_env_variables_from_config()
+    set_env_variables_from_config()
 
     circleci_dir = os.path.dirname(_script_abs_path)
     os.chdir(os.path.dirname(circleci_dir))

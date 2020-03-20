@@ -541,6 +541,10 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
         "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
         "root/usr/sbin/scalyr-agent-2-config",
     )
+    make_soft_link(
+        "/usr/share/scalyr-agent-2/bin/scalyr-switch-python",
+        "root/usr/sbin/scalyr-switch-python",
+    )
 
 
 def build_container_builder(
@@ -762,6 +766,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --after-install postinstall.sh "
         "  --before-remove preuninstall.sh "
         "  --config-files /etc/scalyr-agent-2/agent.json "
+        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
+        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
@@ -892,24 +898,24 @@ def build_base_files(base_configs="config"):
         make_path(agent_source_root, "VERSION"), os.path.join("scalyr_agent", "VERSION")
     )
 
-    # create copy of the agent_main.py with python3 shebang.
+    # create copies of the agent_main.py with python2 and python3 shebang.
     agent_main_path = os.path.join(agent_source_root, "scalyr_agent", "agent_main.py")
+    agent_main_py2_path = os.path.join("scalyr_agent", "agent_main_py2.py")
     agent_main_py3_path = os.path.join("scalyr_agent", "agent_main_py3.py")
-    replace_shebang(
-        agent_main_path,
-        agent_main_py3_path,
-        "#!/usr/bin/env python3"
-    )
-
-    # create copy of the config_main.py with python3 shebang.
-    config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
-    replace_shebang(
-        config_main_path,
-        os.path.join("scalyr_agent", "config_main_py3.py"),
-        "#!/usr/bin/env python3"
-    )
-
+    replace_shebang(agent_main_path, agent_main_py2_path, "#!/usr/bin/env python2")
+    replace_shebang(agent_main_path, agent_main_py3_path, "#!/usr/bin/env python3")
+    os.chmod(agent_main_py2_path, stat.S_IREAD | stat.S_IEXEC)
     os.chmod(agent_main_py3_path, stat.S_IREAD | stat.S_IEXEC)
+
+    # create copies of the config_main.py with python2 and python3 shebang.
+    config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
+    os.chmod(config_main_path, stat.S_IREAD | stat.S_IEXEC)
+    config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
+    config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
+    replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
+    replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
+    os.chmod(config_main_py2_path, stat.S_IREAD | stat.S_IEXEC)
+    os.chmod(config_main_py3_path, stat.S_IREAD | stat.S_IEXEC)
 
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
@@ -960,17 +966,14 @@ def build_base_files(base_configs="config"):
     # Create symlinks for the two commands
     os.chdir("bin")
 
-    make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
-    make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
+    make_soft_link("../py/scalyr_agent/agent_main_py2.py", "scalyr-agent-2")
+    make_soft_link("../py/scalyr_agent/config_main_py2.py", "scalyr-agent-2-config")
+
     # add switch python version script.
     shutil.copy(
         os.path.join(agent_source_root, "installer", "scripts", "scalyr-switch-python.sh"),
         "scalyr-switch-python"
     )
-
-
-
-
 
     os.chdir("..")
 

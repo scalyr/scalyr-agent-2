@@ -1,15 +1,26 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import absolute_import
+
+import tarfile
+import os
+
 import docker
 import pytest
-from pathlib2 import Path
+
+from tests.utils.compat import Path
+
+import six
 
 
 def dockerized_case(builder_cls, file_path):
     """Decorator that makes decorated test case run inside docker container."""
+
     def dockerized_real(f):
         root = Path(__file__).parent.parent.parent
         rel_path = Path("agent_source") / Path(file_path).relative_to(root)
 
-        command = "python -u -m pytest {0}::{1} -s --no-dockerize".format(
+        command = "python3 -u -m pytest {0}::{1} -s --no-dockerize".format(
             rel_path,
             f.__name__
         )
@@ -21,21 +32,45 @@ def dockerized_case(builder_cls, file_path):
                 return result
 
             builder = builder_cls()
-            builder.build()
+            use_cache_path = pytest.config.getoption("--image-cache-path", None)
+
+            builder.build(image_cache_path=use_cache_path)
 
             docker_client = docker.from_env()
 
             container = docker_client.containers.run(
                 builder.image_tag,
                 detach=True,
-                command=command
+                command=command,
+                stdout=True,
+                stderr=True,
+                environment={
+                    "SCALYR_API_KEY": os.environ["SCALYR_API_KEY"],
+                    "READ_API_KEY": os.environ["READ_API_KEY"],
+                    "SCALYR_SERVER": os.environ["SCALYR_SERVER"],
+                    "AGENT_HOST_NAME": os.environ["AGENT_HOST_NAME"]
+                }
             )
 
             exit_code = container.wait()["StatusCode"]
 
-            logs = container.logs(
-            )
+            logs = container.logs()
             print(logs)
+
+            # save logs if artifacts path is specified.
+            artifacts_path = pytest.config.getoption("--artifacts-path", None)
+            if artifacts_path is not None:
+                artifacts_path = Path(artifacts_path)
+                if artifacts_path.exists():
+                    stream, _ = container.get_archive("/var/log/scalyr-agent-2/agent.log")
+                    agent_log_tar_path = artifacts_path / "agent.tar"
+                    with agent_log_tar_path.open("wb") as agent_file:
+                        for b in stream:
+                            agent_file.write(b)
+                    with tarfile.open(agent_log_tar_path) as tar_file:
+                        tar_file.extractall(artifacts_path)
+                    os.remove(agent_log_tar_path)
+
             if exit_code:
                 raise AssertionError("Test case inside container failed.")
 

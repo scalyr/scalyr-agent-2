@@ -13,11 +13,13 @@
 # limitations under the License.
 
 from __future__ import unicode_literals
+from __future__ import print_function
 from __future__ import absolute_import
 
 import shutil
 import os
 import time
+import sys
 
 if False:
     from typing import Dict, Optional, Any
@@ -26,7 +28,7 @@ import json
 import subprocess
 import psutil
 
-from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL
+from scalyr_agent.__scalyr__ import PACKAGE_INSTALL, DEV_INSTALL, get_package_root
 from scalyr_agent.platform_controller import PlatformController
 
 from tests.utils.compat import Path
@@ -34,18 +36,31 @@ from tests.utils.common import get_env
 
 import six
 
-_STANDALONE_COMMAND = [
-    "python",
+_AGENT_MAIN_PATH = Path(get_package_root(), "agent_main.py")
+_CONFIG_MAIN_PATH = Path(get_package_root(), "config_main.py")
+
+_STANDALONE_BASE_COMMAND = [
+    sys.executable,
     "-m",
     "scalyr_agent.agent_main",
-    #"--no-fork",
+]
+_STANDALONE_COMMAND = [
+    sys.executable,
+    "-m",
+    "scalyr_agent.agent_main",
+    "--no-fork",
     "--no-change-user",
     "start",
 ]
+
+_PACKAGE_BASE_COMMAND = [
+    "/usr/sbin/scalyr-agent-2",
+]
+
 _PACKAGE_COMMAND = [
     "/usr/sbin/scalyr-agent-2",
-    #"--no-fork",
-    #"--no-change-user",
+    "--no-fork",
+    "--no-change-user",
     "start",
 ]
 
@@ -97,6 +112,8 @@ class AgentRunner(object):
         self._installation_type = installation_type
 
         self._init_agent_paths()
+
+        self._agent_process = None
 
     def get_file_path_text(self, path):  # type: (Path) -> str
         return str(self._files[six.text_type(path)])
@@ -166,82 +183,83 @@ class AgentRunner(object):
         self.write_to_file(self._agent_config_path, json.dumps(self._agent_config))
 
     def start(self):
-        print("Starting agent.")
-        self.stop_agent_if_running()
-
         # important to call this function before agent was started.
         self._create_agent_files()
 
         if self._installation_type == PACKAGE_INSTALL:
-            self._agent_process = subprocess.Popen(_PACKAGE_COMMAND, )
+            # use service command to start agent, because stop command hands on some of the RHEL based distributions
+            # if agent is started differently.
+            self._agent_process = subprocess.Popen(
+                "service scalyr-agent-2 --no-fork --no-change-user start",
+                shell=True
+            )
         else:
-            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+            self._agent_process = subprocess.Popen(
+                "python {0} --no-fork --no-change-user start".format(_AGENT_MAIN_PATH),
+                shell=True
+            )
+
+        print("Agent started.")
 
     def status(self):
         if self._installation_type == PACKAGE_INSTALL:
-            process = subprocess.check_output([
-                "/usr/sbin/scalyr-agent-2",
-                "status",
-                "-v"
-            ])
+            process = subprocess.check_output(
+                "service scalyr-agent-2 status -v",
+                shell=True
+            )
 
             return process
 
         else:
-            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+            output = subprocess.check_output(
+                "python {0} status -v".format(_AGENT_MAIN_PATH),
+                shell=True
+            )
+            return output
 
     def status_json(self):
         if self._installation_type == PACKAGE_INSTALL:
-            result = subprocess.check_output([
-                "/usr/sbin/scalyr-agent-2",
-                "status",
-                "-v",
-                "--format=json"
-            ])
+            result = subprocess.check_output(
+                "scalyr-agent-2 status -v --format=json",
+                shell=True
+            )
 
             return result
 
         else:
-            self._agent_process = subprocess.Popen(_STANDALONE_COMMAND, )
+            result = subprocess.check_call(
+                "python {0} status -v --format=json".format(_AGENT_MAIN_PATH),
+                shell=True
+            )
+            return result
 
     def switch_version(self, version):
         if self._installation_type == PACKAGE_INSTALL:
-            subprocess.check_call([
-                "/usr/sbin/scalyr-agent-2-config",
-                "--set-python",
-                version
-            ])
-
-
-    @staticmethod
-    def stop_agent_if_running():
-        def find_running_processes():
-            """find running processes from previous agent execution if they exist."""
-            return [
-                p
-                for p in psutil.process_iter(attrs=["cmdline"])
-                if p.info["cmdline"] in (_STANDALONE_COMMAND, _PACKAGE_COMMAND)
-            ]
-
-        # find all agent related running processes.
-        running_processes = find_running_processes()
-        if running_processes:
-            # terminate them.
-            for process in find_running_processes():
-                process.terminate()
-            time.sleep(1)
-
-            # kill if some of them survived.
-            for process in find_running_processes():
-                process.kill()
+            subprocess.check_call(
+                "/usr/sbin/scalyr-agent-2-config --set-python {0}".format(version),
+                shell=True
+            )
+        else:
+            subprocess.check_call(
+                "python {0} --set=python {1}".format(_CONFIG_MAIN_PATH, version),
+                shell=True
+            )
 
     def stop(self):
-        print("Stopping agent.")
-        self.stop_agent_if_running()
+        if self._installation_type == PACKAGE_INSTALL:
+            result = subprocess.check_call(
+                "/usr/sbin/scalyr-agent-2 stop",
+                shell=True
+            )
 
-    def __del__(self):
-        """Not necessary, just for more confidence that agent will be stopped for sure."""
-        self.stop()
+            return result
+
+        else:
+            self._agent_process = subprocess.Popen(
+                "python {0} stop".format(_AGENT_MAIN_PATH),
+                shell=True
+            )
+        print("Agent stopped.")
 
     @property
     def _server_host(self):  # type: () -> six.text_type

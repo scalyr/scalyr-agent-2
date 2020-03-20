@@ -15,9 +15,6 @@ It makes backup of the original file and replace it with 2.0 version. When scrip
  ```
 circleci_cli.py
 ```
-
-* On job execution with command - `circleci_cli.py local execute --job <jobname>`,
-it check `<jobname>` and if it starts with `smoke` it assumes that it is a smoke test
 and imports environment variables from `tests/smoke_tests/config.yml`, so you do not have to specify them manually. (see smoke_test/README.md)
 * When job is running locally, `docker` commands require root permission, so user for this job is changed to `root`.
  (We can not use `sudo` because job will fail on real CircleCI,

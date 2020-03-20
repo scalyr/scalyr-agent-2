@@ -286,12 +286,12 @@ commands:
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
             # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
-            python tests/smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
+            python -m tests.distribution_builders.<< parameters.distribution >>.cmd --dockerfile > ~/Dockerfile
             cat ~/Dockerfile
 
       - restore_cache:
           # here the 'tar' file of the docker image is stored. Use it to restore agent image without building it.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -305,13 +305,10 @@ commands:
             # NOTE: We don't want the build to immediately fail if tox command fails because we
             # want to preserve the build logs as artifacts to aid with debugging
             set +e
-            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            mkdir -p ~/artifacts
+            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
             EXIT_CODE=$?
             set -e
-
-            # copy log files to artifacts directory.
-            mkdir -p ~/artifacts
-            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2 ~/artifacts/
 
             if [ "${EXIT_CODE}" -ne "0" ]; then
                 echo "tox target failed"
@@ -958,6 +955,7 @@ workflows:
       - smoke-k8s
       - smoke-standalone-27-tls12
       - smoke-standalone-26-tls12
+      - smoke-rpm-package-py2
       - coverage:
           requires:
             - unittest-27

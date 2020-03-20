@@ -1152,8 +1152,8 @@ def set_python_version(version):
         agent_main_filename = "agent_main_py3.py"
         config_main_filename = "config_main_py3.py"
     else:
-        agent_main_filename = "agent_main.py"
-        config_main_filename = "config_main.py"
+        agent_main_filename = "agent_main_py2.py"
+        config_main_filename = "config_main_py2.py"
 
     agent_main_source = os.path.join(source_path, agent_main_filename)
     config_main_source = os.path.join(source_path, config_main_filename)
