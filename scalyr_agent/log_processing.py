@@ -726,15 +726,17 @@ class LogFileIterator(object):
                 # parsed object in place. That can be up to 10x faster, but it depends on the object
                 # size (aka number of keys - the more keys the object has the larger the difference)
                 line = attrs.pop(self.__json_log_key, None)
-                timestamp = attrs.pop(self.__json_timestamp_key, None)
+                original_timestamp = attrs.pop(self.__json_timestamp_key, None)
 
-                if timestamp:
+                if original_timestamp:
                     timestamp = scalyr_util.rfc3339_to_nanoseconds_since_epoch(
                         timestamp
                     )
 
-                if "raw_timestamp" not in attrs:
-                    attrs["raw_timestamp"] = timestamp
+                    if "raw_timestamp" not in attrs:
+                        attrs["raw_timestamp"] = original_timestamp
+                else:
+                    timestamp = None
 
                 # if we didn't find a valid line key/value pair
                 # throw a warning and treat it as a normal line
