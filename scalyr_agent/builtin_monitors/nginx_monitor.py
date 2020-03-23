@@ -116,7 +116,13 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
         # pylint: disable=unexpected-keyword-arg
-        bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
+        # NOTE: "strict" argument is not supported by Python 3 class
+        # TODO: We should switch to using urllib Request object directly or requests library
+        if six.PY2:
+            kwargs = {"strict": strict}
+        else:
+            kwargs = {}
+        bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc
 
@@ -251,18 +257,19 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
         # skip any blank lines
         while len(lines[i]) == 0:
             i = i + 1
+
         while i < len(lines):
-            if lines[i].startswith("Active connections:"):
+            if lines[i].startswith(b"Active connections:"):
                 result["active_connections"] = int(
-                    lines[i][len("Active connections: ") :]
+                    lines[i][len(b"Active connections: ") :]
                 )
-            elif lines[i].startswith("server accepts handled requests"):
+            elif lines[i].startswith(b"server accepts handled requests"):
                 i = i + 1
                 values = lines[i].split()
                 result["server_accepts"] = values[0]
                 result["server_handled"] = values[1]
                 result["server_requests"] = values[2]
-            elif lines[i].startswith("Reading:"):
+            elif lines[i].startswith(b"Reading:"):
                 values = lines[i].split()
                 result["reading"] = values[1]
                 result["writing"] = values[3]
@@ -352,13 +359,13 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
         if data is None:
             self._logger.error("No data returned.")
         else:
-            samplesToEmit = {
-                "active_connections": "nginx.connections.active",
-                "reading": "nginx.connections.reading",
-                "writing": "nginx.connections.writing",
-                "waiting": "nginx.connections.waiting",
-            }
+            samplesToEmit = [
+                ("active_connections", "nginx.connections.active"),
+                ("reading", "nginx.connections.reading"),
+                ("writing", "nginx.connections.writing"),
+                ("waiting", "nginx.connections.waiting"),
+            ]
 
-            for key in samplesToEmit:
+            for key, metric_name in samplesToEmit:
                 if key in data:
-                    self._logger.emit_value(samplesToEmit[key], int(data[key]))
+                    self._logger.emit_value(metric_name, int(data[key]))
