@@ -1,8 +1,6 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  annotations:
-    deprecated.daemonset.template.generation: "0"
   creationTimestamp: null
   labels:
     app: scalyr-agent-2
