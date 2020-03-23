@@ -28,7 +28,9 @@ def get_agent_distribution_builder(distribution, python_version):
 
     dockerfiles_directory_path = Path(__file__).parent / "distribution_dockerfiles"
 
-    fpm_builder_dockerfile_path = dockerfiles_directory_path / "Dockerfile.fpm_package_builder"
+    fpm_builder_dockerfile_path = (
+        dockerfiles_directory_path / "Dockerfile.fpm_package_builder"
+    )
 
     fpm_package_builder_dockerfile_content = fpm_builder_dockerfile_path.read_text()
 
@@ -55,6 +57,7 @@ def get_agent_distribution_builder(distribution, python_version):
         return AmazonLinuxSmokeImageBuilder
 
     elif distribution == UBUNTU:
+
         class _UbuntuSmokeImageBuilder(AgentImageBuilder):
             PYTHON_VERSION = python_version
             COPY_AGENT_SOURCE = True
