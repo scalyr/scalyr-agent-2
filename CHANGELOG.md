@@ -30,6 +30,7 @@ Minor updates
 * Docker support now requires the docker 4.1 client library
 * Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
 * When running in foreground mode (``--no-fork`` flag), SIGINT signal (aka CTRL+C) now starts the graceful shutdown procedure.
+* Two new metrics (``app.io.wait``, ``app.mem.majfalt``) are now emitted by the Linux process monitor. If you want those metrics to be excluded for your monitors, you can utilize new ``metric_name_blacklist`` monitor config option.
 
 Testing updates
 * Numerous changes to improve testing and coverage reporting
