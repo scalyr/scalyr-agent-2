@@ -13,8 +13,9 @@ Features
 * Major update of code base to support running under Python 2 and 3
 * Agent now supports Python 2.6, 2.7 and >= 3.5
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
-* RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verifed at package install time.
+* RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
 * Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Add support for ``orjson`` JSON library when running under Python 3. This library offers significantly better performance and can be enabled by setting ``json_library`` config option to ``orjson`` and installing ``orjson`` Python package using pip.
 
 Bugs
 * Fix authentication issue in `kubernetes_monitor` when accessing kublet API.
