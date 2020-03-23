@@ -516,13 +516,13 @@ instance."""
                     "threads",
                     int(m.group(5)),
                     "type",
-                    "max",
+                    "active",
                 ]
                 result["threads_current_busy"] = [
                     "threads",
                     int(m.group(6)),
                     "type",
-                    "max",
+                    "busy",
                 ]
                 result["processing_time_max"] = [
                     "processing_time_max",
