@@ -214,6 +214,8 @@ class QualifiedName(object):
     Represents a fully qualified name for a Kubernetes object using both its name and namespace.
     """
 
+    __slots__ = ("namespace", "name")
+
     def __init__(self, namespace, name):
         self.namespace = namespace
         self.name = name

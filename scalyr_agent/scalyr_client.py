@@ -745,6 +745,8 @@ class EventSequencer(object):
     logic
     """
 
+    __slots__ = ("__previous_sequence_id", "__previous_sequence_number")
+
     def __init__(self):
         # the previously used sequence_id, used to determine if we need to send the sequence_id
         # with an event
