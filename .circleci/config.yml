@@ -996,8 +996,10 @@ workflows:
             - smoke-k8s
   package-tests:
     jobs:
-      - package-test-rpm
-      - package-test-deb
+      - package-test-rpm:
+           <<: *master_only
+      - package-test-deb:
+           <<: *master_only
       - smoke-rpm-package-py2:
           requires:
             - package-test-rpm
