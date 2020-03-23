@@ -15,6 +15,7 @@ Features
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
 * RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verifed at package install time.
 * Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
 
 Bugs
 * Fix authentication issue in `kubernetes_monitor` when accessing kublet API.

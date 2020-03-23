@@ -20,7 +20,6 @@ from __future__ import absolute_import
 
 __author__ = "czerwin@scalyr.com"
 
-
 import re
 
 import scalyr_agent.util as scalyr_util
@@ -39,7 +38,6 @@ class MonitorsManagerTest(ScalyrTestCase):
             [],
         )
         self.assertEquals(len(test_manager.monitors), 1)
-        self.assertEquals(test_manager.monitors[0].monitor_name, "test_monitor()")
 
     def test_multiple_modules_and_platform_monitors(self):
         test_manager, _ = ScalyrTestUtils.create_test_monitors_manager(
