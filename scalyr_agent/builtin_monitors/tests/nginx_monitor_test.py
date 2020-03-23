@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# ------------------------------------------------------------------------
-#
-# author: Edward Chee <echee@scalyr.com>
 
 from __future__ import unicode_literals
 from __future__ import absolute_import
@@ -72,3 +69,26 @@ class NginxMonitorTest(ScalyrMockHttpServerTestCase):
         self.assertEqual(call_args_list[1][0], ("nginx.connections.reading", 3))
         self.assertEqual(call_args_list[2][0], ("nginx.connections.writing", 4))
         self.assertEqual(call_args_list[3][0], ("nginx.connections.waiting", 20))
+
+    def test_gather_sample_404_no_data_returned(self):
+        url = "http://%s:%s/invalid" % (
+            self.mock_http_server_thread.host,
+            self.mock_http_server_thread.port,
+        )
+        monitor_config = {
+            "module": "nginx_monitor",
+            "source_address": "127.0.0.1",
+            "status_url": url,
+        }
+        mock_logger = mock.Mock()
+        monitor = NginxMonitor(monitor_config, mock_logger)
+
+        monitor.gather_sample()
+
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+        self.assertEqual(mock_logger.error.call_count, 2)
+        self.assertTrue(
+            "The URL used to request the status page appears to be incorrect"
+            in mock_logger.error.call_args_list[0][0][0]
+        )
+        self.assertTrue("No data returned" in mock_logger.error.call_args_list[1][0][0])
