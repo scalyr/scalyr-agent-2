@@ -39,7 +39,7 @@ def common_test_python3(install_package_fn):
     :param install_package_fn: callable that installs package with appropriate type to the current machine OS.
     """
 
-    # remove pythn and python2 to make installer see only python3
+    # remove python and python2 to make installer see only python3
     try:
         # some distros do not have 'python' command.
         os.remove(str(Path("/", "usr", "bin", "python")))

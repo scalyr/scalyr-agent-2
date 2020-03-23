@@ -15,8 +15,10 @@
 
 
 # This script is used by rpm and deb packages to switch on available python interpreter after installation.
-# Also it can be used to switch between python interpreters
+# Also, it can be used to switch between python interpreters
 # usage: scalyr-switch-python.sh python2|python3
+
+set -e
 
 if [ $# -lt 1 ]; then
   echo "Usage: ${0} <python2|python3>"
@@ -25,7 +27,7 @@ fi
 
 if [[ ${1} == "--help" || ${1} == "-h" ]]; then
   echo "Usage: ${0} <python2|python3>"
-  echo "Switch python interpreter varsion for Scalyr agent."
+  echo "Switch python interpreter version for Scalyr agent."
   exit 0
 fi
 

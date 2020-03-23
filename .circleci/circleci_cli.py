@@ -41,7 +41,7 @@ def set_root_user_for_docker_jobs(path):
             if "setup_remote_docker" not in step:
                 continue
             for image in job["docker"]:
-                image["user"] = "root"
+                image[str("user")] = str("root")
 
     with open(path, "w") as f:
         yaml.dump(config, f)

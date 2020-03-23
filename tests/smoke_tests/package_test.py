@@ -30,7 +30,7 @@ from tests.common import install_rpm, install_deb
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 @dockerized_case(AmazonlinuxBuilder, __file__)
-def test_smoke_package_rpm_python2():
+def test_smoke_package_rpm_python2(request):
     install_rpm()
     _test_standalone_smoke(PACKAGE_INSTALL, python_version="python2")
 
@@ -38,7 +38,7 @@ def test_smoke_package_rpm_python2():
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 @dockerized_case(AmazonlinuxBuilder, __file__)
-def test_smoke_package_rpm_python3():
+def test_smoke_package_rpm_python3(request):
     install_rpm()
     _test_standalone_smoke(PACKAGE_INSTALL, python_version="python3")
 
@@ -46,7 +46,7 @@ def test_smoke_package_rpm_python3():
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 @dockerized_case(UbuntuBuilder, __file__)
-def test_smoke_package_deb_python2():
+def test_smoke_package_deb_python2(request):
     install_deb()
     _test_standalone_smoke(PACKAGE_INSTALL, python_version="python2")
 
@@ -54,6 +54,6 @@ def test_smoke_package_deb_python2():
 @pytest.mark.usefixtures("agent_environment")
 @pytest.mark.timeout(300)
 @dockerized_case(UbuntuBuilder, __file__)
-def test_smoke_package_deb_python3():
+def test_smoke_package_deb_python3(request):
     install_deb()
     _test_standalone_smoke(PACKAGE_INSTALL, python_version="python3")

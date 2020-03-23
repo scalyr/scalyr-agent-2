@@ -45,7 +45,6 @@ from optparse import OptionParser
 if "win32" != sys.platform:
     from pwd import getpwnam
 
-
 from __scalyr__ import (
     scalyr_init,
     get_install_root,
@@ -1143,7 +1142,9 @@ def set_python_version(version):
     controller = PlatformController.new_platform()
 
     if controller.install_type != PACKAGE_INSTALL:
-        raise Exception("Not a package.")
+        raise RuntimeError(
+            "This operation can not be performed because the Scalyr agent is not installed with package manager."
+        )
 
     binary_path = os.path.join("/", "usr", "share", "scalyr-agent-2", "bin")
     source_path = os.path.join(
@@ -1178,6 +1179,7 @@ def set_python_version(version):
     print(
         "If you have an existing instance of scalyr-agent-2 process running, "
         "you need to restart it for this change to take an affect."
+        "You can do that by running '/etc/init.d/scalyr-agent-2 restart' command."
     )
 
 

@@ -268,6 +268,14 @@ commands:
       python_version:
         description: "The version of the python interpreter to install in distribution."
         type: string
+        default: ""
+      command:
+        description: "Command to run tests."
+        type: string
+      agent_host_name_prefix:
+        description: "Host name for the agent instances that will be started during job."
+        type: string
+        default: ""
     steps:
       - checkout
       - setup_remote_docker:
@@ -300,13 +308,13 @@ commands:
             # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-            export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+            export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
 
             # NOTE: We don't want the build to immediately fail if tox command fails because we
             # want to preserve the build logs as artifacts to aid with debugging
             set +e
             mkdir -p ~/artifacts
-            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
+            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
             EXIT_CODE=$?
             set -e
 
@@ -881,6 +889,26 @@ jobs:
           apt_dependencies: "procps build-essential"
 
 
+  package-test-rpm:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "amazonlinux"
+          agent_host_name_prefix: "package-test"
+          command: tox -eagent_distributions_tests_amazonlinux
+
+  package-test-deb:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - smoke-package:
+          distribution: "ubuntu"
+          agent_host_name_prefix: "package-test"
+          command: tox -eagent_distributions_tests_ubuntu
+
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
     docker:
@@ -889,6 +917,8 @@ jobs:
       - smoke-package:
           distribution: "amazonlinux"
           python_version: "python3"
+          agent_host_name_prefix: "smoke"
+          command: tox -eagent_package_smoke_test_amazonlinux_python3
 
   smoke-rpm-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -898,6 +928,7 @@ jobs:
       - smoke-package:
           distribution: "amazonlinux"
           python_version: "python2"
+          command: tox -eagent_package_smoke_test_amazonlinux_python2
 
   smoke-deb-package-py3:
     working_directory: ~/scalyr-agent-2
@@ -907,6 +938,7 @@ jobs:
       - smoke-package:
           distribution: "ubuntu"
           python_version: "python3"
+          command: tox -eagent_package_smoke_test_ubuntu_python3
 
   smoke-deb-package-py2:
     working_directory: ~/scalyr-agent-2
@@ -916,6 +948,7 @@ jobs:
       - smoke-package:
           distribution: "ubuntu"
           python_version: "python2"
+          command: tox -eagent_package_smoke_test_ubuntu_python2
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -936,31 +969,46 @@ workflows:
   version: 2
   unittest:
     jobs:
-      - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
-      - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
-      - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
+      - package-test-rpm
+      - package-test-deb
+      - smoke-rpm-package-py2:
           requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
+            - package-test-rpm
+      - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
+      - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
+      - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
+#      - lint-checks
+#      - unittest-38
+#      - unittest-37
+#      - unittest-36
+#      - unittest-35
+#      - unittest-27
+#      - unittest-26
+#      - smoke-standalone-38
+#      - smoke-standalone-37
+#      - smoke-standalone-36
+#      - smoke-standalone-35
+#      - smoke-standalone-27
+#      - smoke-standalone-26
+#      # smoke test jobs above are still uses old smoke tests.
+#      - smoke-docker-json
+#      - smoke-docker-syslog
+#      - smoke-k8s
+#      - smoke-standalone-27-tls12
+#      - smoke-standalone-26-tls12
+#      - test
+#      - coverage:
+#          requires:
+#            - unittest-27
+#            - smoke-docker-json
+#            - smoke-docker-syslog
+#            - smoke-k8s
   package-smoke-tests:
     jobs:
       - smoke-rpm-package-py2:
