@@ -1585,6 +1585,39 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
+    def test_set_json_library_on_parse(self):
+        current_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(current_json_lib, "ujson")
+
+        self._write_file_with_separator_conversion(
+            """{
+             api_key: "hi there",
+            json_library: "json"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        new_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(new_json_lib, "json")
+
+        # auth should fall back to ujson again
+        self._write_file_with_separator_conversion(
+            """{
+             api_key: "hi there",
+            json_library: "ujson"
+          }
+        """
+        )
+
+        config = self._create_test_configuration_instance()
+        config.parse()
+
+        new_json_lib = scalyr_util.get_json_lib()
+        self.assertEqual(new_json_lib, "ujson")
+
 
 class TestParseArrayOfStrings(TestConfigurationBase):
     def test_none(self):
