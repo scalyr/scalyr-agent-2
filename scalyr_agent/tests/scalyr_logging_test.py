@@ -26,6 +26,8 @@ __author__ = "czerwin@scalyr.com"
 import os
 import tempfile
 
+import mock
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 from scalyr_agent.test_base import BaseScalyrLogCaptureTestCase
@@ -109,6 +111,109 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
         self.assertLogFileDoesntContainsLineRegex(expression="foo=5")
 
         monitor_logger.closeMetricLog()
+
+    def test_metric_logging_metric_name_blacklist(self):
+        monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
+        monitor_instance._metric_name_blacklist = ["name1", "name3"]
+        metric_file_path = tempfile.mktemp(".log")
+
+        monitor_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo(1)"
+        )
+        monitor_logger.openMetricLogForMonitor(metric_file_path, monitor_instance)
+        monitor_logger.emit_value("name1", 5, {"foo": 5})
+        monitor_logger.emit_value("name2", 6, {"foo": 6})
+        monitor_logger.emit_value("name3", 7, {"foo": 7})
+        monitor_logger.emit_value("name4", 8, {"foo": 8})
+
+        self.assertEquals(monitor_instance.reported_lines, 2)
+
+        # The value should only appear in the metric log file and not the main one.
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="name2"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="foo=6"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="name4"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=metric_file_path, expression="foo=8"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="name1"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=metric_file_path, expression="name3"
+        )
+
+        monitor_logger.closeMetricLog()
+
+    def test_metric_logging_metric_name_blacklist_actual_monitor_class(self):
+        from scalyr_agent.scalyr_monitor import ScalyrMonitor
+
+        monitor_1_config = {"module": "foo1", "metric_name_blacklist": ["a", "b"]}
+        monitor_1_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo1(1)"
+        )
+        monitor_1 = ScalyrMonitor(
+            monitor_config=monitor_1_config, logger=monitor_1_logger
+        )
+        monitor_1_metric_file_path = tempfile.mktemp(".log")
+
+        monitor_2_config = {"module": "foo2", "metric_name_blacklist": ["c", "d"]}
+        monitor_2_logger = scalyr_logging.getLogger(
+            "scalyr_agent.builtin_monitors.foo2(1)"
+        )
+        monitor_2 = ScalyrMonitor(
+            monitor_config=monitor_2_config, logger=monitor_1_logger
+        )
+        monitor_2_metric_file_path = tempfile.mktemp(".log")
+
+        monitor_1_logger.openMetricLogForMonitor(monitor_1_metric_file_path, monitor_1)
+
+        monitor_1_logger.emit_value("a", 1)
+        monitor_1_logger.emit_value("b", 2)
+        monitor_1_logger.emit_value("c", 3)
+        monitor_1_logger.emit_value("d", 4)
+
+        self.assertLogFileContainsLineRegex(
+            file_path=monitor_1_metric_file_path, expression="d"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=monitor_1_metric_file_path, expression="d"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=monitor_1_metric_file_path, expression="a"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=monitor_1_metric_file_path, expression="b"
+        )
+
+        monitor_1_logger.closeMetricLog()
+
+        monitor_2_logger.openMetricLogForMonitor(monitor_2_metric_file_path, monitor_2)
+
+        monitor_2_logger.emit_value("a", 1)
+        monitor_2_logger.emit_value("b", 2)
+        monitor_2_logger.emit_value("c", 3)
+        monitor_2_logger.emit_value("d", 4)
+
+        self.assertLogFileContainsLineRegex(
+            file_path=monitor_2_metric_file_path, expression="a"
+        )
+        self.assertLogFileContainsLineRegex(
+            file_path=monitor_2_metric_file_path, expression="a"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=monitor_2_metric_file_path, expression="c"
+        )
+        self.assertLogFileDoesntContainsLineRegex(
+            file_path=monitor_2_metric_file_path, expression="d"
+        )
+
+        monitor_2_logger.closeMetricLog()
 
     def test_logging_to_metric_log(self):
         monitor_instance = ScalyrLoggingTest.FakeMonitor("testing")
@@ -442,6 +547,8 @@ class ScalyrLoggingTest(BaseScalyrLogCaptureTestCase):
             self.__name = name
             self.reported_lines = 0
             self.errors = 0
+            self._logger = mock.Mock()
+            self._metric_name_blacklist = []
 
         def increment_counter(self, reported_lines=0, errors=0):
             """Increment some of the counters pertaining to the performance of this monitor.

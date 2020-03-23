@@ -132,22 +132,31 @@ class NginxMonitor(ScalyrMonitor):
     """
 # Nginx Monitor
 
-The Nginx monitor allows you to collect data about the usage and performance of your Nginx server.
+This agent monitor plugin records performance and usage data from an nginx server.
 
-Each monitor can be configured to monitor a specific Nginx instance, thus allowing you to configure alerts and the
-dashboard entries independently (if desired) for each instance.
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
 ## Configuring Nginx
 
-To use Scalyr's Nginx monitor, you will first need to configure your Nginx server to enable the status module,
-which servers a status page containing information the monitor will extract.
+To use this monitor, you will need to configure your nginx server to enable the status module. For details,
+see the [nginx documentation](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html).
 
-To enable the status module, you must update the server configuration section of your Nginx server.  Details on the
-status module can be found [here](http://nginx.org/en/docs/http/ngx_http_stub_status_module.html).  You should also
-review the [reference documentation to restrict access](http://nginx.com/resources/admin-guide/restricting-access/)
-to a particular URL since it is important for the status module's URL not to be public.
+First, verify that your nginx server supports the status module. Execute the following command:
 
-The configuration you will want to add to your Nginx config is:
+    nginx -V 2>&1 | grep -o with-http_stub_status_module
+
+The output ``with-http_stub_status_module`` indicates that your server supports the status module. Otherwise,
+you will need to either recompile nginx with the ``--with-http_stub_status_module`` flag, or upgrade to a full
+version of nginx that has been compiled with that flag.
+
+Next, you must enable the status module, by updating the ``server`` configuration section of your nginx server.
+This section can either be found in the ``nginx.conf`` file, or the file in your ``sites-available`` directory
+that corresponds to your site. For most Linux systems, these are located at ``/etc/nginx/nginx.conf`` and
+``/etc/nginx/sites-available``.
+
+Add the following configuration inside the ``server { ... }`` stanza:
 
     location /nginx_status {
       stub_status on;      # enable the status module
@@ -155,30 +164,27 @@ The configuration you will want to add to your Nginx config is:
       deny all;            # deny every other connection
     }
 
-This block does a couple of very important things.  First, it specifies that the status page will be exposed on the
-local server at ``http://<address>/nginx_status``.  ``stub_status on`` is what actually enables the module.  The next
-two  statements work together and are probably the most important for security purposes.  ``allow 127.0.0.1`` says
-that server status URL can only be accessed by the localhost.  The second entry ``deny all`` tells the server to
-disallow  connections from every other machine but the one specified in the allow clause.
+This specifies that the status page should be served at ``http://<address>/nginx_status``, and can't be accessed
+from other servers.
 
-If you decide that there is a need to allow access to the server status beyond just the local machine, it is
-recommended that you consult the Nginx documentation.
+Each time the Scalyr agent fetches ``/nginx_status``, an entry will be added to the Nginx access log. If you wish to
+prevent this, add the line ``access_log off;`` to the above configuration.
 
-One thing to consider in the above stanzas, each access to the ``/nginx_status`` URL will be logged in the Nginx access
-log.  If you wish to change this, add the line ``access_log off;`` to the above configuration.
+Once you make the configuration change, you will need to restart Nginx.  On most Linux systems, use the following
+command:
 
-The specific location to place this block depends upon the server operating system.  To configure it for the default
-site on Ubuntu (and Debian variants), look for the file ``/etc/nginx/sites-enabled/default``.
+    sudo service nginx restart
 
-Once you make the configuration change, you will need to restart Nginx.
+To verify that the status module is working properly, you can view it manually. Execute this command on the server
+(substituting the appropriate port number as needed):
 
+    curl http://localhost:80/nginx_status
 
-## Configuring the Nginx Monitor
+If you have any difficulty enabling the status module, drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
 
-The Nginx monitor is included with the Scalyr agent.  In order to configure it, you will need to add its monitor
-configuration to the Scalyr agent config file.
+## Sample Configuration
 
-A basic Nginx monitor configuration entry might resemble:
+Here is a typical configuration fragment:
 
     monitors: [
       {
@@ -198,7 +204,39 @@ If you were running an instances of Nginx on a non-standard port (say 8080), you
 
 Note the ``id`` field in the configurations.  This is an optional field that allows you to specify an identifier
 specific to a particular instance of Nginx and will make it easier to filter on metrics specific to that
-instance."""
+instance.
+
+accessLog:
+## Uploading the nginx access log
+
+If you have not already done so, you should also configure the Scalyr Agent to upload the access log
+generated by nginx. Scalyr's nginx dashboard uses this log to generate many statistics.
+
+For most Linux systems, the access log is saved in ``/var/log/nginx/access.log``. To upload, edit the
+``logs`` section of ``/etc/scalyr-agent-2/agent.json``. Add the following entry:
+
+    logs: [
+       ...
+
+    ***   {***
+    ***     path: "/var/log/nginx/access.log",***
+    ***     attributes: {parser: "accessLog", serverType: "nginx"}***
+    ***   }***
+    ]
+
+Edit the ``path`` field as appropriate for your system setup.
+
+
+## Viewing Data
+
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+click the {{menuRef:Dashboards}} menu and select {{menuRef:Nginx}}. (The dashboard may not be listed until
+the agent begins sending nginx data.) You will see an overview of nginx data across all servers where you are
+running the nginx plugin. Use the {{menuRef:ServerHost}} dropdown to show data for a specific server.
+
+See [Analyze Access Logs](/solutions/analyze-access-logs) for more information about working with web access logs.
+
+    """
 
     def _initialize(self):
         global httpSourceAddress
