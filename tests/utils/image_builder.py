@@ -18,7 +18,6 @@ from __future__ import absolute_import
 
 import shutil
 import docker
-import docker.errors
 import argparse
 
 if False:
