@@ -1294,7 +1294,6 @@ that supports syslog. It can recieve log messages via the syslog TCP or syslog U
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-
 ## Sample Configuration
 
 This sample will configure the agent to accept syslog messages on TCP port 601 and UDP port 514, from localhost
@@ -1316,7 +1315,6 @@ exports logs via syslog. Set ``accept_remote_connections`` to true to allow this
 
 Additional options are documented in the Configuration Reference section, below.
 
-
 ## Log files and parsers
 
 By default, all syslog messages are written to a single log file, named ``agentSyslog.log``. You can use the
@@ -1331,13 +1329,11 @@ syslog_monitor logs use a parser named ``agentSyslog``. To set up parsing for yo
 {{menuRef:Build Parser By Hand}}. If you are using multiple syslog_monitor stanzas, you can specify a different
 parser for each one, using the ``parser`` option.
 
-
 ## Sending messages via syslog
 
 To send messages to the Scalyr Agent using the syslog protocol, you must configure your application or network
 device. The documentation for your application or device should include instructions. We'll be happy to help out;
 please drop us a line at [support@scalyr.com](mailto:support@scalyr.com).
-
 
 ### Rsyslogd
 
@@ -1353,7 +1349,6 @@ lines to your rsyslogd configuration, which is typically in ``/etc/rsyslogd.conf
 
 Make sure that this line comes before any other filters that could match the authpriv messages. The ``@@`` prefix
 specifies TCP.
-
 
 ## Viewing Data
 

@@ -38,6 +38,7 @@ from threading import Lock
 import six
 
 import scalyr_agent.scalyr_logging as scalyr_logging
+from scalyr_agent.json_lib.objects import ArrayOfStrings
 
 from scalyr_agent.config_util import (
     convert_config_param,
@@ -110,6 +111,13 @@ class ScalyrMonitor(StoppableThread):
         self._logger = logger
         self.monitor_name = monitor_config["module"]
 
+        # Holds raw monitor name without the part which are specific to monitor instances
+        if "." in monitor_config["module"]:
+            split = monitor_config["module"].split(".")
+            self.raw_monitor_name = split[-1]
+        else:
+            self.raw_monitor_name = monitor_config["module"]
+
         # save the global config
         self._global_config = global_config
 
@@ -161,6 +169,11 @@ class ScalyrMonitor(StoppableThread):
         # flushing, but at the cost of possible loss of data if the agent shutdowns down unexpectantly.
         self._log_flush_delay = self._config.get(
             "monitor_log_flush_delay", convert_to=float, default=0.0, min_value=0
+        )
+
+        # List of metrics name which shouldn't be logged and sent to Scalyr
+        self._metric_name_blacklist = self._config.get(
+            "metric_name_blacklist", convert_to=ArrayOfStrings, default=[]
         )
 
         # If true, will adjust the sleep time between gather_sample calls by the time spent in gather_sample, rather
@@ -444,8 +457,12 @@ def load_monitor_class(module_name, additional_python_paths):
             if not inspect.isclass(value):
                 continue
             if "ScalyrMonitor" in six.text_type(value.__bases__):
+                description = value.__doc__
+                if description:
+                    description = description.strip()
+
                 MonitorInformation.set_monitor_info(
-                    module_name, description=value.__doc__
+                    module_name, description=description
                 )
                 return value, MonitorInformation.get_monitor_info(module_name)
 
