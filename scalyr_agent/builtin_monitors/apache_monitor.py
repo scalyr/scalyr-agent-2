@@ -130,7 +130,11 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
         # pylint: disable=unexpected-keyword-arg
-        bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
+        if six.PY2:
+            kwargs = {"strict": strict}
+        else:
+            kwargs = {}
+        bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc
 
@@ -259,18 +263,18 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
 
     def _parse_data(self, data):
         fields = {
-            "Total Accesses:": "total_accesses",
-            "Total kBytes:": "total_kbytes_sent",
-            "Uptime:": "uptime",
-            "ReqPerSec:": "request_per_sec",
-            "BytesPerSec:": "bytes_per_sec",
-            "BytesPerReq:": "bytes_per_req",
-            "BusyWorkers:": "busy_workers",
-            "IdleWorkers:": "idle_workers",
-            "ConnsTotal:": "connections_total",
-            "ConnsAsyncWriting:": "async_connections_writing",
-            "ConnsAsyncKeepAlive:": "async_connections_keep_alive",
-            "ConnsAsyncClosing:": "async_connections_closing",
+            b"Total Accesses:": "total_accesses",
+            b"Total kBytes:": "total_kbytes_sent",
+            b"Uptime:": "uptime",
+            b"ReqPerSec:": "request_per_sec",
+            b"BytesPerSec:": "bytes_per_sec",
+            b"BytesPerReq:": "bytes_per_req",
+            b"BusyWorkers:": "busy_workers",
+            b"IdleWorkers:": "idle_workers",
+            b"ConnsTotal:": "connections_total",
+            b"ConnsAsyncWriting:": "async_connections_writing",
+            b"ConnsAsyncKeepAlive:": "async_connections_keep_alive",
+            b"ConnsAsyncClosing:": "async_connections_closing",
         }
         result = {}
         lines = data.splitlines()
@@ -368,19 +372,19 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
         if data is None:
             self._logger.error("No data returned.")
         else:
-            samplesToEmit = {
-                "busy_workers": "apache.workers.active",
-                "idle_workers": "apache.workers.idle",
-                "connections_total": "apache.connections.active",
-                "async_connections_writing": "apache.connections.writing",
-                "async_connections_keep_alive": "apache.connections.idle",
-                "async_connections_closing": "apache.connections.closing",
-            }
+            samplesToEmit = [
+                ("busy_workers", "apache.workers.active"),
+                ("idle_workers", "apache.workers.idle"),
+                ("connections_total", "apache.connections.active"),
+                ("async_connections_writing", "apache.connections.writing"),
+                ("async_connections_keep_alive", "apache.connections.idle"),
+                ("async_connections_closing", "apache.connections.closing"),
+            ]
 
             statsEmitted = 0
-            for key in samplesToEmit:
+            for key, metric_name in samplesToEmit:
                 if key in data:
-                    self._logger.emit_value(samplesToEmit[key], int(data[key]))
+                    self._logger.emit_value(metric_name, int(data[key]))
                     statsEmitted += 1
 
             if statsEmitted == 0:
