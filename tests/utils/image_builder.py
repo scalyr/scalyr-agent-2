@@ -132,6 +132,7 @@ class AgentImageBuilder(object):
             # if we build it multiple times.
             self._docker_client.images.get(self.image_tag)
             print("The Image is already loaded.")
+            return
         except docker.errors.ImageNotFound:
             pass
 
