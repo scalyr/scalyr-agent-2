@@ -108,7 +108,7 @@ class EncodeDecodeTest(ScalyrTestCase):
             __runtest(UJSON)
         if sys.version_info[:2] > (2, 5):
             __runtest(JSON)
-        if sys.version_info[:2] > (2, 7):
+        if sys.version_info[:2] >= (3, 5):
             __runtest(ORJSON)
 
         # do the same check but now with binary string.

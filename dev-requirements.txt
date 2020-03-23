@@ -19,6 +19,6 @@ docker==4.1.0
 requests==2.15.1
 ujson==1.35
 orjson==2.6.1; python_version >= '3.6'
-orjson==2.0.11; python_version == '2.6' or python_version == '2.7' or python_version == '3.5'
+orjson==2.0.11; python_version == '3.5'
 
 pathlib2==2.3.5; python_version <= '2.7'
