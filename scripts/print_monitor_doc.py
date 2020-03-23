@@ -48,31 +48,64 @@ from six.moves import range
 from scalyr_agent.monitors_manager import load_monitor_class
 
 
-def print_monitor_documentation(monitor_module, column_size, additional_module_paths):
+def print_monitor_documentation(
+    monitor_module, column_size, additional_module_paths, include_sections
+):
     """Prints out the documentation for the specified monitor.
 
     @param monitor_module: The module the monitor is defined in.
     @param column_size: The maximum line size to use.
     @param additional_module_paths: Any additional paths that should be examined to load the monitor module.  This
         can contain multiple paths separated by os.pathsep
+    @param include_sections: List of sections to include in the output.
 
     @type monitor_module: str
     @type column_size: int
     @type additional_module_paths: str
+    @type include_sections: list
     """
+    include_sections = include_sections or [
+        "description",
+        "configuration_reference",
+        "log_reference",
+        "metrics",
+    ]
     info = load_monitor_class(monitor_module, additional_module_paths)[1]
-    print("Description:")
-    print(info.description)
 
-    print("Options:")
-    print_options(info.config_options, column_size)
+    if "description" in include_sections:
+        # NOTE: We only include monitor name header if the section doesn't already contain one
+        if "# " not in info.description:
+            # This turns scalyr_agent.builtin_monitors.redis_monitor -> Redis Monitor
+            monitor_module = info.monitor_module.split(".")[-1]
+            monitor_name = monitor_module.replace("_", "").capitalize()
+            print("# %s" % (monitor_name))
+            print("")
+
+        print(info.description)
+        print("")
+
+    if "configuration_reference" in include_sections and len(info.config_options) > 0:
+        print("## Configuration Reference")
+        print("")
+        print_options(info.config_options, column_size)
+        print("")
+
+    if "log_reference" in include_sections and len(info.log_fields) > 0:
+        print("## Log reference")
+        print("")
+        print("Each event recorded by this plugin will have the following fields:")
+        print("")
+        print_log_fields(info.log_fields, column_size)
+        print("")
+
+    if "metrics" not in include_sections or len(info.metrics) == 0:
+        return
+
+    print("## Metrics")
+    print("")
+    print("The table below describes the metrics recorded by the monitor.")
     print("")
 
-    print("Log reference:")
-    print_log_fields(info.log_fields, column_size)
-    print("")
-
-    print("Metrics:")
     # Have to break the metrics up into their categories if they have them.
     all_metrics = info.metrics
 
@@ -92,7 +125,8 @@ def print_monitor_documentation(monitor_module, column_size, additional_module_p
     print("")
 
     for category in categories:
-        print("%s metrics" % category)
+        print("### %s metrics" % category)
+        print("")
         print_metrics(filter_metric_by_category(all_metrics, category), column_size)
         print("")
 
@@ -200,7 +234,7 @@ def print_metrics(metric_list, column_size):
         metric_name_column.append("``%s``" % metric.metric_name)
 
         # Create the description
-        description_column.append(metric.description)
+        description_column.append(metric.description.strip())
 
         # Create the extra fields cell for this row.
         cell = []
@@ -357,7 +391,12 @@ if __name__ == "__main__":
         dest="module_paths",
         help="Additional paths to examine to search for the monitor module, beyond the standard ones.",
     )
-
+    parser.add_option(
+        "" "--include-sections",
+        dest="include_sections",
+        default="description,configuration_reference,log_reference,metrics",
+        help="Comma delimited list of sections to include (e.g. configuration_reference,metrics)",
+    )
     (options, args) = parser.parse_args()
 
     if len(args) != 1:
@@ -375,5 +414,9 @@ if __name__ == "__main__":
             file=sys.stderr,
         )
 
-    print_monitor_documentation(args[0], int(options.column_size), options.module_paths)
+    include_sections = options.include_sections.split(",")
+
+    print_monitor_documentation(
+        args[0], int(options.column_size), options.module_paths, include_sections
+    )
     sys.exit(0)
