@@ -313,8 +313,8 @@ See [Analyze Access Logs](/solutions/analyze-access-logs) for more information a
             data = None
         except six.moves.urllib.error.URLError as err:
             message = (
-                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
-                err,
+                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
+                % (str(err))
             )
             if err.reason.errno == 111:
                 message = (

@@ -101,3 +101,22 @@ class ApacheMonitorTest(ScalyrMockHttpServerTestCase):
             in mock_logger.error.call_args_list[0][0][0]
         )
         self.assertTrue("No data returned" in mock_logger.error.call_args_list[1][0][0])
+
+    def test_gather_sample_invalid_url(self):
+        url = "http://invalid"
+        monitor_config = {
+            "module": "apache_monitor",
+            "status_url": url,
+        }
+        mock_logger = mock.Mock()
+        monitor = ApacheMonitor(monitor_config, mock_logger)
+
+        monitor.gather_sample()
+
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+        self.assertEqual(mock_logger.error.call_count, 2)
+        self.assertTrue(
+            "The was an error attempting to reach the server"
+            in mock_logger.error.call_args_list[0][0][0]
+        )
+        self.assertTrue("No data returned" in mock_logger.error.call_args_list[1][0][0])

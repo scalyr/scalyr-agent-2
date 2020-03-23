@@ -445,7 +445,7 @@ instance."""
             data = handle.read()
         except six.moves.urllib.error.HTTPError as err:
             message = (
-                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                 err.code,
             )
             if err.code == 404:
@@ -454,15 +454,15 @@ instance."""
                 message = "The server is denying access to the URL specified for requesting the status page.  Please verify that permissions to access the status page are correctly configured in your server configuration and that your apache_monitor configuration reflects the same configuration requirements."
             elif err.code >= 500 or err.code < 600:
                 message = (
-                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                     err.code,
                 )
             self._logger.error(message)
             data = None
         except six.moves.urllib.error.URLError as err:
             message = (
-                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
-                err,
+                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
+                % str(err)
             )
             if err.reason.errno == 111:
                 message = (
