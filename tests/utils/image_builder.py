@@ -18,6 +18,7 @@ from __future__ import absolute_import
 
 import shutil
 import docker
+import docker.errors
 import argparse
 
 if False:
@@ -127,6 +128,13 @@ class AgentImageBuilder(object):
         This is convenient to use for example with CI caches.
         :param dir_path: Path to the directory with cached image or where to save it.
         """
+        try:
+            # if image is loaded earlier - skip to avoid the multiple loading of the same image
+            # if we build it multiple times.
+            self._docker_client.images.get(self.image_tag)
+            print("The Image is already loaded.")
+        except docker.errors.ImageNotFound:
+            pass
 
         image_file_path = dir_path / self.image_tag
         if not image_file_path.exists():

@@ -259,7 +259,7 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
 
-  smoke-package:
+  package-test:
     description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
     parameters:
       distribution:
@@ -894,7 +894,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "amazonlinux"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_amazonlinux
@@ -904,7 +904,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "ubuntu"
           agent_host_name_prefix: "package-test"
           command: tox -eagent_distributions_tests_ubuntu
@@ -914,7 +914,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "amazonlinux"
           python_version: "python3"
           agent_host_name_prefix: "smoke"
@@ -925,7 +925,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "amazonlinux"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_amazonlinux_python2
@@ -935,7 +935,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "ubuntu"
           python_version: "python3"
           command: tox -eagent_package_smoke_test_ubuntu_python3
@@ -945,7 +945,7 @@ jobs:
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "ubuntu"
           python_version: "python2"
           command: tox -eagent_package_smoke_test_ubuntu_python2
