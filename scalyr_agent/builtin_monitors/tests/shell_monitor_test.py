@@ -65,7 +65,7 @@ class ShellMonitorTest(ScalyrTestCase):
     def test_gather_sample_log_all_lines(self):
         monitor_config = {
             "module": "shell_monitor",
-            "command": 'echo -e "line 1\nline 2\nline 3"',
+            "command": 'echo "line 1\nline 2\nline 3"',
             "max_characters": 100,
             "log_all_lines": True,
         }
@@ -79,14 +79,14 @@ class ShellMonitorTest(ScalyrTestCase):
 
         self.assertEqual(call_args, ("output", "line 1\nline 2\nline 3\n"))
         self.assertEqual(
-            call_kwargs["extra_fields"]["command"], 'echo -e "line 1\nline 2\nline 3"'
+            call_kwargs["extra_fields"]["command"], 'echo "line 1\nline 2\nline 3"'
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 21)
 
     def test_gather_sample_extract_expression(self):
         monitor_config = {
             "module": "shell_monitor",
-            "command": 'echo -e "line 1\nline 2\nline 100\nline 200"',
+            "command": 'echo "line 1\nline 2\nline 100\nline 200"',
             "extract": r"line (\d\d\d)",
             "max_characters": 100,
         }
@@ -101,7 +101,7 @@ class ShellMonitorTest(ScalyrTestCase):
         self.assertEqual(call_args, ("output", "100"))
         self.assertEqual(
             call_kwargs["extra_fields"]["command"],
-            'echo -e "line 1\nline 2\nline 100\nline 200"',
+            'echo "line 1\nline 2\nline 100\nline 200"',
         )
         self.assertEqual(call_kwargs["extra_fields"]["length"], 3)
 
