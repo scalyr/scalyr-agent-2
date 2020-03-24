@@ -1178,7 +1178,7 @@ def set_python_version(version):
     print("Switched agent to python {0}".format(version))
     print(
         "If you have an existing instance of scalyr-agent-2 process running, "
-        "you need to restart it for this change to take an affect."
+        "you need to restart it for this change to take an affect.\n"
         "You can do that by running '/etc/init.d/scalyr-agent-2 restart' command."
     )
 
