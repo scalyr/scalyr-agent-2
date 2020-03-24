@@ -13,3 +13,5 @@ omit =
     */venv/*
     */third_party*/*
     tests/*
+    /home/circleci/scalyr-agent-2/tests/*
+    /usr/share/scalyr-agent-2/py/tests/*

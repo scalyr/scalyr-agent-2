@@ -27,8 +27,10 @@ fixes:
 ignore:
     # Ignore top level tests/ directory with end to end package tests for which we
     # currently don't generate coverage
-    - "/home/circleci/scalyr-agent-2/tests"
-    - "tests"
+    - "/home/circleci/scalyr-agent-2/tests/"
+    - "/home/circleci/scalyr-agent-2/tests/**/*"
+    - "tests/"
+    - "tests/**/*"
 
 comment:
   layout: "reach, diff, flags, files"
