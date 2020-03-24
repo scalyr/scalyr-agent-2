@@ -702,7 +702,7 @@ instance."""
 
         status = self._get_status(self._monitor_url)
         if status is not None:
-            status = six.text_type(status)
+            status = six.ensure_text(status)
             stats = self._parse_general_status(status)
             heap = self._parse_heap_status(status)
 
