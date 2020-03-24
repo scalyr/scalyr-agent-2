@@ -12,3 +12,4 @@ omit =
     */.virtualenvs/*
     */venv/*
     */third_party*/*
+    tests/*
