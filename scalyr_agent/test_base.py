@@ -36,6 +36,9 @@ import time
 import tempfile
 import unittest
 import random
+
+from pprint import pprint
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -110,15 +113,23 @@ def _thread_watcher():
     properly stop.  Since it is not a daemon thread, it will block the exit of the entire process.
 
     """
-    # Sleep for 60 seconds since our test suites typically run in less than 15 seconds.
-    time.sleep(60)
+    # Sleep for 45 seconds since our test suites typically run in less than 15 seconds.
+    time.sleep(45)
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
     print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
+        if t.getName() in ["MainThread", "hung thread watcher"]:
+            # Exclude itself and main thread
+            continue
+
         print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
+        pprint(t.__dict__)
     print("Done")
+    # NOTE: We exit with non-zero here to fail early in Circle CI instead of waiting on build
+    # timeout (10 minutes)
+    sys.exit(1)
 
 
 def _start_thread_watcher_if_necessary():
@@ -463,6 +474,14 @@ class ScalyrMockHttpServerTestCase(ScalyrTestCase):
             cls.mock_http_server_thread.stop()
 
 
+def shutdown_flask_server():
+    from flask import request
+
+    func = request.environ["werkzeug.server.shutdown"]
+    func()
+    return ""
+
+
 class MockHTTPServer(StoppableThread):
     """
     Mock HTTP server which can be used for tests.
@@ -472,12 +491,12 @@ class MockHTTPServer(StoppableThread):
 
     def __init__(self, host="127.0.0.1", port=None):
         # type: (str, Optional[int]) -> None
-        super(MockHTTPServer, self).__init__(name="MockHttpServer")
-
-        from flask import Flask
-
         if not port:
             port = random.randint(5000, 20000)
+
+        super(MockHTTPServer, self).__init__(name="MockHttpServer_%s_%s" % (host, port))
+
+        from flask import Flask
 
         self.host = host
         self.port = port
@@ -486,6 +505,7 @@ class MockHTTPServer(StoppableThread):
         self.setDaemon(True)
 
         self.app = Flask("mock_app")
+        self.app.add_url_rule("/shutdown", view_func=shutdown_flask_server)
 
     def run(self):
         LOG.info(
@@ -496,7 +516,13 @@ class MockHTTPServer(StoppableThread):
         super(MockHTTPServer, self).run()
 
     def stop(self, wait_on_join=True, join_timeout=2):
+        import requests
+
         LOG.info("Stopping mock http server...")
 
+        # Sadly there is no better way to kill werkzeug server...
+        url = "http://%s:%s/shutdown" % (self.host, self.port)
+        requests.get(url)
+
         self.app.do_teardown_appcontext()
-        super(MockHTTPServer, self).stop(wait_on_join=False, join_timeout=0.1)
+        super(MockHTTPServer, self).stop(wait_on_join=True, join_timeout=0.1)
