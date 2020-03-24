@@ -480,12 +480,12 @@ class MockHTTPServer(StoppableThread):
 
     def __init__(self, host="127.0.0.1", port=None):
         # type: (str, Optional[int]) -> None
-        super(MockHTTPServer, self).__init__(name="MockHttpServer")
-
-        from flask import Flask
-
         if not port:
             port = random.randint(5000, 20000)
+
+        super(MockHTTPServer, self).__init__(name="MockHttpServer_%s_%s" % (host, port))
+
+        from flask import Flask
 
         self.host = host
         self.port = port
