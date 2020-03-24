@@ -19,7 +19,7 @@
 # This is important because all agent scripts rely on '/usr/bin/env python' command.
 
 
-echo "Check python version." >&2
+echo "Checking Python version." >&2
 
 current_version2=$(/usr/bin/env python2 --version 2>&1 | grep -o "[0-9].[0-9]")
 current_version3=$(/usr/bin/env python3 --version 2>&1 | grep -o "[0-9].[0-9]")
