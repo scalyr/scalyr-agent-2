@@ -100,10 +100,12 @@ class LinuxPlatformController(PosixPlatformController):
         @rtype: list<dict>
         """
         result = []
+
         if config.implicit_metric_monitor:
             result.append(
-                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics")
+                JsonObject(module="scalyr_agent.builtin_monitors.linux_system_metrics",)
             )
+
         if config.implicit_agent_process_metrics_monitor:
             result.append(
                 JsonObject(

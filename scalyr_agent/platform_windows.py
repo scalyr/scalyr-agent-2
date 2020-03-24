@@ -17,8 +17,10 @@
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
+
 import atexit
 import errno
+
 from scalyr_agent import compat
 
 __author__ = "guy.hoozdis@gmail.com"
@@ -323,7 +325,7 @@ class WindowsPlatformController(PlatformController):
         if config.implicit_metric_monitor:
             result.append(
                 JsonObject(
-                    module="scalyr_agent.builtin_monitors.windows_system_metrics"
+                    module="scalyr_agent.builtin_monitors.windows_system_metrics",
                 )
             )
         if config.implicit_agent_process_metrics_monitor:

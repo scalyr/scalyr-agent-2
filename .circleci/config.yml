@@ -687,6 +687,15 @@ jobs:
             IGNORE_BINARY_DOESNT_EXIST: "0"
           command: |
             ./scripts/shell-scripts-lint.sh
+      - run:
+          name: Generate Monitor Docs
+          command: |
+            tox -e generate-monitor-docs
+            # Verify there are no changes after generating the docs. If there
+            # are, this indicates developer didn't run this target locally and
+            # that some files are not up to date
+            git status
+            git status -- *docs/monitors/*.md */docs/monitors/*.md | (grep -q "nothing to commit" || (echo "Auto-generate monitor doc files are not up to date. Make sure you run tox -e generate-monitor-docs and commit any changed files." && exit 1))
       - save_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
           paths:

@@ -152,21 +152,21 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.request_count",
-    "The value represents the total number of requests made.  ",
+    "The value represents the total number of requests made.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.error_count",
-    "The value represents the total number requests that resulted in errors.  ",
+    "The value represents the total number requests that resulted in errors.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number bytes received by the server.  ",
+    "The value represents the total number bytes received by the server.",
     extra_fields={"type": "received"},
     cumulative=True,
     category="general",
@@ -174,7 +174,7 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number sent by the server.  ",
+    "The value represents the total number sent by the server.",
     extra_fields={"type": "sent"},
     cumulative=True,
     category="general",
