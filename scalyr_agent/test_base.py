@@ -36,6 +36,9 @@ import time
 import tempfile
 import unittest
 import random
+
+from pprint import pprint
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -117,7 +120,12 @@ def _thread_watcher():
     # its threads properly.  Let's get some information on them.
     print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
+        if t.getName() in ["MainThread", "hung thread watcher"]:
+            # Exclude itself and main thread
+            continue
+
         print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
+        pprint(t.__dict__)
     print("Done")
 
 
