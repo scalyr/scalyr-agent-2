@@ -35,6 +35,7 @@ import threading
 import time
 import tempfile
 import unittest
+import random
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -46,18 +47,20 @@ PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
 # Need so we can patch print() function for test purposes under both, Python 2 and 3
 print = print
 
+LOG = scalyr_logging.getLogger(__name__)
+
 
 def _noop_skip(reason):
     def decorator(test_func_or_obj):
-        if not isinstance(test_func_or_obj, type):
+        if not isinstance(test_func_or_obj, type) or sys.version_info < (2, 7, 0):
 
-            def skip_wrapper(*args, **kwargs):
+            def test_skip_wrapper(*args, **kwargs):
                 print(
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
                 )
 
-            return skip_wrapper
+            return test_skip_wrapper
         else:
             test_func_or_obj.__unittest_skip__ = True
             test_func_or_obj.__unittest_skip_why__ = reason
@@ -436,3 +439,64 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             content = fp.read()
 
         return bool(matcher.search(content))
+
+
+class ScalyrMockHttpServerTestCase(ScalyrTestCase):
+    """
+    Base Scalyr test case class which starts mock http server on startUpClass() and stops it on
+    tearDownClass()
+    """
+
+    mock_http_server_thread = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mock_http_server_thread = MockHTTPServer()
+        cls.mock_http_server_thread.start()
+
+        # Give server some time to start up
+        time.sleep(0.5)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.mock_http_server_thread:
+            cls.mock_http_server_thread.stop()
+
+
+class MockHTTPServer(StoppableThread):
+    """
+    Mock HTTP server which can be used for tests.
+
+    It works by starting a mock HTTP server which serves a flask app on localhost and random port.
+    """
+
+    def __init__(self, host="127.0.0.1", port=None):
+        # type: (str, Optional[int]) -> None
+        super(MockHTTPServer, self).__init__(name="MockHttpServer")
+
+        from flask import Flask
+
+        if not port:
+            port = random.randint(5000, 20000)
+
+        self.host = host
+        self.port = port
+
+        # Make sure we run in the background
+        self.setDaemon(True)
+
+        self.app = Flask("mock_app")
+
+    def run(self):
+        LOG.info(
+            "Starting mock http server and listening on: %s:%s" % (self.host, self.port)
+        )
+
+        self.app.run(host=self.host, port=self.port)
+        super(MockHTTPServer, self).run()
+
+    def stop(self, wait_on_join=True, join_timeout=2):
+        LOG.info("Stopping mock http server...")
+
+        self.app.do_teardown_appcontext()
+        super(MockHTTPServer, self).stop(wait_on_join=False, join_timeout=0.1)
