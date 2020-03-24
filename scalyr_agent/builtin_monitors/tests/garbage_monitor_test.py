@@ -21,17 +21,20 @@ from scalyr_agent.builtin_monitors.garbage_monitor import GarbageMonitor
 from scalyr_agent.test_base import ScalyrTestCase
 
 import mock
+import six
 
 
 class GarbageMonitorTest(ScalyrTestCase):
     @classmethod
     def setUpClass(cls):
-        super(GarbageMonitorTest, cls).setUpClass()
+        if not six.PY2:
+            super(GarbageMonitorTest, cls).setUpClass()
         gc.set_debug(gc.DEBUG_SAVEALL)
 
     @classmethod
     def tearDownClass(cls):
-        super(GarbageMonitorTest, cls).tearDownClass()
+        if not six.PY2:
+            super(GarbageMonitorTest, cls).tearDownClass()
         gc.set_debug(0)
 
     def test_gather_sample(self):
