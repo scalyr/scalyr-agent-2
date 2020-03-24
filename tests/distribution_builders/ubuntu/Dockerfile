@@ -8,8 +8,8 @@ WORKDIR /second_package
 RUN python /agent_source/build_package.py deb
 
 FROM ubuntu:18.04
-RUN apt update -y
-RUN apt install -y python build-essential
+RUN apt update
+RUN apt install -y apt-utils python build-essential
 
 RUN apt install -y build-essential python python3
 RUN apt install -y python-pip python-dev python3-pip python3-dev

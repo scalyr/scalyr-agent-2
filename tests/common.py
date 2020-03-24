@@ -28,8 +28,17 @@ def _install_rpm(file_path, upgrade=False):
 
 
 def _install_deb(file_path):
+    # NOTE: We need to specify DEBIAN_FRONTEND and PATH otherwise tests might fail depending on the
+    # environment where they run
+    env = {
+        "DEBIAN_FRONTEND": "noninteractive",
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    }
     subprocess.check_call(
-        "apt install -y -f {0}".format(file_path), shell=True, stdin=subprocess.PIPE
+        "apt install -y -f {0}".format(file_path),
+        shell=True,
+        stdin=subprocess.PIPE,
+        env=env,
     )
 
 
