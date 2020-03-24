@@ -40,9 +40,18 @@ ConnsAsyncClosing: 1
 Scoreboard: __W___K...............................................................................................................................................
 """
 
+MOCK_APACHE_STATUS_DATA_PARTIAL = """
+BytesPerSec: 88.1589
+BytesPerReq: 819.2
+"""
+
 
 def mock_apache_server_status_view_func():
     return MOCK_APACHE_STATUS_DATA
+
+
+def mock_apache_server_status_partial_view_func():
+    return MOCK_APACHE_STATUS_DATA_PARTIAL
 
 
 class ApacheMonitorTest(ScalyrMockHttpServerTestCase):
@@ -50,9 +59,14 @@ class ApacheMonitorTest(ScalyrMockHttpServerTestCase):
     def setUpClass(cls):
         super(ApacheMonitorTest, cls).setUpClass()
 
-        # Register mock route
+        # Register mock routes
         cls.mock_http_server_thread.app.add_url_rule(
             "/server-status", view_func=mock_apache_server_status_view_func
+        )
+
+        cls.mock_http_server_thread.app.add_url_rule(
+            "/server-status-partial",
+            view_func=mock_apache_server_status_partial_view_func,
         )
 
     def test_gather_sample_200_success(self):
@@ -79,6 +93,27 @@ class ApacheMonitorTest(ScalyrMockHttpServerTestCase):
         self.assertEqual(call_args_list[3][0], ("apache.connections.writing", 10))
         self.assertEqual(call_args_list[4][0], ("apache.connections.idle", 2))
         self.assertEqual(call_args_list[5][0], ("apache.connections.closing", 1))
+
+    def test_gather_sample_200_incomplete_data_returned_returned(self):
+        url = "http://%s:%s/server-status-partial" % (
+            self.mock_http_server_thread.host,
+            self.mock_http_server_thread.port,
+        )
+        monitor_config = {
+            "module": "apache_monitor",
+            "status_url": url,
+        }
+        mock_logger = mock.Mock()
+        monitor = ApacheMonitor(monitor_config, mock_logger)
+
+        monitor.gather_sample()
+
+        self.assertEqual(mock_logger.emit_value.call_count, 0)
+        self.assertEqual(mock_logger.error.call_count, 1)
+        self.assertTrue(
+            "Status page did not match expected format."
+            in mock_logger.error.call_args_list[0][0][0]
+        )
 
     def test_gather_sample_404_no_data_returned(self):
         url = "http://%s:%s/invalid" % (
