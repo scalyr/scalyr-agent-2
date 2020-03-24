@@ -113,8 +113,8 @@ def _thread_watcher():
     properly stop.  Since it is not a daemon thread, it will block the exit of the entire process.
 
     """
-    # Sleep for 60 seconds since our test suites typically run in less than 15 seconds.
-    time.sleep(60)
+    # Sleep for 45 seconds since our test suites typically run in less than 15 seconds.
+    time.sleep(45)
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
@@ -127,6 +127,9 @@ def _thread_watcher():
         print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
         pprint(t.__dict__)
     print("Done")
+    # NOTE: We exit with non-zero here to fail early in Circle CI instead of waiting on build
+    # timeout (10 minutes)
+    sys.exit(1)
 
 
 def _start_thread_watcher_if_necessary():
