@@ -129,6 +129,7 @@ class TestReportStatus(ScalyrTestCase):
         self.status.server_host = "test_machine"
         self.status.user = "root"
         self.status.version = "2.0.0.beta.7"
+        self.status.python_version = "3.6.8"
 
         config_status = ConfigStatus()
         self.status.config_status = config_status
@@ -260,6 +261,7 @@ class TestReportStatus(ScalyrTestCase):
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine
@@ -331,6 +333,7 @@ Failed monitors:
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine
@@ -398,6 +401,7 @@ Failed monitors:
 Current time:     Fri Sep  5 23:14:13 2014 UTC
 Agent started at: Thu Sep  4 23:14:13 2014 UTC
 Version:          2.0.0.beta.7
+Python version:   3.6.8
 Agent running as: root
 Agent log:        /var/logs/scalyr-agent/agent.log
 ServerHost:       test_machine

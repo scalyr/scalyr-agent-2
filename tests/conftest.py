@@ -12,25 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import unicode_literals
 from __future__ import print_function
-
 from __future__ import absolute_import
-import os
+from __future__ import unicode_literals
 
-import pytest  # type: ignore
+import os
+import shutil
+import tempfile
+
+import pytest
 import yaml
 
-from scalyr_agent.__scalyr__ import DEV_INSTALL, PACKAGE_INSTALL
 from scalyr_agent import compat
-from smoke_tests.tools.compat import Path
+from tests.utils.compat import Path
+from tests.utils.common import TEMP_PREFIX
 
-# mapping of PlatformController 'install_type' constants
-# to possible values of the '--agent-installation-type' command line options.
-AGENT_INSTALLATION_TYPES_MAP = {
-    "PACKAGE_INSTALL": PACKAGE_INSTALL,
-    "DEV_INSTALL": DEV_INSTALL,
-}
+
+@pytest.fixture(scope="session", autouse=True)
+def clear_tmp():
+    for child in Path(tempfile.gettempdir()).iterdir():
+        if child.name.startswith(TEMP_PREFIX):
+            if child.is_dir():
+                shutil.rmtree(str(child))
+            else:
+                os.remove(str(child))
 
 
 def pytest_addoption(parser):
@@ -40,6 +45,26 @@ def pytest_addoption(parser):
         default=Path(__file__).parent / "config.yml",
         help="Path to yaml file with essential agent settings and another test related settings. "
         "Fields from this config file will be set as environment variables.",
+    )
+
+    parser.addoption(
+        "--no-dockerize",
+        action="store_true",
+        help="Make test cases that were decorated by 'utils.dockerized_case' run on that machine, "
+        "not inside docker container. "
+        "Also used by 'utils.dockerized_case' when test case is already in container "
+        "to run actual test case and to prevent another container creation.",
+    )
+
+    parser.addoption(
+        "--image-cache-path",
+        help="Path to cache. If specified, "
+        "image builders look for cached image .tar files inside it and load them and skip the build process.",
+    )
+
+    parser.addoption(
+        "--artifacts-path",
+        help="Path to directory where tests cases can store their results and artifacts.",
     )
 
 

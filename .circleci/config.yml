@@ -259,7 +259,7 @@ commands:
       - store_artifacts:
           path: ~/scalyr-agent-dev/log
 
-  smoke-package:
+  package-test:
     description: "A base command for package smoke tests. It invokes tox target with name 'agent_package_smoke_test_<parameters>'"
     parameters:
       distribution:
@@ -268,6 +268,14 @@ commands:
       python_version:
         description: "The version of the python interpreter to install in distribution."
         type: string
+        default: ""
+      command:
+        description: "Command to run tests."
+        type: string
+      agent_host_name_prefix:
+        description: "Host name for the agent instances that will be started during job."
+        type: string
+        default: ""
     steps:
       - checkout
       - setup_remote_docker:
@@ -286,12 +294,12 @@ commands:
             # Add agent source code to PYTHONPATH to be able to import its components.
             export PYTHONPATH=.:${PYTHONPATH}
             # get Dockerfile of the needed image by specifying distribution name and python version. Also this Dockerfile is needed to get the checksum for cache.
-            python smoke_tests/tools/package/get_agent_distribution_dockerfile.py << parameters.distribution >> << parameters.python_version >> > ~/Dockerfile
+            python -m tests.distribution_builders.<< parameters.distribution >>.cmd --dockerfile > ~/Dockerfile
             cat ~/Dockerfile
 
       - restore_cache:
           # here the 'tar' file of the docker image is stored. Use it to restore agent image without building it.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
 
       - run:
           name: Run Unit Tests under Python << parameters.python_version >>
@@ -300,18 +308,15 @@ commands:
             # when job runs from CircleCi servers, the 'AGENT_HOST_NAME' is not set, so 'CIRCLE_BUILD_NUM' is used.
             # when job runs locally, the 'CIRCLE_BUILD_NUM' is not set, so 'AGENT_HOST_NAME' is used.
             export CIRCLE_BUILD_NUM=${CIRCLE_BUILD_NUM}${AGENT_HOST_NAME}
-            export AGENT_HOST_NAME=agent-package-smoke-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
+            export AGENT_HOST_NAME=<< parameters.agent_host_name_prefix >>-<< parameters.distribution >>-<< parameters.python_version >>-${CIRCLE_BUILD_NUM}
 
             # NOTE: We don't want the build to immediately fail if tox command fails because we
             # want to preserve the build logs as artifacts to aid with debugging
             set +e
-            tox -eagent_package_smoke_test_<< parameters.distribution >>_<< parameters.python_version >> -- --package-image-cache-path ~/agent_image
+            mkdir -p ~/artifacts
+            << parameters.command >> -- --image-cache-path ~/agent_image --artifacts-path ~/artifacts
             EXIT_CODE=$?
             set -e
-
-            # copy log files to artifacts directory.
-            mkdir -p ~/artifacts
-            docker cp scalyr_agent_smoke_<< parameters.distribution >>_<< parameters.python_version >>:/var/log/scalyr-agent-2 ~/artifacts/
 
             if [ "${EXIT_CODE}" -ne "0" ]; then
                 echo "tox target failed"
@@ -320,7 +325,7 @@ commands:
 
       - save_cache:
           # save agent image to 'tar' file here, if this file is not found previously.
-          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-<< parameters.python_version >>-{{ checksum "~/Dockerfile" }}-<< pipeline.parameters.cache_version >>
+          key: smoke-distribution-image-{{ .Branch }}-<< parameters.distribution >>-{{ checksum "~/Dockerfile" }}-{{ checksum "dev-requirements.txt" }}-<< pipeline.parameters.cache_version >>
           paths:
             - "~/agent_image"
 
@@ -893,41 +898,66 @@ jobs:
           apt_dependencies: "procps build-essential"
 
 
+  package-test-rpm:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "amazonlinux"
+          agent_host_name_prefix: "package-test"
+          command: tox -eagent_distributions_tests_amazonlinux
+
+  package-test-deb:
+    working_directory: ~/scalyr-agent-2
+    docker:
+      - image: circleci/python:3.6
+    steps:
+      - package-test:
+          distribution: "ubuntu"
+          agent_host_name_prefix: "package-test"
+          command: tox -eagent_distributions_tests_ubuntu
+
   smoke-rpm-package-py3:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "amazonlinux"
           python_version: "python3"
+          agent_host_name_prefix: "smoke"
+          command: tox -eagent_package_smoke_test_amazonlinux_python3
 
   smoke-rpm-package-py2:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "amazonlinux"
           python_version: "python2"
+          command: tox -eagent_package_smoke_test_amazonlinux_python2
 
   smoke-deb-package-py3:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "ubuntu"
           python_version: "python3"
+          command: tox -eagent_package_smoke_test_ubuntu_python3
 
   smoke-deb-package-py2:
     working_directory: ~/scalyr-agent-2
     docker:
       - image: circleci/python:3.6
     steps:
-      - smoke-package:
+      - package-test:
           distribution: "ubuntu"
           python_version: "python2"
+          command: tox -eagent_package_smoke_test_ubuntu_python2
 
   send-circle-ci-usage-report:
     description: "Job which emails weekly Circle CI usage report"
@@ -973,15 +1003,27 @@ workflows:
             - smoke-docker-json
             - smoke-docker-syslog
             - smoke-k8s
-  package-smoke-tests:
+  package-tests:
     jobs:
+      - package-test-rpm:
+           <<: *master_only
+      - package-test-deb:
+           <<: *master_only
       - smoke-rpm-package-py2:
+          requires:
+            - package-test-rpm
           <<: *master_only
       - smoke-rpm-package-py3:
+          requires:
+            - package-test-rpm
           <<: *master_only
       - smoke-deb-package-py2:
+          requires:
+            - package-test-deb
           <<: *master_only
       - smoke-deb-package-py3:
+          requires:
+            - package-test-deb
           <<: *master_only
   benchmarks:
     jobs:
