@@ -35,6 +35,7 @@ import sys
 import tarfile
 import tempfile
 import traceback
+import errno
 from io import open
 
 from distutils import spawn
@@ -44,13 +45,13 @@ from optparse import OptionParser
 if "win32" != sys.platform:
     from pwd import getpwnam
 
-
 from __scalyr__ import (
     scalyr_init,
     get_install_root,
     TARBALL_INSTALL,
     MSI_INSTALL,
     SCALYR_VERSION,
+    PACKAGE_INSTALL,
 )
 
 scalyr_init()
@@ -1132,6 +1133,56 @@ def create_custom_dockerfile(
     out_tar.close()
 
 
+PYTHON2 = "python2"
+PYTHON3 = "python3"
+
+
+def set_python_version(version):
+    """Switch agent command main files to another version of python"""
+    controller = PlatformController.new_platform()
+
+    if controller.install_type != PACKAGE_INSTALL:
+        raise RuntimeError(
+            "This operation can not be performed because the Scalyr agent is not installed with package manager."
+        )
+
+    binary_path = os.path.join("/", "usr", "share", "scalyr-agent-2", "bin")
+    source_path = os.path.join(
+        "/", "usr", "share", "scalyr-agent-2", "py", "scalyr_agent"
+    )
+
+    if version == PYTHON3:
+        agent_main_filename = "agent_main_py3.py"
+        config_main_filename = "config_main_py3.py"
+    else:
+        agent_main_filename = "agent_main_py2.py"
+        config_main_filename = "config_main_py2.py"
+
+    agent_main_source = os.path.join(source_path, agent_main_filename)
+    config_main_source = os.path.join(source_path, config_main_filename)
+
+    scalyr_agent_2_target = os.path.join(binary_path, "scalyr-agent-2")
+    scalyr_agent_2_config_target = os.path.join(binary_path, "scalyr-agent-2-config")
+
+    def make_symlink(source, target):
+        try:
+            os.symlink(source, target)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                os.remove(target)
+                os.symlink(source, target)
+
+    make_symlink(agent_main_source, scalyr_agent_2_target)
+    make_symlink(config_main_source, scalyr_agent_2_config_target)
+
+    print("Switched agent to python {0}".format(version))
+    print(
+        "If you have an existing instance of scalyr-agent-2 process running, "
+        "you need to restart it for this change to take an affect.\n"
+        "You can do that by running '/etc/init.d/scalyr-agent-2 restart' command."
+    )
+
+
 if __name__ == "__main__":
     parser = OptionParser(usage="Usage: scalyr-agent-2-config [options]")
     parser.add_option(
@@ -1246,6 +1297,14 @@ if __name__ == "__main__":
         "more easily used again when running as a Kubernetes Daemonset."
         "The option value should either be a path to write the tarball or `-` to "
         "write it to stdout.",
+    )
+
+    parser.add_option(
+        "",
+        "--set-python",
+        dest="set_python",
+        choices=[PYTHON2, PYTHON3],
+        help="Switch current python interpreter. Can be selected from python2 and python3.",
     )
 
     # TODO: These options are only available on Windows platforms
@@ -1430,6 +1489,11 @@ if __name__ == "__main__":
             # actions to perform the upgrade.  Currently, we do not do anything, but we need this here in case we ever
             # do find a need to take some action.
             sys.exit(finish_upgrade_tarball_install(paths[0], paths[1]))
+
+    if options.set_python is not None:
+        set_python_version(options.set_python)
+        print("Agent switched to {0}.".format(options.set_python))
+        sys.exit(0)
 
     if "win32" == sys.platform and options.upgrade_windows:
         sys.exit(

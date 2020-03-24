@@ -10,37 +10,38 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.K
+# limitations under the License.
 
-from __future__ import absolute_import
 from __future__ import unicode_literals
 from __future__ import print_function
+from __future__ import absolute_import
 
+import os
 import time
 
-import pytest  # type: ignore
-
 from scalyr_agent import compat
-from smoke_tests.standalone_smoke_tests.verifier import (
+from scalyr_agent.__scalyr__ import DEV_INSTALL, get_package_root
+from tests.smoke_tests.verifier import (
     AgentLogVerifier,
     DataJsonVerifier,
     SystemMetricsVerifier,
     ProcessMetricsVerifier,
 )
+from tests.utils.agent_runner import AgentRunner
 
-from smoke_tests.tools.agent_runner import AgentRunner
 
-
-@pytest.mark.usefixtures("agent_environment")
-@pytest.mark.timeout(300)
-def test_standalone_smoke(agent_installation_type):
+def _test_standalone_smoke(agent_installation_type, python_version=None):
     """
     Agent standalone test to run within the same machine.
     """
-    print("")
+    if agent_installation_type == DEV_INSTALL:
+        os.chdir(get_package_root())
+
     print("Agent host name: {0}".format(compat.os_environ_unicode["AGENT_HOST_NAME"]))
 
     runner = AgentRunner(agent_installation_type)
+    if python_version:
+        runner.switch_version(python_version)
 
     agent_log_verifier = AgentLogVerifier(
         runner, compat.os_environ_unicode["SCALYR_SERVER"]

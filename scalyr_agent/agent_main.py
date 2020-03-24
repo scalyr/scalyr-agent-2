@@ -1411,6 +1411,7 @@ class ScalyrAgent(object):
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server
         result.log_path = self.__log_file_path
+        result.python_version = sys.version.replace("\n", "")
 
         # Describe the status of the configuration file.
         config_result = ConfigStatus()
