@@ -463,6 +463,14 @@ class ScalyrMockHttpServerTestCase(ScalyrTestCase):
             cls.mock_http_server_thread.stop()
 
 
+def shutdown_flask_server():
+    from flask import request
+
+    func = request.environ["werkzeug.server.shutdown"]
+    func()
+    return ""
+
+
 class MockHTTPServer(StoppableThread):
     """
     Mock HTTP server which can be used for tests.
@@ -486,6 +494,7 @@ class MockHTTPServer(StoppableThread):
         self.setDaemon(True)
 
         self.app = Flask("mock_app")
+        self.app.add_url_rule("/shutdown", view_func=shutdown_flask_server)
 
     def run(self):
         LOG.info(
@@ -496,7 +505,13 @@ class MockHTTPServer(StoppableThread):
         super(MockHTTPServer, self).run()
 
     def stop(self, wait_on_join=True, join_timeout=2):
+        import requests
+
         LOG.info("Stopping mock http server...")
 
+        # Sadly there is no better way to kill werkzeug server...
+        url = "http://%s:%s/shutdown" % (self.host, self.port)
+        requests.get(url)
+
         self.app.do_teardown_appcontext()
-        super(MockHTTPServer, self).stop(wait_on_join=False, join_timeout=0.1)
+        super(MockHTTPServer, self).stop(wait_on_join=True, join_timeout=0.1)
