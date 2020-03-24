@@ -15,6 +15,7 @@ Features
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
 * RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
 * Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
 * Add support for ``orjson`` JSON library when running under Python 3. This library offers significantly better performance and can be enabled by setting ``json_library`` config option to ``orjson`` and installing ``orjson`` Python package using pip.
 
 Bugs
@@ -24,6 +25,7 @@ Bugs
 * Update scalyr client code to log raw uncompressed body under debug log level to aid with troubleshooting.
 * Metric type for ``app.disk.requests.{read,write}`` metrics has been fixed.
 * Fix ``iostat`` monitor so it also works with newer versions of Linux kernel.
+* Fix invalid extra field for two ``tomcat.runtime.threads`` metrics in the Tomcat monitor (all of the metrics had type set to ``max`` whereas one should have type set to ``active`` and the other to ``busy``).
 
 Minor updates
 * Update of embedded ecsda library to 0.13.3

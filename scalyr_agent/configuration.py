@@ -1654,7 +1654,6 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config, "https_proxy", None, description, apply_defaults, env_aware=True
         )
-
         self.__verify_or_set_optional_array_of_strings(
             config,
             "k8s_ignore_namespaces",

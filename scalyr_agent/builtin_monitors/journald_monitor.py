@@ -34,17 +34,9 @@ import six
 try:
     from systemd import journal
 except ImportError:
-    # monitor plugins are loaded dynamically so this exception will only be raised
-    # during monitor creation if the user has configured the agent to use this plugin
-    raise Exception(
-        "Python systemd library not installed.\n\nYou must install the systemd python library in order "
-        "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
-        "  apt-get install python-systemd  (debian/ubuntu)\n"
-        "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
-        "or installed from source using pip e.g.\n\n"
-        "  pip install systemd-python\n\n"
-        "See here for more info: https://github.com/systemd/python-systemd/\n"
-    )
+    # We throw exception later during run time. This way we can still use print_monitor_docs.py
+    # script without systemd dependency being installed
+    journal = None
 
 from scalyr_agent import ScalyrMonitor, define_config_option
 import scalyr_agent.scalyr_logging as scalyr_logging
@@ -150,6 +142,22 @@ _global_lock = threading.Lock()
 _global_checkpoints = {}  # type: Dict[str, Checkpoint]
 
 
+def verify_systemd_library_is_available():
+    """
+    Throw an exception if systemd library is not available.
+    """
+    if not journal:
+        raise ImportError(
+            "Python systemd library not installed.\n\nYou must install the systemd python library in order "
+            "to use the journald monitor.\n\nThis can be done via package manager e.g.:\n\n"
+            "  apt-get install python-systemd  (debian/ubuntu)\n"
+            "  dnf install python-systemd  (CentOS/rhel/Fedora)\n\n"
+            "or installed from source using pip e.g.\n\n"
+            "  pip install systemd-python\n\n"
+            "See here for more info: https://github.com/systemd/python-systemd/\n"
+        )
+
+
 def load_checkpoints(filename):
     """
     Atomically loads checkpoints from a file.  The checkpoints are only ever loaded from disk once,
@@ -249,10 +257,73 @@ class Checkpoint(object):
 
 
 class JournaldMonitor(ScalyrMonitor):
+    """
+# Journald Monitor
 
-    "Read logs from journalctl and emit to scalyr"
+A Scalyr agent monitor that imports log entries from journald.
+
+The journald monitor polls systemd journal files every ``journal_poll_interval`` seconds
+and uploads any new entries to the Scalyr servers.
+
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
+
+By default, the journald monitor logs all log entries, but it can also be configured to filter entries by specific
+fields.
+
+## Dependencies
+
+The journald monitor has a dependency on the Python systemd library, which is a Python wrapper around the systemd C API.
+You need to ensure this library has been installed on your system in order to use this monitor, otherwise a warning
+message will be printed if the Scalyr Agent is configured to use the journald monitor but the systemd library cannot be
+found.
+
+You can install the systemd Python library via package manager e.g.:
+
+    apt-get install python-systemd  (debian/ubuntu)
+    dnf install python-systemd  (CentOS/rhel/Fedora)
+
+Or install it from source using pip e.g.
+
+    pip install systemd-python
+
+See here for more information: https://github.com/systemd/python-systemd/
+
+## Sample Configuration
+
+The following example will configure the agent to query the journal entries
+located in /var/log/journal (the default location for persisted journald logs)
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.journald_monitor",
+      }
+    ]
+
+Here is an example that queries journal entries from volatile/non-persisted journals, and filters those entries to only
+include ones that originate from the ssh service
+
+    monitors: [
+      {
+        module: "scalyr_agent.builtin_monitors.journald_monitor",
+        journal_path: "/run/log/journal",
+        journal_matches: ["_SYSTEMD_UNIT=ssh.service"]
+      }
+    ]
+
+## Polling the Journal File
+
+The journald monitor polls the journal file every ``journal_poll_interval`` seconds to check for new logs.  It does this by
+creating a polling object (https://docs.python.org/2/library/select.html#poll-objects) and calling the ``poll`` method
+of that object.  The ``poll`` method is called with a 0 second timeout so it never blocks.
+After processing any new events, or if there are no events to process, the monitor thread sleeps for ``journal_poll_interval``
+seconds and then polls again.
+    """
 
     def _initialize(self):
+        verify_systemd_library_is_available()
+
         self._max_log_rotations = self._config.get("max_log_rotations")
         self._max_log_size = self._config.get("max_log_size")
         self._journal_path = self._config.get("journal_path")

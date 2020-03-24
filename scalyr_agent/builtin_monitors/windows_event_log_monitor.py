@@ -644,10 +644,9 @@ On versions of Windows from Vista onwards, the newer Evt API is used which can b
 simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
 For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-
 ## Sample Configuration
 
-###Windows Vista and later
+### Windows Vista and later
 
 On Windows Vista and later, the Scalyr agent uses the EvtLog API, and you can configure it to query events on any channel, using the standard XPath query mechanism.  See: https://msdn.microsoft.com/en-us/library/windows/desktop/dd996910(v=vs.85).aspx
 
@@ -681,7 +680,7 @@ Alternatively, here is a configuration that will log critical errors for the App
       }
     ]
 
-###Windows Server 2003
+### Windows Server 2003
 
 For Windows versions earlier than Vista, the Scalyr agent will use the older Event Log API.
 
@@ -695,8 +694,6 @@ and System sources:
         event_types:             "Error, Warning",
       }
     ]
-
-
     """
 
     def _initialize(self):
