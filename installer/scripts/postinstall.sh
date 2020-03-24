@@ -15,7 +15,7 @@
 
 
 # if there is no python2, switch on python3. Since we passed preinstall, we think that at least python3 is available.
-if ! /usr/bin/env python2 --version >/dev/null; then
+if ! /usr/bin/env python2 --version > /dev/null 2>&1; then
   echo "Python2 not found, will use python3 binary for running the agent."
   /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
 fi
