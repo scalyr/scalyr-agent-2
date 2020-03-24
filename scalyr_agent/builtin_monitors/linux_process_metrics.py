@@ -790,8 +790,7 @@ class FileDescriptorReader:
         @return:
         @rtype:
         """
-
-        num_fds = 0
+        num_fds = None
         try:
             num_fds = len(os.listdir(self.__path))
         except OSError as e:
@@ -803,7 +802,9 @@ class FileDescriptorReader:
 
         if not collector:
             collector = {}
-        collector.update({Metric("app.io.fds", "open"): num_fds})
+
+        if num_fds is not None:
+            collector.update({Metric("app.io.fds", "open"): num_fds})
         return collector
 
     def close(self):
