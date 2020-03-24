@@ -15,24 +15,24 @@
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import os
+import sys
 import time
 
 from scalyr_agent.builtin_monitors.linux_system_metrics import SystemMetricsMonitor
 from scalyr_agent.scalyr_monitor import load_monitor_class
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 import mock
 
 __all__ = ["LinuxSystemMetricsMonitorTest"]
 
 
+@skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
 class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
     def test_gather_sample_success(self):
         monitor_config = {
             "module": "linux_system_metrics",
-            "id": "my-id",
-            "pid": os.getpid(),
         }
         mock_logger = mock.Mock()
         monitor = SystemMetricsMonitor(monitor_config, mock_logger)
