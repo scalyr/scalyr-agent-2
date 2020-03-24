@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import tarfile
 import os
 
+import six
 import docker
 
 from tests.utils.compat import Path
@@ -48,7 +49,7 @@ def dockerized_case(builder_cls, file_path):
             exit_code = container.wait()["StatusCode"]
 
             logs = container.logs(follow=True)
-            print(logs)
+            print(six.ensure_text(logs))
 
             # save logs if artifacts path is specified.
             artifacts_path = request.config.getoption("--artifacts-path", None)
