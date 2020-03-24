@@ -28,8 +28,8 @@ import mock
 __all__ = ["LinuxSystemMetricsMonitorTest"]
 
 
-@skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
 class LinuxSystemMetricsMonitorTest(ScalyrTestCase):
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_gather_sample_success(self):
         monitor_config = {
             "module": "linux_system_metrics",

@@ -52,15 +52,15 @@ LOG = scalyr_logging.getLogger(__name__)
 
 def _noop_skip(reason):
     def decorator(test_func_or_obj):
-        if not isinstance(test_func_or_obj, type):
+        if not isinstance(test_func_or_obj, type) or sys.version_info < (2, 7, 0):
 
-            def skip_wrapper(*args, **kwargs):
+            def test_skip_wrapper(*args, **kwargs):
                 print(
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
                 )
 
-            return skip_wrapper
+            return test_skip_wrapper
         else:
             test_func_or_obj.__unittest_skip__ = True
             test_func_or_obj.__unittest_skip_why__ = reason
