@@ -717,7 +717,7 @@ class FakeK8s(object):
     def stop(self):
         """Wakes up anything waiting on a pending requests.  Called when the test is finished.
         """
-        self.__lock.acquire()
+        self.__condition_var.acquire()
         try:
             if self.__pending_request is not None:
                 # If there is still a blocked request at the end of the test, drain it out with an arbitrary
@@ -725,9 +725,9 @@ class FakeK8s(object):
                 self.__pending_responses[
                     self.__pending_request
                 ] = self._raise_temp_error
-                self.__condition_var.notify_all()
+            self.__condition_var.notify_all()
         finally:
-            self.__lock.release()
+            self.__condition_var.release()
 
     def wait_until_request_pending(self, namespace=None, name=None):
         """Blocks the caller until there is a pending call to the cache's `query_object` method that is blocked,
