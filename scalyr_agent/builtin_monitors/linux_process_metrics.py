@@ -969,28 +969,54 @@ class ProcessList(object):
 
 
 class ProcessMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records metrics about a running process.
+    """
+# Linux Process Metrics
 
-    To configure this monitor, you need to provide an id for the instance to identify which process the metrics
-    belong to in the logs and a regular expression to match against the list of running processes to determine which
-    process should be monitored.
+This agent monitor plugin records CPU consumption, memory usage, and other metrics for a specified process.
+You can use this plugin to record resource usage for a web server, database, or other application.
 
-    Example:
-      monitors: [{
-         module: "builtin_monitors.linux_process_metrics".
-         id: "tomcat",
-         commandline: "java.*tomcat",
-      }]
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-    Instead of 'commandline', you may also define the 'pid' field which should be set to the id of the process to
-    monitor.  However, since ids can change over time, it's better to use the commandline matcher.  The 'pid' field
-    is mainly used the linux process monitor run to monitor the agent itself.
+## Sample Configuration
 
+Here is a simple configuration fragment showing use of the linux_process_metrics plugin. This sample will record
+resource usage for any process whose command line contains a match for the regular expression ``java.*tomcat6``:
 
-    In additional to the fields listed above, each metric will also have a field 'app' set to the monitor id to specify
-    which process the metric belongs to.
+    monitors: [
+      {
+         module:      "scalyr_agent.builtin_monitors.linux_process_metrics",
+         id:          "tomcat",
+         commandline: "java.*tomcat6",
+      }
+    ]
 
-    You can run multiple instances of this monitor per agent to monitor different processes.
+To record information for more than one process, use several copies of the linux_process_metrics plugin in
+your configuration.
+
+## Viewing Data
+
+After adding this plugin to the agent configuration file, wait one minute for data to begin recording. Then
+click the {{menuRef:Dashboards}} menu and select {{menuRef:Linux Process Metrics}}. (The dashboard will not be
+listed until the agent begins sending data.)
+
+You'll have to edit the dashboard file for each ``id`` value you've used. From the dashboard page, click the
+{{menuRef:Edit Dashboard}} link. Look for the following bit of code, near the top of the file:
+
+      // On the next line, list each "id" that you've used in a linux_process_metrics
+      // clause in the Scalyr Agent configuration file (agent.json).
+      values: [ "agent" ]
+
+Edit the ``values`` list according to the list of ids you've used. For instance, if you've used "tomcat"
+(as in the example above), the list would look like this:
+
+      values: [ "agent", "tomcat" ]
+
+The "agent" ID is used to report metrics for the Scalyr Agent itself.
+
+You can now return to the dashboard. Use the dropdowns near the top of the page to select the host and process
+you'd like to view.
     """
 
     def _initialize(self):

@@ -661,16 +661,25 @@ class WriterThread(StoppableThread):
 
 
 class SystemMetricsMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records system metrics using tcollector.
+    """
+# Linux System Metrics
 
-    There is no required configuration for this monitor, but there are some options fields you can provide.
-    First, you can provide 'tags' whose value should be a dict containing a mapping from tag name to tag value.
-    These tags will be added to all metrics reported by monitor.
+This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
+the agent is running.
 
-    The second optional configuration field is 'collectors_directory' which is the path to the directory
-    containing the Tcollector collectors to run.  You should not normally have to set this.  It is used for testing.
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-    TODO:  Document all of the metrics exported this module.
+## Sample Configuration
+
+The linux_system_metrics plugin is configured automatically by the Scalyr Agent. You do not need to include
+this plugin in your configuration file.
+
+## Viewing Data
+
+You can see an overview of this data in the System dashboard. Click the {{menuRef:Dashboards}} menu and select
+{{menuRef:System}}. Use the dropdown near the top of the page to select the host whose data you'd like to view.
     """
 
     def _initialize(self):
