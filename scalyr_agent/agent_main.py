@@ -431,7 +431,8 @@ class ScalyrAgent(object):
             self.__verify_config(config)
 
         # Apply any global config options
-        self.__last_verify_config["config"].apply_config()
+        if self.__last_verify_config and self.__last_verify_config.get("config", None):
+            self.__last_verify_config["config"].apply_config()
 
         return WorkerThread(
             self.__last_verify_config["config"],
