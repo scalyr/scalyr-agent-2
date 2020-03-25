@@ -4,6 +4,7 @@ metadata:
   labels:
     app: scalyr-agent-2
   name: scalyr-agent-2
+  namespace: scalyr
 spec:
   revisionHistoryLimit: 10
   selector:
