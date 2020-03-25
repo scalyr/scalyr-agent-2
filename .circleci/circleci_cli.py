@@ -41,7 +41,7 @@ def set_root_user_for_docker_jobs(path):
             if "setup_remote_docker" not in step:
                 continue
             for image in job["docker"]:
-                image["user"] = "root"
+                image[str("user")] = str("root")
 
     with open(path, "w") as f:
         yaml.dump(config, f)
@@ -75,14 +75,14 @@ def is_smoke_test():  # type: () -> bool
     return True
 
 
-def set_smoke_env_variables_from_config():
+def set_env_variables_from_config():
     """
     Smoke tests require some environment variables to be able to interact with Scalyr servers.
     Smoke tests provide ability to create 'config.yml' file with agent settings for local testing.
     This function gets those settings and add them as "-e <VAR_NAME>=<VAR_VALUE> to the current circleci command."
     """
     test_config_path = os.path.join(
-        os.path.dirname(os.path.dirname(_script_abs_path)), "smoke_tests", "config.yml"
+        os.path.dirname(os.path.dirname(_script_abs_path)), "tests", "config.yml",
     )
 
     if not os.path.exists(test_config_path):
@@ -108,10 +108,7 @@ def set_smoke_env_variables_from_config():
 
 if __name__ == "__main__":
 
-    if is_smoke_test():
-        # if smoke test is specified, set env. variables from smoke tests config file.
-        # this provides ability to keep only one config file for all kinds of tests(pytest, tox).
-        set_smoke_env_variables_from_config()
+    set_env_variables_from_config()
 
     circleci_dir = os.path.dirname(_script_abs_path)
     os.chdir(os.path.dirname(circleci_dir))

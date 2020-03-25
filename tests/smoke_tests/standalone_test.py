@@ -16,28 +16,13 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
-import argparse
+import pytest
 
-from smoke_tests.tools.package import (
-    ALL_DISTRIBUTION_NAMES,
-    get_agent_distribution_builder,
-)
-import six
+from scalyr_agent.__scalyr__ import DEV_INSTALL
+from tests.smoke_tests.common import _test_standalone_smoke
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "distribution", type=six.text_type, choices=ALL_DISTRIBUTION_NAMES
-    )
-    parser.add_argument(
-        "python_version", type=six.text_type, choices=["python2", "python3"]
-    )
-
-    args = parser.parse_args()
-
-    builder = get_agent_distribution_builder(
-        distribution=args.distribution, python_version=args.python_version
-    )
-
-    print(builder.get_dockerfile_content())
+@pytest.mark.usefixtures("agent_environment")
+@pytest.mark.timeout(300)
+def test_standalone_smoke():
+    _test_standalone_smoke(DEV_INSTALL)

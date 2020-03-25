@@ -35,6 +35,10 @@ import threading
 import time
 import tempfile
 import unittest
+import random
+
+from pprint import pprint
+
 import scalyr_agent.scalyr_logging as scalyr_logging
 
 import six
@@ -46,18 +50,20 @@ PYTHON_26_OR_OLDER = sys.version_info[:2] < (2, 7)
 # Need so we can patch print() function for test purposes under both, Python 2 and 3
 print = print
 
+LOG = scalyr_logging.getLogger(__name__)
+
 
 def _noop_skip(reason):
     def decorator(test_func_or_obj):
-        if not isinstance(test_func_or_obj, type):
+        if not isinstance(test_func_or_obj, type) or sys.version_info < (2, 7, 0):
 
-            def skip_wrapper(*args, **kwargs):
+            def test_skip_wrapper(*args, **kwargs):
                 print(
                     'Skipping test %s. Reason: "%s"'
                     % (test_func_or_obj.__name__, reason)
                 )
 
-            return skip_wrapper
+            return test_skip_wrapper
         else:
             test_func_or_obj.__unittest_skip__ = True
             test_func_or_obj.__unittest_skip_why__ = reason
@@ -107,15 +113,23 @@ def _thread_watcher():
     properly stop.  Since it is not a daemon thread, it will block the exit of the entire process.
 
     """
-    # Sleep for 60 seconds since our test suites typically run in less than 15 seconds.
-    time.sleep(60)
+    # Sleep for 45 seconds since our test suites typically run in less than 15 seconds.
+    time.sleep(45)
 
     # If we are still alive after 60 seconds, it means some test is hung or didn't join
     # its threads properly.  Let's get some information on them.
     print("Detected hung test run.  Active threads are:")
     for t in threading.enumerate():
+        if t.getName() in ["MainThread", "hung thread watcher"]:
+            # Exclude itself and main thread
+            continue
+
         print("Active thread %s daemon=%s" % (t.getName(), six.text_type(t.isDaemon())))
+        pprint(t.__dict__)
     print("Done")
+    # NOTE: We exit with non-zero here to fail early in Circle CI instead of waiting on build
+    # timeout (10 minutes)
+    sys.exit(1)
 
 
 def _start_thread_watcher_if_necessary():
@@ -436,3 +450,79 @@ class BaseScalyrLogCaptureTestCase(ScalyrTestCase):
             content = fp.read()
 
         return bool(matcher.search(content))
+
+
+class ScalyrMockHttpServerTestCase(ScalyrTestCase):
+    """
+    Base Scalyr test case class which starts mock http server on startUpClass() and stops it on
+    tearDownClass()
+    """
+
+    mock_http_server_thread = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mock_http_server_thread = MockHTTPServer()
+        cls.mock_http_server_thread.start()
+
+        # Give server some time to start up
+        time.sleep(0.5)
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.mock_http_server_thread:
+            cls.mock_http_server_thread.stop()
+
+
+def shutdown_flask_server():
+    from flask import request
+
+    func = request.environ["werkzeug.server.shutdown"]
+    func()
+    return ""
+
+
+class MockHTTPServer(StoppableThread):
+    """
+    Mock HTTP server which can be used for tests.
+
+    It works by starting a mock HTTP server which serves a flask app on localhost and random port.
+    """
+
+    def __init__(self, host="127.0.0.1", port=None):
+        # type: (str, Optional[int]) -> None
+        if not port:
+            port = random.randint(5000, 20000)
+
+        super(MockHTTPServer, self).__init__(name="MockHttpServer_%s_%s" % (host, port))
+
+        from flask import Flask
+
+        self.host = host
+        self.port = port
+
+        # Make sure we run in the background
+        self.setDaemon(True)
+
+        self.app = Flask("mock_app")
+        self.app.add_url_rule("/shutdown", view_func=shutdown_flask_server)
+
+    def run(self):
+        LOG.info(
+            "Starting mock http server and listening on: %s:%s" % (self.host, self.port)
+        )
+
+        self.app.run(host=self.host, port=self.port)
+        super(MockHTTPServer, self).run()
+
+    def stop(self, wait_on_join=True, join_timeout=2):
+        import requests
+
+        LOG.info("Stopping mock http server...")
+
+        # Sadly there is no better way to kill werkzeug server...
+        url = "http://%s:%s/shutdown" % (self.host, self.port)
+        requests.get(url)
+
+        self.app.do_teardown_appcontext()
+        super(MockHTTPServer, self).stop(wait_on_join=True, join_timeout=0.1)
