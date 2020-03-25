@@ -429,6 +429,20 @@ class ScalyrAgent(object):
             or self.__last_verify_config["config"] is not config
         ):
             self.__verify_config(config)
+
+        # Set json library based on the config value. If "auto" is provided this means we use
+        # default behavior which is try to use ujson and if that's not available fall back to
+        # stdlib json
+        json_library = self.__last_verify_config["config"].json_library
+        current_json_library = scalyr_util.get_json_lib()
+
+        if json_library != "auto" and json_library != current_json_library:
+            log.debug(
+                'Changing JSON library from "%s" to "%s"'
+                % (current_json_library, json_library)
+            )
+            scalyr_util.set_json_lib(json_library)
+
         return WorkerThread(
             self.__last_verify_config["config"],
             self.__last_verify_config["copying_manager"],
@@ -913,10 +927,6 @@ class ScalyrAgent(object):
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    "JSON library is %s" % (scalyr_util.get_json_lib()),
-                )
 
                 scalyr_server = self.__config.scalyr_server
                 raw_scalyr_server = self.__config.raw_scalyr_server
@@ -938,6 +948,13 @@ class ScalyrAgent(object):
                     self.__copying_manager,
                     self.__monitors_manager,
                 ) = start_worker_thread(self.__config, logs_initial_positions)
+
+                # JSON library setting is applied as part of __create_worker_thread method
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "JSON library is %s" % (scalyr_util.get_json_lib()),
+                )
+
                 current_time = time.time()
 
                 disable_all_config_updates_until = _update_disabled_until(

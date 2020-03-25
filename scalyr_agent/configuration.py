@@ -41,8 +41,6 @@ from scalyr_agent.json_lib.objects import (
 )
 from scalyr_agent.monitor_utils.blocking_rate_limiter import BlockingRateLimiter
 from scalyr_agent.util import JsonReadFileException
-from scalyr_agent.util import set_json_lib
-from scalyr_agent.util import get_json_lib
 from scalyr_agent.config_util import BadConfiguration, get_config_from_env
 
 from scalyr_agent.__scalyr__ import get_install_root
@@ -251,15 +249,6 @@ class Configuration(object):
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
-
-            # Set json library based on the config value. If "auto" is provided this means we use
-            # default behavior which is try to use ujson and if that's not available fall back to
-            # stdlib json
-            json_library = self.__config.get_string("json_library")
-            current_json_library = get_json_lib()
-            if json_library != "auto" and json_library != current_json_library:
-                set_json_lib(json_library)
-
         except BadConfiguration as e:
             self.__last_error = e
             raise e
@@ -507,6 +496,10 @@ class Configuration(object):
     @property
     def disable_logfile_addevents_format(self):
         return self.__get_config().get_bool("disable_logfile_addevents_format")
+
+    @property
+    def json_library(self):
+        return self.__get_config().get_string("json_library")
 
     # Debug leak flags
     @property
