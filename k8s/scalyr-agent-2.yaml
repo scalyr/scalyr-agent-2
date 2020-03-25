@@ -1,7 +1,6 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  creationTimestamp: null
   labels:
     app: scalyr-agent-2
   name: scalyr-agent-2
