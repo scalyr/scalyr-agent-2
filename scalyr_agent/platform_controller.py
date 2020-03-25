@@ -29,8 +29,12 @@ import sys
 
 from scalyr_agent.__scalyr__ import INSTALL_TYPE
 
+# Holds a reference to the existing PlatformController instance which is populated when first
+# calling "PlatformController.existing_instance()".
+PLATFORM_INSTANCE = None
 
-class PlatformController:
+
+class PlatformController(object):
     def __init__(self):
         """Initializes a platform instance.
         """
@@ -80,6 +84,21 @@ class PlatformController:
             if result.can_handle_current_platform():
                 return result
         return None
+
+    @staticmethod
+    def existing_platform():
+        """
+        Return an existing instance of the previously registered platform class.
+
+        The instance is instantiated on first call to the this method. On subsequent calls, existing
+        cached instance is returned.
+        """
+        global PLATFORM_INSTANCE
+
+        if not PLATFORM_INSTANCE:
+            PLATFORM_INSTANCE = PlatformController.new_platform()
+
+        return PLATFORM_INSTANCE
 
     @property
     def install_type(self):

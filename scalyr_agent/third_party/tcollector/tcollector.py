@@ -1235,10 +1235,14 @@ def spawn_collector(col):
     # FIXME: do custom integration of Python scripts into memory/threads
     # if re.search('\.py$', col.name) is not None:
     #     ... load the py module directly instead of using a subprocess ...
+    args = [
+        sys.executable,
+        col.filename,
+    ]
     try:
         # Scalyr edit:  Add in close_fds=True
         col.proc = subprocess.Popen(
-            col.filename, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
         )
     except OSError as e:
         LOG.error("Failed to spawn collector %s: %s" % (col.filename, e))

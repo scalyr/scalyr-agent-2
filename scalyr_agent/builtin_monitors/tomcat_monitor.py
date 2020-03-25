@@ -152,21 +152,21 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.request_count",
-    "The value represents the total number of requests made.  ",
+    "The value represents the total number of requests made.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.error_count",
-    "The value represents the total number requests that resulted in errors.  ",
+    "The value represents the total number requests that resulted in errors.",
     cumulative=True,
     category="general",
 )
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number bytes received by the server.  ",
+    "The value represents the total number bytes received by the server.",
     extra_fields={"type": "received"},
     cumulative=True,
     category="general",
@@ -174,7 +174,7 @@ define_metric(
 define_metric(
     __monitor__,
     "tomcat.runtime.network_bytes",
-    "The value represents the total number sent by the server.  ",
+    "The value represents the total number sent by the server.",
     extra_fields={"type": "sent"},
     cumulative=True,
     category="general",
@@ -260,7 +260,11 @@ class BindableHTTPConnection(six.moves.http_client.HTTPConnection):
 def BindableHTTPConnectionFactory(source_ip):
     def _get(host, port=None, strict=None, timeout=0):
         # pylint: disable=unexpected-keyword-arg
-        bhc = BindableHTTPConnection(host, port=port, strict=strict, timeout=timeout)
+        if six.PY2:
+            kwargs = {"strict": strict}
+        else:
+            kwargs = {}
+        bhc = BindableHTTPConnection(host, port=port, timeout=timeout, **kwargs)
         bhc.source_ip = source_ip
         return bhc
 
@@ -441,7 +445,7 @@ instance."""
             data = handle.read()
         except six.moves.urllib.error.HTTPError as err:
             message = (
-                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                "An HTTP error occurred attempting to retrieve the status.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                 err.code,
             )
             if err.code == 404:
@@ -450,15 +454,15 @@ instance."""
                 message = "The server is denying access to the URL specified for requesting the status page.  Please verify that permissions to access the status page are correctly configured in your server configuration and that your apache_monitor configuration reflects the same configuration requirements."
             elif err.code >= 500 or err.code < 600:
                 message = (
-                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: ",
+                    "The server failed to fulfill the request to get the status page.  Please consult your server logs to determine the cause.  HTTP error code: %s",
                     err.code,
                 )
             self._logger.error(message)
             data = None
         except six.moves.urllib.error.URLError as err:
             message = (
-                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: ",
-                err,
+                "The was an error attempting to reach the server.  Make sure the server is running and properly configured.  The error reported is: %s"
+                % str(err)
             )
             if err.reason.errno == 111:
                 message = (
@@ -516,13 +520,13 @@ instance."""
                     "threads",
                     int(m.group(5)),
                     "type",
-                    "max",
+                    "active",
                 ]
                 result["threads_current_busy"] = [
                     "threads",
                     int(m.group(6)),
                     "type",
-                    "max",
+                    "busy",
                 ]
                 result["processing_time_max"] = [
                     "processing_time_max",
@@ -698,11 +702,12 @@ instance."""
 
         status = self._get_status(self._monitor_url)
         if status is not None:
+            status = six.ensure_text(status)
             stats = self._parse_general_status(status)
             heap = self._parse_heap_status(status)
 
             if stats is not None:
-                for key in stats.keys():
+                for key in sorted(stats.keys()):
                     extra = None
                     if len(stats[key]) == 4:
                         extra = {stats[key][2]: stats[key][3]}
@@ -710,7 +715,7 @@ instance."""
                         "tomcat.runtime.%s" % stats[key][0], stats[key][1], extra
                     )
             if heap is not None:
-                for key in heap.keys():
+                for key in sorted(heap.keys()):
                     extra = {heap[key][2]: heap[key][3]}
                     self._logger.emit_value(
                         "tomcat.memory_pools.%s" % heap[key][0], heap[key][1], extra

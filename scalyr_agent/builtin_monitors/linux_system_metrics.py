@@ -48,7 +48,7 @@ __monitor__ = __name__
 # These are the metrics collected, broken up by tcollector controllor:
 # We use the original tcollector documentation here has much as possible.
 define_metric(
-    __monitor__, "cpu.count", "The number of CPUs on the system", category="general"
+    __monitor__, "sys.cpu.count", "The number of CPUs on the system", category="general"
 )
 
 define_metric(
@@ -63,7 +63,7 @@ define_metric(
 )
 define_metric(
     __monitor__,
-    "proc.stat.intr:",
+    "proc.stat.intr",
     "The number of interrupts since boot.",
     cumulative=True,
     category="general",
@@ -91,19 +91,19 @@ define_metric(
 )
 define_metric(
     __monitor__,
-    "proc.loadavg.1m",
+    "proc.loadavg.1min",
     "The load average over 1 minute.",
     category="general",
 )
 define_metric(
     __monitor__,
-    "proc.loadavg.5m",
+    "proc.loadavg.5min",
     "The load average over 5 minutes.",
     category="general",
 )
 define_metric(
     __monitor__,
-    "proc.loadavg.15m",
+    "proc.loadavg.15min",
     "The load average over 15 minutes.",
     category="general",
 )
@@ -172,14 +172,14 @@ define_metric(
 )
 define_metric(
     __monitor__,
-    "proc.vmstat.pgppin",
+    "proc.vmstat.pgpgin",
     "The total number of pages swapped in since boot.",
     cumulative=True,
     category="virtual memory",
 )
 define_metric(
     __monitor__,
-    "proc.vmstat.pgpout",
+    "proc.vmstat.pgpgout",
     "The total number of pages swapped out in since boot.",
     cumulative=True,
     category="virtual memory",
@@ -465,14 +465,6 @@ define_metric(
 )
 define_metric(
     __monitor__,
-    "df.1kblocks.available",
-    "The number of locks available broken down by mount and filesystem type.",
-    extra_fields={"mount": "", "fstype": ""},
-    unit="bytes:1024",
-    category="disk resources",
-)
-define_metric(
-    __monitor__,
     "df.inodes.total",
     "The number of inodes broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
@@ -491,40 +483,6 @@ define_metric(
     "The number of free inodes broken down by mount and filesystem type.",
     extra_fields={"mount": "", "fstype": ""},
     category="disk resources",
-)
-
-define_metric(
-    __monitor__,
-    "proc.net.bytes",
-    "The total number of bytes transmitted through the interface broken down by interface and direction.",
-    extra_fields={"direction": "", "iface": ""},
-    unit="bytes",
-    cumulative=True,
-    category="network interfaces",
-)
-define_metric(
-    __monitor__,
-    "proc.net.packets",
-    "The total number of packets transmitted through the interface broken down by interface and direction.",
-    extra_fields={"direction": "", "iface": ""},
-    cumulative=True,
-    category="network interfaces",
-)
-define_metric(
-    __monitor__,
-    "proc.net.errs",
-    "The total number of packet errors broken down by interface and direction.",
-    extra_fields={"direction": "", "iface": ""},
-    cumulative=True,
-    category="network interfaces",
-)
-define_metric(
-    __monitor__,
-    "proc.net.dropped",
-    "The total number of dropped packets broken down by interface and direction.",
-    extra_fields={"direction": "", "iface": ""},
-    cumulative=True,
-    category="network interfaces",
 )
 
 define_metric(
@@ -552,7 +510,7 @@ define_metric(
 )
 define_metric(
     __monitor__,
-    "proc.meminfo.buffered",
+    "proc.meminfo.buffers",
     "The total number of 1 KB pages of RAM being used in system buffers.",
     unit="bytes:1024",
     category="memory",
@@ -703,16 +661,25 @@ class WriterThread(StoppableThread):
 
 
 class SystemMetricsMonitor(ScalyrMonitor):
-    """A Scalyr agent monitor that records system metrics using tcollector.
+    """
+# Linux System Metrics
 
-    There is no required configuration for this monitor, but there are some options fields you can provide.
-    First, you can provide 'tags' whose value should be a dict containing a mapping from tag name to tag value.
-    These tags will be added to all metrics reported by monitor.
+This agent monitor plugin records CPU consumption, memory usage, and other metrics for the server on which
+the agent is running.
 
-    The second optional configuration field is 'collectors_directory' which is the path to the directory
-    containing the Tcollector collectors to run.  You should not normally have to set this.  It is used for testing.
+@class=bg-warning docInfoPanel: An *agent monitor plugin* is a component of the Scalyr Agent. To use a plugin,
+simply add it to the ``monitors`` section of the Scalyr Agent configuration file (``/etc/scalyr/agent.json``).
+For more information, see [Agent Plugins](/help/scalyr-agent#plugins).
 
-    TODO:  Document all of the metrics exported this module.
+## Sample Configuration
+
+The linux_system_metrics plugin is configured automatically by the Scalyr Agent. You do not need to include
+this plugin in your configuration file.
+
+## Viewing Data
+
+You can see an overview of this data in the System dashboard. Click the {{menuRef:Dashboards}} menu and select
+{{menuRef:System}}. Use the dropdown near the top of the page to select the host whose data you'd like to view.
     """
 
     def _initialize(self):

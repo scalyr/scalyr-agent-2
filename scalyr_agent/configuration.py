@@ -249,10 +249,32 @@ class Configuration(object):
                 self.__log_configs.append(profile_config)
 
             self.__monitor_configs = list(self.__config.get_json_array("monitors"))
-
         except BadConfiguration as e:
             self.__last_error = e
             raise e
+
+    def apply_config(self):
+        """
+        Apply global configuration object based on the configuration values.
+
+        At this point this only applies to the JSON library which is used.
+        """
+        if not self.__config:
+            # parse() hasn't been called yet. We should probably throw here
+            return
+
+        # Set json library based on the config value. If "auto" is provided this means we use
+        # default behavior which is try to use ujson and if that's not available fall back to
+        # stdlib json
+        json_library = self.json_library
+        current_json_library = scalyr_util.get_json_lib()
+
+        if json_library != "auto" and json_library != current_json_library:
+            self.__logger.debug(
+                'Changing JSON library from "%s" to "%s"'
+                % (current_json_library, json_library)
+            )
+            scalyr_util.set_json_lib(json_library)
 
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
@@ -497,6 +519,10 @@ class Configuration(object):
     @property
     def disable_logfile_addevents_format(self):
         return self.__get_config().get_bool("disable_logfile_addevents_format")
+
+    @property
+    def json_library(self):
+        return self.__get_config().get_string("json_library")
 
     # Debug leak flags
     @property
@@ -1237,6 +1263,15 @@ class Configuration(object):
             apply_defaults,
             env_aware=True,
         )
+        self.__verify_or_set_optional_string(
+            config,
+            "json_library",
+            "auto",
+            "JSON serialization and deserializarion library to use. Valid options are auto, json, ujson and orjson",
+            apply_defaults,
+            env_aware=True,
+            valid_values=["auto", "json", "ujson", "orjson"],
+        )
         self.__verify_or_set_optional_bool(
             config,
             "implicit_agent_log_collection",
@@ -1635,7 +1670,6 @@ class Configuration(object):
         self.__verify_or_set_optional_string(
             config, "https_proxy", None, description, apply_defaults, env_aware=True
         )
-
         self.__verify_or_set_optional_array_of_strings(
             config,
             "k8s_ignore_namespaces",

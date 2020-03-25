@@ -99,6 +99,8 @@ class AgentStatus(BaseAgentStatus):
         # The MonitorManagerStatus object recording the status of the monitor manager (or none if the MonitorManager
         # has not been started).  This contains information about the different ScalyrMonitors being run.
         self.monitor_manager_status = None
+        # version of the running python interpreter.
+        self.python_version = None
 
 
 class GCStatus(BaseAgentStatus):
@@ -348,6 +350,7 @@ def report_status(output, status, current_time):
         file=output,
     )
     print("Version:          %s" % status.version, file=output)
+    print("Python version:   %s" % status.python_version, file=output)
     print("Agent running as: %s" % status.user, file=output)
     print("Agent log:        %s" % status.log_path, file=output)
     print("ServerHost:       %s" % status.server_host, file=output)

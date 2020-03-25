@@ -13,8 +13,10 @@ Features
 * Major update of code base to support running under Python 2 and 3
 * Agent now supports Python 2.6, 2.7 and >= 3.5
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
-* RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verifed at package install time.
+* RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
 * Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
+* Add support for ``orjson`` JSON library when running under Python 3. This library offers significantly better performance and can be enabled by setting ``json_library`` config option to ``orjson`` and installing ``orjson`` Python package using pip.
 
 Bugs
 * Fix authentication issue in `kubernetes_monitor` when accessing kublet API.
@@ -22,12 +24,15 @@ Bugs
 * Updated Kubernetes manifest file to use `apps/v1` for DaemonSet API version instead of beta version.
 * Update scalyr client code to log raw uncompressed body under debug log level to aid with troubleshooting.
 * Metric type for ``app.disk.requests.{read,write}`` metrics has been fixed.
+* Fix ``iostat`` monitor so it also works with newer versions of Linux kernel.
+* Fix invalid extra field for two ``tomcat.runtime.threads`` metrics in the Tomcat monitor (all of the metrics had type set to ``max`` whereas one should have type set to ``active`` and the other to ``busy``).
 
 Minor updates
 * Update of embedded ecsda library to 0.13.3
 * Docker support now requires the docker 4.1 client library
 * Changed which signal is used to execute `scalyr-agent-2 status -v` under Linux to improve handling of SIGINT. Previously ``SIGINT`` was used, now ``SIGUSR1`` is used.
 * When running in foreground mode (``--no-fork`` flag), SIGINT signal (aka CTRL+C) now starts the graceful shutdown procedure.
+* Two new metrics (``app.io.wait``, ``app.mem.majfalt``) are now emitted by the Linux process monitor. If you want those metrics to be excluded for your monitors, you can utilize new ``metric_name_blacklist`` monitor config option.
 
 Testing updates
 * Numerous changes to improve testing and coverage reporting

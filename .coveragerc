@@ -1,4 +1,8 @@
+[run]
+branch = True
+
 [report]
 omit =
     */venv/*
     */third_party*/*
+    tests/*

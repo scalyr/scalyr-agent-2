@@ -541,6 +541,10 @@ def build_common_docker_and_package_files(create_initd_link, base_configs=None):
         "/usr/share/scalyr-agent-2/bin/scalyr-agent-2-config",
         "root/usr/sbin/scalyr-agent-2-config",
     )
+    make_soft_link(
+        "/usr/share/scalyr-agent-2/bin/scalyr-switch-python",
+        "root/usr/sbin/scalyr-switch-python",
+    )
 
 
 def build_container_builder(
@@ -631,7 +635,7 @@ def build_container_builder(
         new_dockerfile_source = re.sub(r"(RUN\spip\s.*)", r"\1 coverage==4.5.4", data)
         new_dockerfile_source = re.sub(
             r"CMD .*\n",
-            'CMD ["coverage", "run", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
+            'CMD ["coverage", "run", "--branch", "/usr/share/scalyr-agent-2/py/scalyr_agent/agent_main.py", '
             '"--no-fork", "--no-change-user", "start"]',
             new_dockerfile_source,
         )
@@ -762,6 +766,8 @@ def build_rpm_or_deb_package(is_rpm, variant, version):
         "  --after-install postinstall.sh "
         "  --before-remove preuninstall.sh "
         "  --config-files /etc/scalyr-agent-2/agent.json "
+        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2 "
+        "  --config-files /usr/share/scalyr-agent-2/bin/scalyr-agent-2-config "
         "  --directories /usr/share/scalyr-agent-2 "
         "  --directories /var/lib/scalyr-agent-2 "
         "  --directories /var/log/scalyr-agent-2 "
@@ -831,6 +837,17 @@ def build_tarball_package(variant, version, no_versioned_file_name):
     return output_name
 
 
+def replace_shebang(path, new_path, new_shebang):
+    # type: (six.text_type, six.text_type, six.text_type) ->None
+    with open(path, "r") as f:
+        with open(new_path, "w") as newf:
+            # skip shebang
+            f.readline()
+            newf.write(new_shebang)
+            newf.write("\n")
+            newf.write(f.read())
+
+
 def build_base_files(base_configs="config"):
     """Build the basic structure for a package in a new directory scalyr-agent-2 in the current working directory.
 
@@ -879,6 +896,27 @@ def build_base_files(base_configs="config"):
     shutil.copy(
         make_path(agent_source_root, "VERSION"), os.path.join("scalyr_agent", "VERSION")
     )
+
+    # create copies of the agent_main.py with python2 and python3 shebang.
+    agent_main_path = os.path.join(agent_source_root, "scalyr_agent", "agent_main.py")
+    agent_main_py2_path = os.path.join("scalyr_agent", "agent_main_py2.py")
+    agent_main_py3_path = os.path.join("scalyr_agent", "agent_main_py3.py")
+    replace_shebang(agent_main_path, agent_main_py2_path, "#!/usr/bin/env python2")
+    replace_shebang(agent_main_path, agent_main_py3_path, "#!/usr/bin/env python3")
+    main_permissions = os.stat(agent_main_path).st_mode
+    os.chmod(agent_main_py2_path, main_permissions)
+    os.chmod(agent_main_py3_path, main_permissions)
+
+    # create copies of the config_main.py with python2 and python3 shebang.
+    config_main_path = os.path.join(agent_source_root, "scalyr_agent", "config_main.py")
+    config_main_py2_path = os.path.join("scalyr_agent", "config_main_py2.py")
+    config_main_py3_path = os.path.join("scalyr_agent", "config_main_py3.py")
+    replace_shebang(config_main_path, config_main_py2_path, "#!/usr/bin/env python2")
+    replace_shebang(config_main_path, config_main_py3_path, "#!/usr/bin/env python3")
+    config_permissions = os.stat(config_main_path).st_mode
+    os.chmod(config_main_py2_path, config_permissions)
+    os.chmod(config_main_py3_path, config_permissions)
+
     # Exclude certain files.
     # TODO:  Should probably use MANIFEST.in to do this, but don't know the Python-fu to do this yet.
     #
@@ -928,8 +966,16 @@ def build_base_files(base_configs="config"):
     # Create symlinks for the two commands
     os.chdir("bin")
 
-    make_soft_link("../py/scalyr_agent/agent_main.py", "scalyr-agent-2")
-    make_soft_link("../py/scalyr_agent/config_main.py", "scalyr-agent-2-config")
+    make_soft_link("../py/scalyr_agent/agent_main_py2.py", "scalyr-agent-2")
+    make_soft_link("../py/scalyr_agent/config_main_py2.py", "scalyr-agent-2-config")
+
+    # add switch python version script.
+    shutil.copy(
+        os.path.join(
+            agent_source_root, "installer", "scripts", "scalyr-switch-python.sh"
+        ),
+        "scalyr-switch-python",
+    )
 
     os.chdir("..")
 

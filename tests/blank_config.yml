@@ -1,0 +1,12 @@
+# This file can be used as a blank template to specify test settings and also to specify essential environment variables for the agent smoke tests.
+# Usage:
+# - Create copy of this file named 'config.yml' (path to this file is added to .gitignore)
+# - Fill it with needed values. Py.test expects those values as environment variables, but if it does not find them, it gets those values from this config.
+
+agent_settings:
+  SCALYR_API_KEY: # this goes as environment variable.
+  READ_API_KEY: # this goes as environment variable.
+  SCALYR_SERVER: # this goes as environment variable.
+  AGENT_HOST_NAME: # this goes to agent.json config as 'server_attributes.serverHost'
+
+

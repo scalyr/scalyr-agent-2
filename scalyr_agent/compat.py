@@ -1,4 +1,8 @@
 from __future__ import absolute_import
+
+if False:
+    from typing import Union, Tuple, Any, Generator, Iterable
+
 import sys
 import struct
 import os
@@ -64,6 +68,7 @@ if six.PY2:
 
         @staticmethod
         def _iterable_elements_to_unicode_generator(iterable):
+            # type: (Iterable) -> Generator[Union[Tuple, Any]]
             """Generator that gets values from original iterable and converts its 'str' values to 'unicode'"""
             for element in iterable:
                 if type(element) is tuple:
@@ -101,6 +106,9 @@ if six.PY2:
             return list(
                 self._iterable_elements_to_unicode_generator(os.environ.values())
             )
+
+        def copy(self):
+            return dict(self.items())
 
         def __iter__(self):
             return self.iterkeys()

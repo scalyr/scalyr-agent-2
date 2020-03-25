@@ -429,6 +429,11 @@ class ScalyrAgent(object):
             or self.__last_verify_config["config"] is not config
         ):
             self.__verify_config(config)
+
+        # Apply any global config options
+        if self.__last_verify_config and self.__last_verify_config.get("config", None):
+            self.__last_verify_config["config"].apply_config()
+
         return WorkerThread(
             self.__last_verify_config["config"],
             self.__last_verify_config["copying_manager"],
@@ -897,23 +902,22 @@ class ScalyrAgent(object):
                     logs_initial_positions = None
 
                 # 2->TODO it was very helpful to see what python version does agent run on. Maybe we can keep it?
+
+                python_version_str = sys.version.replace("\n", "")
+
                 log.info(
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version)
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str)
                 )
                 log.log(
                     scalyr_logging.DEBUG_LEVEL_1,
                     "Starting scalyr agent... (version=%s) %s (Python version: %s)"
-                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), sys.version),
+                    % (SCALYR_VERSION, scalyr_util.get_pid_tid(), python_version_str),
                 )
 
                 self.__controller.emit_init_log(log, self.__config.debug_init)
 
                 self.__start_or_stop_unsafe_debugging()
-                log.log(
-                    scalyr_logging.DEBUG_LEVEL_0,
-                    "JSON library is %s" % (scalyr_util.get_json_lib()),
-                )
 
                 scalyr_server = self.__config.scalyr_server
                 raw_scalyr_server = self.__config.raw_scalyr_server
@@ -935,6 +939,13 @@ class ScalyrAgent(object):
                     self.__copying_manager,
                     self.__monitors_manager,
                 ) = start_worker_thread(self.__config, logs_initial_positions)
+
+                # JSON library setting is applied as part of __create_worker_thread method
+                log.log(
+                    scalyr_logging.DEBUG_LEVEL_0,
+                    "JSON library is %s" % (scalyr_util.get_json_lib()),
+                )
+
                 current_time = time.time()
 
                 disable_all_config_updates_until = _update_disabled_until(
@@ -1408,6 +1419,7 @@ class ScalyrAgent(object):
         result.server_host = self.__config.server_attributes["serverHost"]
         result.scalyr_server = self.__config.scalyr_server
         result.log_path = self.__log_file_path
+        result.python_version = sys.version.replace("\n", "")
 
         # Describe the status of the configuration file.
         config_result = ConfigStatus()
