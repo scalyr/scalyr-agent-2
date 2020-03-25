@@ -90,8 +90,11 @@ The table below describes the metrics recorded by the monitor.
 |||# ``app.mem.bytes``     ||| ``type=resident``      ||| Resident memory usage, in bytes.
 |||# ``app.mem.bytes``     ||| ``type=peak_vmsize``   ||| Peak virtual memory usage, in bytes.
 |||# ``app.mem.bytes``     ||| ``type=peak_resident`` ||| Peak resident memory usage, in bytes.
+|||# ``app.mem.majflt``    |||                        ||| The number of page faults requiring physical I/O.
 |||# ``app.disk.bytes``    ||| ``type=read``          ||| Total bytes read from disk.
 |||# ``app.disk.requests`` ||| ``type=read``          ||| Total disk read requests.
 |||# ``app.disk.bytes``    ||| ``type=write``         ||| Total bytes written to disk.
 |||# ``app.disk.requests`` ||| ``type=write``         ||| Total disk write requests.
 |||# ``app.io.fds``        ||| ``type=open``          ||| The number of open file descriptors help by process.
+|||# ``app.io.wait``       |||                        ||| The number of aggregated block I/O delays, in 1/100ths of a \
+                                                          second.

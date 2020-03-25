@@ -666,13 +666,14 @@ jobs:
       - restore_cache:
           key: deps2-tox-{{ .Branch }}-lint-venv-{{ checksum "dev-requirements.txt" }}-{{ checksum "lint-requirements.txt" }}
       - run:
-          name: Install APT dependencies
+          name: Install Dependencies
           command: |
-            # We add unstable repo to make sure latest version of shellchcek (>=
-            # 0.7.0 is installed)
-            sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
-            sudo apt-get update -y
-            sudo apt-get install -y shellcheck
+            # NOTE: We use precompiled binary since debian sid which contains shellcheck 0.7.0 which we depend on
+            # currently (March 25, 2020) contains broken libc version
+            sudo wget https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz
+            sudo tar xvf shellcheck-stable.linux.x86_64.tar.xz
+            sudo cp shellcheck-stable/shellcheck /usr/local/bin
+            sudo rm -rf shellcheck-stable*
       - run:
           name: Install Python dependencies
           command: |
