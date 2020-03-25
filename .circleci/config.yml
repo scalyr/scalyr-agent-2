@@ -673,6 +673,7 @@ jobs:
             sudo sh -c "echo 'deb http://deb.debian.org/debian unstable main contrib non-free' > /etc/apt/sources.list"
             sudo apt-get update -y
             sudo apt-get install -y shellcheck
+            sudo binutils-config -l
       - run:
           name: Install Python dependencies
           command: |
@@ -979,30 +980,7 @@ workflows:
   unittest:
     jobs:
       - lint-checks
-      - unittest-38
-      - unittest-37
-      - unittest-36
-      - unittest-35
-      - unittest-27
       - unittest-26
-      - smoke-standalone-38
-      - smoke-standalone-37
-      - smoke-standalone-36
-      - smoke-standalone-35
-      - smoke-standalone-27
-      - smoke-standalone-26
-      # smoke test jobs above are still uses old smoke tests.
-      - smoke-docker-json
-      - smoke-docker-syslog
-      - smoke-k8s
-      - smoke-standalone-27-tls12
-      - smoke-standalone-26-tls12
-      - coverage:
-          requires:
-            - unittest-27
-            - smoke-docker-json
-            - smoke-docker-syslog
-            - smoke-k8s
   package-tests:
     jobs:
       - package-test-rpm:
