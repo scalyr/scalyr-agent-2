@@ -67,10 +67,41 @@ except ImportError:
     new_md5 = False
 
 
+USJON_NOT_AVAILABLE_MSG = """
+ujson library is not available. You can install it using pip:
+
+    pip install usjon
+
+Original error: %s
+""".strip()
+
+ORJSON_NOT_AVAILABLE_MSG = """
+orjson library is not available. You can install it using pip.
+
+Python 3.5:
+
+    pip install "orjson==2.0.11"
+
+Python >= 3.6:
+
+    pip install orjson
+
+Original error: %s
+""".strip()
+
+
 def get_json_implementation(lib_name):
+    if lib_name not in ["json", "ujson", "orjson"]:
+        raise ValueError("Unsupported json library %s" % lib_name)
+
+    if lib_name == "orjson" and not six.PY3:
+        raise ValueError('"orjson" is only available under Python 3')
 
     if lib_name == "ujson":
-        import ujson  # pylint: disable=import-error
+        try:
+            import ujson  # pylint: disable=import-error
+        except ImportError as e:
+            raise ImportError(USJON_NOT_AVAILABLE_MSG % (str(e)))
 
         def ujson_dumps_custom(obj, fp):
             """Serialize the objection.
@@ -96,6 +127,16 @@ def get_json_implementation(lib_name):
                 return ujson.dumps(obj, sort_keys=True)
 
         return lib_name, ujson_dumps_custom, ujson.loads
+
+    elif lib_name == "orjson":
+        # todo: throw a more friendly error message on import error with info on how to install it
+        # special case for 3.5
+        try:
+            import orjson  # pylint: disable=import-error
+        except ImportError as e:
+            raise ImportError(ORJSON_NOT_AVAILABLE_MSG % (str(e)))
+
+        return lib_name, orjson.dumps, orjson.loads
 
     else:
         if lib_name != "json":
@@ -139,17 +180,17 @@ _json_encode = None
 _json_decode = None
 
 
-def _set_json_lib(lib_name):
+def set_json_lib(lib_name):
     # This function is not meant to be invoked at runtime.  It exists primarily for testing.
     global _json_lib, _json_encode, _json_decode
     _json_lib, _json_encode, _json_decode = get_json_implementation(lib_name)
 
 
 try:
-    _set_json_lib("ujson")
+    set_json_lib("ujson")
 except ImportError:
     try:
-        _set_json_lib("json")
+        set_json_lib("json")
     except ImportError:
         # Note, we cannot use a logger here because of dependency issues with this file and scalyr_logging.py
         print(
