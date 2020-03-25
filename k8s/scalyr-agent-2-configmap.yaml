@@ -15,3 +15,4 @@ data:
   #
 metadata:
   name: scalyr-config
+  namespace: scalyr
