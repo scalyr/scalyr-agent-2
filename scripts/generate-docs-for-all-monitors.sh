@@ -26,7 +26,10 @@ AUTO_GENERATED_SECTION_MARKER="<!-- Auto generated content below. DO NOT edit ma
 
 SCRIPT_DIR=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 
-for FILE in scalyr_agent/builtin_monitors/*_monitor*.py; do
+MONITOR_FILES=$(find scalyr_agent/builtin_monitors/ -maxdepth 1 -type f -name "*monitor.py" -o -name "*linux*.py")
+
+# shellcheck disable=SC2068
+for FILE in ${MONITOR_FILES[@]}; do
     MONITOR_MODULE=$(echo "${FILE}" | tr "/" "." | sed "s/\.py//")
     MONITOR_NAME=$(basename "${FILE}" | sed "s/\.py//")
     DOC_FILE="docs/monitors/${MONITOR_NAME}.md"

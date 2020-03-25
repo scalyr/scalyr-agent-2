@@ -13,6 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# if there is no python2, switch on python3. Since we passed preinstall, we think that at least python3 is available.
+if ! /usr/bin/env python2 --version > /dev/null 2>&1; then
+  echo "Python2 not found, will use python3 binary for running the agent."
+  /usr/share/scalyr-agent-2/bin/scalyr-switch-python python3
+fi
+
 config_owner=`stat -c %U /etc/scalyr-agent-2/agent.json`
 script_owner=`stat -c %U /usr/share/scalyr-agent-2/bin/scalyr-agent-2`
 
@@ -49,6 +56,7 @@ fi
 # remove is indicated something other than "configure" being passed into $1.
 if [[ "$1" =~ ^[0-9]+$ && $1 -gt 0 ]] || [ "$1" == "configure" ]; then
   service scalyr-agent-2 condrestart --quiet;
+
   exit $?;
 else
   exit 0;

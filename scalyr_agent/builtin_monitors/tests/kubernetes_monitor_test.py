@@ -294,6 +294,9 @@ class ControlledCacheWarmerTest(ScalyrTestCase):
     def test_remove_inactive(self):
         warmer = self.__warmer_test_instance
 
+        # Stop the warmer thread since we don't need it for the test
+        warmer.stop()
+
         warmer.begin_marking()
         warmer.mark_to_warm(self.CONTAINER_1, self.NAMESPACE_1, self.POD_1)
         warmer.end_marking()

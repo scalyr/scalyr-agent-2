@@ -16,6 +16,10 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import absolute_import
 
+import shutil
+import docker
+import argparse
+
 if False:
     from typing import Optional
 
@@ -23,11 +27,28 @@ from abc import ABCMeta, abstractmethod
 
 import six
 
-from smoke_tests.tools.utils import (
-    create_temp_dir_with_constant_name,
-    copy_agent_source as copy_source,
-)
-from smoke_tests.tools.compat import Path
+from scalyr_agent.__scalyr__ import get_package_root
+from tests.utils.common import create_tmp_directory
+from tests.utils.compat import Path
+
+
+def _copy_agent_source(dest_path):
+    root_path = Path(get_package_root()).parent
+    gitignore_path = root_path / ".gitignore"
+    patterns = [
+        p[:-1] if p.endswith("/") else p
+        for p in gitignore_path.read_text().splitlines()
+        if not p.startswith("#")
+    ]
+    shutil.copytree(
+        six.text_type(root_path),
+        six.text_type(dest_path),
+        ignore=shutil.ignore_patterns(*patterns),
+    )
+    # test_config_path = Path(root_path, "test", "config.yml")
+    # if test_config_path.exists():
+    #     config_dest = Path(dest_path, "tests", "config.yml")
+    #     shutil.copy(test_config_path, config_dest)
 
 
 @six.add_metaclass(ABCMeta)
@@ -37,6 +58,7 @@ class AgentImageBuilder(object):
     """
 
     IMAGE_TAG = None  # type: six.text_type
+    DOCKERFILE = None  # type: Path
 
     # add agent source code to the build context of the image
     COPY_AGENT_SOURCE = False  # type: bool
@@ -47,8 +69,6 @@ class AgentImageBuilder(object):
     @property
     def _docker_client(self):
         if self._docker is None:
-            import docker
-
             self._docker = docker.from_env()
 
         return self._docker
@@ -67,26 +87,38 @@ class AgentImageBuilder(object):
         """
         Get the content of the Dockerfile.
         """
-        pass
+        return cls.DOCKERFILE.read_text()
 
-    def build(self):
+    def build(self, image_cache_path=None):
         """
         Build docker image.
+        :param image_cache_path: import image from .tar files located in this directory, if exist.
         """
-        build_context_path = create_temp_dir_with_constant_name(".scalyr_agent_testing")
+
+        if image_cache_path is not None:
+            self.build_with_cache(Path(image_cache_path))
+            return
+
+        print("Build image: '{0}'".format(self.image_tag))
+        build_context_path = create_tmp_directory(
+            suffix="{0}-build-context".format(self.image_tag)
+        )
 
         dockerfile_path = build_context_path / "Dockerfile"
         dockerfile_path.write_text(self.get_dockerfile_content())
         if self._copy_agent_source:
             agent_source_path = build_context_path / "agent_source"
-            copy_source(agent_source_path)
+            _copy_agent_source(agent_source_path)
 
-        self._docker_client.images.build(
+        _, output_gen = self._docker_client.images.build(
             tag=self.image_tag,
             path=six.text_type(build_context_path),
             dockerfile=six.text_type(dockerfile_path),
             rm=True,
         )
+
+        for chunk in output_gen:
+            print(chunk.get("stream", ""), end="")
 
     def build_with_cache(self, dir_path):  # type: (Path) -> None
         """
@@ -95,6 +127,14 @@ class AgentImageBuilder(object):
         This is convenient to use for example with CI caches.
         :param dir_path: Path to the directory with cached image or where to save it.
         """
+        try:
+            # if image is loaded earlier - skip to avoid the multiple loading of the same image
+            # if we build it multiple times.
+            self._docker_client.images.get(self.image_tag)
+            print("The Image is already loaded.")
+            return
+        except docker.errors.ImageNotFound:
+            pass
 
         image_file_path = dir_path / self.image_tag
         if not image_file_path.exists():
@@ -131,3 +171,17 @@ class AgentImageBuilder(object):
                     f.write(chunk)
 
             print("Image '{0}' saved.".format(self.image_tag))
+
+    @classmethod
+    def handle_command_line(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--dockerfile",
+            action="store_true",
+            help="Print dockerfile content of the image.",
+        )
+
+        args = parser.parse_args()
+
+        if args.dockerfile is not None:
+            print(cls.get_dockerfile_content())
