@@ -23,6 +23,8 @@ import os
 import tempfile
 from io import open
 
+import mock
+
 from scalyr_agent.configuration import Configuration, BadConfiguration
 from scalyr_agent.config_util import (
     parse_array_of_strings,
@@ -132,6 +134,8 @@ class TestConfigurationBase(ScalyrTestCase):
         @return:  The test instance
         @rtype: Configuration
         """
+        logger = logger or mock.Mock()
+
         default_paths = DefaultPaths(
             self.convert_path("/var/log/scalyr-agent-2"),
             self.convert_path("/etc/scalyr-agent-2/agent.json"),
@@ -1585,7 +1589,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
-    def test_set_json_library_on_parse(self):
+    def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(current_json_lib, "ujson")
 
@@ -1599,6 +1603,7 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
         config.parse()
+        config.apply_config()
 
         new_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(new_json_lib, "json")
@@ -1614,9 +1619,14 @@ class TestConfiguration(TestConfigurationBase):
 
         config = self._create_test_configuration_instance()
         config.parse()
+        config.apply_config()
 
         new_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(new_json_lib, "ujson")
+
+    def test_apply_config_without_parse(self):
+        config = self._create_test_configuration_instance()
+        config.apply_config()
 
 
 class TestParseArrayOfStrings(TestConfigurationBase):

@@ -253,6 +253,29 @@ class Configuration(object):
             self.__last_error = e
             raise e
 
+    def apply_config(self):
+        """
+        Apply global configuration object based on the configuration values.
+
+        At this point this only applies to the JSON library which is used.
+        """
+        if not self.__config:
+            # parse() hasn't been called yet. We should probably throw here
+            return
+
+        # Set json library based on the config value. If "auto" is provided this means we use
+        # default behavior which is try to use ujson and if that's not available fall back to
+        # stdlib json
+        json_library = self.json_library
+        current_json_library = scalyr_util.get_json_lib()
+
+        if json_library != "auto" and json_library != current_json_library:
+            self.__logger.debug(
+                'Changing JSON library from "%s" to "%s"'
+                % (current_json_library, json_library)
+            )
+            scalyr_util.set_json_lib(json_library)
+
     def __get_default_hostname(self):
         """Returns the default hostname for this host.
         @return: The default hostname for this host.

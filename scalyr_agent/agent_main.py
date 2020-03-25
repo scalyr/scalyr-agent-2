@@ -430,18 +430,8 @@ class ScalyrAgent(object):
         ):
             self.__verify_config(config)
 
-        # Set json library based on the config value. If "auto" is provided this means we use
-        # default behavior which is try to use ujson and if that's not available fall back to
-        # stdlib json
-        json_library = self.__last_verify_config["config"].json_library
-        current_json_library = scalyr_util.get_json_lib()
-
-        if json_library != "auto" and json_library != current_json_library:
-            log.debug(
-                'Changing JSON library from "%s" to "%s"'
-                % (current_json_library, json_library)
-            )
-            scalyr_util.set_json_lib(json_library)
+        # Apply any global config options
+        self.__last_verify_config["config"].apply_config()
 
         return WorkerThread(
             self.__last_verify_config["config"],
