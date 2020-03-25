@@ -20,6 +20,7 @@ from __future__ import absolute_import
 __author__ = "czerwin@scalyr.com"
 
 import os
+import sys
 import tempfile
 from io import open
 
@@ -39,6 +40,7 @@ from scalyr_agent.json_lib.objects import (
 from scalyr_agent.platform_controller import DefaultPaths
 
 from scalyr_agent.test_base import ScalyrTestCase
+from scalyr_agent.test_base import skipIf
 
 from scalyr_agent.builtin_monitors.journald_utils import (
     LogConfigManager,
@@ -1589,6 +1591,7 @@ class TestConfiguration(TestConfigurationBase):
         self.assertEquals(config.server_attributes["webServer"], "true")
         self.assertEquals(config.server_attributes["serverHost"], "foo.com")
 
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_set_json_library_on_apply_config(self):
         current_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(current_json_lib, "ujson")
@@ -1624,6 +1627,7 @@ class TestConfiguration(TestConfigurationBase):
         new_json_lib = scalyr_util.get_json_lib()
         self.assertEqual(new_json_lib, "ujson")
 
+    @skipIf(sys.version_info < (2, 7, 0), "Skipping tests under Python 2.6")
     def test_apply_config_without_parse(self):
         config = self._create_test_configuration_instance()
         config.apply_config()
