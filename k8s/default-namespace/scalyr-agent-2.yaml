@@ -12,7 +12,6 @@ spec:
       app: scalyr-agent-2
   template:
     metadata:
-      creationTimestamp: null
       labels:
         app: scalyr-agent-2
     spec:

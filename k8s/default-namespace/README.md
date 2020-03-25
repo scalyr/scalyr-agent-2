@@ -1,6 +1,9 @@
 ## Kubernetes Files for Versions 2.1.1 and Up
 
-This directory contains the manifest files used for installing the Scalyr Agent prior to the 2.1 Scalyr Agent release. You should only use these manifest files if you are running an instance prior to 2.1.
+This directory contains the manifest files used for installing the Scalyr Agent prior to the 2.1 Scalyr Agent release.
+Prior to 2.1, the Scalyr Agent K8s instructions created all objects in the default namespace. This has since changed to
+create all objects in the scalyr namespace. You should only use these manifest files if you need to continue running the
+Scalyr Agent in the default namespace, possibly as a stopgap measure until you can migrate your configuration.
 
 Detailed instructions for installing and upgrading the Scalyr Agent in Kubernetes can be found [here](https://app.scalyr.com/help/install-agent-kubernetes).
 
