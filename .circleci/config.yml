@@ -673,6 +673,7 @@ jobs:
             sudo wget https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz
             sudo tar xvf shellcheck-stable.linux.x86_64.tar.xz
             sudo cp shellcheck-stable/shellcheck /usr/local/bin
+            sudo rm -rf shellcheck-stable*
       - run:
           name: Install Python dependencies
           command: |
