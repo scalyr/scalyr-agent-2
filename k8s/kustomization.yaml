@@ -1,3 +1,4 @@
+namespace: scalyr
 resources:
 - scalyr-service-account.yaml
 - scalyr-agent-2.yaml
