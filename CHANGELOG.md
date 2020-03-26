@@ -14,7 +14,7 @@ Features
 * Agent now supports Python 2.6, 2.7 and >= 3.5
 * Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
 * RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
-* Added option to `scalyr-agent status -v` to emit JSON (``--format=[text|json]``).
+* Added option to `scalyr-agent-2 status -v` to emit JSON (``--format=[text|json]``).
 * Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
 * Add support for ``orjson`` JSON library when running under Python 3. This library offers significantly better performance and can be enabled by setting ``json_library`` config option to ``orjson`` and installing ``orjson`` Python package using pip.
 

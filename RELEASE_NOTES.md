@@ -6,8 +6,9 @@
   supports Python 2.6, 2.7 and >= 3.5.
 
   On package installation, the installer will try to find a suitable Python version which will
-  be used for running the agent. It defaults to Python 2, but if a suitable Python 2 version is
-  not found, it will try to use Python 3 (if available).
+  be used for running the agent. It defaults to Python 2 (``/usr/bin/env python2``), but if a
+  suitable Python 2 version is not found, it will try to use Python 3 if available (
+  ``/usr/bin/env python3``).
 
   If you want to select a specific Python version you want to use to run the agent (e.g. you have
   both Python 2 and Python 3 installed), you can do that using ``scalyr-switch-python`` tool
@@ -74,4 +75,17 @@
   ```bash
   pip install ujson
   pip install orjson
+  ```
+
+* ``scalyr-agent-2 status -v`` command now also supports printing the output in a machine readable
+  (JSON) format.
+
+  Example usage:
+
+  ```bash
+  # Print the output in JSON format
+  scalyr-agent-2 status -v --format=json
+
+  # Print the output in human readable format (default)
+  scalyr-agent-2 status -v --format=text
   ```
