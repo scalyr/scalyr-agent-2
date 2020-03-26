@@ -18,8 +18,12 @@ from __future__ import absolute_import
 import os
 import time
 import json
+import shutil
+
+from scalyr_agent import compat
 
 from tests.utils.compat import Path
+from tests.utils.common import get_shebang_from_file
 from tests.utils.agent_runner import AgentRunner, PACKAGE_INSTALL
 
 
@@ -95,6 +99,66 @@ def common_test_python2to3(install_package_fn):
     runner.start()
     time.sleep(1)
     assert _get_python_major_version(runner) == 3
+
+
+def common_test_switch_command_works_without_agent_config(install_package_fn):
+    """
+    Verify that the Python version switch command works if the config file is not present or
+    doesn't contain a valid API key.
+
+    This is important because this command may run as part of package postinstall script when the
+    key won't be configured yet.
+
+    Basically it asserts that the switch command doesn't rely agent config being present and
+    correctly configured.
+    """
+    install_package_fn()
+
+    runner = AgentRunner(PACKAGE_INSTALL)
+
+    # Make sure the config is not present
+    agent_config_path = "/etc/scalyr-agent-2/agent.json"
+    agent_config_d_path = "/etc/scalyr-agent-2/agent.d"
+
+    if os.path.isfile(agent_config_path):
+        os.unlink(agent_config_path)
+
+    if os.path.isdir(agent_config_d_path):
+        shutil.rmtree(agent_config_d_path)
+
+    # Make sure no SCALYR_ environment variables are set
+    env = compat.os_environ_unicode.copy()
+
+    for key in list(env.keys()):
+        if key.lower().startswith("scalyr"):
+            del env[key]
+
+    binary_path = os.path.join("/", "usr", "share", "scalyr-agent-2", "bin")
+
+    scalyr_agent_2_target = os.path.join(binary_path, "scalyr-agent-2")
+    scalyr_agent_2_config_target = os.path.join(binary_path, "scalyr-agent-2-config")
+
+    # Default should be python2
+    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+    assert shebang_line_main == "#!/usr/bin/env python2"
+    assert shebang_line_config == "#!/usr/bin/env python2"
+
+    # Switch to python3
+    runner.switch_version("python3", env=env)
+
+    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+    assert shebang_line_main == "#!/usr/bin/env python3"
+    assert shebang_line_config == "#!/usr/bin/env python3"
+
+    # Switch back to python2
+    runner.switch_version("python2", env=env)
+
+    shebang_line_main = get_shebang_from_file(scalyr_agent_2_target)
+    shebang_line_config = get_shebang_from_file(scalyr_agent_2_config_target)
+    assert shebang_line_main == "#!/usr/bin/env python2"
+    assert shebang_line_config == "#!/usr/bin/env python2"
 
 
 def common_test_python3_upgrade(install_package_fn, install_next_version_fn):

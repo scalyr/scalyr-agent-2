@@ -22,12 +22,19 @@ from tests.distribution_builders.ubuntu import UbuntuBuilder
 
 from tests.utils.dockerized import dockerized_case
 from tests.distribution.python_version_change_tests.common import (
+    common_test_switch_command_works_without_agent_config,
     common_test_python2,
     common_test_python3,
     common_test_python2to3,
     common_test_python3_upgrade,
 )
 from tests.common import install_deb, install_next_version_deb
+
+
+@pytest.mark.usefixtures("agent_environment")
+@dockerized_case(UbuntuBuilder, __file__)
+def test_deb_switch_command_works_without_agent_config(request):
+    common_test_switch_command_works_without_agent_config(install_deb)
 
 
 @pytest.mark.usefixtures("agent_environment")
