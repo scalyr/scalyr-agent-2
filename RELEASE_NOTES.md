@@ -17,15 +17,15 @@
   Selecting Python 2:
 
   ```bash
-  scalyr-switch-python python2
-  /etc/init.d/scalyr-agent-2 restart
+  sudo scalyr-switch-python python2
+  sudo /etc/init.d/scalyr-agent-2 restart
   ```
 
   Selecting Python 3:
 
   ```bash
-  scalyr-switch-python python3
-  /etc/init.d/scalyr-agent-2 restart
+  sudo scalyr-switch-python python2
+  sudo /etc/init.d/scalyr-agent-2 restart
   ```
 
   Keep in mind that you need to restart the agent after running the ``scalyr-switch-python``
@@ -73,8 +73,8 @@
   be installed using pip.
 
   ```bash
-  pip install ujson
-  pip install orjson
+  sudo pip install ujson
+  sudo pip install orjson
   ```
 
 * ``scalyr-agent-2 status -v`` command now also supports printing the output in a machine readable
@@ -89,3 +89,23 @@
   # Print the output in human readable format (default)
   scalyr-agent-2 status -v --format=text
   ```
+
+* New ``app.io.wait`` and ``app.mem.majflt`` metric has been added to the Linux process metrics
+  monitor.
+
+ If you don't want this metric to be logged and shipped to Scalyr you can utilize new
+ ``metric_name_blacklist`` config option as shown below:
+
+  ```javascript
+  // This is only needed if you are changing settings for built-int agent process metrics
+  //monitor
+  implicit_agent_process_metrics_monitor: false,
+
+  monitors: [
+    {
+        "module": "scalyr_agent.builtin_monitors.linux_process_metrics",
+        "id": "agent",
+        "pid": "$$",
+        "metric_name_blacklist": ["app.io.wait", "app.mem.majflt"],
+    },
+  ]
