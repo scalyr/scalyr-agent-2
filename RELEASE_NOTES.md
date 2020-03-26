@@ -60,17 +60,25 @@ Prior to release 2.1.1, the default Kubernetes manifest files created all Scalyr
 As of the 2.1.1 relase, they are now created in the ``scalyr`` namespace.  You must take the
 following actions to upgrade your existing Scalyr Agent K8s instance:
 
-# TODO: Yan fill these in:
-
   1.  Create the ``scalyr`` namespace:
 
-  2.  Create the API key in the ``scalyr`` namespace:
+    kubectl create namespace scalyr
+
+  2.  Copy your existing API key to the ``scalyr`` namespace:
+
+    kubectl get secret scalyr-api-key --namespace=default --export -o yaml | kubectl apply -f - --namespace=scalyr
 
   3.  Copy your existing configmap to the ``scalyr`` namespace:
 
+    kubectl get configmap scalyr-config --namespace=default --export -o yaml | kubectl apply -f - --namespace=scalyr
+
   4.  Delete the existing Scalyr Agent DaemonSet.
 
+    kubectl delete -f https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s/default-namespace
+
   5.  Create the Scalyr Agent service account and DaemonSet in the ``scalyr`` namespace.
+
+    kubectl apply -k https://raw.githubusercontent.com/scalyr/scalyr-agent-2/release/k8s
 
 ### Preventing collection of metrics using ``metric_name_blacklist``
 
