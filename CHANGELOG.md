@@ -4,15 +4,17 @@ Scalyr Agent 2 Changes By Release
 ## 2.1.1 "Millenium Falcon" - TBD
 
 <!---
-Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 15, 2020 10:30 -0800
+Packaged by Steven Czerwinski <czerwin@scalyr.com> on Mar 27, 2020 10:30 -0800
 --->
 
 Note, this release is still under development.  Actual release date TBD
 
 Features
-* Major update of code base to support running under Python 2 and 3
+* Major update of code base to support running under Python 2 and 3.  See [release notes](https://github.com/scalyr/scalyr-agent-2/blob/master/RELEASE_NOTES.md) for more information.
 * Agent now supports Python 2.6, 2.7 and >= 3.5
-* Agent will use whatever version of Python `/usr/bin/env python` points to on Linux.
+* When installing using RPM or Debian, Python 2 will be used by default unless unavailable.
+* The Python version used to run the Agent may be controlled using the `scalyr-switch-python` command.
+* The K8s manifest files have been changed to run the Agent in the `scalyr` namespace instead of the `default` namespace.  When updating an existing Scalyr Agent K8s instance, you must follow the upgrade instructions described in the [upgrade notes](https://github.com/scalyr/scalyr-agent-2/blob/master/upgrade_notes.md).
 * RPM and Debian packages no longer declare dependency on Python to promote cross-distribution compatibility.  The dependency is now verified at package install time.
 * Added option to `scalyr-agent-2 status -v` to emit JSON (``--format=[text|json]``).
 * Add new ``metric_name_blacklist`` supported attribute to each monitor configuration section. With this attribute, user can define a list of metric names which should be excluded and not shipped to Scalyr.
