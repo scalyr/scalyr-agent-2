@@ -163,7 +163,11 @@ def common_test_switch_command_works_without_agent_config(install_package_fn):
 
     # Write a config with invalid config, this way we ensure config is indeed not parsed by that
     # command even if it's present
-    mock_config = {"api_key": "", "scalr_server": "agent.scalyr.com"}
+    mock_config = {
+        "api_key": "",
+        "scalyr_server": "agent.scalyr.com",
+    }
+
     with open(agent_config_path, "w") as fp:
         fp.write(json.dumps(mock_config))
 
