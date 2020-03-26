@@ -8,10 +8,11 @@ include:
 * Support for Python 3 (Python 3.5 and higher) in addition to existing support for Python 2.6
   and 2.7.  See below for instructions on how to control which version of Python is used by
   the Scalyr Agent.
-* No backward incompatiable changes have been made with the exception of the default K8s
-  install directions creating the Scalyr Agent DaemonSet (and related resources)
-  in the ``scalyr`` namespace instead of ``default``.  See below for instructions on how to
-  upgrade an existing Scalyr Agent K8s instance.
+* This release is backward compatiable with previous Scalyr Agent releases with
+  one exception related to Kubernetes.  The new install instructions for K8s creates
+  the Scalyr Agent DaemonSet (and related resources) in the ``scalyr`` namespace
+  instead of ``default``.  See below for instructions on how to upgrade an existing Scalyr
+  Agent K8s instance.
 * Updated K8s manifest files allowing rolling updates, persistence of checkpoint files, and
   customization via `kustomize`.
 * Collection of two new metrics (``app.io.wait`` and ``app.mem.majflt``) in the
